@@ -442,7 +442,7 @@
         'case-actionstep': 'actionstep.html',
         'crm-leadly': 'leadly.html',
         'crm-gohighlevel': 'gohighlevel.html',
-        // Add more special cases as needed
+        // Add more system-level integrations here as they're built
       };
 
       // Check if this connector has a dedicated page
@@ -451,17 +451,8 @@
         return;
       }
 
-      // Otherwise, route to generic category page
-      const pages = {
-        crm: 'connector-crm.html',
-        case: 'connector-case.html',
-        financial: 'connector-financial.html',
-        communications: 'connector-communications.html',
-        documents: 'connector-documents.html'
-      };
-
-      const page = pages[category] || 'connector-crm.html'; // Default to CRM if category unknown
-      window.location.href = `${page}?id=${connectorId}`;
+      // All other connectors (registry-based) use the generic integration config page
+      window.location.href = `integration-config.html?id=${connectorId}`;
     }
 
     // Render available connector card from registry
@@ -529,8 +520,10 @@
         if (result.success) {
           Toast.success(`${connectorId} installed successfully!`);
 
-          // Reload connectors to show the newly installed connector
-          await loadConnectors();
+          // Redirect to configuration page
+          setTimeout(() => {
+            window.location.href = `integration-config.html?id=${connectorId}`;
+          }, 1000);
         } else {
           Toast.error(`Failed to install ${connectorId}`);
         }

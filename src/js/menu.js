@@ -48,6 +48,7 @@ const MenuIcons = {
   timeline: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
   search: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>',
   onboarding: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>',
+  help: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
 };
 
 // ============================================================
@@ -145,6 +146,7 @@ const MenuConfig = {
         isFooter: true, // Push to bottom of sidebar
         items: [
           { id: 'settings', label: 'Settings', href: '/settings.html', icon: 'settings' },
+          { id: 'help', label: 'Help & Support', href: '/help.html', icon: 'help' },
         ]
       }
     ]
@@ -277,6 +279,7 @@ const MenuConfig = {
         isFooter: true,
         items: [
           { id: 'workflows-settings', label: 'Settings', href: '/settings.html', icon: 'settings' },
+          { id: 'workflows-help', label: 'Help & Support', href: '/help.html', icon: 'help' },
         ]
       }
     ]
@@ -349,6 +352,7 @@ const MenuConfig = {
         isFooter: true,
         items: [
           { id: 'insights-settings', label: 'Settings', href: '/settings.html', icon: 'settings' },
+          { id: 'insights-help', label: 'Help & Support', href: '/help.html', icon: 'help' },
         ]
       }
     ]
@@ -408,6 +412,7 @@ const MenuConfig = {
         isFooter: true,
         items: [
           { id: 'integrations-settings', label: 'Settings', href: '/settings.html', icon: 'settings' },
+          { id: 'integrations-help', label: 'Help & Support', href: '/help.html', icon: 'help' },
         ]
       }
     ]
