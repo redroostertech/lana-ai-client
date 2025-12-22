@@ -34,7 +34,7 @@
           <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
           </button>
-          <a href="connector-case.html" class="text-gray-500 hover:text-gray-700">
+          <a href="connectors.html" class="text-gray-500 hover:text-gray-700">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
           </a>
           <div>
@@ -53,39 +53,7 @@
     </header>
 
     <main class="p-4 lg:p-8">
-      <!-- Not Configured State -->
-      <div id="notConfigured" class="hidden">
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
-          <div class="text-center">
-            <div class="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <svg class="w-10 h-10 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-            </div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-2">ActionStep Not Configured</h2>
-            <p id="notConfiguredMessage" class="text-gray-500 max-w-md mx-auto mb-6">The ActionStep integration requires server configuration.</p>
-
-            <div class="bg-gray-50 rounded-lg p-6 max-w-lg mx-auto text-left">
-              <h3 class="font-semibold text-gray-900 mb-3">Administrator Setup Required</h3>
-              <p class="text-sm text-gray-600 mb-4">Add the following to your <code class="bg-gray-200 px-1 rounded">.env</code> file:</p>
-              <pre class="bg-gray-900 text-green-400 p-4 rounded-lg text-sm overflow-x-auto"><code># ActionStep Integration
-ACTIONSTEP_IMPORT_DIR=/path/to/actionstep/export
-ACTIONSTEP_SYNC_FREQUENCY=daily</code></pre>
-              <p class="text-sm text-gray-500 mt-4">The import directory should contain:</p>
-              <ul class="text-sm text-gray-600 mt-2 space-y-1">
-                <li class="flex items-center gap-2">
-                  <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
-                  <code class="text-xs bg-gray-200 px-1 rounded">data/</code> - CSV files (actions.csv, participants.csv, etc.)
-                </li>
-                <li class="flex items-center gap-2">
-                  <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
-                  <code class="text-xs bg-gray-200 px-1 rounded">documents/</code> - Document files for RAG processing
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Dashboard Content -->
+      <!-- Dashboard Content (Always Visible) -->
       <div id="dashboardContent" class="hidden">
         <!-- Import Actions -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
@@ -201,21 +169,33 @@ ACTIONSTEP_SYNC_FREQUENCY=daily</code></pre>
         <!-- Tabs -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-8">
           <div class="border-b border-gray-200">
-            <nav class="flex -mb-px">
-              <button onclick="switchTab('matters')" id="tab-matters" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-emerald-600 text-emerald-600">
+            <nav class="flex -mb-px overflow-x-auto">
+              <button onclick="switchTab('overview')" id="tab-overview" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-emerald-600 text-emerald-600 whitespace-nowrap">
+                Overview
+              </button>
+              <button onclick="switchTab('configuration')" id="tab-configuration" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                Configuration
+              </button>
+              <button onclick="switchTab('matters')" id="tab-matters" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
                 Matters
               </button>
-              <button onclick="switchTab('participants')" id="tab-participants" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+              <button onclick="switchTab('participants')" id="tab-participants" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
                 Participants
               </button>
-              <button onclick="switchTab('tasks')" id="tab-tasks" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+              <button onclick="switchTab('tasks')" id="tab-tasks" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
                 Tasks
               </button>
-              <button onclick="switchTab('notes')" id="tab-notes" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+              <button onclick="switchTab('notes')" id="tab-notes" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
                 File Notes
               </button>
-              <button onclick="switchTab('sync')" id="tab-sync" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
-                Sync History
+              <button onclick="switchTab('logs')" id="tab-logs" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                Execution Logs
+              </button>
+              <button onclick="switchTab('documentation')" id="tab-documentation" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                Documentation
+              </button>
+              <button onclick="switchTab('workflows')" id="tab-workflows" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                Workflows
               </button>
             </nav>
           </div>
@@ -232,6 +212,99 @@ ACTIONSTEP_SYNC_FREQUENCY=daily</code></pre>
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
       </div>
     </main>
+  </div>
+
+  <!-- Directory Browser Modal -->
+  <div id="directoryBrowserModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between p-6 border-b border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-900">Select Import Directory</h3>
+        <button onclick="closeDirectoryBrowser()" class="text-gray-400 hover:text-gray-600">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="flex-1 overflow-hidden flex flex-col p-6">
+        <!-- Volume Selector -->
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Storage Volume</label>
+          <select id="volumeSelector" onchange="onVolumeChange()" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+            <option value="">Loading volumes...</option>
+          </select>
+        </div>
+
+        <!-- Manual Path Entry (optional) -->
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            Or Enter Path Manually
+            <span class="text-xs font-normal text-gray-500">(Optional)</span>
+          </label>
+          <input
+            type="text"
+            id="manualPathInput"
+            placeholder="e.g., /Volumes/chef-primary/my-folder"
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
+            onchange="updateSelectedPathFromManual()"
+          />
+          <p class="mt-1 text-xs text-gray-500">Type a full path if you know it, or use the volume selector and browser above</p>
+        </div>
+
+        <!-- Browse Section -->
+        <div id="browseSection">
+          <!-- Current Path Display -->
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Current Path</label>
+            <div class="flex items-center gap-2">
+              <input
+                type="text"
+                id="currentPath"
+                readonly
+                class="flex-1 px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-600"
+                value="/"
+              />
+              <button onclick="createNewFolder()" id="createFolderBtn" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                New Folder
+              </button>
+            </div>
+          </div>
+
+          <!-- Directory Browser -->
+          <div class="flex-1 border border-gray-200 rounded-lg overflow-hidden flex flex-col">
+            <div class="bg-gray-50 px-4 py-2 border-b border-gray-200 text-sm font-medium text-gray-700">
+              Directories
+            </div>
+            <div id="directoryList" class="flex-1 overflow-y-auto p-2">
+              <!-- Directory items will be loaded here -->
+              <div class="flex items-center justify-center py-8 text-gray-500">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex items-center justify-between p-6 border-t border-gray-200">
+        <p class="text-sm text-gray-500">
+          Selected: <span id="selectedPath" class="font-medium text-gray-900">/</span>
+        </p>
+        <div class="flex gap-3">
+          <button onclick="closeDirectoryBrowser()" class="px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+          <button onclick="selectDirectory()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors">
+            Select This Directory
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Settings Modal -->
@@ -289,7 +362,7 @@ ACTIONSTEP_SYNC_FREQUENCY=daily</code></pre>
     document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
 
     let dashboardData = null;
-    let currentTab = 'matters';
+    let currentTab = 'overview';
 
     // Format number
     function formatNumber(num) {
@@ -300,24 +373,15 @@ ACTIONSTEP_SYNC_FREQUENCY=daily</code></pre>
     async function loadDashboard() {
       document.getElementById('loadingState').classList.remove('hidden');
       document.getElementById('dashboardContent').classList.add('hidden');
-      document.getElementById('notConfigured').classList.add('hidden');
 
       try {
         const result = await api.get('/api/v1/actionstep/dashboard');
         dashboardData = result;
 
-        if (!result.configured) {
-          document.getElementById('loadingState').classList.add('hidden');
-          document.getElementById('notConfigured').classList.remove('hidden');
-          // Show specific message if available
-          if (result.message) {
-            document.getElementById('notConfiguredMessage').textContent = result.message;
-          }
-          return;
-        }
+        // Always show dashboard content with tabs, regardless of configuration status
 
-        // Update stats
-        const stats = result.stats;
+        // Update stats (handle null/undefined stats gracefully)
+        const stats = result.stats || {};
         document.getElementById('statMatters').textContent = formatNumber(stats.matters?.total || 0);
         document.getElementById('statMattersActive').textContent = `${formatNumber(stats.matters?.active || 0)} active`;
 
@@ -345,8 +409,26 @@ ACTIONSTEP_SYNC_FREQUENCY=daily</code></pre>
         // Load current tab
         loadTabContent(currentTab);
       } catch (error) {
+        console.error('Dashboard load error:', error);
         document.getElementById('loadingState').classList.add('hidden');
-        Toast.error('Failed to load dashboard: ' + error.message);
+
+        // Still show dashboard with tabs even on error
+        dashboardData = { configured: false, stats: null, message: error.message };
+        document.getElementById('dashboardContent').classList.remove('hidden');
+
+        // Initialize stats to zero
+        document.getElementById('statMatters').textContent = '0';
+        document.getElementById('statMattersActive').textContent = '0 active';
+        document.getElementById('statParticipants').textContent = '0';
+        document.getElementById('statCompanies').textContent = '0 companies';
+        document.getElementById('statNotes').textContent = '0';
+        document.getElementById('statTasks').textContent = '0';
+        document.getElementById('statTasksOverdue').textContent = 'No overdue tasks';
+        document.getElementById('statDocuments').textContent = '0';
+        document.getElementById('statDocsProcessing').textContent = 'All processed';
+
+        // Load current tab (will show not configured message)
+        loadTabContent(currentTab);
       }
     }
 
@@ -372,6 +454,12 @@ ACTIONSTEP_SYNC_FREQUENCY=daily</code></pre>
 
       try {
         switch (tab) {
+          case 'overview':
+            await loadOverview();
+            break;
+          case 'configuration':
+            await loadConfiguration();
+            break;
           case 'matters':
             await loadMatters();
             break;
@@ -384,9 +472,17 @@ ACTIONSTEP_SYNC_FREQUENCY=daily</code></pre>
           case 'notes':
             await loadFileNotes();
             break;
-          case 'sync':
-            await loadSyncHistory();
+          case 'logs':
+            await loadExecutionLogs();
             break;
+          case 'documentation':
+            await loadDocumentation();
+            break;
+          case 'workflows':
+            await loadWorkflows();
+            break;
+          default:
+            await loadOverview();
         }
       } catch (error) {
         content.innerHTML = `<div class="text-center text-red-600 py-8">Failed to load data: ${error.message}</div>`;
@@ -611,6 +707,515 @@ ACTIONSTEP_SYNC_FREQUENCY=daily</code></pre>
               }).join('')}
             </tbody>
           </table>
+        </div>
+      `;
+    }
+
+    // Load Overview tab
+    async function loadOverview() {
+      const content = document.getElementById('tabContent');
+      const isConfigured = dashboardData?.configured !== false;
+
+      if (!isConfigured) {
+        // Not configured state
+        content.innerHTML = `
+          <div class="text-center py-12">
+            <div class="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <svg class="w-10 h-10 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+              </svg>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-900 mb-2">ActionStep Not Configured</h2>
+            <p class="text-gray-500 max-w-md mx-auto mb-6">${dashboardData?.message || 'The ActionStep integration requires server configuration.'}</p>
+            <button onclick="switchTab('configuration')" class="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors">
+              Configure Integration
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      // Configured state
+      const stats = dashboardData?.stats || {};
+      content.innerHTML = `
+        <div class="space-y-6">
+          <!-- Integration Status -->
+          <div class="bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg p-6 border border-emerald-100">
+            <div class="flex items-start justify-between">
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">ActionStep Integration</h3>
+                <p class="text-gray-600 mb-4">Syncing matters, participants, tasks, file notes, and documents from your ActionStep export directory.</p>
+
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+                  <div>
+                    <p class="text-sm text-gray-500">Status</p>
+                    <p class="font-medium text-green-600">Connected</p>
+                  </div>
+                  <div>
+                    <p class="text-sm text-gray-500">Last Sync</p>
+                    <p class="font-medium text-gray-900" id="overviewLastSync">Loading...</p>
+                  </div>
+                  <div>
+                    <p class="text-sm text-gray-500">Sync Frequency</p>
+                    <p class="font-medium text-gray-900">Daily</p>
+                  </div>
+                </div>
+              </div>
+              <div class="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
+                <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button onclick="syncCSVData()" class="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-lg hover:border-emerald-300 hover:shadow-sm transition-all">
+              <div class="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+              </div>
+              <div class="text-left">
+                <p class="font-medium text-gray-900">Import CSV Data</p>
+                <p class="text-xs text-gray-500">Sync latest changes</p>
+              </div>
+            </button>
+
+            <button onclick="switchTab('configuration')" class="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-lg hover:border-emerald-300 hover:shadow-sm transition-all">
+              <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+              </div>
+              <div class="text-left">
+                <p class="font-medium text-gray-900">Settings</p>
+                <p class="text-xs text-gray-500">View configuration</p>
+              </div>
+            </button>
+
+            <button onclick="switchTab('logs')" class="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-lg hover:border-emerald-300 hover:shadow-sm transition-all">
+              <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+              </div>
+              <div class="text-left">
+                <p class="font-medium text-gray-900">View Logs</p>
+                <p class="text-xs text-gray-500">Import history</p>
+              </div>
+            </button>
+          </div>
+
+          <!-- Data Summary -->
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Data Summary</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div class="bg-white border border-gray-200 rounded-lg p-4">
+                <p class="text-sm text-gray-500 mb-1">Matters</p>
+                <p class="text-2xl font-bold text-gray-900">${formatNumber(stats.matters?.total || 0)}</p>
+                <p class="text-xs text-emerald-600 mt-1">${formatNumber(stats.matters?.active || 0)} active</p>
+              </div>
+              <div class="bg-white border border-gray-200 rounded-lg p-4">
+                <p class="text-sm text-gray-500 mb-1">Participants</p>
+                <p class="text-2xl font-bold text-gray-900">${formatNumber(stats.participants?.total || 0)}</p>
+                <p class="text-xs text-gray-500 mt-1">${formatNumber(stats.participants?.companies || 0)} companies</p>
+              </div>
+              <div class="bg-white border border-gray-200 rounded-lg p-4">
+                <p class="text-sm text-gray-500 mb-1">Tasks</p>
+                <p class="text-2xl font-bold text-gray-900">${formatNumber(stats.tasks?.total || 0)}</p>
+                <p class="text-xs text-gray-500 mt-1">${formatNumber(stats.tasks?.overdue || 0)} overdue</p>
+              </div>
+              <div class="bg-white border border-gray-200 rounded-lg p-4">
+                <p class="text-sm text-gray-500 mb-1">Documents</p>
+                <p class="text-2xl font-bold text-gray-900">${formatNumber(stats.documents?.total || 0)}</p>
+                <p class="text-xs text-gray-500 mt-1">${formatNumber(stats.documents?.processing || 0)} processing</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Load last sync time
+      try {
+        const result = await api.get('/api/v1/actionstep/sync-logs?limit=1');
+        if (result.logs && result.logs.length > 0) {
+          document.getElementById('overviewLastSync').textContent = timeAgo(result.logs[0].started_at);
+        } else {
+          document.getElementById('overviewLastSync').textContent = 'Never';
+        }
+      } catch (error) {
+        document.getElementById('overviewLastSync').textContent = 'Unknown';
+      }
+    }
+
+    // Load Configuration tab
+    async function loadConfiguration() {
+      const content = document.getElementById('tabContent');
+      const isConfigured = dashboardData?.configured !== false;
+      const currentConfig = dashboardData?.config || {};
+
+      content.innerHTML = `
+        <div class="max-w-4xl">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">ActionStep Configuration</h3>
+
+          ${!isConfigured ? `
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+              <div class="flex gap-3">
+                <svg class="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+                <div>
+                  <p class="font-medium text-yellow-900">Integration Not Configured</p>
+                  <p class="text-sm text-yellow-800 mt-1">Configure the import directory below to enable ActionStep integration.</p>
+                </div>
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Configuration Form -->
+          <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+            <h4 class="font-semibold text-gray-900 mb-4">Integration Settings</h4>
+
+            <form id="actionstepConfigForm" class="space-y-6">
+              <div>
+                <label for="import_dir" class="block text-sm font-medium text-gray-700 mb-2">Import Directory *</label>
+                <div class="flex gap-2">
+                  <input
+                    type="text"
+                    id="import_dir"
+                    name="import_dir"
+                    value="${currentConfig.import_dir || ''}"
+                    placeholder="/path/to/actionstep/export"
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onclick="openDirectoryBrowser()"
+                    class="px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                    </svg>
+                    Browse
+                  </button>
+                </div>
+                <p class="mt-1 text-xs text-gray-500">Select a directory from available volumes or enter a custom path</p>
+              </div>
+
+              <div>
+                <label for="sync_frequency" class="block text-sm font-medium text-gray-700 mb-2">Sync Frequency</label>
+                <select
+                  id="sync_frequency"
+                  name="sync_frequency"
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                >
+                  <option value="realtime" ${currentConfig.sync_frequency === 'realtime' ? 'selected' : ''}>Real-time (when files change)</option>
+                  <option value="hourly" ${currentConfig.sync_frequency === 'hourly' ? 'selected' : ''}>Hourly</option>
+                  <option value="daily" ${currentConfig.sync_frequency === 'daily' || !currentConfig.sync_frequency ? 'selected' : ''}>Daily</option>
+                  <option value="manual" ${currentConfig.sync_frequency === 'manual' ? 'selected' : ''}>Manual Only</option>
+                </select>
+              </div>
+
+              <div class="bg-gray-50 rounded-lg p-4">
+                <p class="text-sm font-medium text-gray-900 mb-3">The import directory should contain:</p>
+                <ul class="text-sm text-gray-600 space-y-2">
+                  <li class="flex items-start gap-2">
+                    <svg class="w-4 h-4 text-gray-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div>
+                      <code class="bg-gray-200 px-1.5 py-0.5 rounded text-xs">data/</code> - CSV files from ActionStep export
+                      <p class="text-xs text-gray-500 mt-1">actions.csv, participants.csv, filenotes.csv, etc.</p>
+                    </div>
+                  </li>
+                  <li class="flex items-start gap-2">
+                    <svg class="w-4 h-4 text-gray-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div>
+                      <code class="bg-gray-200 px-1.5 py-0.5 rounded text-xs">documents/</code> - Document files for RAG processing (optional)
+                      <p class="text-xs text-gray-500 mt-1">PDFs, Word docs, and other matter documents</p>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+
+              <div class="flex gap-3">
+                <button
+                  type="button"
+                  onclick="testActionStepPath()"
+                  id="testPathBtn"
+                  class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Test Path
+                </button>
+                <button
+                  type="submit"
+                  id="saveConfigBtn"
+                  class="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors"
+                >
+                  Save Configuration
+                </button>
+              </div>
+
+              <div id="configStatus" class="hidden text-center py-3 rounded-lg"></div>
+            </form>
+          </div>
+
+          <!-- Current Configuration Status -->
+          <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+            <h4 class="font-semibold text-gray-900 mb-4">Current Configuration</h4>
+            <dl class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <dt class="text-sm font-medium text-gray-500">Status</dt>
+                <dd class="mt-1">
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${isConfigured ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+                    ${isConfigured ? 'Configured' : 'Not Configured'}
+                  </span>
+                </dd>
+              </div>
+              <div>
+                <dt class="text-sm font-medium text-gray-500">Config Source</dt>
+                <dd class="mt-1 text-sm text-gray-900">
+                  ${currentConfig.source || 'None'}
+                </dd>
+              </div>
+              <div>
+                <dt class="text-sm font-medium text-gray-500">Sync Frequency</dt>
+                <dd class="mt-1 text-sm text-gray-900">
+                  ${currentConfig.sync_frequency || 'Not set'}
+                </dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+      `;
+
+      // Setup form handler
+      document.getElementById('actionstepConfigForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await saveActionStepConfig();
+      });
+    }
+
+    // Test ActionStep path
+    async function testActionStepPath() {
+      const statusEl = document.getElementById('configStatus');
+      const importDir = document.getElementById('import_dir').value.trim();
+      const testBtn = document.getElementById('testPathBtn');
+
+      if (!importDir) {
+        statusEl.className = 'text-center py-3 rounded-lg bg-yellow-100 text-yellow-800';
+        statusEl.textContent = 'Please enter an import directory path';
+        statusEl.classList.remove('hidden');
+        return;
+      }
+
+      try {
+        testBtn.disabled = true;
+        testBtn.textContent = 'Testing...';
+
+        statusEl.className = 'text-center py-3 rounded-lg bg-gray-100 text-gray-600';
+        statusEl.textContent = 'Testing path and checking for required files...';
+        statusEl.classList.remove('hidden');
+
+        const result = await api.post('/api/v1/filesystem/validate-path', {
+          path: importDir
+        });
+
+        if (result.valid && result.exists && result.is_directory) {
+          statusEl.className = 'text-center py-3 rounded-lg bg-green-100 text-green-800';
+          statusEl.textContent = `✓ Path is valid and accessible${result.writable ? ' (writable)' : ' (read-only)'}`;
+        } else if (!result.exists) {
+          statusEl.className = 'text-center py-3 rounded-lg bg-yellow-100 text-yellow-800';
+          statusEl.textContent = 'Path does not exist. It will be created when you save.';
+        } else {
+          statusEl.className = 'text-center py-3 rounded-lg bg-red-100 text-red-800';
+          statusEl.textContent = result.error || 'Path validation failed';
+        }
+      } catch (error) {
+        statusEl.className = 'text-center py-3 rounded-lg bg-red-100 text-red-800';
+        statusEl.textContent = error.message || 'Failed to test path';
+      } finally {
+        testBtn.disabled = false;
+        testBtn.textContent = 'Test Path';
+      }
+    }
+
+    // Save ActionStep configuration
+    async function saveActionStepConfig() {
+      const statusEl = document.getElementById('configStatus');
+      const saveBtn = document.getElementById('saveConfigBtn');
+
+      const config = {
+        import_dir: document.getElementById('import_dir').value.trim(),
+        sync_frequency: document.getElementById('sync_frequency').value
+      };
+
+      if (!config.import_dir) {
+        statusEl.className = 'text-center py-3 rounded-lg bg-yellow-100 text-yellow-800';
+        statusEl.textContent = 'Please enter an import directory path';
+        statusEl.classList.remove('hidden');
+        return;
+      }
+
+      try {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+
+        statusEl.className = 'text-center py-3 rounded-lg bg-gray-100 text-gray-600';
+        statusEl.textContent = 'Saving configuration...';
+        statusEl.classList.remove('hidden');
+
+        await api.post('/api/v1/actionstep/config', config);
+
+        statusEl.className = 'text-center py-3 rounded-lg bg-green-100 text-green-800';
+        statusEl.textContent = 'Configuration saved successfully! Reloading...';
+
+        // Reload dashboard to reflect new configuration
+        setTimeout(() => {
+          loadDashboard();
+        }, 1500);
+      } catch (error) {
+        statusEl.className = 'text-center py-3 rounded-lg bg-red-100 text-red-800';
+        statusEl.textContent = error.message || 'Failed to save configuration';
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Configuration';
+      }
+    }
+
+    // Load Execution Logs tab
+    async function loadExecutionLogs() {
+      // Reuse the existing sync history function
+      await loadSyncHistory();
+    }
+
+    // Load Documentation tab
+    async function loadDocumentation() {
+      const content = document.getElementById('tabContent');
+      content.innerHTML = `
+        <div class="prose max-w-none">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">ActionStep Integration Documentation</h3>
+
+          <div class="space-y-6">
+            <section>
+              <h4 class="font-semibold text-gray-900 mb-2">Overview</h4>
+              <p class="text-gray-600">
+                The ActionStep integration allows you to import legal case data from ActionStep into LanaAI for analysis and AI-powered insights.
+              </p>
+            </section>
+
+            <section>
+              <h4 class="font-semibold text-gray-900 mb-2">Setup Instructions</h4>
+              <ol class="list-decimal list-inside space-y-2 text-gray-600">
+                <li>Export your ActionStep data as CSV files (actions.csv, participants.csv, etc.)</li>
+                <li>Place the exported files in the configured import directory on your server</li>
+                <li>Add documents to the documents/ subdirectory for RAG processing</li>
+                <li>Click "Import CSV Data" to start the sync process</li>
+                <li>Monitor the sync progress and check execution logs for any errors</li>
+              </ol>
+            </section>
+
+            <section>
+              <h4 class="font-semibold text-gray-900 mb-2">Required Files</h4>
+              <div class="bg-gray-50 rounded-lg p-4">
+                <ul class="space-y-2 text-sm">
+                  <li class="flex items-start gap-2">
+                    <code class="bg-gray-200 px-2 py-1 rounded text-xs">data/actions.csv</code>
+                    <span class="text-gray-600">Matter/case information</span>
+                  </li>
+                  <li class="flex items-start gap-2">
+                    <code class="bg-gray-200 px-2 py-1 rounded text-xs">data/participants.csv</code>
+                    <span class="text-gray-600">Contacts and participants</span>
+                  </li>
+                  <li class="flex items-start gap-2">
+                    <code class="bg-gray-200 px-2 py-1 rounded text-xs">data/tasks.csv</code>
+                    <span class="text-gray-600">Tasks and to-dos</span>
+                  </li>
+                  <li class="flex items-start gap-2">
+                    <code class="bg-gray-200 px-2 py-1 rounded text-xs">data/file_notes.csv</code>
+                    <span class="text-gray-600">Case notes and communications</span>
+                  </li>
+                  <li class="flex items-start gap-2">
+                    <code class="bg-gray-200 px-2 py-1 rounded text-xs">documents/</code>
+                    <span class="text-gray-600">PDF and document files for RAG</span>
+                  </li>
+                </ul>
+              </div>
+            </section>
+
+            <section>
+              <h4 class="font-semibold text-gray-900 mb-2">Troubleshooting</h4>
+              <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p class="text-sm text-blue-800 mb-2"><strong>Import fails or shows "Not Configured":</strong></p>
+                <ul class="list-disc list-inside space-y-1 text-sm text-blue-700 ml-4">
+                  <li>Verify the ACTIONSTEP_IMPORT_DIR environment variable is set correctly</li>
+                  <li>Ensure the import directory exists and contains the data/ folder</li>
+                  <li>Check file permissions - the server must have read access to the directory</li>
+                  <li>Review execution logs for specific error messages</li>
+                </ul>
+              </div>
+            </section>
+
+            <section>
+              <h4 class="font-semibold text-gray-900 mb-2">Support</h4>
+              <p class="text-gray-600">
+                For additional help, contact your system administrator or refer to the
+                <a href="https://docs.lanaai.com/integrations/actionstep" target="_blank" class="text-emerald-600 hover:text-emerald-700">full ActionStep integration documentation</a>.
+              </p>
+            </section>
+          </div>
+        </div>
+      `;
+    }
+
+    // Load Workflows tab
+    async function loadWorkflows() {
+      const content = document.getElementById('tabContent');
+      content.innerHTML = `
+        <div class="space-y-6">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Workflows Using ActionStep Data</h3>
+            <p class="text-gray-600 mb-6">
+              View and manage workflows that utilize data from this ActionStep integration.
+            </p>
+          </div>
+
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+            <svg class="w-12 h-12 text-blue-600 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+            </svg>
+            <p class="text-blue-800 font-medium mb-2">Workflow Integration Coming Soon</p>
+            <p class="text-sm text-blue-600">
+              Workflow features will be available in a future update. This tab will show all workflows that use ActionStep data.
+            </p>
+          </div>
+
+          <div class="space-y-4">
+            <h4 class="font-semibold text-gray-900">Example Use Cases:</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="bg-gray-50 rounded-lg p-4">
+                <h5 class="font-medium text-gray-900 mb-2">Matter Analysis</h5>
+                <p class="text-sm text-gray-600">Automatically analyze new matters and extract key information</p>
+              </div>
+              <div class="bg-gray-50 rounded-lg p-4">
+                <h5 class="font-medium text-gray-900 mb-2">Document Processing</h5>
+                <p class="text-sm text-gray-600">Process and index documents for AI-powered search</p>
+              </div>
+              <div class="bg-gray-50 rounded-lg p-4">
+                <h5 class="font-medium text-gray-900 mb-2">Task Automation</h5>
+                <p class="text-sm text-gray-600">Trigger automated actions based on task updates</p>
+              </div>
+              <div class="bg-gray-50 rounded-lg p-4">
+                <h5 class="font-medium text-gray-900 mb-2">Client Communications</h5>
+                <p class="text-sm text-gray-600">Generate summaries and updates from file notes</p>
+              </div>
+            </div>
+          </div>
         </div>
       `;
     }
@@ -953,6 +1558,225 @@ ACTIONSTEP_SYNC_FREQUENCY=daily</code></pre>
     // Hide settings modal
     function hideSettings() {
       document.getElementById('settingsModal').classList.add('hidden');
+    }
+
+    // Directory Browser State
+    let currentBrowsePath = '/';
+    let selectedVolume = '';
+    let availableVolumes = [];
+
+    // Open directory browser modal
+    async function openDirectoryBrowser() {
+      const modal = document.getElementById('directoryBrowserModal');
+      modal.classList.remove('hidden');
+
+      // Load available volumes
+      try {
+        const result = await api.get('/api/v1/filesystem/volumes');
+        availableVolumes = result.volumes || [];
+
+        const volumeSelector = document.getElementById('volumeSelector');
+
+        // Build volume options
+        const volumeOptions = availableVolumes.map(v =>
+          `<option value="${v.path}">${v.name}${v.is_default ? ' (Default)' : ''}</option>`
+        ).join('');
+
+        volumeSelector.innerHTML = volumeOptions;
+
+        // Select first volume or chef-primary if available
+        const defaultVolume = availableVolumes.find(v => v.is_default) || availableVolumes[0];
+        if (defaultVolume) {
+          selectedVolume = defaultVolume.path;
+          volumeSelector.value = selectedVolume;
+          await loadDirectory(selectedVolume);
+        }
+      } catch (error) {
+        console.error('Failed to load volumes:', error);
+        Toast.error('Failed to load storage volumes');
+      }
+    }
+
+    // Close directory browser modal
+    function closeDirectoryBrowser() {
+      document.getElementById('directoryBrowserModal').classList.add('hidden');
+      currentBrowsePath = '/';
+
+      // Reset manual path input
+      document.getElementById('manualPathInput').value = '';
+    }
+
+    // Volume changed
+    async function onVolumeChange() {
+      const volumeSelector = document.getElementById('volumeSelector');
+      selectedVolume = volumeSelector.value;
+
+      // Load directory for the selected volume
+      currentBrowsePath = '/';
+      await loadDirectory(selectedVolume);
+    }
+
+    // Update selected path from manual input
+    function updateSelectedPathFromManual() {
+      const manualPath = document.getElementById('manualPathInput').value.trim();
+      if (manualPath) {
+        document.getElementById('selectedPath').textContent = manualPath;
+      }
+    }
+
+    // Load directory contents
+    async function loadDirectory(basePath, subPath = '') {
+      const fullPath = subPath ? `${basePath}/${subPath}`.replace(/\/+/g, '/') : basePath;
+      currentBrowsePath = fullPath;
+
+      document.getElementById('currentPath').value = fullPath;
+      document.getElementById('selectedPath').textContent = fullPath;
+
+      const directoryList = document.getElementById('directoryList');
+      directoryList.innerHTML = '<div class="flex items-center justify-center py-8"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div></div>';
+
+      try {
+        console.log('Loading directory:', fullPath);
+
+        // Build query string manually since api.get doesn't support params object
+        const encodedPath = encodeURIComponent(fullPath);
+        const result = await api.get(`/api/v1/filesystem/browse?path=${encodedPath}`);
+
+        console.log('Browse result:', result);
+        const directories = result.directories || [];
+
+        if (directories.length === 0) {
+          directoryList.innerHTML = `
+            <div class="text-center py-8 text-gray-500">
+              <svg class="w-12 h-12 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+              </svg>
+              <p>No subdirectories found</p>
+              <p class="text-xs mt-1">You can create a new folder here</p>
+            </div>
+          `;
+          return;
+        }
+
+        directoryList.innerHTML = directories.map(dir => `
+          <div class="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors group" onclick="navigateToDirectory('${dir.path}')">
+            <svg class="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+            </svg>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium text-gray-900 truncate">${dir.name}</p>
+              <p class="text-xs text-gray-500">${dir.path}</p>
+            </div>
+            <svg class="w-4 h-4 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+          </div>
+        `).join('');
+
+        // Enable/disable create folder button based on volume writability
+        const createBtn = document.getElementById('createFolderBtn');
+        const currentVolume = availableVolumes.find(v => selectedVolume.startsWith(v.path));
+        const isWritable = currentVolume ? currentVolume.writable : true; // Assume writable for custom paths
+        createBtn.disabled = !isWritable;
+        createBtn.title = isWritable ? 'Create new folder' : 'This volume is read-only';
+      } catch (error) {
+        console.error('Failed to load directory:', error);
+        console.error('Error response:', error.response);
+        console.error('Error status:', error.status);
+        console.error('Error data:', error.data);
+
+        let errorMessage = 'Unknown error';
+        let errorDetails = '';
+
+        if (error.data) {
+          // ApiClient error format
+          errorMessage = error.data.error || error.data.message || 'Request failed';
+          if (error.data.code) {
+            errorDetails = `Code: ${error.data.code}`;
+          }
+          if (error.data.hint) {
+            errorDetails += ` - ${error.data.hint}`;
+          }
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+
+        directoryList.innerHTML = `
+          <div class="text-center py-8 text-red-600">
+            <p class="font-medium">Failed to load directory</p>
+            <p class="text-sm mt-2">${errorMessage}</p>
+            ${errorDetails ? `<p class="text-xs mt-1 text-gray-600">${errorDetails}</p>` : ''}
+            <p class="text-xs mt-2 text-gray-500">Path: ${fullPath}</p>
+            <button onclick="loadDirectory('${basePath}', '${subPath}')" class="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg">
+              Retry
+            </button>
+          </div>
+        `;
+      }
+    }
+
+    // Navigate to subdirectory
+    async function navigateToDirectory(path) {
+      const relativePath = path.replace(selectedVolume, '').replace(/^\/+/, '');
+      await loadDirectory(selectedVolume, relativePath);
+    }
+
+    // Create new folder
+    async function createNewFolder() {
+      const folderName = prompt('Enter folder name:');
+      if (!folderName) return;
+
+      // Validate folder name
+      if (!/^[a-zA-Z0-9_-]+$/.test(folderName)) {
+        Toast.error('Folder name can only contain letters, numbers, hyphens, and underscores');
+        return;
+      }
+
+      try {
+        const newPath = `${currentBrowsePath}/${folderName}`.replace(/\/+/g, '/');
+        await api.post('/api/v1/filesystem/create-dir', {
+          path: newPath
+        });
+
+        Toast.success(`Folder "${folderName}" created successfully`);
+
+        // Reload directory
+        await loadDirectory(selectedVolume, currentBrowsePath.replace(selectedVolume, '').replace(/^\/+/, ''));
+      } catch (error) {
+        console.error('Failed to create folder:', error);
+        Toast.error(error.message || 'Failed to create folder');
+      }
+    }
+
+    // Select directory
+    function selectDirectory() {
+      // Check if user entered a manual path
+      const manualPath = document.getElementById('manualPathInput').value.trim();
+
+      let selectedPath;
+      if (manualPath) {
+        // Use manual path if provided
+        selectedPath = manualPath;
+      } else {
+        // Use browsed path
+        selectedPath = document.getElementById('selectedPath').textContent;
+      }
+
+      // Validate the path
+      if (!selectedPath || selectedPath === '/' || selectedPath === '(enter path)') {
+        Toast.error('Please select a directory or enter a path');
+        return;
+      }
+
+      // Basic path validation
+      if (!selectedPath.startsWith('/')) {
+        Toast.error('Path must be an absolute path starting with /');
+        return;
+      }
+
+      document.getElementById('import_dir').value = selectedPath;
+      closeDirectoryBrowser();
+      Toast.success('Directory selected: ' + selectedPath);
     }
 
     // Initialize
