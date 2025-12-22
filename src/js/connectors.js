@@ -434,6 +434,159 @@ const Connectors = {
   }
 };
 
+/**
+ * ConnectorRegistry - Fetch available connectors from the connector registry
+ * Registry URL can be configured via window.config.connectorRegistryUrl
+ */
+const ConnectorRegistry = {
+  /**
+   * Get connector registry URL from config or use default
+   */
+  getRegistryUrl() {
+    // In production, this will point to AWS: https://redroostertec.com/lana-ai/connectors
+    // In development, use local registry server
+    return window.LanaConfig?.CONNECTOR_REGISTRY_URL || 'http://localhost:3001';
+  },
+
+  /**
+   * Fetch the connector catalog from the registry
+   * Returns list of all available connectors
+   */
+  async getCatalog() {
+    try {
+      const registryUrl = this.getRegistryUrl();
+      const response = await fetch(`${registryUrl}/index.json`);
+
+      if (!response.ok) {
+        throw new Error(`Registry returned ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return {
+        connectors: data.connectors || [],
+        registry_version: data.registry_version,
+        updated_at: data.updated_at
+      };
+    } catch (error) {
+      console.error('Failed to fetch connector catalog from registry:', error);
+
+      // If registry is unavailable in demo mode, return empty catalog
+      if (api.isDemoMode()) {
+        return { connectors: [], registry_version: '1.0.0', updated_at: new Date().toISOString() };
+      }
+
+      throw error;
+    }
+  },
+
+  /**
+   * Fetch a specific connector configuration from the registry
+   * @param {string} connectorId - The connector ID (e.g., 'sharepoint', 'google-drive')
+   */
+  async getConnectorConfig(connectorId) {
+    try {
+      const registryUrl = this.getRegistryUrl();
+      const response = await fetch(`${registryUrl}/${connectorId}.json`);
+
+      if (!response.ok) {
+        throw new Error(`Connector ${connectorId} not found in registry`);
+      }
+
+      const config = await response.json();
+      return config;
+    } catch (error) {
+      console.error(`Failed to fetch connector config for ${connectorId}:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * Install a connector from the registry
+   * This sends the connector configuration to the backend to create an integration_source
+   * @param {string} connectorId - The connector ID from the registry
+   */
+  async installConnector(connectorId) {
+    try {
+      // 1. Fetch connector config from registry
+      const connectorConfig = await this.getConnectorConfig(connectorId);
+
+      // 2. Send to backend to create integration source
+      if (api.isDemoMode()) {
+        await MockData.delay(500);
+        // In demo mode, just add to the connectors list
+        const newConnector = {
+          id: `doc-${connectorId}`,
+          name: connectorConfig.metadata.name,
+          category: this._mapCategoryToInternal(connectorConfig.metadata.category),
+          description: connectorConfig.metadata.description,
+          status: 'disconnected',
+          records: 0,
+          lastSync: null,
+          config: {},
+          connector_id: connectorId,
+          authType: connectorConfig.auth.type
+        };
+        ConnectorsMockData.connectors.push(newConnector);
+        return { success: true, connector: newConnector };
+      }
+
+      // Production: Send to backend API
+      return api.post('/api/v1/integrations/registry/install', {
+        connector_id: connectorId,
+        connector_config: connectorConfig
+      });
+    } catch (error) {
+      console.error(`Failed to install connector ${connectorId}:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * Map registry category to internal category format
+   * Registry uses: document_storage, crm, case_management, etc.
+   * Internal uses: documents, crm, case, etc.
+   */
+  _mapCategoryToInternal(registryCategory) {
+    const mapping = {
+      'document_storage': 'documents',
+      'crm': 'crm',
+      'case_management': 'case',
+      'financial': 'financial',
+      'communications': 'communications'
+    };
+    return mapping[registryCategory] || registryCategory;
+  },
+
+  /**
+   * Check if a connector from the registry is already installed
+   * @param {string} connectorId - The registry connector ID
+   * @param {Array} installedConnectors - List of connectors from backend API
+   */
+  isConnectorInstalled(connectorId, installedConnectors) {
+    return installedConnectors.some(c => {
+      // Check exact match on connector_id field (if backend stores it)
+      if (c.connector_id === connectorId) {
+        return true;
+      }
+
+      // Check if the ID ends with the connector ID (e.g., "doc-sharepoint" ends with "sharepoint")
+      if (c.id && c.id.endsWith(connectorId)) {
+        return true;
+      }
+
+      // Check if ID ends with connector ID after removing category prefix
+      // e.g., "doc-sharepoint" matches "sharepoint"
+      const idParts = c.id ? c.id.split('-') : [];
+      if (idParts.length > 1 && idParts[idParts.length - 1] === connectorId) {
+        return true;
+      }
+
+      return false;
+    });
+  }
+};
+
 // Export for use in other modules
 window.Connectors = Connectors;
 window.ConnectorsMockData = ConnectorsMockData;
+window.ConnectorRegistry = ConnectorRegistry;

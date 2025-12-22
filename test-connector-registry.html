@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connector Registry Test - LanaAI</title>
+  <script src="public_html/js/config.js"></script>
+  <script src="public_html/js/mock-data.js"></script>
+  <script src="public_html/js/api.js"></script>
+  <script src="public_html/js/connectors.js"></script>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f3f4f6;
+    }
+    h1 {
+      color: #1f2937;
+    }
+    .section {
+      background: white;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .connector-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 15px;
+      margin: 10px 0;
+      background: #fafafa;
+    }
+    .connector-card h3 {
+      margin: 0 0 5px 0;
+      color: #4f46e5;
+    }
+    .connector-card p {
+      margin: 5px 0;
+      color: #6b7280;
+      font-size: 14px;
+    }
+    .status {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .status.success {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    .status.error {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .status.pending {
+      background: #fef3c7;
+      color: #92400e;
+    }
+    button {
+      background: #4f46e5;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #4338ca;
+    }
+    button:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+    }
+    .log {
+      background: #1f2937;
+      color: #10b981;
+      padding: 15px;
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      max-height: 300px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔌 Connector Registry Integration Test</h1>
+
+  <div class="section">
+    <h2>Configuration</h2>
+    <p><strong>Registry URL:</strong> <span id="registryUrl">-</span></p>
+    <p><strong>Development Mode:</strong> <span id="devMode">-</span></p>
+    <p><strong>Demo Mode:</strong> <span id="demoMode">-</span></p>
+  </div>
+
+  <div class="section">
+    <h2>1. Test Registry Connection</h2>
+    <button onclick="testRegistryConnection()">Test Connection</button>
+    <div id="registryStatus"></div>
+  </div>
+
+  <div class="section">
+    <h2>2. Fetch Connector Catalog</h2>
+    <button onclick="fetchCatalog()">Fetch Catalog</button>
+    <div id="catalogResults"></div>
+  </div>
+
+  <div class="section">
+    <h2>3. Fetch Specific Connector Config</h2>
+    <button onclick="fetchConnectorConfig('sharepoint')">Fetch SharePoint Config</button>
+    <button onclick="fetchConnectorConfig('google-drive')">Fetch Google Drive Config</button>
+    <div id="connectorConfigResults"></div>
+  </div>
+
+  <div class="section">
+    <h2>4. Test Install Flow (Demo Mode)</h2>
+    <p><em>This will test the install function in demo mode (no backend required)</em></p>
+    <button onclick="testInstall('sharepoint')">Install SharePoint</button>
+    <button onclick="testInstall('google-drive')">Install Google Drive</button>
+    <div id="installResults"></div>
+  </div>
+
+  <div class="section">
+    <h2>Console Log</h2>
+    <div id="log" class="log">Starting connector registry test...\n</div>
+  </div>
+
+  <script>
+    // Helper functions
+    function log(message, type = 'info') {
+      const logDiv = document.getElementById('log');
+      const timestamp = new Date().toLocaleTimeString();
+      const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+      logDiv.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    function showStatus(elementId, status, message) {
+      const el = document.getElementById(elementId);
+      const statusClass = status === 'success' ? 'success' : status === 'error' ? 'error' : 'pending';
+      el.innerHTML = `<p><span class="status ${statusClass}">${status.toUpperCase()}</span> ${message}</p>`;
+    }
+
+    // Initialize
+    document.getElementById('registryUrl').textContent = window.LanaConfig.CONNECTOR_REGISTRY_URL;
+    document.getElementById('devMode').textContent = window.LanaConfig.DEVELOPMENT_MODE;
+    document.getElementById('demoMode').textContent = window.LanaConfig.DEMO_MODE;
+
+    log('Configuration loaded');
+    log(`Registry URL: ${window.LanaConfig.CONNECTOR_REGISTRY_URL}`);
+
+    // Test 1: Test registry connection
+    async function testRegistryConnection() {
+      log('Testing registry connection...');
+      try {
+        const url = ConnectorRegistry.getRegistryUrl();
+        const response = await fetch(`${url}/index.json`);
+
+        if (response.ok) {
+          showStatus('registryStatus', 'success', `Connected to registry at ${url}`);
+          log('Registry connection successful!', 'success');
+        } else {
+          showStatus('registryStatus', 'error', `Failed to connect: ${response.status} ${response.statusText}`);
+          log(`Registry connection failed: ${response.status}`, 'error');
+        }
+      } catch (error) {
+        showStatus('registryStatus', 'error', `Error: ${error.message}`);
+        log(`Registry connection error: ${error.message}`, 'error');
+      }
+    }
+
+    // Test 2: Fetch catalog
+    async function fetchCatalog() {
+      log('Fetching connector catalog...');
+      try {
+        const catalog = await ConnectorRegistry.getCatalog();
+
+        log(`Catalog fetched: ${catalog.connectors.length} connectors`, 'success');
+
+        let html = `
+          <div style="margin-top: 10px;">
+            <p><strong>Registry Version:</strong> ${catalog.registry_version}</p>
+            <p><strong>Updated:</strong> ${new Date(catalog.updated_at).toLocaleString()}</p>
+            <p><strong>Connectors:</strong> ${catalog.connectors.length}</p>
+          </div>
+        `;
+
+        catalog.connectors.forEach(c => {
+          html += `
+            <div class="connector-card">
+              <h3>${c.name}</h3>
+              <p>${c.description}</p>
+              <p><strong>ID:</strong> ${c.id} | <strong>Category:</strong> ${c.category} | <strong>Version:</strong> ${c.version}</p>
+            </div>
+          `;
+        });
+
+        document.getElementById('catalogResults').innerHTML = html;
+      } catch (error) {
+        log(`Failed to fetch catalog: ${error.message}`, 'error');
+        document.getElementById('catalogResults').innerHTML = `<p class="status error">Error: ${error.message}</p>`;
+      }
+    }
+
+    // Test 3: Fetch specific connector config
+    async function fetchConnectorConfig(connectorId) {
+      log(`Fetching config for ${connectorId}...`);
+      try {
+        const config = await ConnectorRegistry.getConnectorConfig(connectorId);
+
+        log(`Config fetched for ${connectorId}`, 'success');
+
+        const html = `
+          <div style="margin-top: 10px;">
+            <h3>${config.metadata.name}</h3>
+            <p>${config.metadata.description}</p>
+            <p><strong>Category:</strong> ${config.metadata.category}</p>
+            <p><strong>Auth Type:</strong> ${config.auth.type}</p>
+            <p><strong>Version:</strong> ${config.version}</p>
+            <details style="margin-top: 10px;">
+              <summary style="cursor: pointer; font-weight: 600;">View Full Config</summary>
+              <pre style="background: #f3f4f6; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 11px;">${JSON.stringify(config, null, 2)}</pre>
+            </details>
+          </div>
+        `;
+
+        document.getElementById('connectorConfigResults').innerHTML = html;
+      } catch (error) {
+        log(`Failed to fetch config for ${connectorId}: ${error.message}`, 'error');
+        document.getElementById('connectorConfigResults').innerHTML = `<p class="status error">Error: ${error.message}</p>`;
+      }
+    }
+
+    // Test 4: Test install flow
+    async function testInstall(connectorId) {
+      log(`Testing install flow for ${connectorId}...`);
+      try {
+        const result = await ConnectorRegistry.installConnector(connectorId);
+
+        log(`Install completed for ${connectorId}`, 'success');
+
+        const html = `
+          <div style="margin-top: 10px;">
+            <p class="status success">Successfully installed ${connectorId}!</p>
+            <pre style="background: #f3f4f6; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 11px;">${JSON.stringify(result, null, 2)}</pre>
+          </div>
+        `;
+
+        document.getElementById('installResults').innerHTML = html;
+      } catch (error) {
+        log(`Install failed for ${connectorId}: ${error.message}`, 'error');
+        document.getElementById('installResults').innerHTML = `<p class="status error">Error: ${error.message}</p>`;
+      }
+    }
+
+    log('Test page ready. Click buttons above to run tests.');
+  </script>
+</body>
+</html>
