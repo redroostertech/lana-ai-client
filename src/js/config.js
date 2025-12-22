@@ -55,21 +55,16 @@ window.LanaConfig = {
   /**
    * Connector Registry URL
    *
-   * URL of the connector registry server that serves connector configuration files
+   * Base URL of the connector registry API server
    *
-   * AUTO-CONFIGURED based on DEVELOPMENT_MODE:
-   *   - Development: 'http://localhost:3001' (local registry server)
-   *   - Production: 'https://redroostertec.com/lana-ai/connectors' (AWS hosted)
+   * Production: 'https://www.redroostertec.com' (RedRooster hosted)
+   * API endpoints: /lana-ai/v1/catalog/connectors
    *
    * Can be manually overridden by setting a specific URL
    */
   get CONNECTOR_REGISTRY_URL() {
-    // Auto-detect based on environment
-    if (this.DEVELOPMENT_MODE || this.DEMO_MODE) {
-      return 'http://localhost:3001';
-    } else {
-      return 'https://redroostertec.com/lana-ai/connectors';
-    }
+    // Use live RedRooster URL for connector registry
+    return 'https://www.redroostertec.com';
   },
 
   // ============================================================

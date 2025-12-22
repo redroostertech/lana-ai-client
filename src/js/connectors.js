@@ -47,6 +47,26 @@ const ConnectorsMockData = {
       lastSync: null,
       config: {}
     },
+    {
+      id: 'crm-gohighlevel',
+      name: 'GoHighLevel',
+      category: 'crm',
+      description: 'All-in-one marketing and CRM platform',
+      status: 'connected',
+      records: 1654,
+      lastSync: new Date(Date.now() - 2400000).toISOString(),
+      config: { api_key: '***hidden***', sync_frequency: 'hourly' }
+    },
+    {
+      id: 'doc-googlesheets',
+      name: 'Google Sheets',
+      category: 'documents',
+      description: 'Spreadsheet data and collaboration',
+      status: 'connected',
+      records: 847,
+      lastSync: new Date(Date.now() - 1500000).toISOString(),
+      config: { oauth_connected: true, spreadsheets: ['Lead Tracker', 'Client Database'] }
+    },
 
     // Case Management Connectors
     {
@@ -443,19 +463,19 @@ const ConnectorRegistry = {
    * Get connector registry URL from config or use default
    */
   getRegistryUrl() {
-    // In production, this will point to AWS: https://redroostertec.com/lana-ai/connectors
-    // In development, use local registry server
+    // Production: https://www.redroostertec.com
     return window.LanaConfig?.CONNECTOR_REGISTRY_URL || 'http://localhost:3001';
   },
 
   /**
-   * Fetch the connector catalog from the registry
+   * Fetch the connector catalog from the registry API
    * Returns list of all available connectors
+   * API: GET /lana-ai/v1/catalog/connectors
    */
   async getCatalog() {
     try {
-      const registryUrl = this.getRegistryUrl();
-      const response = await fetch(`${registryUrl}/index.json`);
+      const baseUrl = this.getRegistryUrl();
+      const response = await fetch(`${baseUrl}/lana-ai/v1/catalog/connectors`);
 
       if (!response.ok) {
         throw new Error(`Registry returned ${response.status}: ${response.statusText}`);
@@ -464,8 +484,8 @@ const ConnectorRegistry = {
       const data = await response.json();
       return {
         connectors: data.connectors || [],
-        registry_version: data.registry_version,
-        updated_at: data.updated_at
+        registry_version: data.version,
+        updated_at: data.last_updated
       };
     } catch (error) {
       console.error('Failed to fetch connector catalog from registry:', error);
@@ -480,20 +500,21 @@ const ConnectorRegistry = {
   },
 
   /**
-   * Fetch a specific connector configuration from the registry
-   * @param {string} connectorId - The connector ID (e.g., 'sharepoint', 'google-drive')
+   * Fetch a specific connector configuration from the registry API
+   * API: GET /lana-ai/v1/catalog/connectors/:connector_id
+   * @param {string} connectorId - The connector ID (e.g., 'hubspot-crm', 'google-drive')
    */
   async getConnectorConfig(connectorId) {
     try {
-      const registryUrl = this.getRegistryUrl();
-      const response = await fetch(`${registryUrl}/${connectorId}.json`);
+      const baseUrl = this.getRegistryUrl();
+      const response = await fetch(`${baseUrl}/lana-ai/v1/catalog/connectors/${connectorId}`);
 
       if (!response.ok) {
         throw new Error(`Connector ${connectorId} not found in registry`);
       }
 
-      const config = await response.json();
-      return config;
+      const data = await response.json();
+      return data.connector;
     } catch (error) {
       console.error(`Failed to fetch connector config for ${connectorId}:`, error);
       throw error;
@@ -507,7 +528,7 @@ const ConnectorRegistry = {
    */
   async installConnector(connectorId) {
     try {
-      // 1. Fetch connector config from registry
+      // 1. Fetch connector config from registry API
       const connectorConfig = await this.getConnectorConfig(connectorId);
 
       // 2. Send to backend to create integration source
@@ -516,15 +537,15 @@ const ConnectorRegistry = {
         // In demo mode, just add to the connectors list
         const newConnector = {
           id: `doc-${connectorId}`,
-          name: connectorConfig.metadata.name,
-          category: this._mapCategoryToInternal(connectorConfig.metadata.category),
-          description: connectorConfig.metadata.description,
+          name: connectorConfig.name,
+          category: connectorConfig.category,
+          description: connectorConfig.description,
           status: 'disconnected',
           records: 0,
           lastSync: null,
           config: {},
           connector_id: connectorId,
-          authType: connectorConfig.auth.type
+          authType: connectorConfig.auth_type
         };
         ConnectorsMockData.connectors.push(newConnector);
         return { success: true, connector: newConnector };
@@ -539,22 +560,6 @@ const ConnectorRegistry = {
       console.error(`Failed to install connector ${connectorId}:`, error);
       throw error;
     }
-  },
-
-  /**
-   * Map registry category to internal category format
-   * Registry uses: document_storage, crm, case_management, etc.
-   * Internal uses: documents, crm, case, etc.
-   */
-  _mapCategoryToInternal(registryCategory) {
-    const mapping = {
-      'document_storage': 'documents',
-      'crm': 'crm',
-      'case_management': 'case',
-      'financial': 'financial',
-      'communications': 'communications'
-    };
-    return mapping[registryCategory] || registryCategory;
   },
 
   /**

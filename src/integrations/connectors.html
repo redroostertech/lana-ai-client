@@ -308,58 +308,16 @@
           </div>
         </section>
 
-        <!-- CRM Connectors -->
-        <section>
+        <!-- Installed Connectors -->
+        <section id="installedConnectorsSection">
           <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold text-gray-900">CRM & Lead Management</h2>
-            <a href="connector-crm.html" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">View All</a>
+            <div>
+              <h2 class="text-lg font-semibold text-gray-900">Installed Connectors</h2>
+              <p class="text-sm text-gray-500 mt-1">Active connectors configured for your organization</p>
+            </div>
           </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="crmConnectors">
-            <!-- Connector cards will be rendered here -->
-          </div>
-        </section>
-
-        <!-- Case Management Connectors -->
-        <section>
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold text-gray-900">Case Management</h2>
-            <a href="connector-case.html" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">View All</a>
-          </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="caseConnectors">
-            <!-- Connector cards will be rendered here -->
-          </div>
-        </section>
-
-        <!-- Financial Connectors -->
-        <section>
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold text-gray-900">Financial & Accounting</h2>
-            <a href="connector-financial.html" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">View All</a>
-          </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="financialConnectors">
-            <!-- Connector cards will be rendered here -->
-          </div>
-        </section>
-
-        <!-- Communications Connectors -->
-        <section>
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold text-gray-900">Communications</h2>
-            <a href="connector-communications.html" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">View All</a>
-          </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="commsConnectors">
-            <!-- Connector cards will be rendered here -->
-          </div>
-        </section>
-
-        <!-- Document Connectors -->
-        <section>
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold text-gray-900">Documents & Storage</h2>
-            <a href="connector-documents.html" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">View All</a>
-          </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="docConnectors">
-            <!-- Connector cards will be rendered here -->
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="installedConnectors">
+            <!-- Installed connector cards will be rendered here -->
           </div>
         </section>
       </div>
@@ -418,37 +376,55 @@
 
     // Render connector card
     function renderConnectorCard(connector) {
+      // Normalize connector data - handle backend field variations
+      const normalizedConnector = {
+        id: connector.id || connector.connector_id || 'unknown',
+        name: connector.name || connector.connector_name || 'Unknown Connector',
+        description: connector.description || connector.connector_description || 'No description available',
+        status: connector.status || connector.auth_status || 'disconnected',
+        category: connector.category || connector.connector_category || 'unknown',
+        records: connector.records || connector.total_records || 0,
+        lastSync: connector.lastSync || connector.last_sync_at || null,
+        logo: connector.logo || connector.icon || null
+      };
+
       const statusColors = {
         connected: 'bg-green-100 text-green-800',
         disconnected: 'bg-gray-100 text-gray-600',
         error: 'bg-red-100 text-red-800',
-        syncing: 'bg-blue-100 text-blue-800'
+        syncing: 'bg-blue-100 text-blue-800',
+        active: 'bg-green-100 text-green-800'  // Map 'active' to 'connected' styling
       };
 
       const statusIcons = {
         connected: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>',
         disconnected: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>',
         error: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
-        syncing: '<svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>'
+        syncing: '<svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>',
+        active: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>'
       };
 
+      const displayStatus = normalizedConnector.status;
+      const statusColor = statusColors[displayStatus] || statusColors.disconnected;
+      const statusIcon = statusIcons[displayStatus] || statusIcons.disconnected;
+
       return `
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow cursor-pointer" onclick="openConnector('${connector.id}', '${connector.category}')">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow cursor-pointer" onclick="openConnector('${normalizedConnector.id}', '${normalizedConnector.category}')">
           <div class="flex items-start justify-between mb-4">
             <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-              ${connector.logo || `<span class="text-lg font-bold text-gray-400">${connector.name.charAt(0)}</span>`}
+              ${normalizedConnector.logo || `<span class="text-lg font-bold text-gray-400">${normalizedConnector.name.charAt(0)}</span>`}
             </div>
-            <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${statusColors[connector.status]}">
-              ${statusIcons[connector.status]}
-              ${connector.status}
+            <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${statusColor}">
+              ${statusIcon}
+              ${displayStatus}
             </span>
           </div>
-          <h3 class="font-semibold text-gray-900 mb-1">${connector.name}</h3>
-          <p class="text-sm text-gray-500 mb-3">${connector.description}</p>
-          ${connector.status === 'connected' ? `
+          <h3 class="font-semibold text-gray-900 mb-1">${normalizedConnector.name}</h3>
+          <p class="text-sm text-gray-500 mb-3">${normalizedConnector.description}</p>
+          ${normalizedConnector.status === 'connected' || normalizedConnector.status === 'active' ? `
             <div class="flex items-center justify-between text-xs text-gray-400">
-              <span>${connector.records?.toLocaleString() || 0} records</span>
-              <span>Last sync: ${connector.lastSync ? timeAgo(connector.lastSync) : 'Never'}</span>
+              <span>${normalizedConnector.records?.toLocaleString() || 0} records</span>
+              <span>Last sync: ${normalizedConnector.lastSync ? timeAgo(normalizedConnector.lastSync) : 'Never'}</span>
             </div>
           ` : `
             <button class="w-full mt-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
@@ -461,6 +437,21 @@
 
     // Open connector configuration
     function openConnector(connectorId, category) {
+      // Special routing for system-level integrations with dedicated pages
+      const specialPages = {
+        'case-actionstep': 'actionstep.html',
+        'crm-leadly': 'leadly.html',
+        'crm-gohighlevel': 'gohighlevel.html',
+        // Add more special cases as needed
+      };
+
+      // Check if this connector has a dedicated page
+      if (specialPages[connectorId]) {
+        window.location.href = `${specialPages[connectorId]}?id=${connectorId}`;
+        return;
+      }
+
+      // Otherwise, route to generic category page
       const pages = {
         crm: 'connector-crm.html',
         case: 'connector-case.html',
@@ -468,7 +459,9 @@
         communications: 'connector-communications.html',
         documents: 'connector-documents.html'
       };
-      window.location.href = `${pages[category]}?id=${connectorId}`;
+
+      const page = pages[category] || 'connector-crm.html'; // Default to CRM if category unknown
+      window.location.href = `${page}?id=${connectorId}`;
     }
 
     // Render available connector card from registry
@@ -590,18 +583,10 @@
           const lastSynced = connected.filter(c => c.lastSync).sort((a, b) => new Date(b.lastSync) - new Date(a.lastSync))[0];
           document.getElementById('lastSync').textContent = lastSynced ? timeAgo(lastSynced.lastSync) : 'Never';
 
-          // Render by category
-          const categories = {
-            crmConnectors: installedConnectors.filter(c => c.category === 'crm'),
-            caseConnectors: installedConnectors.filter(c => c.category === 'case'),
-            financialConnectors: installedConnectors.filter(c => c.category === 'financial'),
-            commsConnectors: installedConnectors.filter(c => c.category === 'communications'),
-            docConnectors: installedConnectors.filter(c => c.category === 'documents')
-          };
-
-          for (const [containerId, connectors] of Object.entries(categories)) {
-            const container = document.getElementById(containerId);
-            container.innerHTML = connectors.map(renderConnectorCard).join('');
+          // Render all installed connectors
+          const installedContainer = document.getElementById('installedConnectors');
+          if (installedContainer) {
+            installedContainer.innerHTML = installedConnectors.map(renderConnectorCard).join('');
           }
         } else {
           console.error('Failed to fetch installed connectors:', installedData.reason);
