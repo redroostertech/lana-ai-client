@@ -294,6 +294,19 @@
 
       <!-- Connector Categories - Content -->
       <div id="connectorsContent" class="hidden space-y-8">
+        <!-- Installed Connectors -->
+        <section id="installedConnectorsSection">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="text-lg font-semibold text-gray-900">Installed Connectors</h2>
+              <p class="text-sm text-gray-500 mt-1">Active connectors configured for your organization</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="installedConnectors">
+            <!-- Installed connector cards will be rendered here -->
+          </div>
+        </section>
+
         <!-- Available Connectors from Registry -->
         <section id="availableConnectorsSection" class="hidden">
           <div class="flex items-center justify-between mb-4">
@@ -305,19 +318,6 @@
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="availableConnectors">
             <!-- Available connector cards from registry will be rendered here -->
-          </div>
-        </section>
-
-        <!-- Installed Connectors -->
-        <section id="installedConnectorsSection">
-          <div class="flex items-center justify-between mb-4">
-            <div>
-              <h2 class="text-lg font-semibold text-gray-900">Installed Connectors</h2>
-              <p class="text-sm text-gray-500 mt-1">Active connectors configured for your organization</p>
-            </div>
-          </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="installedConnectors">
-            <!-- Installed connector cards will be rendered here -->
           </div>
         </section>
       </div>
