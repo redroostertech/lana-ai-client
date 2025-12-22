@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sync Status - LanaAI</title>
+  <script src="../js/tailwind-loader.js"></script>
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/notifications.js"></script>
+  <script src="../js/connectors.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <!-- Sidebar -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
+    <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
+      <a href="../index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
+      <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
+      <!-- Menu will be dynamically rendered by menu.js -->
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="lg:ml-64">
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
+      <div class="flex items-center justify-between h-16 px-4 lg:px-8">
+        <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+        <div class="flex-1 px-4 lg:px-0">
+          <h1 class="text-xl font-semibold text-gray-900">Sync Status</h1>
+          <p class="text-sm text-gray-500">Monitor data synchronization across all connected sources</p>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <!-- Sync All Button -->
+          <button id="syncAllBtn" class="flex items-center gap-2 px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+          Sync All
+        </button>
+
+          <!-- Notifications -->
+          <button id="notificationBtn" class="relative text-gray-500 hover:text-gray-700">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+            </svg>
+            <span id="notificationBadge" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">0</span>
+          </button>
+
+          <!-- User Menu -->
+          <div class="relative" id="userMenu">
+            <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900">
+              <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                <span id="userInitials" class="text-sm font-medium text-indigo-600">U</span>
+              </div>
+              <span id="userName" class="hidden sm:block text-sm font-medium">User</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            </button>
+            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+              <a href="../settings.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
+              <hr class="my-1">
+              <button id="logoutBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sign out</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Notification Panel Overlay -->
+    <div id="notificationOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
+
+    <!-- Notification Slide-out Panel -->
+    <div id="notificationPanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
+      <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
+        <h2 class="text-lg font-semibold text-gray-900">Notifications</h2>
+        <div class="flex items-center gap-3">
+          <button id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium hidden">Mark all read</button>
+          <button id="refreshNotificationsBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+          </button>
+          <button id="closeNotificationPanel" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
+        <button id="filterAll" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">All</button>
+        <button id="filterUnread" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Unread</button>
+      </div>
+      <div id="notificationList" class="flex-1 overflow-y-auto">
+        <div id="notificationLoading" class="p-8 text-center">
+          <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+          <p class="text-gray-500 mt-3 text-sm">Loading notifications...</p>
+        </div>
+      </div>
+      <div id="notificationLoadingMore" class="hidden p-4 border-t border-gray-100 text-center flex-shrink-0">
+        <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+      </div>
+    </div>
+
+    <main class="p-4 lg:p-8">
+      <!-- Summary Stats - Loading -->
+      <div id="statsLoading" class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+        <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100 animate-pulse">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="h-4 bg-gray-200 rounded w-20 mb-2"></div>
+              <div class="h-8 bg-gray-200 rounded w-8"></div>
+            </div>
+            <div class="w-10 h-10 bg-gray-200 rounded-lg"></div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100 animate-pulse">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="h-4 bg-gray-200 rounded w-20 mb-2"></div>
+              <div class="h-8 bg-gray-200 rounded w-10"></div>
+            </div>
+            <div class="w-10 h-10 bg-gray-200 rounded-lg"></div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100 animate-pulse">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+              <div class="h-8 bg-gray-200 rounded w-16"></div>
+            </div>
+            <div class="w-10 h-10 bg-gray-200 rounded-lg"></div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100 animate-pulse">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="h-4 bg-gray-200 rounded w-20 mb-2"></div>
+              <div class="h-8 bg-gray-200 rounded w-8"></div>
+            </div>
+            <div class="w-10 h-10 bg-gray-200 rounded-lg"></div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100 animate-pulse">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+              <div class="h-8 bg-gray-200 rounded w-12"></div>
+            </div>
+            <div class="w-10 h-10 bg-gray-200 rounded-lg"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Summary Stats - Content -->
+      <div id="statsContent" class="hidden grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+        <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm text-gray-500">Active Syncs</p>
+              <p id="activeSyncs" class="text-2xl font-bold text-gray-900">0</p>
+            </div>
+            <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+              <svg class="w-5 h-5 text-blue-600 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm text-gray-500">Syncs Today</p>
+              <p id="syncsToday" class="text-2xl font-bold text-gray-900">-</p>
+            </div>
+            <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+              <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm text-gray-500">Records Synced</p>
+              <p id="recordsSynced" class="text-2xl font-bold text-gray-900">-</p>
+            </div>
+            <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+              <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path></svg>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm text-gray-500">Failed Syncs</p>
+              <p id="failedSyncs" class="text-2xl font-bold text-red-600">-</p>
+            </div>
+            <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+              <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm text-gray-500">Next Scheduled</p>
+              <p id="nextScheduled" class="text-2xl font-bold text-gray-900">-</p>
+            </div>
+            <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+              <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Connected Sources Status -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-8">
+        <div class="px-6 py-4 border-b border-gray-100">
+          <h2 class="text-lg font-semibold text-gray-900">Connected Sources</h2>
+          <p class="text-sm text-gray-500">Real-time sync status for all connected data sources</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Source</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Sync</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Records</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Schedule</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <!-- Table Loading Skeleton -->
+            <tbody id="connectedSourcesLoading" class="bg-white divide-y divide-gray-200">
+              <tr class="animate-pulse">
+                <td class="px-6 py-4"><div class="flex items-center gap-3"><div class="w-10 h-10 bg-gray-200 rounded-lg"></div><div><div class="h-4 bg-gray-200 rounded w-24 mb-1"></div><div class="h-3 bg-gray-200 rounded w-16"></div></div></div></td>
+                <td class="px-6 py-4"><div class="h-6 bg-gray-200 rounded-full w-20"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-20"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-16"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-20"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-16"></div></td>
+              </tr>
+              <tr class="animate-pulse">
+                <td class="px-6 py-4"><div class="flex items-center gap-3"><div class="w-10 h-10 bg-gray-200 rounded-lg"></div><div><div class="h-4 bg-gray-200 rounded w-28 mb-1"></div><div class="h-3 bg-gray-200 rounded w-20"></div></div></div></td>
+                <td class="px-6 py-4"><div class="h-6 bg-gray-200 rounded-full w-20"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-24"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-12"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-16"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-16"></div></td>
+              </tr>
+              <tr class="animate-pulse">
+                <td class="px-6 py-4"><div class="flex items-center gap-3"><div class="w-10 h-10 bg-gray-200 rounded-lg"></div><div><div class="h-4 bg-gray-200 rounded w-20 mb-1"></div><div class="h-3 bg-gray-200 rounded w-24"></div></div></div></td>
+                <td class="px-6 py-4"><div class="h-6 bg-gray-200 rounded-full w-20"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-16"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-20"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-24"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-16"></div></td>
+              </tr>
+            </tbody>
+            <!-- Table Content -->
+            <tbody id="connectedSourcesTable" class="hidden bg-white divide-y divide-gray-200">
+              <!-- Populated by JavaScript -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Sync History -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900">Sync History</h2>
+            <p class="text-sm text-gray-500">Recent synchronization activity log</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <select id="filterConnector" class="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+              <option value="">All Connectors</option>
+            </select>
+            <select id="filterStatus" class="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+              <option value="">All Status</option>
+              <option value="success">Success</option>
+              <option value="error">Error</option>
+            </select>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Connector</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Started</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Records</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
+              </tr>
+            </thead>
+            <!-- History Loading Skeleton -->
+            <tbody id="syncHistoryLoading" class="bg-white divide-y divide-gray-200">
+              <tr class="animate-pulse">
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-24"></div></td>
+                <td class="px-6 py-4"><div class="h-6 bg-gray-200 rounded-full w-16"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-32"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-12"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-16"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-8"></div></td>
+              </tr>
+              <tr class="animate-pulse">
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-28"></div></td>
+                <td class="px-6 py-4"><div class="h-6 bg-gray-200 rounded-full w-16"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-28"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-16"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-12"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-8"></div></td>
+              </tr>
+              <tr class="animate-pulse">
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-20"></div></td>
+                <td class="px-6 py-4"><div class="h-6 bg-gray-200 rounded-full w-16"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-36"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-10"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-20"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-8"></div></td>
+              </tr>
+              <tr class="animate-pulse">
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-32"></div></td>
+                <td class="px-6 py-4"><div class="h-6 bg-gray-200 rounded-full w-16"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-32"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-14"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-16"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-8"></div></td>
+              </tr>
+            </tbody>
+            <!-- History Content -->
+            <tbody id="syncHistoryTable" class="hidden bg-white divide-y divide-gray-200">
+              <!-- Populated by JavaScript -->
+            </tbody>
+          </table>
+        </div>
+        <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+          <p id="historyCount" class="text-sm text-gray-500">Showing 0 entries</p>
+          <button id="loadMoreBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">Load More</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    if (!api.requireAuth()) throw new Error('Not authenticated');
+
+    // Load full user profile with roles before rendering menu
+    (async () => {
+      try {
+        await api.loadUserProfile();
+      } catch (error) {
+        console.error('Failed to load user profile:', error);
+      }
+
+      // Render dynamic menu (will now have access to roles)
+      renderMenu('#mainNav');
+    })();
+
+    // Initialize notifications panel
+    NotificationPanel.init();
+
+    // Load user info
+    function loadUserInfo() {
+      const user = api.user;
+      if (user) {
+        const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+        const initials = (user.firstName?.[0] || '') + (user.lastName?.[0] || '') || user.email[0].toUpperCase();
+        document.getElementById('userName').textContent = name;
+        document.getElementById('userInitials').textContent = initials;
+      }
+    }
+    loadUserInfo();
+
+    // User menu toggle
+    const userMenu = document.getElementById('userMenu');
+    const userDropdown = document.getElementById('userDropdown');
+    userMenu.addEventListener('click', () => userDropdown.classList.toggle('hidden'));
+    document.addEventListener('click', (e) => {
+      if (!userMenu.contains(e.target)) userDropdown.classList.add('hidden');
+    });
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      await api.logout();
+      window.location.href = '../login.html';
+    });
+
+    // Sidebar toggle
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('openSidebar').addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+    document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+
+    // Status badge helper
+    function getSyncStatusBadge(status) {
+      const styles = {
+        success: 'bg-green-100 text-green-800',
+        error: 'bg-red-100 text-red-800',
+        syncing: 'bg-blue-100 text-blue-800',
+        connected: 'bg-green-100 text-green-800',
+        disconnected: 'bg-gray-100 text-gray-600'
+      };
+      const icons = {
+        success: '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>',
+        error: '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>',
+        syncing: '<svg class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>',
+        connected: '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>',
+        disconnected: '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>'
+      };
+      return `<span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${styles[status] || styles.disconnected}">${icons[status] || ''} ${status}</span>`;
+    }
+
+    // Format duration
+    function formatDuration(ms) {
+      if (ms < 1000) return `${ms}ms`;
+      if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+      return `${Math.floor(ms / 60000)}m ${Math.floor((ms % 60000) / 1000)}s`;
+    }
+
+    // Get schedule label
+    function getScheduleLabel(config) {
+      if (!config) return 'Manual';
+      const freq = config.sync_frequency || 'manual';
+      const labels = {
+        realtime: 'Real-time',
+        hourly: 'Every hour',
+        daily: 'Daily',
+        manual: 'Manual'
+      };
+      return labels[freq] || freq;
+    }
+
+    // Render connected sources table
+    function renderConnectedSources(connectors) {
+      const connected = connectors.filter(c => c.status === 'connected');
+      const tbody = document.getElementById('connectedSourcesTable');
+
+      if (connected.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" class="px-6 py-12 text-center text-gray-500">
+              <svg class="w-12 h-12 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+              <p class="font-medium">No connected sources</p>
+              <p class="mt-1">Connect your first data source to start syncing</p>
+              <a href="connectors.html" class="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                Add Connector
+              </a>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = connected.map(c => `
+        <tr class="hover:bg-gray-50">
+          <td class="px-6 py-4 whitespace-nowrap">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                <span class="text-sm font-bold text-gray-500">${c.name.charAt(0)}</span>
+              </div>
+              <div>
+                <p class="font-medium text-gray-900">${c.name}</p>
+                <p class="text-sm text-gray-500">${c.category}</p>
+              </div>
+            </div>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            ${getSyncStatusBadge(c.status)}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            ${c.lastSync ? timeAgo(c.lastSync) : 'Never'}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+            ${(c.records || 0).toLocaleString()}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            ${getScheduleLabel(c.config)}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <button onclick="triggerSync('${c.id}')" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
+              Sync Now
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // Render sync history table
+    function renderSyncHistory(history) {
+      const tbody = document.getElementById('syncHistoryTable');
+
+      if (history.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" class="px-6 py-12 text-center text-gray-500">
+              No sync history available
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = history.map(h => `
+        <tr class="hover:bg-gray-50">
+          <td class="px-6 py-4 whitespace-nowrap">
+            <p class="font-medium text-gray-900">${h.connector_name}</p>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            ${getSyncStatusBadge(h.status)}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            ${formatDateTime(h.started_at)}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            ${formatDuration(h.duration_ms)}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+            ${h.records_synced.toLocaleString()}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            ${h.error_message ? `
+              <button onclick="showError('${h.error_message}')" class="text-red-600 hover:text-red-800 text-sm font-medium">
+                View Error
+              </button>
+            ` : `
+              <span class="text-sm text-gray-400">-</span>
+            `}
+          </td>
+        </tr>
+      `).join('');
+
+      document.getElementById('historyCount').textContent = `Showing ${history.length} entries`;
+    }
+
+    // Trigger sync for a connector
+    async function triggerSync(connectorId) {
+      try {
+        Toast.info('Starting sync...');
+        await Connectors.triggerSync(connectorId);
+        Toast.success('Sync completed successfully');
+        loadData();
+      } catch (error) {
+        Toast.error('Sync failed: ' + error.message);
+      }
+    }
+
+    // Show error details
+    function showError(message) {
+      Modal.alert('Sync Error', message);
+    }
+
+    // Sync all connected sources
+    document.getElementById('syncAllBtn').addEventListener('click', async () => {
+      try {
+        const { connectors } = await Connectors.getAll();
+        const connected = connectors.filter(c => c.status === 'connected');
+
+        if (connected.length === 0) {
+          Toast.warning('No connected sources to sync');
+          return;
+        }
+
+        Toast.info(`Syncing ${connected.length} sources...`);
+
+        for (const connector of connected) {
+          await Connectors.triggerSync(connector.id);
+        }
+
+        Toast.success('All syncs completed');
+        loadData();
+      } catch (error) {
+        Toast.error('Sync failed: ' + error.message);
+      }
+    });
+
+    // Filter handlers
+    document.getElementById('filterConnector').addEventListener('change', loadData);
+    document.getElementById('filterStatus').addEventListener('change', loadData);
+
+    // Load all data
+    async function loadData(showLoading = false) {
+      const statsLoading = document.getElementById('statsLoading');
+      const statsContent = document.getElementById('statsContent');
+      const sourcesLoading = document.getElementById('connectedSourcesLoading');
+      const sourcesTable = document.getElementById('connectedSourcesTable');
+      const historyLoading = document.getElementById('syncHistoryLoading');
+      const historyTable = document.getElementById('syncHistoryTable');
+      
+      // Only show loading skeletons on initial load
+      if (showLoading) {
+        statsLoading.classList.remove('hidden');
+        statsContent.classList.add('hidden');
+        sourcesLoading.classList.remove('hidden');
+        sourcesTable.classList.add('hidden');
+        historyLoading.classList.remove('hidden');
+        historyTable.classList.add('hidden');
+      }
+      
+      try {
+        const [connectorsData, statsData, historyData] = await Promise.all([
+          Connectors.getAll(),
+          Connectors.getSyncStats(),
+          Connectors.getSyncHistory()
+        ]);
+
+        // Update stats
+        document.getElementById('activeSyncs').textContent = connectorsData.connectors.filter(c => c.status === 'syncing').length;
+        document.getElementById('syncsToday').textContent = statsData.syncs_today || 0;
+        document.getElementById('recordsSynced').textContent = statsData.total_records?.toLocaleString() || '0';
+        document.getElementById('failedSyncs').textContent = statsData.sync_errors || 0;
+        document.getElementById('nextScheduled').textContent = '5 min';
+
+        // Render tables
+        renderConnectedSources(connectorsData.connectors);
+
+        // Populate connector filter
+        const filterSelect = document.getElementById('filterConnector');
+        const connected = connectorsData.connectors.filter(c => c.status === 'connected');
+        filterSelect.innerHTML = '<option value="">All Connectors</option>' +
+          connected.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+
+        // Apply filters to history
+        let history = historyData.history;
+        const connectorFilter = document.getElementById('filterConnector').value;
+        const statusFilter = document.getElementById('filterStatus').value;
+
+        if (connectorFilter) {
+          history = history.filter(h => h.connector_id === connectorFilter);
+        }
+        if (statusFilter) {
+          history = history.filter(h => h.status === statusFilter);
+        }
+
+        renderSyncHistory(history);
+        
+        // Hide loading, show content
+        statsLoading.classList.add('hidden');
+        statsContent.classList.remove('hidden');
+        sourcesLoading.classList.add('hidden');
+        sourcesTable.classList.remove('hidden');
+        historyLoading.classList.add('hidden');
+        historyTable.classList.remove('hidden');
+      } catch (error) {
+        // Hide loading, show content (even on error)
+        statsLoading.classList.add('hidden');
+        statsContent.classList.remove('hidden');
+        sourcesLoading.classList.add('hidden');
+        sourcesTable.classList.remove('hidden');
+        historyLoading.classList.add('hidden');
+        historyTable.classList.remove('hidden');
+        Toast.error('Failed to load sync data');
+        console.error(error);
+      }
+    }
+
+    // Initialize with loading state
+    loadData(true);
+
+    // Auto-refresh every 30 seconds
+    setInterval(loadData, 30000);
+  </script>
+</body>
+</html>

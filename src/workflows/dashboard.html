@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workflows - LanaAI</title>
+  <script src="../js/tailwind-loader.js"></script>
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/workflows.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <!-- Sidebar -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
+    <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
+      <a href="../index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
+      <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
+      <!-- Menu will be dynamically rendered by menu.js -->
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="lg:ml-64">
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
+      <div class="flex items-center justify-between h-16 px-4 lg:px-8">
+        <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+        <div class="flex-1 px-4 lg:px-0">
+          <h1 class="text-xl font-semibold text-gray-900">Workflow Automation</h1>
+          <p class="text-sm text-gray-500">Automate your business processes with intelligent workflows</p>
+        </div>
+<!-- New Workflow button hidden until feature is complete
+        <a href="templates.html" class="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+          New Workflow
+        </a>
+        -->
+      </div>
+    </header>
+
+    <main class="p-4 lg:p-8">
+      <!-- Stats Cards Loading Skeleton -->
+      <div id="statsLoading" class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+            <div class="w-16 h-5 bg-gray-200 rounded-full"></div>
+          </div>
+          <div class="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+          <div class="h-8 bg-gray-200 rounded w-16"></div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+            <div class="w-16 h-5 bg-gray-200 rounded-full"></div>
+          </div>
+          <div class="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+          <div class="h-8 bg-gray-200 rounded w-16"></div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+          </div>
+          <div class="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+          <div class="h-8 bg-gray-200 rounded w-16"></div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+            <div class="w-20 h-5 bg-gray-200 rounded-full"></div>
+          </div>
+          <div class="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+          <div class="h-8 bg-gray-200 rounded w-16"></div>
+        </div>
+      </div>
+
+      <!-- Stats Cards -->
+      <div id="statsCards" class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8 hidden">
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+            </div>
+            <span class="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full">Active</span>
+          </div>
+          <p class="text-sm text-gray-500">Active Workflows</p>
+          <p id="activeCount" class="text-3xl font-bold text-gray-900">-</p>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+            </div>
+            <span class="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-full">Today</span>
+          </div>
+          <p class="text-sm text-gray-500">Executions Today</p>
+          <p id="executionsToday" class="text-3xl font-bold text-gray-900">-</p>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+          </div>
+          <p class="text-sm text-gray-500">Avg Success Rate</p>
+          <p id="successRate" class="text-3xl font-bold text-gray-900">-</p>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+            <span id="errorBadge" class="hidden text-xs font-medium text-red-600 bg-red-50 px-2 py-1 rounded-full">Needs Attention</span>
+          </div>
+          <p class="text-sm text-gray-500">Failed Workflows</p>
+          <p id="errorCount" class="text-3xl font-bold text-red-600">-</p>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <a href="templates.html" class="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl p-6 text-white hover:shadow-lg transition-shadow">
+          <div class="flex items-center gap-4">
+            <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6z"></path></svg>
+            </div>
+            <div>
+              <h3 class="font-semibold text-lg">Browse Templates</h3>
+              <p class="text-sm text-white/80">Pre-built automation workflows</p>
+            </div>
+          </div>
+        </a>
+        <a href="follow-up-cadences.html" class="bg-gradient-to-br from-green-500 to-teal-600 rounded-xl p-6 text-white hover:shadow-lg transition-shadow">
+          <div class="flex items-center gap-4">
+            <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+            <div>
+              <h3 class="font-semibold text-lg">Follow-up Cadences</h3>
+              <p class="text-sm text-white/80">Configure green/yellow/red zones</p>
+            </div>
+          </div>
+        </a>
+        <a href="retargeting.html" class="bg-gradient-to-br from-orange-500 to-red-600 rounded-xl p-6 text-white hover:shadow-lg transition-shadow">
+          <div class="flex items-center gap-4">
+            <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            </div>
+            <div>
+              <h3 class="font-semibold text-lg">Retargeting Setup</h3>
+              <p class="text-sm text-white/80">Facebook & Google audiences</p>
+            </div>
+          </div>
+        </a>
+      </div>
+
+      <!-- Active Workflows Loading Skeleton -->
+      <div id="workflowsLoading" class="bg-white rounded-xl shadow-sm border border-gray-100 mb-8">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <div class="h-5 bg-gray-200 rounded w-32 mb-2 animate-pulse"></div>
+            <div class="h-4 bg-gray-200 rounded w-48 animate-pulse"></div>
+          </div>
+          <div class="h-4 bg-gray-200 rounded w-16 animate-pulse"></div>
+        </div>
+        <div class="p-6 space-y-4">
+          <div class="flex items-center gap-4 animate-pulse">
+            <div class="flex-1"><div class="h-4 bg-gray-200 rounded w-3/4 mb-2"></div><div class="h-3 bg-gray-200 rounded w-1/2"></div></div>
+            <div class="h-6 bg-gray-200 rounded-full w-16"></div>
+            <div class="h-4 bg-gray-200 rounded w-20"></div>
+            <div class="h-2 bg-gray-200 rounded-full w-20"></div>
+            <div class="flex gap-2"><div class="h-8 w-8 bg-gray-200 rounded"></div><div class="h-8 w-8 bg-gray-200 rounded"></div></div>
+          </div>
+          <div class="flex items-center gap-4 animate-pulse">
+            <div class="flex-1"><div class="h-4 bg-gray-200 rounded w-2/3 mb-2"></div><div class="h-3 bg-gray-200 rounded w-1/3"></div></div>
+            <div class="h-6 bg-gray-200 rounded-full w-16"></div>
+            <div class="h-4 bg-gray-200 rounded w-20"></div>
+            <div class="h-2 bg-gray-200 rounded-full w-20"></div>
+            <div class="flex gap-2"><div class="h-8 w-8 bg-gray-200 rounded"></div><div class="h-8 w-8 bg-gray-200 rounded"></div></div>
+          </div>
+          <div class="flex items-center gap-4 animate-pulse">
+            <div class="flex-1"><div class="h-4 bg-gray-200 rounded w-1/2 mb-2"></div><div class="h-3 bg-gray-200 rounded w-2/5"></div></div>
+            <div class="h-6 bg-gray-200 rounded-full w-16"></div>
+            <div class="h-4 bg-gray-200 rounded w-20"></div>
+            <div class="h-2 bg-gray-200 rounded-full w-20"></div>
+            <div class="flex gap-2"><div class="h-8 w-8 bg-gray-200 rounded"></div><div class="h-8 w-8 bg-gray-200 rounded"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Workflows -->
+      <div id="workflowsContent" class="bg-white rounded-xl shadow-sm border border-gray-100 mb-8 hidden">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h3 class="font-semibold text-gray-900">Active Workflows</h3>
+            <p class="text-sm text-gray-500">Your currently running automations</p>
+          </div>
+          <a href="active.html" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">View All</a>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Workflow</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Run</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Success Rate</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="workflowsTable" class="divide-y divide-gray-200">
+              <!-- Populated by JavaScript -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Recent Executions Loading Skeleton -->
+      <div id="executionsLoading" class="bg-white rounded-xl shadow-sm border border-gray-100">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <div class="h-5 bg-gray-200 rounded w-36 mb-2 animate-pulse"></div>
+            <div class="h-4 bg-gray-200 rounded w-32 animate-pulse"></div>
+          </div>
+          <div class="h-4 bg-gray-200 rounded w-20 animate-pulse"></div>
+        </div>
+        <div class="p-6 space-y-4">
+          <div class="flex items-center gap-4 animate-pulse">
+            <div class="h-4 bg-gray-200 rounded w-32"></div>
+            <div class="h-6 bg-gray-200 rounded-full w-16"></div>
+            <div class="h-4 bg-gray-200 rounded w-24"></div>
+            <div class="h-4 bg-gray-200 rounded w-12"></div>
+            <div class="h-6 bg-gray-200 rounded-full w-20"></div>
+          </div>
+          <div class="flex items-center gap-4 animate-pulse">
+            <div class="h-4 bg-gray-200 rounded w-40"></div>
+            <div class="h-6 bg-gray-200 rounded-full w-16"></div>
+            <div class="h-4 bg-gray-200 rounded w-24"></div>
+            <div class="h-4 bg-gray-200 rounded w-12"></div>
+            <div class="h-6 bg-gray-200 rounded-full w-20"></div>
+          </div>
+          <div class="flex items-center gap-4 animate-pulse">
+            <div class="h-4 bg-gray-200 rounded w-36"></div>
+            <div class="h-6 bg-gray-200 rounded-full w-16"></div>
+            <div class="h-4 bg-gray-200 rounded w-24"></div>
+            <div class="h-4 bg-gray-200 rounded w-12"></div>
+            <div class="h-6 bg-gray-200 rounded-full w-20"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Executions -->
+      <div id="executionsContent" class="bg-white rounded-xl shadow-sm border border-gray-100 hidden">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h3 class="font-semibold text-gray-900">Recent Executions</h3>
+            <p class="text-sm text-gray-500">Latest workflow runs</p>
+          </div>
+          <a href="execution-logs.html" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">View All Logs</a>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Workflow</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Records</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trigger</th>
+              </tr>
+            </thead>
+            <tbody id="executionsTable" class="divide-y divide-gray-200">
+              <!-- Populated by JavaScript -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    if (!api.requireAuth()) throw new Error('Not authenticated');
+    renderMenu('#mainNav');
+
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('openSidebar').addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+    document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+
+    function getStatusBadge(status) {
+      const config = {
+        active: { bg: 'bg-green-100', text: 'text-green-800', icon: '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>' },
+        paused: { bg: 'bg-yellow-100', text: 'text-yellow-800', icon: '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>' },
+        error: { bg: 'bg-red-100', text: 'text-red-800', icon: '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>' },
+        success: { bg: 'bg-green-100', text: 'text-green-800', icon: '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>' }
+      };
+      const c = config[status] || config.paused;
+      return `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${c.bg} ${c.text}">${c.icon} ${status}</span>`;
+    }
+
+    function renderWorkflowsTable(workflows) {
+      const tbody = document.getElementById('workflowsTable');
+      if (!workflows || workflows.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="5" class="px-6 py-8 text-center text-gray-500">
+              <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+              <p class="text-sm">No active workflows yet</p>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+      tbody.innerHTML = workflows.slice(0, 5).map(w => `
+        <tr class="hover:bg-gray-50">
+          <td class="px-6 py-4">
+            <p class="font-medium text-gray-900">${w.name}</p>
+            <p class="text-sm text-gray-500">${w.description}</p>
+          </td>
+          <td class="px-6 py-4">${getStatusBadge(w.status)}</td>
+          <td class="px-6 py-4 text-sm text-gray-500">${w.lastRun ? timeAgo(w.lastRun) : 'Never'}</td>
+          <td class="px-6 py-4">
+            <div class="flex items-center gap-2">
+              <div class="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden w-20">
+                <div class="h-full bg-green-500 rounded-full" style="width: ${w.successRate}%"></div>
+              </div>
+              <span class="text-sm text-gray-600">${w.successRate.toFixed(1)}%</span>
+            </div>
+          </td>
+          <td class="px-6 py-4">
+            <div class="flex items-center gap-2">
+              <button onclick="toggleWorkflow('${w.id}', ${w.status !== 'active'})" class="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded" title="${w.status === 'active' ? 'Pause' : 'Activate'}">
+                ${w.status === 'active' ?
+                  '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>' :
+                  '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>'
+                }
+              </button>
+              <button onclick="runWorkflow('${w.id}')" class="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded" title="Run Now">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function renderExecutionsTable(logs) {
+      const tbody = document.getElementById('executionsTable');
+      if (!logs || logs.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="5" class="px-6 py-8 text-center text-gray-500">
+              <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              <p class="text-sm">No workflow executions yet</p>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+      tbody.innerHTML = logs.slice(0, 5).map(l => `
+        <tr class="hover:bg-gray-50">
+          <td class="px-6 py-4 font-medium text-gray-900">${l.workflowName}</td>
+          <td class="px-6 py-4">${getStatusBadge(l.status)}</td>
+          <td class="px-6 py-4 text-sm text-gray-500">${timeAgo(l.startedAt)}</td>
+          <td class="px-6 py-4 text-sm text-gray-900">${l.recordsProcessed}</td>
+          <td class="px-6 py-4">
+            <span class="px-2 py-1 text-xs font-medium rounded-full ${l.trigger === 'scheduled' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}">${l.trigger}</span>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function toggleWorkflow(id, enabled) {
+      try {
+        await Workflows.toggle(id, enabled);
+        Toast.success(`Workflow ${enabled ? 'activated' : 'paused'}`);
+        loadDashboard();
+      } catch (error) {
+        Toast.error('Failed to update workflow');
+      }
+    }
+
+    async function runWorkflow(id) {
+      try {
+        Toast.info('Running workflow...');
+        const result = await Workflows.execute(id);
+        Toast.success(`Workflow completed. Processed ${result.recordsProcessed} records.`);
+        loadDashboard();
+      } catch (error) {
+        Toast.error('Workflow execution failed');
+      }
+    }
+
+    function showLoadingStates() {
+      document.getElementById('statsLoading').classList.remove('hidden');
+      document.getElementById('statsCards').classList.add('hidden');
+      document.getElementById('workflowsLoading').classList.remove('hidden');
+      document.getElementById('workflowsContent').classList.add('hidden');
+      document.getElementById('executionsLoading').classList.remove('hidden');
+      document.getElementById('executionsContent').classList.add('hidden');
+    }
+
+    function hideLoadingStates() {
+      document.getElementById('statsLoading').classList.add('hidden');
+      document.getElementById('statsCards').classList.remove('hidden');
+      document.getElementById('workflowsLoading').classList.add('hidden');
+      document.getElementById('workflowsContent').classList.remove('hidden');
+      document.getElementById('executionsLoading').classList.add('hidden');
+      document.getElementById('executionsContent').classList.remove('hidden');
+    }
+
+    async function loadDashboard() {
+      showLoadingStates();
+
+      // Load each section independently to handle partial failures
+      let stats = { activeCount: 0, executionsToday: 0, avgSuccessRate: 0, errorCount: 0 };
+      let workflowsData = { workflows: [] };
+      let logsData = { logs: [] };
+
+      // Try to load stats
+      try {
+        stats = await Workflows.getStats();
+      } catch (error) {
+        console.warn('Failed to load workflow stats:', error);
+      }
+
+      // Try to load workflows
+      try {
+        workflowsData = await Workflows.getAll();
+      } catch (error) {
+        console.warn('Failed to load workflows:', error);
+      }
+
+      // Try to load execution logs
+      try {
+        logsData = await Workflows.getExecutionLogs();
+      } catch (error) {
+        console.warn('Failed to load execution logs:', error);
+      }
+
+      // Update stats display
+      document.getElementById('activeCount').textContent = stats.activeCount || 0;
+      document.getElementById('executionsToday').textContent = stats.executionsToday || 0;
+      document.getElementById('successRate').textContent = `${(stats.avgSuccessRate || 0).toFixed(1)}%`;
+      document.getElementById('errorCount').textContent = stats.errorCount || 0;
+
+      if (stats.errorCount > 0) {
+        document.getElementById('errorBadge').classList.remove('hidden');
+      }
+
+      // Render tables (will show empty state if no data)
+      renderWorkflowsTable(workflowsData.workflows || []);
+      renderExecutionsTable(logsData.logs || []);
+      hideLoadingStates();
+    }
+
+    loadDashboard();
+  </script>
+</body>
+</html>

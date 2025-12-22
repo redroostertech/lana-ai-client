@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Access Denied - Lana AI</title>
+    <script src="js/tailwind-loader.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/error-reporter.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+    <div class="max-w-md w-full mx-4">
+        <div class="bg-white rounded-lg shadow-lg p-8 text-center">
+            <div class="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i class="fas fa-lock text-yellow-600 text-3xl"></i>
+            </div>
+
+            <h1 class="text-2xl font-bold text-gray-900 mb-2" id="errorTitle">Access Denied</h1>
+            <p class="text-gray-600 mb-6" id="errorMessage">You don't have permission to access this resource.</p>
+
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 text-left" id="errorInfo">
+                <div class="flex items-start">
+                    <i class="fas fa-info-circle text-yellow-600 mt-0.5 mr-3"></i>
+                    <div>
+                        <p class="text-sm text-yellow-800 font-medium">Why am I seeing this?</p>
+                        <p class="text-sm text-yellow-700 mt-1" id="errorReason">
+                            Your account may not have the required permissions, or your session may have expired.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <a href="/login.html" id="loginBtn" class="block w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition">
+                    <i class="fas fa-sign-in-alt mr-2"></i>Sign In
+                </a>
+                <button onclick="history.back()" class="w-full bg-gray-200 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-300 transition">
+                    <i class="fas fa-arrow-left mr-2"></i>Go Back
+                </button>
+                <a href="/index.html" class="block w-full text-gray-600 py-2 px-4 hover:text-gray-800 transition">
+                    <i class="fas fa-home mr-2"></i>Go to Dashboard
+                </a>
+            </div>
+
+            <div class="mt-8 pt-6 border-t border-gray-200">
+                <p class="text-sm text-gray-500 mb-2">Think this is a mistake?</p>
+                <a href="mailto:support@lana.ai" class="text-blue-600 hover:underline text-sm">
+                    <i class="fas fa-envelope mr-1"></i>Contact your administrator
+                </a>
+            </div>
+        </div>
+
+        <p class="text-center text-gray-400 text-sm mt-6">
+            &copy; 2024 Lana AI. All rights reserved.
+        </p>
+        <p id="app-version" class="text-center text-gray-400 text-xs mt-2"></p>
+    </div>
+
+    <script>
+        // Set app version from config
+        document.getElementById('app-version').textContent = 'v' + (window.LanaConfig?.APP_VERSION || '2.0.0');
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const params = new URLSearchParams(window.location.search);
+            const errorType = params.get('type') || '403';
+            const message = params.get('message');
+            const returnUrl = params.get('return');
+
+            // Update content based on error type
+            if (errorType === '401') {
+                document.getElementById('errorTitle').textContent = 'Authentication Required';
+                document.getElementById('errorMessage').textContent = 'Please sign in to access this page.';
+                document.getElementById('errorReason').textContent = 'Your session may have expired or you need to sign in first.';
+            } else if (errorType === 'sso') {
+                document.getElementById('errorTitle').textContent = 'SSO Authentication Failed';
+                document.getElementById('errorMessage').textContent = 'Unable to authenticate with your identity provider.';
+                document.getElementById('errorReason').textContent = 'There was a problem connecting to your organization\'s login system. Please try again or contact your IT department.';
+            }
+
+            if (message) {
+                document.getElementById('errorMessage').textContent = decodeURIComponent(message);
+            }
+
+            // Set return URL for login button
+            if (returnUrl) {
+                const loginBtn = document.getElementById('loginBtn');
+                loginBtn.href = '/login.html?return=' + encodeURIComponent(returnUrl);
+            }
+        });
+    </script>
+</body>
+</html>

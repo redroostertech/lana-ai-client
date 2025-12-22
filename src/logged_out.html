@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logged Out - Lana AI</title>
+    <script src="js/tailwind-loader.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/error-reporter.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+    <div class="max-w-md w-full mx-4">
+        <div class="bg-white rounded-lg shadow-lg p-8 text-center">
+            <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i class="fas fa-check-circle text-green-500 text-3xl"></i>
+            </div>
+
+            <h1 class="text-2xl font-bold text-gray-900 mb-2">You've Been Logged Out</h1>
+            <p class="text-gray-600 mb-6">Your session has been securely ended. Thank you for using Lana AI.</p>
+
+            <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                <div class="flex items-center justify-center text-sm text-gray-600">
+                    <i class="fas fa-shield-alt text-green-500 mr-2"></i>
+                    <span>Session cookies have been cleared</span>
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <a href="/login.html" class="block w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition">
+                    <i class="fas fa-sign-in-alt mr-2"></i>Sign In Again
+                </a>
+            </div>
+
+            <div class="mt-8 pt-6 border-t border-gray-200">
+                <p class="text-sm text-gray-500">
+                    <i class="fas fa-lightbulb text-yellow-500 mr-1"></i>
+                    Tip: Always log out when using shared computers
+                </p>
+            </div>
+        </div>
+
+        <p class="text-center text-gray-400 text-sm mt-6">
+            &copy; 2024 Lana AI. All rights reserved.
+        </p>
+        <p id="app-version" class="text-center text-gray-400 text-xs mt-2"></p>
+    </div>
+
+    <script>
+        // Set app version from config
+        document.getElementById('app-version').textContent = 'v' + (window.LanaConfig?.APP_VERSION || '2.0.0');
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Clear all stored authentication data
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            localStorage.removeItem('refreshToken');
+
+            // Clear session storage as well
+            sessionStorage.clear();
+        });
+    </script>
+</body>
+</html>

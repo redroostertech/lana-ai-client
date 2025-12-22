@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Predictions - LanaAI</title>
+  <script src="../js/tailwind-loader.js"></script>
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/notifications.js"></script>
+  <script src="../js/insights.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <!-- Sidebar -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
+    <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
+      <a href="../index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
+      <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
+      <!-- Menu will be dynamically rendered by menu.js -->
+    </nav>
+  </aside>
+
+  <div class="lg:ml-64">
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
+      <div class="flex items-center justify-between h-16 px-4 lg:px-8">
+        <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+        <div class="flex-1 px-4 lg:px-0">
+          <h1 class="text-xl font-semibold text-gray-900">AI Predictions</h1>
+          <p class="text-sm text-gray-500">Machine learning-powered forecasts and risk assessments</p>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <!-- Notifications -->
+          <button id="notificationBtn" class="relative text-gray-500 hover:text-gray-700">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+            </svg>
+            <span id="notificationBadge" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">0</span>
+          </button>
+
+          <!-- User Menu -->
+          <div class="relative" id="userMenu">
+            <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900">
+              <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                <span id="userInitials" class="text-sm font-medium text-indigo-600">U</span>
+              </div>
+              <span id="userName" class="hidden sm:block text-sm font-medium">User</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            </button>
+            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+              <a href="../settings.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
+              <hr class="my-1">
+              <button id="logoutBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sign out</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Notification Panel Overlay -->
+    <div id="notificationOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
+
+    <!-- Notification Slide-out Panel -->
+    <div id="notificationPanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
+      <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
+        <h2 class="text-lg font-semibold text-gray-900">Notifications</h2>
+        <div class="flex items-center gap-3">
+          <button id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium hidden">Mark all read</button>
+          <button id="refreshNotificationsBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+          </button>
+          <button id="closeNotificationPanel" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
+        <button id="filterAll" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">All</button>
+        <button id="filterUnread" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Unread</button>
+      </div>
+      <div id="notificationList" class="flex-1 overflow-y-auto">
+        <div id="notificationLoading" class="p-8 text-center">
+          <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+          <p class="text-gray-500 mt-3 text-sm">Loading notifications...</p>
+        </div>
+      </div>
+      <div id="notificationLoadingMore" class="hidden p-4 border-t border-gray-100 text-center flex-shrink-0">
+        <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+      </div>
+    </div>
+
+    <main class="p-4 lg:p-8">
+      <!-- No-Show Predictions Loading State -->
+      <div id="noShowLoading" class="bg-white rounded-xl shadow-sm border border-gray-100 mb-8">
+        <div class="px-6 py-4 border-b border-gray-100 animate-pulse">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-gray-200 rounded-lg"></div>
+            <div>
+              <div class="h-5 bg-gray-200 rounded w-48 mb-2"></div>
+              <div class="h-4 bg-gray-200 rounded w-64"></div>
+            </div>
+          </div>
+        </div>
+        <div class="divide-y divide-gray-100 animate-pulse">
+          <div class="p-6">
+            <div class="flex items-start justify-between">
+              <div class="flex-1">
+                <div class="flex items-center gap-3 mb-2">
+                  <div class="h-5 bg-gray-200 rounded w-32"></div>
+                  <div class="h-6 bg-gray-200 rounded-full w-20"></div>
+                </div>
+                <div class="h-4 bg-gray-200 rounded w-48 mb-3"></div>
+                <div class="flex flex-wrap gap-2 mb-3">
+                  <div class="h-6 bg-gray-200 rounded w-24"></div>
+                  <div class="h-6 bg-gray-200 rounded w-20"></div>
+                  <div class="h-6 bg-gray-200 rounded w-28"></div>
+                </div>
+                <div class="h-4 bg-gray-200 rounded w-56"></div>
+              </div>
+              <div class="h-8 bg-gray-200 rounded w-28"></div>
+            </div>
+          </div>
+          <div class="p-6">
+            <div class="flex items-start justify-between">
+              <div class="flex-1">
+                <div class="flex items-center gap-3 mb-2">
+                  <div class="h-5 bg-gray-200 rounded w-28"></div>
+                  <div class="h-6 bg-gray-200 rounded-full w-16"></div>
+                </div>
+                <div class="h-4 bg-gray-200 rounded w-52 mb-3"></div>
+                <div class="flex flex-wrap gap-2 mb-3">
+                  <div class="h-6 bg-gray-200 rounded w-20"></div>
+                  <div class="h-6 bg-gray-200 rounded w-32"></div>
+                </div>
+                <div class="h-4 bg-gray-200 rounded w-48"></div>
+              </div>
+              <div class="h-8 bg-gray-200 rounded w-28"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- No-Show Predictions -->
+      <div id="noShowContent" class="hidden bg-white rounded-xl shadow-sm border border-gray-100 mb-8">
+        <div class="px-6 py-4 border-b border-gray-100">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+              <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+            <div>
+              <h3 class="font-semibold text-gray-900">No-Show Predictions - Today</h3>
+              <p class="text-sm text-gray-500">Appointments with high no-show probability</p>
+            </div>
+          </div>
+        </div>
+        <div id="noShowList" class="divide-y divide-gray-100">
+          <!-- Populated by JavaScript -->
+        </div>
+      </div>
+
+      <!-- Revenue Forecasts Loading State -->
+      <div id="forecastLoading" class="bg-white rounded-xl shadow-sm border border-gray-100 mb-8">
+        <div class="px-6 py-4 border-b border-gray-100 animate-pulse">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-gray-200 rounded-lg"></div>
+            <div>
+              <div class="h-5 bg-gray-200 rounded w-36 mb-2"></div>
+              <div class="h-4 bg-gray-200 rounded w-56"></div>
+            </div>
+          </div>
+        </div>
+        <div class="p-6">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 animate-pulse">
+            <div class="text-center p-6 bg-gray-50 rounded-xl">
+              <div class="h-4 bg-gray-200 rounded w-28 mx-auto mb-3"></div>
+              <div class="h-8 bg-gray-200 rounded w-24 mx-auto mb-2"></div>
+              <div class="h-3 bg-gray-200 rounded w-32 mx-auto"></div>
+            </div>
+            <div class="text-center p-6 bg-gray-50 rounded-xl">
+              <div class="h-4 bg-gray-200 rounded w-28 mx-auto mb-3"></div>
+              <div class="h-8 bg-gray-200 rounded w-28 mx-auto mb-2"></div>
+              <div class="h-3 bg-gray-200 rounded w-32 mx-auto"></div>
+            </div>
+            <div class="text-center p-6 bg-gray-50 rounded-xl">
+              <div class="h-4 bg-gray-200 rounded w-28 mx-auto mb-3"></div>
+              <div class="h-8 bg-gray-200 rounded w-24 mx-auto mb-2"></div>
+              <div class="h-3 bg-gray-200 rounded w-32 mx-auto"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Revenue Forecasts -->
+      <div id="forecastContent" class="hidden bg-white rounded-xl shadow-sm border border-gray-100 mb-8">
+        <div class="px-6 py-4 border-b border-gray-100">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+              <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+            <div>
+              <h3 class="font-semibold text-gray-900">Revenue Forecasts</h3>
+              <p class="text-sm text-gray-500">Projected revenue based on current pipeline</p>
+            </div>
+          </div>
+        </div>
+        <div class="p-6">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="text-center p-6 bg-gray-50 rounded-xl">
+              <p class="text-sm text-gray-500 mb-2">30-Day Forecast</p>
+              <p id="forecast30" class="text-3xl font-bold text-gray-900">-</p>
+              <div class="mt-2 flex items-center justify-center gap-2">
+                <span id="confidence30" class="text-xs text-gray-500">Confidence: -</span>
+                <span id="trend30" class="text-xs text-green-600"></span>
+              </div>
+            </div>
+            <div class="text-center p-6 bg-gray-50 rounded-xl">
+              <p class="text-sm text-gray-500 mb-2">60-Day Forecast</p>
+              <p id="forecast60" class="text-3xl font-bold text-gray-900">-</p>
+              <div class="mt-2 flex items-center justify-center gap-2">
+                <span id="confidence60" class="text-xs text-gray-500">Confidence: -</span>
+                <span id="trend60" class="text-xs text-green-600"></span>
+              </div>
+            </div>
+            <div class="text-center p-6 bg-gray-50 rounded-xl">
+              <p class="text-sm text-gray-500 mb-2">90-Day Forecast</p>
+              <p id="forecast90" class="text-3xl font-bold text-gray-900">-</p>
+              <div class="mt-2 flex items-center justify-center gap-2">
+                <span id="confidence90" class="text-xs text-gray-500">Confidence: -</span>
+                <span id="trend90" class="text-xs text-green-600"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Case Duration Loading State -->
+      <div id="caseLoading" class="bg-white rounded-xl shadow-sm border border-gray-100">
+        <div class="px-6 py-4 border-b border-gray-100 animate-pulse">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-gray-200 rounded-lg"></div>
+            <div>
+              <div class="h-5 bg-gray-200 rounded w-44 mb-2"></div>
+              <div class="h-4 bg-gray-200 rounded w-60"></div>
+            </div>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-6 py-3"><div class="h-4 bg-gray-200 rounded w-16"></div></th>
+                <th class="px-6 py-3"><div class="h-4 bg-gray-200 rounded w-28"></div></th>
+                <th class="px-6 py-3"><div class="h-4 bg-gray-200 rounded w-20"></div></th>
+                <th class="px-6 py-3"><div class="h-4 bg-gray-200 rounded w-16"></div></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 animate-pulse">
+              <tr>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-36"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-24"></div></td>
+                <td class="px-6 py-4"><div class="flex items-center gap-2"><div class="w-16 h-2 bg-gray-200 rounded-full"></div><div class="h-3 bg-gray-200 rounded w-8"></div></div></td>
+                <td class="px-6 py-4"><div class="flex gap-1"><div class="h-5 bg-gray-200 rounded w-16"></div><div class="h-5 bg-gray-200 rounded w-20"></div></div></td>
+              </tr>
+              <tr>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-32"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-24"></div></td>
+                <td class="px-6 py-4"><div class="flex items-center gap-2"><div class="w-16 h-2 bg-gray-200 rounded-full"></div><div class="h-3 bg-gray-200 rounded w-8"></div></div></td>
+                <td class="px-6 py-4"><div class="flex gap-1"><div class="h-5 bg-gray-200 rounded w-20"></div><div class="h-5 bg-gray-200 rounded w-14"></div></div></td>
+              </tr>
+              <tr>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-28"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-24"></div></td>
+                <td class="px-6 py-4"><div class="flex items-center gap-2"><div class="w-16 h-2 bg-gray-200 rounded-full"></div><div class="h-3 bg-gray-200 rounded w-8"></div></div></td>
+                <td class="px-6 py-4"><div class="flex gap-1"><div class="h-5 bg-gray-200 rounded w-18"></div><div class="h-5 bg-gray-200 rounded w-16"></div></div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Case Duration Predictions -->
+      <div id="caseContent" class="hidden bg-white rounded-xl shadow-sm border border-gray-100">
+        <div class="px-6 py-4 border-b border-gray-100">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+              <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+            <div>
+              <h3 class="font-semibold text-gray-900">Case Duration Predictions</h3>
+              <p class="text-sm text-gray-500">Estimated completion dates for active matters</p>
+            </div>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Matter</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Est. Completion</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Confidence</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Factors</th>
+              </tr>
+            </thead>
+            <tbody id="caseDurationTable" class="divide-y divide-gray-200"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    if (!api.requireAuth()) throw new Error('Not authenticated');
+    
+    // Render dynamic menu
+    renderMenu('#mainNav');
+
+    // Initialize notifications panel
+    NotificationPanel.init();
+
+    // Load user info
+    function loadUserInfo() {
+      const user = api.user;
+      if (user) {
+        const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+        const initials = (user.firstName?.[0] || '') + (user.lastName?.[0] || '') || user.email[0].toUpperCase();
+        document.getElementById('userName').textContent = name;
+        document.getElementById('userInitials').textContent = initials;
+      }
+    }
+    loadUserInfo();
+
+    // User menu toggle
+    const userMenu = document.getElementById('userMenu');
+    const userDropdown = document.getElementById('userDropdown');
+    userMenu.addEventListener('click', () => userDropdown.classList.toggle('hidden'));
+    document.addEventListener('click', (e) => {
+      if (!userMenu.contains(e.target)) userDropdown.classList.add('hidden');
+    });
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      await api.logout();
+      window.location.href = '../login.html';
+    });
+
+    // Sidebar toggle
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('openSidebar').addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+    document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+
+    // Show/hide loading states
+    function showLoadingStates() {
+      document.getElementById('noShowLoading').classList.remove('hidden');
+      document.getElementById('noShowContent').classList.add('hidden');
+      document.getElementById('forecastLoading').classList.remove('hidden');
+      document.getElementById('forecastContent').classList.add('hidden');
+      document.getElementById('caseLoading').classList.remove('hidden');
+      document.getElementById('caseContent').classList.add('hidden');
+    }
+
+    function hideLoadingStates() {
+      document.getElementById('noShowLoading').classList.add('hidden');
+      document.getElementById('noShowContent').classList.remove('hidden');
+      document.getElementById('forecastLoading').classList.add('hidden');
+      document.getElementById('forecastContent').classList.remove('hidden');
+      document.getElementById('caseLoading').classList.add('hidden');
+      document.getElementById('caseContent').classList.remove('hidden');
+    }
+
+    function formatCurrency(val) {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(val);
+    }
+
+    function renderNoShows(noShows) {
+      const container = document.getElementById('noShowList');
+      if (!noShows || noShows.length === 0) {
+        container.innerHTML = '<div class="p-6 text-center text-gray-500">No high-risk appointments predicted for today</div>';
+        return;
+      }
+      container.innerHTML = noShows.map(ns => `
+        <div class="p-6 hover:bg-gray-50">
+          <div class="flex items-start justify-between">
+            <div class="flex-1">
+              <div class="flex items-center gap-3 mb-2">
+                <p class="font-semibold text-gray-900">${ns.clientName}</p>
+                <span class="px-2 py-1 text-xs font-medium rounded-full ${ns.probability >= 0.6 ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}">${Math.round(ns.probability * 100)}% risk</span>
+              </div>
+              <p class="text-sm text-gray-500 mb-3">Appointment: ${new Date(ns.appointmentTime).toLocaleString()}</p>
+              <div class="flex flex-wrap gap-2 mb-3">
+                ${ns.riskFactors.map(f => `<span class="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">${f}</span>`).join('')}
+              </div>
+              <p class="text-sm text-indigo-600 font-medium">${ns.suggestedAction}</p>
+            </div>
+            <button class="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">Send Reminder</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderCaseDurations(cases) {
+      const tbody = document.getElementById('caseDurationTable');
+      if (!cases || cases.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-8 text-center text-gray-500">No case duration predictions available</td></tr>';
+        return;
+      }
+      tbody.innerHTML = cases.map(c => `
+        <tr class="hover:bg-gray-50">
+          <td class="px-6 py-4 font-medium text-gray-900">${c.matterName}</td>
+          <td class="px-6 py-4 text-sm text-gray-500">${formatDate(c.estimatedCompletion)}</td>
+          <td class="px-6 py-4">
+            <div class="flex items-center gap-2">
+              <div class="w-16 h-2 bg-gray-200 rounded-full"><div class="h-full bg-purple-500 rounded-full" style="width: ${c.confidence * 100}%"></div></div>
+              <span class="text-xs text-gray-500">${Math.round(c.confidence * 100)}%</span>
+            </div>
+          </td>
+          <td class="px-6 py-4">
+            <div class="flex flex-wrap gap-1">
+              ${c.factors.map(f => `<span class="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded">${f}</span>`).join('')}
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function loadData() {
+      // Show loading skeletons
+      showLoadingStates();
+
+      try {
+        const data = await Insights.getPredictions();
+
+        renderNoShows(data.noShows);
+
+        if (data.forecasts || data.revenueForecasts) {
+          const forecasts = data.forecasts || data.revenueForecasts;
+          document.getElementById('forecast30').textContent = formatCurrency(forecasts['30_day'].value);
+          document.getElementById('confidence30').textContent = `Confidence: ${Math.round(forecasts['30_day'].confidence * 100)}%`;
+          document.getElementById('trend30').textContent = `+${forecasts['30_day'].comparisonLastPeriod}% vs prior`;
+
+          document.getElementById('forecast60').textContent = formatCurrency(forecasts['60_day'].value);
+          document.getElementById('confidence60').textContent = `Confidence: ${Math.round(forecasts['60_day'].confidence * 100)}%`;
+          document.getElementById('trend60').textContent = `+${forecasts['60_day'].comparisonLastPeriod}% vs prior`;
+
+          document.getElementById('forecast90').textContent = formatCurrency(forecasts['90_day'].value);
+          document.getElementById('confidence90').textContent = `Confidence: ${Math.round(forecasts['90_day'].confidence * 100)}%`;
+          document.getElementById('trend90').textContent = `+${forecasts['90_day'].comparisonLastPeriod}% vs prior`;
+        }
+
+        renderCaseDurations(data.caseDurations || []);
+
+        // Hide loading skeletons, show content
+        hideLoadingStates();
+      } catch (error) {
+        // Hide loading even on error
+        hideLoadingStates();
+        Toast.error('Failed to load predictions');
+        console.error(error);
+      }
+    }
+
+    loadData();
+  </script>
+</body>
+</html>

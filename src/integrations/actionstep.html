@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ActionStep Dashboard - LanaAI</title>
+  <script src="../js/tailwind-loader.js"></script>
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/menu.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <!-- Sidebar -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col h-full">
+    <div class="flex items-center justify-between h-16 px-6 border-b border-gray-800 flex-shrink-0">
+      <a href="../index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
+      <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
+      <!-- Menu will be dynamically rendered by menu.js -->
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="lg:ml-64">
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
+      <div class="flex items-center justify-between h-16 px-4 lg:px-8">
+        <div class="flex items-center gap-4">
+          <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+          </button>
+          <a href="connector-case.html" class="text-gray-500 hover:text-gray-700">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+          </a>
+          <div>
+            <h1 class="text-xl font-semibold text-gray-900">ActionStep Dashboard</h1>
+            <p class="text-sm text-gray-500">Legal case management integration</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <span id="lastSyncTime" class="text-sm text-gray-500"></span>
+          <button onclick="loadDashboard()" class="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            Refresh
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="p-4 lg:p-8">
+      <!-- Not Configured State -->
+      <div id="notConfigured" class="hidden">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+          <div class="text-center">
+            <div class="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <svg class="w-10 h-10 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-900 mb-2">ActionStep Not Configured</h2>
+            <p id="notConfiguredMessage" class="text-gray-500 max-w-md mx-auto mb-6">The ActionStep integration requires server configuration.</p>
+
+            <div class="bg-gray-50 rounded-lg p-6 max-w-lg mx-auto text-left">
+              <h3 class="font-semibold text-gray-900 mb-3">Administrator Setup Required</h3>
+              <p class="text-sm text-gray-600 mb-4">Add the following to your <code class="bg-gray-200 px-1 rounded">.env</code> file:</p>
+              <pre class="bg-gray-900 text-green-400 p-4 rounded-lg text-sm overflow-x-auto"><code># ActionStep Integration
+ACTIONSTEP_IMPORT_DIR=/path/to/actionstep/export
+ACTIONSTEP_SYNC_FREQUENCY=daily</code></pre>
+              <p class="text-sm text-gray-500 mt-4">The import directory should contain:</p>
+              <ul class="text-sm text-gray-600 mt-2 space-y-1">
+                <li class="flex items-center gap-2">
+                  <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+                  <code class="text-xs bg-gray-200 px-1 rounded">data/</code> - CSV files (actions.csv, participants.csv, etc.)
+                </li>
+                <li class="flex items-center gap-2">
+                  <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+                  <code class="text-xs bg-gray-200 px-1 rounded">documents/</code> - Document files for RAG processing
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dashboard Content -->
+      <div id="dashboardContent" class="hidden">
+        <!-- Import Actions -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
+          <div class="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 class="text-lg font-semibold text-gray-900">Data Import</h2>
+              <p class="text-sm text-gray-500">Import data from your ActionStep export folder</p>
+            </div>
+            <div class="flex flex-wrap gap-3">
+              <button onclick="syncCSVData()" id="syncCSVBtn" class="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                Import CSV Data
+              </button>
+              <button onclick="importDocuments()" id="importDocsBtn" class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                Import Documents
+              </button>
+              <button onclick="showSettings()" class="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                Settings
+              </button>
+            </div>
+          </div>
+
+          <!-- Import Progress (hidden by default) -->
+          <div id="importProgress" class="hidden mt-6 p-4 bg-gray-50 rounded-lg">
+            <div class="flex items-center gap-4">
+              <div id="importSpinner" class="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600"></div>
+              <div class="flex-1">
+                <p id="importProgressText" class="font-medium text-gray-900">Importing...</p>
+                <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
+                  <div id="importProgressBar" class="bg-emerald-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <div id="importProgressDetails" class="mt-3 grid grid-cols-3 md:grid-cols-6 gap-2 text-xs"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Summary Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+          <!-- Matters -->
+          <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-gray-500">Matters</p>
+                <p id="statMatters" class="text-3xl font-bold text-gray-900">-</p>
+              </div>
+              <div class="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
+                <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg>
+              </div>
+            </div>
+            <p id="statMattersActive" class="text-sm text-emerald-600 mt-2">-</p>
+          </div>
+
+          <!-- Participants -->
+          <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-gray-500">Participants</p>
+                <p id="statParticipants" class="text-3xl font-bold text-gray-900">-</p>
+              </div>
+              <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+              </div>
+            </div>
+            <p id="statCompanies" class="text-sm text-blue-600 mt-2">-</p>
+          </div>
+
+          <!-- File Notes -->
+          <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-gray-500">File Notes</p>
+                <p id="statNotes" class="text-3xl font-bold text-gray-900">-</p>
+              </div>
+              <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+              </div>
+            </div>
+            <p class="text-sm text-gray-500 mt-2">Case notes & memos</p>
+          </div>
+
+          <!-- Tasks -->
+          <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-gray-500">Tasks</p>
+                <p id="statTasks" class="text-3xl font-bold text-gray-900">-</p>
+              </div>
+              <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+              </div>
+            </div>
+            <p id="statTasksOverdue" class="text-sm text-red-600 mt-2">-</p>
+          </div>
+
+          <!-- Documents -->
+          <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-gray-500">Documents</p>
+                <p id="statDocuments" class="text-3xl font-bold text-gray-900">-</p>
+              </div>
+              <div class="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+                <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+              </div>
+            </div>
+            <p id="statDocsProcessing" class="text-sm text-indigo-600 mt-2">-</p>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-8">
+          <div class="border-b border-gray-200">
+            <nav class="flex -mb-px">
+              <button onclick="switchTab('matters')" id="tab-matters" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-emerald-600 text-emerald-600">
+                Matters
+              </button>
+              <button onclick="switchTab('participants')" id="tab-participants" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                Participants
+              </button>
+              <button onclick="switchTab('tasks')" id="tab-tasks" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                Tasks
+              </button>
+              <button onclick="switchTab('notes')" id="tab-notes" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                File Notes
+              </button>
+              <button onclick="switchTab('sync')" id="tab-sync" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                Sync History
+              </button>
+            </nav>
+          </div>
+
+          <!-- Tab Content -->
+          <div id="tabContent" class="p-6">
+            <!-- Content loaded dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div id="loadingState" class="flex items-center justify-center py-12">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settingsModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
+    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <div class="p-6 border-b border-gray-200">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-semibold text-gray-900">ActionStep Configuration</h3>
+          <button onclick="hideSettings()" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+      </div>
+      <div class="p-6 space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Import Directory</label>
+          <div id="settingsImportDir" class="px-4 py-2 bg-gray-100 rounded-lg text-gray-700 font-mono text-sm">-</div>
+          <p class="text-xs text-gray-500 mt-1">Configured via ACTIONSTEP_IMPORT_DIR in .env</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Sync Frequency</label>
+          <div id="settingsSyncFreq" class="px-4 py-2 bg-gray-100 rounded-lg text-gray-700">-</div>
+          <p class="text-xs text-gray-500 mt-1">Configured via ACTIONSTEP_SYNC_FREQUENCY in .env</p>
+        </div>
+        <div class="pt-4 border-t">
+          <p class="text-sm text-gray-500">To change these settings, update your <code class="bg-gray-200 px-1 rounded">.env</code> file and restart the server.</p>
+        </div>
+        <div class="flex justify-end pt-2">
+          <button onclick="hideSettings()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    if (!api.requireAuth()) throw new Error('Not authenticated');
+
+    // Load full user profile with roles before rendering menu
+    (async () => {
+      try {
+        await api.loadUserProfile();
+      } catch (error) {
+        console.error('Failed to load user profile:', error);
+      }
+
+      // Render dynamic menu (will now have access to roles)
+      renderMenu('#mainNav', { menuType: 'integrations' });
+    })();
+
+    // Sidebar toggle
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('openSidebar').addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+    document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+
+    let dashboardData = null;
+    let currentTab = 'matters';
+
+    // Format number
+    function formatNumber(num) {
+      return new Intl.NumberFormat('en-US').format(num || 0);
+    }
+
+    // Load dashboard data
+    async function loadDashboard() {
+      document.getElementById('loadingState').classList.remove('hidden');
+      document.getElementById('dashboardContent').classList.add('hidden');
+      document.getElementById('notConfigured').classList.add('hidden');
+
+      try {
+        const result = await api.get('/api/v1/actionstep/dashboard');
+        dashboardData = result;
+
+        if (!result.configured) {
+          document.getElementById('loadingState').classList.add('hidden');
+          document.getElementById('notConfigured').classList.remove('hidden');
+          // Show specific message if available
+          if (result.message) {
+            document.getElementById('notConfiguredMessage').textContent = result.message;
+          }
+          return;
+        }
+
+        // Update stats
+        const stats = result.stats;
+        document.getElementById('statMatters').textContent = formatNumber(stats.matters?.total || 0);
+        document.getElementById('statMattersActive').textContent = `${formatNumber(stats.matters?.active || 0)} active`;
+
+        document.getElementById('statParticipants').textContent = formatNumber(stats.participants?.total || 0);
+        document.getElementById('statCompanies').textContent = `${formatNumber(stats.participants?.companies || 0)} companies`;
+
+        document.getElementById('statNotes').textContent = formatNumber(stats.file_notes?.total || 0);
+
+        document.getElementById('statTasks').textContent = formatNumber(stats.tasks?.total || 0);
+        const overdue = stats.tasks?.overdue || 0;
+        document.getElementById('statTasksOverdue').textContent = overdue > 0 ? `${formatNumber(overdue)} overdue` : 'No overdue tasks';
+
+        document.getElementById('statDocuments').textContent = formatNumber(stats.documents?.total || 0);
+        const processing = stats.documents?.processing || 0;
+        document.getElementById('statDocsProcessing').textContent = processing > 0 ? `${formatNumber(processing)} processing` : 'All processed';
+
+        // Update last sync time
+        if (result.last_sync) {
+          document.getElementById('lastSyncTime').textContent = `Last sync: ${timeAgo(result.last_sync.completed_at || result.last_sync.started_at)}`;
+        }
+
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('dashboardContent').classList.remove('hidden');
+
+        // Load current tab
+        loadTabContent(currentTab);
+      } catch (error) {
+        document.getElementById('loadingState').classList.add('hidden');
+        Toast.error('Failed to load dashboard: ' + error.message);
+      }
+    }
+
+    // Switch tab
+    function switchTab(tab) {
+      currentTab = tab;
+
+      // Update tab styles
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('border-emerald-600', 'text-emerald-600');
+        btn.classList.add('border-transparent', 'text-gray-500');
+      });
+      document.getElementById(`tab-${tab}`).classList.remove('border-transparent', 'text-gray-500');
+      document.getElementById(`tab-${tab}`).classList.add('border-emerald-600', 'text-emerald-600');
+
+      loadTabContent(tab);
+    }
+
+    // Load tab content
+    async function loadTabContent(tab) {
+      const content = document.getElementById('tabContent');
+      content.innerHTML = '<div class="flex justify-center py-8"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div></div>';
+
+      try {
+        switch (tab) {
+          case 'matters':
+            await loadMatters();
+            break;
+          case 'participants':
+            await loadParticipants();
+            break;
+          case 'tasks':
+            await loadTasks();
+            break;
+          case 'notes':
+            await loadFileNotes();
+            break;
+          case 'sync':
+            await loadSyncHistory();
+            break;
+        }
+      } catch (error) {
+        content.innerHTML = `<div class="text-center text-red-600 py-8">Failed to load data: ${error.message}</div>`;
+      }
+    }
+
+    // Load matters
+    async function loadMatters() {
+      const result = await api.get('/api/v1/actionstep/matters?limit=25');
+      const content = document.getElementById('tabContent');
+
+      if (!result.matters || result.matters.length === 0) {
+        content.innerHTML = '<div class="text-center text-gray-500 py-8">No matters found. Click "Import CSV Data" to import from ActionStep.</div>';
+        return;
+      }
+
+      const statusColors = {
+        'Active': 'bg-green-100 text-green-800',
+        'Closed': 'bg-gray-100 text-gray-800',
+        'Pending': 'bg-yellow-100 text-yellow-800'
+      };
+
+      content.innerHTML = `
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Matter Name</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">File Ref</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Assigned To</th>
+                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              ${result.matters.map(m => `
+                <tr class="hover:bg-gray-50">
+                  <td class="px-4 py-3 font-medium text-gray-900">${m.matter_name || 'Untitled'}</td>
+                  <td class="px-4 py-3 text-sm text-gray-600">${m.file_reference || '-'}</td>
+                  <td class="px-4 py-3 text-sm text-gray-600">${m.action_type_name || '-'}</td>
+                  <td class="px-4 py-3 text-sm text-gray-600">${m.assigned_to_name || 'Unassigned'}</td>
+                  <td class="px-4 py-3 text-center">
+                    <span class="px-2 py-1 text-xs font-medium rounded-full ${statusColors[m.status] || 'bg-gray-100'}">${m.status || 'Unknown'}</span>
+                  </td>
+                  <td class="px-4 py-3 text-sm text-gray-500">${m.date_created ? new Date(m.date_created).toLocaleDateString() : '-'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-4 text-sm text-gray-500 text-center">Showing ${result.matters.length} of ${result.pagination?.total || result.matters.length} matters</div>
+      `;
+    }
+
+    // Load participants
+    async function loadParticipants() {
+      const result = await api.get('/api/v1/actionstep/participants?limit=25');
+      const content = document.getElementById('tabContent');
+
+      if (!result.participants || result.participants.length === 0) {
+        content.innerHTML = '<div class="text-center text-gray-500 py-8">No participants found</div>';
+        return;
+      }
+
+      content.innerHTML = `
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
+                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Type</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              ${result.participants.map(p => `
+                <tr class="hover:bg-gray-50">
+                  <td class="px-4 py-3">
+                    <div class="font-medium text-gray-900">${p.display_name || p.company_name || 'Unknown'}</div>
+                    ${p.is_company && p.company_name ? '' : (p.company_name ? `<div class="text-sm text-gray-500">${p.company_name}</div>` : '')}
+                  </td>
+                  <td class="px-4 py-3 text-sm text-gray-600">${p.email || '-'}</td>
+                  <td class="px-4 py-3 text-sm text-gray-600">${p.phone || '-'}</td>
+                  <td class="px-4 py-3 text-sm text-gray-600">${[p.city, p.state_province].filter(Boolean).join(', ') || '-'}</td>
+                  <td class="px-4 py-3 text-center">
+                    <span class="px-2 py-1 text-xs font-medium rounded-full ${p.is_company ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}">${p.is_company ? 'Company' : 'Person'}</span>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-4 text-sm text-gray-500 text-center">Showing ${result.participants.length} of ${result.pagination?.total || result.participants.length} participants</div>
+      `;
+    }
+
+    // Load tasks
+    async function loadTasks() {
+      const result = await api.get('/api/v1/actionstep/tasks?limit=25');
+      const content = document.getElementById('tabContent');
+
+      if (!result.tasks || result.tasks.length === 0) {
+        content.innerHTML = '<div class="text-center text-gray-500 py-8">No tasks found</div>';
+        return;
+      }
+
+      const statusColors = {
+        'Completed': 'bg-green-100 text-green-800',
+        'In Progress': 'bg-blue-100 text-blue-800',
+        'Pending': 'bg-yellow-100 text-yellow-800',
+        'Overdue': 'bg-red-100 text-red-800'
+      };
+
+      content.innerHTML = `
+        <div class="space-y-3">
+          ${result.tasks.map(t => {
+            const isOverdue = !t.completed_timestamp && t.due_date && new Date(t.due_date) < new Date();
+            const displayStatus = isOverdue ? 'Overdue' : (t.current_status || 'Pending');
+            return `
+              <div class="flex items-start gap-4 p-4 bg-gray-50 rounded-lg ${isOverdue ? 'border-l-4 border-red-500' : ''}">
+                <div class="w-6 h-6 rounded-full border-2 flex items-center justify-center ${t.completed_timestamp ? 'bg-green-100 border-green-500' : 'border-gray-300'}">
+                  ${t.completed_timestamp ? '<svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>' : ''}
+                </div>
+                <div class="flex-1">
+                  <div class="font-medium text-gray-900 ${t.completed_timestamp ? 'line-through text-gray-500' : ''}">${t.task_name || 'Untitled Task'}</div>
+                  ${t.description ? `<p class="text-sm text-gray-500 mt-1">${t.description.substring(0, 150)}${t.description.length > 150 ? '...' : ''}</p>` : ''}
+                  <div class="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                    ${t.matter_name ? `<span>Matter: ${t.matter_name}</span>` : ''}
+                    ${t.assigned_to_name ? `<span>Assigned: ${t.assigned_to_name}</span>` : ''}
+                    ${t.due_date ? `<span class="${isOverdue ? 'text-red-600 font-medium' : ''}">Due: ${new Date(t.due_date).toLocaleDateString()}</span>` : ''}
+                  </div>
+                </div>
+                <span class="px-2 py-1 text-xs font-medium rounded-full ${statusColors[displayStatus] || 'bg-gray-100'}">${displayStatus}</span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+        <div class="mt-4 text-sm text-gray-500 text-center">Showing ${result.tasks.length} of ${result.pagination?.total || result.tasks.length} tasks</div>
+      `;
+    }
+
+    // Load file notes
+    async function loadFileNotes() {
+      const result = await api.get('/api/v1/actionstep/file-notes?limit=25');
+      const content = document.getElementById('tabContent');
+
+      if (!result.file_notes || result.file_notes.length === 0) {
+        content.innerHTML = '<div class="text-center text-gray-500 py-8">No file notes found</div>';
+        return;
+      }
+
+      content.innerHTML = `
+        <div class="space-y-4">
+          ${result.file_notes.map(n => `
+            <div class="p-4 bg-gray-50 rounded-lg">
+              <div class="flex items-center justify-between mb-2">
+                <div class="font-medium text-gray-900">${n.matter_name || 'Unknown Matter'}</div>
+                <span class="text-xs text-gray-500">${n.note_timestamp ? timeAgo(n.note_timestamp) : ''}</span>
+              </div>
+              <p class="text-sm text-gray-700 whitespace-pre-wrap">${n.note_text?.substring(0, 500) || ''}${(n.note_text?.length || 0) > 500 ? '...' : ''}</p>
+              <div class="mt-2 text-xs text-gray-500">
+                By ${n.entered_by_name || 'Unknown'} ${n.source ? `via ${n.source}` : ''}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="mt-4 text-sm text-gray-500 text-center">Showing ${result.file_notes.length} of ${result.pagination?.total || result.file_notes.length} notes</div>
+      `;
+    }
+
+    // Load sync history
+    async function loadSyncHistory() {
+      const result = await api.get('/api/v1/actionstep/sync-logs?limit=20');
+      const content = document.getElementById('tabContent');
+
+      if (!result.logs || result.logs.length === 0) {
+        content.innerHTML = '<div class="text-center text-gray-500 py-8">No sync history found</div>';
+        return;
+      }
+
+      const statusColors = {
+        'completed': 'bg-green-100 text-green-800',
+        'failed': 'bg-red-100 text-red-800',
+        'running': 'bg-blue-100 text-blue-800'
+      };
+
+      content.innerHTML = `
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Started</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
+                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Processed</th>
+                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Created</th>
+                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Failed</th>
+                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              ${result.logs.map(l => {
+                const duration = l.completed_at && l.started_at
+                  ? Math.round((new Date(l.completed_at) - new Date(l.started_at)) / 1000) + 's'
+                  : '-';
+                return `
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 font-medium text-gray-900">${l.sync_type || 'Full'}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600">${l.started_at ? timeAgo(l.started_at) : '-'}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600">${duration}</td>
+                    <td class="px-4 py-3 text-sm text-right text-gray-600">${formatNumber(l.records_processed)}</td>
+                    <td class="px-4 py-3 text-sm text-right text-green-600">${formatNumber(l.records_created)}</td>
+                    <td class="px-4 py-3 text-sm text-right ${l.records_failed > 0 ? 'text-red-600' : 'text-gray-600'}">${formatNumber(l.records_failed)}</td>
+                    <td class="px-4 py-3 text-center">
+                      <span class="px-2 py-1 text-xs font-medium rounded-full ${statusColors[l.status] || 'bg-gray-100'}">${l.status || 'unknown'}</span>
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    // Sync CSV data with progress polling
+    let importPollingInterval = null;
+
+    async function syncCSVData() {
+      const btn = document.getElementById('syncCSVBtn');
+      const progress = document.getElementById('importProgress');
+      const progressText = document.getElementById('importProgressText');
+      const progressBar = document.getElementById('importProgressBar');
+
+      btn.disabled = true;
+      document.getElementById('importDocsBtn').disabled = true;
+      progress.classList.remove('hidden');
+      progressText.textContent = 'Starting CSV import...';
+      progressBar.style.width = '5%';
+      progressBar.classList.remove('bg-red-600');
+      progressBar.classList.add('bg-emerald-600');
+
+      // Start polling for progress updates FIRST (before the request)
+      startImportPolling(progressText, progressBar);
+
+      // Start the import - don't stop polling on timeout since import continues on server
+      api.post('/api/v1/actionstep/sync', {})
+        .then(result => {
+          // Import completed successfully via HTTP response
+          stopImportPolling();
+          progressBar.style.width = '100%';
+
+          const totalProcessed = Object.values(result.stats || {}).reduce((sum, s) => sum + (s.processed || 0), 0);
+          const totalCreated = Object.values(result.stats || {}).reduce((sum, s) => sum + (s.created || 0), 0);
+
+          progressText.textContent = `Import complete! Processed ${formatNumber(totalProcessed)} records, created ${formatNumber(totalCreated)} new`;
+          Toast.success('CSV data imported successfully');
+
+          setTimeout(() => {
+            progress.classList.add('hidden');
+            btn.disabled = false;
+            document.getElementById('importDocsBtn').disabled = false;
+            loadDashboard();
+          }, 3000);
+        })
+        .catch(error => {
+          // Check if it's a timeout - if so, keep polling since server is still working
+          const isTimeout = error.message?.toLowerCase().includes('timeout') ||
+                           error.message?.toLowerCase().includes('network') ||
+                           error.message?.toLowerCase().includes('aborted');
+
+          if (isTimeout) {
+            // Don't stop polling - server is still processing
+            console.log('Request timed out, but import continues on server. Polling for status...');
+            progressText.textContent = 'Import in progress (monitoring via polling)...';
+            // Polling will handle completion detection
+          } else {
+            // Real error - stop polling
+            stopImportPolling();
+            progressText.textContent = 'Import failed: ' + error.message;
+            progressBar.classList.remove('bg-emerald-600');
+            progressBar.classList.add('bg-red-600');
+            Toast.error('CSV import failed: ' + error.message);
+            btn.disabled = false;
+            document.getElementById('importDocsBtn').disabled = false;
+          }
+        });
+    }
+
+    function startImportPolling(progressText, progressBar) {
+      let pollCount = 0;
+      const entityOrder = ['actionTypes', 'participants', 'matters', 'matterParticipants', 'fileNotes', 'tasks'];
+      const entityLabels = {
+        actionTypes: 'Types',
+        participants: 'Participants',
+        matters: 'Matters',
+        matterParticipants: 'Links',
+        fileNotes: 'Notes',
+        tasks: 'Tasks'
+      };
+      const progressDetails = document.getElementById('importProgressDetails');
+
+      importPollingInterval = setInterval(async () => {
+        try {
+          pollCount++;
+          const result = await api.get('/api/v1/actionstep/sync-logs?limit=1');
+
+          if (result.logs && result.logs.length > 0) {
+            const log = result.logs[0];
+
+            if (log.status === 'completed') {
+              // Import completed - handle it here (in case HTTP request timed out)
+              stopImportPolling();
+              progressBar.style.width = '100%';
+
+              const entityStats = log.entity_stats || {};
+              let totalProcessed = 0;
+              for (const entity of entityOrder) {
+                totalProcessed += entityStats[entity]?.processed || 0;
+              }
+
+              progressText.textContent = `Import complete! Processed ${formatNumber(totalProcessed)} records`;
+              document.getElementById('importSpinner').classList.remove('animate-spin');
+              Toast.success('CSV data imported successfully');
+
+              setTimeout(() => {
+                document.getElementById('importProgress').classList.add('hidden');
+                document.getElementById('syncCSVBtn').disabled = false;
+                document.getElementById('importDocsBtn').disabled = false;
+                document.getElementById('importSpinner').classList.add('animate-spin');
+                loadDashboard();
+              }, 3000);
+              return;
+            }
+
+            if (log.status === 'failed') {
+              stopImportPolling();
+              progressText.textContent = 'Import failed: ' + (log.error_message || 'Unknown error');
+              progressBar.classList.remove('bg-emerald-600');
+              progressBar.classList.add('bg-red-600');
+              document.getElementById('importSpinner').classList.add('hidden');
+              document.getElementById('syncCSVBtn').disabled = false;
+              document.getElementById('importDocsBtn').disabled = false;
+              return;
+            }
+
+            // Parse entity stats to show progress
+            const entityStats = log.entity_stats || {};
+            let currentEntity = 'Starting...';
+            let progressPercent = 5;
+            let totalProcessed = 0;
+            let detailsHtml = '';
+
+            // Find current entity being processed and build details
+            for (let i = 0; i < entityOrder.length; i++) {
+              const entity = entityOrder[i];
+              const stats = entityStats[entity];
+              const processed = stats?.processed || 0;
+              const created = stats?.created || 0;
+              const updated = stats?.updated || 0;
+
+              if (processed > 0) {
+                currentEntity = entityLabels[entity];
+                totalProcessed += processed;
+                // Each entity is ~16% of progress (6 entities)
+                progressPercent = Math.min(95, 5 + ((i + 1) / entityOrder.length) * 90);
+              }
+
+              // Show stat box for each entity
+              const isActive = stats && stats.processed > 0;
+              const isDone = i < entityOrder.length - 1 && entityStats[entityOrder[i + 1]]?.processed > 0;
+              const statusClass = isDone ? 'bg-green-100 text-green-800' : (isActive ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-400');
+
+              detailsHtml += `
+                <div class="p-2 rounded ${statusClass} text-center">
+                  <div class="font-medium">${entityLabels[entity]}</div>
+                  <div>${formatNumber(processed)}</div>
+                </div>
+              `;
+            }
+
+            progressDetails.innerHTML = detailsHtml;
+            progressBar.style.width = progressPercent + '%';
+            progressText.textContent = `Importing ${currentEntity}... (${formatNumber(log.records_processed || totalProcessed)} total records)`;
+          }
+        } catch (e) {
+          // Ignore polling errors, just keep trying
+          console.log('Polling error:', e);
+        }
+      }, 2000); // Poll every 2 seconds
+    }
+
+    function stopImportPolling() {
+      if (importPollingInterval) {
+        clearInterval(importPollingInterval);
+        importPollingInterval = null;
+      }
+    }
+
+    // Import documents with progress polling
+    let docImportPollingInterval = null;
+    let currentDocBatchId = null;
+
+    async function importDocuments() {
+      const btn = document.getElementById('importDocsBtn');
+      const progress = document.getElementById('importProgress');
+      const progressText = document.getElementById('importProgressText');
+      const progressBar = document.getElementById('importProgressBar');
+      const progressDetails = document.getElementById('importProgressDetails');
+
+      btn.disabled = true;
+      document.getElementById('syncCSVBtn').disabled = true;
+      progress.classList.remove('hidden');
+      progressText.textContent = 'Scanning documents folder...';
+      progressBar.style.width = '5%';
+      progressBar.classList.remove('bg-red-600');
+      progressBar.classList.add('bg-emerald-600');
+      progressDetails.innerHTML = '';
+
+      // Start the import (don't await - let it run in background for large imports)
+      api.post('/api/v1/actionstep/documents/import', {
+        folder_path: dashboardData?.config?.import_directory ?
+          dashboardData.config.import_directory + '/documents' : undefined
+      })
+        .then(result => {
+          currentDocBatchId = result.batchId;
+
+          // Show initial stats
+          const stats = result.stats || {};
+          progressText.textContent = `Scanned ${formatNumber(stats.scanned || 0)} files, ${formatNumber(stats.new || 0)} new to import`;
+          progressBar.style.width = '20%';
+
+          // If documents were queued, start polling for processing progress
+          if (stats.queued > 0) {
+            progressText.textContent = `${formatNumber(stats.queued)} documents queued for processing...`;
+            startDocImportPolling(progressText, progressBar, progressDetails, result.batchId);
+          } else if (stats.scanned === 0) {
+            progressText.textContent = 'No documents found in the documents folder';
+            progressBar.style.width = '100%';
+            setTimeout(() => {
+              progress.classList.add('hidden');
+              btn.disabled = false;
+              document.getElementById('syncCSVBtn').disabled = false;
+            }, 3000);
+          } else {
+            // All files already imported
+            progressText.textContent = `All ${formatNumber(stats.scanned)} documents already imported (${formatNumber(stats.skipped)} skipped)`;
+            progressBar.style.width = '100%';
+            Toast.success('No new documents to import');
+            setTimeout(() => {
+              progress.classList.add('hidden');
+              btn.disabled = false;
+              document.getElementById('syncCSVBtn').disabled = false;
+              loadDashboard();
+            }, 3000);
+          }
+        })
+        .catch(error => {
+          stopDocImportPolling();
+          progressText.textContent = 'Import failed: ' + error.message;
+          progressBar.classList.remove('bg-emerald-600');
+          progressBar.classList.add('bg-red-600');
+          document.getElementById('importSpinner').classList.add('hidden');
+          Toast.error('Document import failed: ' + error.message);
+          btn.disabled = false;
+          document.getElementById('syncCSVBtn').disabled = false;
+        });
+    }
+
+    function startDocImportPolling(progressText, progressBar, progressDetails, batchId) {
+      docImportPollingInterval = setInterval(async () => {
+        try {
+          const result = await api.get('/api/v1/actionstep/documents/status' + (batchId ? `?batch_id=${batchId}` : ''));
+
+          if (result.statuses) {
+            // Batch-specific status
+            const total = result.total || 0;
+            const completed = result.statuses.completed || 0;
+            const processing = result.statuses.processing || 0;
+            const pending = result.statuses.pending || 0;
+            const uploaded = result.statuses.uploaded || 0;
+            const failed = result.statuses.failed || 0;
+
+            const done = completed + failed;
+            const progressPercent = total > 0 ? Math.min(95, 20 + (done / total) * 75) : 20;
+
+            progressBar.style.width = progressPercent + '%';
+            progressText.textContent = `Processing documents: ${formatNumber(completed)} completed, ${formatNumber(processing + pending + uploaded)} in queue`;
+
+            // Show detailed stats
+            progressDetails.innerHTML = `
+              <div class="p-2 rounded bg-green-100 text-green-800 text-center">
+                <div class="font-medium">Completed</div>
+                <div>${formatNumber(completed)}</div>
+              </div>
+              <div class="p-2 rounded bg-blue-100 text-blue-800 text-center">
+                <div class="font-medium">Processing</div>
+                <div>${formatNumber(processing)}</div>
+              </div>
+              <div class="p-2 rounded bg-yellow-100 text-yellow-800 text-center">
+                <div class="font-medium">Pending</div>
+                <div>${formatNumber(pending + uploaded)}</div>
+              </div>
+              <div class="p-2 rounded ${failed > 0 ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-400'} text-center">
+                <div class="font-medium">Failed</div>
+                <div>${formatNumber(failed)}</div>
+              </div>
+            `;
+
+            // Check if done
+            if (done >= total && total > 0) {
+              stopDocImportPolling();
+              progressBar.style.width = '100%';
+              progressText.textContent = `Document import complete! ${formatNumber(completed)} processed, ${formatNumber(failed)} failed`;
+              document.getElementById('importSpinner').classList.remove('animate-spin');
+
+              if (failed === 0) {
+                Toast.success('All documents processed successfully');
+              } else {
+                Toast.success(`Documents processed with ${failed} failures`);
+              }
+
+              setTimeout(() => {
+                document.getElementById('importProgress').classList.add('hidden');
+                document.getElementById('importDocsBtn').disabled = false;
+                document.getElementById('syncCSVBtn').disabled = false;
+                document.getElementById('importSpinner').classList.add('animate-spin');
+                loadDashboard();
+              }, 3000);
+            }
+          } else {
+            // Overall status (no batch ID)
+            const total = parseInt(result.total) || 0;
+            const completed = parseInt(result.completed) || 0;
+            const processing = parseInt(result.processing) || 0;
+
+            progressText.textContent = `Documents: ${formatNumber(completed)} completed, ${formatNumber(processing)} processing`;
+          }
+        } catch (e) {
+          console.log('Doc polling error:', e);
+        }
+      }, 3000); // Poll every 3 seconds (document processing is slower)
+    }
+
+    function stopDocImportPolling() {
+      if (docImportPollingInterval) {
+        clearInterval(docImportPollingInterval);
+        docImportPollingInterval = null;
+      }
+    }
+
+    // Show settings modal
+    function showSettings() {
+      document.getElementById('settingsModal').classList.remove('hidden');
+      if (dashboardData?.config) {
+        document.getElementById('settingsImportDir').textContent = dashboardData.config.import_directory || 'Not set';
+        document.getElementById('settingsSyncFreq').textContent = (dashboardData.config.sync_frequency || 'daily').charAt(0).toUpperCase() + (dashboardData.config.sync_frequency || 'daily').slice(1);
+      }
+    }
+
+    // Hide settings modal
+    function hideSettings() {
+      document.getElementById('settingsModal').classList.add('hidden');
+    }
+
+    // Initialize
+    loadDashboard();
+  </script>
+</body>
+</html>

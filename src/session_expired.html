@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Session Expired - Lana AI</title>
+    <script src="js/tailwind-loader.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/error-reporter.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+    <div class="max-w-md w-full mx-4">
+        <div class="bg-white rounded-lg shadow-lg p-8 text-center">
+            <div class="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i class="fas fa-clock text-blue-500 text-3xl"></i>
+            </div>
+
+            <h1 class="text-2xl font-bold text-gray-900 mb-2">Session Expired</h1>
+            <p class="text-gray-600 mb-6">Your session has timed out due to inactivity. Please sign in again to continue.</p>
+
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
+                <div class="flex items-start">
+                    <i class="fas fa-shield-alt text-blue-600 mt-0.5 mr-3"></i>
+                    <div>
+                        <p class="text-sm text-blue-800 font-medium">Security Notice</p>
+                        <p class="text-sm text-blue-700 mt-1">
+                            For your protection, sessions automatically expire after a period of inactivity.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <a href="/login.html" id="loginBtn" class="block w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition">
+                    <i class="fas fa-sign-in-alt mr-2"></i>Sign In Again
+                </a>
+            </div>
+
+            <p class="text-sm text-gray-500 mt-6" id="redirectMessage" style="display: none;">
+                <i class="fas fa-info-circle mr-1"></i>
+                You'll be redirected to your previous page after signing in.
+            </p>
+        </div>
+
+        <p class="text-center text-gray-400 text-sm mt-6">
+            &copy; 2024 Lana AI. All rights reserved.
+        </p>
+        <p id="app-version" class="text-center text-gray-400 text-xs mt-2"></p>
+    </div>
+
+    <script>
+        // Set app version from config
+        document.getElementById('app-version').textContent = 'v' + (window.LanaConfig?.APP_VERSION || '2.0.0');
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Clear any stored tokens
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+
+            // Get intended destination from URL
+            const params = new URLSearchParams(window.location.search);
+            const returnUrl = params.get('return');
+
+            if (returnUrl) {
+                const loginBtn = document.getElementById('loginBtn');
+                loginBtn.href = '/login.html?return=' + encodeURIComponent(returnUrl);
+                document.getElementById('redirectMessage').style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>

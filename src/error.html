@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error - Lana AI</title>
+    <script src="js/tailwind-loader.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/error-reporter.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+    <div class="max-w-md w-full mx-4">
+        <div class="bg-white rounded-lg shadow-lg p-8 text-center">
+            <div class="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i class="fas fa-exclamation-triangle text-red-500 text-3xl"></i>
+            </div>
+
+            <h1 class="text-2xl font-bold text-gray-900 mb-2">Something Went Wrong</h1>
+            <p class="text-gray-600 mb-6" id="errorMessage">An unexpected error occurred. Please try again later.</p>
+
+            <div class="bg-gray-50 rounded-lg p-4 mb-6 text-left" id="errorDetails" style="display: none;">
+                <p class="text-sm text-gray-500 mb-1">Error Code:</p>
+                <p class="font-mono text-sm text-gray-700" id="errorCode"></p>
+                <p class="text-sm text-gray-500 mt-3 mb-1">Reference ID:</p>
+                <p class="font-mono text-sm text-gray-700" id="errorRef"></p>
+            </div>
+
+            <div class="space-y-3">
+                <button onclick="window.location.reload()" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition">
+                    <i class="fas fa-redo mr-2"></i>Try Again
+                </button>
+                <a href="/index.html" class="block w-full bg-gray-200 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-300 transition">
+                    <i class="fas fa-home mr-2"></i>Go to Dashboard
+                </a>
+            </div>
+
+            <div class="mt-8 pt-6 border-t border-gray-200">
+                <p class="text-sm text-gray-500 mb-2">Need help?</p>
+                <a href="mailto:support@lana.ai" class="text-blue-600 hover:underline text-sm">
+                    <i class="fas fa-envelope mr-1"></i>Contact Support
+                </a>
+            </div>
+        </div>
+
+        <p class="text-center text-gray-400 text-sm mt-6">
+            &copy; 2024 Lana AI. All rights reserved.
+        </p>
+        <p id="app-version" class="text-center text-gray-400 text-xs mt-2"></p>
+    </div>
+
+    <script>
+        // Set app version from config
+        document.getElementById('app-version').textContent = 'v' + (window.LanaConfig?.APP_VERSION || '2.0.0');
+
+        // Parse error details from URL parameters
+        document.addEventListener('DOMContentLoaded', function() {
+            const params = new URLSearchParams(window.location.search);
+
+            const message = params.get('message');
+            const code = params.get('code');
+            const ref = params.get('ref');
+
+            if (message) {
+                document.getElementById('errorMessage').textContent = decodeURIComponent(message);
+            }
+
+            if (code || ref) {
+                document.getElementById('errorDetails').style.display = 'block';
+                if (code) {
+                    document.getElementById('errorCode').textContent = code;
+                }
+                if (ref) {
+                    document.getElementById('errorRef').textContent = ref;
+                } else {
+                    document.getElementById('errorRef').textContent = 'ERR-' + Date.now().toString(36).toUpperCase();
+                }
+            }
+        });
+    </script>
+</body>
+</html>

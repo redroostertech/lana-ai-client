@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document Generation - LanaAI</title>
+  <script src="../js/tailwind-loader.js"></script>
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/workflows.js"></script>
+  <!-- Quill Editor -->
+  <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
+  <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+  <style>
+    .ql-editor {
+      min-height: 300px;
+      font-family: 'Times New Roman', serif;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .ql-toolbar {
+      border-top-left-radius: 8px;
+      border-top-right-radius: 8px;
+      background: #f9fafb;
+    }
+    .ql-container {
+      border-bottom-left-radius: 8px;
+      border-bottom-right-radius: 8px;
+    }
+    .merge-field {
+      background: #e0e7ff;
+      color: #3730a3;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <!-- Sidebar Navigation -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
+    <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
+      <a href="../index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
+      <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
+      <!-- Menu will be dynamically rendered by menu.js -->
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="lg:ml-64">
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
+      <div class="flex items-center justify-between h-16 px-4 lg:px-8">
+        <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+        <div class="flex-1 px-4 lg:px-0">
+          <h1 class="text-xl font-semibold text-gray-900">Document Generation</h1>
+          <p class="text-sm text-gray-500">Create and manage document templates for automated generation</p>
+        </div>
+        <button onclick="openTemplateEditor()" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+          New Template
+        </button>
+      </div>
+    </header>
+
+    <main class="p-4 lg:p-8">
+      <!-- Templates Section -->
+      <div class="mb-8">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Document Templates</h2>
+        <div id="templatesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <!-- Populated by JavaScript -->
+        </div>
+      </div>
+
+      <!-- Automation Rules Section (temporarily hidden) -->
+      <div class="hidden bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900">Automation Rules</h2>
+            <p class="text-sm text-gray-500">Configure when documents are automatically generated</p>
+          </div>
+          <button onclick="addAutomationRule()" class="px-3 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+            Add Rule
+          </button>
+        </div>
+
+        <div id="automationRules" class="space-y-4">
+          <!-- Populated by JavaScript -->
+        </div>
+      </div>
+
+      <!-- Available Merge Fields Reference -->
+      <div class="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Available Merge Fields</h2>
+        <p class="text-sm text-gray-500 mb-4">Use these fields in your templates to insert dynamic data</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div>
+            <h3 class="text-sm font-medium text-gray-700 mb-2">Client Information</h3>
+            <div class="space-y-1">
+              <code class="merge-field block">{{client.name}}</code>
+              <code class="merge-field block">{{client.email}}</code>
+              <code class="merge-field block">{{client.phone}}</code>
+              <code class="merge-field block">{{client.address}}</code>
+            </div>
+          </div>
+          <div>
+            <h3 class="text-sm font-medium text-gray-700 mb-2">Matter Information</h3>
+            <div class="space-y-1">
+              <code class="merge-field block">{{matter.name}}</code>
+              <code class="merge-field block">{{matter.type}}</code>
+              <code class="merge-field block">{{matter.number}}</code>
+              <code class="merge-field block">{{matter.status}}</code>
+            </div>
+          </div>
+          <div>
+            <h3 class="text-sm font-medium text-gray-700 mb-2">Dates & Amounts</h3>
+            <div class="space-y-1">
+              <code class="merge-field block">{{date.today}}</code>
+              <code class="merge-field block">{{fee.amount}}</code>
+              <code class="merge-field block">{{fee.retainer}}</code>
+              <code class="merge-field block">{{attorney.name}}</code>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Template Editor Modal -->
+  <div id="editorModal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
+      <!-- Modal Header -->
+      <div class="p-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-4">
+          <h3 class="text-lg font-semibold text-gray-900" id="editorTitle">New Template</h3>
+        </div>
+        <button onclick="closeTemplateEditor()" class="text-gray-400 hover:text-gray-600">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="flex-1 overflow-y-auto p-6">
+        <div class="grid grid-cols-3 gap-6">
+          <!-- Left: Template Details -->
+          <div class="col-span-1 space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Template Name</label>
+              <input type="text" id="templateName" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="e.g., Engagement Letter">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <textarea id="templateDescription" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Brief description of this template"></textarea>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+              <select id="templateCategory" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                <option value="Client Intake">Client Intake</option>
+                <option value="Billing">Billing</option>
+                <option value="Case Documents">Case Documents</option>
+                <option value="Correspondence">Correspondence</option>
+              </select>
+            </div>
+
+            <!-- Insert Merge Field -->
+            <div class="pt-4 border-t border-gray-200">
+              <label class="block text-sm font-medium text-gray-700 mb-2">Insert Merge Field</label>
+              <select id="mergeFieldSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-2">
+                <option value="">Select field...</option>
+                <optgroup label="Client">
+                  <option value="{{client.name}}">Client Name</option>
+                  <option value="{{client.email}}">Client Email</option>
+                  <option value="{{client.phone}}">Client Phone</option>
+                  <option value="{{client.address}}">Client Address</option>
+                </optgroup>
+                <optgroup label="Matter">
+                  <option value="{{matter.name}}">Matter Name</option>
+                  <option value="{{matter.type}}">Matter Type</option>
+                  <option value="{{matter.number}}">Matter Number</option>
+                </optgroup>
+                <optgroup label="Dates & Amounts">
+                  <option value="{{date.today}}">Today's Date</option>
+                  <option value="{{fee.amount}}">Fee Amount</option>
+                  <option value="{{fee.retainer}}">Retainer Amount</option>
+                </optgroup>
+                <optgroup label="Firm">
+                  <option value="{{attorney.name}}">Attorney Name</option>
+                  <option value="{{firm.name}}">Firm Name</option>
+                  <option value="{{firm.address}}">Firm Address</option>
+                </optgroup>
+              </select>
+              <button onclick="insertMergeField()" class="w-full px-3 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg">
+                Insert at Cursor
+              </button>
+            </div>
+          </div>
+
+          <!-- Right: Editor -->
+          <div class="col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Template Content</label>
+            <div id="editor" class="bg-white"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-4 border-t border-gray-100 flex items-center justify-between flex-shrink-0">
+        <button onclick="previewTemplate()" class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+          Preview with Sample Data
+        </button>
+        <div class="flex gap-3">
+          <button onclick="closeTemplateEditor()" class="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
+            Cancel
+          </button>
+          <button onclick="saveTemplate()" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg">
+            Save Template
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Preview Modal -->
+  <div id="previewModal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div class="p-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+        <h3 class="text-lg font-semibold text-gray-900">Document Preview</h3>
+        <button onclick="closePreviewModal()" class="text-gray-400 hover:text-gray-600">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <div class="flex-1 overflow-y-auto p-8 bg-gray-100">
+        <div id="previewContent" class="bg-white shadow-lg mx-auto max-w-2xl p-8 min-h-[600px]" style="font-family: 'Times New Roman', serif; font-size: 14px; line-height: 1.6;">
+          <!-- Preview content here -->
+        </div>
+      </div>
+      <div class="p-4 border-t border-gray-100 flex justify-end flex-shrink-0">
+        <button onclick="closePreviewModal()" class="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
+          Close Preview
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Automation Rule Modal -->
+  <div id="ruleModal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg">
+      <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-900">Add Automation Rule</h3>
+        <button onclick="closeRuleModal()" class="text-gray-400 hover:text-gray-600">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">When this happens...</label>
+          <select id="ruleTrigger" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+            <option value="verbal_yes">Client gives verbal yes</option>
+            <option value="engagement_signed">Engagement letter signed</option>
+            <option value="stage_change">Case stage changes</option>
+            <option value="payment_received">Payment received</option>
+            <option value="consultation_completed">Consultation completed</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Generate this document...</label>
+          <select id="ruleTemplate" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+            <!-- Populated by JS -->
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Save to folder</label>
+          <input type="text" id="rulePath" value="/matters/{{matter.number}}/documents/" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">File naming pattern</label>
+          <input type="text" id="ruleNaming" value="{{client.name}}_{{template.name}}_{{date.today}}" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+        </div>
+        <div class="flex items-center gap-2">
+          <input type="checkbox" id="ruleAutoSend" class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+          <label for="ruleAutoSend" class="text-sm text-gray-700">Email document to client after generation</label>
+        </div>
+      </div>
+      <div class="p-4 border-t border-gray-100 flex justify-end gap-3">
+        <button onclick="closeRuleModal()" class="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
+          Cancel
+        </button>
+        <button onclick="saveAutomationRule()" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg">
+          Add Rule
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    if (!api.requireAuth()) throw new Error('Not authenticated');
+    renderMenu('#mainNav');
+
+    // Sidebar toggle
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('openSidebar').addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+    document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+
+    // Quill editor instance
+    let quillEditor = null;
+    let editingTemplateId = null;
+
+    // Mock data for document templates
+    let documentTemplates = [
+      {
+        id: 'doc-001',
+        name: 'Engagement Letter',
+        description: 'Standard client engagement letter for new matters',
+        category: 'Client Intake',
+        content: `<p>{{date.today}}</p><p><br></p><p>{{client.name}}<br>{{client.address}}</p><p><br></p><p>RE: {{matter.name}}</p><p><br></p><p>Dear {{client.name}},</p><p><br></p><p>Thank you for choosing {{firm.name}} to represent you in the above-referenced matter. This letter confirms the terms of our engagement.</p><p><br></p><p><strong>Scope of Representation:</strong></p><p>We have agreed to represent you in connection with {{matter.type}} matters.</p><p><br></p><p><strong>Fee Arrangement:</strong></p><p>Our fee for this representation will be {{fee.amount}}. A retainer of {{fee.retainer}} is due upon signing this agreement.</p><p><br></p><p>Please sign below to indicate your agreement to these terms.</p><p><br></p><p>Sincerely,</p><p><br></p><p>{{attorney.name}}<br>{{firm.name}}</p>`,
+        mergeFields: ['client.name', 'client.address', 'matter.name', 'matter.type', 'fee.amount', 'fee.retainer', 'attorney.name', 'firm.name', 'date.today'],
+        lastModified: '2024-11-15T10:00:00Z'
+      },
+      {
+        id: 'doc-002',
+        name: 'Fee Agreement',
+        description: 'Detailed fee agreement with payment terms',
+        category: 'Billing',
+        content: `<p><strong>FEE AGREEMENT</strong></p><p><br></p><p>This Fee Agreement is entered into between {{firm.name}} ("Firm") and {{client.name}} ("Client").</p><p><br></p><p><strong>1. Services</strong></p><p>The Firm agrees to provide legal services in connection with: {{matter.type}}</p><p><br></p><p><strong>2. Fees</strong></p><p>The Client agrees to pay the following:</p><ul><li>Initial retainer: {{fee.retainer}}</li><li>Hourly rate: {{fee.amount}}/hour</li></ul><p><br></p><p>Date: {{date.today}}</p>`,
+        mergeFields: ['client.name', 'firm.name', 'matter.type', 'fee.retainer', 'fee.amount', 'date.today'],
+        lastModified: '2024-11-10T14:30:00Z'
+      },
+      {
+        id: 'doc-003',
+        name: 'Welcome Packet',
+        description: 'Welcome information for new clients',
+        category: 'Client Intake',
+        content: `<p><strong>Welcome to {{firm.name}}</strong></p><p><br></p><p>Dear {{client.name}},</p><p><br></p><p>Welcome! We are pleased to have you as a client. Your matter number is {{matter.number}}.</p><p><br></p><p>Your primary attorney will be {{attorney.name}}.</p><p><br></p><p>If you have any questions, please don't hesitate to contact us.</p>`,
+        mergeFields: ['client.name', 'firm.name', 'matter.number', 'attorney.name'],
+        lastModified: '2024-11-05T09:15:00Z'
+      }
+    ];
+
+    let automationRules = [
+      {
+        id: 'rule-001',
+        trigger: 'verbal_yes',
+        triggerLabel: 'Client gives verbal yes',
+        templateId: 'doc-001',
+        templateName: 'Engagement Letter',
+        outputPath: '/matters/{{matter.number}}/documents/',
+        namingPattern: '{{client.name}}_Engagement_{{date.today}}',
+        autoSend: true,
+        enabled: true
+      },
+      {
+        id: 'rule-002',
+        trigger: 'engagement_signed',
+        triggerLabel: 'Engagement letter signed',
+        templateId: 'doc-003',
+        templateName: 'Welcome Packet',
+        outputPath: '/matters/{{matter.number}}/documents/',
+        namingPattern: '{{client.name}}_Welcome_{{date.today}}',
+        autoSend: true,
+        enabled: true
+      }
+    ];
+
+    // Sample data for preview
+    const sampleData = {
+      'client.name': 'John Smith',
+      'client.email': 'john.smith@email.com',
+      'client.phone': '(555) 123-4567',
+      'client.address': '123 Main Street, Suite 100\nAnytown, ST 12345',
+      'matter.name': 'Smith Personal Injury Case',
+      'matter.type': 'Personal Injury',
+      'matter.number': 'PI-2024-001',
+      'matter.status': 'Active',
+      'date.today': new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+      'fee.amount': '$5,000',
+      'fee.retainer': '$2,500',
+      'attorney.name': 'Jane Attorney',
+      'firm.name': 'Smith & Associates Law Firm',
+      'firm.address': '456 Legal Way, Suite 200\nLawtown, ST 54321'
+    };
+
+    function renderTemplates() {
+      const container = document.getElementById('templatesGrid');
+      container.innerHTML = documentTemplates.map(t => `
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+          <div class="p-6">
+            <div class="flex items-start justify-between mb-4">
+              <div class="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+              </div>
+              <span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-700">${t.category}</span>
+            </div>
+            <h3 class="font-semibold text-gray-900 mb-1">${t.name}</h3>
+            <p class="text-sm text-gray-500 mb-4">${t.description}</p>
+            <div class="flex items-center justify-between pt-4 border-t border-gray-100">
+              <span class="text-xs text-gray-400">${t.mergeFields.length} merge fields</span>
+              <div class="flex gap-2">
+                <button onclick="editTemplate('${t.id}')" class="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg" title="Edit">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                </button>
+                <button onclick="previewTemplateById('${t.id}')" class="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg" title="Preview">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                </button>
+                <button onclick="deleteTemplate('${t.id}')" class="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Delete">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderAutomationRules() {
+      const container = document.getElementById('automationRules');
+      if (automationRules.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-8 text-gray-500">
+            <svg class="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+            <p>No automation rules configured</p>
+            <p class="text-sm">Add rules to automatically generate documents</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = automationRules.map(r => `
+        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+          <div class="flex items-center gap-4">
+            <div class="relative">
+              <input type="checkbox" ${r.enabled ? 'checked' : ''} onchange="toggleRule('${r.id}')"
+                class="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+            </div>
+            <div>
+              <p class="font-medium text-gray-900">When: ${r.triggerLabel}</p>
+              <p class="text-sm text-gray-500">Generate: ${r.templateName} ${r.autoSend ? '(auto-send enabled)' : ''}</p>
+            </div>
+          </div>
+          <button onclick="deleteRule('${r.id}')" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+      `).join('');
+    }
+
+    function openTemplateEditor(templateId = null) {
+      editingTemplateId = templateId;
+
+      if (templateId) {
+        const template = documentTemplates.find(t => t.id === templateId);
+        if (template) {
+          document.getElementById('editorTitle').textContent = 'Edit Template';
+          document.getElementById('templateName').value = template.name;
+          document.getElementById('templateDescription').value = template.description;
+          document.getElementById('templateCategory').value = template.category;
+
+          // Initialize Quill and set content
+          initQuillEditor();
+          quillEditor.root.innerHTML = template.content;
+        }
+      } else {
+        document.getElementById('editorTitle').textContent = 'New Template';
+        document.getElementById('templateName').value = '';
+        document.getElementById('templateDescription').value = '';
+        document.getElementById('templateCategory').value = 'Client Intake';
+
+        initQuillEditor();
+        quillEditor.root.innerHTML = '<p>Start writing your document template here...</p>';
+      }
+
+      document.getElementById('editorModal').classList.remove('hidden');
+    }
+
+    function initQuillEditor() {
+      // Properly destroy existing Quill instance
+      const editorContainer = document.getElementById('editor');
+      if (quillEditor) {
+        quillEditor = null;
+      }
+
+      // Remove any existing Quill elements (toolbar and container)
+      const existingToolbar = editorContainer.previousElementSibling;
+      if (existingToolbar && existingToolbar.classList.contains('ql-toolbar')) {
+        existingToolbar.remove();
+      }
+
+      // Clear and reset the editor container
+      editorContainer.innerHTML = '';
+      editorContainer.className = 'bg-white'; // Reset classes added by Quill
+
+      quillEditor = new Quill('#editor', {
+        theme: 'snow',
+        modules: {
+          toolbar: [
+            [{ 'header': [1, 2, 3, false] }],
+            ['bold', 'italic', 'underline'],
+            [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+            [{ 'align': [] }],
+            ['clean']
+          ]
+        }
+      });
+    }
+
+    function closeTemplateEditor() {
+      document.getElementById('editorModal').classList.add('hidden');
+      editingTemplateId = null;
+    }
+
+    function insertMergeField() {
+      const select = document.getElementById('mergeFieldSelect');
+      const field = select.value;
+      if (field && quillEditor) {
+        const range = quillEditor.getSelection(true);
+        quillEditor.insertText(range.index, field, 'user');
+        quillEditor.setSelection(range.index + field.length);
+        select.value = '';
+      }
+    }
+
+    function editTemplate(id) {
+      openTemplateEditor(id);
+    }
+
+    function saveTemplate() {
+      const name = document.getElementById('templateName').value.trim();
+      const description = document.getElementById('templateDescription').value.trim();
+      const category = document.getElementById('templateCategory').value;
+      const content = quillEditor.root.innerHTML;
+
+      if (!name) {
+        Toast.error('Please enter a template name');
+        return;
+      }
+
+      // Extract merge fields from content
+      const mergeFieldRegex = /\{\{([^}]+)\}\}/g;
+      const mergeFields = [];
+      let match;
+      while ((match = mergeFieldRegex.exec(content)) !== null) {
+        if (!mergeFields.includes(match[1])) {
+          mergeFields.push(match[1]);
+        }
+      }
+
+      if (editingTemplateId) {
+        // Update existing
+        const idx = documentTemplates.findIndex(t => t.id === editingTemplateId);
+        if (idx !== -1) {
+          documentTemplates[idx] = {
+            ...documentTemplates[idx],
+            name,
+            description,
+            category,
+            content,
+            mergeFields,
+            lastModified: new Date().toISOString()
+          };
+        }
+        Toast.success('Template updated successfully');
+      } else {
+        // Create new
+        const newTemplate = {
+          id: `doc-${Date.now()}`,
+          name,
+          description,
+          category,
+          content,
+          mergeFields,
+          lastModified: new Date().toISOString()
+        };
+        documentTemplates.push(newTemplate);
+        Toast.success('Template created successfully');
+      }
+
+      closeTemplateEditor();
+      renderTemplates();
+    }
+
+    function deleteTemplate(id) {
+      if (confirm('Are you sure you want to delete this template?')) {
+        documentTemplates = documentTemplates.filter(t => t.id !== id);
+        // Also remove any automation rules using this template
+        automationRules = automationRules.filter(r => r.templateId !== id);
+        Toast.success('Template deleted');
+        renderTemplates();
+        renderAutomationRules();
+      }
+    }
+
+    function previewTemplateById(id) {
+      const template = documentTemplates.find(t => t.id === id);
+      if (template) {
+        showPreview(template.content);
+      }
+    }
+
+    function previewTemplate() {
+      if (quillEditor) {
+        showPreview(quillEditor.root.innerHTML);
+      }
+    }
+
+    function showPreview(content) {
+      // Replace merge fields with sample data
+      let preview = content;
+      Object.entries(sampleData).forEach(([key, value]) => {
+        const regex = new RegExp(`\\{\\{${key.replace('.', '\\.')}\\}\\}`, 'g');
+        preview = preview.replace(regex, value);
+      });
+
+      document.getElementById('previewContent').innerHTML = preview;
+      document.getElementById('previewModal').classList.remove('hidden');
+    }
+
+    function closePreviewModal() {
+      document.getElementById('previewModal').classList.add('hidden');
+    }
+
+    function addAutomationRule() {
+      // Populate template select
+      const select = document.getElementById('ruleTemplate');
+      select.innerHTML = documentTemplates.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+      document.getElementById('ruleModal').classList.remove('hidden');
+    }
+
+    function closeRuleModal() {
+      document.getElementById('ruleModal').classList.add('hidden');
+    }
+
+    function saveAutomationRule() {
+      const trigger = document.getElementById('ruleTrigger').value;
+      const triggerLabel = document.getElementById('ruleTrigger').options[document.getElementById('ruleTrigger').selectedIndex].text;
+      const templateId = document.getElementById('ruleTemplate').value;
+      const template = documentTemplates.find(t => t.id === templateId);
+      const outputPath = document.getElementById('rulePath').value;
+      const namingPattern = document.getElementById('ruleNaming').value;
+      const autoSend = document.getElementById('ruleAutoSend').checked;
+
+      if (!templateId) {
+        Toast.error('Please select a template');
+        return;
+      }
+
+      const newRule = {
+        id: `rule-${Date.now()}`,
+        trigger,
+        triggerLabel,
+        templateId,
+        templateName: template ? template.name : 'Unknown',
+        outputPath,
+        namingPattern,
+        autoSend,
+        enabled: true
+      };
+
+      automationRules.push(newRule);
+      Toast.success('Automation rule added');
+      closeRuleModal();
+      renderAutomationRules();
+    }
+
+    function toggleRule(id) {
+      const rule = automationRules.find(r => r.id === id);
+      if (rule) {
+        rule.enabled = !rule.enabled;
+        Toast.info(`Rule ${rule.enabled ? 'enabled' : 'disabled'}`);
+      }
+    }
+
+    function deleteRule(id) {
+      automationRules = automationRules.filter(r => r.id !== id);
+      Toast.success('Rule deleted');
+      renderAutomationRules();
+    }
+
+    // Close modals on backdrop click
+    document.getElementById('editorModal').addEventListener('click', (e) => {
+      if (e.target.id === 'editorModal') closeTemplateEditor();
+    });
+    document.getElementById('previewModal').addEventListener('click', (e) => {
+      if (e.target.id === 'previewModal') closePreviewModal();
+    });
+    document.getElementById('ruleModal').addEventListener('click', (e) => {
+      if (e.target.id === 'ruleModal') closeRuleModal();
+    });
+
+    // Initialize
+    renderTemplates();
+    renderAutomationRules();
+  </script>
+</body>
+</html>

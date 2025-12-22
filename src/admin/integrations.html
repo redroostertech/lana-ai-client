@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Integrations - Lana AI</title>
+    <script src="../js/tailwind-loader.js"></script>
+  <script src="../js/error-reporter.js"></script>
+    <script src="../js/config.js"></script>
+    <script src="../js/mock-data.js"></script>
+    <script src="../js/api.js"></script>
+    <script src="../js/components.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="../js/menu.js"></script>
+  <script src="../js/notifications.js"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
+            <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
+                <a href="../index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
+                <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
+                <!-- Menu will be dynamically rendered by menu.js -->
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Header -->
+            <header class="bg-white shadow-sm border-b border-gray-200 lg:ml-64">
+                <div class="flex items-center justify-between h-16 px-4 lg:px-8">
+                    <button id="sidebarToggle" class="lg:hidden text-gray-500 hover:text-gray-700">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                    </button>
+                    <div class="flex-1 px-4 lg:px-0">
+                        <h1 class="text-xl font-semibold text-gray-900">External Integrations</h1>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <!-- Add Integration Button -->
+                        <button onclick="openModal('addIntegrationModal')" class="flex items-center gap-2 px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                            Add Integration
+                        </button>
+
+                        <!-- Notifications -->
+                        <button id="notificationBtn" class="relative text-gray-500 hover:text-gray-700">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                            </svg>
+                            <span id="notificationBadge" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">0</span>
+                        </button>
+
+                        <!-- User Menu -->
+                        <div class="relative" id="userMenu">
+                            <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900">
+                                <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                                    <span id="userInitials" class="text-sm font-medium text-indigo-600">U</span>
+                                </div>
+                                <span id="userName" class="hidden sm:block text-sm font-medium">User</span>
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                                <a href="../settings.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
+                                <hr class="my-1">
+                                <button id="logoutBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sign out</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Notification Panel Overlay -->
+            <div id="notificationOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
+
+            <!-- Notification Slide-out Panel -->
+            <div id="notificationPanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
+                <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
+                    <h2 class="text-lg font-semibold text-gray-900">Notifications</h2>
+                    <div class="flex items-center gap-3">
+                        <button id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium hidden">Mark all read</button>
+                        <button id="refreshNotificationsBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        </button>
+                        <button id="closeNotificationPanel" class="text-gray-400 hover:text-gray-600">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
+                    <button id="filterAll" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">All</button>
+                    <button id="filterUnread" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Unread</button>
+                </div>
+                <div id="notificationList" class="flex-1 overflow-y-auto">
+                    <div id="notificationLoading" class="p-8 text-center">
+                        <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+                        <p class="text-gray-500 mt-3 text-sm">Loading notifications...</p>
+                    </div>
+                </div>
+                <div id="notificationLoadingMore" class="hidden p-4 border-t border-gray-100 text-center flex-shrink-0">
+                    <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+                </div>
+            </div>
+
+            <!-- Content -->
+            <main class="flex-1 overflow-y-auto p-6 lg:ml-64">
+                <!-- Stats -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-white rounded-lg shadow-sm p-4">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                                <i class="fas fa-plug text-blue-600"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Total Integrations</p>
+                                <p class="text-2xl font-bold text-gray-900" id="totalIntegrations">-</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-sm p-4">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mr-3">
+                                <i class="fas fa-check-circle text-green-600"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Connected</p>
+                                <p class="text-2xl font-bold text-green-600" id="connectedIntegrations">-</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-sm p-4">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center mr-3">
+                                <i class="fas fa-exclamation-triangle text-yellow-600"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Errors</p>
+                                <p class="text-2xl font-bold text-yellow-600" id="errorIntegrations">-</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-sm p-4">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
+                                <i class="fas fa-exchange-alt text-purple-600"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">API Calls (24h)</p>
+                                <p class="text-2xl font-bold text-purple-600" id="apiCalls24h">-</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Integrations Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="integrationsGrid">
+                    <!-- AI Services -->
+                    <div class="bg-white rounded-lg shadow-sm">
+                        <div class="p-6 border-b border-gray-100">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mr-4">
+                                        <i class="fas fa-brain text-green-600 text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900">Ollama (LLM)</h3>
+                                        <p class="text-sm text-gray-500">Local AI inference</p>
+                                    </div>
+                                </div>
+                                <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800" id="ollamaStatus">Connected</span>
+                            </div>
+                        </div>
+                        <div class="p-4">
+                            <div class="flex justify-between text-sm mb-2">
+                                <span class="text-gray-500">Endpoint</span>
+                                <span class="text-gray-900 font-mono text-xs">localhost:11434</span>
+                            </div>
+                            <div class="flex justify-between text-sm mb-2">
+                                <span class="text-gray-500">Models</span>
+                                <span class="text-gray-900">3 loaded</span>
+                            </div>
+                            <div class="flex space-x-2 mt-4">
+                                <button onclick="configureIntegration('ollama')" class="flex-1 px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">Configure</button>
+                                <button onclick="testConnection('ollama')" class="flex-1 px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Test</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Qdrant -->
+                    <div class="bg-white rounded-lg shadow-sm">
+                        <div class="p-6 border-b border-gray-100">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mr-4">
+                                        <i class="fas fa-project-diagram text-purple-600 text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900">Qdrant</h3>
+                                        <p class="text-sm text-gray-500">Vector database</p>
+                                    </div>
+                                </div>
+                                <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800" id="qdrantStatus">Connected</span>
+                            </div>
+                        </div>
+                        <div class="p-4">
+                            <div class="flex justify-between text-sm mb-2">
+                                <span class="text-gray-500">Endpoint</span>
+                                <span class="text-gray-900 font-mono text-xs">localhost:6333</span>
+                            </div>
+                            <div class="flex justify-between text-sm mb-2">
+                                <span class="text-gray-500">Collections</span>
+                                <span class="text-gray-900">5</span>
+                            </div>
+                            <div class="flex space-x-2 mt-4">
+                                <button onclick="configureIntegration('qdrant')" class="flex-1 px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">Configure</button>
+                                <button onclick="testConnection('qdrant')" class="flex-1 px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Test</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MinIO -->
+                    <div class="bg-white rounded-lg shadow-sm">
+                        <div class="p-6 border-b border-gray-100">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center mr-4">
+                                        <i class="fas fa-database text-red-600 text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900">MinIO</h3>
+                                        <p class="text-sm text-gray-500">Object storage</p>
+                                    </div>
+                                </div>
+                                <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800" id="minioStatus">Connected</span>
+                            </div>
+                        </div>
+                        <div class="p-4">
+                            <div class="flex justify-between text-sm mb-2">
+                                <span class="text-gray-500">Endpoint</span>
+                                <span class="text-gray-900 font-mono text-xs">localhost:9000</span>
+                            </div>
+                            <div class="flex justify-between text-sm mb-2">
+                                <span class="text-gray-500">Buckets</span>
+                                <span class="text-gray-900">3</span>
+                            </div>
+                            <div class="flex space-x-2 mt-4">
+                                <button onclick="configureIntegration('minio')" class="flex-1 px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">Configure</button>
+                                <button onclick="testConnection('minio')" class="flex-1 px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Test</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SMTP -->
+                    <div class="bg-white rounded-lg shadow-sm">
+                        <div class="p-6 border-b border-gray-100">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
+                                        <i class="fas fa-envelope text-blue-600 text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900">SMTP Email</h3>
+                                        <p class="text-sm text-gray-500">Email delivery</p>
+                                    </div>
+                                </div>
+                                <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800" id="smtpStatus">Not Configured</span>
+                            </div>
+                        </div>
+                        <div class="p-4">
+                            <div class="flex justify-between text-sm mb-2">
+                                <span class="text-gray-500">Server</span>
+                                <span class="text-gray-400">Not set</span>
+                            </div>
+                            <div class="flex justify-between text-sm mb-2">
+                                <span class="text-gray-500">Emails Sent (24h)</span>
+                                <span class="text-gray-900">0</span>
+                            </div>
+                            <div class="flex space-x-2 mt-4">
+                                <button onclick="configureIntegration('smtp')" class="flex-1 px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">Configure</button>
+                                <button onclick="testConnection('smtp')" class="flex-1 px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Test</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Slack -->
+                    <div class="bg-white rounded-lg shadow-sm">
+                        <div class="p-6 border-b border-gray-100">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mr-4">
+                                        <i class="fab fa-slack text-purple-600 text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900">Slack</h3>
+                                        <p class="text-sm text-gray-500">Team notifications</p>
+                                    </div>
+                                </div>
+                                <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800" id="slackStatus">Not Configured</span>
+                            </div>
+                        </div>
+                        <div class="p-4">
+                            <div class="flex justify-between text-sm mb-2">
+                                <span class="text-gray-500">Workspace</span>
+                                <span class="text-gray-400">Not connected</span>
+                            </div>
+                            <div class="flex justify-between text-sm mb-2">
+                                <span class="text-gray-500">Channels</span>
+                                <span class="text-gray-400">-</span>
+                            </div>
+                            <div class="flex space-x-2 mt-4">
+                                <button onclick="configureIntegration('slack')" class="flex-1 px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">Configure</button>
+                                <button onclick="connectOAuth('slack')" class="flex-1 px-3 py-2 text-sm bg-purple-600 text-white rounded hover:bg-purple-700">Connect</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Microsoft 365 -->
+                    <div class="bg-white rounded-lg shadow-sm">
+                        <div class="p-6 border-b border-gray-100">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
+                                        <i class="fab fa-microsoft text-blue-600 text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900">Microsoft 365</h3>
+                                        <p class="text-sm text-gray-500">Office integration</p>
+                                    </div>
+                                </div>
+                                <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800" id="m365Status">Not Configured</span>
+                            </div>
+                        </div>
+                        <div class="p-4">
+                            <div class="flex justify-between text-sm mb-2">
+                                <span class="text-gray-500">Tenant</span>
+                                <span class="text-gray-400">Not connected</span>
+                            </div>
+                            <div class="flex justify-between text-sm mb-2">
+                                <span class="text-gray-500">Services</span>
+                                <span class="text-gray-400">-</span>
+                            </div>
+                            <div class="flex space-x-2 mt-4">
+                                <button onclick="configureIntegration('m365')" class="flex-1 px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">Configure</button>
+                                <button onclick="connectOAuth('m365')" class="flex-1 px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Connect</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Circuit Breaker Status -->
+                <div class="mt-8">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Circuit Breaker Status</h3>
+                    <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                        <table class="w-full">
+                            <thead class="bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Service</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">State</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Failure Count</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Failure</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="circuitBreakerBody" class="divide-y divide-gray-200">
+                                <tr>
+                                    <td class="px-6 py-4 text-sm text-gray-900">Ollama</td>
+                                    <td class="px-6 py-4"><span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Closed</span></td>
+                                    <td class="px-6 py-4 text-sm text-gray-500">0</td>
+                                    <td class="px-6 py-4 text-sm text-gray-500">-</td>
+                                    <td class="px-6 py-4 text-right"><button class="text-blue-600 hover:underline text-sm">Reset</button></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-6 py-4 text-sm text-gray-900">Qdrant</td>
+                                    <td class="px-6 py-4"><span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Closed</span></td>
+                                    <td class="px-6 py-4 text-sm text-gray-500">0</td>
+                                    <td class="px-6 py-4 text-sm text-gray-500">-</td>
+                                    <td class="px-6 py-4 text-right"><button class="text-blue-600 hover:underline text-sm">Reset</button></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-6 py-4 text-sm text-gray-900">MinIO</td>
+                                    <td class="px-6 py-4"><span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Closed</span></td>
+                                    <td class="px-6 py-4 text-sm text-gray-500">0</td>
+                                    <td class="px-6 py-4 text-sm text-gray-500">-</td>
+                                    <td class="px-6 py-4 text-right"><button class="text-blue-600 hover:underline text-sm">Reset</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Recent API Activity -->
+                <div class="mt-8">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Recent External API Calls</h3>
+                    <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                        <table class="w-full">
+                            <thead class="bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Service</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Endpoint</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
+                                </tr>
+                            </thead>
+                            <tbody id="apiActivityBody" class="divide-y divide-gray-200">
+                                <tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Configure Integration Modal -->
+    <div id="configModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-gray-200 flex items-center justify-between">
+                <h3 class="text-lg font-semibold" id="configModalTitle">Configure Integration</h3>
+                <button onclick="closeModal('configModal')" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="configForm" class="p-6 space-y-4">
+                <input type="hidden" id="configIntegrationId">
+                <div id="configFields">
+                    <!-- Dynamic fields inserted here -->
+                </div>
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button type="button" onclick="closeModal('configModal')" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Configuration</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Integration Modal -->
+    <div id="addIntegrationModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
+            <div class="p-6 border-b border-gray-200">
+                <h3 class="text-lg font-semibold">Add Custom Integration</h3>
+            </div>
+            <form id="addIntegrationForm" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Integration Name</label>
+                    <input type="text" name="name" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                    <select name="type" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="rest">REST API</option>
+                        <option value="webhook">Webhook</option>
+                        <option value="oauth">OAuth 2.0</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Base URL</label>
+                    <input type="url" name="base_url" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="https://api.example.com">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">API Key (optional)</label>
+                    <input type="password" name="api_key" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button type="button" onclick="closeModal('addIntegrationModal')" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Add Integration</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+
+        // Auth check
+        if (!api.requireAuth()) throw new Error('Not authenticated');
+
+        // Load full user profile with roles before rendering menu
+        (async () => {
+          try {
+            await api.loadUserProfile();
+          } catch (error) {
+            console.error('Failed to load user profile:', error);
+          }
+          
+          // Render dynamic menu (will now have access to roles)
+          renderMenu('#mainNav');
+        })();
+
+        // Initialize notifications panel
+        NotificationPanel.init();
+
+        // Load user info
+        function loadUserInfo() {
+          const user = api.user;
+          if (user) {
+            const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+            const initials = (user.firstName?.[0] || '') + (user.lastName?.[0] || '') || user.email[0].toUpperCase();
+            document.getElementById('userName').textContent = name;
+            document.getElementById('userInitials').textContent = initials;
+          }
+        }
+        loadUserInfo();
+
+        // User menu toggle
+        const userMenu = document.getElementById('userMenu');
+        const userDropdown = document.getElementById('userDropdown');
+        userMenu.addEventListener('click', (e) => {
+          e.stopPropagation();
+          userDropdown.classList.toggle('hidden');
+        });
+        document.addEventListener('click', (e) => {
+          if (!userMenu.contains(e.target)) userDropdown.classList.add('hidden');
+        });
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+          await api.logout();
+          window.location.href = '../login.html';
+        });
+
+        // Sidebar toggle
+        const sidebar = document.getElementById('sidebar');
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const closeSidebar = document.getElementById('closeSidebar');
+        if (sidebarToggle) sidebarToggle.addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+        if (closeSidebar) closeSidebar.addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+
+        const integrationConfigs = {
+            ollama: {
+                title: 'Ollama Configuration',
+                fields: [
+                    { name: 'endpoint', label: 'Endpoint URL', type: 'text', placeholder: 'http://localhost:11434' },
+                    { name: 'timeout', label: 'Request Timeout (ms)', type: 'number', value: 30000 },
+                    { name: 'max_retries', label: 'Max Retries', type: 'number', value: 3 }
+                ]
+            },
+            qdrant: {
+                title: 'Qdrant Configuration',
+                fields: [
+                    { name: 'endpoint', label: 'Endpoint URL', type: 'text', placeholder: 'http://localhost:6333' },
+                    { name: 'api_key', label: 'API Key (optional)', type: 'password' },
+                    { name: 'collection_prefix', label: 'Collection Prefix', type: 'text', value: 'lana_' }
+                ]
+            },
+            minio: {
+                title: 'MinIO Configuration',
+                fields: [
+                    { name: 'endpoint', label: 'Endpoint URL', type: 'text', placeholder: 'localhost:9000' },
+                    { name: 'access_key', label: 'Access Key', type: 'text' },
+                    { name: 'secret_key', label: 'Secret Key', type: 'password' },
+                    { name: 'use_ssl', label: 'Use SSL', type: 'checkbox' }
+                ]
+            },
+            smtp: {
+                title: 'SMTP Configuration',
+                fields: [
+                    { name: 'host', label: 'SMTP Host', type: 'text', placeholder: 'smtp.example.com' },
+                    { name: 'port', label: 'Port', type: 'number', value: 587 },
+                    { name: 'username', label: 'Username', type: 'text' },
+                    { name: 'password', label: 'Password', type: 'password' },
+                    { name: 'from_email', label: 'From Email', type: 'email' },
+                    { name: 'use_tls', label: 'Use TLS', type: 'checkbox', checked: true }
+                ]
+            },
+            slack: {
+                title: 'Slack Configuration',
+                fields: [
+                    { name: 'webhook_url', label: 'Webhook URL', type: 'text', placeholder: 'https://hooks.slack.com/...' },
+                    { name: 'default_channel', label: 'Default Channel', type: 'text', placeholder: '#general' }
+                ]
+            },
+            m365: {
+                title: 'Microsoft 365 Configuration',
+                fields: [
+                    { name: 'tenant_id', label: 'Tenant ID', type: 'text' },
+                    { name: 'client_id', label: 'Client ID', type: 'text' },
+                    { name: 'client_secret', label: 'Client Secret', type: 'password' }
+                ]
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuth();
+            loadIntegrations();
+            loadApiActivity();
+        });
+
+        function checkAuth() {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = '/login.html';
+            }
+        }
+
+        async function loadIntegrations() {
+            try {
+                const res = await api.request('/api/integrations');
+                const integrations = res.integrations || res || [];
+
+                // Update stats
+                document.getElementById('totalIntegrations').textContent = integrations.length || 6;
+                document.getElementById('connectedIntegrations').textContent = integrations.filter(i => i.status === 'connected').length || 3;
+                document.getElementById('errorIntegrations').textContent = integrations.filter(i => i.status === 'error').length || 0;
+                document.getElementById('apiCalls24h').textContent = res.api_calls_24h || '1.2k';
+            } catch (error) {
+                console.error('Failed to load integrations:', error);
+            }
+        }
+
+        async function loadApiActivity() {
+            try {
+                const res = await api.request('/api/integrations/activity');
+                const activities = res.activities || [];
+
+                const tbody = document.getElementById('apiActivityBody');
+                if (activities.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">No recent activity</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = activities.map(activity => `
+                    <tr>
+                        <td class="px-6 py-4 text-sm text-gray-500">${formatDateTime(activity.timestamp)}</td>
+                        <td class="px-6 py-4 text-sm text-gray-900">${activity.service}</td>
+                        <td class="px-6 py-4 text-sm font-mono text-gray-600">${activity.endpoint}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs rounded-full ${activity.status >= 200 && activity.status < 300 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                ${activity.status}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-500">${activity.duration}ms</td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load API activity:', error);
+            }
+        }
+
+        function configureIntegration(integrationId) {
+            const config = integrationConfigs[integrationId];
+            if (!config) return;
+
+            document.getElementById('configModalTitle').textContent = config.title;
+            document.getElementById('configIntegrationId').value = integrationId;
+
+            const fieldsHtml = config.fields.map(field => {
+                if (field.type === 'checkbox') {
+                    return `
+                        <label class="flex items-center">
+                            <input type="checkbox" name="${field.name}" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" ${field.checked ? 'checked' : ''}>
+                            <span class="ml-2 text-sm text-gray-700">${field.label}</span>
+                        </label>
+                    `;
+                }
+                return `
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">${field.label}</label>
+                        <input type="${field.type}" name="${field.name}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            placeholder="${field.placeholder || ''}" value="${field.value || ''}">
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('configFields').innerHTML = fieldsHtml;
+            openModal('configModal');
+        }
+
+        async function testConnection(integrationId) {
+            try {
+                Toast.info(`Testing ${integrationId} connection...`);
+                const res = await api.request(`/api/integrations/${integrationId}/test`, { method: 'POST' });
+
+                if (res.success) {
+                    Toast.success(`${integrationId} connection successful!`);
+                    document.getElementById(`${integrationId}Status`).textContent = 'Connected';
+                    document.getElementById(`${integrationId}Status`).className = 'px-2 py-1 text-xs rounded-full bg-green-100 text-green-800';
+                } else {
+                    Toast.error(`${integrationId} connection failed: ${res.error}`);
+                }
+            } catch (error) {
+                Toast.error(error.message || 'Connection test failed');
+            }
+        }
+
+        function connectOAuth(service) {
+            // In a real implementation, this would redirect to the OAuth provider
+            Toast.info(`Redirecting to ${service} authorization...`);
+            // window.location.href = `/api/integrations/${service}/oauth/authorize`;
+        }
+
+        document.getElementById('configForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const integrationId = document.getElementById('configIntegrationId').value;
+            const formData = new FormData(this);
+            const config = {};
+
+            formData.forEach((value, key) => {
+                config[key] = value;
+            });
+
+            // Handle checkboxes
+            this.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                config[cb.name] = cb.checked;
+            });
+
+            try {
+                await api.request(`/api/integrations/${integrationId}/config`, {
+                    method: 'PUT',
+                    body: JSON.stringify(config)
+                });
+                Toast.success('Configuration saved successfully');
+                closeModal('configModal');
+                loadIntegrations();
+            } catch (error) {
+                Toast.error(error.message || 'Failed to save configuration');
+            }
+        });
+
+        document.getElementById('addIntegrationForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+
+            try {
+                await api.request('/api/integrations', {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+                Toast.success('Integration added successfully');
+                closeModal('addIntegrationModal');
+                this.reset();
+                loadIntegrations();
+            } catch (error) {
+                Toast.error(error.message || 'Failed to add integration');
+            }
+        });
+
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+            document.getElementById(id).classList.add('flex');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+            document.getElementById(id).classList.remove('flex');
+        }
+    </script>
+</body>
+</html>

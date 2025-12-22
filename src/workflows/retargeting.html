@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Retargeting - LanaAI</title>
+  <script src="../js/tailwind-loader.js"></script>
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/workflows.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
+    <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
+      <a href="../index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
+      <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
+      <!-- Menu will be dynamically rendered by menu.js -->
+    </nav>
+  </aside>
+
+  <div class="lg:ml-64">
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
+      <div class="flex items-center justify-between h-16 px-4 lg:px-8">
+        <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+        <div class="flex-1 px-4 lg:px-0">
+          <h1 class="text-xl font-semibold text-gray-900">Retargeting Audiences</h1>
+          <p class="text-sm text-gray-500">Sync lead segments to Facebook and Google ad platforms</p>
+        </div>
+        <button onclick="showCreateAudienceModal()" class="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+          Create Audience
+        </button>
+      </div>
+    </header>
+
+    <main class="p-4 lg:p-8">
+      <!-- Platform Connections Loading Skeleton -->
+      <div id="platformsLoading" class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 animate-pulse">
+          <div class="flex items-start justify-between mb-4">
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+              <div>
+                <div class="h-5 bg-gray-200 rounded w-28 mb-2"></div>
+                <div class="h-4 bg-gray-200 rounded w-20"></div>
+              </div>
+            </div>
+            <div class="h-9 bg-gray-200 rounded-lg w-24"></div>
+          </div>
+          <div class="h-4 bg-gray-200 rounded w-40"></div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 animate-pulse">
+          <div class="flex items-start justify-between mb-4">
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+              <div>
+                <div class="h-5 bg-gray-200 rounded w-24 mb-2"></div>
+                <div class="h-4 bg-gray-200 rounded w-24"></div>
+              </div>
+            </div>
+            <div class="h-9 bg-gray-200 rounded-lg w-20"></div>
+          </div>
+          <div class="h-4 bg-gray-200 rounded w-48"></div>
+        </div>
+      </div>
+
+      <!-- Platform Connections -->
+      <div id="platformsContent" class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 hidden">
+        <div id="facebookCard" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div class="flex items-start justify-between mb-4">
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
+                <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+              </div>
+              <div>
+                <h3 class="font-semibold text-gray-900">Facebook Ads</h3>
+                <p id="facebookStatus" class="text-sm text-green-600">Connected</p>
+              </div>
+            </div>
+            <button id="facebookBtn" onclick="toggleFacebookConnection()" class="px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">
+              Disconnect
+            </button>
+          </div>
+          <div id="facebookDetails" class="text-sm text-gray-500">
+            <p>Account ID: <span id="facebookAccountId" class="font-mono">-</span></p>
+          </div>
+        </div>
+
+        <div id="googleCard" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div class="flex items-start justify-between mb-4">
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 bg-gradient-to-br from-blue-500 via-green-500 to-yellow-500 rounded-lg flex items-center justify-center">
+                <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+              </div>
+              <div>
+                <h3 class="font-semibold text-gray-900">Google Ads</h3>
+                <p id="googleStatus" class="text-sm text-gray-500">Not Connected</p>
+              </div>
+            </div>
+            <button id="googleBtn" onclick="toggleGoogleConnection()" class="px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">
+              Connect
+            </button>
+          </div>
+          <div id="googleDetails" class="text-sm text-gray-500">
+            <p>Connect your Google Ads account to sync audiences</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Audiences Table Loading Skeleton -->
+      <div id="tableLoading" class="bg-white rounded-xl shadow-sm border border-gray-100">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between animate-pulse">
+          <div>
+            <div class="h-5 bg-gray-200 rounded w-40 mb-2"></div>
+            <div class="h-4 bg-gray-200 rounded w-52"></div>
+          </div>
+          <div class="h-8 bg-gray-200 rounded w-20"></div>
+        </div>
+        <div class="p-6 space-y-4">
+          <div class="flex items-center gap-4 animate-pulse">
+            <div class="flex-1"><div class="h-4 bg-gray-200 rounded w-32 mb-1"></div><div class="h-3 bg-gray-200 rounded w-24"></div></div>
+            <div class="h-6 bg-gray-200 rounded-full w-20"></div>
+            <div class="h-4 bg-gray-200 rounded w-16"></div>
+            <div class="h-4 bg-gray-200 rounded w-24"></div>
+            <div class="h-6 bg-gray-200 rounded-full w-16"></div>
+            <div class="flex gap-2"><div class="h-7 w-7 bg-gray-200 rounded"></div><div class="h-7 w-7 bg-gray-200 rounded"></div></div>
+          </div>
+          <div class="flex items-center gap-4 animate-pulse">
+            <div class="flex-1"><div class="h-4 bg-gray-200 rounded w-40 mb-1"></div><div class="h-3 bg-gray-200 rounded w-24"></div></div>
+            <div class="h-6 bg-gray-200 rounded-full w-20"></div>
+            <div class="h-4 bg-gray-200 rounded w-16"></div>
+            <div class="h-4 bg-gray-200 rounded w-24"></div>
+            <div class="h-6 bg-gray-200 rounded-full w-16"></div>
+            <div class="flex gap-2"><div class="h-7 w-7 bg-gray-200 rounded"></div><div class="h-7 w-7 bg-gray-200 rounded"></div></div>
+          </div>
+          <div class="flex items-center gap-4 animate-pulse">
+            <div class="flex-1"><div class="h-4 bg-gray-200 rounded w-36 mb-1"></div><div class="h-3 bg-gray-200 rounded w-24"></div></div>
+            <div class="h-6 bg-gray-200 rounded-full w-20"></div>
+            <div class="h-4 bg-gray-200 rounded w-16"></div>
+            <div class="h-4 bg-gray-200 rounded w-24"></div>
+            <div class="h-6 bg-gray-200 rounded-full w-16"></div>
+            <div class="flex gap-2"><div class="h-7 w-7 bg-gray-200 rounded"></div><div class="h-7 w-7 bg-gray-200 rounded"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Audiences Table -->
+      <div id="tableContent" class="bg-white rounded-xl shadow-sm border border-gray-100 hidden">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h3 class="font-semibold text-gray-900">Retargeting Audiences</h3>
+            <p class="text-sm text-gray-500">Manage and sync your custom audiences</p>
+          </div>
+          <button onclick="syncAllAudiences()" class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            Sync All
+          </button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Audience</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Platform</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Size</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Sync</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sync Status</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="audiencesTable" class="divide-y divide-gray-200">
+              <!-- Populated by JavaScript -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div id="emptyState" class="hidden text-center py-16">
+        <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+        </div>
+        <h3 class="text-lg font-medium text-gray-900 mb-1">No audiences created</h3>
+        <p class="text-gray-500 mb-4">Create custom audiences to retarget leads across ad platforms</p>
+        <button onclick="showCreateAudienceModal()" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg">
+          Create First Audience
+        </button>
+      </div>
+    </main>
+  </div>
+
+  <!-- Create Audience Modal -->
+  <div id="createModal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full">
+      <div class="p-6 border-b border-gray-100">
+        <div class="flex items-start justify-between">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900">Create Retargeting Audience</h3>
+            <p class="text-sm text-gray-500 mt-1">Define criteria for audience sync</p>
+          </div>
+          <button onclick="closeCreateModal()" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+      </div>
+      <div class="p-6">
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Audience Name</label>
+            <input type="text" id="audienceName" placeholder="e.g., Cold Leads 30+ Days" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Platform</label>
+            <select id="audiencePlatform" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+              <option value="facebook">Facebook Ads</option>
+              <option value="google">Google Ads</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Lead Criteria</label>
+            <select id="audienceCriteria" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+              <option value="no_show">No-Shows</option>
+              <option value="stale_15">Stale Leads (15+ days)</option>
+              <option value="stale_30">Stale Leads (30+ days)</option>
+              <option value="lost">Lost Opportunities</option>
+              <option value="past_clients">Past Clients</option>
+              <option value="custom">Custom Criteria</option>
+            </select>
+          </div>
+          <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div>
+              <p class="font-medium text-gray-900">Enable Auto-Sync</p>
+              <p class="text-sm text-gray-500">Automatically sync audience daily</p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="audienceAutoSync" class="sr-only peer" checked>
+              <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+            </label>
+          </div>
+        </div>
+        <div class="flex gap-3 mt-6">
+          <button onclick="createAudience()" class="flex-1 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">
+            Create Audience
+          </button>
+          <button onclick="closeCreateModal()" class="px-4 py-3 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    if (!api.requireAuth()) throw new Error('Not authenticated');
+    renderMenu('#mainNav');
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('openSidebar').addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+    document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+
+    let retargetingConfig = null;
+
+    function getPlatformBadge(platform) {
+      if (platform === 'facebook') {
+        return `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+          <svg class="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+          Facebook
+        </span>`;
+      }
+      return `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+        <svg class="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/></svg>
+        Google
+      </span>`;
+    }
+
+    function getSyncStatusBadge(enabled, lastSync) {
+      if (!enabled) {
+        return `<span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">Disabled</span>`;
+      }
+      if (!lastSync) {
+        return `<span class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Never Synced</span>`;
+      }
+      return `<span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Active</span>`;
+    }
+
+    function updatePlatformCards() {
+      const fb = retargetingConfig.platforms.facebook;
+      const google = retargetingConfig.platforms.google;
+
+      if (fb.connected) {
+        document.getElementById('facebookStatus').textContent = 'Connected';
+        document.getElementById('facebookStatus').className = 'text-sm text-green-600';
+        document.getElementById('facebookAccountId').textContent = fb.accountId;
+        document.getElementById('facebookBtn').textContent = 'Disconnect';
+        document.getElementById('facebookBtn').className = 'px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200';
+      } else {
+        document.getElementById('facebookStatus').textContent = 'Not Connected';
+        document.getElementById('facebookStatus').className = 'text-sm text-gray-500';
+        document.getElementById('facebookDetails').innerHTML = '<p>Connect your Facebook Ads account to sync audiences</p>';
+        document.getElementById('facebookBtn').textContent = 'Connect';
+        document.getElementById('facebookBtn').className = 'px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700';
+      }
+
+      if (google.connected) {
+        document.getElementById('googleStatus').textContent = 'Connected';
+        document.getElementById('googleStatus').className = 'text-sm text-green-600';
+        document.getElementById('googleDetails').innerHTML = `<p>Account ID: <span class="font-mono">${google.accountId}</span></p>`;
+        document.getElementById('googleBtn').textContent = 'Disconnect';
+        document.getElementById('googleBtn').className = 'px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200';
+      } else {
+        document.getElementById('googleStatus').textContent = 'Not Connected';
+        document.getElementById('googleStatus').className = 'text-sm text-gray-500';
+        document.getElementById('googleDetails').innerHTML = '<p>Connect your Google Ads account to sync audiences</p>';
+        document.getElementById('googleBtn').textContent = 'Connect';
+        document.getElementById('googleBtn').className = 'px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700';
+      }
+    }
+
+    function renderAudiencesTable() {
+      const audiences = retargetingConfig.audiences;
+      const tbody = document.getElementById('audiencesTable');
+      const emptyState = document.getElementById('emptyState');
+
+      if (audiences.length === 0) {
+        tbody.innerHTML = '';
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+      tbody.innerHTML = audiences.map(a => `
+        <tr class="hover:bg-gray-50">
+          <td class="px-6 py-4">
+            <p class="font-medium text-gray-900">${a.name}</p>
+            <p class="text-xs text-gray-500">${a.id}</p>
+          </td>
+          <td class="px-6 py-4">${getPlatformBadge(a.platform)}</td>
+          <td class="px-6 py-4 text-sm text-gray-900 font-medium">${a.size.toLocaleString()}</td>
+          <td class="px-6 py-4 text-sm text-gray-500">${a.lastSync ? timeAgo(a.lastSync) : 'Never'}</td>
+          <td class="px-6 py-4">${getSyncStatusBadge(a.syncEnabled, a.lastSync)}</td>
+          <td class="px-6 py-4">
+            <div class="flex items-center gap-2">
+              <button onclick="syncAudience('${a.id}')" class="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded" title="Sync Now">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+              </button>
+              <button onclick="toggleAudienceSync('${a.id}', ${!a.syncEnabled})" class="p-1.5 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 rounded" title="${a.syncEnabled ? 'Disable' : 'Enable'} Sync">
+                ${a.syncEnabled ?
+                  '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>' :
+                  '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>'
+                }
+              </button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function toggleFacebookConnection() {
+      if (retargetingConfig.platforms.facebook.connected) {
+        retargetingConfig.platforms.facebook = { connected: false, accountId: null };
+        Toast.success('Facebook disconnected');
+      } else {
+        Toast.info('Connecting to Facebook...');
+        await MockData.delay(1500);
+        retargetingConfig.platforms.facebook = { connected: true, accountId: 'act_987654321' };
+        Toast.success('Facebook connected successfully');
+      }
+      updatePlatformCards();
+    }
+
+    async function toggleGoogleConnection() {
+      if (retargetingConfig.platforms.google.connected) {
+        retargetingConfig.platforms.google = { connected: false, accountId: null };
+        Toast.success('Google disconnected');
+      } else {
+        Toast.info('Connecting to Google...');
+        await MockData.delay(1500);
+        retargetingConfig.platforms.google = { connected: true, accountId: '123-456-7890' };
+        Toast.success('Google connected successfully');
+      }
+      updatePlatformCards();
+    }
+
+    async function syncAudience(audienceId) {
+      try {
+        Toast.info('Syncing audience...');
+        await Workflows.syncRetargetingAudience(audienceId);
+        const audience = retargetingConfig.audiences.find(a => a.id === audienceId);
+        if (audience) {
+          audience.lastSync = new Date().toISOString();
+          audience.size += Math.floor(Math.random() * 20);
+        }
+        renderAudiencesTable();
+        Toast.success('Audience synced successfully');
+      } catch (error) {
+        Toast.error('Failed to sync audience');
+      }
+    }
+
+    async function toggleAudienceSync(audienceId, enabled) {
+      try {
+        await Workflows.updateRetargetingAudience(audienceId, { syncEnabled: enabled });
+        const audience = retargetingConfig.audiences.find(a => a.id === audienceId);
+        if (audience) {
+          audience.syncEnabled = enabled;
+        }
+        renderAudiencesTable();
+        Toast.success(`Audience sync ${enabled ? 'enabled' : 'disabled'}`);
+      } catch (error) {
+        Toast.error('Failed to update audience');
+      }
+    }
+
+    async function syncAllAudiences() {
+      Toast.info('Syncing all audiences...');
+      const enabledAudiences = retargetingConfig.audiences.filter(a => a.syncEnabled);
+      for (const audience of enabledAudiences) {
+        audience.lastSync = new Date().toISOString();
+        audience.size += Math.floor(Math.random() * 20);
+      }
+      await MockData.delay(2000);
+      renderAudiencesTable();
+      Toast.success(`Synced ${enabledAudiences.length} audiences`);
+    }
+
+    function showCreateAudienceModal() {
+      document.getElementById('audienceName').value = '';
+      document.getElementById('audiencePlatform').value = 'facebook';
+      document.getElementById('audienceCriteria').value = 'stale_15';
+      document.getElementById('audienceAutoSync').checked = true;
+      document.getElementById('createModal').classList.remove('hidden');
+    }
+
+    function closeCreateModal() {
+      document.getElementById('createModal').classList.add('hidden');
+    }
+
+    async function createAudience() {
+      const name = document.getElementById('audienceName').value.trim();
+      const platform = document.getElementById('audiencePlatform').value;
+      const syncEnabled = document.getElementById('audienceAutoSync').checked;
+
+      if (!name) {
+        Toast.error('Please enter an audience name');
+        return;
+      }
+
+      const newAudience = {
+        id: `aud-${Date.now()}`,
+        name,
+        platform,
+        syncEnabled,
+        size: Math.floor(Math.random() * 500) + 50,
+        lastSync: null
+      };
+
+      retargetingConfig.audiences.push(newAudience);
+      renderAudiencesTable();
+      closeCreateModal();
+      Toast.success('Audience created successfully');
+    }
+
+    document.getElementById('createModal').addEventListener('click', (e) => {
+      if (e.target.id === 'createModal') closeCreateModal();
+    });
+
+    function showLoadingStates() {
+      document.getElementById('platformsLoading').classList.remove('hidden');
+      document.getElementById('platformsContent').classList.add('hidden');
+      document.getElementById('tableLoading').classList.remove('hidden');
+      document.getElementById('tableContent').classList.add('hidden');
+      document.getElementById('emptyState').classList.add('hidden');
+    }
+
+    function hideLoadingStates() {
+      document.getElementById('platformsLoading').classList.add('hidden');
+      document.getElementById('platformsContent').classList.remove('hidden');
+      document.getElementById('tableLoading').classList.add('hidden');
+      document.getElementById('tableContent').classList.remove('hidden');
+    }
+
+    async function loadConfig() {
+      showLoadingStates();
+      try {
+        retargetingConfig = await Workflows.getRetargetingConfig();
+        updatePlatformCards();
+        hideLoadingStates();
+        renderAudiencesTable();
+      } catch (error) {
+        hideLoadingStates();
+        Toast.error('Failed to load retargeting configuration');
+        console.error(error);
+      }
+    }
+
+    loadConfig();
+  </script>
+</body>
+</html>

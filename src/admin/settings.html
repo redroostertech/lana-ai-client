@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Settings - Lana AI</title>
+    <script src="../js/tailwind-loader.js"></script>
+  <script src="../js/error-reporter.js"></script>
+    <script src="../js/config.js"></script>
+    <script src="../js/mock-data.js"></script>
+    <script src="../js/api.js"></script>
+    <script src="../js/components.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="../js/menu.js"></script>
+    <script src="../js/notifications.js"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
+            <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
+                <a href="../index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
+                <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
+                <!-- Menu will be dynamically rendered by menu.js -->
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Header -->
+            <header class="bg-white shadow-sm border-b border-gray-200">
+                <div class="flex items-center justify-between px-6 py-4">
+                    <div class="flex items-center">
+                        <button id="sidebarToggle" class="md:hidden mr-4 text-gray-600"><i class="fas fa-bars text-xl"></i></button>
+                        <h2 class="text-xl font-semibold text-gray-800">System Settings</h2>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <!-- Save All Changes Button -->
+                        <button onclick="saveAllSettings()" class="flex items-center gap-2 px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
+                            </svg>
+                            Save All Changes
+                        </button>
+                        <!-- Notification Button -->
+                        <button id="notificationBtn" class="relative text-gray-500 hover:text-gray-700">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                            </svg>
+                            <span id="notificationBadge" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">0</span>
+                        </button>
+                        <!-- User Menu -->
+                        <div class="relative" id="userMenu">
+                            <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900">
+                                <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                                    <span id="userInitials" class="text-sm font-medium text-indigo-600">U</span>
+                                </div>
+                                <span id="userName" class="hidden sm:block text-sm font-medium">User</span>
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                                <a href="../settings.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
+                                <hr class="my-1">
+                                <button id="logoutBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sign out</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Notification Panel Overlay -->
+            <div id="notificationOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
+
+            <!-- Notification Slide-out Panel -->
+            <div id="notificationPanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
+                <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
+                    <h2 class="text-lg font-semibold text-gray-900">Notifications</h2>
+                    <div class="flex items-center gap-3">
+                        <button id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium hidden">Mark all read</button>
+                        <button id="refreshNotificationsBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        </button>
+                        <button id="closeNotificationPanel" class="text-gray-400 hover:text-gray-600">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
+                    <button id="filterAll" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">All</button>
+                    <button id="filterUnread" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Unread</button>
+                </div>
+                <div id="notificationList" class="flex-1 overflow-y-auto">
+                    <div id="notificationLoading" class="p-8 text-center">
+                        <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+                        <p class="text-gray-500 mt-3 text-sm">Loading notifications...</p>
+                    </div>
+                </div>
+                <div id="notificationLoadingMore" class="hidden p-4 border-t border-gray-100 text-center flex-shrink-0">
+                    <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+                </div>
+            </div>
+
+            <!-- Content -->
+            <main class="flex-1 overflow-y-auto p-6">
+                <!-- Settings Navigation -->
+                <div class="bg-white rounded-lg shadow-sm mb-6">
+                    <div class="flex overflow-x-auto border-b border-gray-200">
+                        <button onclick="showSection('general')" class="settings-tab px-6 py-3 text-sm font-medium text-blue-600 border-b-2 border-blue-600" data-section="general">General</button>
+                        <button onclick="showSection('security')" class="settings-tab px-6 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" data-section="security">Security</button>
+                        <button onclick="showSection('authentication')" class="settings-tab px-6 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" data-section="authentication">Authentication</button>
+                        <button onclick="showSection('rate-limiting')" class="settings-tab px-6 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" data-section="rate-limiting">Rate Limiting</button>
+                        <button onclick="showSection('features')" class="settings-tab px-6 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" data-section="features">Features</button>
+                        <button onclick="showSection('tier')" class="settings-tab px-6 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" data-section="tier">Tier Config</button>
+                    </div>
+                </div>
+
+                <!-- General Settings -->
+                <div id="section-general" class="settings-section space-y-6">
+                    <div class="bg-white rounded-lg shadow-sm p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">General Settings</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Application Name</label>
+                                <input type="text" id="appName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" value="Lana AI">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Support Email</label>
+                                <input type="email" id="supportEmail" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" value="support@lana.ai">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Default Timezone</label>
+                                <select id="timezone" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                    <option value="UTC">UTC</option>
+                                    <option value="America/New_York">Eastern Time (US)</option>
+                                    <option value="America/Chicago">Central Time (US)</option>
+                                    <option value="America/Denver">Mountain Time (US)</option>
+                                    <option value="America/Los_Angeles">Pacific Time (US)</option>
+                                    <option value="Europe/London">London</option>
+                                    <option value="Europe/Paris">Paris</option>
+                                    <option value="Asia/Tokyo">Tokyo</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Date Format</label>
+                                <select id="dateFormat" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                    <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                                    <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                                    <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-sm p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Maintenance Mode</h3>
+                        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                            <div>
+                                <p class="font-medium text-gray-900">Enable Maintenance Mode</p>
+                                <p class="text-sm text-gray-500">Users will see a maintenance message and be unable to access the application</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="maintenanceMode" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Security Settings -->
+                <div id="section-security" class="settings-section space-y-6 hidden">
+                    <div class="bg-white rounded-lg shadow-sm p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Password Policy</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Minimum Password Length</label>
+                                <input type="number" id="minPasswordLength" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" value="8" min="6" max="32">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="requireUppercase" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
+                                    <span class="ml-2 text-sm text-gray-700">Require uppercase letter</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="requireLowercase" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
+                                    <span class="ml-2 text-sm text-gray-700">Require lowercase letter</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="requireNumbers" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
+                                    <span class="ml-2 text-sm text-gray-700">Require number</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="requireSpecial" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
+                                    <span class="ml-2 text-sm text-gray-700">Require special character</span>
+                                </label>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Password Expiry (days)</label>
+                                <input type="number" id="passwordExpiry" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" value="90" min="0">
+                                <p class="text-xs text-gray-500 mt-1">Set to 0 to disable password expiry</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Password History (prevent reuse)</label>
+                                <input type="number" id="passwordHistory" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" value="5" min="0" max="24">
+                                <p class="text-xs text-gray-500 mt-1">Number of previous passwords to remember</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-sm p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Account Lockout</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Failed Login Attempts Before Lockout</label>
+                                <input type="number" id="maxFailedAttempts" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" value="5" min="3" max="10">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Lockout Duration (minutes)</label>
+                                <input type="number" id="lockoutDuration" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" value="30" min="5">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Authentication Settings -->
+                <div id="section-authentication" class="settings-section space-y-6 hidden">
+                    <div class="bg-white rounded-lg shadow-sm p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Session Settings</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Session Timeout (minutes)</label>
+                                <input type="number" id="sessionTimeout" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" value="30" min="5">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Remember Me Duration (days)</label>
+                                <input type="number" id="rememberMeDuration" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" value="30" min="1" max="90">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Maximum Concurrent Sessions</label>
+                                <input type="number" id="maxSessions" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" value="5" min="1" max="10">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-sm p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Multi-Factor Authentication</h3>
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div>
+                                    <p class="font-medium text-gray-900">Require MFA for All Users</p>
+                                    <p class="text-sm text-gray-500">Force all users to enable MFA</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="requireMfa" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+                            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div>
+                                    <p class="font-medium text-gray-900">Require MFA for Admins</p>
+                                    <p class="text-sm text-gray-500">Force admin users to enable MFA</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="requireMfaAdmin" class="sr-only peer" checked>
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-sm p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">SSO Configuration</h3>
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div>
+                                    <p class="font-medium text-gray-900">Enable SAML SSO</p>
+                                    <p class="text-sm text-gray-500">Allow users to log in with SAML identity providers</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="enableSaml" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+                            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div>
+                                    <p class="font-medium text-gray-900">Enable OAuth 2.0</p>
+                                    <p class="text-sm text-gray-500">Allow users to log in with OAuth providers</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="enableOauth" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rate Limiting Settings -->
+                <div id="section-rate-limiting" class="settings-section space-y-6 hidden">
+                    <div class="bg-white rounded-lg shadow-sm p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">API Rate Limits</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Requests per Minute (per user)</label>
+                                <input type="number" id="ratePerMinute" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" value="60" min="10">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Requests per Hour (per user)</label>
+                                <input type="number" id="ratePerHour" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" value="1000" min="100">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Max File Upload Size (MB)</label>
+                                <input type="number" id="maxUploadSize" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" value="100" min="1">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-sm p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Login Rate Limits</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Login Attempts per IP (per hour)</label>
+                                <input type="number" id="loginRatePerIp" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" value="10" min="5">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Password Reset Requests (per hour)</label>
+                                <input type="number" id="passwordResetRate" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" value="3" min="1">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Feature Flags -->
+                <div id="section-features" class="settings-section space-y-6 hidden">
+                    <div class="bg-white rounded-lg shadow-sm p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Feature Flags</h3>
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div>
+                                    <p class="font-medium text-gray-900">AI Chat</p>
+                                    <p class="text-sm text-gray-500">Enable AI-powered chat functionality</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="featureChat" class="sr-only peer" checked>
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+                            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div>
+                                    <p class="font-medium text-gray-900">Document Processing</p>
+                                    <p class="text-sm text-gray-500">Enable document upload and analysis</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="featureDocuments" class="sr-only peer" checked>
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+                            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div>
+                                    <p class="font-medium text-gray-900">Canvas (Document Generation)</p>
+                                    <p class="text-sm text-gray-500">Enable AI document generation canvas</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="featureCanvas" class="sr-only peer" checked>
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+                            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div>
+                                    <p class="font-medium text-gray-900">Plugin System</p>
+                                    <p class="text-sm text-gray-500">Enable third-party plugins</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="featurePlugins" class="sr-only peer" checked>
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+                            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div>
+                                    <p class="font-medium text-gray-900">API Access</p>
+                                    <p class="text-sm text-gray-500">Allow external API access</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="featureApi" class="sr-only peer" checked>
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tier Configuration -->
+                <div id="section-tier" class="settings-section space-y-6 hidden">
+                    <div class="bg-white rounded-lg shadow-sm p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Current Tier</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Deployment Tier</label>
+                                <select id="deploymentTier" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                    <option value="demo">Demo</option>
+                                    <option value="edge">Edge</option>
+                                    <option value="professional" selected>Professional</option>
+                                    <option value="enterprise">Enterprise</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-sm p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Tier Limits</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Feature</th>
+                                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Demo</th>
+                                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Edge</th>
+                                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Professional</th>
+                                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Enterprise</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200">
+                                    <tr>
+                                        <td class="px-4 py-3 text-sm text-gray-900">Users</td>
+                                        <td class="px-4 py-3 text-center text-sm text-gray-600">5</td>
+                                        <td class="px-4 py-3 text-center text-sm text-gray-600">25</td>
+                                        <td class="px-4 py-3 text-center text-sm text-gray-600">100</td>
+                                        <td class="px-4 py-3 text-center text-sm text-gray-600">Unlimited</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 text-sm text-gray-900">Matters</td>
+                                        <td class="px-4 py-3 text-center text-sm text-gray-600">10</td>
+                                        <td class="px-4 py-3 text-center text-sm text-gray-600">50</td>
+                                        <td class="px-4 py-3 text-center text-sm text-gray-600">500</td>
+                                        <td class="px-4 py-3 text-center text-sm text-gray-600">Unlimited</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 text-sm text-gray-900">Storage (GB)</td>
+                                        <td class="px-4 py-3 text-center text-sm text-gray-600">5</td>
+                                        <td class="px-4 py-3 text-center text-sm text-gray-600">50</td>
+                                        <td class="px-4 py-3 text-center text-sm text-gray-600">500</td>
+                                        <td class="px-4 py-3 text-center text-sm text-gray-600">Unlimited</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 text-sm text-gray-900">AI Queries/day</td>
+                                        <td class="px-4 py-3 text-center text-sm text-gray-600">50</td>
+                                        <td class="px-4 py-3 text-center text-sm text-gray-600">500</td>
+                                        <td class="px-4 py-3 text-center text-sm text-gray-600">5,000</td>
+                                        <td class="px-4 py-3 text-center text-sm text-gray-600">Unlimited</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 text-sm text-gray-900">SSO</td>
+                                        <td class="px-4 py-3 text-center"><i class="fas fa-times text-red-500"></i></td>
+                                        <td class="px-4 py-3 text-center"><i class="fas fa-times text-red-500"></i></td>
+                                        <td class="px-4 py-3 text-center"><i class="fas fa-check text-green-500"></i></td>
+                                        <td class="px-4 py-3 text-center"><i class="fas fa-check text-green-500"></i></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 text-sm text-gray-900">API Access</td>
+                                        <td class="px-4 py-3 text-center"><i class="fas fa-times text-red-500"></i></td>
+                                        <td class="px-4 py-3 text-center"><i class="fas fa-check text-green-500"></i></td>
+                                        <td class="px-4 py-3 text-center"><i class="fas fa-check text-green-500"></i></td>
+                                        <td class="px-4 py-3 text-center"><i class="fas fa-check text-green-500"></i></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 text-sm text-gray-900">Audit Logs</td>
+                                        <td class="px-4 py-3 text-center text-sm text-gray-600">7 days</td>
+                                        <td class="px-4 py-3 text-center text-sm text-gray-600">30 days</td>
+                                        <td class="px-4 py-3 text-center text-sm text-gray-600">1 year</td>
+                                        <td class="px-4 py-3 text-center text-sm text-gray-600">Unlimited</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+
+        // Auth check
+        if (!api.requireAuth()) throw new Error('Not authenticated');
+
+        // Load full user profile with roles before rendering menu
+        (async () => {
+          try {
+            await api.loadUserProfile();
+          } catch (error) {
+            console.error('Failed to load user profile:', error);
+          }
+          
+          // Render dynamic menu (will now have access to roles)
+          renderMenu('#mainNav');
+
+          // Initialize notifications panel
+          NotificationPanel.init();
+
+          // Load user info
+          function loadUserInfo() {
+            const user = api.user;
+            if (user) {
+              const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+              const initials = (user.firstName?.[0] || '') + (user.lastName?.[0] || '') || user.email[0].toUpperCase();
+              document.getElementById('userName').textContent = name;
+              document.getElementById('userInitials').textContent = initials;
+            }
+          }
+          loadUserInfo();
+        })();
+
+        // User menu toggle
+        const userMenu = document.getElementById('userMenu');
+        const userDropdown = document.getElementById('userDropdown');
+        userMenu.addEventListener('click', (e) => {
+          e.stopPropagation();
+          userDropdown.classList.toggle('hidden');
+        });
+        document.addEventListener('click', (e) => {
+          if (!userMenu.contains(e.target)) userDropdown.classList.add('hidden');
+        });
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+          await api.logout();
+          window.location.href = '../login.html';
+        });
+
+        // Sidebar toggle
+        const sidebar = document.getElementById('sidebar');
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const closeSidebar = document.getElementById('closeSidebar');
+        if (sidebarToggle) sidebarToggle.addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+        if (closeSidebar) closeSidebar.addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSettings();
+        });
+
+        function checkAuth() {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = '/login.html';
+            }
+        }
+
+        function showSection(section) {
+            // Hide all sections
+            document.querySelectorAll('.settings-section').forEach(s => s.classList.add('hidden'));
+
+            // Show selected section
+            document.getElementById('section-' + section).classList.remove('hidden');
+
+            // Update tab styles
+            document.querySelectorAll('.settings-tab').forEach(tab => {
+                tab.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
+                tab.classList.add('text-gray-500');
+            });
+
+            const activeTab = document.querySelector(`.settings-tab[data-section="${section}"]`);
+            activeTab.classList.remove('text-gray-500');
+            activeTab.classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
+        }
+
+        async function loadSettings() {
+            try {
+                const settings = await api.request('/api/settings');
+
+                // General
+                if (settings.general) {
+                    document.getElementById('appName').value = settings.general.app_name || 'Lana AI';
+                    document.getElementById('supportEmail').value = settings.general.support_email || '';
+                    document.getElementById('timezone').value = settings.general.timezone || 'UTC';
+                    document.getElementById('dateFormat').value = settings.general.date_format || 'MM/DD/YYYY';
+                    document.getElementById('maintenanceMode').checked = settings.general.maintenance_mode || false;
+                }
+
+                // Security
+                if (settings.security) {
+                    document.getElementById('minPasswordLength').value = settings.security.min_password_length || 8;
+                    document.getElementById('requireUppercase').checked = settings.security.require_uppercase !== false;
+                    document.getElementById('requireLowercase').checked = settings.security.require_lowercase !== false;
+                    document.getElementById('requireNumbers').checked = settings.security.require_numbers !== false;
+                    document.getElementById('requireSpecial').checked = settings.security.require_special !== false;
+                    document.getElementById('passwordExpiry').value = settings.security.password_expiry || 90;
+                    document.getElementById('passwordHistory').value = settings.security.password_history || 5;
+                    document.getElementById('maxFailedAttempts').value = settings.security.max_failed_attempts || 5;
+                    document.getElementById('lockoutDuration').value = settings.security.lockout_duration || 30;
+                }
+
+                // Authentication
+                if (settings.authentication) {
+                    document.getElementById('sessionTimeout').value = settings.authentication.session_timeout || 30;
+                    document.getElementById('rememberMeDuration').value = settings.authentication.remember_me_duration || 30;
+                    document.getElementById('maxSessions').value = settings.authentication.max_sessions || 5;
+                    document.getElementById('requireMfa').checked = settings.authentication.require_mfa || false;
+                    document.getElementById('requireMfaAdmin').checked = settings.authentication.require_mfa_admin !== false;
+                    document.getElementById('enableSaml').checked = settings.authentication.enable_saml || false;
+                    document.getElementById('enableOauth').checked = settings.authentication.enable_oauth || false;
+                }
+
+                // Rate Limiting
+                if (settings.rate_limiting) {
+                    document.getElementById('ratePerMinute').value = settings.rate_limiting.requests_per_minute || 60;
+                    document.getElementById('ratePerHour').value = settings.rate_limiting.requests_per_hour || 1000;
+                    document.getElementById('maxUploadSize').value = settings.rate_limiting.max_upload_size || 100;
+                    document.getElementById('loginRatePerIp').value = settings.rate_limiting.login_rate_per_ip || 10;
+                    document.getElementById('passwordResetRate').value = settings.rate_limiting.password_reset_rate || 3;
+                }
+
+                // Features
+                if (settings.features) {
+                    document.getElementById('featureChat').checked = settings.features.chat !== false;
+                    document.getElementById('featureDocuments').checked = settings.features.documents !== false;
+                    document.getElementById('featureCanvas').checked = settings.features.canvas !== false;
+                    document.getElementById('featurePlugins').checked = settings.features.plugins !== false;
+                    document.getElementById('featureApi').checked = settings.features.api !== false;
+                }
+
+                // Tier
+                if (settings.tier) {
+                    document.getElementById('deploymentTier').value = settings.tier.current || 'professional';
+                }
+            } catch (error) {
+                console.error('Failed to load settings:', error);
+            }
+        }
+
+        async function saveAllSettings() {
+            const settings = {
+                general: {
+                    app_name: document.getElementById('appName').value,
+                    support_email: document.getElementById('supportEmail').value,
+                    timezone: document.getElementById('timezone').value,
+                    date_format: document.getElementById('dateFormat').value,
+                    maintenance_mode: document.getElementById('maintenanceMode').checked
+                },
+                security: {
+                    min_password_length: parseInt(document.getElementById('minPasswordLength').value),
+                    require_uppercase: document.getElementById('requireUppercase').checked,
+                    require_lowercase: document.getElementById('requireLowercase').checked,
+                    require_numbers: document.getElementById('requireNumbers').checked,
+                    require_special: document.getElementById('requireSpecial').checked,
+                    password_expiry: parseInt(document.getElementById('passwordExpiry').value),
+                    password_history: parseInt(document.getElementById('passwordHistory').value),
+                    max_failed_attempts: parseInt(document.getElementById('maxFailedAttempts').value),
+                    lockout_duration: parseInt(document.getElementById('lockoutDuration').value)
+                },
+                authentication: {
+                    session_timeout: parseInt(document.getElementById('sessionTimeout').value),
+                    remember_me_duration: parseInt(document.getElementById('rememberMeDuration').value),
+                    max_sessions: parseInt(document.getElementById('maxSessions').value),
+                    require_mfa: document.getElementById('requireMfa').checked,
+                    require_mfa_admin: document.getElementById('requireMfaAdmin').checked,
+                    enable_saml: document.getElementById('enableSaml').checked,
+                    enable_oauth: document.getElementById('enableOauth').checked
+                },
+                rate_limiting: {
+                    requests_per_minute: parseInt(document.getElementById('ratePerMinute').value),
+                    requests_per_hour: parseInt(document.getElementById('ratePerHour').value),
+                    max_upload_size: parseInt(document.getElementById('maxUploadSize').value),
+                    login_rate_per_ip: parseInt(document.getElementById('loginRatePerIp').value),
+                    password_reset_rate: parseInt(document.getElementById('passwordResetRate').value)
+                },
+                features: {
+                    chat: document.getElementById('featureChat').checked,
+                    documents: document.getElementById('featureDocuments').checked,
+                    canvas: document.getElementById('featureCanvas').checked,
+                    plugins: document.getElementById('featurePlugins').checked,
+                    api: document.getElementById('featureApi').checked
+                },
+                tier: {
+                    current: document.getElementById('deploymentTier').value
+                }
+            };
+
+            try {
+                await api.request('/api/settings', {
+                    method: 'PUT',
+                    body: JSON.stringify(settings)
+                });
+                Toast.success('Settings saved successfully');
+            } catch (error) {
+                Toast.error(error.message || 'Failed to save settings');
+            }
+        }
+    </script>
+</body>
+</html>

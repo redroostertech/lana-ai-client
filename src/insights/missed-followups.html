@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Missed Follow-ups - LanaAI</title>
+  <script src="../js/tailwind-loader.js"></script>
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/notifications.js"></script>
+  <script src="../js/insights.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <!-- Sidebar -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
+    <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
+      <a href="../index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
+      <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
+      <!-- Menu will be dynamically rendered by menu.js -->
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="lg:ml-64">
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
+      <div class="flex items-center justify-between h-16 px-4 lg:px-8">
+        <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+        <div class="flex-1 px-4 lg:px-0">
+          <h1 class="text-xl font-semibold text-gray-900">Missed Follow-ups Tracker</h1>
+          <p class="text-sm text-gray-500">Track and resolve overdue follow-up tasks</p>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <!-- Export Button -->
+          <button onclick="exportData()" class="flex items-center gap-2 px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+          Export
+        </button>
+
+          <!-- Notifications -->
+          <button id="notificationBtn" class="relative text-gray-500 hover:text-gray-700">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+            </svg>
+            <span id="notificationBadge" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">0</span>
+          </button>
+
+          <!-- User Menu -->
+          <div class="relative" id="userMenu">
+            <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900">
+              <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                <span id="userInitials" class="text-sm font-medium text-indigo-600">U</span>
+              </div>
+              <span id="userName" class="hidden sm:block text-sm font-medium">User</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            </button>
+            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+              <a href="../settings.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
+              <hr class="my-1">
+              <button id="logoutBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sign out</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Notification Panel Overlay -->
+    <div id="notificationOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
+
+    <!-- Notification Slide-out Panel -->
+    <div id="notificationPanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
+      <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
+        <h2 class="text-lg font-semibold text-gray-900">Notifications</h2>
+        <div class="flex items-center gap-3">
+          <button id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium hidden">Mark all read</button>
+          <button id="refreshNotificationsBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+          </button>
+          <button id="closeNotificationPanel" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
+        <button id="filterAll" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">All</button>
+        <button id="filterUnread" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Unread</button>
+      </div>
+      <div id="notificationList" class="flex-1 overflow-y-auto">
+        <div id="notificationLoading" class="p-8 text-center">
+          <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+          <p class="text-gray-500 mt-3 text-sm">Loading notifications...</p>
+        </div>
+      </div>
+      <div id="notificationLoadingMore" class="hidden p-4 border-t border-gray-100 text-center flex-shrink-0">
+        <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+      </div>
+    </div>
+
+    <main class="p-4 lg:p-8">
+      <!-- Summary Cards Loading State -->
+      <div id="summaryLoading" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 animate-pulse">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+              <div class="h-8 bg-gray-200 rounded w-12"></div>
+            </div>
+            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 animate-pulse">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+              <div class="h-8 bg-gray-200 rounded w-12"></div>
+            </div>
+            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 animate-pulse">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="h-4 bg-gray-200 rounded w-28 mb-2"></div>
+              <div class="h-8 bg-gray-200 rounded w-12"></div>
+            </div>
+            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 animate-pulse">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+              <div class="h-8 bg-gray-200 rounded w-12"></div>
+            </div>
+            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Summary Cards -->
+      <div id="summaryCards" class="hidden grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm text-gray-500">Total Overdue</p>
+              <p id="totalOverdue" class="text-3xl font-bold text-gray-900">-</p>
+            </div>
+            <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm text-gray-500">High Priority</p>
+              <p id="highPriority" class="text-3xl font-bold text-red-600">-</p>
+            </div>
+            <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm text-gray-500">Medium Priority</p>
+              <p id="mediumPriority" class="text-3xl font-bold text-yellow-600">-</p>
+            </div>
+            <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm text-gray-500">Low Priority</p>
+              <p id="lowPriority" class="text-3xl font-bold text-green-600">-</p>
+            </div>
+            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
+        <div class="flex flex-wrap items-center gap-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Priority</label>
+            <select id="filterPriority" class="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+              <option value="">All Priorities</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Type</label>
+            <select id="filterType" class="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+              <option value="">All Types</option>
+              <option value="call">Call</option>
+              <option value="email">Email</option>
+              <option value="meeting">Meeting</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Assigned Rep</label>
+            <select id="filterRep" class="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+              <option value="">All Reps</option>
+            </select>
+          </div>
+          <div class="flex-1"></div>
+          <button onclick="clearFilters()" class="text-sm text-gray-500 hover:text-gray-700">Clear Filters</button>
+        </div>
+      </div>
+
+      <!-- Follow-ups Table Loading State -->
+      <div id="tableLoading" class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between animate-pulse">
+          <div>
+            <div class="h-5 bg-gray-200 rounded w-32 mb-2"></div>
+            <div class="h-4 bg-gray-200 rounded w-28"></div>
+          </div>
+          <div class="h-8 bg-gray-200 rounded w-32"></div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="w-10 px-6 py-3"><div class="h-4 bg-gray-200 rounded w-4"></div></th>
+                <th class="px-6 py-3"><div class="h-4 bg-gray-200 rounded w-14"></div></th>
+                <th class="px-6 py-3"><div class="h-4 bg-gray-200 rounded w-12"></div></th>
+                <th class="px-6 py-3"><div class="h-4 bg-gray-200 rounded w-20"></div></th>
+                <th class="px-6 py-3"><div class="h-4 bg-gray-200 rounded w-16"></div></th>
+                <th class="px-6 py-3"><div class="h-4 bg-gray-200 rounded w-16"></div></th>
+                <th class="px-6 py-3"><div class="h-4 bg-gray-200 rounded w-24"></div></th>
+                <th class="px-6 py-3"><div class="h-4 bg-gray-200 rounded w-16"></div></th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200 animate-pulse">
+              <tr>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-4"></div></td>
+                <td class="px-6 py-4"><div class="h-5 bg-gray-200 rounded w-32 mb-2"></div><div class="h-4 bg-gray-200 rounded w-40"></div></td>
+                <td class="px-6 py-4"><div class="h-6 bg-gray-200 rounded-full w-16"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-24"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-16"></div></td>
+                <td class="px-6 py-4"><div class="h-6 bg-gray-200 rounded-full w-14"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-24"></div></td>
+                <td class="px-6 py-4"><div class="flex gap-2"><div class="h-4 bg-gray-200 rounded w-20"></div><div class="h-4 bg-gray-200 rounded w-16"></div></div></td>
+              </tr>
+              <tr>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-4"></div></td>
+                <td class="px-6 py-4"><div class="h-5 bg-gray-200 rounded w-28 mb-2"></div><div class="h-4 bg-gray-200 rounded w-36"></div></td>
+                <td class="px-6 py-4"><div class="h-6 bg-gray-200 rounded-full w-14"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-24"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-16"></div></td>
+                <td class="px-6 py-4"><div class="h-6 bg-gray-200 rounded-full w-16"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-20"></div></td>
+                <td class="px-6 py-4"><div class="flex gap-2"><div class="h-4 bg-gray-200 rounded w-20"></div><div class="h-4 bg-gray-200 rounded w-16"></div></div></td>
+              </tr>
+              <tr>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-4"></div></td>
+                <td class="px-6 py-4"><div class="h-5 bg-gray-200 rounded w-36 mb-2"></div><div class="h-4 bg-gray-200 rounded w-32"></div></td>
+                <td class="px-6 py-4"><div class="h-6 bg-gray-200 rounded-full w-18"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-24"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-16"></div></td>
+                <td class="px-6 py-4"><div class="h-6 bg-gray-200 rounded-full w-12"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-28"></div></td>
+                <td class="px-6 py-4"><div class="flex gap-2"><div class="h-4 bg-gray-200 rounded w-20"></div><div class="h-4 bg-gray-200 rounded w-16"></div></div></td>
+              </tr>
+              <tr>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-4"></div></td>
+                <td class="px-6 py-4"><div class="h-5 bg-gray-200 rounded w-24 mb-2"></div><div class="h-4 bg-gray-200 rounded w-44"></div></td>
+                <td class="px-6 py-4"><div class="h-6 bg-gray-200 rounded-full w-16"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-24"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-16"></div></td>
+                <td class="px-6 py-4"><div class="h-6 bg-gray-200 rounded-full w-14"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-24"></div></td>
+                <td class="px-6 py-4"><div class="flex gap-2"><div class="h-4 bg-gray-200 rounded w-20"></div><div class="h-4 bg-gray-200 rounded w-16"></div></div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Follow-ups Table -->
+      <div id="tableContent" class="hidden bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h3 class="font-semibold text-gray-900">Missed Follow-ups</h3>
+            <p id="tableCount" class="text-sm text-gray-500">Showing 0 items</p>
+          </div>
+          <button onclick="bulkReschedule()" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">
+            Bulk Reschedule
+          </button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="w-10 px-6 py-3">
+                  <input type="checkbox" id="selectAll" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                </th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Overdue</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned To</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="followupsTable" class="bg-white divide-y divide-gray-200">
+              <!-- Populated by JavaScript -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Reschedule Modal -->
+  <div id="rescheduleModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-900">Reschedule Follow-up</h3>
+        <button onclick="closeRescheduleModal()" class="text-gray-400 hover:text-gray-600">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <div class="p-6">
+        <p id="rescheduleClient" class="text-sm text-gray-500 mb-4"></p>
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">New Date</label>
+          <input type="date" id="rescheduleDate" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div class="flex gap-3">
+          <button onclick="closeRescheduleModal()" class="flex-1 px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-lg">Cancel</button>
+          <button onclick="confirmReschedule()" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg">Reschedule</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    if (!api.requireAuth()) throw new Error('Not authenticated');
+
+    // Initialize notifications panel
+    NotificationPanel.init();
+
+    // Load user info
+    function loadUserInfo() {
+      const user = api.user;
+      if (user) {
+        const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+        const initials = (user.firstName?.[0] || '') + (user.lastName?.[0] || '') || user.email[0].toUpperCase();
+        document.getElementById('userName').textContent = name;
+        document.getElementById('userInitials').textContent = initials;
+      }
+    }
+    loadUserInfo();
+
+    // User menu toggle
+    const userMenu = document.getElementById('userMenu');
+    const userDropdown = document.getElementById('userDropdown');
+    userMenu.addEventListener('click', () => userDropdown.classList.toggle('hidden'));
+    document.addEventListener('click', (e) => {
+      if (!userMenu.contains(e.target)) userDropdown.classList.add('hidden');
+    });
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      await api.logout();
+      window.location.href = '../login.html';
+    });
+
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('openSidebar').addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+    document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+
+    let allFollowups = [];
+    let selectedIds = new Set();
+    let currentRescheduleId = null;
+
+    // Show/hide loading states
+    function showLoadingStates() {
+      document.getElementById('summaryLoading').classList.remove('hidden');
+      document.getElementById('summaryCards').classList.add('hidden');
+      document.getElementById('tableLoading').classList.remove('hidden');
+      document.getElementById('tableContent').classList.add('hidden');
+    }
+
+    function hideLoadingStates() {
+      document.getElementById('summaryLoading').classList.add('hidden');
+      document.getElementById('summaryCards').classList.remove('hidden');
+      document.getElementById('tableLoading').classList.add('hidden');
+      document.getElementById('tableContent').classList.remove('hidden');
+    }
+
+    function getTypeBadge(type) {
+      const config = {
+        call: { bg: 'bg-green-100', text: 'text-green-800', icon: '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>' },
+        email: { bg: 'bg-blue-100', text: 'text-blue-800', icon: '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>' },
+        meeting: { bg: 'bg-purple-100', text: 'text-purple-800', icon: '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>' }
+      };
+      const c = config[type] || config.call;
+      return `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${c.bg} ${c.text}">${c.icon} ${type}</span>`;
+    }
+
+    function getPriorityBadge(priority) {
+      const config = {
+        high: { bg: 'bg-red-100', text: 'text-red-800' },
+        medium: { bg: 'bg-yellow-100', text: 'text-yellow-800' },
+        low: { bg: 'bg-green-100', text: 'text-green-800' }
+      };
+      const c = config[priority];
+      return `<span class="px-2 py-1 rounded-full text-xs font-medium ${c.bg} ${c.text}">${priority}</span>`;
+    }
+
+    function renderTable(followups) {
+      const tbody = document.getElementById('followupsTable');
+      document.getElementById('tableCount').textContent = `Showing ${followups.length} items`;
+
+      if (followups.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-12 text-center text-gray-500">No missed follow-ups. Great job!</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = followups.map(f => `
+        <tr class="hover:bg-gray-50">
+          <td class="px-6 py-4"><input type="checkbox" class="row-checkbox rounded border-gray-300 text-indigo-600" data-id="${f.id}"></td>
+          <td class="px-6 py-4">
+            <p class="font-medium text-gray-900">${f.clientName}</p>
+            <p class="text-sm text-gray-500">${f.notes}</p>
+          </td>
+          <td class="px-6 py-4">${getTypeBadge(f.followupType)}</td>
+          <td class="px-6 py-4 text-sm text-gray-500">${formatDate(f.dueDate)}</td>
+          <td class="px-6 py-4"><span class="text-sm font-medium text-red-600">${f.daysOverdue} days</span></td>
+          <td class="px-6 py-4">${getPriorityBadge(f.priority)}</td>
+          <td class="px-6 py-4 text-sm text-gray-500">${f.assignedRep}</td>
+          <td class="px-6 py-4">
+            <div class="flex items-center gap-2">
+              <button onclick="reschedule('${f.id}', '${f.clientName}')" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">Reschedule</button>
+              <button onclick="markComplete('${f.id}')" class="text-green-600 hover:text-green-800 text-sm font-medium">Complete</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function reschedule(id, clientName) {
+      currentRescheduleId = id;
+      document.getElementById('rescheduleClient').textContent = `Reschedule follow-up for ${clientName}`;
+      document.getElementById('rescheduleDate').valueAsDate = new Date(Date.now() + 86400000);
+      document.getElementById('rescheduleModal').classList.remove('hidden');
+    }
+
+    function closeRescheduleModal() {
+      document.getElementById('rescheduleModal').classList.add('hidden');
+      currentRescheduleId = null;
+    }
+
+    async function confirmReschedule() {
+      const newDate = document.getElementById('rescheduleDate').value;
+      if (!newDate) {
+        Toast.warning('Please select a date');
+        return;
+      }
+      await Insights.rescheduleFollowup(currentRescheduleId, newDate);
+      Toast.success('Follow-up rescheduled');
+      closeRescheduleModal();
+      loadData();
+    }
+
+    async function markComplete(id) {
+      await Insights.completeFollowup(id);
+      Toast.success('Follow-up marked as complete');
+      loadData();
+    }
+
+    async function exportData() {
+      await Insights.exportData('followups');
+      Toast.success('Export downloaded');
+    }
+
+    function clearFilters() {
+      document.getElementById('filterPriority').value = '';
+      document.getElementById('filterType').value = '';
+      document.getElementById('filterRep').value = '';
+      loadData();
+    }
+
+    async function loadData() {
+      // Show loading skeletons
+      showLoadingStates();
+
+      try {
+        const filters = {
+          priority: document.getElementById('filterPriority').value,
+          type: document.getElementById('filterType').value,
+          rep: document.getElementById('filterRep').value
+        };
+
+        const data = await Insights.getMissedFollowups(filters);
+        allFollowups = data.followups;
+
+        document.getElementById('totalOverdue').textContent = data.summary.total;
+        document.getElementById('highPriority').textContent = data.summary.high;
+        document.getElementById('mediumPriority').textContent = data.summary.medium;
+        document.getElementById('lowPriority').textContent = data.summary.low;
+
+        const reps = [...new Set(data.followups.map(f => f.assignedRep))];
+        const repSelect = document.getElementById('filterRep');
+        if (repSelect.options.length <= 1) {
+          reps.forEach(rep => repSelect.add(new Option(rep, rep)));
+        }
+
+        renderTable(data.followups);
+
+        // Hide loading skeletons, show content
+        hideLoadingStates();
+      } catch (error) {
+        // Hide loading even on error
+        hideLoadingStates();
+        Toast.error('Failed to load data');
+        console.error(error);
+      }
+    }
+
+    document.getElementById('filterPriority').addEventListener('change', loadData);
+    document.getElementById('filterType').addEventListener('change', loadData);
+    document.getElementById('filterRep').addEventListener('change', loadData);
+
+    // Initialize dynamic menu
+    renderMenu('#mainNav');
+
+    loadData();
+  </script>
+</body>
+</html>

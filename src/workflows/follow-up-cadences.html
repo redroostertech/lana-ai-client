@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Follow-up Cadences - LanaAI</title>
+  <script src="../js/tailwind-loader.js"></script>
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/workflows.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
+    <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
+      <a href="../index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
+      <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
+      <!-- Menu will be dynamically rendered by menu.js -->
+    </nav>
+  </aside>
+
+  <div class="lg:ml-64">
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
+      <div class="flex items-center justify-between h-16 px-4 lg:px-8">
+        <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+        <div class="flex-1 px-4 lg:px-0">
+          <h1 class="text-xl font-semibold text-gray-900">Follow-up Cadences</h1>
+          <p class="text-sm text-gray-500">Configure green, yellow, and red zone follow-up rules</p>
+        </div>
+        <button onclick="saveConfig()" class="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+          Save Changes
+        </button>
+      </div>
+    </header>
+
+    <main class="p-4 lg:p-8">
+      <!-- Zone Overview -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            </div>
+            <div>
+              <h3 class="font-semibold text-lg">Green Zone</h3>
+              <p class="text-sm text-white/80">0-7 days</p>
+            </div>
+          </div>
+          <p class="text-sm text-white/90">Fresh opportunities with high engagement potential. Light-touch follow-ups recommended.</p>
+        </div>
+        <div class="bg-gradient-to-br from-yellow-500 to-orange-500 rounded-xl p-6 text-white">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+            <div>
+              <h3 class="font-semibold text-lg">Yellow Zone</h3>
+              <p class="text-sm text-white/80">8-14 days</p>
+            </div>
+          </div>
+          <p class="text-sm text-white/90">Opportunities at risk of going cold. Increase follow-up frequency and urgency.</p>
+        </div>
+        <div class="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-6 text-white">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            </div>
+            <div>
+              <h3 class="font-semibold text-lg">Red Zone</h3>
+              <p class="text-sm text-white/80">15+ days</p>
+            </div>
+          </div>
+          <p class="text-sm text-white/90">Stale opportunities requiring escalation and aggressive outreach strategies.</p>
+        </div>
+      </div>
+
+      <!-- Zone Configs Loading Skeleton -->
+      <div id="configLoading" class="space-y-6">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+          <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-3 animate-pulse">
+            <div class="w-4 h-4 bg-gray-200 rounded-full"></div>
+            <div class="h-5 bg-gray-200 rounded w-64"></div>
+          </div>
+          <div class="p-6 animate-pulse">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div><div class="h-4 bg-gray-200 rounded w-24 mb-2"></div><div class="h-10 bg-gray-200 rounded w-full"></div></div>
+              <div><div class="h-4 bg-gray-200 rounded w-24 mb-2"></div><div class="h-10 bg-gray-200 rounded w-full"></div></div>
+            </div>
+            <div class="h-5 bg-gray-200 rounded w-16 mb-4"></div>
+            <div class="space-y-4">
+              <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div class="flex items-center gap-3"><div class="w-5 h-5 bg-gray-200 rounded"></div><div><div class="h-4 bg-gray-200 rounded w-32 mb-1"></div><div class="h-3 bg-gray-200 rounded w-40"></div></div></div>
+                <div class="w-11 h-6 bg-gray-200 rounded-full"></div>
+              </div>
+              <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div class="flex items-center gap-3"><div class="w-5 h-5 bg-gray-200 rounded"></div><div><div class="h-4 bg-gray-200 rounded w-28 mb-1"></div><div class="h-3 bg-gray-200 rounded w-36"></div></div></div>
+                <div class="w-11 h-6 bg-gray-200 rounded-full"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+          <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-3 animate-pulse">
+            <div class="w-4 h-4 bg-gray-200 rounded-full"></div>
+            <div class="h-5 bg-gray-200 rounded w-64"></div>
+          </div>
+          <div class="p-6 animate-pulse">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div><div class="h-4 bg-gray-200 rounded w-24 mb-2"></div><div class="h-10 bg-gray-200 rounded w-full"></div></div>
+              <div><div class="h-4 bg-gray-200 rounded w-24 mb-2"></div><div class="h-10 bg-gray-200 rounded w-full"></div></div>
+            </div>
+            <div class="h-5 bg-gray-200 rounded w-16 mb-4"></div>
+            <div class="space-y-4">
+              <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div class="flex items-center gap-3"><div class="w-5 h-5 bg-gray-200 rounded"></div><div><div class="h-4 bg-gray-200 rounded w-32 mb-1"></div><div class="h-3 bg-gray-200 rounded w-40"></div></div></div>
+                <div class="w-11 h-6 bg-gray-200 rounded-full"></div>
+              </div>
+              <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div class="flex items-center gap-3"><div class="w-5 h-5 bg-gray-200 rounded"></div><div><div class="h-4 bg-gray-200 rounded w-28 mb-1"></div><div class="h-3 bg-gray-200 rounded w-36"></div></div></div>
+                <div class="w-11 h-6 bg-gray-200 rounded-full"></div>
+              </div>
+              <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div class="flex items-center gap-3"><div class="w-5 h-5 bg-gray-200 rounded"></div><div><div class="h-4 bg-gray-200 rounded w-24 mb-1"></div><div class="h-3 bg-gray-200 rounded w-32"></div></div></div>
+                <div class="w-11 h-6 bg-gray-200 rounded-full"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+          <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-3 animate-pulse">
+            <div class="w-4 h-4 bg-gray-200 rounded-full"></div>
+            <div class="h-5 bg-gray-200 rounded w-64"></div>
+          </div>
+          <div class="p-6 animate-pulse">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div><div class="h-4 bg-gray-200 rounded w-24 mb-2"></div><div class="h-10 bg-gray-200 rounded w-full"></div></div>
+              <div><div class="h-4 bg-gray-200 rounded w-24 mb-2"></div><div class="h-10 bg-gray-200 rounded w-full"></div></div>
+            </div>
+            <div class="h-5 bg-gray-200 rounded w-16 mb-4"></div>
+            <div class="space-y-4">
+              <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div class="flex items-center gap-3"><div class="w-5 h-5 bg-gray-200 rounded"></div><div><div class="h-4 bg-gray-200 rounded w-32 mb-1"></div><div class="h-3 bg-gray-200 rounded w-40"></div></div></div>
+                <div class="w-11 h-6 bg-gray-200 rounded-full"></div>
+              </div>
+              <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div class="flex items-center gap-3"><div class="w-5 h-5 bg-gray-200 rounded"></div><div><div class="h-4 bg-gray-200 rounded w-28 mb-1"></div><div class="h-3 bg-gray-200 rounded w-36"></div></div></div>
+                <div class="w-11 h-6 bg-gray-200 rounded-full"></div>
+              </div>
+              <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div class="flex items-center gap-3"><div class="w-5 h-5 bg-gray-200 rounded"></div><div><div class="h-4 bg-gray-200 rounded w-24 mb-1"></div><div class="h-3 bg-gray-200 rounded w-44"></div></div></div>
+                <div class="w-11 h-6 bg-gray-200 rounded-full"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Zone Configs Content -->
+      <div id="configContent" class="hidden">
+      <!-- Green Zone Config -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
+          <div class="w-4 h-4 bg-green-500 rounded-full"></div>
+          <h3 class="font-semibold text-gray-900">Green Zone Configuration (0-7 days)</h3>
+        </div>
+        <div class="p-6">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Day Range Start</label>
+              <input type="number" id="greenStart" value="0" min="0" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Day Range End</label>
+              <input type="number" id="greenEnd" value="7" min="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+            </div>
+          </div>
+          <h4 class="font-medium text-gray-900 mb-4">Actions</h4>
+          <div class="space-y-4">
+            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div class="flex items-center gap-3">
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                <div>
+                  <p class="font-medium text-gray-900">Internal Notification</p>
+                  <p class="text-sm text-gray-500">Notify assigned representative</p>
+                </div>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="greenNotification" class="sr-only peer" checked>
+                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+              </label>
+            </div>
+            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div class="flex items-center gap-3">
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                <div>
+                  <p class="font-medium text-gray-900">Email Follow-up</p>
+                  <p class="text-sm text-gray-500">Send initial follow-up template</p>
+                </div>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="greenEmail" class="sr-only peer">
+                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Yellow Zone Config -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
+          <div class="w-4 h-4 bg-yellow-500 rounded-full"></div>
+          <h3 class="font-semibold text-gray-900">Yellow Zone Configuration (8-14 days)</h3>
+        </div>
+        <div class="p-6">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Day Range Start</label>
+              <input type="number" id="yellowStart" value="8" min="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Day Range End</label>
+              <input type="number" id="yellowEnd" value="14" min="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500">
+            </div>
+          </div>
+          <h4 class="font-medium text-gray-900 mb-4">Actions</h4>
+          <div class="space-y-4">
+            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div class="flex items-center gap-3">
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                <div>
+                  <p class="font-medium text-gray-900">Urgent Notification</p>
+                  <p class="text-sm text-gray-500">High-priority alert to assigned rep</p>
+                </div>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="yellowNotification" class="sr-only peer" checked>
+                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-yellow-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-yellow-500"></div>
+              </label>
+            </div>
+            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div class="flex items-center gap-3">
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                <div>
+                  <p class="font-medium text-gray-900">Second Follow-up Email</p>
+                  <p class="text-sm text-gray-500">Send follow-up reminder template</p>
+                </div>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="yellowEmail" class="sr-only peer" checked>
+                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-yellow-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-yellow-500"></div>
+              </label>
+            </div>
+            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div class="flex items-center gap-3">
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+                <div>
+                  <p class="font-medium text-gray-900">SMS Reminder</p>
+                  <p class="text-sm text-gray-500">Send text message reminder</p>
+                </div>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="yellowSms" class="sr-only peer">
+                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-yellow-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-yellow-500"></div>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Red Zone Config -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
+          <div class="w-4 h-4 bg-red-500 rounded-full"></div>
+          <h3 class="font-semibold text-gray-900">Red Zone Configuration (15+ days)</h3>
+        </div>
+        <div class="p-6">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Day Range Start</label>
+              <input type="number" id="redStart" value="15" min="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Day Range End</label>
+              <input type="text" id="redEnd" value="No limit" disabled class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500">
+            </div>
+          </div>
+          <h4 class="font-medium text-gray-900 mb-4">Actions</h4>
+          <div class="space-y-4">
+            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div class="flex items-center gap-3">
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                <div>
+                  <p class="font-medium text-gray-900">Escalate to Manager</p>
+                  <p class="text-sm text-gray-500">Alert manager for review and intervention</p>
+                </div>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="redEscalate" class="sr-only peer" checked>
+                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-red-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+              </label>
+            </div>
+            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div class="flex items-center gap-3">
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                <div>
+                  <p class="font-medium text-gray-900">Urgent Follow-up Email</p>
+                  <p class="text-sm text-gray-500">Send final follow-up attempt</p>
+                </div>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="redEmail" class="sr-only peer" checked>
+                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-red-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+              </label>
+            </div>
+            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div class="flex items-center gap-3">
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                <div>
+                  <p class="font-medium text-gray-900">Add to Retargeting</p>
+                  <p class="text-sm text-gray-500">Sync to Facebook/Google retargeting audiences</p>
+                </div>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="redRetargeting" class="sr-only peer" checked>
+                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-red-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    if (!api.requireAuth()) throw new Error('Not authenticated');
+    renderMenu('#mainNav');
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('openSidebar').addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+    document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+
+    function showLoadingStates() {
+      document.getElementById('configLoading').classList.remove('hidden');
+      document.getElementById('configContent').classList.add('hidden');
+    }
+
+    function hideLoadingStates() {
+      document.getElementById('configLoading').classList.add('hidden');
+      document.getElementById('configContent').classList.remove('hidden');
+    }
+
+    async function loadConfig() {
+      showLoadingStates();
+      try {
+        const config = await Workflows.getCadenceConfig();
+
+        // Green Zone
+        document.getElementById('greenStart').value = config.greenZone.dayRange[0];
+        document.getElementById('greenEnd').value = config.greenZone.dayRange[1];
+        const greenNotif = config.greenZone.actions.find(a => a.type === 'internal_notification');
+        const greenEmail = config.greenZone.actions.find(a => a.type === 'email');
+        if (greenNotif) document.getElementById('greenNotification').checked = greenNotif.enabled;
+        if (greenEmail) document.getElementById('greenEmail').checked = greenEmail.enabled;
+
+        // Yellow Zone
+        document.getElementById('yellowStart').value = config.yellowZone.dayRange[0];
+        document.getElementById('yellowEnd').value = config.yellowZone.dayRange[1];
+        const yellowNotif = config.yellowZone.actions.find(a => a.type === 'internal_notification');
+        const yellowEmail = config.yellowZone.actions.find(a => a.type === 'email');
+        const yellowSms = config.yellowZone.actions.find(a => a.type === 'sms');
+        if (yellowNotif) document.getElementById('yellowNotification').checked = yellowNotif.enabled;
+        if (yellowEmail) document.getElementById('yellowEmail').checked = yellowEmail.enabled;
+        if (yellowSms) document.getElementById('yellowSms').checked = yellowSms.enabled;
+
+        // Red Zone
+        document.getElementById('redStart').value = config.redZone.dayRange[0];
+        const redEscalate = config.redZone.actions.find(a => a.type === 'escalate');
+        const redEmail = config.redZone.actions.find(a => a.type === 'email');
+        const redRetargeting = config.redZone.actions.find(a => a.type === 'retargeting');
+        if (redEscalate) document.getElementById('redEscalate').checked = redEscalate.enabled;
+        if (redEmail) document.getElementById('redEmail').checked = redEmail.enabled;
+        if (redRetargeting) document.getElementById('redRetargeting').checked = redRetargeting.enabled;
+
+        hideLoadingStates();
+      } catch (error) {
+        hideLoadingStates();
+        Toast.error('Failed to load cadence configuration');
+        console.error(error);
+      }
+    }
+
+    async function saveConfig() {
+      try {
+        const config = {
+          greenZone: {
+            dayRange: [parseInt(document.getElementById('greenStart').value), parseInt(document.getElementById('greenEnd').value)],
+            actions: [
+              { type: 'internal_notification', enabled: document.getElementById('greenNotification').checked, config: { notify: 'assigned_rep' } },
+              { type: 'email', enabled: document.getElementById('greenEmail').checked, config: { template: 'initial_followup' } }
+            ]
+          },
+          yellowZone: {
+            dayRange: [parseInt(document.getElementById('yellowStart').value), parseInt(document.getElementById('yellowEnd').value)],
+            actions: [
+              { type: 'internal_notification', enabled: document.getElementById('yellowNotification').checked, config: { notify: 'assigned_rep', urgency: 'high' } },
+              { type: 'email', enabled: document.getElementById('yellowEmail').checked, config: { template: 'second_followup' } },
+              { type: 'sms', enabled: document.getElementById('yellowSms').checked, config: { template: 'reminder_sms' } }
+            ]
+          },
+          redZone: {
+            dayRange: [parseInt(document.getElementById('redStart').value), null],
+            actions: [
+              { type: 'escalate', enabled: document.getElementById('redEscalate').checked, config: { escalateTo: 'manager' } },
+              { type: 'email', enabled: document.getElementById('redEmail').checked, config: { template: 'urgent_followup' } },
+              { type: 'retargeting', enabled: document.getElementById('redRetargeting').checked, config: { audience: 'stale_leads' } }
+            ]
+          }
+        };
+
+        await Workflows.updateCadenceConfig(config);
+        Toast.success('Cadence configuration saved successfully');
+      } catch (error) {
+        Toast.error('Failed to save configuration');
+        console.error(error);
+      }
+    }
+
+    loadConfig();
+  </script>
+</body>
+</html>

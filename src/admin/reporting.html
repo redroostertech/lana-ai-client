@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporting - Lana AI</title>
+    <script src="../js/tailwind-loader.js"></script>
+  <script src="../js/error-reporter.js"></script>
+    <script src="../js/config.js"></script>
+    <script src="../js/mock-data.js"></script>
+    <script src="../js/api.js"></script>
+    <script src="../js/components.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/notifications.js"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
+            <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
+                <a href="../index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
+                <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
+                <!-- Menu will be dynamically rendered by menu.js -->
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Header -->
+            <header class="bg-white shadow-sm border-b border-gray-200 lg:ml-64">
+                <div class="flex items-center justify-between h-16 px-4 lg:px-8">
+                    <button id="sidebarToggle" class="lg:hidden text-gray-500 hover:text-gray-700">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                    </button>
+                    <div class="flex-1 px-4 lg:px-0">
+                        <h1 class="text-xl font-semibold text-gray-900">Analytics & Reporting</h1>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <select id="dateRange" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                            <option value="7d">Last 7 days</option>
+                            <option value="30d" selected>Last 30 days</option>
+                            <option value="90d">Last 90 days</option>
+                            <option value="1y">Last year</option>
+                        </select>
+                        <!-- Export Button -->
+                        <button onclick="exportReport()" class="flex items-center gap-2 px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                            Export
+                        </button>
+
+                        <!-- Notifications -->
+                        <button id="notificationBtn" class="relative text-gray-500 hover:text-gray-700">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                            </svg>
+                            <span id="notificationBadge" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">0</span>
+                        </button>
+
+                        <!-- User Menu -->
+                        <div class="relative" id="userMenu">
+                            <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900">
+                                <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                                    <span id="userInitials" class="text-sm font-medium text-indigo-600">U</span>
+                                </div>
+                                <span id="userName" class="hidden sm:block text-sm font-medium">User</span>
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                                <a href="../settings.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
+                                <hr class="my-1">
+                                <button id="logoutBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sign out</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Notification Panel Overlay -->
+            <div id="notificationOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
+
+            <!-- Notification Slide-out Panel -->
+            <div id="notificationPanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
+                <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
+                    <h2 class="text-lg font-semibold text-gray-900">Notifications</h2>
+                    <div class="flex items-center gap-3">
+                        <button id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium hidden">Mark all read</button>
+                        <button id="refreshNotificationsBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        </button>
+                        <button id="closeNotificationPanel" class="text-gray-400 hover:text-gray-600">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
+                    <button id="filterAll" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">All</button>
+                    <button id="filterUnread" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Unread</button>
+                </div>
+                <div id="notificationList" class="flex-1 overflow-y-auto">
+                    <div id="notificationLoading" class="p-8 text-center">
+                        <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+                        <p class="text-gray-500 mt-3 text-sm">Loading notifications...</p>
+                    </div>
+                </div>
+                <div id="notificationLoadingMore" class="hidden p-4 border-t border-gray-100 text-center flex-shrink-0">
+                    <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+                </div>
+            </div>
+
+            <!-- Content -->
+            <main class="flex-1 overflow-y-auto p-6 lg:ml-64">
+                <!-- Tabs -->
+                <div class="bg-white rounded-lg shadow-sm mb-6">
+                    <div class="flex overflow-x-auto border-b border-gray-200">
+                        <button onclick="showTab('usage')" class="report-tab px-6 py-3 text-sm font-medium text-blue-600 border-b-2 border-blue-600" data-tab="usage">Usage Metrics</button>
+                        <button onclick="showTab('compliance')" class="report-tab px-6 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" data-tab="compliance">Compliance</button>
+                        <button onclick="showTab('custom')" class="report-tab px-6 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" data-tab="custom">Custom Reports</button>
+                        <button onclick="showTab('scheduled')" class="report-tab px-6 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" data-tab="scheduled">Scheduled Reports</button>
+                    </div>
+                </div>
+
+                <!-- Usage Metrics Tab -->
+                <div id="tab-usage" class="report-section space-y-6">
+                    <!-- Summary Stats -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div class="bg-white rounded-lg shadow-sm p-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm text-gray-500">Active Users</p>
+                                    <p class="text-2xl font-bold text-gray-900" id="activeUsersCount">-</p>
+                                    <p class="text-xs text-green-600 mt-1"><i class="fas fa-arrow-up mr-1"></i>12% vs last period</p>
+                                </div>
+                                <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-users text-blue-600"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-lg shadow-sm p-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm text-gray-500">Documents Processed</p>
+                                    <p class="text-2xl font-bold text-gray-900" id="docsProcessed">-</p>
+                                    <p class="text-xs text-green-600 mt-1"><i class="fas fa-arrow-up mr-1"></i>8% vs last period</p>
+                                </div>
+                                <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-file-alt text-green-600"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-lg shadow-sm p-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm text-gray-500">AI Queries</p>
+                                    <p class="text-2xl font-bold text-gray-900" id="aiQueries">-</p>
+                                    <p class="text-xs text-green-600 mt-1"><i class="fas fa-arrow-up mr-1"></i>24% vs last period</p>
+                                </div>
+                                <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-brain text-purple-600"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-lg shadow-sm p-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm text-gray-500">Storage Used</p>
+                                    <p class="text-2xl font-bold text-gray-900" id="storageUsed">-</p>
+                                    <p class="text-xs text-gray-500 mt-1">of 500 GB quota</p>
+                                </div>
+                                <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-hdd text-orange-600"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts Row -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-white rounded-lg shadow-sm p-6">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">User Activity Over Time</h3>
+                            <canvas id="userActivityChart" height="200"></canvas>
+                        </div>
+                        <div class="bg-white rounded-lg shadow-sm p-6">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">AI Query Types</h3>
+                            <canvas id="queryTypesChart" height="200"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- More Charts -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-white rounded-lg shadow-sm p-6">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Document Processing</h3>
+                            <canvas id="docProcessingChart" height="200"></canvas>
+                        </div>
+                        <div class="bg-white rounded-lg shadow-sm p-6">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Top Organizations by Usage</h3>
+                            <div class="space-y-4" id="topOrgsUsage">
+                                <!-- Dynamic content -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Compliance Tab -->
+                <div id="tab-compliance" class="report-section space-y-6 hidden">
+                    <!-- Compliance Overview -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="bg-white rounded-lg shadow-sm p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="font-semibold text-gray-900">SOC 2</h3>
+                                <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Compliant</span>
+                            </div>
+                            <div class="space-y-2">
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-gray-500">Last Audit</span>
+                                    <span class="text-gray-900">Oct 15, 2024</span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-gray-500">Next Review</span>
+                                    <span class="text-gray-900">Apr 15, 2025</span>
+                                </div>
+                            </div>
+                            <button onclick="generateComplianceReport('soc2')" class="w-full mt-4 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">Generate Report</button>
+                        </div>
+                        <div class="bg-white rounded-lg shadow-sm p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="font-semibold text-gray-900">GDPR</h3>
+                                <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Compliant</span>
+                            </div>
+                            <div class="space-y-2">
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-gray-500">Data Subjects</span>
+                                    <span class="text-gray-900">1,234</span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-gray-500">Pending Requests</span>
+                                    <span class="text-gray-900">0</span>
+                                </div>
+                            </div>
+                            <button onclick="generateComplianceReport('gdpr')" class="w-full mt-4 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">Generate Report</button>
+                        </div>
+                        <div class="bg-white rounded-lg shadow-sm p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="font-semibold text-gray-900">HIPAA</h3>
+                                <span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">Review Needed</span>
+                            </div>
+                            <div class="space-y-2">
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-gray-500">PHI Records</span>
+                                    <span class="text-gray-900">0</span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-gray-500">BAA Status</span>
+                                    <span class="text-gray-900">Active</span>
+                                </div>
+                            </div>
+                            <button onclick="generateComplianceReport('hipaa')" class="w-full mt-4 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">Generate Report</button>
+                        </div>
+                    </div>
+
+                    <!-- Compliance Metrics -->
+                    <div class="bg-white rounded-lg shadow-sm p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Compliance Metrics</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead class="bg-gray-50 border-b border-gray-200">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Metric</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Target</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200">
+                                    <tr>
+                                        <td class="px-4 py-3 text-sm text-gray-900">Password Policy Compliance</td>
+                                        <td class="px-4 py-3"><span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Pass</span></td>
+                                        <td class="px-4 py-3 text-sm text-gray-900">100%</td>
+                                        <td class="px-4 py-3 text-sm text-gray-500">100%</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 text-sm text-gray-900">MFA Adoption</td>
+                                        <td class="px-4 py-3"><span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">Warning</span></td>
+                                        <td class="px-4 py-3 text-sm text-gray-900">78%</td>
+                                        <td class="px-4 py-3 text-sm text-gray-500">90%</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 text-sm text-gray-900">Data Encryption</td>
+                                        <td class="px-4 py-3"><span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Pass</span></td>
+                                        <td class="px-4 py-3 text-sm text-gray-900">100%</td>
+                                        <td class="px-4 py-3 text-sm text-gray-500">100%</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 text-sm text-gray-900">Audit Log Retention</td>
+                                        <td class="px-4 py-3"><span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Pass</span></td>
+                                        <td class="px-4 py-3 text-sm text-gray-900">365 days</td>
+                                        <td class="px-4 py-3 text-sm text-gray-500">365 days</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 text-sm text-gray-900">Session Timeout</td>
+                                        <td class="px-4 py-3"><span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Pass</span></td>
+                                        <td class="px-4 py-3 text-sm text-gray-900">30 min</td>
+                                        <td class="px-4 py-3 text-sm text-gray-500">≤60 min</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Custom Reports Tab -->
+                <div id="tab-custom" class="report-section space-y-6 hidden">
+                    <div class="bg-white rounded-lg shadow-sm p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Build Custom Report</h3>
+                        <form id="customReportForm" class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Report Name</label>
+                                    <input type="text" name="name" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="My Custom Report">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Report Type</label>
+                                    <select name="type" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                        <option value="usage">Usage Analytics</option>
+                                        <option value="audit">Audit Trail</option>
+                                        <option value="security">Security Events</option>
+                                        <option value="documents">Document Processing</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Select Metrics</label>
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                    <label class="flex items-center p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+                                        <input type="checkbox" name="metrics" value="users" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
+                                        <span class="ml-2 text-sm text-gray-700">Users</span>
+                                    </label>
+                                    <label class="flex items-center p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+                                        <input type="checkbox" name="metrics" value="sessions" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
+                                        <span class="ml-2 text-sm text-gray-700">Sessions</span>
+                                    </label>
+                                    <label class="flex items-center p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+                                        <input type="checkbox" name="metrics" value="documents" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                        <span class="ml-2 text-sm text-gray-700">Documents</span>
+                                    </label>
+                                    <label class="flex items-center p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+                                        <input type="checkbox" name="metrics" value="queries" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                        <span class="ml-2 text-sm text-gray-700">AI Queries</span>
+                                    </label>
+                                    <label class="flex items-center p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+                                        <input type="checkbox" name="metrics" value="storage" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                        <span class="ml-2 text-sm text-gray-700">Storage</span>
+                                    </label>
+                                    <label class="flex items-center p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+                                        <input type="checkbox" name="metrics" value="errors" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                        <span class="ml-2 text-sm text-gray-700">Errors</span>
+                                    </label>
+                                    <label class="flex items-center p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+                                        <input type="checkbox" name="metrics" value="api_calls" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                        <span class="ml-2 text-sm text-gray-700">API Calls</span>
+                                    </label>
+                                    <label class="flex items-center p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+                                        <input type="checkbox" name="metrics" value="logins" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                        <span class="ml-2 text-sm text-gray-700">Logins</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Date Range</label>
+                                    <select name="date_range" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                        <option value="7d">Last 7 days</option>
+                                        <option value="30d">Last 30 days</option>
+                                        <option value="90d">Last 90 days</option>
+                                        <option value="custom">Custom Range</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Group By</label>
+                                    <select name="group_by" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                        <option value="day">Day</option>
+                                        <option value="week">Week</option>
+                                        <option value="month">Month</option>
+                                        <option value="organization">Organization</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Export Format</label>
+                                    <select name="format" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                        <option value="pdf">PDF</option>
+                                        <option value="csv">CSV</option>
+                                        <option value="xlsx">Excel</option>
+                                        <option value="json">JSON</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="flex justify-end space-x-3 pt-4">
+                                <button type="button" onclick="previewReport()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Preview</button>
+                                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Generate Report</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Scheduled Reports Tab -->
+                <div id="tab-scheduled" class="report-section space-y-6 hidden">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold text-gray-900">Scheduled Reports</h3>
+                        <button onclick="openModal('scheduleModal')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                            <i class="fas fa-plus mr-2"></i>Schedule Report
+                        </button>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                        <table class="w-full">
+                            <thead class="bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Report Name</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Schedule</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Recipients</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Run</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scheduledReportsBody" class="divide-y divide-gray-200">
+                                <tr>
+                                    <td class="px-6 py-4 text-sm text-gray-900">Weekly Usage Summary</td>
+                                    <td class="px-6 py-4 text-sm text-gray-500">Every Monday at 9:00 AM</td>
+                                    <td class="px-6 py-4 text-sm text-gray-500">admin@company.com</td>
+                                    <td class="px-6 py-4 text-sm text-gray-500">Nov 25, 2024</td>
+                                    <td class="px-6 py-4"><span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Active</span></td>
+                                    <td class="px-6 py-4 text-right">
+                                        <button class="text-blue-600 hover:underline text-sm mr-3">Edit</button>
+                                        <button class="text-red-600 hover:underline text-sm">Delete</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="px-6 py-4 text-sm text-gray-900">Monthly Compliance Report</td>
+                                    <td class="px-6 py-4 text-sm text-gray-500">1st of every month at 8:00 AM</td>
+                                    <td class="px-6 py-4 text-sm text-gray-500">compliance@company.com</td>
+                                    <td class="px-6 py-4 text-sm text-gray-500">Nov 1, 2024</td>
+                                    <td class="px-6 py-4"><span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Active</span></td>
+                                    <td class="px-6 py-4 text-right">
+                                        <button class="text-blue-600 hover:underline text-sm mr-3">Edit</button>
+                                        <button class="text-red-600 hover:underline text-sm">Delete</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Schedule Report Modal -->
+    <div id="scheduleModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
+            <div class="p-6 border-b border-gray-200">
+                <h3 class="text-lg font-semibold">Schedule Report</h3>
+            </div>
+            <form id="scheduleForm" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Report Type</label>
+                    <select name="report_type" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="usage">Usage Summary</option>
+                        <option value="compliance">Compliance Report</option>
+                        <option value="security">Security Report</option>
+                        <option value="audit">Audit Trail</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Schedule</label>
+                    <select name="schedule" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Recipients (comma separated)</label>
+                    <input type="text" name="recipients" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="email@example.com">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Format</label>
+                    <select name="format" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="pdf">PDF</option>
+                        <option value="csv">CSV</option>
+                        <option value="xlsx">Excel</option>
+                    </select>
+                </div>
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button type="button" onclick="closeModal('scheduleModal')" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Schedule</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+
+        // Auth check
+        if (!api.requireAuth()) throw new Error('Not authenticated');
+
+        // Load full user profile with roles before rendering menu
+        (async () => {
+          try {
+            await api.loadUserProfile();
+          } catch (error) {
+            console.error('Failed to load user profile:', error);
+          }
+          
+          // Render dynamic menu (will now have access to roles)
+          renderMenu('#mainNav');
+        })();
+
+        // Initialize notifications panel
+        NotificationPanel.init();
+
+        // Load user info
+        function loadUserInfo() {
+          const user = api.user;
+          if (user) {
+            const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+            const initials = (user.firstName?.[0] || '') + (user.lastName?.[0] || '') || user.email[0].toUpperCase();
+            document.getElementById('userName').textContent = name;
+            document.getElementById('userInitials').textContent = initials;
+          }
+        }
+        loadUserInfo();
+
+        // User menu toggle
+        const userMenu = document.getElementById('userMenu');
+        const userDropdown = document.getElementById('userDropdown');
+        userMenu.addEventListener('click', (e) => {
+          e.stopPropagation();
+          userDropdown.classList.toggle('hidden');
+        });
+        document.addEventListener('click', (e) => {
+          if (!userMenu.contains(e.target)) userDropdown.classList.add('hidden');
+        });
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+          await api.logout();
+          window.location.href = '../login.html';
+        });
+
+        // Sidebar toggle
+        const sidebar = document.getElementById('sidebar');
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const closeSidebar = document.getElementById('closeSidebar');
+        if (sidebarToggle) sidebarToggle.addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+        if (closeSidebar) closeSidebar.addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+
+        let userActivityChart, queryTypesChart, docProcessingChart;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuth();
+            loadReportingData();
+            initCharts();
+
+            document.getElementById('dateRange').addEventListener('change', loadReportingData);
+        });
+
+        function checkAuth() {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = '/login.html';
+            }
+        }
+
+        function showTab(tab) {
+            document.querySelectorAll('.report-section').forEach(s => s.classList.add('hidden'));
+            document.getElementById('tab-' + tab).classList.remove('hidden');
+
+            document.querySelectorAll('.report-tab').forEach(t => {
+                t.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
+                t.classList.add('text-gray-500');
+            });
+
+            const activeTab = document.querySelector(`.report-tab[data-tab="${tab}"]`);
+            activeTab.classList.remove('text-gray-500');
+            activeTab.classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
+        }
+
+        async function loadReportingData() {
+            try {
+                const dateRange = document.getElementById('dateRange').value;
+                const res = await api.request(`/api/reporting/metrics?range=${dateRange}`);
+
+                document.getElementById('activeUsersCount').textContent = res.active_users || 156;
+                document.getElementById('docsProcessed').textContent = res.docs_processed || '2.4k';
+                document.getElementById('aiQueries').textContent = res.ai_queries || '12.5k';
+                document.getElementById('storageUsed').textContent = res.storage_used || '127 GB';
+
+                // Update top orgs
+                const topOrgs = res.top_organizations || [
+                    { name: 'Acme Corp', usage: 85, queries: 4500 },
+                    { name: 'Legal Partners LLP', usage: 72, queries: 3200 },
+                    { name: 'Global Law Group', usage: 65, queries: 2800 },
+                    { name: 'Smith & Associates', usage: 45, queries: 1900 }
+                ];
+
+                document.getElementById('topOrgsUsage').innerHTML = topOrgs.map(org => `
+                    <div class="flex items-center">
+                        <div class="flex-1">
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-gray-900">${org.name}</span>
+                                <span class="text-gray-500">${org.queries.toLocaleString()} queries</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-blue-600 h-2 rounded-full" style="width: ${org.usage}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+                updateCharts(res);
+            } catch (error) {
+                console.error('Failed to load reporting data:', error);
+            }
+        }
+
+        function initCharts() {
+            // User Activity Chart
+            const userCtx = document.getElementById('userActivityChart').getContext('2d');
+            userActivityChart = new Chart(userCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+                    datasets: [{
+                        label: 'Active Users',
+                        data: [120, 145, 156, 162],
+                        borderColor: 'rgb(59, 130, 246)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+
+            // Query Types Chart
+            const queryCtx = document.getElementById('queryTypesChart').getContext('2d');
+            queryTypesChart = new Chart(queryCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Document Analysis', 'Legal Research', 'Contract Review', 'Q&A', 'Other'],
+                    datasets: [{
+                        data: [35, 25, 20, 15, 5],
+                        backgroundColor: [
+                            'rgb(59, 130, 246)',
+                            'rgb(16, 185, 129)',
+                            'rgb(139, 92, 246)',
+                            'rgb(245, 158, 11)',
+                            'rgb(156, 163, 175)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+
+            // Document Processing Chart
+            const docCtx = document.getElementById('docProcessingChart').getContext('2d');
+            docProcessingChart = new Chart(docCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['PDF', 'Word', 'Excel', 'Image', 'Other'],
+                    datasets: [{
+                        label: 'Documents',
+                        data: [1200, 800, 450, 300, 150],
+                        backgroundColor: 'rgb(59, 130, 246)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+        function updateCharts(data) {
+            if (data.user_activity && userActivityChart) {
+                userActivityChart.data.labels = data.user_activity.labels;
+                userActivityChart.data.datasets[0].data = data.user_activity.values;
+                userActivityChart.update();
+            }
+        }
+
+        async function exportReport() {
+            try {
+                const dateRange = document.getElementById('dateRange').value;
+                Toast.info('Generating report...');
+                const res = await api.request(`/api/reporting/export?range=${dateRange}&format=pdf`, {
+                    responseType: 'blob'
+                });
+                // In production, this would trigger a download
+                Toast.success('Report generated successfully');
+            } catch (error) {
+                Toast.error('Failed to generate report');
+            }
+        }
+
+        async function generateComplianceReport(type) {
+            try {
+                Toast.info(`Generating ${type.toUpperCase()} compliance report...`);
+                await api.request(`/api/reporting/compliance/${type}`, { method: 'POST' });
+                Toast.success('Report generated successfully');
+            } catch (error) {
+                Toast.error('Failed to generate report');
+            }
+        }
+
+        function previewReport() {
+            Toast.info('Generating preview...');
+            // In production, this would show a preview
+        }
+
+        document.getElementById('customReportForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            Toast.info('Generating custom report...');
+            // In production, this would generate the report
+            setTimeout(() => Toast.success('Report generated successfully'), 1500);
+        });
+
+        document.getElementById('scheduleForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            try {
+                const formData = new FormData(this);
+                const data = Object.fromEntries(formData);
+                await api.request('/api/reporting/schedules', {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+                Toast.success('Report scheduled successfully');
+                closeModal('scheduleModal');
+                this.reset();
+            } catch (error) {
+                Toast.error('Failed to schedule report');
+            }
+        });
+
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+            document.getElementById(id).classList.add('flex');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+            document.getElementById(id).classList.remove('flex');
+        }
+    </script>
+</body>
+</html>

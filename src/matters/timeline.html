@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Matter Timeline - LanaAI</title>
+  <script src="../js/tailwind-loader.js"></script>
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/components.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30">
+    <div class="flex items-center justify-between h-16 px-6 border-b border-gray-800">
+      <a href="../index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
+      <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <nav class="mt-6 px-3">
+      <div class="space-y-1">
+        <a href="../index.html" class="flex items-center gap-3 px-4 py-3 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+          Dashboard
+        </a>
+        <a href="../chat.html" class="flex items-center gap-3 px-4 py-3 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+          Chat
+        </a>
+      </div>
+      <div class="mt-8">
+        <p class="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Matter Management</p>
+        <div class="mt-3 space-y-1">
+          <a href="timeline.html" class="flex items-center gap-3 px-4 py-3 text-white bg-gray-800 rounded-lg text-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            Timeline View
+          </a>
+        </div>
+      </div>
+    </nav>
+  </aside>
+
+  <div class="lg:ml-64">
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
+      <div class="flex items-center justify-between h-16 px-4 lg:px-8">
+        <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+        <div class="flex-1 px-4 lg:px-0">
+          <h1 class="text-xl font-semibold text-gray-900">Matter Timeline</h1>
+          <p class="text-sm text-gray-500">Unified view of all matter activities</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <select id="matterSelect" onchange="loadTimeline()" class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+            <option value="">Select a Matter</option>
+          </select>
+        </div>
+      </div>
+    </header>
+
+    <main class="p-4 lg:p-8">
+      <!-- Matter Summary -->
+      <div id="matterSummary" class="hidden bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
+        <div class="flex items-start justify-between">
+          <div>
+            <h2 id="matterName" class="text-xl font-semibold text-gray-900">Matter Name</h2>
+            <p id="matterClient" class="text-sm text-gray-500">Client Name</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <span id="matterStatus" class="px-3 py-1 text-sm font-medium rounded-full bg-green-100 text-green-800">Active</span>
+            <span id="matterType" class="px-3 py-1 text-sm font-medium rounded-full bg-indigo-100 text-indigo-800">Type</span>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-gray-100">
+          <div>
+            <p class="text-xs text-gray-500 uppercase">Opened</p>
+            <p id="matterOpened" class="text-sm font-medium text-gray-900">-</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500 uppercase">Assigned To</p>
+            <p id="matterAssigned" class="text-sm font-medium text-gray-900">-</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500 uppercase">Value</p>
+            <p id="matterValue" class="text-sm font-medium text-green-600">-</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500 uppercase">Last Activity</p>
+            <p id="matterLastActivity" class="text-sm font-medium text-gray-900">-</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filter Tabs -->
+      <div id="filterTabs" class="hidden bg-white rounded-xl shadow-sm border border-gray-100 p-2 mb-6">
+        <div class="flex flex-wrap gap-2">
+          <button onclick="filterEvents('all')" class="filter-btn px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white" data-filter="all">All Events</button>
+          <button onclick="filterEvents('communication')" class="filter-btn px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200" data-filter="communication">Communications</button>
+          <button onclick="filterEvents('document')" class="filter-btn px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200" data-filter="document">Documents</button>
+          <button onclick="filterEvents('appointment')" class="filter-btn px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200" data-filter="appointment">Appointments</button>
+          <button onclick="filterEvents('note')" class="filter-btn px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200" data-filter="note">Notes</button>
+          <button onclick="filterEvents('status')" class="filter-btn px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200" data-filter="status">Status Changes</button>
+          <button onclick="filterEvents('billing')" class="filter-btn px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200" data-filter="billing">Billing</button>
+        </div>
+      </div>
+
+      <!-- Timeline -->
+      <div id="timeline" class="space-y-4">
+        <!-- Populated by JavaScript -->
+      </div>
+
+      <!-- Empty State -->
+      <div id="emptyState" class="text-center py-16">
+        <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        </div>
+        <h3 class="text-lg font-medium text-gray-900 mb-1">Select a Matter</h3>
+        <p class="text-gray-500">Choose a matter from the dropdown to view its complete timeline</p>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    if (!api.requireAuth()) throw new Error('Not authenticated');
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('openSidebar').addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+    document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+
+    // Mock matter data
+    const mockMatters = [
+      { id: 'mat-001', name: 'Johnson v. Smith', client: 'Robert Johnson', type: 'Personal Injury', status: 'Active', assigned: 'Sarah Martinez', value: 125000, opened: '2024-08-15', lastActivity: new Date(Date.now() - 3600000).toISOString() },
+      { id: 'mat-002', name: 'Acme Corp Formation', client: 'Acme Corporation', type: 'Business Formation', status: 'Active', assigned: 'Michael Chen', value: 5000, opened: '2024-10-01', lastActivity: new Date(Date.now() - 86400000).toISOString() },
+      { id: 'mat-003', name: 'Williams Estate', client: 'The Williams Family', type: 'Estate Planning', status: 'Pending', assigned: 'Sarah Martinez', value: 15000, opened: '2024-09-20', lastActivity: new Date(Date.now() - 172800000).toISOString() }
+    ];
+
+    const mockTimelines = {
+      'mat-001': [
+        { id: 't-001', type: 'status', title: 'Matter Opened', description: 'Case file created and assigned to Sarah Martinez', timestamp: '2024-08-15T09:00:00Z', user: 'System' },
+        { id: 't-002', type: 'communication', title: 'Initial Client Call', description: 'Discussed accident details and potential case value', timestamp: '2024-08-15T14:30:00Z', user: 'Sarah Martinez', duration: '45 min' },
+        { id: 't-003', type: 'document', title: 'Retainer Agreement Uploaded', description: 'Signed engagement letter received', timestamp: '2024-08-16T10:00:00Z', user: 'Client Portal', file: 'retainer_agreement.pdf' },
+        { id: 't-004', type: 'appointment', title: 'Consultation Scheduled', description: 'In-person consultation at main office', timestamp: '2024-08-20T13:00:00Z', user: 'Sarah Martinez', location: 'Office - Room 201' },
+        { id: 't-005', type: 'note', title: 'Case Notes Added', description: 'Client mentioned ongoing medical treatment. Follow up on medical records.', timestamp: '2024-08-20T15:00:00Z', user: 'Sarah Martinez' },
+        { id: 't-006', type: 'document', title: 'Medical Records Requested', description: 'Authorization form sent to Memorial Hospital', timestamp: '2024-08-22T11:00:00Z', user: 'Sarah Martinez', file: 'hipaa_auth_form.pdf' },
+        { id: 't-007', type: 'billing', title: 'Invoice #1001 Created', description: 'Retainer deposit invoice', timestamp: '2024-08-25T09:00:00Z', user: 'Billing System', amount: 5000 },
+        { id: 't-008', type: 'billing', title: 'Payment Received', description: 'Check payment processed', timestamp: '2024-08-28T14:00:00Z', user: 'Billing System', amount: 5000 },
+        { id: 't-009', type: 'communication', title: 'Email to Insurance', description: 'Demand letter sent to State Farm', timestamp: '2024-09-05T10:30:00Z', user: 'Sarah Martinez' },
+        { id: 't-010', type: 'document', title: 'Medical Records Received', description: 'Complete records from Memorial Hospital', timestamp: '2024-09-15T16:00:00Z', user: 'System', file: 'medical_records.pdf' },
+        { id: 't-011', type: 'status', title: 'Status Updated', description: 'Moved to "Negotiation" stage', timestamp: '2024-10-01T09:00:00Z', user: 'Sarah Martinez' },
+        { id: 't-012', type: 'communication', title: 'Settlement Discussion', description: 'Call with insurance adjuster - initial offer $75,000', timestamp: new Date(Date.now() - 3600000).toISOString(), user: 'Sarah Martinez', duration: '30 min' }
+      ],
+      'mat-002': [
+        { id: 't-020', type: 'status', title: 'Matter Opened', description: 'Business formation case initiated', timestamp: '2024-10-01T10:00:00Z', user: 'System' },
+        { id: 't-021', type: 'communication', title: 'Kickoff Call', description: 'Discussed business structure options', timestamp: '2024-10-01T14:00:00Z', user: 'Michael Chen', duration: '60 min' },
+        { id: 't-022', type: 'document', title: 'Articles of Incorporation Drafted', description: 'Initial draft for client review', timestamp: '2024-10-05T11:00:00Z', user: 'Michael Chen', file: 'articles_draft.pdf' },
+        { id: 't-023', type: 'note', title: 'Client Feedback', description: 'Client requested changes to ownership structure', timestamp: new Date(Date.now() - 86400000).toISOString(), user: 'Michael Chen' }
+      ],
+      'mat-003': [
+        { id: 't-030', type: 'status', title: 'Matter Opened', description: 'Estate planning consultation', timestamp: '2024-09-20T09:00:00Z', user: 'System' },
+        { id: 't-031', type: 'appointment', title: 'Initial Consultation', description: 'Discussed estate planning needs', timestamp: '2024-09-25T10:00:00Z', user: 'Sarah Martinez', location: 'Office - Room 101' },
+        { id: 't-032', type: 'document', title: 'Asset Inventory Received', description: 'Client submitted financial information', timestamp: '2024-10-01T15:00:00Z', user: 'Client Portal', file: 'asset_inventory.xlsx' },
+        { id: 't-033', type: 'status', title: 'Status Changed to Pending', description: 'Awaiting additional documentation', timestamp: new Date(Date.now() - 172800000).toISOString(), user: 'Sarah Martinez' }
+      ]
+    };
+
+    let currentMatter = null;
+    let allEvents = [];
+    let activeFilter = 'all';
+
+    function formatCurrency(val) {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(val);
+    }
+
+    function getEventIcon(type) {
+      const icons = {
+        communication: { bg: 'bg-blue-100', color: 'text-blue-600', icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>' },
+        document: { bg: 'bg-green-100', color: 'text-green-600', icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>' },
+        appointment: { bg: 'bg-purple-100', color: 'text-purple-600', icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>' },
+        note: { bg: 'bg-yellow-100', color: 'text-yellow-600', icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>' },
+        status: { bg: 'bg-indigo-100', color: 'text-indigo-600', icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>' },
+        billing: { bg: 'bg-emerald-100', color: 'text-emerald-600', icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>' }
+      };
+      return icons[type] || icons.note;
+    }
+
+    function getEventMeta(event) {
+      let meta = [];
+      if (event.duration) meta.push(`Duration: ${event.duration}`);
+      if (event.location) meta.push(`Location: ${event.location}`);
+      if (event.file) meta.push(`<a href="#" class="text-indigo-600 hover:underline">${event.file}</a>`);
+      if (event.amount) meta.push(`Amount: ${formatCurrency(event.amount)}`);
+      return meta;
+    }
+
+    function filterEvents(filter) {
+      activeFilter = filter;
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        if (btn.dataset.filter === filter) {
+          btn.className = 'filter-btn px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white';
+        } else {
+          btn.className = 'filter-btn px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200';
+        }
+      });
+      renderTimeline();
+    }
+
+    function renderTimeline() {
+      let events = allEvents;
+      if (activeFilter !== 'all') {
+        events = events.filter(e => e.type === activeFilter);
+      }
+
+      // Sort by timestamp descending (newest first)
+      events.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+      const container = document.getElementById('timeline');
+      if (events.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-8 text-gray-500">
+            No events found for this filter
+          </div>
+        `;
+        return;
+      }
+
+      // Group by date
+      const grouped = {};
+      events.forEach(e => {
+        const date = new Date(e.timestamp).toDateString();
+        if (!grouped[date]) grouped[date] = [];
+        grouped[date].push(e);
+      });
+
+      container.innerHTML = Object.entries(grouped).map(([date, dateEvents]) => `
+        <div class="mb-8">
+          <h3 class="text-sm font-semibold text-gray-500 mb-4">${formatDate(dateEvents[0].timestamp).split(',')[0]}</h3>
+          <div class="space-y-4">
+            ${dateEvents.map(e => {
+              const iconConfig = getEventIcon(e.type);
+              const meta = getEventMeta(e);
+              return `
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition-shadow">
+                  <div class="flex gap-4">
+                    <div class="flex-shrink-0">
+                      <div class="w-10 h-10 ${iconConfig.bg} rounded-lg flex items-center justify-center ${iconConfig.color}">
+                        ${iconConfig.icon}
+                      </div>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-start justify-between">
+                        <div>
+                          <p class="font-medium text-gray-900">${e.title}</p>
+                          <p class="text-sm text-gray-500 mt-1">${e.description}</p>
+                          ${meta.length > 0 ? `
+                            <div class="flex flex-wrap gap-3 mt-2 text-xs text-gray-500">
+                              ${meta.map(m => `<span>${m}</span>`).join('')}
+                            </div>
+                          ` : ''}
+                        </div>
+                        <div class="text-right flex-shrink-0 ml-4">
+                          <p class="text-sm text-gray-500">${new Date(e.timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</p>
+                          <p class="text-xs text-gray-400 mt-1">${e.user}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function populateMatterSelect() {
+      const select = document.getElementById('matterSelect');
+      select.innerHTML = '<option value="">Select a Matter</option>' +
+        mockMatters.map(m => `<option value="${m.id}">${m.name} - ${m.client}</option>`).join('');
+    }
+
+    function loadTimeline() {
+      const matterId = document.getElementById('matterSelect').value;
+
+      if (!matterId) {
+        document.getElementById('matterSummary').classList.add('hidden');
+        document.getElementById('filterTabs').classList.add('hidden');
+        document.getElementById('timeline').innerHTML = '';
+        document.getElementById('emptyState').classList.remove('hidden');
+        currentMatter = null;
+        allEvents = [];
+        return;
+      }
+
+      currentMatter = mockMatters.find(m => m.id === matterId);
+      allEvents = mockTimelines[matterId] || [];
+
+      // Update matter summary
+      document.getElementById('matterName').textContent = currentMatter.name;
+      document.getElementById('matterClient').textContent = currentMatter.client;
+      document.getElementById('matterStatus').textContent = currentMatter.status;
+      document.getElementById('matterType').textContent = currentMatter.type;
+      document.getElementById('matterOpened').textContent = formatDate(currentMatter.opened);
+      document.getElementById('matterAssigned').textContent = currentMatter.assigned;
+      document.getElementById('matterValue').textContent = formatCurrency(currentMatter.value);
+      document.getElementById('matterLastActivity').textContent = timeAgo(currentMatter.lastActivity);
+
+      // Show UI elements
+      document.getElementById('matterSummary').classList.remove('hidden');
+      document.getElementById('filterTabs').classList.remove('hidden');
+      document.getElementById('emptyState').classList.add('hidden');
+
+      // Reset filter and render
+      activeFilter = 'all';
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        if (btn.dataset.filter === 'all') {
+          btn.className = 'filter-btn px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white';
+        } else {
+          btn.className = 'filter-btn px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200';
+        }
+      });
+
+      renderTimeline();
+    }
+
+    // Check for matter ID in URL
+    function checkUrlParams() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const matterId = urlParams.get('id');
+      if (matterId && mockMatters.find(m => m.id === matterId)) {
+        document.getElementById('matterSelect').value = matterId;
+        loadTimeline();
+      }
+    }
+
+    populateMatterSelect();
+    checkUrlParams();
+  </script>
+</body>
+</html>

@@ -1,0 +1,1815 @@
+
+============================================================
+LANA AI API TEST SUITE
+============================================================
+
+
+----------------------------------------
+Testing: Authentication
+----------------------------------------
+[INFO] 2025-12-03T06:56:08.373Z - Testing: POST /api/v1/auth/login
+[PASS] 2025-12-03T06:56:08.573Z - POST /api/v1/auth/login - Status: 200 (199ms)
+Response: {
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIwMDAwMDAwMC0wMDAwLTEwMDAtODAwMC0wMDAwMDAwMDAxMDAiLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJvcmdhbml6YXRpb25JZCI6IjAwMDAwMDAwLTAwMDAtMTAwMC04MDAwLTAwMDAwMDAwMDAwMSIsImlhdCI6MTc2NDc0NDk2OCwiZXhwIjoxNzY0ODMxMzY4fQ.w1PWUFmQ_W7as7Zd8IiwqjCUeM8Cu2OAB63KJ9sUFuw",
+  "user": {
+    "id": "00000000-0000-1000-8000-000000000100",
+    "email": "test@example.com",
+    "firstName": "Updated",
+    "lastName": "Name",
+    "organizationId": "00000000-0
+[INFO] 2025-12-03T06:56:08.574Z - Auth token acquired
+[INFO] 2025-12-03T06:56:08.574Z - Testing: GET /api/v1/auth/refresh
+[PASS] 2025-12-03T06:56:08.647Z - GET /api/v1/auth/refresh - Status: 200 (72ms)
+Response: {
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIwMDAwMDAwMC0wMDAwLTEwMDAtODAwMC0wMDAwMDAwMDAxMDAiLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJvcmdhbml6YXRpb25JZCI6IjAwMDAwMDAwLTAwMDAtMTAwMC04MDAwLTAwMDAwMDAwMDAwMSIsImlhdCI6MTc2NDc0NDk2OCwiZXhwIjoxNzY0ODMxMzY4fQ.w1PWUFmQ_W7as7Zd8IiwqjCUeM8Cu2OAB63KJ9sUFuw",
+  "expiresAt": "2025-12-04T06:56:08.616Z"
+}
+[INFO] 2025-12-03T06:56:08.649Z - Testing: GET /api/v1/auth/me
+[PASS] 2025-12-03T06:56:08.723Z - GET /api/v1/auth/me - Status: 200 (72ms)
+Response: {
+  "user": {
+    "id": "00000000-0000-1000-8000-000000000100",
+    "email": "test@example.com",
+    "first_name": "Updated",
+    "last_name": "Name",
+    "status": "active",
+    "organization_id": "00000000-0000-1000-8000-000000000001",
+    "created_at": "2025-12-03T06:51:15.636Z",
+    "last_login": "2025-12-03T06:56:08.575Z"
+  }
+}
+[INFO] 2025-12-03T06:56:08.725Z - Testing: POST /api/v1/auth/request-password-reset
+[PASS] 2025-12-03T06:56:08.806Z - POST /api/v1/auth/request-password-reset - Status: 200 (78ms)
+Response: {
+  "message": "If an account with this email exists, a password reset link has been sent.",
+  "sent": true
+}
+[INFO] 2025-12-03T06:56:08.808Z - Testing: POST /api/v1/auth/reset-password (validates token)
+[PASS] 2025-12-03T06:56:08.878Z - POST /api/v1/auth/reset-password (validates token) - Status: undefined (undefinedms)
+Response: {
+  "message": "Token validation working correctly"
+}
+[INFO] 2025-12-03T06:56:08.881Z - Testing: POST /api/v1/auth/activate (validates code)
+[PASS] 2025-12-03T06:56:08.921Z - POST /api/v1/auth/activate (validates code) - Status: undefined (undefinedms)
+Response: {
+  "message": "Activation code validation working correctly"
+}
+
+----------------------------------------
+Testing: Admin Users
+----------------------------------------
+[INFO] 2025-12-03T06:56:08.994Z - Testing: GET /api/v1/admin/users
+[PASS] 2025-12-03T06:56:09.126Z - GET /api/v1/admin/users - Status: 200 (129ms)
+Response: {
+  "users": [
+    {
+      "id": "af85b892-079a-4c84-bd83-4667d774355c",
+      "username": "testuser_1764744695850",
+      "email": "test_1764744695850@example.com",
+      "first_name": "Test",
+      "last_name": "User",
+      "role_id": "00000000-0000-1000-8000-000000000011",
+      "role_name": "user",
+      "role_permissions": [
+        "documents:read",
+        "documents:write",
+        "matters:read",
+        "search:read"
+      ],
+      "organization_id": "00000000-0000-1000-8000-000000000
+[INFO] 2025-12-03T06:56:09.129Z - Testing: GET /api/v1/admin/users/{userId}
+[PASS] 2025-12-03T06:56:09.246Z - GET /api/v1/admin/users/{userId} - Status: 200 (115ms)
+Response: {
+  "id": "af85b892-079a-4c84-bd83-4667d774355c",
+  "username": "testuser_1764744695850",
+  "email": "test_1764744695850@example.com",
+  "first_name": "Test",
+  "last_name": "User",
+  "role_id": "00000000-0000-1000-8000-000000000011",
+  "role_name": "user",
+  "role_permissions": [
+    "documents:read",
+    "documents:write",
+    "matters:read",
+    "search:read"
+  ],
+  "organization_id": "00000000-0000-1000-8000-000000000001",
+  "status": "inactive",
+  "is_active": false,
+  "created_at": "2025-1
+[INFO] 2025-12-03T06:56:09.250Z - Testing: POST /api/v1/admin/users
+[PASS] 2025-12-03T06:56:10.007Z - POST /api/v1/admin/users - Status: 201 (755ms)
+Response: {
+  "id": "e87bc573-3076-4163-850b-e1bebc5321a8",
+  "username": "testuser_1764744969250",
+  "email": "test_1764744969250@example.com",
+  "first_name": "Test",
+  "last_name": "User",
+  "role_id": "00000000-0000-1000-8000-000000000011",
+  "role_name": "user",
+  "role_permissions": [
+    "documents:read",
+    "documents:write",
+    "matters:read",
+    "search:read"
+  ],
+  "organization_id": "00000000-0000-1000-8000-000000000001",
+  "status": "inactive",
+  "is_active": false,
+  "created_at": "2025-1
+[INFO] 2025-12-03T06:56:10.011Z - Testing: PUT /api/v1/admin/users/{userId}
+[PASS] 2025-12-03T06:56:10.193Z - PUT /api/v1/admin/users/{userId} - Status: 200 (180ms)
+Response: {
+  "id": "af85b892-079a-4c84-bd83-4667d774355c",
+  "username": "testuser_1764744695850",
+  "email": "test_1764744695850@example.com",
+  "first_name": "Updated",
+  "last_name": "Name",
+  "role_id": "00000000-0000-1000-8000-000000000011",
+  "role_name": "user",
+  "role_permissions": [
+    "documents:read",
+    "documents:write",
+    "matters:read",
+    "search:read"
+  ],
+  "organization_id": "00000000-0000-1000-8000-000000000001",
+  "status": "inactive",
+  "is_active": false,
+  "created_at": "202
+[INFO] 2025-12-03T06:56:10.197Z - Testing: POST /api/v1/admin/users/{userId}/activate
+[PASS] 2025-12-03T06:56:10.404Z - POST /api/v1/admin/users/{userId}/activate - Status: 200 (205ms)
+Response: {
+  "id": "af85b892-079a-4c84-bd83-4667d774355c",
+  "username": "testuser_1764744695850",
+  "email": "test_1764744695850@example.com",
+  "first_name": "Updated",
+  "last_name": "Name",
+  "role_id": "00000000-0000-1000-8000-000000000011",
+  "role_name": "user",
+  "role_permissions": [
+    "documents:read",
+    "documents:write",
+    "matters:read",
+    "search:read"
+  ],
+  "organization_id": "00000000-0000-1000-8000-000000000001",
+  "status": "active",
+  "is_active": true,
+  "created_at": "2025-1
+[INFO] 2025-12-03T06:56:10.409Z - Testing: POST /api/v1/admin/users/{userId}/deactivate
+[PASS] 2025-12-03T06:56:10.655Z - POST /api/v1/admin/users/{userId}/deactivate - Status: 200 (242ms)
+Response: {
+  "id": "af85b892-079a-4c84-bd83-4667d774355c",
+  "username": "testuser_1764744695850",
+  "email": "test_1764744695850@example.com",
+  "first_name": "Updated",
+  "last_name": "Name",
+  "role_id": "00000000-0000-1000-8000-000000000011",
+  "role_name": "user",
+  "role_permissions": [
+    "documents:read",
+    "documents:write",
+    "matters:read",
+    "search:read"
+  ],
+  "organization_id": "00000000-0000-1000-8000-000000000001",
+  "status": "inactive",
+  "is_active": false,
+  "created_at": "202
+[INFO] 2025-12-03T06:56:10.658Z - Testing: POST /api/v1/admin/users/{userId}/reset-password
+[PASS] 2025-12-03T06:56:11.138Z - POST /api/v1/admin/users/{userId}/reset-password - Status: 200 (477ms)
+Response: {
+  "status": "success",
+  "message": "Password reset successfully",
+  "user": {
+    "user_id": "af85b892-079a-4c84-bd83-4667d774355c",
+    "email": "test_1764744695850@example.com",
+    "username": "testuser_1764744695850",
+    "updated_at": "2025-12-03T06:56:11.078Z"
+  },
+  "security_actions": {
+    "sessions_invalidated": true,
+    "password_changed": true
+  }
+}
+[INFO] 2025-12-03T06:56:11.144Z - Testing: POST /api/v1/admin/users/{userId}/regenerate-activation-key
+[PASS] 2025-12-03T06:56:11.549Z - POST /api/v1/admin/users/{userId}/regenerate-activation-key - Status: 200 (403ms)
+Response: {
+  "user_id": "af85b892-079a-4c84-bd83-4667d774355c",
+  "email": "test_1764744695850@example.com",
+  "first_name": "Updated",
+  "last_name": "Name",
+  "activation_key": "LANA-699BD7-224FC7-F43B06",
+  "expires_at": "2026-01-02T06:56:11.513Z",
+  "expiry_days": 30,
+  "activation_link": "https://app.lana-ai.com/activate?key=LANA-699BD7-224FC7-F43B06"
+}
+[INFO] 2025-12-03T06:56:11.553Z - Testing: POST /api/v1/admin/users/{userId}/temporary-password
+[PASS] 2025-12-03T06:56:11.685Z - POST /api/v1/admin/users/{userId}/temporary-password - Status: 200 (130ms)
+Response: {
+  "success": true,
+  "message": "Temporary password set successfully. User must change password on next login.",
+  "user_id": "af85b892-079a-4c84-bd83-4667d774355c",
+  "password_reset_required": true
+}
+[INFO] 2025-12-03T06:56:11.689Z - Testing: GET /api/v1/admin/users/check-email
+[PASS] 2025-12-03T06:56:11.794Z - GET /api/v1/admin/users/check-email - Status: 200 (102ms)
+Response: {
+  "exists": false
+}
+[INFO] 2025-12-03T06:56:11.797Z - Testing: GET /api/v1/admin/users/check-username
+[PASS] 2025-12-03T06:56:11.889Z - GET /api/v1/admin/users/check-username - Status: 200 (90ms)
+Response: {
+  "exists": false
+}
+[INFO] 2025-12-03T06:56:11.893Z - Testing: GET /api/v1/admin/users/{userId}/sessions
+[PASS] 2025-12-03T06:56:12.040Z - GET /api/v1/admin/users/{userId}/sessions - Status: 200 (146ms)
+Response: {
+  "sessions": [],
+  "pagination": {
+    "page": 1,
+    "page_size": 50,
+    "total_count": 0,
+    "total_pages": 0,
+    "has_next": false,
+    "has_previous": false
+  }
+}
+[INFO] 2025-12-03T06:56:12.045Z - Testing: DELETE /api/v1/admin/users/{userId}/sessions
+[PASS] 2025-12-03T06:56:12.193Z - DELETE /api/v1/admin/users/{userId}/sessions - Status: 200 (144ms)
+Response: {
+  "message": "All sessions revoked successfully",
+  "revoked_count": 0
+}
+[INFO] 2025-12-03T06:56:12.200Z - Testing: DELETE /api/v1/admin/users/{userId}
+[PASS] 2025-12-03T06:56:12.397Z - DELETE /api/v1/admin/users/{userId} - Status: 200 (194ms)
+Response: {
+  "message": "User deleted successfully",
+  "user_id": "af85b892-079a-4c84-bd83-4667d774355c"
+}
+
+----------------------------------------
+Testing: User Roles
+----------------------------------------
+[INFO] 2025-12-03T06:56:12.500Z - Testing: GET /api/v1/admin/users/{userId}/roles
+[PASS] 2025-12-03T06:56:12.634Z - GET /api/v1/admin/users/{userId}/roles - Status: 200 (131ms)
+Response: {
+  "roles": [
+    {
+      "id": "00000000-0000-1000-8000-000000000010",
+      "name": "admin",
+      "display_name": "Administrator",
+      "description": "Full system access",
+      "permissions": [
+        "*"
+      ],
+      "level": 100,
+      "can_access_all_matters": true,
+      "granted_at": "2025-12-03T06:51:15.636Z",
+      "granted_by": null
+    }
+  ]
+}
+[INFO] 2025-12-03T06:56:12.643Z - Testing: POST /api/v1/admin/users/{userId}/roles
+[PASS] 2025-12-03T06:56:12.810Z - POST /api/v1/admin/users/{userId}/roles - Status: 200 (162ms)
+Response: {
+  "message": "Role assigned"
+}
+[INFO] 2025-12-03T06:56:12.817Z - Testing: DELETE /api/v1/admin/users/{userId}/roles/{roleId}
+[PASS] 2025-12-03T06:56:12.957Z - DELETE /api/v1/admin/users/{userId}/roles/{roleId} - Status: 200 (136ms)
+Response: {
+  "message": "Role removed"
+}
+
+----------------------------------------
+Testing: RBAC
+----------------------------------------
+[INFO] 2025-12-03T06:56:13.036Z - Testing: GET /api/v1/rbac/roles
+[PASS] 2025-12-03T06:56:13.137Z - GET /api/v1/rbac/roles - Status: 200 (98ms)
+Response: {
+  "roles": [
+    {
+      "id": "00000000-0000-1000-8000-000000000010",
+      "name": "admin",
+      "display_name": "Administrator",
+      "description": "Full system access",
+      "permissions": [
+        "*"
+      ],
+      "level": 100,
+      "can_access_all_matters": true,
+      "department_access_scope": null,
+      "created_at": "2025-12-03T06:51:15.636Z",
+      "updated_at": "2025-12-03T06:51:15.636Z",
+      "is_active": true,
+      "user_count": "1"
+    },
+    {
+      "id": "00000000-0
+[INFO] 2025-12-03T06:56:13.141Z - Testing: GET /api/v1/rbac/roles/{roleId}
+[PASS] 2025-12-03T06:56:13.245Z - GET /api/v1/rbac/roles/{roleId} - Status: 200 (101ms)
+Response: {
+  "role": {
+    "id": "00000000-0000-1000-8000-000000000010",
+    "organization_id": "00000000-0000-1000-8000-000000000001",
+    "name": "admin",
+    "display_name": "Administrator",
+    "description": "Full system access",
+    "level": 100,
+    "permissions": [
+      "*"
+    ],
+    "can_access_all_matters": true,
+    "department_access_scope": null,
+    "created_at": "2025-12-03T06:51:15.636Z",
+    "updated_at": "2025-12-03T06:51:15.636Z",
+    "is_active": true,
+    "user_count": "1"
+  }
+}
+[INFO] 2025-12-03T06:56:13.252Z - Testing: POST /api/v1/rbac/roles
+[PASS] 2025-12-03T06:56:13.391Z - POST /api/v1/rbac/roles - Status: 201 (136ms)
+Response: {
+  "role": {
+    "id": "c3b285f2-3e3a-4b8f-878a-bfd0caf4054c",
+    "organization_id": "00000000-0000-1000-8000-000000000001",
+    "name": "test_role_1764744973255",
+    "display_name": "test_role_1764744973255",
+    "description": "Test role for API testing",
+    "level": 1,
+    "permissions": [
+      "documents:read"
+    ],
+    "can_access_all_matters": false,
+    "department_access_scope": null,
+    "created_at": "2025-12-03T06:56:13.393Z",
+    "updated_at": "2025-12-03T06:56:13.393Z",
+    "i
+[INFO] 2025-12-03T06:56:13.399Z - Testing: PUT /api/v1/rbac/roles/{roleId}
+[PASS] 2025-12-03T06:56:13.549Z - PUT /api/v1/rbac/roles/{roleId} - Status: 200 (146ms)
+Response: {
+  "role": {
+    "id": "c3b285f2-3e3a-4b8f-878a-bfd0caf4054c",
+    "organization_id": "00000000-0000-1000-8000-000000000001",
+    "name": "test_role_1764744973255",
+    "display_name": "test_role_1764744973255",
+    "description": "Updated description",
+    "level": 1,
+    "permissions": [
+      "documents:read"
+    ],
+    "can_access_all_matters": false,
+    "department_access_scope": null,
+    "created_at": "2025-12-03T06:56:13.393Z",
+    "updated_at": "2025-12-03T06:56:13.552Z",
+    "is_acti
+[INFO] 2025-12-03T06:56:13.554Z - Testing: GET /api/v1/rbac/roles/{roleId}/permissions
+[PASS] 2025-12-03T06:56:13.652Z - GET /api/v1/rbac/roles/{roleId}/permissions - Status: 200 (96ms)
+Response: {
+  "role_id": "c3b285f2-3e3a-4b8f-878a-bfd0caf4054c",
+  "role_name": "test_role_1764744973255",
+  "display_name": "test_role_1764744973255",
+  "level": 1,
+  "permissions": [
+    "documents:read"
+  ]
+}
+[INFO] 2025-12-03T06:56:13.656Z - Testing: GET /api/v1/rbac/roles/{roleId}/permissions/inherited
+[PASS] 2025-12-03T06:56:13.795Z - GET /api/v1/rbac/roles/{roleId}/permissions/inherited - Status: 200 (137ms)
+Response: {
+  "role_id": "c3b285f2-3e3a-4b8f-878a-bfd0caf4054c",
+  "role_name": "test_role_1764744973255",
+  "level": 1,
+  "permissions": {
+    "direct": [
+      "documents:read"
+    ],
+    "inherited": [],
+    "all": [
+      "documents:read"
+    ]
+  },
+  "inheritance_chain": []
+}
+[INFO] 2025-12-03T06:56:13.801Z - Testing: GET /api/v1/permissions/all
+[PASS] 2025-12-03T06:56:13.878Z - GET /api/v1/permissions/all - Status: 200 (75ms)
+Response: {
+  "permissions": [
+    "documents:read",
+    "documents:write",
+    "documents:delete",
+    "documents:upload",
+    "documents:process",
+    "matters:read",
+    "matters:write",
+    "matters:delete",
+    "matters:create",
+    "users:read",
+    "users:write",
+    "users:delete",
+    "users:create",
+    "users:manage",
+    "search:query",
+    "search:advanced",
+    "rag:query",
+    "admin:access",
+    "admin:manage_roles",
+    "admin:manage_organization",
+    "roles:read",
+    "roles:write",
+   
+[INFO] 2025-12-03T06:56:13.882Z - Testing: DELETE /api/v1/rbac/roles/{roleId}
+[PASS] 2025-12-03T06:56:14.064Z - DELETE /api/v1/rbac/roles/{roleId} - Status: 200 (179ms)
+Response: {
+  "message": "Role deleted"
+}
+
+----------------------------------------
+Testing: Matters
+----------------------------------------
+[INFO] 2025-12-03T06:56:14.165Z - Testing: GET /api/v1/matters
+[PASS] 2025-12-03T06:56:14.320Z - GET /api/v1/matters - Status: 200 (152ms)
+Response: {
+  "matters": [
+    {
+      "id": "00000000-0000-1000-8000-000000000300",
+      "matter_id": "TEST-001",
+      "name": "Test Matter",
+      "description": "Test matter for API testing",
+      "client_name": "Test Client",
+      "organization_id": "00000000-0000-1000-8000-000000000001",
+      "status": "active",
+      "created_by": "00000000-0000-1000-8000-000000000100",
+      "created_at": "2025-12-03T06:51:15.636Z",
+      "updated_at": "2025-12-03T06:51:15.636Z",
+      "is_active": true,
+     
+[INFO] 2025-12-03T06:56:14.327Z - Testing: GET /api/v1/matters (search)
+[PASS] 2025-12-03T06:56:14.494Z - GET /api/v1/matters (search) - Status: 200 (164ms)
+Response: {
+  "matters": [
+    {
+      "id": "00000000-0000-1000-8000-000000000300",
+      "matter_id": "TEST-001",
+      "name": "Test Matter",
+      "description": "Test matter for API testing",
+      "client_name": "Test Client",
+      "organization_id": "00000000-0000-1000-8000-000000000001",
+      "status": "active",
+      "created_by": "00000000-0000-1000-8000-000000000100",
+      "created_at": "2025-12-03T06:51:15.636Z",
+      "updated_at": "2025-12-03T06:51:15.636Z",
+      "is_active": true,
+     
+[INFO] 2025-12-03T06:56:14.501Z - Testing: GET /api/v1/matters/{matterId}
+[PASS] 2025-12-03T06:56:14.634Z - GET /api/v1/matters/{matterId} - Status: 200 (129ms)
+Response: {
+  "matter": {
+    "id": "00000000-0000-1000-8000-000000000300",
+    "matter_id": "TEST-001",
+    "name": "Test Matter",
+    "description": "Test matter for API testing",
+    "client_name": "Test Client",
+    "organization_id": "00000000-0000-1000-8000-000000000001",
+    "status": "active",
+    "created_by": "00000000-0000-1000-8000-000000000100",
+    "created_at": "2025-12-03T06:51:15.636Z",
+    "updated_at": "2025-12-03T06:51:15.636Z",
+    "is_active": true,
+    "metadata": {
+      "matter_ty
+[INFO] 2025-12-03T06:56:14.639Z - Testing: POST /api/v1/matters
+[PASS] 2025-12-03T06:56:14.836Z - POST /api/v1/matters - Status: 201 (194ms)
+Response: {
+  "matter": {
+    "id": "2c82b2d6-8935-4d7c-b938-6f6a2706017c",
+    "matter_id": "test-matter-1764744974639",
+    "name": "Test Matter 1764744974639",
+    "description": "Test matter for API testing",
+    "client_name": null,
+    "organization_id": "00000000-0000-1000-8000-000000000001",
+    "status": "active",
+    "created_by": "00000000-0000-1000-8000-000000000100",
+    "created_at": "2025-12-03T06:56:14.806Z",
+    "updated_at": "2025-12-03T06:56:14.806Z",
+    "is_active": true,
+    "metadat
+[INFO] 2025-12-03T06:56:14.865Z - Testing: PUT /api/v1/matters/{matterId}
+[PASS] 2025-12-03T06:56:15.059Z - PUT /api/v1/matters/{matterId} - Status: 200 (180ms)
+Response: {
+  "matter": {
+    "id": "2c82b2d6-8935-4d7c-b938-6f6a2706017c",
+    "matter_id": "test-matter-1764744974639",
+    "name": "Updated Matter Name",
+    "description": "Test matter for API testing",
+    "client_name": null,
+    "organization_id": "00000000-0000-1000-8000-000000000001",
+    "status": "active",
+    "created_by": "00000000-0000-1000-8000-000000000100",
+    "created_at": "2025-12-03T06:56:14.806Z",
+    "updated_at": "2025-12-03T06:56:15.062Z",
+    "is_active": true,
+    "metadata": {}
+[INFO] 2025-12-03T06:56:15.075Z - Testing: GET /api/v1/matters/{matterId}/permissions
+[PASS] 2025-12-03T06:56:15.261Z - GET /api/v1/matters/{matterId}/permissions - Status: 200 (166ms)
+Response: {
+  "matter_id": "test-matter-1764744974639",
+  "permissions": []
+}
+[INFO] 2025-12-03T06:56:15.283Z - Testing: POST /api/v1/matters/{matterId}/share/users
+[PASS] 2025-12-03T06:56:15.501Z - POST /api/v1/matters/{matterId}/share/users - Status: 200 (201ms)
+Response: {
+  "message": "User shared with matter",
+  "share": {
+    "user_id": "00000000-0000-1000-8000-000000000100",
+    "matter_id": "test-matter-1764744974639",
+    "permissions": [
+      "read",
+      "write"
+    ],
+    "granted_at": "2025-12-03T06:56:15.504Z",
+    "expires_at": null
+  }
+}
+[INFO] 2025-12-03T06:56:15.525Z - Testing: DELETE /api/v1/matters/{matterId}/share/users/{userId}
+[PASS] 2025-12-03T06:56:15.707Z - DELETE /api/v1/matters/{matterId}/share/users/{userId} - Status: 200 (164ms)
+Response: {
+  "message": "User removed from matter",
+  "matter_id": "test-matter-1764744974639",
+  "user_id": "00000000-0000-1000-8000-000000000100"
+}
+[INFO] 2025-12-03T06:56:15.733Z - Testing: DELETE /api/v1/matters/{matterId}
+[PASS] 2025-12-03T06:56:15.946Z - DELETE /api/v1/matters/{matterId} - Status: 200 (196ms)
+Response: {
+  "message": "Matter deleted"
+}
+
+----------------------------------------
+Testing: Audit
+----------------------------------------
+[INFO] 2025-12-03T06:56:16.091Z - Testing: GET /api/v1/audit/logs
+[PASS] 2025-12-03T06:56:16.289Z - GET /api/v1/audit/logs - Status: 200 (187ms)
+Response: {
+  "logs": [
+    {
+      "id": "00000000-0000-1000-8000-000000001001",
+      "event_type": "document.view",
+      "user_id": "00000000-0000-1000-8000-000000000100",
+      "organization_id": "00000000-0000-1000-8000-000000000001",
+      "matter_id": null,
+      "document_id": null,
+      "query_text": null,
+      "retrieved_documents": null,
+      "resource_type": "document",
+      "resource_id": "00000000-0000-1000-8000-000000000999",
+      "action": "view",
+      "details": {
+        "document
+[INFO] 2025-12-03T06:56:16.317Z - Testing: POST /api/v1/audit/query
+[PASS] 2025-12-03T06:56:16.513Z - POST /api/v1/audit/query - Status: 200 (180ms)
+Response: {
+  "logs": [
+    {
+      "id": "00000000-0000-1000-8000-000000001001",
+      "event_type": "document.view",
+      "user_id": "00000000-0000-1000-8000-000000000100",
+      "organization_id": "00000000-0000-1000-8000-000000000001",
+      "matter_id": null,
+      "document_id": null,
+      "query_text": null,
+      "retrieved_documents": null,
+      "resource_type": "document",
+      "resource_id": "00000000-0000-1000-8000-000000000999",
+      "action": "view",
+      "details": {
+        "document
+[INFO] 2025-12-03T06:56:16.545Z - Testing: GET /api/v1/audit/event-types
+[PASS] 2025-12-03T06:56:16.700Z - GET /api/v1/audit/event-types - Status: 200 (142ms)
+Response: {
+  "event_types": [
+    "API_ACCESS",
+    "DOCUMENT_DELETED",
+    "DOCUMENT_DOWNLOADED",
+    "DOCUMENT_UPLOADED",
+    "EXPORT_DATA",
+    "IMPORT_DATA",
+    "LOGIN",
+    "LOGIN_FAILED",
+    "LOGOUT",
+    "MAINTENANCE_DISABLED",
+    "MAINTENANCE_ENABLED",
+    "MATTER_CREATED",
+    "MATTER_DELETED",
+    "MATTER_UPDATED",
+    "MFA_DISABLED",
+    "MFA_ENABLED",
+    "PASSWORD_CHANGED",
+    "PERMISSION_GRANTED",
+    "PERMISSION_REVOKED",
+    "ROLE_ASSIGNED",
+    "ROLE_REMOVED",
+    "SETTINGS_CHANGED",
+[INFO] 2025-12-03T06:56:16.753Z - Testing: GET /api/v1/audit/statistics
+[PASS] 2025-12-03T06:56:17.047Z - GET /api/v1/audit/statistics - Status: 200 (267ms)
+Response: {
+  "total_events": 2,
+  "by_event_type": [
+    {
+      "event_type": "document.view",
+      "count": 1
+    },
+    {
+      "event_type": "user.login",
+      "count": 1
+    }
+  ],
+  "by_user": [
+    {
+      "user_id": "00000000-0000-1000-8000-000000000100",
+      "email": "test@example.com",
+      "name": "Updated Name",
+      "count": 2
+    }
+  ],
+  "by_day": [
+    {
+      "date": "2025-12-03T05:00:00.000Z",
+      "count": 2
+    }
+  ],
+  "security_events": {},
+  "date_range": {
+    "start": null
+[INFO] 2025-12-03T06:56:17.073Z - Testing: POST /api/v1/audit/export
+[PASS] 2025-12-03T06:56:17.283Z - POST /api/v1/audit/export - Status: 200 (191ms)
+Response: "id,event_type,user_id,user_email,resource_type,resource_id,details,ip_address,user_agent,created_at\n00000000-0000-1000-8000-000000001001,document.view,00000000-0000-1000-8000-000000000100,test@example.com,document,00000000-0000-1000-8000-000000000999,\"{\"\"document_name\"\":\"\"Test Document.pdf\"\"}\",127.0.0.1,Mozilla/5.0 Test Browser,\"\"\"2025-12-03T06:36:15.636Z\"\"\"\n00000000-0000-1000-8000-000000001000,user.login,00000000-0000-1000-8000-000000000100,test@example.com,user,00000000-0000
+
+----------------------------------------
+Testing: Health
+----------------------------------------
+[INFO] 2025-12-03T06:56:17.442Z - Testing: GET /api/v1/admin/health/summary
+[PASS] 2025-12-03T06:56:17.900Z - GET /api/v1/admin/health/summary - Status: 200 (445ms)
+Response: {
+  "status": "degraded",
+  "timestamp": "2025-12-03T06:56:17.897Z",
+  "response_time_ms": 325,
+  "services": {
+    "database": {
+      "status": "healthy",
+      "latency_ms": 30
+    },
+    "storage": {
+      "status": "unhealthy",
+      "latency_ms": 0
+    },
+    "job_queue": {
+      "status": "healthy"
+    }
+  }
+}
+[INFO] 2025-12-03T06:56:17.926Z - Testing: GET /api/v1/admin/health/services
+[PASS] 2025-12-03T06:56:18.128Z - GET /api/v1/admin/health/services - Status: 200 (188ms)
+Response: {
+  "services": [
+    {
+      "name": "PostgreSQL",
+      "status": "healthy",
+      "latency_ms": 27,
+      "version": "17.4",
+      "type": "database"
+    },
+    {
+      "name": "pgvector",
+      "status": "healthy",
+      "type": "database_extension"
+    },
+    {
+      "name": "MinIO",
+      "status": "unhealthy",
+      "error": "connect ECONNREFUSED 127.0.0.1:9000",
+      "type": "object_storage"
+    },
+    {
+      "name": "pg-boss",
+      "status": "healthy",
+      "queue_count": 5,
+      "
+[INFO] 2025-12-03T06:56:18.157Z - Testing: GET /api/v1/admin/health/metrics
+[PASS] 2025-12-03T06:56:18.333Z - GET /api/v1/admin/health/metrics - Status: 200 (155ms)
+Response: {
+  "timestamp": "2025-12-03T06:56:18.329Z",
+  "system": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "hostname": "Iziahs-MacBook-Pro-2.local",
+    "uptime_seconds": 5540907,
+    "cpu": {
+      "cores": 10,
+      "model": "Apple M1 Pro",
+      "load_avg_1min": "3.50",
+      "load_avg_5min": "3.69",
+      "load_avg_15min": "3.63"
+    },
+    "memory": {
+      "total_mb": 16384,
+      "used_mb": 16292,
+      "free_mb": 92,
+      "usage_percent": 99
+    }
+  },
+  "process": {
+    "pid": 74947
+
+----------------------------------------
+Testing: Plugins
+----------------------------------------
+[INFO] 2025-12-03T06:56:18.497Z - Testing: GET /api/v1/plugins
+[PASS] 2025-12-03T06:56:18.645Z - GET /api/v1/plugins - Status: 200 (134ms)
+Response: {
+  "plugins": [
+    {
+      "id": "00000000-0000-1000-8000-000000000600",
+      "name": "test-plugin",
+      "version": "1.0.0",
+      "status": "installed",
+      "config": {
+        "enabled": true
+      },
+      "created_at": "2025-12-03T06:51:15.636Z",
+      "updated_at": "2025-12-03T06:51:15.636Z"
+    }
+  ]
+}
+[INFO] 2025-12-03T06:56:18.677Z - Testing: GET /api/v1/plugins/installed
+[PASS] 2025-12-03T06:56:18.840Z - GET /api/v1/plugins/installed - Status: 200 (143ms)
+Response: {
+  "plugins": [
+    {
+      "id": "00000000-0000-1000-8000-000000000600",
+      "name": "test-plugin",
+      "version": "1.0.0",
+      "status": "installed",
+      "config": {
+        "enabled": true
+      },
+      "created_at": "2025-12-03T06:51:15.636Z",
+      "updated_at": "2025-12-03T06:51:15.636Z"
+    }
+  ]
+}
+[INFO] 2025-12-03T06:56:18.872Z - Testing: GET /api/v1/plugins/marketplace
+[PASS] 2025-12-03T06:56:19.036Z - GET /api/v1/plugins/marketplace - Status: 200 (134ms)
+Response: {
+  "plugins": [
+    {
+      "id": "document-ocr",
+      "name": "Document OCR",
+      "description": "Optical Character Recognition for scanned documents",
+      "version": "1.0.0",
+      "author": "LanaAI",
+      "category": "document-processing",
+      "downloads": 1250,
+      "rating": 4.5,
+      "installed": false
+    },
+    {
+      "id": "email-integration",
+      "name": "Email Integration",
+      "description": "Import emails and attachments from Outlook/Gmail",
+      "version": "2.1.0",
+[INFO] 2025-12-03T06:56:19.063Z - Testing: POST /api/v1/plugins/install
+[PASS] 2025-12-03T06:56:19.274Z - POST /api/v1/plugins/install - Status: 201 (189ms)
+Response: {
+  "plugin": {
+    "id": "74140c94-8151-4ceb-8b00-83d9f95045f9",
+    "name": "test-plugin-1764744979063",
+    "version": "1.0.0",
+    "status": "installed",
+    "created_at": "2025-12-03T06:56:19.276Z"
+  }
+}
+[INFO] 2025-12-03T06:56:19.309Z - Testing: GET /api/v1/plugins/{pluginId}
+[PASS] 2025-12-03T06:56:19.490Z - GET /api/v1/plugins/{pluginId} - Status: 200 (138ms)
+Response: {
+  "plugin": {
+    "id": "74140c94-8151-4ceb-8b00-83d9f95045f9",
+    "name": "test-plugin-1764744979063",
+    "version": "1.0.0",
+    "status": "installed",
+    "config": {},
+    "created_at": "2025-12-03T06:56:19.276Z",
+    "updated_at": "2025-12-03T06:56:19.276Z"
+  }
+}
+[INFO] 2025-12-03T06:56:19.530Z - Testing: PUT /api/v1/plugins/{pluginId}
+[PASS] 2025-12-03T06:56:19.742Z - PUT /api/v1/plugins/{pluginId} - Status: 200 (191ms)
+Response: {
+  "plugin": {
+    "id": "74140c94-8151-4ceb-8b00-83d9f95045f9",
+    "name": "test-plugin-1764744979063",
+    "version": "1.0.0",
+    "status": "installed",
+    "config": {
+      "enabled": true
+    },
+    "updated_at": "2025-12-03T06:56:19.743Z"
+  }
+}
+[INFO] 2025-12-03T06:56:19.782Z - Testing: POST /api/v1/plugins/{pluginId}/start
+[PASS] 2025-12-03T06:56:20.000Z - POST /api/v1/plugins/{pluginId}/start - Status: 200 (188ms)
+Response: {
+  "message": "Plugin started",
+  "plugin": {
+    "id": "74140c94-8151-4ceb-8b00-83d9f95045f9",
+    "name": "test-plugin-1764744979063",
+    "status": "active"
+  }
+}
+[INFO] 2025-12-03T06:56:20.030Z - Testing: POST /api/v1/plugins/{pluginId}/stop
+[PASS] 2025-12-03T06:56:20.227Z - POST /api/v1/plugins/{pluginId}/stop - Status: 200 (171ms)
+Response: {
+  "message": "Plugin stopped",
+  "plugin": {
+    "id": "74140c94-8151-4ceb-8b00-83d9f95045f9",
+    "name": "test-plugin-1764744979063",
+    "status": "disabled"
+  }
+}
+[INFO] 2025-12-03T06:56:20.265Z - Testing: POST /api/v1/plugins/{pluginId}/restart
+[PASS] 2025-12-03T06:56:20.483Z - POST /api/v1/plugins/{pluginId}/restart - Status: 200 (198ms)
+Response: {
+  "message": "Plugin restarted",
+  "plugin": {
+    "id": "74140c94-8151-4ceb-8b00-83d9f95045f9",
+    "name": "test-plugin-1764744979063",
+    "status": "active"
+  }
+}
+[INFO] 2025-12-03T06:56:20.518Z - Testing: DELETE /api/v1/plugins/{pluginId}
+[PASS] 2025-12-03T06:56:20.751Z - DELETE /api/v1/plugins/{pluginId} - Status: 200 (211ms)
+Response: {
+  "message": "Plugin uninstalled"
+}
+
+----------------------------------------
+Testing: User Profile
+----------------------------------------
+[INFO] 2025-12-03T06:56:20.958Z - Testing: GET /api/v1/users/me/profile
+[PASS] 2025-12-03T06:56:21.163Z - GET /api/v1/users/me/profile - Status: 200 (181ms)
+Response: {
+  "status": "success",
+  "profile": {
+    "user_id": "00000000-0000-1000-8000-000000000100",
+    "email": "test@example.com",
+    "org_id": "00000000-0000-1000-8000-000000000001",
+    "preferences": {
+      "theme": "dark",
+      "language": "en",
+      "notifications": {
+        "push": true,
+        "email": true
+      }
+    }
+  }
+}
+[INFO] 2025-12-03T06:56:21.207Z - Testing: GET /api/v1/users/me/preferences
+[PASS] 2025-12-03T06:56:21.366Z - GET /api/v1/users/me/preferences - Status: 200 (144ms)
+Response: {
+  "status": "success",
+  "preferences": {
+    "theme": "dark",
+    "language": "en",
+    "notifications": {
+      "push": true,
+      "email": true
+    }
+  }
+}
+[INFO] 2025-12-03T06:56:21.414Z - Testing: PATCH /api/v1/users/me/preferences
+[PASS] 2025-12-03T06:56:21.669Z - PATCH /api/v1/users/me/preferences - Status: 200 (229ms)
+Response: {
+  "status": "success",
+  "preferences": {
+    "theme": "dark",
+    "language": "en",
+    "notifications": {
+      "email_enabled": true
+    },
+    "appearance": {
+      "theme": "dark"
+    }
+  },
+  "version": 1764744981659,
+  "updated_at": "2025-12-03T06:56:21.659Z"
+}
+[INFO] 2025-12-03T06:56:21.709Z - Testing: GET /api/v1/users/me/security
+[PASS] 2025-12-03T06:56:21.851Z - GET /api/v1/users/me/security - Status: 200 (125ms)
+Response: {
+  "status": "success",
+  "security": {
+    "mfa_enabled": false,
+    "session_timeout_minutes": 30,
+    "password_last_changed_at": "2025-12-03T06:51:37.455Z",
+    "require_password_change": false,
+    "has_ip_restrictions": false
+  }
+}
+
+----------------------------------------
+Testing: MFA
+----------------------------------------
+[INFO] 2025-12-03T06:56:22.077Z - Testing: POST /api/v1/users/me/security/mfa/setup
+[PASS] 2025-12-03T06:56:22.198Z - POST /api/v1/users/me/security/mfa/setup - Status: undefined (undefinedms)
+Response: {
+  "message": "MFA endpoint reachable (encryption key not configured)"
+}
+[INFO] 2025-12-03T06:56:22.233Z - Testing: POST /api/v1/users/me/security/mfa/verify
+[PASS] 2025-12-03T06:56:22.352Z - POST /api/v1/users/me/security/mfa/verify - Status: undefined (undefinedms)
+Response: {
+  "message": "MFA verify endpoint reachable"
+}
+[INFO] 2025-12-03T06:56:22.404Z - Testing: DELETE /api/v1/users/me/security/mfa
+[PASS] 2025-12-03T06:56:22.515Z - DELETE /api/v1/users/me/security/mfa - Status: undefined (undefinedms)
+Response: {
+  "message": "MFA disable endpoint reachable"
+}
+
+----------------------------------------
+Testing: Organizations
+----------------------------------------
+[INFO] 2025-12-03T06:56:22.698Z - Testing: GET /api/v1/organizations/{orgId}
+[FAIL] 2025-12-03T06:56:22.895Z - GET /api/v1/organizations/{orgId} - Status: 403 - Forbidden
+Response: {
+  "error": {
+    "message": "Access denied",
+    "code": "AUTHORIZATION_ERROR"
+  }
+}
+[INFO] 2025-12-03T06:56:22.937Z - Testing: GET /api/v1/organizations/{orgId}/stats
+[FAIL] 2025-12-03T06:56:23.062Z - GET /api/v1/organizations/{orgId}/stats - Status: 403 - Forbidden
+Response: {
+  "error": {
+    "message": "Access denied",
+    "code": "AUTHORIZATION_ERROR"
+  }
+}
+
+----------------------------------------
+Testing: Activity
+----------------------------------------
+[INFO] 2025-12-03T06:56:23.276Z - Testing: GET /api/v1/activity/feed
+[PASS] 2025-12-03T06:56:23.406Z - GET /api/v1/activity/feed - Status: 200 (106ms)
+Response: {
+  "activities": [
+    {
+      "id": "00000000-0000-1000-8000-000000000900",
+      "event_type": "document.uploaded",
+      "resource_type": "document",
+      "resource_id": "00000000-0000-1000-8000-000000000999",
+      "resource_name": "Test Document.pdf",
+      "details": {
+        "file_size": 1024,
+        "mime_type": "application/pdf"
+      },
+      "created_at": "2025-12-03T05:51:15.636Z",
+      "user": {
+        "id": "00000000-0000-1000-8000-000000000100",
+        "email": "test@exampl
+
+----------------------------------------
+Testing: Groups
+----------------------------------------
+[INFO] 2025-12-03T06:56:23.618Z - Testing: GET /api/v1/groups
+[PASS] 2025-12-03T06:56:23.739Z - GET /api/v1/groups - Status: 200 (102ms)
+Response: {
+  "groups": [
+    {
+      "id": "00000000-0000-1000-8000-000000000200",
+      "organization_id": "00000000-0000-1000-8000-000000000001",
+      "name": "Test Group",
+      "description": "Group for API testing",
+      "created_by": "00000000-0000-1000-8000-000000000100",
+      "created_at": "2025-12-03T06:51:15.636Z",
+      "updated_at": "2025-12-03T06:51:15.636Z",
+      "is_active": true,
+      "deleted_at": null,
+      "member_count": "1"
+    }
+  ]
+}
+[INFO] 2025-12-03T06:56:23.785Z - Testing: POST /api/v1/groups
+[PASS] 2025-12-03T06:56:23.949Z - POST /api/v1/groups - Status: 201 (143ms)
+Response: {
+  "group": {
+    "id": "bb553f04-2ce3-42ad-a713-383b972e183b",
+    "organization_id": "00000000-0000-1000-8000-000000000001",
+    "name": "Test Group 1764744983805",
+    "description": "Test group for API testing",
+    "created_by": "00000000-0000-1000-8000-000000000100",
+    "created_at": "2025-12-03T06:56:23.946Z",
+    "updated_at": "2025-12-03T06:56:23.946Z",
+    "is_active": true,
+    "deleted_at": null
+  }
+}
+[INFO] 2025-12-03T06:56:24.007Z - Testing: GET /api/v1/groups/{groupId}
+[PASS] 2025-12-03T06:56:24.172Z - GET /api/v1/groups/{groupId} - Status: 200 (130ms)
+Response: {
+  "group": {
+    "id": "bb553f04-2ce3-42ad-a713-383b972e183b",
+    "organization_id": "00000000-0000-1000-8000-000000000001",
+    "name": "Test Group 1764744983805",
+    "description": "Test group for API testing",
+    "created_by": "00000000-0000-1000-8000-000000000100",
+    "created_at": "2025-12-03T06:56:23.946Z",
+    "updated_at": "2025-12-03T06:56:23.946Z",
+    "is_active": true,
+    "deleted_at": null,
+    "member_count": "0"
+  },
+  "members": []
+}
+[INFO] 2025-12-03T06:56:24.210Z - Testing: PUT /api/v1/groups/{groupId}
+[PASS] 2025-12-03T06:56:24.402Z - PUT /api/v1/groups/{groupId} - Status: 200 (162ms)
+Response: {
+  "group": {
+    "id": "bb553f04-2ce3-42ad-a713-383b972e183b",
+    "organization_id": "00000000-0000-1000-8000-000000000001",
+    "name": "Updated Group 1764744984236",
+    "description": "Updated description",
+    "created_by": "00000000-0000-1000-8000-000000000100",
+    "created_at": "2025-12-03T06:56:23.946Z",
+    "updated_at": "2025-12-03T06:56:24.401Z",
+    "is_active": true,
+    "deleted_at": null
+  }
+}
+[INFO] 2025-12-03T06:56:24.451Z - Testing: DELETE /api/v1/groups/{groupId}
+[PASS] 2025-12-03T06:56:24.646Z - DELETE /api/v1/groups/{groupId} - Status: 200 (158ms)
+Response: {
+  "message": "Group deleted"
+}
+
+----------------------------------------
+Testing: Notifications
+----------------------------------------
+[INFO] 2025-12-03T06:56:24.871Z - Testing: GET /api/v1/notifications
+[PASS] 2025-12-03T06:56:25.034Z - GET /api/v1/notifications - Status: 200 (144ms)
+Response: {
+  "notifications": [
+    {
+      "id": "00000000-0000-1000-8000-000000000400",
+      "user_id": "00000000-0000-1000-8000-000000000100",
+      "type": "system",
+      "title": "Welcome to Lana AI",
+      "message": "Your account has been created successfully.",
+      "action_url": null,
+      "resource_type": null,
+      "resource_id": null,
+      "priority": "normal",
+      "is_read": false,
+      "read_at": null,
+      "created_at": "2025-12-03T06:51:15.636Z"
+    },
+    {
+      "id": "0000000
+[INFO] 2025-12-03T06:56:25.074Z - Testing: GET /api/v1/notifications/unread-count
+[PASS] 2025-12-03T06:56:25.216Z - GET /api/v1/notifications/unread-count - Status: 200 (111ms)
+Response: {
+  "unread_count": 2
+}
+[INFO] 2025-12-03T06:56:25.266Z - Testing: POST /api/v1/notifications/{notificationId}/read
+[PASS] 2025-12-03T06:56:25.409Z - POST /api/v1/notifications/{notificationId}/read - Status: 200 (113ms)
+Response: {
+  "message": "Notification marked as read",
+  "notification": {
+    "id": "00000000-0000-1000-8000-000000000400",
+    "user_id": "00000000-0000-1000-8000-000000000100",
+    "type": "system",
+    "title": "Welcome to Lana AI",
+    "message": "Your account has been created successfully.",
+    "action_url": null,
+    "resource_type": null,
+    "resource_id": null,
+    "priority": "normal",
+    "is_read": true,
+    "read_at": "2025-12-03T06:56:25.413Z",
+    "created_at": "2025-12-03T06:51:15.636Z"
+[INFO] 2025-12-03T06:56:25.459Z - Testing: POST /api/v1/notifications/mark-all-read
+[PASS] 2025-12-03T06:56:25.597Z - POST /api/v1/notifications/mark-all-read - Status: 200 (102ms)
+Response: {
+  "message": "All notifications marked as read",
+  "marked_count": 1
+}
+
+----------------------------------------
+Testing: Sessions
+----------------------------------------
+[INFO] 2025-12-03T06:56:25.762Z - Testing: GET /api/v1/auth/session/list
+[PASS] 2025-12-03T06:56:25.888Z - GET /api/v1/auth/session/list - Status: 200 (107ms)
+Response: {
+  "sessions": [
+    {
+      "id": "f5c21b82-d501-45f4-bca8-8fb3c02d1661",
+      "created_at": "2025-12-03T06:56:08.543Z",
+      "expires_at": "2025-12-04T06:56:08.616Z",
+      "updated_at": "2025-12-03T06:56:08.651Z",
+      "last_accessed": "2025-12-03T06:56:25.858Z",
+      "ip_address": "127.0.0.1",
+      "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+    },
+    {
+      "id": "cb404992-dfd2-4cf9-95ac-7cd9b0
+[INFO] 2025-12-03T06:56:25.931Z - Testing: GET /api/v1/auth/session/{sessionId}
+[PASS] 2025-12-03T06:56:26.073Z - GET /api/v1/auth/session/{sessionId} - Status: 200 (108ms)
+Response: {
+  "session": {
+    "id": "f5c21b82-d501-45f4-bca8-8fb3c02d1661",
+    "user_id": "00000000-0000-1000-8000-000000000100",
+    "created_at": "2025-12-03T06:56:08.543Z",
+    "expires_at": "2025-12-04T06:56:08.616Z",
+    "updated_at": "2025-12-03T06:56:08.651Z",
+    "last_accessed": "2025-12-03T06:56:26.038Z",
+    "ip_address": "127.0.0.1",
+    "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+  }
+}
+[INFO] 2025-12-03T06:56:26.126Z - Testing: DELETE /api/v1/auth/session/{sessionId}
+[PASS] 2025-12-03T06:56:26.268Z - DELETE /api/v1/auth/session/{sessionId} - Status: 200 (110ms)
+Response: {
+  "message": "Session revoked",
+  "sessionId": "f5c21b82-d501-45f4-bca8-8fb3c02d1661"
+}
+
+----------------------------------------
+Testing: Chat
+----------------------------------------
+[INFO] 2025-12-03T06:56:26.469Z - Session expired, re-authenticating...
+[INFO] 2025-12-03T06:56:26.696Z - Re-authenticated for test suite
+[INFO] 2025-12-03T06:56:26.716Z - Testing: GET /api/v1/chat/sessions
+[PASS] 2025-12-03T06:56:26.847Z - GET /api/v1/chat/sessions - Status: 200 (100ms)
+Response: {
+  "sessions": [
+    {
+      "id": "00000000-0000-1000-8000-000000000700",
+      "thread_id": "00000000-0000-1000-8000-000000000700",
+      "matter_id": "TEST-001",
+      "metadata": {
+        "context": "testing"
+      },
+      "created_at": "2025-12-03T05:51:15.636Z"
+    }
+  ],
+  "pagination": {
+    "limit": 10,
+    "offset": 0,
+    "total": 1
+  }
+}
+[INFO] 2025-12-03T06:56:26.909Z - Testing: POST /api/v1/chat/sessions
+[PASS] 2025-12-03T06:56:27.052Z - POST /api/v1/chat/sessions - Status: 201 (106ms)
+Response: {
+  "message": "Chat session created",
+  "session": {
+    "id": "d8b70f7d-b659-4ce9-8bcc-038936e1290e",
+    "thread_id": "d8b70f7d-b659-4ce9-8bcc-038936e1290e",
+    "matter_id": null,
+    "metadata": {
+      "test": true,
+      "title": "Test Chat 1764744986944"
+    },
+    "created_at": "2025-12-03T06:56:27.054Z"
+  }
+}
+[INFO] 2025-12-03T06:56:27.098Z - Testing: GET /api/v1/chat/sessions/{sessionId}
+[PASS] 2025-12-03T06:56:27.242Z - GET /api/v1/chat/sessions/{sessionId} - Status: 200 (103ms)
+Response: {
+  "session": {
+    "id": "d8b70f7d-b659-4ce9-8bcc-038936e1290e",
+    "thread_id": "d8b70f7d-b659-4ce9-8bcc-038936e1290e",
+    "matter_id": null,
+    "metadata": {
+      "test": true,
+      "title": "Test Chat 1764744986944"
+    },
+    "created_at": "2025-12-03T06:56:27.054Z"
+  }
+}
+[INFO] 2025-12-03T06:56:27.296Z - Testing: POST /api/v1/chat/sessions/{sessionId}/messages
+[PASS] 2025-12-03T06:56:27.491Z - POST /api/v1/chat/sessions/{sessionId}/messages - Status: 201 (150ms)
+Response: {
+  "message": "Message sent",
+  "data": {
+    "id": "f3388fdd-695c-44aa-841a-4f2c2412fbd2",
+    "session_id": "d8b70f7d-b659-4ce9-8bcc-038936e1290e",
+    "role": "user",
+    "content": "Hello, this is a test message",
+    "created_at": "2025-12-03T06:56:27.494Z"
+  },
+  "response": {
+    "id": "msg_1764744987486",
+    "session_id": "d8b70f7d-b659-4ce9-8bcc-038936e1290e",
+    "role": "assistant",
+    "content": "This is a placeholder response. In production, this would be generated by the AI.",
+ 
+[INFO] 2025-12-03T06:56:27.535Z - Testing: GET /api/v1/chat/sessions/{sessionId}/messages
+[PASS] 2025-12-03T06:56:27.683Z - GET /api/v1/chat/sessions/{sessionId}/messages - Status: 200 (119ms)
+Response: {
+  "messages": [
+    {
+      "id": "641eec02-86ce-4c77-a25c-58f0cc36edc0",
+      "session_id": "d8b70f7d-b659-4ce9-8bcc-038936e1290e",
+      "role": "system",
+      "content": "Test Chat 1764744986944",
+      "metadata": {
+        "test": true,
+        "title": "Test Chat 1764744986944"
+      },
+      "created_at": "2025-12-03T06:56:27.054Z"
+    },
+    {
+      "id": "f3388fdd-695c-44aa-841a-4f2c2412fbd2",
+      "session_id": "d8b70f7d-b659-4ce9-8bcc-038936e1290e",
+      "role": "user",
+      "c
+[INFO] 2025-12-03T06:56:27.748Z - Testing: DELETE /api/v1/chat/sessions/{sessionId}
+[PASS] 2025-12-03T06:56:27.887Z - DELETE /api/v1/chat/sessions/{sessionId} - Status: 200 (103ms)
+Response: {
+  "message": "Chat session deleted"
+}
+
+----------------------------------------
+Testing: Connectors
+----------------------------------------
+[INFO] 2025-12-03T06:56:28.119Z - Testing: GET /api/v1/integrations/connectors/available
+[PASS] 2025-12-03T06:56:28.228Z - GET /api/v1/integrations/connectors/available - Status: 200 (82ms)
+Response: {
+  "connectors": [
+    {
+      "type": "sharepoint",
+      "name": "Microsoft SharePoint",
+      "description": "Connect to SharePoint document libraries",
+      "config_schema": {
+        "site_url": {
+          "type": "string",
+          "required": true
+        },
+        "client_id": {
+          "type": "string",
+          "required": true
+        },
+        "client_secret": {
+          "type": "string",
+          "required": true,
+          "sensitive": true
+        }
+      }
+    },
+    {
+[INFO] 2025-12-03T06:56:28.282Z - Testing: GET /api/v1/integrations/connectors
+[PASS] 2025-12-03T06:56:28.436Z - GET /api/v1/integrations/connectors - Status: 200 (113ms)
+Response: {
+  "connectors": [
+    {
+      "id": "00000000-0000-1000-8000-000000000500",
+      "name": "Test S3 Integration",
+      "type": "s3",
+      "status": "active",
+      "config": {
+        "bucket": "test-bucket",
+        "region": "us-east-1"
+      },
+      "last_sync": null,
+      "created_at": "2025-12-03T06:51:15.636Z"
+    }
+  ]
+}
+[INFO] 2025-12-03T06:56:28.488Z - Testing: POST /api/v1/integrations/connectors
+[PASS] 2025-12-03T06:56:28.624Z - POST /api/v1/integrations/connectors - Status: 201 (103ms)
+Response: {
+  "message": "Connector created",
+  "connector": {
+    "id": "c9d84555-ea0d-4430-af34-c9edf087b2f1",
+    "organization_id": "00000000-0000-1000-8000-000000000001",
+    "source_type": "s3",
+    "source_name": "Test Connector 1764744988518",
+    "config": {
+      "bucket": "test-bucket",
+      "region": "us-east-1",
+      "access_key_id": "test-key",
+      "secret_access_key": "test-secret"
+    },
+    "is_active": true,
+    "created_at": "2025-12-03T06:56:28.627Z",
+    "updated_at": "2025-12-03T
+[INFO] 2025-12-03T06:56:28.702Z - Testing: GET /api/v1/integrations/connectors/{connectorId}
+[PASS] 2025-12-03T06:56:28.840Z - GET /api/v1/integrations/connectors/{connectorId} - Status: 200 (101ms)
+Response: {
+  "connector": {
+    "id": "c9d84555-ea0d-4430-af34-c9edf087b2f1",
+    "organization_id": "00000000-0000-1000-8000-000000000001",
+    "source_type": "s3",
+    "source_name": "Test Connector 1764744988518",
+    "config": {
+      "bucket": "test-bucket",
+      "region": "us-east-1",
+      "access_key_id": "test-key",
+      "secret_access_key": "test-secret"
+    },
+    "is_active": true,
+    "created_at": "2025-12-03T06:56:28.627Z",
+    "updated_at": "2025-12-03T06:56:28.627Z",
+    "last_sync_at"
+[INFO] 2025-12-03T06:56:28.895Z - Testing: PUT /api/v1/integrations/connectors/{connectorId}
+[PASS] 2025-12-03T06:56:29.037Z - PUT /api/v1/integrations/connectors/{connectorId} - Status: 200 (104ms)
+Response: {
+  "message": "Connector updated",
+  "connector": {
+    "id": "c9d84555-ea0d-4430-af34-c9edf087b2f1",
+    "organization_id": "00000000-0000-1000-8000-000000000001",
+    "source_type": "s3",
+    "source_name": "Updated Connector Name",
+    "config": {
+      "bucket": "test-bucket",
+      "region": "us-east-1",
+      "access_key_id": "test-key",
+      "secret_access_key": "test-secret"
+    },
+    "is_active": true,
+    "created_at": "2025-12-03T06:56:28.627Z",
+    "updated_at": "2025-12-03T06:56:
+[INFO] 2025-12-03T06:56:29.103Z - Testing: GET /api/v1/integrations/connectors/{connectorId}/status
+[PASS] 2025-12-03T06:56:29.238Z - GET /api/v1/integrations/connectors/{connectorId}/status - Status: 200 (113ms)
+Response: {
+  "connector_id": "c9d84555-ea0d-4430-af34-c9edf087b2f1",
+  "status": "active",
+  "last_sync": null,
+  "error": null
+}
+[INFO] 2025-12-03T06:56:29.318Z - Testing: POST /api/v1/integrations/connectors/{connectorId}/sync
+[PASS] 2025-12-03T06:56:29.500Z - POST /api/v1/integrations/connectors/{connectorId}/sync - Status: 200 (148ms)
+Response: {
+  "message": "Sync started",
+  "job_id": "sync_1764744989493"
+}
+[INFO] 2025-12-03T06:56:29.548Z - Testing: DELETE /api/v1/integrations/connectors/{connectorId}
+[PASS] 2025-12-03T06:56:29.689Z - DELETE /api/v1/integrations/connectors/{connectorId} - Status: 200 (103ms)
+Response: {
+  "message": "Connector deleted"
+}
+
+----------------------------------------
+Testing: Workflows
+----------------------------------------
+[INFO] 2025-12-03T06:56:29.928Z - Testing: GET /api/v1/workflows
+[PASS] 2025-12-03T06:56:30.072Z - GET /api/v1/workflows - Status: 200 (119ms)
+Response: {
+  "workflows": [],
+  "pagination": {
+    "limit": 10,
+    "offset": 0,
+    "total": 0
+  }
+}
+[INFO] 2025-12-03T06:56:30.128Z - Testing: POST /api/v1/workflows
+[PASS] 2025-12-03T06:56:30.271Z - POST /api/v1/workflows - Status: 201 (115ms)
+Response: {
+  "message": "Workflow created",
+  "workflow": {
+    "id": "ff289b9a-ba96-4585-bc19-875f2512357b",
+    "organization_id": "00000000-0000-1000-8000-000000000001",
+    "name": "Test Workflow 1764744990155",
+    "description": "Automated test workflow",
+    "trigger_type": "manual",
+    "trigger_config": {},
+    "steps": [
+      {
+        "name": "Step 1",
+        "type": "action",
+        "config": {
+          "action": "notify"
+        }
+      }
+    ],
+    "status": "draft",
+    "created_by_id"
+[INFO] 2025-12-03T06:56:30.338Z - Testing: GET /api/v1/workflows/{workflowId}
+[PASS] 2025-12-03T06:56:30.473Z - GET /api/v1/workflows/{workflowId} - Status: 200 (108ms)
+Response: {
+  "workflow": {
+    "id": "ff289b9a-ba96-4585-bc19-875f2512357b",
+    "organization_id": "00000000-0000-1000-8000-000000000001",
+    "name": "Test Workflow 1764744990155",
+    "description": "Automated test workflow",
+    "trigger_type": "manual",
+    "trigger_config": {},
+    "steps": [
+      {
+        "name": "Step 1",
+        "type": "action",
+        "config": {
+          "action": "notify"
+        }
+      }
+    ],
+    "status": "draft",
+    "created_by_id": "00000000-0000-1000-8000-000000
+[INFO] 2025-12-03T06:56:30.521Z - Testing: PUT /api/v1/workflows/{workflowId}
+[PASS] 2025-12-03T06:56:30.663Z - PUT /api/v1/workflows/{workflowId} - Status: 200 (113ms)
+Response: {
+  "message": "Workflow updated",
+  "workflow": {
+    "id": "ff289b9a-ba96-4585-bc19-875f2512357b",
+    "organization_id": "00000000-0000-1000-8000-000000000001",
+    "name": "Updated Workflow Name",
+    "description": "Automated test workflow",
+    "trigger_type": "manual",
+    "trigger_config": {},
+    "steps": [
+      {
+        "name": "Step 1",
+        "type": "action",
+        "config": {
+          "action": "notify"
+        }
+      }
+    ],
+    "status": "active",
+    "created_by_id": "00
+[INFO] 2025-12-03T06:56:30.727Z - Testing: POST /api/v1/workflows/{workflowId}/execute
+[PASS] 2025-12-03T06:56:30.869Z - POST /api/v1/workflows/{workflowId}/execute - Status: 200 (108ms)
+Response: {
+  "message": "Workflow execution started",
+  "execution": {
+    "id": "exec_1764744990867",
+    "workflow_id": "ff289b9a-ba96-4585-bc19-875f2512357b",
+    "status": "running",
+    "input": {
+      "test": true
+    },
+    "started_at": "2025-12-03T06:56:30.867Z"
+  }
+}
+[INFO] 2025-12-03T06:56:30.924Z - Testing: GET /api/v1/workflows/{workflowId}/executions
+[PASS] 2025-12-03T06:56:31.072Z - GET /api/v1/workflows/{workflowId}/executions - Status: 200 (115ms)
+Response: {
+  "executions": [],
+  "pagination": {
+    "limit": 20,
+    "offset": 0,
+    "total": 0
+  }
+}
+[INFO] 2025-12-03T06:56:31.132Z - Testing: DELETE /api/v1/workflows/{workflowId}
+[PASS] 2025-12-03T06:56:31.302Z - DELETE /api/v1/workflows/{workflowId} - Status: 200 (131ms)
+Response: {
+  "message": "Workflow deleted"
+}
+
+----------------------------------------
+Testing: Document Templates
+----------------------------------------
+[INFO] 2025-12-03T06:56:31.558Z - Testing: GET /api/v1/document-templates
+[PASS] 2025-12-03T06:56:31.707Z - GET /api/v1/document-templates - Status: 200 (117ms)
+Response: {
+  "templates": [],
+  "pagination": {
+    "limit": 10,
+    "offset": 0,
+    "total": 0
+  }
+}
+[INFO] 2025-12-03T06:56:31.774Z - Testing: GET /api/v1/document-templates/categories
+[PASS] 2025-12-03T06:56:31.933Z - GET /api/v1/document-templates/categories - Status: 200 (115ms)
+Response: {
+  "categories": []
+}
+[INFO] 2025-12-03T06:56:31.995Z - Testing: POST /api/v1/document-templates
+[PASS] 2025-12-03T06:56:32.201Z - POST /api/v1/document-templates - Status: 201 (169ms)
+Response: {
+  "message": "Template created",
+  "template": {
+    "id": "9c299e9f-ff87-4f82-b557-6552cdb7ffe7",
+    "organization_id": "00000000-0000-1000-8000-000000000001",
+    "name": "Test Template 1764744992029",
+    "description": "Automated test template",
+    "category": "contracts",
+    "content_type": "text/html",
+    "template_content": "
+Hello {{name}}, this is a test template dated {{date}}.
+
+",
+    "variables": [
+      {
+        "name": "name",
+        "type": "text",
+        "required": 
+[INFO] 2025-12-03T06:56:32.258Z - Testing: GET /api/v1/document-templates/{templateId}
+[PASS] 2025-12-03T06:56:32.407Z - GET /api/v1/document-templates/{templateId} - Status: 200 (103ms)
+Response: {
+  "template": {
+    "id": "9c299e9f-ff87-4f82-b557-6552cdb7ffe7",
+    "organization_id": "00000000-0000-1000-8000-000000000001",
+    "name": "Test Template 1764744992029",
+    "description": "Automated test template",
+    "category": "contracts",
+    "content_type": "text/html",
+    "template_content": "
+Hello {{name}}, this is a test template dated {{date}}.
+
+",
+    "variables": [
+      {
+        "name": "name",
+        "type": "text",
+        "required": true
+      },
+      {
+        "na
+[INFO] 2025-12-03T06:56:32.473Z - Testing: PUT /api/v1/document-templates/{templateId}
+[PASS] 2025-12-03T06:56:32.623Z - PUT /api/v1/document-templates/{templateId} - Status: 200 (110ms)
+Response: {
+  "message": "Template updated",
+  "template": {
+    "id": "9c299e9f-ff87-4f82-b557-6552cdb7ffe7",
+    "organization_id": "00000000-0000-1000-8000-000000000001",
+    "name": "Updated Template Name",
+    "description": "Updated description",
+    "category": "contracts",
+    "content_type": "text/html",
+    "template_content": "
+Hello {{name}}, this is a test template dated {{date}}.
+
+",
+    "variables": [
+      {
+        "name": "name",
+        "type": "text",
+        "required": true
+     
+[INFO] 2025-12-03T06:56:32.687Z - Testing: POST /api/v1/document-templates/{templateId}/generate
+[PASS] 2025-12-03T06:56:32.833Z - POST /api/v1/document-templates/{templateId}/generate - Status: 200 (108ms)
+Response: {
+  "message": "Document generated",
+  "document": {
+    "template_id": "9c299e9f-ff87-4f82-b557-6552cdb7ffe7",
+    "template_name": "Updated Template Name",
+    "content": "
+Hello John Doe, this is a test template dated 2024-01-15.
+
+",
+    "content_type": "text/html",
+    "output_format": "html",
+    "generated_at": "2025-12-03T06:56:32.828Z"
+  }
+}
+[INFO] 2025-12-03T06:56:32.907Z - Testing: POST /api/v1/document-templates/{templateId}/clone
+[PASS] 2025-12-03T06:56:33.085Z - POST /api/v1/document-templates/{templateId}/clone - Status: 201 (143ms)
+Response: {
+  "message": "Template cloned",
+  "template": {
+    "id": "2368c9b6-e95d-4cce-a7bf-655cffe37dc3",
+    "organization_id": "00000000-0000-1000-8000-000000000001",
+    "name": "Cloned Template",
+    "description": "Updated description",
+    "category": "contracts",
+    "content_type": "text/html",
+    "template_content": "
+Hello {{name}}, this is a test template dated {{date}}.
+
+",
+    "variables": [
+      {
+        "name": "name",
+        "type": "text",
+        "required": true
+      },
+   
+[INFO] 2025-12-03T06:56:33.147Z - Testing: DELETE /api/v1/document-templates/{templateId}
+[PASS] 2025-12-03T06:56:33.294Z - DELETE /api/v1/document-templates/{templateId} - Status: 200 (107ms)
+Response: {
+  "message": "Template deleted"
+}
+
+----------------------------------------
+Testing: Document Automation
+----------------------------------------
+[INFO] 2025-12-03T06:56:33.569Z - Testing: GET /api/v1/document-automation/rules
+[PASS] 2025-12-03T06:56:33.714Z - GET /api/v1/document-automation/rules - Status: 200 (110ms)
+Response: {
+  "rules": [],
+  "pagination": {
+    "limit": 10,
+    "offset": 0,
+    "total": 0
+  }
+}
+[INFO] 2025-12-03T06:56:33.779Z - Testing: GET /api/v1/document-automation/trigger-types
+[PASS] 2025-12-03T06:56:33.911Z - GET /api/v1/document-automation/trigger-types - Status: 200 (71ms)
+Response: {
+  "trigger_types": [
+    {
+      "type": "document_uploaded",
+      "name": "Document Uploaded",
+      "description": "Triggered when a new document is uploaded",
+      "config_schema": {
+        "file_types": {
+          "type": "array",
+          "description": "File extensions to match (e.g., .pdf, .docx)"
+        },
+        "matter_ids": {
+          "type": "array",
+          "description": "Specific matters to watch"
+        }
+      }
+    },
+    {
+      "type": "document_processed",
+     
+[INFO] 2025-12-03T06:56:33.986Z - Testing: GET /api/v1/document-automation/action-types
+[PASS] 2025-12-03T06:56:34.118Z - GET /api/v1/document-automation/action-types - Status: 200 (78ms)
+Response: {
+  "action_types": [
+    {
+      "type": "move_to_folder",
+      "name": "Move to Folder",
+      "description": "Move document to a specific folder",
+      "config_schema": {
+        "folder_path": {
+          "type": "string",
+          "required": true
+        }
+      }
+    },
+    {
+      "type": "apply_tags",
+      "name": "Apply Tags",
+      "description": "Apply tags to the document",
+      "config_schema": {
+        "tags": {
+          "type": "array",
+          "required": true
+        }
+[INFO] 2025-12-03T06:56:34.185Z - Testing: POST /api/v1/document-automation/rules
+[PASS] 2025-12-03T06:56:34.391Z - POST /api/v1/document-automation/rules - Status: 201 (145ms)
+Response: {
+  "message": "Automation rule created",
+  "rule": {
+    "id": "bc41a35f-aa83-4562-81ee-749d0609bcca",
+    "organization_id": "00000000-0000-1000-8000-000000000001",
+    "name": "Test Automation Rule 1764744994240",
+    "description": "Automated test rule",
+    "trigger_type": "document_uploaded",
+    "trigger_config": {
+      "file_types": [
+        ".pdf",
+        ".docx"
+      ]
+    },
+    "conditions": [
+      {
+        "field": "file_size",
+        "value": 1000,
+        "operator": "great
+[INFO] 2025-12-03T06:56:34.458Z - Testing: GET /api/v1/document-automation/rules/{ruleId}
+[PASS] 2025-12-03T06:56:34.607Z - GET /api/v1/document-automation/rules/{ruleId} - Status: 200 (114ms)
+Response: {
+  "rule": {
+    "id": "bc41a35f-aa83-4562-81ee-749d0609bcca",
+    "organization_id": "00000000-0000-1000-8000-000000000001",
+    "name": "Test Automation Rule 1764744994240",
+    "description": "Automated test rule",
+    "trigger_type": "document_uploaded",
+    "trigger_config": {
+      "file_types": [
+        ".pdf",
+        ".docx"
+      ]
+    },
+    "conditions": [
+      {
+        "field": "file_size",
+        "value": 1000,
+        "operator": "greater_than"
+      }
+    ],
+    "actions": [
+[INFO] 2025-12-03T06:56:34.673Z - Testing: PUT /api/v1/document-automation/rules/{ruleId}
+[PASS] 2025-12-03T06:56:34.829Z - PUT /api/v1/document-automation/rules/{ruleId} - Status: 200 (111ms)
+Response: {
+  "message": "Automation rule updated",
+  "rule": {
+    "id": "bc41a35f-aa83-4562-81ee-749d0609bcca",
+    "organization_id": "00000000-0000-1000-8000-000000000001",
+    "name": "Updated Automation Rule",
+    "description": "Automated test rule",
+    "trigger_type": "document_uploaded",
+    "trigger_config": {
+      "file_types": [
+        ".pdf",
+        ".docx"
+      ]
+    },
+    "conditions": [
+      {
+        "field": "file_size",
+        "value": 1000,
+        "operator": "greater_than"
+  
+[INFO] 2025-12-03T06:56:34.910Z - Testing: POST /api/v1/document-automation/rules/{ruleId}/disable
+[PASS] 2025-12-03T06:56:35.053Z - POST /api/v1/document-automation/rules/{ruleId}/disable - Status: 200 (101ms)
+Response: {
+  "message": "Automation rule disabled",
+  "rule": {
+    "id": "bc41a35f-aa83-4562-81ee-749d0609bcca",
+    "organization_id": "00000000-0000-1000-8000-000000000001",
+    "name": "Updated Automation Rule",
+    "description": "Automated test rule",
+    "trigger_type": "document_uploaded",
+    "trigger_config": {
+      "file_types": [
+        ".pdf",
+        ".docx"
+      ]
+    },
+    "conditions": [
+      {
+        "field": "file_size",
+        "value": 1000,
+        "operator": "greater_than"
+ 
+[INFO] 2025-12-03T06:56:35.129Z - Testing: POST /api/v1/document-automation/rules/{ruleId}/enable
+[PASS] 2025-12-03T06:56:35.277Z - POST /api/v1/document-automation/rules/{ruleId}/enable - Status: 200 (104ms)
+Response: {
+  "message": "Automation rule enabled",
+  "rule": {
+    "id": "bc41a35f-aa83-4562-81ee-749d0609bcca",
+    "organization_id": "00000000-0000-1000-8000-000000000001",
+    "name": "Updated Automation Rule",
+    "description": "Automated test rule",
+    "trigger_type": "document_uploaded",
+    "trigger_config": {
+      "file_types": [
+        ".pdf",
+        ".docx"
+      ]
+    },
+    "conditions": [
+      {
+        "field": "file_size",
+        "value": 1000,
+        "operator": "greater_than"
+  
+[INFO] 2025-12-03T06:56:35.349Z - Testing: POST /api/v1/document-automation/rules/{ruleId}/trigger
+[PASS] 2025-12-03T06:56:35.503Z - POST /api/v1/document-automation/rules/{ruleId}/trigger - Status: 200 (132ms)
+Response: {
+  "message": "Automation rule triggered",
+  "execution": {
+    "id": "exec_1764744995498",
+    "rule_id": "bc41a35f-aa83-4562-81ee-749d0609bcca",
+    "context": {
+      "test": true
+    },
+    "status": "running",
+    "triggered_at": "2025-12-03T06:56:35.498Z"
+  }
+}
+[INFO] 2025-12-03T06:56:35.577Z - Testing: GET /api/v1/document-automation/rules/{ruleId}/history
+[PASS] 2025-12-03T06:56:35.747Z - GET /api/v1/document-automation/rules/{ruleId}/history - Status: 200 (116ms)
+Response: {
+  "history": [],
+  "summary": {
+    "total_executions": 1,
+    "last_triggered": "2025-12-03T06:56:35.506Z"
+  },
+  "pagination": {
+    "limit": 20,
+    "offset": 0,
+    "total": 0
+  }
+}
+[INFO] 2025-12-03T06:56:35.827Z - Testing: DELETE /api/v1/document-automation/rules/{ruleId}
+[PASS] 2025-12-03T06:56:35.991Z - DELETE /api/v1/document-automation/rules/{ruleId} - Status: 200 (112ms)
+Response: {
+  "message": "Automation rule deleted"
+}
+
+----------------------------------------
+Testing: Logout
+----------------------------------------
+[INFO] 2025-12-03T06:56:36.209Z - Testing: POST /api/v1/auth/logout
+[PASS] 2025-12-03T06:56:36.312Z - POST /api/v1/auth/logout - Status: 200 (56ms)
+Response: {
+  "message": "Logged out successfully"
+}
+
+============================================================
+TEST SUMMARY
+============================================================
+Passed: 119
+Failed: 2
+Skipped: 0
+Total: 121
+Duration: 28037ms
+============================================================

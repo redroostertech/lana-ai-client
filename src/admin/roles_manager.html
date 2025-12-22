@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Role Manager - Lana AI</title>
+    <script src="../js/tailwind-loader.js"></script>
+  <script src="../js/error-reporter.js"></script>
+    <script src="../js/config.js"></script>
+    <script src="../js/mock-data.js"></script>
+    <script src="../js/api.js"></script>
+    <script src="../js/components.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="../js/menu.js"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
+            <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
+                <a href="../index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
+                <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
+                <!-- Menu will be dynamically rendered by menu.js -->
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Header -->
+            <header class="bg-white shadow-sm border-b border-gray-200">
+                <div class="flex items-center justify-between px-6 py-4">
+                    <div class="flex items-center">
+                        <button id="sidebarToggle" class="md:hidden mr-4 text-gray-600"><i class="fas fa-bars text-xl"></i></button>
+                        <div>
+                            <a href="/admin/roles.html" class="text-blue-600 hover:underline text-sm"><i class="fas fa-arrow-left mr-1"></i>Back to Roles</a>
+                            <h2 class="text-xl font-semibold text-gray-800" id="pageTitle">Role Manager</h2>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <button onclick="saveRole()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                            <i class="fas fa-save mr-2"></i>Save Changes
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Content -->
+            <main class="flex-1 overflow-y-auto p-6">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Role Details -->
+                    <div class="lg:col-span-1">
+                        <div class="bg-white rounded-lg shadow-sm p-6">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Role Details</h3>
+                            <form id="roleForm" class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Role Name</label>
+                                    <input type="text" id="roleName" name="name" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                                    <textarea id="roleDescription" name="description" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+                                </div>
+                                <div>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" id="roleIsSystem" name="is_system" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" disabled>
+                                        <span class="ml-2 text-sm text-gray-600">System Role (cannot be deleted)</span>
+                                    </label>
+                                </div>
+                            </form>
+
+                            <!-- Role Hierarchy -->
+                            <div class="mt-6 pt-6 border-t border-gray-200">
+                                <h4 class="text-sm font-medium text-gray-900 mb-3">Role Hierarchy</h4>
+                                <div class="space-y-2" id="roleHierarchy">
+                                    <p class="text-sm text-gray-500">No parent roles</p>
+                                </div>
+                            </div>
+
+                            <!-- Users with Role -->
+                            <div class="mt-6 pt-6 border-t border-gray-200">
+                                <h4 class="text-sm font-medium text-gray-900 mb-3">Users with this Role</h4>
+                                <div id="roleUsers" class="space-y-2">
+                                    <p class="text-sm text-gray-500">Loading...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Permissions Matrix -->
+                    <div class="lg:col-span-2">
+                        <div class="bg-white rounded-lg shadow-sm p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-semibold text-gray-900">Permissions</h3>
+                                <div class="flex items-center space-x-2">
+                                    <button onclick="selectAll()" class="text-sm text-blue-600 hover:underline">Select All</button>
+                                    <span class="text-gray-300">|</span>
+                                    <button onclick="deselectAll()" class="text-sm text-blue-600 hover:underline">Deselect All</button>
+                                </div>
+                            </div>
+
+                            <!-- Permission Search -->
+                            <div class="mb-4">
+                                <input type="text" id="permissionSearch" placeholder="Search permissions..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+
+                            <!-- Permission Categories -->
+                            <div id="permissionsContainer" class="space-y-6">
+                                <div class="text-gray-500 text-sm">Loading permissions...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+
+        // Auth check
+        if (!api.requireAuth()) throw new Error('Not authenticated');
+
+        // Load full user profile with roles before rendering menu
+        (async () => {
+          try {
+            await api.loadUserProfile();
+          } catch (error) {
+            console.error('Failed to load user profile:', error);
+          }
+          
+          // Render dynamic menu (will now have access to roles)
+          renderMenu('#mainNav');
+        })();
+
+        // Sidebar toggle
+        const sidebar = document.getElementById('sidebar');
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const closeSidebar = document.getElementById('closeSidebar');
+        if (sidebarToggle) sidebarToggle.addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+        if (closeSidebar) closeSidebar.addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+
+        let roleId = null;
+        let allPermissions = [];
+        let rolePermissions = [];
+
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuth();
+
+            // Get role ID from URL
+            const params = new URLSearchParams(window.location.search);
+            roleId = params.get('id');
+
+            if (roleId) {
+                loadRole();
+            } else {
+                document.getElementById('pageTitle').textContent = 'Create New Role';
+            }
+
+            loadPermissions();
+
+            // Setup search
+            document.getElementById('permissionSearch').addEventListener('input', debounce(filterPermissions, 300));
+        });
+
+        function checkAuth() {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = '/login.html';
+            }
+        }
+
+        async function loadRole() {
+            try {
+                const role = await api.request(`/api/rbac/roles/${roleId}`);
+
+                document.getElementById('pageTitle').textContent = `Edit Role: ${role.name}`;
+                document.getElementById('roleName').value = role.name;
+                document.getElementById('roleDescription').value = role.description || '';
+                document.getElementById('roleIsSystem').checked = role.is_system;
+
+                if (role.is_system) {
+                    document.getElementById('roleName').disabled = true;
+                }
+
+                rolePermissions = role.permissions || [];
+                updatePermissionCheckboxes();
+                loadRoleUsers();
+            } catch (error) {
+                Toast.error('Failed to load role');
+                console.error(error);
+            }
+        }
+
+        async function loadPermissions() {
+            try {
+                const res = await api.getPermissions();
+                allPermissions = res.permissions || res || [];
+                renderPermissions();
+            } catch (error) {
+                console.error('Failed to load permissions:', error);
+            }
+        }
+
+        function renderPermissions() {
+            const container = document.getElementById('permissionsContainer');
+
+            // Group permissions by category
+            const categories = {};
+            allPermissions.forEach(perm => {
+                const category = perm.category || perm.name.split(':')[0] || 'general';
+                if (!categories[category]) {
+                    categories[category] = [];
+                }
+                categories[category].push(perm);
+            });
+
+            container.innerHTML = Object.entries(categories).map(([category, perms]) => `
+                <div class="permission-category" data-category="${category}">
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="font-medium text-gray-900 capitalize">${category.replace(/_/g, ' ')}</h4>
+                        <button onclick="toggleCategory('${category}')" class="text-xs text-blue-600 hover:underline">Toggle All</button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        ${perms.map(perm => `
+                            <label class="flex items-start p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer permission-item" data-name="${perm.name.toLowerCase()}" data-description="${(perm.description || '').toLowerCase()}">
+                                <input type="checkbox" class="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 permission-checkbox"
+                                    value="${perm.id || perm.name}"
+                                    data-category="${category}"
+                                    ${rolePermissions.some(p => (p.id || p.name || p) === (perm.id || perm.name)) ? 'checked' : ''}>
+                                <div class="ml-3">
+                                    <p class="text-sm font-medium text-gray-900">${perm.name}</p>
+                                    <p class="text-xs text-gray-500">${perm.description || ''}</p>
+                                </div>
+                            </label>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updatePermissionCheckboxes() {
+            document.querySelectorAll('.permission-checkbox').forEach(checkbox => {
+                checkbox.checked = rolePermissions.some(p =>
+                    (p.id || p.name || p) === checkbox.value
+                );
+            });
+        }
+
+        function filterPermissions(e) {
+            const query = e.target.value.toLowerCase();
+            document.querySelectorAll('.permission-item').forEach(item => {
+                const name = item.dataset.name;
+                const description = item.dataset.description;
+                const matches = name.includes(query) || description.includes(query);
+                item.style.display = matches ? '' : 'none';
+            });
+
+            // Hide empty categories
+            document.querySelectorAll('.permission-category').forEach(cat => {
+                const visibleItems = cat.querySelectorAll('.permission-item[style=""], .permission-item:not([style])');
+                cat.style.display = visibleItems.length > 0 ? '' : 'none';
+            });
+        }
+
+        function selectAll() {
+            document.querySelectorAll('.permission-checkbox').forEach(cb => cb.checked = true);
+        }
+
+        function deselectAll() {
+            document.querySelectorAll('.permission-checkbox').forEach(cb => cb.checked = false);
+        }
+
+        function toggleCategory(category) {
+            const checkboxes = document.querySelectorAll(`.permission-checkbox[data-category="${category}"]`);
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            checkboxes.forEach(cb => cb.checked = !allChecked);
+        }
+
+        async function loadRoleUsers() {
+            try {
+                const res = await api.request(`/api/rbac/roles/${roleId}/users`);
+                const users = res.users || res || [];
+                const container = document.getElementById('roleUsers');
+
+                if (users.length === 0) {
+                    container.innerHTML = '<p class="text-sm text-gray-500">No users have this role</p>';
+                    return;
+                }
+
+                container.innerHTML = users.slice(0, 5).map(user => `
+                    <div class="flex items-center p-2 bg-gray-50 rounded-lg">
+                        <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-3">
+                            <span class="text-blue-600 text-xs font-medium">${(user.first_name?.[0] || user.username[0]).toUpperCase()}</span>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-gray-900 truncate">${user.first_name || ''} ${user.last_name || user.username}</p>
+                            <p class="text-xs text-gray-500 truncate">${user.email}</p>
+                        </div>
+                    </div>
+                `).join('') + (users.length > 5 ? `
+                    <p class="text-sm text-gray-500 mt-2">+ ${users.length - 5} more users</p>
+                ` : '');
+            } catch (error) {
+                document.getElementById('roleUsers').innerHTML = '<p class="text-sm text-gray-500">Failed to load users</p>';
+            }
+        }
+
+        async function saveRole() {
+            const name = document.getElementById('roleName').value;
+            const description = document.getElementById('roleDescription').value;
+
+            if (!name) {
+                Toast.error('Role name is required');
+                return;
+            }
+
+            // Collect selected permissions
+            const selectedPermissions = Array.from(document.querySelectorAll('.permission-checkbox:checked'))
+                .map(cb => cb.value);
+
+            try {
+                if (roleId) {
+                    // Update existing role
+                    await api.updateRole(roleId, { name, description });
+
+                    // Update permissions
+                    await api.request(`/api/rbac/roles/${roleId}/permissions`, {
+                        method: 'PUT',
+                        body: JSON.stringify({ permissions: selectedPermissions })
+                    });
+
+                    Toast.success('Role updated successfully');
+                } else {
+                    // Create new role
+                    const newRole = await api.createRole({ name, description, permissions: selectedPermissions });
+                    roleId = newRole.id;
+
+                    Toast.success('Role created successfully');
+                    window.history.replaceState({}, '', `?id=${roleId}`);
+                }
+            } catch (error) {
+                Toast.error(error.message || 'Failed to save role');
+            }
+        }
+
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - LanaAI</title>
+  <script src="js/tailwind-loader.js"></script>
+  <script src="js/error-reporter.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/mock-data.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/components.js"></script>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+  <div class="w-full max-w-md">
+    <!-- Logo -->
+    <div class="text-center mb-8">
+      <h1 class="text-4xl font-bold text-indigo-600">LanaAI</h1>
+      <p class="text-gray-600 mt-2">Legal Document Intelligence Platform</p>
+    </div>
+
+    <!-- Login Card -->
+    <div class="bg-white rounded-2xl shadow-xl p-8">
+      <!-- Step 1: Organization Discovery -->
+      <div id="step1" class="step-content">
+        <h2 class="text-2xl font-semibold text-gray-900 mb-6">Connect to your organization</h2>
+
+        <form id="discoveryForm" class="space-y-5">
+          <div>
+            <label for="orgId" class="block text-sm font-medium text-gray-700 mb-1">Organization ID</label>
+            <input type="text" id="orgId" name="orgId" required
+              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+              placeholder="your-organization-id">
+            <p class="text-xs text-gray-500 mt-1">Provided by your administrator</p>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label for="serverUrl" class="block text-sm font-medium text-gray-700">Server URL</label>
+              <button type="button" id="toggleCustomUrl" class="text-xs text-indigo-600 hover:text-indigo-500 font-medium">
+                Use custom URL
+              </button>
+            </div>
+            <input type="text" id="serverUrl" name="serverUrl" required readonly
+              class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 transition-colors"
+              placeholder="your-org-id.lanaai.io">
+            <p id="serverUrlHint" class="text-xs text-gray-500 mt-1">Auto-generated from Organization ID</p>
+          </div>
+
+          <!-- Development Mode API Override -->
+          <div id="devApiOverrideContainer" class="hidden">
+            <label for="devApiOverride" class="block text-sm font-medium text-orange-700 mb-1">
+              API Override (Development Only)
+            </label>
+            <input type="text" id="devApiOverride" name="devApiOverride"
+              class="w-full px-4 py-3 border border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-orange-50"
+              placeholder="http://localhost:8080 or https://192.168.1.100:8080">
+            <p class="text-xs text-orange-600 mt-1 font-medium">
+              ⚠️ Only available in development mode. If you're in production and seeing this, do not touch this field.
+            </p>
+          </div>
+
+          <button type="submit" id="connectBtn"
+            class="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+            Connect
+          </button>
+        </form>
+      </div>
+
+      <!-- Step 2: Sign In (hidden initially) -->
+      <div id="step2" class="step-content hidden">
+        <!-- Organization Info Banner -->
+        <div id="orgBanner" class="mb-6 p-4 bg-indigo-50 rounded-lg border border-indigo-100">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm font-medium text-indigo-900" id="connectedOrgName">Organization Name</p>
+              <p class="text-xs text-indigo-600" id="connectedServerUrl">server.url:8080</p>
+            </div>
+            <button type="button" id="changeOrgBtn" class="text-xs text-indigo-600 hover:text-indigo-500 font-medium">
+              Change
+            </button>
+          </div>
+        </div>
+
+        <h2 class="text-2xl font-semibold text-gray-900 mb-6">Sign in to your account</h2>
+
+        <form id="loginForm" class="space-y-5">
+          <div>
+            <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email address</label>
+            <input type="email" id="email" name="email" required
+              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+              placeholder="you@example.com">
+          </div>
+
+          <div>
+            <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <div class="relative">
+              <input type="password" id="password" name="password" required minlength="8"
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                placeholder="Enter your password">
+              <button type="button" id="togglePassword" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- MFA Token (hidden by default) -->
+          <div id="mfaField" class="hidden">
+            <label for="mfaToken" class="block text-sm font-medium text-gray-700 mb-1">MFA Code</label>
+            <input type="text" id="mfaToken" name="mfaToken" maxlength="6" pattern="[0-9]{6}"
+              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-center text-2xl tracking-widest"
+              placeholder="000000">
+            <p class="text-sm text-gray-500 mt-1">Enter the 6-digit code from your authenticator app</p>
+          </div>
+
+          <div class="flex items-center justify-between">
+            <label class="flex items-center">
+              <input type="checkbox" id="rememberMe" class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+              <span class="ml-2 text-sm text-gray-600">Remember me</span>
+            </label>
+            <a href="password-reset-request.html" class="text-sm text-indigo-600 hover:text-indigo-500">Forgot password?</a>
+          </div>
+
+          <button type="submit" id="submitBtn"
+            class="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+            Sign in
+          </button>
+        </form>
+
+        <div class="mt-6 text-center">
+          <p class="text-sm text-gray-600">
+            Need to activate your account?
+            <a href="activate.html" class="text-indigo-600 hover:text-indigo-500 font-medium">Activate here</a>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <p class="text-center text-gray-500 text-sm mt-8">
+      &copy; 2024 LanaAI. All rights reserved.
+    </p>
+    <p id="app-version" class="text-center text-gray-400 text-xs mt-2"></p>
+  </div>
+
+  <script>
+    // Set app version from config
+    document.getElementById('app-version').textContent = 'v' + (window.LanaConfig?.APP_VERSION || '2.0.0');
+
+    // Hosted discovery endpoint
+    const HOSTED_DISCOVERY_URL = 'https://www.redroostertec.com/lana-ai/v1/discovery';
+
+    // Check if development mode is enabled (Electron or config.js)
+    let isDevelopmentMode = window.LanaConfig?.DEVELOPMENT_MODE || false;
+    const devApiOverrideContainer = document.getElementById('devApiOverrideContainer');
+
+    // For Electron: Check if NODE_ENV=development was passed
+    if (window.electronAPI) {
+      window.electronAPI.getConfig().then(config => {
+        if (config.isDevelopment) {
+          isDevelopmentMode = true;
+          devApiOverrideContainer.classList.remove('hidden');
+          console.warn('[Login] 🔧 Development mode enabled (NODE_ENV=development) - API override field is available');
+        }
+      });
+    } else if (isDevelopmentMode) {
+      // Browser mode: Check config.js setting
+      devApiOverrideContainer.classList.remove('hidden');
+      console.warn('[Login] 🔧 Development mode enabled (config.js) - API override field is available');
+    }
+
+    // Check if already logged in
+    if (api.isAuthenticated()) {
+      window.location.href = 'index.html';
+    }
+
+    // DOM Elements - Step 1 (Discovery)
+    const step1 = document.getElementById('step1');
+    const step2 = document.getElementById('step2');
+    const discoveryForm = document.getElementById('discoveryForm');
+    const orgIdInput = document.getElementById('orgId');
+    const serverUrlInput = document.getElementById('serverUrl');
+    const devApiOverrideInput = document.getElementById('devApiOverride');
+    const toggleCustomUrlBtn = document.getElementById('toggleCustomUrl');
+    const serverUrlHint = document.getElementById('serverUrlHint');
+    const connectBtn = document.getElementById('connectBtn');
+
+    // DOM Elements - Step 2 (Login)
+    const loginForm = document.getElementById('loginForm');
+    const mfaField = document.getElementById('mfaField');
+    const submitBtn = document.getElementById('submitBtn');
+    const togglePassword = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('password');
+    const emailInput = document.getElementById('email');
+    const rememberMeCheckbox = document.getElementById('rememberMe');
+    const changeOrgBtn = document.getElementById('changeOrgBtn');
+    const connectedOrgName = document.getElementById('connectedOrgName');
+    const connectedServerUrl = document.getElementById('connectedServerUrl');
+
+    // State
+    let mfaRequired = false;
+    let isCustomUrl = false;
+    let resolvedServerInfo = null;
+
+    /**
+     * Generate default server URL from org ID
+     */
+    function generateServerUrl(orgId) {
+      if (!orgId) return '';
+      return `${orgId.trim().toLowerCase()}.lanaai.io`;
+    }
+
+    /**
+     * Update server URL field based on org ID (if not using custom URL)
+     */
+    function updateServerUrl() {
+      if (!isCustomUrl) {
+        serverUrlInput.value = generateServerUrl(orgIdInput.value);
+      }
+    }
+
+    /**
+     * Toggle between auto-generated and custom URL mode
+     */
+    function toggleCustomUrlMode() {
+      isCustomUrl = !isCustomUrl;
+
+      if (isCustomUrl) {
+        // Enable custom URL editing
+        serverUrlInput.readOnly = false;
+        serverUrlInput.classList.remove('bg-gray-50', 'text-gray-600');
+        serverUrlInput.classList.add('bg-white', 'text-gray-900', 'focus:ring-2', 'focus:ring-indigo-500', 'focus:border-indigo-500');
+        toggleCustomUrlBtn.textContent = 'Use default URL';
+        serverUrlHint.textContent = 'Enter your custom server URL (e.g., 192.168.1.100:8080)';
+        serverUrlInput.placeholder = 'custom-server.example.com or 192.168.1.100:8080';
+      } else {
+        // Revert to auto-generated URL
+        serverUrlInput.readOnly = true;
+        serverUrlInput.classList.add('bg-gray-50', 'text-gray-600');
+        serverUrlInput.classList.remove('bg-white', 'text-gray-900', 'focus:ring-2', 'focus:ring-indigo-500', 'focus:border-indigo-500');
+        toggleCustomUrlBtn.textContent = 'Use custom URL';
+        serverUrlHint.textContent = 'Auto-generated from Organization ID';
+        serverUrlInput.placeholder = 'your-org-id.lanaai.io';
+        updateServerUrl();
+      }
+    }
+
+    /**
+     * Show Step 1 (Discovery)
+     */
+    function showStep1() {
+      step1.classList.remove('hidden');
+      step2.classList.add('hidden');
+      resolvedServerInfo = null;
+    }
+
+    /**
+     * Show Step 2 (Login) with resolved server info
+     */
+    function showStep2(serverInfo) {
+      resolvedServerInfo = serverInfo;
+      step1.classList.add('hidden');
+      step2.classList.remove('hidden');
+
+      // Update the organization banner
+      connectedOrgName.textContent = serverInfo.orgName || serverInfo.orgId;
+      connectedServerUrl.textContent = `${serverInfo.staticIp}:${serverInfo.port}`;
+
+      // Focus on email input
+      emailInput.focus();
+    }
+
+    // Listen for org ID changes to update server URL
+    orgIdInput.addEventListener('input', updateServerUrl);
+
+    // Toggle custom URL mode
+    toggleCustomUrlBtn.addEventListener('click', toggleCustomUrlMode);
+
+    // Change organization button - clears saved server and shows Step 1
+    changeOrgBtn.addEventListener('click', () => {
+      localStorage.removeItem('lana_saved_server');
+      showStep1();
+    });
+
+    // Restore remembered credentials on page load
+    const rememberedEmail = localStorage.getItem('lana_remembered_email');
+    const rememberedOrgId = localStorage.getItem('lana_remembered_org_id');
+    const rememberedServerUrl = localStorage.getItem('lana_remembered_server_url');
+    const rememberedIsCustomUrl = localStorage.getItem('lana_remembered_is_custom_url') === 'true';
+
+    if (rememberedEmail) {
+      emailInput.value = rememberedEmail;
+      rememberMeCheckbox.checked = true;
+    }
+    if (rememberedOrgId) {
+      orgIdInput.value = rememberedOrgId;
+    }
+    if (rememberedIsCustomUrl && rememberedServerUrl) {
+      isCustomUrl = true;
+      toggleCustomUrlMode(); // This will toggle to custom mode
+      serverUrlInput.value = rememberedServerUrl;
+    } else {
+      updateServerUrl(); // Generate default URL from org ID
+    }
+
+    // Check if we have a saved server connection - if so, skip to Step 2
+    const savedServerJson = localStorage.getItem('lana_saved_server');
+    if (savedServerJson) {
+      try {
+        const savedServer = JSON.parse(savedServerJson);
+        if (savedServer && savedServer.url && savedServer.orgId) {
+          console.log('[Login] Found saved server, skipping to Step 2:', savedServer.orgName || savedServer.orgId);
+          // Set the API base URL
+          api.baseUrl = savedServer.url;
+          // Show Step 2 directly
+          showStep2(savedServer);
+        }
+      } catch (e) {
+        console.warn('[Login] Failed to parse saved server:', e);
+        localStorage.removeItem('lana_saved_server');
+      }
+    }
+
+    // Toggle password visibility
+    togglePassword.addEventListener('click', () => {
+      const type = passwordInput.type === 'password' ? 'text' : 'password';
+      passwordInput.type = type;
+    });
+
+    /**
+     * Extract domain from server URL (removes protocol and port)
+     */
+    function extractDomain(url) {
+      let domain = url.trim();
+      // Remove protocol
+      domain = domain.replace(/^https?:\/\//, '');
+      // Remove port
+      domain = domain.split(':')[0];
+      // Remove trailing slashes and paths
+      domain = domain.split('/')[0];
+      return domain;
+    }
+
+    /**
+     * Resolve organization via hosted discovery endpoint
+     * Sends org_id + domain for validation
+     * Uses static_ip, port, and is_secure_ssl from response to build API URL
+     * (domain in response is just for reference, not used to construct URL)
+     */
+    async function resolveOrganization(orgId, serverUrl) {
+      const domain = extractDomain(serverUrl);
+
+      try {
+        const response = await fetch(HOSTED_DISCOVERY_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            org_id: orgId,
+            domain: domain
+          })
+        });
+
+        const data = await response.json();
+
+        // Handle different response statuses
+        if (response.status === 400) {
+          // Validation error
+          const details = data.details ? data.details.join(', ') : data.error;
+          throw new Error(`Invalid request: ${details}`);
+        }
+
+        if (response.status === 404) {
+          // Not found or inactive
+          throw new Error(data.error || 'Organization not found or inactive');
+        }
+
+        if (response.status === 500) {
+          throw new Error('Discovery service error. Please try again later.');
+        }
+
+        if (!response.ok || data.status !== 'healthy') {
+          throw new Error(data.error || 'Organization not available');
+        }
+
+        // Determine protocol based on is_secure_ssl flag
+        const isSecure = data.discovery.is_secure_ssl === true;
+        const protocol = isSecure ? 'https' : 'http';
+        const apiUrl = `${protocol}://${data.discovery.static_ip}:${data.discovery.port}`;
+
+        // Extract VPN info if available
+        const vpnInfo = data.discovery.vpn || null;
+
+        return {
+          url: apiUrl,
+          orgId: data.server.org_id,
+          orgName: data.server.org_name,
+          version: data.server.version,
+          apiVersion: data.server.api_version,
+          domain: data.domain,
+          staticIp: data.discovery.static_ip,
+          port: data.discovery.port,
+          isSecure: isSecure,
+          vpn: vpnInfo  // Include VPN configuration from discovery
+        };
+      } catch (error) {
+        if (error.message === 'Failed to fetch') {
+          throw new Error('Unable to reach discovery service. Please check your internet connection.');
+        }
+        throw error;
+      }
+    }
+
+    /**
+     * Verify the resolved server is actually reachable
+     * Returns: boolean (true if server is healthy and reachable)
+     */
+    async function verifyServer(serverUrl) {
+      try {
+        const response = await fetch(`${serverUrl}/api/health/discovery`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(5000) // 5 second timeout
+        });
+
+        if (!response.ok) {
+          return false;
+        }
+
+        const data = await response.json();
+        return data.status === 'healthy';
+      } catch (error) {
+        console.warn('[Login] Server verification failed:', error.message);
+        return false;
+      }
+    }
+
+    /**
+     * Step 1: Discovery Form Submit Handler
+     */
+    discoveryForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const orgId = orgIdInput.value.trim().toLowerCase();
+      const serverUrl = serverUrlInput.value.trim();
+
+      if (!orgId) {
+        Toast.error('Organization ID is required');
+        return;
+      }
+
+      if (!serverUrl) {
+        Toast.error('Server URL is required');
+        return;
+      }
+
+      connectBtn.disabled = true;
+      connectBtn.innerHTML = `
+        <span class="flex items-center justify-center">
+          <svg class="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Looking up organization...
+        </span>
+      `;
+
+      try {
+        // Call hosted discovery to get static_ip and port
+        let serverInfo = await resolveOrganization(orgId, serverUrl);
+
+        // Development mode: Override API URL if provided
+        const devApiOverride = devApiOverrideInput.value.trim();
+        // Check field visibility (ensures dev mode is on) and that field has value
+        const isDevFieldVisible = !devApiOverrideContainer.classList.contains('hidden');
+        if (isDevFieldVisible && devApiOverride) {
+          console.warn('[Login] 🔧 Development mode: Overriding API URL');
+          console.warn('[Login] Original URL:', serverInfo.url);
+          console.warn('[Login] Override URL:', devApiOverride);
+
+          // Parse the override URL to extract components
+          const overrideUrl = new URL(devApiOverride);
+          serverInfo.url = devApiOverride;
+          serverInfo.staticIp = overrideUrl.hostname;
+          serverInfo.port = overrideUrl.port || (overrideUrl.protocol === 'https:' ? '443' : '80');
+          serverInfo.isSecure = overrideUrl.protocol === 'https:';
+        }
+
+        console.log('[Login] Organization resolved:', {
+          orgId: serverInfo.orgId,
+          orgName: serverInfo.orgName,
+          apiUrl: serverInfo.url,
+          staticIp: serverInfo.staticIp,
+          port: serverInfo.port
+        });
+
+        // Verify the resolved server is reachable
+        connectBtn.innerHTML = `
+          <span class="flex items-center justify-center">
+            <svg class="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Connecting to server...
+          </span>
+        `;
+
+        const isReachable = await verifyServer(serverInfo.url);
+
+        if (!isReachable) {
+          // Server not reachable - check if VPN is available from discovery
+          if (serverInfo.vpn && serverInfo.vpn.enabled) {
+            // VPN is available! Redirect to setup page
+            const serverInfoEncoded = btoa(JSON.stringify(serverInfo));
+            window.location.href = `vpn-setup.html?server=${encodeURIComponent(serverInfoEncoded)}`;
+            return;
+          }
+
+          // No VPN available - just show error
+          throw new Error(`Unable to reach server at ${serverInfo.staticIp}:${serverInfo.port}. Please check your network connection or contact your administrator.`);
+        }
+
+        // Set the API base URL
+        api.baseUrl = serverInfo.url;
+        console.log('[Login] Connected to server:', serverInfo.url);
+
+        // Save server connection to localStorage (persists across sessions)
+        localStorage.setItem('lana_saved_server', JSON.stringify(serverInfo));
+        console.log('[Login] Server connection saved to localStorage');
+
+        // Save server info for Electron (if running in Electron)
+        if (window.electronAPI) {
+          await window.electronAPI.saveSettings({
+            url: serverInfo.url,
+            orgId: serverInfo.orgId,
+            orgName: serverInfo.orgName,
+            version: serverInfo.version,
+            apiVersion: serverInfo.apiVersion,
+            domain: serverInfo.domain,
+            host: serverInfo.staticIp,
+            port: serverInfo.port
+          });
+        }
+
+        Toast.success(`Connected to ${serverInfo.orgName || serverInfo.orgId}`);
+
+        // Show Step 2 (Login)
+        showStep2(serverInfo);
+
+      } catch (error) {
+        Toast.error(error.message || 'Failed to connect to organization.');
+      } finally {
+        connectBtn.disabled = false;
+        connectBtn.textContent = 'Connect';
+      }
+    });
+
+    /**
+     * Step 2: Login Form Submit Handler
+     */
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      if (!resolvedServerInfo) {
+        Toast.error('Please connect to an organization first');
+        showStep1();
+        return;
+      }
+
+      const email = emailInput.value.trim();
+      const password = passwordInput.value;
+      const mfaToken = document.getElementById('mfaToken').value;
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `
+        <span class="flex items-center justify-center">
+          <svg class="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Signing in...
+        </span>
+      `;
+
+      try {
+        await api.login(email, password, mfaToken || null);
+
+        // Save or clear remembered credentials based on checkbox
+        if (rememberMeCheckbox.checked) {
+          localStorage.setItem('lana_remembered_email', email);
+          localStorage.setItem('lana_remembered_org_id', orgIdInput.value.trim().toLowerCase());
+          localStorage.setItem('lana_remembered_server_url', serverUrlInput.value.trim());
+          localStorage.setItem('lana_remembered_is_custom_url', isCustomUrl.toString());
+        } else {
+          localStorage.removeItem('lana_remembered_email');
+          localStorage.removeItem('lana_remembered_org_id');
+          localStorage.removeItem('lana_remembered_server_url');
+          localStorage.removeItem('lana_remembered_is_custom_url');
+        }
+
+        Toast.success('Login successful! Redirecting...');
+        setTimeout(() => {
+          window.location.href = 'index.html';
+        }, 500);
+      } catch (error) {
+        if (error.message === 'MFA token required') {
+          mfaRequired = true;
+          mfaField.classList.remove('hidden');
+          document.getElementById('mfaToken').focus();
+          Toast.info('Please enter your MFA code');
+        } else {
+          Toast.error(error.message || 'Login failed. Please check your credentials.');
+        }
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Sign in';
+      }
+    });
+  </script>
+</body>
+</html>

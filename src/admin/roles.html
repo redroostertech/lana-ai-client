@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Roles & Permissions - LanaAI</title>
+  <script src="../js/tailwind-loader.js"></script>
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/notifications.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <!-- Sidebar -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
+    <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
+      <a href="../index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
+      <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
+      <!-- Menu will be dynamically rendered by menu.js -->
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="lg:ml-64">
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
+      <div class="flex items-center justify-between h-16 px-4 lg:px-8">
+        <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+        <div class="flex-1 px-4 lg:px-0">
+          <h1 class="text-xl font-semibold text-gray-900">Roles & Permissions</h1>
+        </div>
+        <div class="flex items-center gap-4">
+          <!-- Notifications -->
+          <button id="notificationBtn" class="relative text-gray-500 hover:text-gray-700">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+            </svg>
+            <span id="notificationBadge" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">0</span>
+          </button>
+
+          <!-- User Menu -->
+          <div class="relative" id="userMenu">
+            <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900">
+              <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                <span id="userInitials" class="text-sm font-medium text-indigo-600">U</span>
+              </div>
+              <span id="userName" class="hidden sm:block text-sm font-medium">User</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            </button>
+            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+              <a href="../settings.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
+              <hr class="my-1">
+              <button id="logoutBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sign out</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Notification Panel Overlay -->
+    <div id="notificationOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
+
+    <!-- Notification Slide-out Panel -->
+    <div id="notificationPanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
+      <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
+        <h2 class="text-lg font-semibold text-gray-900">Notifications</h2>
+        <div class="flex items-center gap-3">
+          <button id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium hidden">Mark all read</button>
+          <button id="refreshNotificationsBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+          </button>
+          <button id="closeNotificationPanel" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+      </div>
+      <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
+        <button id="filterAll" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">All</button>
+        <button id="filterUnread" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Unread</button>
+      </div>
+      <div id="notificationList" class="flex-1 overflow-y-auto">
+        <div id="notificationLoading" class="p-8 text-center">
+          <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+          <p class="text-gray-500 mt-3 text-sm">Loading notifications...</p>
+        </div>
+      </div>
+      <div id="notificationLoadingMore" class="hidden p-4 border-t border-gray-100 text-center flex-shrink-0">
+        <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+      </div>
+    </div>
+
+    <main class="p-4 lg:p-8">
+      <!-- Tabs -->
+      <div class="border-b border-gray-200 mb-6">
+        <nav class="flex gap-8">
+          <button id="tabRoles" class="tab-btn pb-4 px-1 border-b-2 border-indigo-500 text-indigo-600 font-medium">Roles</button>
+          <button id="tabPermissions" class="tab-btn pb-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium">Permissions</button>
+        </nav>
+      </div>
+
+      <!-- Roles Tab Content -->
+      <div id="rolesContent">
+        <div class="flex justify-between items-center mb-6">
+          <p class="text-gray-600">Manage roles and their associated permissions.</p>
+          <button id="createRoleBtn" class="hidden px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+            Create Role
+          </button>
+        </div>
+
+        <!-- Roles Loading Skeleton -->
+        <div id="rolesLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 animate-pulse">
+            <div class="flex items-start justify-between mb-4">
+              <div><div class="h-5 bg-gray-200 rounded w-32 mb-2"></div><div class="h-4 bg-gray-200 rounded w-40"></div></div>
+              <div class="h-6 bg-gray-200 rounded w-16"></div>
+            </div>
+            <div class="flex items-center justify-between"><div class="h-4 bg-gray-200 rounded w-24"></div><div class="flex gap-2"><div class="h-4 bg-gray-200 rounded w-10"></div><div class="h-4 bg-gray-200 rounded w-10"></div></div></div>
+          </div>
+          <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 animate-pulse">
+            <div class="flex items-start justify-between mb-4">
+              <div><div class="h-5 bg-gray-200 rounded w-28 mb-2"></div><div class="h-4 bg-gray-200 rounded w-36"></div></div>
+              <div class="h-6 bg-gray-200 rounded w-16"></div>
+            </div>
+            <div class="flex items-center justify-between"><div class="h-4 bg-gray-200 rounded w-24"></div><div class="flex gap-2"><div class="h-4 bg-gray-200 rounded w-10"></div><div class="h-4 bg-gray-200 rounded w-10"></div></div></div>
+          </div>
+          <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 animate-pulse">
+            <div class="flex items-start justify-between mb-4">
+              <div><div class="h-5 bg-gray-200 rounded w-24 mb-2"></div><div class="h-4 bg-gray-200 rounded w-32"></div></div>
+              <div class="h-6 bg-gray-200 rounded w-16"></div>
+            </div>
+            <div class="flex items-center justify-between"><div class="h-4 bg-gray-200 rounded w-24"></div><div class="flex gap-2"><div class="h-4 bg-gray-200 rounded w-10"></div><div class="h-4 bg-gray-200 rounded w-10"></div></div></div>
+          </div>
+        </div>
+
+        <div id="rolesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 hidden">
+          <!-- Roles will be loaded here -->
+        </div>
+      </div>
+
+      <!-- Permissions Tab Content -->
+      <div id="permissionsContent" class="hidden">
+        <p class="text-gray-600 mb-6">Available system permissions that can be assigned to roles.</p>
+
+        <!-- Permissions Loading Skeleton -->
+        <div id="permissionsLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 animate-pulse">
+            <div class="h-5 bg-gray-200 rounded w-24 mb-3"></div>
+            <div class="space-y-2">
+              <div class="flex items-center gap-2"><div class="w-2 h-2 bg-gray-200 rounded-full"></div><div class="h-4 bg-gray-200 rounded w-28"></div></div>
+              <div class="flex items-center gap-2"><div class="w-2 h-2 bg-gray-200 rounded-full"></div><div class="h-4 bg-gray-200 rounded w-32"></div></div>
+              <div class="flex items-center gap-2"><div class="w-2 h-2 bg-gray-200 rounded-full"></div><div class="h-4 bg-gray-200 rounded w-24"></div></div>
+            </div>
+          </div>
+          <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 animate-pulse">
+            <div class="h-5 bg-gray-200 rounded w-20 mb-3"></div>
+            <div class="space-y-2">
+              <div class="flex items-center gap-2"><div class="w-2 h-2 bg-gray-200 rounded-full"></div><div class="h-4 bg-gray-200 rounded w-24"></div></div>
+              <div class="flex items-center gap-2"><div class="w-2 h-2 bg-gray-200 rounded-full"></div><div class="h-4 bg-gray-200 rounded w-28"></div></div>
+            </div>
+          </div>
+          <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 animate-pulse">
+            <div class="h-5 bg-gray-200 rounded w-28 mb-3"></div>
+            <div class="space-y-2">
+              <div class="flex items-center gap-2"><div class="w-2 h-2 bg-gray-200 rounded-full"></div><div class="h-4 bg-gray-200 rounded w-32"></div></div>
+              <div class="flex items-center gap-2"><div class="w-2 h-2 bg-gray-200 rounded-full"></div><div class="h-4 bg-gray-200 rounded w-20"></div></div>
+              <div class="flex items-center gap-2"><div class="w-2 h-2 bg-gray-200 rounded-full"></div><div class="h-4 bg-gray-200 rounded w-28"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="permissionsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 hidden">
+          <!-- Permissions will be loaded here -->
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Role Modal -->
+  <div id="roleModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <h3 id="roleModalTitle" class="text-lg font-semibold text-gray-900">Create Role</h3>
+        <button id="closeRoleModal" class="text-gray-400 hover:text-gray-600">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <form id="roleForm" class="p-6 space-y-4">
+        <input type="hidden" id="roleId">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Role Name</label>
+          <input type="text" id="roleName" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+          <textarea id="roleDescription" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></textarea>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Level (1-100, higher = more privileges)</label>
+          <input type="number" id="roleLevel" min="1" max="100" value="1" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-3">Permissions</label>
+          <div id="permissionCheckboxes" class="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-3">
+            <!-- Permission checkboxes will be loaded here -->
+          </div>
+        </div>
+        <div class="flex justify-end gap-3 pt-4">
+          <button type="button" id="cancelRoleBtn" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">Cancel</button>
+          <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg">Save Role</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Role Details Modal -->
+  <div id="roleDetailsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-900">Role Details</h3>
+        <button id="closeRoleDetails" class="text-gray-400 hover:text-gray-600">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <div id="roleDetailsContent" class="p-6">
+        <!-- Details will be loaded here -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    if (!api.requireAuth()) throw new Error('Not authenticated');
+    
+    // Load full user profile with roles before rendering menu
+    (async () => {
+      try {
+        await api.loadUserProfile();
+      } catch (error) {
+        console.error('Failed to load user profile:', error);
+      }
+      
+      // Render dynamic menu (will now have access to roles)
+      renderMenu('#mainNav');
+    })();
+
+    // Initialize notifications panel
+    NotificationPanel.init();
+
+    // Load user info
+    function loadUserInfo() {
+      const user = api.user;
+      if (user) {
+        const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+        const initials = (user.firstName?.[0] || '') + (user.lastName?.[0] || '') || user.email[0].toUpperCase();
+        document.getElementById('userName').textContent = name;
+        document.getElementById('userInitials').textContent = initials;
+      }
+    }
+    loadUserInfo();
+
+    // User menu toggle
+    const userMenu = document.getElementById('userMenu');
+    const userDropdown = document.getElementById('userDropdown');
+    userMenu.addEventListener('click', (e) => {
+      e.stopPropagation();
+      userDropdown.classList.toggle('hidden');
+    });
+    document.addEventListener('click', (e) => {
+      if (!userMenu.contains(e.target)) userDropdown.classList.add('hidden');
+    });
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      await api.logout();
+      window.location.href = '../login.html';
+    });
+
+    // Sidebar toggle
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('openSidebar').addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+    document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+
+    // Tab switching
+    const tabRoles = document.getElementById('tabRoles');
+    const tabPermissions = document.getElementById('tabPermissions');
+    const rolesContent = document.getElementById('rolesContent');
+    const permissionsContent = document.getElementById('permissionsContent');
+
+    tabRoles.addEventListener('click', () => {
+      tabRoles.classList.add('border-indigo-500', 'text-indigo-600');
+      tabRoles.classList.remove('border-transparent', 'text-gray-500');
+      tabPermissions.classList.remove('border-indigo-500', 'text-indigo-600');
+      tabPermissions.classList.add('border-transparent', 'text-gray-500');
+      rolesContent.classList.remove('hidden');
+      permissionsContent.classList.add('hidden');
+    });
+
+    tabPermissions.addEventListener('click', () => {
+      tabPermissions.classList.add('border-indigo-500', 'text-indigo-600');
+      tabPermissions.classList.remove('border-transparent', 'text-gray-500');
+      tabRoles.classList.remove('border-indigo-500', 'text-indigo-600');
+      tabRoles.classList.add('border-transparent', 'text-gray-500');
+      permissionsContent.classList.remove('hidden');
+      rolesContent.classList.add('hidden');
+    });
+
+    // State
+    let roles = [];
+    let permissions = [];
+
+    // Loading states
+    function showRolesLoading() {
+      document.getElementById('rolesLoading').classList.remove('hidden');
+      document.getElementById('rolesGrid').classList.add('hidden');
+    }
+
+    function hideRolesLoading() {
+      document.getElementById('rolesLoading').classList.add('hidden');
+      document.getElementById('rolesGrid').classList.remove('hidden');
+    }
+
+    function showPermissionsLoading() {
+      document.getElementById('permissionsLoading').classList.remove('hidden');
+      document.getElementById('permissionsGrid').classList.add('hidden');
+    }
+
+    function hidePermissionsLoading() {
+      document.getElementById('permissionsLoading').classList.add('hidden');
+      document.getElementById('permissionsGrid').classList.remove('hidden');
+    }
+
+    // Load roles
+    async function loadRoles() {
+      const grid = document.getElementById('rolesGrid');
+      showRolesLoading();
+      try {
+        const result = await api.getRoles();
+        roles = result.roles || [];
+        hideRolesLoading();
+
+        grid.innerHTML = roles.map(role => `
+          <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+            <div class="flex items-start justify-between mb-4">
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900">${role.name}</h3>
+                <p class="text-sm text-gray-500 mt-1">${role.description || 'No description'}</p>
+              </div>
+              <span class="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs font-medium rounded">Level ${role.level || 1}</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-500">${(role.permissions?.length || role.permission_count || 0)} permissions</span>
+              <div class="flex gap-2">
+                <button onclick="viewRole('${role.id}')" class="text-indigo-600 hover:text-indigo-800">View</button>
+                <button onclick="editRole('${role.id}')" class="text-indigo-600 hover:text-indigo-800">Edit</button>
+                ${!role.is_system ? `<button onclick="deleteRole('${role.id}')" class="text-red-600 hover:text-red-800">Delete</button>` : ''}
+              </div>
+            </div>
+          </div>
+        `).join('') || '<p class="text-gray-500 col-span-3 text-center py-8">No roles found</p>';
+      } catch (error) {
+        hideRolesLoading();
+        Toast.error('Failed to load roles');
+      }
+    }
+
+    // Load permissions
+    async function loadPermissions() {
+      const grid = document.getElementById('permissionsGrid');
+      const checkboxes = document.getElementById('permissionCheckboxes');
+      showPermissionsLoading();
+
+      try {
+        const result = await api.getPermissions();
+        permissions = result.permissions || [];
+        hidePermissionsLoading();
+
+        // Group by category
+        const grouped = permissions.reduce((acc, perm) => {
+          const category = perm.name.split(':')[0] || 'other';
+          if (!acc[category]) acc[category] = [];
+          acc[category].push(perm);
+          return acc;
+        }, {});
+
+        grid.innerHTML = Object.entries(grouped).map(([category, perms]) => `
+          <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+            <h4 class="font-medium text-gray-900 capitalize mb-3">${category}</h4>
+            <div class="space-y-2">
+              ${perms.map(p => `
+                <div class="flex items-center gap-2 text-sm">
+                  <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span class="text-gray-700">${p.name}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `).join('');
+
+        // Checkboxes for modal
+        checkboxes.innerHTML = permissions.map(p => `
+          <label class="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="permissions" value="${p.name}" class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+            ${p.name}
+          </label>
+        `).join('');
+      } catch (error) {
+        hidePermissionsLoading();
+        Toast.error('Failed to load permissions');
+      }
+    }
+
+    // Role modal
+    const roleModal = document.getElementById('roleModal');
+    const roleForm = document.getElementById('roleForm');
+
+    document.getElementById('createRoleBtn').addEventListener('click', () => {
+      document.getElementById('roleModalTitle').textContent = 'Create Role';
+      document.getElementById('roleId').value = '';
+      roleForm.reset();
+      roleModal.classList.remove('hidden');
+    });
+
+    document.getElementById('closeRoleModal').addEventListener('click', () => roleModal.classList.add('hidden'));
+    document.getElementById('cancelRoleBtn').addEventListener('click', () => roleModal.classList.add('hidden'));
+
+    // Edit role
+    async function editRole(roleId) {
+      try {
+        const result = await api.getRole(roleId);
+        const role = result.role;
+        document.getElementById('roleModalTitle').textContent = 'Edit Role';
+        document.getElementById('roleId').value = role.id;
+        document.getElementById('roleName').value = role.name;
+        document.getElementById('roleDescription').value = role.description || '';
+        document.getElementById('roleLevel').value = role.level || 1;
+
+        // Check permissions
+        const rolePerms = role.permissions || [];
+        document.querySelectorAll('input[name="permissions"]').forEach(cb => {
+          cb.checked = rolePerms.includes(cb.value);
+        });
+
+        roleModal.classList.remove('hidden');
+      } catch (error) {
+        Toast.error('Failed to load role');
+      }
+    }
+
+    // View role with inherited permissions
+    async function viewRole(roleId) {
+      const modal = document.getElementById('roleDetailsModal');
+      const content = document.getElementById('roleDetailsContent');
+
+      try {
+        const [roleResult, inheritedResult] = await Promise.all([
+          api.getRole(roleId),
+          api.getInheritedPermissions(roleId).catch(() => ({ permissions: { direct: [], inherited: [] } }))
+        ]);
+
+        const role = roleResult.role;
+        const directPerms = inheritedResult.permissions?.direct || role.permissions || [];
+        const inheritedPerms = inheritedResult.permissions?.inherited || [];
+
+        content.innerHTML = `
+          <div class="space-y-6">
+            <div>
+              <h4 class="text-xl font-semibold text-gray-900">${role.name}</h4>
+              <p class="text-gray-500 mt-1">${role.description || 'No description'}</p>
+              <div class="flex gap-4 mt-3">
+                <span class="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs font-medium rounded">Level ${role.level || 1}</span>
+                ${role.is_system ? '<span class="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded">System Role</span>' : ''}
+              </div>
+            </div>
+
+            <div>
+              <h5 class="font-medium text-gray-900 mb-2">Direct Permissions (${directPerms.length})</h5>
+              <div class="flex flex-wrap gap-2">
+                ${directPerms.length > 0 ? directPerms.map(p => `
+                  <span class="px-2 py-1 bg-green-100 text-green-700 text-xs rounded">${p}</span>
+                `).join('') : '<span class="text-gray-500 text-sm">None</span>'}
+              </div>
+            </div>
+
+            <div>
+              <h5 class="font-medium text-gray-900 mb-2">Inherited Permissions (${inheritedPerms.length})</h5>
+              <div class="flex flex-wrap gap-2">
+                ${inheritedPerms.length > 0 ? inheritedPerms.map(p => `
+                  <span class="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">${p}</span>
+                `).join('') : '<span class="text-gray-500 text-sm">None</span>'}
+              </div>
+            </div>
+          </div>
+        `;
+
+        modal.classList.remove('hidden');
+      } catch (error) {
+        Toast.error('Failed to load role details');
+      }
+    }
+
+    document.getElementById('closeRoleDetails').addEventListener('click', () => {
+      document.getElementById('roleDetailsModal').classList.add('hidden');
+    });
+
+    // Delete role
+    async function deleteRole(roleId) {
+      Modal.confirm('Delete Role', 'Are you sure you want to delete this role?', async () => {
+        try {
+          await api.deleteRole(roleId);
+          Toast.success('Role deleted');
+          loadRoles();
+        } catch (error) {
+          Toast.error(error.message);
+        }
+      });
+    }
+
+    // Form submission
+    roleForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const roleId = document.getElementById('roleId').value;
+      const data = {
+        name: document.getElementById('roleName').value,
+        description: document.getElementById('roleDescription').value,
+        level: parseInt(document.getElementById('roleLevel').value),
+        permissions: Array.from(document.querySelectorAll('input[name="permissions"]:checked')).map(cb => cb.value)
+      };
+
+      try {
+        if (roleId) {
+          await api.updateRole(roleId, data);
+          Toast.success('Role updated');
+        } else {
+          await api.createRole(data);
+          Toast.success('Role created');
+        }
+        roleModal.classList.add('hidden');
+        loadRoles();
+      } catch (error) {
+        Toast.error(error.message);
+      }
+    });
+
+    // Initialize
+    loadRoles();
+    loadPermissions();
+  </script>
+</body>
+</html>

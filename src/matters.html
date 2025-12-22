@@ -1,0 +1,2659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Matters - LanaAI</title>
+  <script src="js/tailwind-loader.js"></script>
+  <script src="js/error-reporter.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/mock-data.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/components.js"></script>
+  <script src="js/menu.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/activity.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <!-- Sidebar -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
+    <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
+      <a href="index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
+      <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <nav id="mainNav" class="flex-1 mt-6 px-3 overflow-hidden">
+      <!-- Menu will be dynamically rendered by menu.js -->
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="lg:ml-64">
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
+      <div class="flex items-center justify-between h-16 px-4 lg:px-8">
+        <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+
+        <div class="flex-1 px-4 lg:px-0">
+          <h1 class="text-xl font-semibold text-gray-900">Matters</h1>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <!-- Notifications -->
+          <button id="notificationBtn" class="relative text-gray-500 hover:text-gray-700">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+            </svg>
+            <span id="notificationBadge" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">0</span>
+          </button>
+
+          <!-- User Menu -->
+          <div class="relative" id="userMenu">
+            <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900">
+              <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                <span id="userInitials" class="text-sm font-medium text-indigo-600">U</span>
+              </div>
+              <span id="userName" class="hidden sm:block text-sm font-medium">User</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            </button>
+            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+              <a href="settings.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
+              <hr class="my-1">
+              <button id="logoutBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sign out</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Notification Panel Overlay -->
+    <div id="notificationOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
+
+    <!-- Notification Slide-out Panel -->
+    <div id="notificationPanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
+      <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
+        <h2 class="text-lg font-semibold text-gray-900">Notifications</h2>
+        <div class="flex items-center gap-3">
+          <button id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium hidden">Mark all read</button>
+          <button id="refreshNotificationsBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+          </button>
+          <button id="closeNotificationPanel" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
+        <button id="filterAll" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">All</button>
+        <button id="filterUnread" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Unread</button>
+      </div>
+      <div id="notificationList" class="flex-1 overflow-y-auto">
+        <div id="notificationLoading" class="p-8 text-center">
+          <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+          <p class="text-gray-500 mt-3 text-sm">Loading notifications...</p>
+        </div>
+      </div>
+      <div id="notificationLoadingMore" class="hidden p-4 border-t border-gray-100 text-center flex-shrink-0">
+        <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+      </div>
+    </div>
+
+    <main class="p-4 lg:p-8">
+      <!-- Welcome Banner -->
+      <div class="mb-6 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-6 shadow-lg">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div class="flex-1">
+            <h2 class="text-2xl font-bold text-white mb-2">Organize with Matters</h2>
+            <p class="text-indigo-100 text-sm leading-relaxed">
+              Matters are the foundation of your workspace - they organize cases, projects, or clients into dedicated spaces. Each matter keeps conversations, documents, and AI interactions neatly separated, ensuring privacy and context are maintained across all your work.
+            </p>
+          </div>
+          <button onclick="openMattersInfoModal()" class="px-5 py-2.5 bg-white text-indigo-600 hover:bg-indigo-50 font-medium rounded-lg transition-colors flex-shrink-0 shadow-md hover:shadow-lg">
+            Learn More
+          </button>
+        </div>
+      </div>
+
+      <!-- Header Actions -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <!-- Left: Search -->
+        <div class="flex-1 max-w-md">
+          <div class="relative">
+            <input type="text" id="searchInput" placeholder="Search matters..."
+              class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Right: Selection Controls + Filters + Actions -->
+        <div class="flex items-center gap-3 flex-wrap">
+          <!-- Select All Checkbox -->
+          <div class="flex items-center border-r border-gray-300 pr-3">
+            <input type="checkbox" id="selectAllMatters" class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+            <label for="selectAllMatters" class="ml-2 text-sm text-gray-700 whitespace-nowrap">Select All</label>
+          </div>
+
+          <!-- Bulk Actions (shown when items selected) -->
+          <div id="bulkActions" class="hidden flex items-center gap-2 border-r border-gray-300 pr-3">
+            <span id="selectedCount" class="text-sm font-medium text-gray-700 whitespace-nowrap">0 selected</span>
+            <button id="bulkDeleteBtn" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+              </svg>
+              Delete Selected
+            </button>
+            <button id="clearSelectionBtn" class="text-xs text-gray-600 hover:text-gray-800 underline">Clear</button>
+          </div>
+
+          <!-- Status Filter -->
+          <select id="statusFilter" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm">
+            <option value="">All Status</option>
+            <option value="active">Active</option>
+            <option value="closed">Closed</option>
+            <option value="archived">Archived</option>
+          </select>
+
+          <!-- New Matter Button -->
+          <button id="createMatterBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            New Matter
+          </button>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div id="mattersLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Skeleton cards -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 animate-pulse">
+          <div class="flex items-start justify-between mb-4">
+            <div class="flex-1">
+              <div class="h-3 bg-gray-200 rounded w-20 mb-2"></div>
+              <div class="h-5 bg-gray-200 rounded w-3/4 mb-2"></div>
+              <div class="h-4 bg-gray-200 rounded w-1/2"></div>
+            </div>
+            <div class="h-6 bg-gray-200 rounded-full w-16"></div>
+          </div>
+          <div class="space-y-2 mb-4">
+            <div class="h-3 bg-gray-200 rounded w-full"></div>
+            <div class="h-3 bg-gray-200 rounded w-2/3"></div>
+          </div>
+          <div class="flex items-center justify-between">
+            <div class="h-3 bg-gray-200 rounded w-24"></div>
+            <div class="flex gap-2">
+              <div class="h-3 bg-gray-200 rounded w-8"></div>
+              <div class="h-3 bg-gray-200 rounded w-10"></div>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 animate-pulse hidden md:block">
+          <div class="flex items-start justify-between mb-4">
+            <div class="flex-1">
+              <div class="h-3 bg-gray-200 rounded w-20 mb-2"></div>
+              <div class="h-5 bg-gray-200 rounded w-3/4 mb-2"></div>
+              <div class="h-4 bg-gray-200 rounded w-1/2"></div>
+            </div>
+            <div class="h-6 bg-gray-200 rounded-full w-16"></div>
+          </div>
+          <div class="space-y-2 mb-4">
+            <div class="h-3 bg-gray-200 rounded w-full"></div>
+            <div class="h-3 bg-gray-200 rounded w-2/3"></div>
+          </div>
+          <div class="flex items-center justify-between">
+            <div class="h-3 bg-gray-200 rounded w-24"></div>
+            <div class="flex gap-2">
+              <div class="h-3 bg-gray-200 rounded w-8"></div>
+              <div class="h-3 bg-gray-200 rounded w-10"></div>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 animate-pulse hidden lg:block">
+          <div class="flex items-start justify-between mb-4">
+            <div class="flex-1">
+              <div class="h-3 bg-gray-200 rounded w-20 mb-2"></div>
+              <div class="h-5 bg-gray-200 rounded w-3/4 mb-2"></div>
+              <div class="h-4 bg-gray-200 rounded w-1/2"></div>
+            </div>
+            <div class="h-6 bg-gray-200 rounded-full w-16"></div>
+          </div>
+          <div class="space-y-2 mb-4">
+            <div class="h-3 bg-gray-200 rounded w-full"></div>
+            <div class="h-3 bg-gray-200 rounded w-2/3"></div>
+          </div>
+          <div class="flex items-center justify-between">
+            <div class="h-3 bg-gray-200 rounded w-24"></div>
+            <div class="flex gap-2">
+              <div class="h-3 bg-gray-200 rounded w-8"></div>
+              <div class="h-3 bg-gray-200 rounded w-10"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Matters Grid -->
+      <div id="mattersGrid" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Matters will be loaded here -->
+      </div>
+
+      <!-- Pagination -->
+      <div id="pagination" class="mt-8 flex justify-center"></div>
+    </main>
+  </div>
+
+  <!-- Matter Modal -->
+  <div id="matterModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <h3 id="matterModalTitle" class="text-lg font-semibold text-gray-900">Create Matter</h3>
+        <button id="closeMatterModal" class="text-gray-400 hover:text-gray-600">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <form id="matterForm" class="p-6 space-y-5">
+        <input type="hidden" id="matterId">
+        <div id="matterIdDisplay" class="hidden">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Matter ID</label>
+          <div class="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600 font-mono text-sm" id="matterIdValue"></div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Matter Name <span class="text-red-500">*</span></label>
+            <input type="text" id="matterName" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Client Name</label>
+            <input type="text" id="clientName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+          <textarea id="matterDescription" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Brief description of the matter..."></textarea>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <select id="matterStatus" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+              <option value="active">Active</option>
+              <option value="closed">Closed</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Visibility</label>
+            <select id="matterVisibility" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+              <option value="private">Private - Only shared users can access</option>
+              <option value="organization">Organization - All org members can view</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Share with Users Section -->
+        <div id="shareWithSection">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Share with Team Members</label>
+          <div class="border border-gray-200 rounded-lg">
+            <!-- Search users input -->
+            <div class="p-3 border-b border-gray-200">
+              <div class="relative">
+                <input type="text" id="userSearchInput" placeholder="Search users to add..." 
+                  class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+              </div>
+              <!-- User search results dropdown -->
+              <div id="userSearchResults" class="hidden mt-2 max-h-40 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+                <!-- Results populated by JS -->
+              </div>
+            </div>
+            <!-- Selected users list -->
+            <div class="p-3">
+              <div id="selectedUsersList" class="space-y-2">
+                <p class="text-sm text-gray-500 italic" id="noUsersSelected">No users selected. Start typing to search and add team members.</p>
+              </div>
+            </div>
+          </div>
+          <p class="text-xs text-gray-500 mt-1">Selected users will have read and write access to this matter.</p>
+        </div>
+
+        <!-- Document Upload Section (only shown when editing existing matter) -->
+        <div id="documentUploadSection" class="hidden">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Upload Documents</label>
+          <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-indigo-400 transition-colors cursor-pointer"
+               id="dropZone">
+            <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.txt,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.pptx,.ppt" class="hidden">
+            <div id="dropZoneContent">
+              <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+              </svg>
+              <p class="mt-2 text-sm text-gray-600">
+                <button type="button" onclick="document.getElementById('fileInput').click()" class="text-indigo-600 hover:text-indigo-800 font-medium">
+                  Click to upload
+                </button>
+                or drag and drop
+              </p>
+              <p class="mt-1 text-xs text-gray-500">PDF, Word, Excel, PowerPoint, Images up to 50MB each</p>
+            </div>
+            <div id="uploadProgress" class="hidden">
+              <div class="flex items-center justify-center gap-3">
+                <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full"></div>
+                <span id="uploadProgressText" class="text-sm text-gray-600">Uploading...</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Uploaded Files List -->
+          <div id="uploadedFilesList" class="mt-3 space-y-2 max-h-40 overflow-y-auto"></div>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
+          <button type="button" id="cancelMatterBtn" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium">Cancel</button>
+          <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg">Save Matter</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Matter Details Drawer -->
+  <div id="matterDrawer" class="hidden fixed inset-y-0 right-0 w-full max-w-lg bg-white shadow-xl z-40 transform translate-x-full transition-transform">
+    <div class="h-full flex flex-col">
+      <!-- Header -->
+      <div class="px-6 py-4 border-b border-gray-200 flex-shrink-0">
+        <div class="flex items-center justify-between">
+          <div>
+            <span id="drawerMatterId" class="text-xs text-gray-400 font-mono"></span>
+            <h3 id="drawerMatterName" class="text-lg font-semibold text-gray-900">Matter Details</h3>
+            <p id="drawerClientName" class="text-sm text-gray-500"></p>
+          </div>
+          <button id="closeDrawer" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+        <div id="drawerStatusBadge" class="mt-2"></div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
+        <button id="tabDetails" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600" onclick="switchMatterTab('details')">
+          Details
+        </button>
+        <button id="tabDocuments" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('documents')">
+          Documents
+          <span id="documentCount" class="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-full"></span>
+        </button>
+        <button id="tabConversations" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('conversations')">
+          Conversations
+          <span id="conversationCount" class="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-full"></span>
+        </button>
+        <button id="tabActivity" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('activity')">
+          Activity
+        </button>
+      </div>
+
+      <!-- Tab Content -->
+      <div class="flex-1 overflow-y-auto">
+        <div id="tabContentDetails" class="p-6"></div>
+        <div id="tabContentDocuments" class="hidden p-6"></div>
+        <div id="tabContentConversations" class="hidden p-6"></div>
+        <div id="tabContentActivity" class="hidden p-6"></div>
+      </div>
+
+      <!-- Footer Actions -->
+      <div id="drawerFooter" class="px-6 py-4 border-t border-gray-200 flex gap-2 flex-shrink-0">
+        <button id="drawerEditBtn" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium">Edit Matter</button>
+        <button id="drawerDeleteBtn" class="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg font-medium">Delete</button>
+      </div>
+    </div>
+  </div>
+  <div id="drawerOverlay" class="hidden fixed inset-0 bg-black bg-opacity-50 z-30"></div>
+
+  <!-- Document Viewer Modal -->
+  <div id="documentViewerModal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-6xl h-[90vh] flex flex-col">
+      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-3">
+          <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+          </svg>
+          <div>
+            <h3 id="viewerFileName" class="text-lg font-semibold text-gray-900">Document</h3>
+            <p id="viewerFileInfo" class="text-sm text-gray-500"></p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <a id="viewerDownloadBtn" href="#" class="px-4 py-2 text-indigo-600 hover:bg-indigo-50 rounded-lg font-medium flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            Download
+          </a>
+          <button id="closeDocumentViewer" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+      </div>
+      <div id="viewerContent" class="flex-1 overflow-auto bg-gray-100 p-4">
+        <div id="viewerLoading" class="flex items-center justify-center h-full">
+          <div class="text-center">
+            <div class="animate-spin w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto mb-4"></div>
+            <p class="text-gray-500">Loading document...</p>
+          </div>
+        </div>
+        <div id="viewerError" class="hidden flex items-center justify-center h-full">
+          <div class="text-center">
+            <svg class="w-16 h-16 text-red-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+            <p id="viewerErrorMsg" class="text-gray-600 mb-4">Unable to preview this file</p>
+            <a id="viewerErrorDownload" href="#" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium inline-flex items-center gap-2">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+              Download Instead
+            </a>
+          </div>
+        </div>
+        <iframe id="viewerIframe" class="hidden w-full h-full bg-white rounded-lg shadow-sm"></iframe>
+        <pre id="viewerText" class="hidden w-full h-full bg-white rounded-lg shadow-sm p-6 overflow-auto text-sm font-mono whitespace-pre-wrap"></pre>
+        <img id="viewerImage" class="hidden max-w-full max-h-full mx-auto rounded-lg shadow-sm object-contain">
+      </div>
+    </div>
+  </div>
+
+  <!-- Document Metadata Modal -->
+  <div id="documentMetadataModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg">
+      <div class="px-6 py-4 border-b border-gray-200">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900">Document Details</h3>
+              <p class="text-sm text-gray-500">Add optional metadata to help organize and find this document</p>
+            </div>
+          </div>
+          <button id="closeMetadataModal" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="p-6 space-y-4">
+        <!-- File info -->
+        <div class="bg-gray-50 rounded-lg p-3 border border-gray-200">
+          <p class="text-sm text-gray-600">
+            <span class="font-medium text-gray-900" id="metadataFileName">filename.pdf</span>
+            <span class="text-gray-400 mx-1">•</span>
+            <span id="metadataFileSize">1.2 MB</span>
+          </p>
+        </div>
+
+        <!-- Document Type -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Document Type</label>
+          <select id="metadataDocType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+            <option value="">Auto-detect (recommended)</option>
+            <option value="contract">Contract</option>
+            <option value="pleading">Pleading</option>
+            <option value="deposition">Deposition</option>
+            <option value="medical_record">Medical Record</option>
+            <option value="police_report">Police Report</option>
+            <option value="email">Email</option>
+            <option value="expert_report">Expert Report</option>
+            <option value="correspondence">Correspondence</option>
+            <option value="document">Other Document</option>
+          </select>
+          <p class="text-xs text-gray-500 mt-1">Leave as "Auto-detect" to let AI classify the document</p>
+        </div>
+
+        <!-- Tags -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Tags</label>
+          <input type="text" id="metadataTags" maxlength="500" placeholder="e.g., important, confidential, draft" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+          <p class="text-xs text-gray-500 mt-1">Separate multiple tags with commas (max 10 tags, 500 chars total)</p>
+        </div>
+
+        <!-- Notes -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+          <textarea id="metadataNotes" rows="3" maxlength="2000" placeholder="Add any notes about this document..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"></textarea>
+          <p class="text-xs text-gray-500 mt-1"><span id="notesCharCount">0</span>/2000 characters</p>
+        </div>
+      </div>
+
+      <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3 bg-gray-50 rounded-b-xl">
+        <button id="cancelMetadataUpload" class="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg font-medium transition-colors">
+          Cancel
+        </button>
+        <button id="confirmMetadataUpload" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+          </svg>
+          Upload Document
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Matters Info Modal -->
+  <div id="mattersInfoModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) closeMattersInfoModal()">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white rounded-t-xl z-10">
+        <h2 class="text-2xl font-bold text-gray-900">What Are Matters?</h2>
+        <button onclick="closeMattersInfoModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6 space-y-6">
+        <!-- Introduction -->
+        <div>
+          <p class="text-gray-700 text-lg leading-relaxed">
+            Matters are the organizational foundation of your Lana AI workspace. They provide dedicated, isolated spaces for managing cases, projects, clients, or any work that requires separate context and privacy.
+          </p>
+        </div>
+
+        <!-- Key Benefits -->
+        <div>
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">Why Use Matters?</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="p-4 bg-indigo-50 rounded-lg border-2 border-indigo-200">
+              <div class="flex items-start gap-3">
+                <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                  </svg>
+                </div>
+                <div>
+                  <h4 class="font-medium text-gray-900 mb-1">Complete Isolation</h4>
+                  <p class="text-sm text-gray-600">Each matter maintains its own documents, conversations, and AI context - no cross-contamination between cases.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="p-4 bg-green-50 rounded-lg border-2 border-green-200">
+              <div class="flex items-start gap-3">
+                <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                  </svg>
+                </div>
+                <div>
+                  <h4 class="font-medium text-gray-900 mb-1">Organized Workspace</h4>
+                  <p class="text-sm text-gray-600">Keep related work together - all documents, chats, and research for a case in one dedicated space.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="p-4 bg-purple-50 rounded-lg border-2 border-purple-200">
+              <div class="flex items-start gap-3">
+                <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                  </svg>
+                </div>
+                <div>
+                  <h4 class="font-medium text-gray-900 mb-1">Contextual AI</h4>
+                  <p class="text-sm text-gray-600">Lana AI learns and remembers each matter's unique context, providing more relevant and accurate assistance.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+              <div class="flex items-start gap-3">
+                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                  </svg>
+                </div>
+                <div>
+                  <h4 class="font-medium text-gray-900 mb-1">Team Collaboration</h4>
+                  <p class="text-sm text-gray-600">Control access and permissions per matter, enabling secure collaboration with specific team members.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- How It Works -->
+        <div>
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">How Matters Work</h3>
+          <div class="space-y-4">
+            <div class="flex items-start gap-4">
+              <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0 text-indigo-600 font-bold">1</div>
+              <div>
+                <h4 class="font-medium text-gray-900 mb-1">Create a Matter</h4>
+                <p class="text-sm text-gray-600">Start a new matter for each case, project, or client. Give it a descriptive name and optional details like matter ID, client name, and description.</p>
+              </div>
+            </div>
+
+            <div class="flex items-start gap-4">
+              <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0 text-indigo-600 font-bold">2</div>
+              <div>
+                <h4 class="font-medium text-gray-900 mb-1">Upload Documents</h4>
+                <p class="text-sm text-gray-600">Add all relevant files to the matter's document library. Lana AI processes and indexes them for intelligent search and retrieval.</p>
+              </div>
+            </div>
+
+            <div class="flex items-start gap-4">
+              <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0 text-indigo-600 font-bold">3</div>
+              <div>
+                <h4 class="font-medium text-gray-900 mb-1">Start Conversations</h4>
+                <p class="text-sm text-gray-600">Chat with Lana AI in the context of the matter. The AI has access to all matter documents and previous conversations for informed responses.</p>
+              </div>
+            </div>
+
+            <div class="flex items-start gap-4">
+              <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0 text-indigo-600 font-bold">4</div>
+              <div>
+                <h4 class="font-medium text-gray-900 mb-1">Manage & Organize</h4>
+                <p class="text-sm text-gray-600">Track matter status (active, closed, archived), search across all content, and manage team access as your work progresses.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Best Practices -->
+        <div>
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">Best Practices</h3>
+          <div class="bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg p-4 border-l-4 border-amber-400">
+            <ul class="space-y-2 text-sm text-gray-700">
+              <li class="flex items-start gap-2">
+                <svg class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span><strong>One matter per case/project</strong> - Keep work isolated for clarity and privacy</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <svg class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span><strong>Use descriptive names</strong> - Make matters easy to find and identify later</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <svg class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span><strong>Upload key documents early</strong> - Give Lana AI full context from the start</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <svg class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span><strong>Archive completed matters</strong> - Keep your workspace focused on active work</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Example Use Cases -->
+        <div>
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">Example Use Cases</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"></path>
+                </svg>
+              </div>
+              <p class="text-sm font-medium text-gray-900 text-center">Legal Cases</p>
+              <p class="text-xs text-gray-600 mt-1 text-center">Client representation & litigation</p>
+            </div>
+            <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                </svg>
+              </div>
+              <p class="text-sm font-medium text-gray-900 text-center">Client Projects</p>
+              <p class="text-xs text-gray-600 mt-1 text-center">Consulting & advisory work</p>
+            </div>
+            <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+              </div>
+              <p class="text-sm font-medium text-gray-900 text-center">Internal Work</p>
+              <p class="text-xs text-gray-600 mt-1 text-center">Research & strategy planning</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-6 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+        <button onclick="closeMattersInfoModal()" class="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium">
+          Get Started with Matters
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    if (!api.requireAuth()) throw new Error('Not authenticated');
+
+    // Load full user profile with roles before rendering menu
+    (async () => {
+      try {
+        await api.loadUserProfile();
+      } catch (error) {
+        console.error('Failed to load user profile:', error);
+      }
+      
+      // Render dynamic menu (will now have access to roles)
+      renderMenu('#mainNav');
+      
+      // Continue with page initialization
+      initializePage();
+    })();
+
+    function initializePage() {
+
+      // Initialize notifications panel
+      NotificationPanel.init();
+
+    // Load user info
+    function loadUserInfo() {
+      const user = api.user;
+      if (user) {
+        const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+        const initials = (user.firstName?.[0] || '') + (user.lastName?.[0] || '') || user.email[0].toUpperCase();
+        document.getElementById('userName').textContent = name;
+        document.getElementById('userInitials').textContent = initials;
+      }
+    }
+    loadUserInfo();
+
+    // Check if user is org_admin or system_admin
+    function isOrgAdmin() {
+      const user = api.user;
+      if (!user) return false;
+      const roles = user.roles || [];
+      return roles.includes('org_admin') || 
+             roles.includes('system_admin') || 
+             roles.some(r => r?.name === 'org_admin' || r?.name === 'system_admin');
+    }
+
+    // User menu toggle
+    const userMenu = document.getElementById('userMenu');
+    const userDropdown = document.getElementById('userDropdown');
+    userMenu.addEventListener('click', () => userDropdown.classList.toggle('hidden'));
+    document.addEventListener('click', (e) => {
+      if (!userMenu.contains(e.target)) userDropdown.classList.add('hidden');
+    });
+
+    // Sidebar toggle
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('openSidebar').addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+    document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      await api.logout();
+      window.location.href = 'login.html';
+    });
+
+    // State
+    let currentPage = 1;
+    const pageSize = 12;
+    let selectedMatters = new Set(); // Track selected matter IDs
+    let currentMatters = []; // Track currently displayed matters for "Select All"
+    let matters = [];
+
+    // Load matters
+    async function loadMatters() {
+      const grid = document.getElementById('mattersGrid');
+      const loading = document.getElementById('mattersLoading');
+      const pagination = document.getElementById('pagination');
+      
+      // Show loading state
+      loading.classList.remove('hidden');
+      grid.classList.add('hidden');
+      pagination.innerHTML = '';
+      
+      try {
+        const search = document.getElementById('searchInput').value;
+        const status = document.getElementById('statusFilter').value;
+        // org_admin sees all matters, others see only their own
+        const includeAll = isOrgAdmin();
+        const result = await api.getMatters(currentPage, pageSize, { search, status, include_all: includeAll });
+        matters = result.matters || [];
+        currentMatters = matters; // Store for select all functionality
+
+        // Hide loading, show grid
+        loading.classList.add('hidden');
+        grid.classList.remove('hidden');
+
+        if (matters.length === 0) {
+          grid.innerHTML = `
+            <div class="col-span-full py-16">
+              <div class="max-w-md mx-auto text-center">
+                <div class="w-24 h-24 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <svg class="w-12 h-12 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
+                  </svg>
+                </div>
+                <h3 class="text-xl font-semibold text-gray-900 mb-2">No matters yet</h3>
+                <p class="text-gray-500 mb-6">Get started by creating your first matter to organize your documents and collaborate with your team.</p>
+                <button onclick="document.getElementById('createMatterBtn').click()" class="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors shadow-lg shadow-indigo-200">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                  </svg>
+                  Create your first matter
+                </button>
+              </div>
+            </div>
+          `;
+          return;
+        }
+
+        grid.innerHTML = matters.map(matter => `
+          <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow relative matter-card ${selectedMatters.has(matter.matter_id) ? 'ring-2 ring-indigo-500' : ''}" data-matter-id="${matter.matter_id}">
+            <!-- Selection Checkbox -->
+            <div class="absolute top-4 left-4 z-10">
+              <input type="checkbox"
+                     class="matter-checkbox w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                     data-matter-id="${matter.matter_id}"
+                     ${selectedMatters.has(matter.matter_id) ? 'checked' : ''}
+                     onclick="event.stopPropagation(); toggleMatterSelection('${matter.matter_id}')">
+            </div>
+
+            <div class="cursor-pointer pl-8" onclick="viewMatter('${matter.matter_id}')">
+              <div class="flex items-start justify-between mb-4">
+                <div class="flex-1">
+                  <span class="text-xs text-gray-400 font-mono">${matter.matter_id}</span>
+                  <h3 class="text-lg font-semibold text-gray-900 mt-1">${matter.matter_name || 'Untitled'}</h3>
+                  <p class="text-sm text-gray-500">${matter.client_name || ''}</p>
+                </div>
+                ${statusBadge(matter.status || 'active')}
+              </div>
+              <p class="text-sm text-gray-600 line-clamp-2 mb-4">${matter.description || 'No description'}</p>
+              <div class="flex items-center justify-between text-xs text-gray-400">
+                <span>Created ${formatDate(matter.created_at)}</span>
+                <div class="flex gap-2">
+                  <button onclick="event.stopPropagation(); editMatter('${matter.matter_id}')" class="text-indigo-600 hover:text-indigo-800">Edit</button>
+                  <button onclick="event.stopPropagation(); deleteMatter('${matter.matter_id}')" class="text-red-600 hover:text-red-800">Delete</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        `).join('');
+
+        // Update pagination
+        const total = result.total || matters.length;
+        const totalPages = Math.ceil(total / pageSize);
+        updatePagination(totalPages);
+      } catch (error) {
+        // Hide loading, show grid with error state
+        loading.classList.add('hidden');
+        grid.classList.remove('hidden');
+        grid.innerHTML = `
+          <div class="col-span-full py-16">
+            <div class="max-w-md mx-auto text-center">
+              <div class="w-24 h-24 bg-gradient-to-br from-red-100 to-red-200 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg class="w-12 h-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+              </div>
+              <h3 class="text-xl font-semibold text-gray-900 mb-2">Failed to load matters</h3>
+              <p class="text-gray-500 mb-6">There was a problem loading your matters. Please try again.</p>
+              <button onclick="loadMatters()" class="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                Try Again
+              </button>
+            </div>
+          </div>
+        `;
+        Toast.error('Failed to load matters');
+      }
+    }
+
+    function updatePagination(totalPages) {
+      const pagination = document.getElementById('pagination');
+      if (totalPages <= 1) {
+        pagination.innerHTML = '';
+        return;
+      }
+
+      pagination.innerHTML = `
+        <div class="flex gap-2">
+          <button ${currentPage === 1 ? 'disabled' : ''} onclick="goToPage(${currentPage - 1})" class="px-3 py-1 border rounded ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'}">Previous</button>
+          <span class="px-3 py-1 text-gray-600">Page ${currentPage} of ${totalPages}</span>
+          <button ${currentPage === totalPages ? 'disabled' : ''} onclick="goToPage(${currentPage + 1})" class="px-3 py-1 border rounded ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'}">Next</button>
+        </div>
+      `;
+    }
+
+    window.goToPage = function(page) {
+      currentPage = page;
+      loadMatters();
+    }
+
+    // Search and filter
+    document.getElementById('searchInput').addEventListener('input', debounce(() => {
+      currentPage = 1;
+      loadMatters();
+    }, 300));
+
+    document.getElementById('statusFilter').addEventListener('change', () => {
+      currentPage = 1;
+      loadMatters();
+    });
+
+    // Modal
+    const modal = document.getElementById('matterModal');
+    const form = document.getElementById('matterForm');
+    let allOrgUsers = [];
+    let selectedUsers = [];
+
+    // Load org users for sharing
+    async function loadOrgUsers() {
+      try {
+        const result = await api.getUsers(1, 200);
+        allOrgUsers = (result.users || []).filter(u => u.id !== api.user?.id); // Exclude current user
+      } catch (error) {
+        console.error('Failed to load org users:', error);
+      }
+    }
+    loadOrgUsers();
+
+    // User search functionality
+    const userSearchInput = document.getElementById('userSearchInput');
+    const userSearchResults = document.getElementById('userSearchResults');
+    const selectedUsersList = document.getElementById('selectedUsersList');
+    const noUsersSelected = document.getElementById('noUsersSelected');
+
+    userSearchInput.addEventListener('input', debounce(() => {
+      const query = userSearchInput.value.toLowerCase().trim();
+      if (query.length < 2) {
+        userSearchResults.classList.add('hidden');
+        return;
+      }
+
+      const filtered = allOrgUsers.filter(u => 
+        !selectedUsers.some(s => s.id === u.id) && (
+          (u.email || '').toLowerCase().includes(query) ||
+          (u.first_name || '').toLowerCase().includes(query) ||
+          (u.last_name || '').toLowerCase().includes(query)
+        )
+      ).slice(0, 8);
+
+      if (filtered.length === 0) {
+        userSearchResults.innerHTML = '<div class="p-3 text-sm text-gray-500">No users found</div>';
+      } else {
+        userSearchResults.innerHTML = filtered.map(u => `
+          <div class="p-2 hover:bg-gray-50 cursor-pointer flex items-center gap-2" onclick="addUserToShare('${u.id}')">
+            <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <span class="text-xs font-medium text-indigo-600">${(u.first_name?.[0] || '') + (u.last_name?.[0] || '') || u.email?.[0]?.toUpperCase() || 'U'}</span>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium text-gray-900 truncate">${u.first_name || ''} ${u.last_name || ''}</p>
+              <p class="text-xs text-gray-500 truncate">${u.email}</p>
+            </div>
+          </div>
+        `).join('');
+      }
+      userSearchResults.classList.remove('hidden');
+    }, 200));
+
+    // Hide search results when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!userSearchInput.contains(e.target) && !userSearchResults.contains(e.target)) {
+        userSearchResults.classList.add('hidden');
+      }
+    });
+
+    window.addUserToShare = function(userId) {
+      const user = allOrgUsers.find(u => u.id === userId);
+      if (!user || selectedUsers.some(u => u.id === userId)) return;
+      
+      selectedUsers.push(user);
+      renderSelectedUsers();
+      userSearchInput.value = '';
+      userSearchResults.classList.add('hidden');
+      
+      // Auto-set visibility to private when users are selected
+      document.getElementById('matterVisibility').value = 'private';
+      updateShareSectionVisibility();
+    }
+
+    window.removeUserFromShare = function(userId) {
+      selectedUsers = selectedUsers.filter(u => u.id !== userId);
+      renderSelectedUsers();
+    }
+
+    // Handle visibility change
+    const visibilitySelect = document.getElementById('matterVisibility');
+    visibilitySelect.addEventListener('change', () => {
+      if (visibilitySelect.value === 'organization') {
+        // Clear selected users when switching to organization visibility
+        selectedUsers = [];
+        renderSelectedUsers();
+      }
+      updateShareSectionVisibility();
+    });
+
+    // Show/hide share section based on visibility
+    function updateShareSectionVisibility() {
+      const shareSection = document.getElementById('shareWithSection');
+      const visibility = document.getElementById('matterVisibility').value;
+      
+      if (visibility === 'organization') {
+        shareSection.classList.add('opacity-50');
+        shareSection.querySelector('#userSearchInput').disabled = true;
+        shareSection.querySelector('label').innerHTML = 'Share with Team Members <span class="text-gray-400 text-xs font-normal">(Not needed for organization visibility)</span>';
+      } else {
+        shareSection.classList.remove('opacity-50');
+        shareSection.querySelector('#userSearchInput').disabled = false;
+        shareSection.querySelector('label').innerHTML = 'Share with Team Members';
+      }
+    }
+
+    function renderSelectedUsers() {
+      if (selectedUsers.length === 0) {
+        selectedUsersList.innerHTML = '<p class="text-sm text-gray-500 italic" id="noUsersSelected">No users selected. Start typing to search and add team members.</p>';
+        return;
+      }
+
+      selectedUsersList.innerHTML = selectedUsers.map(u => `
+        <div class="flex items-center justify-between bg-gray-50 rounded-lg p-2">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <span class="text-xs font-medium text-indigo-600">${(u.first_name?.[0] || '') + (u.last_name?.[0] || '') || u.email?.[0]?.toUpperCase() || 'U'}</span>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-gray-900">${u.first_name || ''} ${u.last_name || ''}</p>
+              <p class="text-xs text-gray-500">${u.email}</p>
+            </div>
+          </div>
+          <button type="button" onclick="removeUserFromShare('${u.id}')" class="text-gray-400 hover:text-red-600 p-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+      `).join('');
+    }
+
+    function resetShareForm() {
+      selectedUsers = [];
+      renderSelectedUsers();
+      userSearchInput.value = '';
+      userSearchResults.classList.add('hidden');
+      document.getElementById('matterVisibility').value = 'private';
+      updateShareSectionVisibility();
+    }
+
+    // ================== DOCUMENT UPLOAD HANDLING ==================
+    
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const uploadProgress = document.getElementById('uploadProgress');
+    const dropZoneContent = document.getElementById('dropZoneContent');
+    const uploadProgressText = document.getElementById('uploadProgressText');
+    const uploadedFilesList = document.getElementById('uploadedFilesList');
+    let uploadedFiles = [];
+
+    // Drag and drop handlers
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('border-indigo-400', 'bg-indigo-50');
+    });
+
+    dropZone.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('border-indigo-400', 'bg-indigo-50');
+    });
+
+    dropZone.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('border-indigo-400', 'bg-indigo-50');
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        await handleFileUpload(files);
+      }
+    });
+
+    // Click on drop zone to open file picker
+    dropZone.addEventListener('click', (e) => {
+      if (e.target.tagName !== 'BUTTON') {
+        fileInput.click();
+      }
+    });
+
+    fileInput.addEventListener('change', async (e) => {
+      if (e.target.files.length > 0) {
+        await handleFileUpload(e.target.files);
+      }
+    });
+
+    async function handleFileUpload(files) {
+      const matterId = document.getElementById('matterId').value;
+      if (!matterId) {
+        Toast.error('Please save the matter first before uploading documents');
+        return;
+      }
+
+      // Show progress
+      dropZoneContent.classList.add('hidden');
+      uploadProgress.classList.remove('hidden');
+
+      const fileArray = Array.from(files);
+      let successCount = 0;
+      
+      for (let i = 0; i < fileArray.length; i++) {
+        const file = fileArray[i];
+        uploadProgressText.textContent = `Uploading ${i + 1}/${fileArray.length}: ${file.name}`;
+        
+        try {
+          const result = await api.uploadDocument(file, matterId);
+          
+          // Add to uploaded files list
+          uploadedFiles.push({
+            name: file.name,
+            size: file.size,
+            document_id: result.document_id,
+            status: 'uploaded'
+          });
+          successCount++;
+          renderUploadedFiles();
+        } catch (error) {
+          Toast.error(`Failed to upload ${file.name}: ${error.message}`);
+          
+          // Add as failed
+          uploadedFiles.push({
+            name: file.name,
+            size: file.size,
+            status: 'failed',
+            error: error.message
+          });
+          renderUploadedFiles();
+        }
+      }
+
+      // Reset upload zone
+      dropZoneContent.classList.remove('hidden');
+      uploadProgress.classList.add('hidden');
+      fileInput.value = '';
+      
+      if (successCount > 0) {
+        Toast.success(`Uploaded ${successCount} document(s) - processing will begin shortly`);
+      }
+    }
+
+    function renderUploadedFiles() {
+      if (uploadedFiles.length === 0) {
+        uploadedFilesList.innerHTML = '';
+        return;
+      }
+
+      uploadedFilesList.innerHTML = uploadedFiles.map((file, index) => `
+        <div class="flex items-center justify-between bg-gray-50 rounded-lg p-2 ${file.status === 'failed' ? 'border border-red-200' : ''}">
+          <div class="flex items-center gap-2 min-w-0">
+            <svg class="w-5 h-5 flex-shrink-0 ${file.status === 'failed' ? 'text-red-500' : 'text-green-500'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              ${file.status === 'failed' 
+                ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>'
+                : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>'
+              }
+            </svg>
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-gray-900 truncate">${file.name}</p>
+              <p class="text-xs text-gray-500">${formatFileSize(file.size)}${file.status === 'failed' ? ' - ' + file.error : ''}</p>
+            </div>
+          </div>
+          <button type="button" onclick="removeUploadedFile(${index})" class="text-gray-400 hover:text-red-600 p-1 flex-shrink-0">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+      `).join('');
+    }
+
+    window.removeUploadedFile = function(index) {
+      uploadedFiles.splice(index, 1);
+      renderUploadedFiles();
+    }
+
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    function resetUploadSection() {
+      uploadedFiles = [];
+      renderUploadedFiles();
+      if (fileInput) fileInput.value = '';
+      if (dropZoneContent) dropZoneContent.classList.remove('hidden');
+      if (uploadProgress) uploadProgress.classList.add('hidden');
+    }
+
+    document.getElementById('createMatterBtn').addEventListener('click', () => {
+      document.getElementById('matterModalTitle').textContent = 'Create Matter';
+      document.getElementById('matterId').value = '';
+      document.getElementById('matterIdDisplay').classList.add('hidden');
+      document.getElementById('shareWithSection').classList.remove('hidden');
+      document.getElementById('documentUploadSection').classList.add('hidden'); // Hide upload for new matters
+      form.reset();
+      resetShareForm();
+      resetUploadSection();
+      modal.classList.remove('hidden');
+    });
+
+    document.getElementById('closeMatterModal').addEventListener('click', () => modal.classList.add('hidden'));
+    document.getElementById('cancelMatterBtn').addEventListener('click', () => modal.classList.add('hidden'));
+
+    // Edit matter
+    window.editMatter = async function(matterId) {
+      try {
+        const [matterResult, permResult] = await Promise.all([
+          api.getMatter(matterId),
+          api.getMatterPermissions(matterId).catch(() => ({ permissions: [] }))
+        ]);
+        const matter = matterResult.matter;
+        const permissions = permResult.permissions || [];
+        
+        document.getElementById('matterModalTitle').textContent = 'Edit Matter';
+        document.getElementById('matterId').value = matter.matter_id;
+        document.getElementById('matterIdDisplay').classList.remove('hidden');
+        document.getElementById('matterIdValue').textContent = matter.matter_id;
+        document.getElementById('clientName').value = matter.client_name || '';
+        document.getElementById('matterName').value = matter.matter_name || '';
+        document.getElementById('matterDescription').value = matter.description || '';
+        document.getElementById('matterStatus').value = matter.status || 'active';
+        document.getElementById('matterVisibility').value = matter.visibility || 'private';
+        
+        // Load existing shared users
+        selectedUsers = permissions.map(p => ({
+          id: p.user_id,
+          email: p.email,
+          first_name: p.first_name,
+          last_name: p.last_name
+        }));
+        renderSelectedUsers();
+        
+        // Show share section in edit mode and update visibility state
+        document.getElementById('shareWithSection').classList.remove('hidden');
+        updateShareSectionVisibility();
+        
+        // Show upload section for existing matters
+        document.getElementById('documentUploadSection').classList.remove('hidden');
+        resetUploadSection();
+        
+        modal.classList.remove('hidden');
+      } catch (error) {
+        Toast.error('Failed to load matter');
+      }
+    }
+
+    // View matter
+    // Store current matter data globally for tab switching
+    let currentMatterData = null;
+
+    window.viewMatter = async function(matterId, defaultTab = 'details') {
+      const drawer = document.getElementById('matterDrawer');
+      const overlay = document.getElementById('drawerOverlay');
+
+      // Log the matter_id being used to fetch conversations
+      console.log('[viewMatter] Loading matter details:', {
+        matterId,
+        format: matterId.startsWith('MATT-') ? 'MATT-XXXXX' : 'other',
+        defaultTab
+      });
+
+      try {
+        // Fetch all matter data in parallel
+        const [matterResult, permissionsResult, activityResult, chatsResult, docsResult] = await Promise.all([
+          api.getMatter(matterId),
+          api.getMatterPermissions(matterId).catch(() => ({ permissions: [] })),
+          api.getMatterActivity(matterId, 100).catch(() => ({ activities: [] })), // Get more for activity tab
+          api.getMatterConversations(matterId, 100).catch((err) => {
+            console.error('[viewMatter] Failed to fetch conversations:', err);
+            return { sessions: [] };
+          }), // Get all conversations
+          api.getMatterFiles(matterId).catch((err) => {
+            console.error('[viewMatter] Failed to fetch documents:', err);
+            return { files: [], pagination: { total_count: 0 } };
+          }) // Get documents
+        ]);
+
+        const matter = matterResult.matter;
+        const permissions = permissionsResult.permissions || [];
+        const activities = activityResult.activities || [];
+        const chats = chatsResult.sessions || [];
+        const documents = docsResult.files || [];
+        const documentsPagination = docsResult.pagination || { total_count: 0 };
+
+        // Log conversation results for debugging
+        console.log('[viewMatter] Conversations loaded:', {
+          matterId,
+          matterUUID: matter?.id,
+          conversationCount: chats.length,
+          conversations: chats.map(c => ({
+            thread_id: c.thread_id,
+            matter_id: c.matter_id,
+            title: c.title || c.metadata?.title
+          }))
+        });
+
+        console.log('[viewMatter] Documents loaded:', {
+          matterId,
+          documentCount: documents.length,
+          totalDocuments: documentsPagination.total_count
+        });
+
+        // Store data globally for tab switching
+        currentMatterData = { matter, permissions, activities, chats, documents, documentsPagination };
+
+        // Update drawer header
+        document.getElementById('drawerMatterId').textContent = matter.matter_id;
+        document.getElementById('drawerMatterName').textContent = matter.matter_name || 'Untitled';
+        document.getElementById('drawerClientName').textContent = matter.client_name || '';
+        document.getElementById('drawerStatusBadge').innerHTML = statusBadge(matter.status || 'active');
+        document.getElementById('conversationCount').textContent = chats.length || '';
+        document.getElementById('documentCount').textContent = documentsPagination.total_count || documents.length || '';
+
+        // Set up footer actions
+        document.getElementById('drawerEditBtn').onclick = () => { editMatter(matter.matter_id); closeDrawer(); };
+        document.getElementById('drawerDeleteBtn').onclick = () => deleteMatter(matter.matter_id);
+
+        // Render the specified tab (default is 'details')
+        switchMatterTab(defaultTab);
+
+        drawer.classList.remove('hidden', 'translate-x-full');
+        overlay.classList.remove('hidden');
+      } catch (error) {
+        Toast.error('Failed to load matter details');
+      }
+    }
+
+    // Switch between tabs in matter drawer
+    window.switchMatterTab = function(tabName) {
+      if (!currentMatterData) return;
+
+      const { matter, permissions, activities, chats, documents } = currentMatterData;
+
+      // Update tab buttons
+      const tabs = ['Details', 'Documents', 'Conversations', 'Activity'];
+      tabs.forEach(tab => {
+        const btn = document.getElementById(`tab${tab}`);
+        const content = document.getElementById(`tabContent${tab}`);
+        if (tab.toLowerCase() === tabName) {
+          btn.classList.add('text-indigo-600', 'border-indigo-600');
+          btn.classList.remove('text-gray-500', 'border-transparent');
+          content.classList.remove('hidden');
+        } else {
+          btn.classList.remove('text-indigo-600', 'border-indigo-600');
+          btn.classList.add('text-gray-500', 'border-transparent');
+          content.classList.add('hidden');
+        }
+      });
+
+      // Render the selected tab content
+      switch(tabName) {
+        case 'details':
+          renderDetailsTab(matter, permissions);
+          break;
+        case 'documents':
+          renderDocumentsTab(matter, documents);
+          break;
+        case 'conversations':
+          renderConversationsTab(matter, chats);
+          break;
+        case 'activity':
+          renderActivityTab(matter, activities);
+          break;
+      }
+    }
+
+    // Render Details Tab
+    function renderDetailsTab(matter, permissions) {
+      const content = document.getElementById('tabContentDetails');
+      content.innerHTML = `
+        <div class="space-y-6">
+          <div class="bg-gray-50 rounded-lg p-4">
+            <h5 class="text-sm font-medium text-gray-700 mb-2">Description</h5>
+            <p class="text-sm text-gray-600">${matter.description || 'No description provided.'}</p>
+          </div>
+
+          <div class="bg-gray-50 rounded-lg p-4">
+            <h5 class="text-sm font-medium text-gray-700 mb-2">Matter Information</h5>
+            <dl class="space-y-2 text-sm">
+              <div class="flex justify-between">
+                <dt class="text-gray-500">Matter ID</dt>
+                <dd class="text-gray-900 font-mono">${matter.matter_id}</dd>
+              </div>
+              <div class="flex justify-between">
+                <dt class="text-gray-500">Client</dt>
+                <dd class="text-gray-900">${matter.client_name || 'N/A'}</dd>
+              </div>
+              <div class="flex justify-between">
+                <dt class="text-gray-500">Status</dt>
+                <dd class="text-gray-900">${statusBadge(matter.status || 'active')}</dd>
+              </div>
+              <div class="flex justify-between">
+                <dt class="text-gray-500">Visibility</dt>
+                <dd class="text-gray-900">${matter.visibility === 'organization' ? '🏢 Organization' : '🔒 Private'}</dd>
+              </div>
+              <div class="flex justify-between">
+                <dt class="text-gray-500">Created</dt>
+                <dd class="text-gray-900">${formatDate(matter.created_at)}</dd>
+              </div>
+              <div class="flex justify-between">
+                <dt class="text-gray-500">Last Updated</dt>
+                <dd class="text-gray-900">${formatDate(matter.updated_at)}</dd>
+              </div>
+            </dl>
+          </div>
+
+          <!-- Shared With Section -->
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <h5 class="text-sm font-medium text-gray-700">Shared With</h5>
+            </div>
+            <div class="space-y-2">
+              ${permissions.length > 0 ? permissions.map(p => `
+                <div class="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+                  <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                      <span class="text-xs font-medium text-indigo-600">${(p.first_name?.[0] || '') + (p.last_name?.[0] || '') || p.email?.[0]?.toUpperCase() || 'U'}</span>
+                    </div>
+                    <div>
+                      <p class="text-sm font-medium text-gray-900">${p.first_name || ''} ${p.last_name || ''}</p>
+                      <p class="text-xs text-gray-500">${p.email}</p>
+                    </div>
+                  </div>
+                  <button onclick="removeShare('${matter.matter_id}', '${p.user_id}')" class="text-red-600 hover:text-red-800">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                  </button>
+                </div>
+              `).join('') : `<p class="text-sm text-gray-500 text-center py-4">${matter.visibility === 'organization' ? 'All organization members can access this matter' : 'Not shared with any specific users'}</p>`}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Render Documents Tab
+    function renderDocumentsTab(matter, documents) {
+      const content = document.getElementById('tabContentDocuments');
+
+      // File type icon helper
+      function getFileIcon(contentType) {
+        if (!contentType) return '<svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>';
+
+        if (contentType.includes('pdf')) {
+          return '<svg class="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM8.5 13.5v3h1v-1h.5a1 1 0 0 0 1-1v-1a1 1 0 0 0-1-1h-1.5zm1 1h.5v1h-.5v-1zm2.5-1v3h1.5a1 1 0 0 0 1-1v-1a1 1 0 0 0-1-1H12zm1 1h.5v1H13v-1zm2.5-1v3h1v-1.5h.5v-1h-.5v-.5h1v-1h-2z"/></svg>';
+        }
+        if (contentType.includes('word') || contentType.includes('document')) {
+          return '<svg class="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM9 13l1.5 6 1.5-4 1.5 4 1.5-6h-1l-.75 3-1.25-3.5h-.5L10.25 16 9.5 13H9z"/></svg>';
+        }
+        if (contentType.includes('sheet') || contentType.includes('excel') || contentType.includes('csv')) {
+          return '<svg class="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM8 13h2v2H8v-2zm0 3h2v2H8v-2zm3-3h2v2h-2v-2zm0 3h2v2h-2v-2zm3-3h2v2h-2v-2zm0 3h2v2h-2v-2z"/></svg>';
+        }
+        if (contentType.includes('image')) {
+          return '<svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>';
+        }
+        return '<svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>';
+      }
+
+      // Format file size
+      function formatSize(bytes) {
+        if (!bytes) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+      }
+
+      if (documents.length === 0) {
+        content.innerHTML = `
+          <div class="text-center py-12">
+            <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+              </svg>
+            </div>
+            <h4 class="text-lg font-semibold text-gray-900 mb-2">No documents yet</h4>
+            <p class="text-gray-500 mb-6">Upload documents to this matter to enable AI-powered search and analysis</p>
+            <div id="drawerEmptyDropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-indigo-400 transition-colors cursor-pointer">
+              <input type="file" id="drawerEmptyFileInput" multiple accept=".pdf,.doc,.docx,.txt,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.pptx,.ppt" class="hidden">
+              <div class="text-center">
+                <svg class="mx-auto h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                </svg>
+                <p class="mt-2 text-sm text-gray-600">
+                  <span class="text-indigo-600 hover:text-indigo-800 font-medium">Click to upload</span> or drag and drop
+                </p>
+                <p class="mt-1 text-xs text-gray-500">PDF, Word, Excel, Images up to 50MB</p>
+              </div>
+            </div>
+          </div>
+        `;
+        setupDrawerUpload(matter.matter_id, 'drawerEmptyDropZone', 'drawerEmptyFileInput');
+        return;
+      }
+
+      content.innerHTML = `
+        <div class="space-y-4">
+          <!-- Upload area -->
+          <div id="drawerDocDropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-indigo-400 transition-colors cursor-pointer">
+            <input type="file" id="drawerDocFileInput" multiple accept=".pdf,.doc,.docx,.txt,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.pptx,.ppt" class="hidden">
+            <div id="drawerDocDropContent" class="flex items-center justify-center gap-3">
+              <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+              </svg>
+              <span class="text-sm text-gray-600">
+                <span class="text-indigo-600 font-medium">Upload files</span> or drag and drop
+              </span>
+            </div>
+            <div id="drawerDocUploadProgress" class="hidden flex items-center justify-center gap-3">
+              <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full"></div>
+              <span id="drawerDocUploadText" class="text-sm text-gray-600">Uploading...</span>
+            </div>
+          </div>
+
+          <!-- Document count -->
+          <div class="flex items-center justify-between">
+            <p class="text-sm text-gray-500">${documents.length} document${documents.length !== 1 ? 's' : ''}</p>
+          </div>
+
+          <!-- Document list -->
+          <div class="space-y-2">
+            ${documents.map(doc => `
+              <div class="bg-white border border-gray-200 hover:border-indigo-300 rounded-lg p-3 transition-all group" data-doc-id="${doc.id}">
+                <div class="flex items-start gap-3">
+                  <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    ${getFileIcon(doc.content_type)}
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-start justify-between gap-2">
+                      <div class="min-w-0">
+                        <h6 class="text-sm font-medium text-gray-900 truncate" title="${doc.original_filename || doc.filename}">${doc.original_filename || doc.filename}</h6>
+                        <p class="text-xs text-gray-500 flex items-center gap-2 mt-0.5">
+                          <span>${formatSize(doc.file_size)}</span>
+                          <span class="text-gray-300">|</span>
+                          <span>${timeAgo(doc.created_at)}</span>
+                        </p>
+                      </div>
+                      <div class="flex items-center gap-2 flex-shrink-0">
+                        ${docStatusBadge(doc.status)}
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-2 mt-2" data-doc-actions>
+                      ${['active', 'completed'].includes(doc.status) ? `
+                        <button onclick="viewDocument('${doc.id}', '${matter.matter_id}', '${doc.filename}', '${doc.content_type}', '${doc.file_size}')" class="text-xs text-emerald-600 hover:text-emerald-800 font-medium flex items-center gap-1">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                          View
+                        </button>
+                        <button onclick="downloadDocument('${doc.id}', '${matter.matter_id}', '${doc.filename}')" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                          Download
+                        </button>
+                      ` : ['pending', 'processing', 'queued'].includes(doc.status) && doc.job_id ? `
+                        <span class="text-xs text-gray-500 italic flex items-center gap-1">
+                          <svg class="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Processing...
+                        </span>
+                        <button onclick="cancelDocumentProcessing('${doc.job_id}', '${doc.filename}')" class="text-xs text-orange-600 hover:text-orange-800 font-medium flex items-center gap-1">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                          Cancel
+                        </button>
+                      ` : ''}
+                      <button onclick="deleteDrawerDocument('${doc.id}', '${matter.matter_id}')" class="text-xs text-red-600 hover:text-red-800 font-medium flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+      setupDrawerUpload(matter.matter_id, 'drawerDocDropZone', 'drawerDocFileInput');
+    }
+
+    // Track active SSE connections for document processing
+    const activeSSEConnections = new Map(); // jobId -> EventSource
+
+    // Start SSE stream to monitor document processing status
+    function startDocumentStatusStream(jobId, fileId, matterId, filename) {
+      // Don't create duplicate connections
+      if (activeSSEConnections.has(jobId)) {
+        console.log(`SSE connection already exists for job ${jobId}`);
+        return;
+      }
+
+      console.log(`Starting SSE stream for job ${jobId} (${filename})`);
+
+      // EventSource doesn't support custom headers, so we pass token as query param
+      const eventSource = new EventSource(`${api.baseUrl}/api/v1/ingest/status/${jobId}/stream?token=${api.token}`);
+
+      activeSSEConnections.set(jobId, eventSource);
+
+      eventSource.addEventListener('status', (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log(`Status update for ${filename}:`, data.status);
+
+          // Update the UI with new status
+          updateDocumentStatus(fileId, data.status);
+
+          // Show toast for completed/failed
+          if (data.status === 'completed') {
+            Toast.success(`Document ready: ${filename}`);
+          } else if (data.status === 'failed') {
+            Toast.error(`Document processing failed: ${filename}`);
+          }
+        } catch (error) {
+          console.error('Failed to parse SSE status event:', error);
+        }
+      });
+
+      eventSource.addEventListener('complete', (event) => {
+        console.log(`Processing complete for ${filename}`);
+        eventSource.close();
+        activeSSEConnections.delete(jobId);
+
+        // Refresh documents to get final state
+        refreshDrawerDocuments(matterId);
+      });
+
+      eventSource.addEventListener('error', (event) => {
+        console.error(`SSE error for job ${jobId}:`, event);
+        eventSource.close();
+        activeSSEConnections.delete(jobId);
+      });
+
+      eventSource.onerror = () => {
+        console.log(`SSE connection closed for job ${jobId}`);
+        eventSource.close();
+        activeSSEConnections.delete(jobId);
+      };
+    }
+
+    // Update document status in UI without full refresh
+    function updateDocumentStatus(fileId, status) {
+      // Find the document element
+      const docElements = document.querySelectorAll(`[data-doc-id="${fileId}"]`);
+
+      docElements.forEach(docEl => {
+        // Update status badge
+        const statusBadge = docEl.querySelector('[data-status-badge]');
+        if (statusBadge) {
+          statusBadge.outerHTML = docStatusBadge(status);
+        }
+
+        // Show/hide action buttons based on status
+        const actions = docEl.querySelector('[data-doc-actions]');
+        if (actions) {
+          if (['active', 'completed'].includes(status)) {
+            actions.innerHTML = getDocumentActions(fileId, status);
+          } else if (['pending', 'processing'].includes(status)) {
+            actions.innerHTML = getProcessingActions(fileId);
+          }
+        }
+      });
+    }
+
+    // Get action buttons HTML based on status
+    function getDocumentActions(fileId, status) {
+      // This will be updated with actual matter ID when rendered
+      return `
+        <button onclick="downloadDocument('${fileId}', currentMatterData.matter.matter_id, '')" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+          Download
+        </button>
+      `;
+    }
+
+    function getProcessingActions(fileId) {
+      return `
+        <span class="text-xs text-gray-500 italic">Processing...</span>
+      `;
+    }
+
+    // Cancel document processing
+    window.cancelDocumentProcessing = async function(jobId, filename) {
+      try {
+        const response = await fetch(`${api.baseUrl}/api/v1/ingest/jobs/${jobId}/cancel`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${api.token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to cancel processing');
+        }
+
+        // Close SSE connection
+        const eventSource = activeSSEConnections.get(jobId);
+        if (eventSource) {
+          eventSource.close();
+          activeSSEConnections.delete(jobId);
+        }
+
+        Toast.success(`Cancelled processing: ${filename}`);
+
+        // Refresh documents
+        if (currentMatterData) {
+          await refreshDrawerDocuments(currentMatterData.matter.matter_id);
+        }
+      } catch (error) {
+        console.error('Failed to cancel document processing:', error);
+        Toast.error(error.message || 'Failed to cancel processing');
+      }
+    };
+
+    // Helper function for status badge (moved outside render function for reuse)
+    function docStatusBadge(status) {
+      const badges = {
+        'completed': '<span data-status-badge class="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700">Ready</span>',
+        'active': '<span data-status-badge class="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700">Ready</span>',
+        'processing': '<span data-status-badge class="px-2 py-0.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-700">Processing</span>',
+        'queued': '<span data-status-badge class="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700">Queued</span>',
+        'pending': '<span data-status-badge class="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700">Pending</span>',
+        'cancelled': '<span data-status-badge class="px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-700">Cancelled</span>',
+        'failed': '<span data-status-badge class="px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-700">Failed</span>',
+        'error': '<span data-status-badge class="px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-700">Error</span>',
+        'deleted': '<span data-status-badge class="px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-700">Deleted</span>'
+      };
+      return badges[status] || badges['pending'];
+    }
+
+    // Setup upload handlers for drawer
+    function setupDrawerUpload(matterId, dropZoneId, fileInputId) {
+      const dropZone = document.getElementById(dropZoneId);
+      const fileInput = document.getElementById(fileInputId);
+
+      if (!dropZone || !fileInput) return;
+
+      // Click to open file picker
+      dropZone.addEventListener('click', (e) => {
+        if (e.target.tagName !== 'INPUT') {
+          fileInput.click();
+        }
+      });
+
+      // Drag and drop
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('border-indigo-400', 'bg-indigo-50');
+      });
+
+      dropZone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('border-indigo-400', 'bg-indigo-50');
+      });
+
+      dropZone.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('border-indigo-400', 'bg-indigo-50');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+          await handleDrawerFileUpload(files, matterId);
+        }
+      });
+
+      // File input change
+      fileInput.addEventListener('change', async (e) => {
+        if (e.target.files.length > 0) {
+          await handleDrawerFileUpload(e.target.files, matterId);
+        }
+      });
+    }
+
+    // Handle file upload from drawer
+    async function handleDrawerFileUpload(files, matterId) {
+      const fileArray = Array.from(files);
+
+      // For single file uploads, show metadata modal
+      if (fileArray.length === 1) {
+        showMetadataModal(fileArray[0], matterId);
+        return;
+      }
+
+      // For multiple files, upload directly without metadata modal
+      const dropContent = document.getElementById('drawerDocDropContent');
+      const uploadProgress = document.getElementById('drawerDocUploadProgress');
+      const uploadText = document.getElementById('drawerDocUploadText');
+
+      // Show progress
+      if (dropContent) dropContent.classList.add('hidden');
+      if (uploadProgress) uploadProgress.classList.remove('hidden');
+
+      let successCount = 0;
+
+      for (let i = 0; i < fileArray.length; i++) {
+        const file = fileArray[i];
+        if (uploadText) uploadText.textContent = `Uploading ${i + 1}/${fileArray.length}: ${file.name}`;
+
+        try {
+          const result = await api.uploadDocument(file, matterId);
+          successCount++;
+
+          // Start SSE stream to monitor processing status
+          if (result.job_id && result.file_id) {
+            console.log(`Starting SSE stream for ${file.name}`, {
+              jobId: result.job_id,
+              fileId: result.file_id
+            });
+            startDocumentStatusStream(result.job_id, result.file_id, matterId, file.name);
+          }
+        } catch (error) {
+          Toast.error(`Failed to upload ${file.name}: ${error.message}`);
+        }
+      }
+
+      // Reset UI
+      if (dropContent) dropContent.classList.remove('hidden');
+      if (uploadProgress) uploadProgress.classList.add('hidden');
+
+      // Reset file inputs to allow re-selection of same files
+      const emptyFileInput = document.getElementById('drawerEmptyFileInput');
+      const docFileInput = document.getElementById('drawerDocFileInput');
+      if (emptyFileInput) emptyFileInput.value = '';
+      if (docFileInput) docFileInput.value = '';
+
+      if (successCount > 0) {
+        Toast.success(`Uploaded ${successCount} document(s) - processing started`);
+        // Refresh documents to show initial state
+        await refreshDrawerDocuments(matterId);
+      }
+    }
+
+    // Refresh documents in drawer
+    async function refreshDrawerDocuments(matterId) {
+      try {
+        const docsResult = await api.getMatterFiles(matterId);
+        const documents = docsResult.files || [];
+        const pagination = docsResult.pagination || { total_count: 0 };
+
+        // Update current matter data
+        if (currentMatterData) {
+          currentMatterData.documents = documents;
+          currentMatterData.documentsPagination = pagination;
+        }
+
+        // Update document count badge
+        document.getElementById('documentCount').textContent = pagination.total_count || documents.length || '';
+
+        // Re-render the documents tab
+        renderDocumentsTab(currentMatterData.matter, documents);
+      } catch (error) {
+        console.error('Failed to refresh documents:', error);
+      }
+    }
+
+    // Delete document from drawer
+    window.deleteDrawerDocument = async function(fileId, matterId) {
+      Modal.confirm('Delete Document', 'Are you sure you want to delete this document? This action cannot be undone.', async () => {
+        try {
+          await api.deleteDocument(fileId, matterId);
+          Toast.success('Document deleted');
+          await refreshDrawerDocuments(matterId);
+        } catch (error) {
+          Toast.error(error.message || 'Failed to delete document');
+        }
+      });
+    }
+
+    // Document Metadata Modal Setup
+    const metadataModal = document.getElementById('documentMetadataModal');
+    const metadataFileName = document.getElementById('metadataFileName');
+    const metadataFileSize = document.getElementById('metadataFileSize');
+    const metadataDocType = document.getElementById('metadataDocType');
+    const metadataTags = document.getElementById('metadataTags');
+    const metadataNotes = document.getElementById('metadataNotes');
+    const confirmMetadataUpload = document.getElementById('confirmMetadataUpload');
+    const cancelMetadataUpload = document.getElementById('cancelMetadataUpload');
+    const closeMetadataModal = document.getElementById('closeMetadataModal');
+
+    let pendingFileUpload = null;
+    let pendingMatterId = null;
+
+    function formatFileSize(bytes) {
+      if (!bytes) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    function showMetadataModal(file, matterId) {
+      pendingFileUpload = file;
+      pendingMatterId = matterId;
+
+      // Populate file info
+      metadataFileName.textContent = file.name;
+      metadataFileSize.textContent = formatFileSize(file.size);
+
+      // Reset form fields
+      metadataDocType.value = '';
+      metadataTags.value = '';
+      metadataNotes.value = '';
+
+      // Reset character counter
+      const charCount = document.getElementById('notesCharCount');
+      if (charCount) charCount.textContent = '0';
+
+      // Show modal
+      metadataModal.classList.remove('hidden');
+    }
+
+    function closeMetadataModalFn() {
+      metadataModal.classList.add('hidden');
+      pendingFileUpload = null;
+      pendingMatterId = null;
+
+      // Reset file inputs to allow re-selection of same file
+      const fileInputs = ['drawerEmptyFileInput', 'drawerDocFileInput'];
+      fileInputs.forEach(id => {
+        const input = document.getElementById(id);
+        if (input) input.value = '';
+      });
+    }
+
+    async function confirmMetadataUploadFn() {
+      if (!pendingFileUpload || !pendingMatterId) {
+        Toast.error('No file selected for upload');
+        return;
+      }
+
+      // Disable button and show loading state
+      confirmMetadataUpload.disabled = true;
+      const originalContent = confirmMetadataUpload.innerHTML;
+      confirmMetadataUpload.innerHTML = `
+        <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span>Uploading...</span>
+      `;
+
+      const file = pendingFileUpload;
+      const matterId = pendingMatterId;
+
+      // Collect metadata
+      const options = {};
+
+      const docType = metadataDocType.value;
+      if (docType) {
+        options.document_type = docType;
+      }
+
+      const tags = metadataTags.value.trim();
+      if (tags) {
+        options.tags = tags;
+      }
+
+      const notes = metadataNotes.value.trim();
+      if (notes) {
+        options.notes = notes;
+      }
+
+      // Small delay to show loading state, then close modal
+      await new Promise(resolve => setTimeout(resolve, 300));
+      closeMetadataModalFn();
+
+      // Reset button state
+      confirmMetadataUpload.disabled = false;
+      confirmMetadataUpload.innerHTML = originalContent;
+
+      // Show upload progress
+      const dropContent = document.getElementById('drawerDocDropContent');
+      const uploadProgress = document.getElementById('drawerDocUploadProgress');
+      const uploadText = document.getElementById('drawerDocUploadText');
+
+      if (dropContent) dropContent.classList.add('hidden');
+      if (uploadProgress) uploadProgress.classList.remove('hidden');
+      if (uploadText) uploadText.textContent = `Uploading ${file.name}...`;
+
+      try {
+        const result = await api.uploadDocument(file, matterId, options);
+
+        // Start SSE stream to monitor processing status
+        if (result.job_id && result.file_id) {
+          console.log(`Starting SSE stream for ${file.name}`, {
+            jobId: result.job_id,
+            fileId: result.file_id
+          });
+          startDocumentStatusStream(result.job_id, result.file_id, matterId, file.name);
+        }
+
+        Toast.success(`Document uploaded - processing started`);
+        await refreshDrawerDocuments(matterId);
+      } catch (error) {
+        Toast.error(`Failed to upload ${file.name}: ${error.message}`);
+      } finally {
+        // Reset UI
+        if (dropContent) dropContent.classList.remove('hidden');
+        if (uploadProgress) uploadProgress.classList.add('hidden');
+      }
+    }
+
+    // Event listeners for metadata modal
+    closeMetadataModal.addEventListener('click', closeMetadataModalFn);
+    cancelMetadataUpload.addEventListener('click', closeMetadataModalFn);
+    confirmMetadataUpload.addEventListener('click', confirmMetadataUploadFn);
+
+    // Character counter for notes field
+    metadataNotes.addEventListener('input', (e) => {
+      const charCount = document.getElementById('notesCharCount');
+      if (charCount) {
+        charCount.textContent = e.target.value.length;
+      }
+    });
+
+    // Close modal when clicking outside
+    metadataModal.addEventListener('click', (e) => {
+      if (e.target === metadataModal) {
+        closeMetadataModalFn();
+      }
+    });
+
+    // Close modal with ESC key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !metadataModal.classList.contains('hidden')) {
+        closeMetadataModalFn();
+      }
+    });
+
+    // Document Viewer Modal Setup
+    const viewerModal = document.getElementById('documentViewerModal');
+    const viewerLoading = document.getElementById('viewerLoading');
+    const viewerError = document.getElementById('viewerError');
+    const viewerIframe = document.getElementById('viewerIframe');
+    const viewerText = document.getElementById('viewerText');
+    const viewerImage = document.getElementById('viewerImage');
+
+    document.getElementById('closeDocumentViewer').addEventListener('click', closeDocumentViewer);
+    viewerModal.addEventListener('click', (e) => {
+      if (e.target === viewerModal) closeDocumentViewer();
+    });
+
+    function closeDocumentViewer() {
+      viewerModal.classList.add('hidden');
+      // Clean up content
+      viewerIframe.src = '';
+      viewerIframe.classList.add('hidden');
+      viewerText.textContent = '';
+      viewerText.classList.add('hidden');
+      viewerImage.src = '';
+      viewerImage.classList.add('hidden');
+      viewerError.classList.add('hidden');
+    }
+
+    function formatFileSize(bytes) {
+      if (!bytes) return '0 B';
+      const units = ['B', 'KB', 'MB', 'GB'];
+      let i = 0;
+      let size = parseInt(bytes);
+      while (size >= 1024 && i < units.length - 1) {
+        size /= 1024;
+        i++;
+      }
+      return `${size.toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
+    }
+
+    // View document in modal
+    window.viewDocument = async function(fileId, matterId, filename, contentType, fileSize) {
+      // Show modal with loading state
+      viewerModal.classList.remove('hidden');
+      viewerLoading.classList.remove('hidden');
+      viewerError.classList.add('hidden');
+      viewerIframe.classList.add('hidden');
+      viewerText.classList.add('hidden');
+      viewerImage.classList.add('hidden');
+
+      // Set file info
+      document.getElementById('viewerFileName').textContent = filename;
+      document.getElementById('viewerFileInfo').textContent = `${contentType || 'Unknown type'} • ${formatFileSize(fileSize)}`;
+
+      // Set download button URL (will be handled by downloadDocument)
+      document.getElementById('viewerDownloadBtn').onclick = () => downloadDocument(fileId, matterId, filename);
+      document.getElementById('viewerErrorDownload').onclick = () => downloadDocument(fileId, matterId, filename);
+
+      try {
+        // Fetch file with authentication
+        const response = await fetch(api.getFileViewUrl(fileId, matterId), {
+          headers: {
+            'Authorization': `Bearer ${api.token}`
+          }
+        });
+
+        if (!response.ok) {
+          // Check for authentication errors (401) - redirect to login
+          if (response.status === 401) {
+            if (window.api && typeof window.api.showSessionExpiredModal === 'function') {
+              window.api.showSessionExpiredModal();
+            } else {
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              Toast.error('Session expired. Redirecting to login...');
+              setTimeout(() => { window.location.href = 'login.html'; }, 1500);
+            }
+            throw new Error('Session expired');
+          }
+          throw new Error(`Failed to load document: ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+
+        viewerLoading.classList.add('hidden');
+
+        // Display based on content type
+        const type = contentType?.toLowerCase() || '';
+
+        if (type.startsWith('image/')) {
+          // Image files
+          viewerImage.src = url;
+          viewerImage.classList.remove('hidden');
+        } else if (type === 'application/pdf') {
+          // PDF files - use iframe
+          viewerIframe.src = url;
+          viewerIframe.classList.remove('hidden');
+        } else if (type.startsWith('text/') || type === 'application/json' || type === 'application/xml' || filename.match(/\.(txt|md|json|xml|csv|log|js|ts|py|html|css|yaml|yml)$/i)) {
+          // Text-based files
+          const text = await blob.text();
+          viewerText.textContent = text;
+          viewerText.classList.remove('hidden');
+        } else {
+          // Unsupported file type - show error with download option
+          viewerError.classList.remove('hidden');
+          document.getElementById('viewerErrorMsg').textContent = `Preview not available for ${contentType || 'this file type'}`;
+        }
+      } catch (error) {
+        console.error('Failed to load document:', error);
+        viewerLoading.classList.add('hidden');
+        viewerError.classList.remove('hidden');
+        document.getElementById('viewerErrorMsg').textContent = error.message || 'Failed to load document';
+      }
+    }
+
+    // Download document with authentication
+    window.downloadDocument = async function(fileId, matterId, filename) {
+      try {
+        const response = await fetch(api.getFileDownloadUrl(fileId, matterId), {
+          headers: {
+            'Authorization': `Bearer ${api.token}`
+          }
+        });
+
+        if (!response.ok) {
+          // Check for authentication errors (401) - redirect to login
+          if (response.status === 401) {
+            if (window.api && typeof window.api.showSessionExpiredModal === 'function') {
+              window.api.showSessionExpiredModal();
+            } else {
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              Toast.error('Session expired. Redirecting to login...');
+              setTimeout(() => { window.location.href = 'login.html'; }, 1500);
+            }
+            throw new Error('Session expired');
+          }
+          throw new Error(`Failed to download: ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+
+        // Create download link
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        Toast.success('Download started');
+      } catch (error) {
+        console.error('Download failed:', error);
+        Toast.error(error.message || 'Failed to download file');
+      }
+    }
+
+    // Render Conversations Tab
+    function renderConversationsTab(matter, chats) {
+      const content = document.getElementById('tabContentConversations');
+      
+      if (chats.length === 0) {
+        content.innerHTML = `
+          <div class="text-center py-12">
+            <div class="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
+              </svg>
+            </div>
+            <h4 class="text-lg font-semibold text-gray-900 mb-2">No conversations yet</h4>
+            <p class="text-gray-500 mb-6">Start a conversation in this matter to organize all related chats</p>
+            <a href="chat.html?matter=${matter.matter_id}" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+              Start First Conversation
+            </a>
+          </div>
+        `;
+        return;
+      }
+
+      content.innerHTML = `
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <p class="text-sm text-gray-500">${chats.length} conversation${chats.length !== 1 ? 's' : ''}</p>
+            <a href="chat.html?matter=${matter.matter_id}" class="inline-flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+              New Chat
+            </a>
+          </div>
+
+          <div class="space-y-2">
+            ${chats.map(chat => `
+              <a href="chat.html?session=${chat.thread_id}" class="block bg-white border border-gray-200 hover:border-indigo-300 hover:shadow-sm rounded-lg p-4 transition-all group">
+                <div class="flex items-start gap-3">
+                  <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
+                    </svg>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <h6 class="text-sm font-semibold text-gray-900 group-hover:text-indigo-600 mb-1 truncate">${chat.metadata?.title || 'Untitled Conversation'}</h6>
+                    <p class="text-xs text-gray-500 flex items-center gap-4">
+                      <span>Started ${timeAgo(chat.created_at)}</span>
+                      ${chat.metadata?.messageCount ? `<span>• ${chat.metadata.messageCount} messages</span>` : ''}
+                    </p>
+                  </div>
+                  <svg class="w-5 h-5 text-gray-400 group-hover:text-indigo-600 flex-shrink-0 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                  </svg>
+                </div>
+              </a>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    // Render Activity Tab
+    function renderActivityTab(matter, activities) {
+      const content = document.getElementById('tabContentActivity');
+      
+      if (activities.length === 0) {
+        content.innerHTML = `
+          <div class="text-center py-12">
+            <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <h4 class="text-lg font-semibold text-gray-900 mb-2">No activity yet</h4>
+            <p class="text-gray-500">Activity related to this matter will appear here</p>
+          </div>
+        `;
+        return;
+      }
+
+      // Group activities by date
+      const groupedActivities = {};
+      activities.forEach(activity => {
+        const date = new Date(activity.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        if (!groupedActivities[date]) {
+          groupedActivities[date] = [];
+        }
+        groupedActivities[date].push(activity);
+      });
+
+      content.innerHTML = `
+        <div class="space-y-6">
+          ${Object.entries(groupedActivities).map(([date, dayActivities]) => `
+            <div>
+              <h6 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 sticky top-0 bg-white py-2">${date}</h6>
+              <div class="space-y-3">
+                ${dayActivities.map(activity => `
+                  <div class="flex items-start gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                    <div class="w-8 h-8 ${getActivityBgColor(activity.action_type)} rounded-full flex items-center justify-center flex-shrink-0">
+                      ${getActivityIcon(activity.action_type)}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm text-gray-900 leading-relaxed">${getActivityDescription(activity)}</p>
+                      <p class="text-xs text-gray-500 mt-1">${timeAgo(activity.created_at)}</p>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    // Activity helper functions
+    function getActivityIcon(actionType) {
+      const icons = {
+        'document_uploaded': '<svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>',
+        'document_viewed': '<svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>',
+        'matter_created': '<svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>',
+        'matter_updated': '<svg class="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>',
+        'chat_message': '<svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>',
+        'user_shared': '<svg class="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>'
+      };
+      return icons[actionType] || '<svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+    }
+
+    function getActivityBgColor(actionType) {
+      const colors = {
+        'document_uploaded': 'bg-blue-100',
+        'document_viewed': 'bg-green-100',
+        'matter_created': 'bg-indigo-100',
+        'matter_updated': 'bg-yellow-100',
+        'chat_message': 'bg-purple-100',
+        'user_shared': 'bg-teal-100'
+      };
+      return colors[actionType] || 'bg-gray-100';
+    }
+
+    function getActivityDescription(activity) {
+      const descriptions = {
+        'document_uploaded': `Document uploaded: ${activity.metadata?.filename || 'file'}`,
+        'document_viewed': `Document viewed: ${activity.metadata?.filename || 'file'}`,
+        'matter_created': 'Matter was created',
+        'matter_updated': `Matter was updated${activity.metadata?.field ? ': ' + activity.metadata.field : ''}`,
+        'chat_message': 'New chat message',
+        'user_shared': `Shared with ${activity.metadata?.user_email || 'user'}`
+      };
+      return descriptions[activity.action_type] || activity.description || activity.action_type?.replace(/_/g, ' ') || 'Activity';
+    }
+
+    // Close drawer function (must be defined before event listeners)
+    window.closeDrawer = function() {
+      document.getElementById('matterDrawer').classList.add('translate-x-full');
+      setTimeout(() => {
+        document.getElementById('matterDrawer').classList.add('hidden');
+        document.getElementById('drawerOverlay').classList.add('hidden');
+      }, 300);
+    }
+
+    // Close drawer event listeners
+    const closeDrawerBtn = document.getElementById('closeDrawer');
+    const drawerOverlay = document.getElementById('drawerOverlay');
+    if (closeDrawerBtn) {
+      closeDrawerBtn.addEventListener('click', closeDrawer);
+    }
+    if (drawerOverlay) {
+      drawerOverlay.addEventListener('click', closeDrawer);
+    }
+
+    // Delete matter
+    window.deleteMatter = async function(matterId) {
+      Modal.confirm('Delete Matter', 'Are you sure you want to delete this matter? This action cannot be undone.', async () => {
+        try {
+          await api.deleteMatter(matterId);
+          Toast.success('Matter deleted');
+          closeDrawer();
+          loadMatters();
+        } catch (error) {
+          Toast.error(error.message);
+        }
+      });
+    }
+
+    // ==============================================================================
+    // Multi-Select and Bulk Delete Functions
+    // ==============================================================================
+
+    // Toggle individual matter selection
+    window.toggleMatterSelection = function(matterId) {
+      if (selectedMatters.has(matterId)) {
+        selectedMatters.delete(matterId);
+      } else {
+        selectedMatters.add(matterId);
+      }
+      updateSelectionUI();
+    }
+
+    // Update selection UI (checkboxes, count, bulk actions visibility)
+    function updateSelectionUI() {
+      const selectedCount = selectedMatters.size;
+      const selectAllCheckbox = document.getElementById('selectAllMatters');
+      const bulkActions = document.getElementById('bulkActions');
+      const selectedCountEl = document.getElementById('selectedCount');
+
+      // Update selected count text
+      selectedCountEl.textContent = `${selectedCount} selected`;
+
+      // Show/hide bulk actions
+      if (selectedCount > 0) {
+        bulkActions.classList.remove('hidden');
+      } else {
+        bulkActions.classList.add('hidden');
+      }
+
+      // Update select all checkbox state
+      if (selectedCount === 0) {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+      } else if (selectedCount === currentMatters.length) {
+        selectAllCheckbox.checked = true;
+        selectAllCheckbox.indeterminate = false;
+      } else {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = true;
+      }
+
+      // Update card highlighting and checkboxes
+      document.querySelectorAll('.matter-card').forEach(card => {
+        const matterId = card.dataset.matterId;
+        const checkbox = card.querySelector('.matter-checkbox');
+        if (selectedMatters.has(matterId)) {
+          card.classList.add('ring-2', 'ring-indigo-500');
+          if (checkbox) checkbox.checked = true;
+        } else {
+          card.classList.remove('ring-2', 'ring-indigo-500');
+          if (checkbox) checkbox.checked = false;
+        }
+      });
+    }
+
+    // Select all matters on current page
+    document.getElementById('selectAllMatters').addEventListener('change', (e) => {
+      if (e.target.checked) {
+        // Select all
+        currentMatters.forEach(matter => selectedMatters.add(matter.matter_id));
+      } else {
+        // Deselect all
+        selectedMatters.clear();
+      }
+      updateSelectionUI();
+    });
+
+    // Clear selection
+    document.getElementById('clearSelectionBtn').addEventListener('click', () => {
+      selectedMatters.clear();
+      updateSelectionUI();
+    });
+
+    // Bulk delete
+    document.getElementById('bulkDeleteBtn').addEventListener('click', async () => {
+      const count = selectedMatters.size;
+      const matterIds = Array.from(selectedMatters);
+
+      Modal.confirm(
+        'Delete Multiple Matters',
+        `Are you sure you want to delete ${count} matter(s)? This action cannot be undone.`,
+        async () => {
+          try {
+            const result = await api.bulkDeleteMatters(matterIds);
+
+            if (result.errors && result.errors.length > 0) {
+              Toast.warning(`Deleted ${result.soft_deleted + result.hard_deleted} matters, ${result.errors.length} failed`);
+            } else {
+              Toast.success(`Successfully deleted ${result.soft_deleted + result.hard_deleted} matter(s)`);
+            }
+
+            // Clear selection and reload
+            selectedMatters.clear();
+            updateSelectionUI();
+            closeDrawer();
+            loadMatters();
+          } catch (error) {
+            Toast.error(error.message || 'Failed to delete matters');
+          }
+        }
+      );
+    });
+
+    // Share modal
+    async function showShareModal(matterId) {
+      const usersResult = await api.getUsers(1, 100);
+      const users = usersResult.users || [];
+
+      const content = document.createElement('div');
+      content.innerHTML = `
+        <select id="shareUserId" class="w-full px-3 py-2 border border-gray-300 rounded-lg mb-4">
+          <option value="">Select a user</option>
+          ${users.map(u => `<option value="${u.id}">${u.email} (${u.first_name || ''} ${u.last_name || ''})</option>`).join('')}
+        </select>
+        <div class="flex gap-2">
+          <label class="flex items-center gap-2">
+            <input type="checkbox" name="perm" value="read" checked class="w-4 h-4"> Read
+          </label>
+          <label class="flex items-center gap-2">
+            <input type="checkbox" name="perm" value="write" class="w-4 h-4"> Write
+          </label>
+          <label class="flex items-center gap-2">
+            <input type="checkbox" name="perm" value="delete" class="w-4 h-4"> Delete
+          </label>
+        </div>
+      `;
+
+      Modal.show({
+        title: 'Share Matter',
+        content,
+        confirmText: 'Share',
+        onConfirm: async () => {
+          const userId = document.getElementById('shareUserId').value;
+          if (!userId) {
+            Toast.error('Please select a user');
+            return;
+          }
+          const permissions = Array.from(document.querySelectorAll('input[name="perm"]:checked')).map(cb => cb.value);
+          try {
+            await api.shareMatterWithUser(matterId, userId, permissions);
+            Toast.success('Matter shared');
+            viewMatter(matterId);
+          } catch (error) {
+            Toast.error(error.message);
+          }
+        }
+      });
+    }
+
+    // Remove share
+    window.removeShare = async function(matterId, userId) {
+      try {
+        await api.removeMatterShare(matterId, userId);
+        Toast.success('Access removed');
+        viewMatter(matterId);
+      } catch (error) {
+        Toast.error(error.message);
+      }
+    }
+
+    // Form submission
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const matterId = document.getElementById('matterId').value;
+      const data = {
+        client_name: document.getElementById('clientName').value,
+        name: document.getElementById('matterName').value,
+        description: document.getElementById('matterDescription').value,
+        status: document.getElementById('matterStatus').value,
+        visibility: document.getElementById('matterVisibility').value,
+        share_with: selectedUsers.map(u => u.id)
+      };
+
+      try {
+        if (matterId) {
+          await api.updateMatter(matterId, data);
+          // Update sharing - sync the selected users
+          const currentPerms = await api.getMatterPermissions(matterId).catch(() => ({ permissions: [] }));
+          const currentUserIds = (currentPerms.permissions || []).map(p => p.user_id);
+          const newUserIds = selectedUsers.map(u => u.id);
+          
+          // Remove users no longer selected
+          for (const userId of currentUserIds) {
+            if (!newUserIds.includes(userId)) {
+              await api.removeMatterShare(matterId, userId).catch(() => {});
+            }
+          }
+          
+          // Add new users
+          for (const userId of newUserIds) {
+            if (!currentUserIds.includes(userId)) {
+              await api.shareMatterWithUser(matterId, userId, ['read', 'write']).catch(() => {});
+            }
+          }
+          
+          Toast.success('Matter updated');
+        } else {
+          const result = await api.createMatter(data);
+          Toast.success(`Matter created: ${result.matter?.matter_id || 'Success'}`);
+        }
+        modal.classList.add('hidden');
+        resetShareForm();
+        loadMatters();
+      } catch (error) {
+        Toast.error(error.message);
+      }
+    });
+
+      // Initialize - use async IIFE to handle promise-based flow
+      (async function init() {
+        // Load matters first
+        await loadMatters();
+
+        // Check for matter_id or open URL parameter and auto-open drawer
+        const urlParams = new URLSearchParams(window.location.search);
+        const matterId = urlParams.get('matter_id') || urlParams.get('open');
+        const defaultTab = urlParams.get('tab') || 'details';
+        if (matterId) {
+          // Matters are now loaded, open the drawer immediately
+          viewMatter(matterId, defaultTab);
+        }
+      })();
+    }
+
+    // Matters Info Modal Functions
+    window.openMattersInfoModal = function() {
+      const modal = document.getElementById('mattersInfoModal');
+      modal.classList.remove('hidden');
+    }
+
+    window.closeMattersInfoModal = function() {
+      const modal = document.getElementById('mattersInfoModal');
+      modal.classList.add('hidden');
+    }
+  </script>
+</body>
+</html>

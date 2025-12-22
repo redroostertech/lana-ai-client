@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings - LanaAI</title>
+  <script src="js/tailwind-loader.js"></script>
+  <script src="js/error-reporter.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/mock-data.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/components.js"></script>
+  <script src="js/menu.js"></script>
+  <script src="js/vpn-manager.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <!-- Sidebar -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
+    <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
+      <a href="index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
+      <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
+      <!-- Menu will be dynamically rendered by menu.js -->
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="lg:ml-64">
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
+      <div class="flex items-center justify-between h-16 px-4 lg:px-8">
+        <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+        <h1 class="text-xl font-semibold text-gray-900">Settings</h1>
+        <button id="logoutBtn" class="text-gray-500 hover:text-gray-700" title="Logout">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="p-4 lg:p-8">
+      <!-- Profile Section -->
+      <section class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-gray-900">Profile Information</h2>
+          <button id="editProfileBtn" class="hidden px-3 py-1.5 text-sm text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors flex items-center gap-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+            Edit
+          </button>
+        </div>
+
+        <!-- Profile Loading Skeleton -->
+        <div id="profileLoading" class="animate-pulse">
+          <div class="flex items-center gap-6 mb-6">
+            <div class="w-20 h-20 bg-gray-200 rounded-full"></div>
+            <div>
+              <div class="h-6 bg-gray-200 rounded w-40 mb-2"></div>
+              <div class="h-4 bg-gray-200 rounded w-48"></div>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div class="h-4 bg-gray-200 rounded w-20 mb-2"></div>
+              <div class="h-5 bg-gray-200 rounded w-28"></div>
+            </div>
+            <div>
+              <div class="h-4 bg-gray-200 rounded w-20 mb-2"></div>
+              <div class="h-5 bg-gray-200 rounded w-24"></div>
+            </div>
+            <div>
+              <div class="h-4 bg-gray-200 rounded w-12 mb-2"></div>
+              <div class="h-5 bg-gray-200 rounded w-20"></div>
+            </div>
+            <div>
+              <div class="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+              <div class="h-5 bg-gray-200 rounded w-32"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Read-only Profile View -->
+        <div id="profileView" class="hidden">
+          <div class="flex items-center gap-6 mb-6">
+            <div class="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center">
+              <span id="profileInitials" class="text-2xl font-bold text-indigo-600">U</span>
+            </div>
+            <div>
+              <h3 id="profileName" class="text-xl font-semibold text-gray-900">Loading...</h3>
+              <p id="profileEmail" class="text-gray-500">Loading...</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p class="text-sm text-gray-500">First Name</p>
+              <p id="profileFirstName" class="text-gray-900 font-medium">—</p>
+            </div>
+            <div>
+              <p class="text-sm text-gray-500">Last Name</p>
+              <p id="profileLastName" class="text-gray-900 font-medium">—</p>
+            </div>
+            <div>
+              <p class="text-sm text-gray-500">Role</p>
+              <p id="profileRole" class="text-gray-900 font-medium">—</p>
+            </div>
+            <div>
+              <p class="text-sm text-gray-500">Organization</p>
+              <p id="profileOrg" class="text-gray-900 font-medium">—</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Edit Profile Form (hidden by default) -->
+        <form id="profileForm" class="hidden space-y-4">
+          <div class="flex items-center gap-6 mb-6">
+            <div class="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center">
+              <span id="profileInitialsEdit" class="text-2xl font-bold text-indigo-600">U</span>
+            </div>
+            <div>
+              <h3 id="profileNameEdit" class="text-xl font-semibold text-gray-900">Loading...</h3>
+              <p id="profileEmailEdit" class="text-gray-500">Loading...</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+              <input type="text" id="firstName" name="first_name"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+              <input type="text" id="lastName" name="last_name"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+            </div>
+          </div>
+          <div class="flex gap-3">
+            <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg">
+              Save Changes
+            </button>
+            <button type="button" id="cancelEditBtn" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg">
+              Cancel
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Security Section -->
+      <section class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Security</h2>
+
+        <!-- Change Password -->
+        <div class="border-b border-gray-200 pb-6 mb-6">
+          <h3 class="text-sm font-medium text-gray-700 mb-3">Change Password</h3>
+          <form id="passwordForm" class="space-y-4">
+            <div>
+              <label class="block text-sm text-gray-600 mb-1">Current Password</label>
+              <input type="password" id="currentPassword" required
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+              <p id="currentPasswordError" class="text-red-500 text-sm mt-1 hidden"></p>
+            </div>
+            <div>
+              <label class="block text-sm text-gray-600 mb-1">New Password</label>
+              <input type="password" id="newPassword" required minlength="8"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+              <p id="newPasswordError" class="text-red-500 text-sm mt-1 hidden"></p>
+              <div class="mt-2 text-xs text-gray-500">
+                <p id="pwReqLength" class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-gray-300"></span> At least 12 characters</p>
+                <p id="pwReqUpper" class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-gray-300"></span> One uppercase letter</p>
+                <p id="pwReqLower" class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-gray-300"></span> One lowercase letter</p>
+                <p id="pwReqNumber" class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-gray-300"></span> One number</p>
+                <p id="pwReqSpecial" class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-gray-300"></span> One special character</p>
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm text-gray-600 mb-1">Confirm New Password</label>
+              <input type="password" id="confirmPassword" required minlength="8"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+              <p id="confirmPasswordError" class="text-red-500 text-sm mt-1 hidden"></p>
+            </div>
+            <button type="submit" id="updatePasswordBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed">
+              Update Password
+            </button>
+          </form>
+        </div>
+
+        <!-- MFA (hidden if MFA_ENABLED is false) -->
+        <div id="mfaSection" class="hidden">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h3 class="text-sm font-medium text-gray-700">Two-Factor Authentication</h3>
+              <p class="text-sm text-gray-500">Add an extra layer of security to your account</p>
+            </div>
+            <div id="mfaStatus">
+              <!-- MFA status will be loaded here -->
+            </div>
+          </div>
+          <button id="mfaToggle" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg">
+            Loading...
+          </button>
+        </div>
+      </section>
+
+      <!-- VPN Status Section -->
+      <section id="vpnSection" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6 hidden">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+              <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+              </svg>
+            </div>
+            <div>
+              <h2 class="text-lg font-semibold text-gray-900">VPN Status</h2>
+              <p class="text-sm text-gray-500">Secure remote access connection</p>
+            </div>
+          </div>
+          <div id="vpnStatusBadge">
+            <!-- Status badge will be rendered here -->
+          </div>
+        </div>
+
+        <!-- VPN Loading State -->
+        <div id="vpnLoading" class="animate-pulse">
+          <div class="bg-gray-50 rounded-lg p-4">
+            <div class="h-4 bg-gray-200 rounded w-1/3 mb-3"></div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <div class="h-3 bg-gray-200 rounded w-16 mb-2"></div>
+                <div class="h-4 bg-gray-200 rounded w-24"></div>
+              </div>
+              <div>
+                <div class="h-3 bg-gray-200 rounded w-20 mb-2"></div>
+                <div class="h-4 bg-gray-200 rounded w-32"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- VPN Configured State -->
+        <div id="vpnConfigured" class="hidden">
+          <div class="bg-green-50 rounded-lg p-4 border border-green-200 mb-4">
+            <div class="flex items-start gap-3">
+              <svg class="w-5 h-5 text-green-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <div class="flex-1">
+                <p class="font-medium text-green-800">VPN Configured</p>
+                <p class="text-sm text-green-700 mt-1">Your device is set up for secure remote access.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-gray-50 rounded-lg p-4 mb-4">
+            <h4 class="text-sm font-medium text-gray-700 mb-3">Device Information</h4>
+            <div class="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span class="text-gray-500">Device ID</span>
+                <p id="vpnDeviceId" class="text-gray-900 font-mono mt-1">...</p>
+              </div>
+              <div>
+                <span class="text-gray-500">VPN IP Address</span>
+                <p id="vpnClientIp" class="text-gray-900 font-mono mt-1">...</p>
+              </div>
+              <div>
+                <span class="text-gray-500">Registration</span>
+                <p id="vpnRegistration" class="text-gray-900 mt-1">...</p>
+              </div>
+              <div>
+                <span class="text-gray-500">Created</span>
+                <p id="vpnCreatedAt" class="text-gray-900 mt-1">...</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex gap-3">
+            <button id="downloadVpnConfigBtn" class="flex-1 py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+              </svg>
+              Download Config
+            </button>
+            <button id="resetVpnBtn" class="py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors">
+              Reset
+            </button>
+          </div>
+        </div>
+
+        <!-- VPN Not Configured State -->
+        <div id="vpnNotConfigured" class="hidden">
+          <div class="bg-yellow-50 rounded-lg p-4 border border-yellow-200 mb-4">
+            <div class="flex items-start gap-3">
+              <svg class="w-5 h-5 text-yellow-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+              </svg>
+              <div class="flex-1">
+                <p class="font-medium text-yellow-800">VPN Not Configured</p>
+                <p class="text-sm text-yellow-700 mt-1">Set up VPN to access LanaAI securely from outside your network.</p>
+              </div>
+            </div>
+          </div>
+
+          <button id="setupVpnBtn" class="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+            </svg>
+            Set Up VPN
+          </button>
+        </div>
+      </section>
+
+      <!-- Preferences Section (hidden if USER_PREFERENCES_EDIT_ENABLED is false) -->
+      <section id="preferencesSection" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6 hidden">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Preferences</h2>
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-sm font-medium text-gray-700">Email Notifications</h3>
+              <p class="text-sm text-gray-500">Receive email notifications for important updates</p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="prefEmailNotifications" class="sr-only peer">
+              <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+            </label>
+          </div>
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-sm font-medium text-gray-700">Dark Mode</h3>
+              <p class="text-sm text-gray-500">Use dark theme for the interface</p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="prefDarkMode" class="sr-only peer">
+              <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Sessions Section -->
+      <section class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-gray-900">Active Sessions</h2>
+          <button id="revokeAllSessions" class="text-sm text-red-600 hover:text-red-800">Revoke all other sessions</button>
+        </div>
+        <!-- Sessions Loading Skeleton -->
+        <div id="sessionsLoading" class="space-y-3 animate-pulse">
+          <div class="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+            <div class="flex-1">
+              <div class="h-4 bg-gray-200 rounded w-28 mb-2"></div>
+              <div class="h-3 bg-gray-200 rounded w-48 mb-1"></div>
+              <div class="h-3 bg-gray-200 rounded w-32"></div>
+            </div>
+            <div class="h-4 bg-gray-200 rounded w-14"></div>
+          </div>
+          <div class="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+            <div class="flex-1">
+              <div class="h-4 bg-gray-200 rounded w-32 mb-2"></div>
+              <div class="h-3 bg-gray-200 rounded w-40 mb-1"></div>
+              <div class="h-3 bg-gray-200 rounded w-28"></div>
+            </div>
+            <div class="h-4 bg-gray-200 rounded w-14"></div>
+          </div>
+          <div class="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+            <div class="flex-1">
+              <div class="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+              <div class="h-3 bg-gray-200 rounded w-44 mb-1"></div>
+              <div class="h-3 bg-gray-200 rounded w-36"></div>
+            </div>
+            <div class="h-4 bg-gray-200 rounded w-14"></div>
+          </div>
+        </div>
+        <!-- Sessions Content -->
+        <div id="sessionsList" class="hidden space-y-3">
+          <!-- Sessions will be loaded here -->
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    if (!api.requireAuth()) throw new Error('Not authenticated');
+
+    // Render dynamic menu
+    renderMenu('#mainNav');
+
+    // Sidebar
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('openSidebar').addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+    document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      await api.logout();
+      window.location.href = 'login.html';
+    });
+
+    // Profile edit toggle
+    const profileView = document.getElementById('profileView');
+    const profileForm = document.getElementById('profileForm');
+    const editProfileBtn = document.getElementById('editProfileBtn');
+    const cancelEditBtn = document.getElementById('cancelEditBtn');
+
+    function showEditMode() {
+      profileView.classList.add('hidden');
+      profileForm.classList.remove('hidden');
+      editProfileBtn.classList.add('hidden');
+    }
+
+    function showViewMode() {
+      profileView.classList.remove('hidden');
+      profileForm.classList.add('hidden');
+      editProfileBtn.classList.remove('hidden');
+    }
+
+    editProfileBtn.addEventListener('click', showEditMode);
+    cancelEditBtn.addEventListener('click', showViewMode);
+
+    // Load profile
+    async function loadProfile() {
+      const profileLoading = document.getElementById('profileLoading');
+      const profileView = document.getElementById('profileView');
+      const editProfileBtn = document.getElementById('editProfileBtn');
+      
+      try {
+        const result = await api.getProfile();
+        const user = result.profile || result.user || result;
+
+        // Populate view mode
+        const firstName = user.first_name || '';
+        const lastName = user.last_name || '';
+        const name = `${firstName} ${lastName}`.trim() || user.email;
+        const initials = (firstName[0] || '') + (lastName[0] || '') || user.email?.[0]?.toUpperCase();
+
+        document.getElementById('profileName').textContent = name;
+        document.getElementById('profileEmail').textContent = user.email || '';
+        document.getElementById('profileInitials').textContent = initials;
+        document.getElementById('profileFirstName').textContent = firstName || '—';
+        document.getElementById('profileLastName').textContent = lastName || '—';
+        document.getElementById('profileRole').textContent = user.role_name || '—';
+        document.getElementById('profileOrg').textContent = user.organization_name || '—';
+
+        // Populate edit form
+        document.getElementById('firstName').value = firstName;
+        document.getElementById('lastName').value = lastName;
+        document.getElementById('profileNameEdit').textContent = name;
+        document.getElementById('profileEmailEdit').textContent = user.email || '';
+        document.getElementById('profileInitialsEdit').textContent = initials;
+        
+        // Hide loading, show content
+        profileLoading.classList.add('hidden');
+        profileView.classList.remove('hidden');
+        editProfileBtn.classList.remove('hidden');
+      } catch (error) {
+        // Hide loading, show content with error state
+        profileLoading.classList.add('hidden');
+        profileView.classList.remove('hidden');
+        Toast.error('Failed to load profile');
+      }
+    }
+
+    // Update profile
+    document.getElementById('profileForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        await api.updateProfile({
+          first_name: document.getElementById('firstName').value,
+          last_name: document.getElementById('lastName').value
+        });
+        Toast.success('Profile updated');
+        showViewMode();
+        loadProfile();
+      } catch (error) {
+        Toast.error(error.message);
+      }
+    });
+
+    // Password validation helpers
+    function checkPasswordRequirements(password) {
+      return {
+        length: password.length >= 12,
+        upper: /[A-Z]/.test(password),
+        lower: /[a-z]/.test(password),
+        number: /[0-9]/.test(password),
+        special: /[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]/.test(password)
+      };
+    }
+
+    function updatePasswordIndicators(reqs) {
+      const update = (id, met) => {
+        const el = document.getElementById(id);
+        const dot = el.querySelector('span');
+        dot.className = `w-3 h-3 rounded-full ${met ? 'bg-green-500' : 'bg-gray-300'}`;
+      };
+      update('pwReqLength', reqs.length);
+      update('pwReqUpper', reqs.upper);
+      update('pwReqLower', reqs.lower);
+      update('pwReqNumber', reqs.number);
+      update('pwReqSpecial', reqs.special);
+    }
+
+    function allPasswordRequirementsMet(reqs) {
+      return reqs.length && reqs.upper && reqs.lower && reqs.number && reqs.special;
+    }
+
+    function clearPasswordErrors() {
+      document.getElementById('currentPasswordError').classList.add('hidden');
+      document.getElementById('newPasswordError').classList.add('hidden');
+      document.getElementById('confirmPasswordError').classList.add('hidden');
+    }
+
+    function showPasswordError(field, message) {
+      const el = document.getElementById(field + 'Error');
+      el.textContent = message;
+      el.classList.remove('hidden');
+    }
+
+    // Show success modal with countdown and redirect to login
+    function showPasswordChangeSuccessModal() {
+      // Create modal overlay
+      const overlay = document.createElement('div');
+      overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+      overlay.id = 'passwordSuccessModal';
+      
+      overlay.innerHTML = `
+        <div class="bg-white rounded-xl shadow-2xl p-8 max-w-md mx-4 text-center">
+          <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+          </div>
+          <h3 class="text-xl font-semibold text-gray-900 mb-2">Password Changed Successfully</h3>
+          <p class="text-gray-600 mb-4">For security, you will be redirected to login with your new password.</p>
+          <div class="text-2xl font-bold text-indigo-600 mb-2" id="countdownTimer">3</div>
+          <p class="text-sm text-gray-500">Redirecting to login...</p>
+        </div>
+      `;
+      
+      document.body.appendChild(overlay);
+      
+      // Start countdown
+      let seconds = 3;
+      const timerEl = document.getElementById('countdownTimer');
+      
+      const countdown = setInterval(() => {
+        seconds--;
+        timerEl.textContent = seconds;
+        
+        if (seconds <= 0) {
+          clearInterval(countdown);
+          // Clear auth and redirect
+          api.logout().finally(() => {
+            window.location.href = 'login.html';
+          });
+        }
+      }, 1000);
+    }
+
+    // Check if password form is valid and update button state
+    function validatePasswordForm() {
+      const currentPass = document.getElementById('currentPassword').value;
+      const newPass = document.getElementById('newPassword').value;
+      const confirmPass = document.getElementById('confirmPassword').value;
+      const updateBtn = document.getElementById('updatePasswordBtn');
+      
+      const reqs = checkPasswordRequirements(newPass);
+      const allReqsMet = allPasswordRequirementsMet(reqs);
+      const passwordsMatch = newPass === confirmPass && confirmPass.length > 0;
+      const hasCurrentPass = currentPass.length > 0;
+      
+      // Enable button only if all conditions are met
+      updateBtn.disabled = !(hasCurrentPass && allReqsMet && passwordsMatch);
+    }
+
+    // Real-time password requirement checking
+    document.getElementById('newPassword').addEventListener('input', (e) => {
+      const reqs = checkPasswordRequirements(e.target.value);
+      updatePasswordIndicators(reqs);
+      validatePasswordForm();
+      
+      // Also check confirm password match if it has a value
+      const confirmPass = document.getElementById('confirmPassword').value;
+      const errorEl = document.getElementById('confirmPasswordError');
+      if (confirmPass && confirmPass !== e.target.value) {
+        errorEl.textContent = 'Passwords do not match';
+        errorEl.classList.remove('hidden');
+      } else {
+        errorEl.classList.add('hidden');
+      }
+    });
+
+    // Real-time confirm password matching
+    document.getElementById('confirmPassword').addEventListener('input', (e) => {
+      const newPass = document.getElementById('newPassword').value;
+      const confirm = e.target.value;
+      const errorEl = document.getElementById('confirmPasswordError');
+      
+      if (confirm && confirm !== newPass) {
+        errorEl.textContent = 'Passwords do not match';
+        errorEl.classList.remove('hidden');
+      } else {
+        errorEl.classList.add('hidden');
+      }
+      validatePasswordForm();
+    });
+
+    // Current password input validation
+    document.getElementById('currentPassword').addEventListener('input', validatePasswordForm);
+
+    // Change password form submission
+    document.getElementById('passwordForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearPasswordErrors();
+
+      const current = document.getElementById('currentPassword').value;
+      const newPass = document.getElementById('newPassword').value;
+      const confirm = document.getElementById('confirmPassword').value;
+
+      // Client-side validation
+      if (!current) {
+        showPasswordError('currentPassword', 'Current password is required');
+        return;
+      }
+
+      const reqs = checkPasswordRequirements(newPass);
+      updatePasswordIndicators(reqs);
+
+      if (!allPasswordRequirementsMet(reqs)) {
+        showPasswordError('newPassword', 'Password does not meet all requirements');
+        return;
+      }
+
+      if (newPass !== confirm) {
+        showPasswordError('confirmPassword', 'Passwords do not match');
+        return;
+      }
+
+      try {
+        await api.request('PATCH', '/api/v1/users/me/security/password', {
+          current_password: current,
+          new_password: newPass
+        });
+        
+        // Show redirect modal
+        showPasswordChangeSuccessModal();
+      } catch (error) {
+        // Extract error details - handle different response formats
+        const errorData = error.data || error;
+        const errorField = errorData.field || errorData.error?.field;
+        const errorMessage = errorData.message || errorData.error?.message || error.message || 'Password update failed';
+        
+        // Handle field-specific errors from server
+        if (errorField === 'current_password') {
+          showPasswordError('currentPassword', errorMessage);
+        } else if (errorField === 'new_password') {
+          showPasswordError('newPassword', errorMessage);
+        } else if (errorMessage.toLowerCase().includes('current') || errorMessage.toLowerCase().includes('incorrect')) {
+          showPasswordError('currentPassword', errorMessage);
+        } else {
+          Toast.error(errorMessage);
+        }
+      }
+    });
+
+    // MFA - only show if enabled in config
+    async function loadMfaStatus() {
+      const mfaSection = document.getElementById('mfaSection');
+      const statusEl = document.getElementById('mfaStatus');
+      const toggleBtn = document.getElementById('mfaToggle');
+
+      // Check if MFA is enabled in config
+      if (!api.isMfaEnabled()) {
+        mfaSection.classList.add('hidden');
+        return;
+      }
+
+      // Show MFA section
+      mfaSection.classList.remove('hidden');
+
+      try {
+        const result = await api.getMfaStatus();
+        const enabled = result.mfa_enabled || result.enabled;
+
+        statusEl.innerHTML = enabled ?
+          '<span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">Enabled</span>' :
+          '<span class="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">Disabled</span>';
+
+        toggleBtn.textContent = enabled ? 'Disable MFA' : 'Enable MFA';
+        toggleBtn.onclick = enabled ? disableMfa : enableMfa;
+      } catch (error) {
+        statusEl.innerHTML = '<span class="text-sm text-gray-500">Unknown</span>';
+        toggleBtn.textContent = 'Check Status';
+      }
+    }
+
+    async function enableMfa() {
+      try {
+        const result = await api.setupMfa();
+        // Show QR code modal
+        const content = document.createElement('div');
+        content.className = 'text-center';
+        content.innerHTML = `
+          <p class="mb-4">Scan this QR code with your authenticator app:</p>
+          <img src="${result.qr_code}" alt="MFA QR Code" class="mx-auto mb-4">
+          <p class="text-sm text-gray-500 mb-4">Or enter this key manually: ${result.secret}</p>
+          <input type="text" id="mfaVerifyToken" placeholder="Enter 6-digit code" maxlength="6"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-center text-xl tracking-widest">
+        `;
+
+        Modal.show({
+          title: 'Setup Two-Factor Authentication',
+          content,
+          confirmText: 'Verify & Enable',
+          onConfirm: async () => {
+            const token = document.getElementById('mfaVerifyToken').value;
+            try {
+              await api.verifyMfa(token);
+              Toast.success('MFA enabled successfully');
+              loadMfaStatus();
+            } catch (error) {
+              Toast.error('Invalid code. Please try again.');
+            }
+          }
+        });
+      } catch (error) {
+        Toast.error(error.message);
+      }
+    }
+
+    async function disableMfa() {
+      Modal.confirm('Disable MFA', 'Are you sure you want to disable two-factor authentication? This will make your account less secure.', async () => {
+        try {
+          await api.disableMfa();
+          Toast.success('MFA disabled');
+          loadMfaStatus();
+        } catch (error) {
+          Toast.error(error.message);
+        }
+      });
+    }
+
+    // Preferences - only load if enabled in config
+    async function loadPreferences() {
+      const preferencesSection = document.getElementById('preferencesSection');
+      
+      // Check if preferences editing is enabled in config
+      if (window.LanaConfig?.USER_PREFERENCES_EDIT_ENABLED !== true) {
+        preferencesSection.classList.add('hidden');
+        return;
+      }
+      
+      // Show preferences section
+      preferencesSection.classList.remove('hidden');
+      
+      try {
+        const result = await api.getPreferences();
+        const prefs = result.preferences || {};
+
+        document.getElementById('prefEmailNotifications').checked = prefs.email_notifications !== false;
+        document.getElementById('prefDarkMode').checked = prefs.dark_mode === true;
+      } catch (error) {
+        console.error('Failed to load preferences:', error);
+      }
+    }
+
+    document.getElementById('prefEmailNotifications').addEventListener('change', async (e) => {
+      try {
+        await api.updatePreference('email_notifications', e.target.checked);
+        Toast.success('Preference saved');
+      } catch (error) {
+        Toast.error(error.message);
+      }
+    });
+
+    document.getElementById('prefDarkMode').addEventListener('change', async (e) => {
+      try {
+        await api.updatePreference('dark_mode', e.target.checked);
+        Toast.success('Preference saved');
+      } catch (error) {
+        Toast.error(error.message);
+      }
+    });
+
+    // Sessions
+    async function loadSessions() {
+      const container = document.getElementById('sessionsList');
+      const loading = document.getElementById('sessionsLoading');
+      
+      try {
+        const result = await api.get('/api/v1/auth/session/list');
+        const sessions = result.sessions || [];
+
+        container.innerHTML = sessions.map(session => `
+          <div class="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+            <div>
+              <p class="text-sm font-medium text-gray-900">${session.ip_address || 'Unknown IP'}</p>
+              <p class="text-xs text-gray-500">${session.user_agent ? session.user_agent.substring(0, 50) + '...' : 'Unknown device'}</p>
+              <p class="text-xs text-gray-400">Last active: ${timeAgo(session.last_accessed || session.created_at)}</p>
+            </div>
+            <button onclick="revokeSession('${session.id}')" class="text-red-600 hover:text-red-800 text-sm">Revoke</button>
+          </div>
+        `).join('') || '<p class="text-gray-500 text-sm">No active sessions</p>';
+        
+        // Hide loading, show content
+        loading.classList.add('hidden');
+        container.classList.remove('hidden');
+      } catch (error) {
+        container.innerHTML = '<p class="text-gray-500 text-sm">Failed to load sessions</p>';
+        // Hide loading, show content with error
+        loading.classList.add('hidden');
+        container.classList.remove('hidden');
+      }
+    }
+
+    async function revokeSession(sessionId) {
+      try {
+        await api.delete(`/api/v1/auth/session/${sessionId}`);
+        Toast.success('Session revoked');
+        loadSessions();
+      } catch (error) {
+        Toast.error(error.message);
+      }
+    }
+
+    document.getElementById('revokeAllSessions').addEventListener('click', async () => {
+      Modal.confirm('Revoke All Sessions', 'This will log you out of all other devices. Continue?', async () => {
+        try {
+          const currentSession = localStorage.getItem('token');
+          await api.delete('/api/v1/auth/session/', { revoke_all_except: currentSession });
+          Toast.success('All other sessions revoked');
+          loadSessions();
+        } catch (error) {
+          Toast.error(error.message);
+        }
+      });
+    });
+
+    // VPN Status Management
+    async function loadVpnStatus() {
+      const vpnSection = document.getElementById('vpnSection');
+      const vpnLoading = document.getElementById('vpnLoading');
+      const vpnConfigured = document.getElementById('vpnConfigured');
+      const vpnNotConfigured = document.getElementById('vpnNotConfigured');
+      const vpnStatusBadge = document.getElementById('vpnStatusBadge');
+
+      // Check if VPN manager is available
+      if (typeof vpnManager === 'undefined') {
+        console.warn('[Settings] VPN Manager not loaded');
+        return;
+      }
+
+      // Show VPN section
+      vpnSection.classList.remove('hidden');
+
+      try {
+        const isConfigured = await vpnManager.isConfigured();
+        const isRegistered = await vpnManager.isRegistered();
+
+        // Hide loading
+        vpnLoading.classList.add('hidden');
+
+        if (isConfigured) {
+          // Load VPN details
+          const keys = await vpnManager._loadKeys();
+
+          // Show configured state
+          vpnConfigured.classList.remove('hidden');
+          vpnNotConfigured.classList.add('hidden');
+
+          // Update status badge
+          if (isRegistered) {
+            vpnStatusBadge.innerHTML = '<span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">Registered</span>';
+          } else {
+            vpnStatusBadge.innerHTML = '<span class="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">Pending Registration</span>';
+          }
+
+          // Populate device info
+          document.getElementById('vpnDeviceId').textContent = keys.deviceId ? keys.deviceId.substring(0, 8) + '...' : 'Unknown';
+          document.getElementById('vpnClientIp').textContent = keys.clientIp || 'Not assigned';
+          document.getElementById('vpnRegistration').textContent = isRegistered ? 'Registered' : 'Pending';
+          document.getElementById('vpnCreatedAt').textContent = keys.createdAt ? new Date(keys.createdAt).toLocaleDateString() : 'Unknown';
+
+        } else {
+          // Show not configured state
+          vpnConfigured.classList.add('hidden');
+          vpnNotConfigured.classList.remove('hidden');
+          vpnStatusBadge.innerHTML = '<span class="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded-full">Not Configured</span>';
+        }
+
+      } catch (error) {
+        console.error('[Settings] Failed to load VPN status:', error);
+        vpnLoading.classList.add('hidden');
+        vpnNotConfigured.classList.remove('hidden');
+        vpnStatusBadge.innerHTML = '<span class="px-2 py-1 bg-red-100 text-red-800 text-xs font-medium rounded-full">Error</span>';
+      }
+    }
+
+    // Download VPN config button
+    document.getElementById('downloadVpnConfigBtn')?.addEventListener('click', async () => {
+      try {
+        // Get saved server info for VPN config
+        const savedServerJson = localStorage.getItem('lana_saved_server');
+        if (!savedServerJson) {
+          Toast.error('No server connection found. Please log in again.');
+          return;
+        }
+
+        const serverInfo = JSON.parse(savedServerJson);
+        if (!serverInfo.vpn) {
+          Toast.error('VPN configuration not available from server.');
+          return;
+        }
+
+        const config = await vpnManager.getOrCreateConfig(serverInfo.vpn);
+        const filename = vpnManager.downloadConfigFile(config.configFile, serverInfo.orgName || serverInfo.orgId);
+        Toast.success(`Downloaded: ${filename}`);
+
+      } catch (error) {
+        console.error('[Settings] Failed to download VPN config:', error);
+        Toast.error(error.message || 'Failed to download VPN configuration');
+      }
+    });
+
+    // Reset VPN button
+    document.getElementById('resetVpnBtn')?.addEventListener('click', () => {
+      Modal.confirm('Reset VPN Configuration', 'This will remove your VPN keys. You will need to set up VPN again. Continue?', async () => {
+        try {
+          await vpnManager.clearKeys();
+          Toast.success('VPN configuration reset');
+          loadVpnStatus();
+        } catch (error) {
+          Toast.error(error.message || 'Failed to reset VPN');
+        }
+      });
+    });
+
+    // Setup VPN button
+    document.getElementById('setupVpnBtn')?.addEventListener('click', () => {
+      // Get saved server info
+      const savedServerJson = localStorage.getItem('lana_saved_server');
+      if (savedServerJson) {
+        const serverInfo = JSON.parse(savedServerJson);
+        const serverInfoEncoded = btoa(JSON.stringify(serverInfo));
+        window.location.href = `vpn-setup.html?server=${encodeURIComponent(serverInfoEncoded)}`;
+      } else {
+        Toast.error('No server connection found. Please log out and reconnect.');
+      }
+    });
+
+    // Initialize
+    loadProfile();
+    loadMfaStatus();
+    loadPreferences();
+    loadSessions();
+    loadVpnStatus();
+
+    // Disable password button initially
+    document.getElementById('updatePasswordBtn').disabled = true;
+  </script>
+</body>
+</html>

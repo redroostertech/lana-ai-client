@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRM Connectors - LanaAI</title>
+  <script src="../js/tailwind-loader.js"></script>
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/connectors.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <!-- Sidebar -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col h-full">
+    <div class="flex items-center justify-between h-16 px-6 border-b border-gray-800 flex-shrink-0">
+      <a href="../index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
+      <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
+      <!-- Menu will be dynamically rendered by menu.js -->
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="lg:ml-64">
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
+      <div class="flex items-center justify-between h-16 px-4 lg:px-8">
+        <div class="flex items-center gap-4">
+          <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+          </button>
+          <a href="connectors.html" class="text-gray-500 hover:text-gray-700">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+          </a>
+          <div>
+            <h1 class="text-xl font-semibold text-gray-900">CRM Connectors</h1>
+            <p class="text-sm text-gray-500">Connect your CRM and lead management platforms</p>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="p-4 lg:p-8">
+      <!-- Connector Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <!-- Leadly (Active - GoHighLevel Integration) -->
+        <a href="leadly.html" class="block bg-white rounded-xl shadow-sm border-2 border-indigo-200 overflow-hidden hover:shadow-lg hover:border-indigo-400 transition-all cursor-pointer group" id="card-crm-leadly">
+          <div class="p-6 border-b border-gray-100">
+            <div class="flex items-start justify-between">
+              <div class="flex items-center gap-4">
+                <div class="w-14 h-14 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <span class="text-xl font-bold text-white">L</span>
+                </div>
+                <div>
+                  <h3 class="text-lg font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">Leadly</h3>
+                  <p class="text-sm text-gray-500">GoHighLevel CRM Integration</p>
+                </div>
+              </div>
+              <span class="px-3 py-1 text-sm font-medium rounded-full bg-green-100 text-green-800">Active</span>
+            </div>
+          </div>
+          <div class="p-6">
+            <div class="space-y-3">
+              <p class="text-sm text-gray-600">Sync contacts, opportunities, and pipeline data from GoHighLevel for AI-powered analysis.</p>
+              <div class="flex items-center justify-between text-sm">
+                <span class="text-gray-500">Click to view dashboard</span>
+                <svg class="w-5 h-5 text-indigo-500 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+              </div>
+            </div>
+          </div>
+        </a>
+
+        <!-- HubSpot (Coming Soon) -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden opacity-50 cursor-not-allowed" id="card-crm-hubspot">
+          <div class="p-6 border-b border-gray-100">
+            <div class="flex items-start justify-between">
+              <div class="flex items-center gap-4">
+                <div class="w-14 h-14 bg-gradient-to-br from-gray-400 to-gray-500 rounded-xl flex items-center justify-center">
+                  <span class="text-xl font-bold text-white">H</span>
+                </div>
+                <div>
+                  <h3 class="text-lg font-semibold text-gray-500">HubSpot</h3>
+                  <p class="text-sm text-gray-400">Inbound marketing and CRM</p>
+                </div>
+              </div>
+              <span class="px-3 py-1 text-sm font-medium rounded-full bg-gray-200 text-gray-500">Coming Soon</span>
+            </div>
+          </div>
+          <div class="p-6">
+            <div class="text-center py-4">
+              <p class="text-gray-400">HubSpot integration coming soon</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Salesforce (Coming Soon) -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden opacity-50 cursor-not-allowed" id="card-crm-salesforce">
+          <div class="p-6 border-b border-gray-100">
+            <div class="flex items-start justify-between">
+              <div class="flex items-center gap-4">
+                <div class="w-14 h-14 bg-gradient-to-br from-gray-400 to-gray-500 rounded-xl flex items-center justify-center">
+                  <span class="text-xl font-bold text-white">SF</span>
+                </div>
+                <div>
+                  <h3 class="text-lg font-semibold text-gray-500">Salesforce</h3>
+                  <p class="text-sm text-gray-400">Enterprise CRM solution</p>
+                </div>
+              </div>
+              <span class="px-3 py-1 text-sm font-medium rounded-full bg-gray-200 text-gray-500">Coming Soon</span>
+            </div>
+          </div>
+          <div class="p-6">
+            <div class="text-center py-4">
+              <p class="text-gray-400">Salesforce integration coming soon</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Zoho CRM (Coming Soon) -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden opacity-50 cursor-not-allowed" id="card-crm-zoho">
+          <div class="p-6 border-b border-gray-100">
+            <div class="flex items-start justify-between">
+              <div class="flex items-center gap-4">
+                <div class="w-14 h-14 bg-gradient-to-br from-gray-400 to-gray-500 rounded-xl flex items-center justify-center">
+                  <span class="text-xl font-bold text-white">Z</span>
+                </div>
+                <div>
+                  <h3 class="text-lg font-semibold text-gray-500">Zoho CRM</h3>
+                  <p class="text-sm text-gray-400">Small business CRM</p>
+                </div>
+              </div>
+              <span class="px-3 py-1 text-sm font-medium rounded-full bg-gray-200 text-gray-500">Coming Soon</span>
+            </div>
+          </div>
+          <div class="p-6">
+            <div class="text-center py-4">
+              <p class="text-gray-400">Zoho CRM integration coming soon</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Field Mapping Section (shown when a connector is selected) -->
+      <div id="fieldMappingSection" class="hidden">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">Field Mapping</h3>
+          <p class="text-sm text-gray-500 mb-6">Map fields from your CRM to LanaAI's data model</p>
+          <div id="fieldMappingTable" class="overflow-x-auto">
+            <!-- Field mapping table will be rendered here -->
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Configuration Modal -->
+  <div id="configModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4">
+      <div class="px-6 py-4 border-b border-gray-200">
+        <h3 id="modalTitle" class="text-lg font-semibold text-gray-900">Configure Connector</h3>
+      </div>
+      <div class="p-6" id="modalContent">
+        <!-- Modal content will be rendered here -->
+      </div>
+      <div class="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+        <button onclick="closeModal()" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Cancel</button>
+        <button id="modalSaveBtn" class="px-4 py-2 text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors">Save & Connect</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    if (!api.requireAuth()) throw new Error('Not authenticated');
+
+    // Load full user profile with roles before rendering menu
+    (async () => {
+      try {
+        await api.loadUserProfile();
+      } catch (error) {
+        console.error('Failed to load user profile:', error);
+      }
+
+      // Render dynamic menu (will now have access to roles)
+      renderMenu('#mainNav', { menuType: 'integrations' });
+    })();
+
+    // Sidebar toggle
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('openSidebar').addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+    document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+
+    let currentConnector = null;
+
+    // Render connector config panel
+    function renderConnectorPanel(connector) {
+      const statusEl = document.getElementById(`status-${connector.id}`);
+      const configEl = document.getElementById(`config-${connector.id}`);
+
+      const statusColors = {
+        connected: 'bg-green-100 text-green-800',
+        disconnected: 'bg-gray-100 text-gray-600',
+        error: 'bg-red-100 text-red-800',
+        syncing: 'bg-blue-100 text-blue-800'
+      };
+
+      statusEl.className = `px-3 py-1 text-sm font-medium rounded-full ${statusColors[connector.status]}`;
+      statusEl.textContent = connector.status.charAt(0).toUpperCase() + connector.status.slice(1);
+
+      if (connector.status === 'connected') {
+        configEl.innerHTML = `
+          <div class="space-y-4">
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-500">Records synced</span>
+              <span class="font-medium text-gray-900">${connector.records?.toLocaleString() || 0}</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-500">Last sync</span>
+              <span class="font-medium text-gray-900">${connector.lastSync ? timeAgo(connector.lastSync) : 'Never'}</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-500">Sync frequency</span>
+              <span class="font-medium text-gray-900">${connector.config?.sync_frequency || 'Manual'}</span>
+            </div>
+            <div class="flex gap-3 pt-4 border-t border-gray-100">
+              <button onclick="syncNow('${connector.id}')" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
+                Sync Now
+              </button>
+              <button onclick="showFieldMapping('${connector.id}')" class="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors">
+                Field Mapping
+              </button>
+              <button onclick="disconnectConnector('${connector.id}')" class="px-4 py-2 text-red-600 hover:bg-red-50 text-sm font-medium rounded-lg transition-colors">
+                Disconnect
+              </button>
+            </div>
+          </div>
+        `;
+      } else {
+        configEl.innerHTML = `
+          <div class="text-center py-4">
+            <p class="text-gray-500 mb-4">Connect your ${connector.name} account to sync lead and contact data</p>
+            <button onclick="showConfigModal('${connector.id}')" class="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">
+              Connect ${connector.name}
+            </button>
+          </div>
+        `;
+      }
+    }
+
+    // Show configuration modal
+    function showConfigModal(connectorId) {
+      currentConnector = ConnectorsMockData.connectors.find(c => c.id === connectorId);
+      if (!currentConnector) return;
+
+      const modal = document.getElementById('configModal');
+      const title = document.getElementById('modalTitle');
+      const content = document.getElementById('modalContent');
+
+      title.textContent = `Connect ${currentConnector.name}`;
+
+      // Different config forms based on connector type
+      if (connectorId.includes('hubspot') || connectorId.includes('salesforce')) {
+        content.innerHTML = `
+          <div class="text-center py-6">
+            <p class="text-gray-600 mb-6">Click below to authorize LanaAI to access your ${currentConnector.name} account</p>
+            <button onclick="startOAuth('${connectorId}')" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">
+              <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+              Authorize with ${currentConnector.name}
+            </button>
+          </div>
+        `;
+        document.getElementById('modalSaveBtn').classList.add('hidden');
+      } else {
+        content.innerHTML = `
+          <form id="configForm" class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">API Key</label>
+              <input type="password" name="api_key" required placeholder="Enter your ${currentConnector.name} API key"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+              <p class="mt-1 text-xs text-gray-500">You can find this in your ${currentConnector.name} settings</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Sync Frequency</label>
+              <select name="sync_frequency" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                <option value="realtime">Real-time</option>
+                <option value="hourly" selected>Hourly</option>
+                <option value="daily">Daily</option>
+                <option value="manual">Manual only</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Data to Sync</label>
+              <div class="space-y-2">
+                <label class="flex items-center">
+                  <input type="checkbox" name="sync_leads" checked class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                  <span class="ml-2 text-sm text-gray-700">Leads</span>
+                </label>
+                <label class="flex items-center">
+                  <input type="checkbox" name="sync_contacts" checked class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                  <span class="ml-2 text-sm text-gray-700">Contacts</span>
+                </label>
+                <label class="flex items-center">
+                  <input type="checkbox" name="sync_deals" checked class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                  <span class="ml-2 text-sm text-gray-700">Deals/Opportunities</span>
+                </label>
+                <label class="flex items-center">
+                  <input type="checkbox" name="sync_activities" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                  <span class="ml-2 text-sm text-gray-700">Activities/Tasks</span>
+                </label>
+              </div>
+            </div>
+          </form>
+        `;
+        document.getElementById('modalSaveBtn').classList.remove('hidden');
+      }
+
+      modal.classList.remove('hidden');
+    }
+
+    // Close modal
+    function closeModal() {
+      document.getElementById('configModal').classList.add('hidden');
+      currentConnector = null;
+    }
+
+    // Start OAuth flow
+    function startOAuth(connectorId) {
+      if (api.isDemoMode()) {
+        Toast.info('Demo mode: OAuth would redirect to provider');
+        closeModal();
+        // Simulate successful connection
+        setTimeout(async () => {
+          await Connectors.configure(connectorId, { oauth_connected: true, sync_frequency: 'hourly' });
+          Toast.success('Connected successfully!');
+          loadConnectors();
+        }, 1000);
+        return;
+      }
+      window.location.href = Connectors.getOAuthUrl(connectorId, window.location.href);
+    }
+
+    // Save configuration
+    document.getElementById('modalSaveBtn').addEventListener('click', async () => {
+      if (!currentConnector) return;
+
+      const form = document.getElementById('configForm');
+      if (!form || !Form.validate(form)) return;
+
+      const config = Form.serialize(form);
+
+      try {
+        // Test connection first
+        Toast.info('Testing connection...');
+        await Connectors.testConnection(currentConnector.id, config);
+
+        // Save configuration
+        await Connectors.configure(currentConnector.id, config);
+        Toast.success('Connected successfully!');
+        closeModal();
+        loadConnectors();
+      } catch (error) {
+        Toast.error(error.message || 'Failed to connect');
+      }
+    });
+
+    // Sync now
+    async function syncNow(connectorId) {
+      try {
+        Toast.info('Starting sync...');
+        const result = await Connectors.triggerSync(connectorId);
+        Toast.success(`Synced ${result.records_synced} records`);
+        loadConnectors();
+      } catch (error) {
+        Toast.error('Sync failed: ' + error.message);
+      }
+    }
+
+    // Show field mapping
+    async function showFieldMapping(connectorId) {
+      const section = document.getElementById('fieldMappingSection');
+      const table = document.getElementById('fieldMappingTable');
+
+      try {
+        const result = await Connectors.getFieldMappings(connectorId);
+        const mappings = result.mappings || [];
+
+        if (mappings.length === 0) {
+          table.innerHTML = '<p class="text-gray-500">No field mappings configured</p>';
+        } else {
+          table.innerHTML = `
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source Field</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Target Field</th>
+                  <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Enabled</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                ${mappings.map(m => `
+                  <tr>
+                    <td class="px-4 py-3 text-sm text-gray-900">${m.source}</td>
+                    <td class="px-4 py-3 text-sm text-gray-900">${m.target}</td>
+                    <td class="px-4 py-3 text-center">
+                      <input type="checkbox" ${m.enabled ? 'checked' : ''} class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          `;
+        }
+
+        section.classList.remove('hidden');
+        section.scrollIntoView({ behavior: 'smooth' });
+      } catch (error) {
+        Toast.error('Failed to load field mappings');
+      }
+    }
+
+    // Disconnect connector
+    async function disconnectConnector(connectorId) {
+      Modal.confirm('Disconnect Connector', 'Are you sure you want to disconnect this connector? Historical data will be preserved.', async () => {
+        try {
+          await Connectors.disconnect(connectorId);
+          Toast.success('Disconnected successfully');
+          loadConnectors();
+        } catch (error) {
+          Toast.error('Failed to disconnect');
+        }
+      });
+    }
+
+    // CRM connectors page uses static cards (Leadly is active, others are "Coming Soon")
+    // No API call needed - the cards are already rendered in HTML
+    // The Leadly card links directly to leadly.html for the dashboard
+
+    // Close modal on outside click
+    document.getElementById('configModal').addEventListener('click', (e) => {
+      if (e.target.id === 'configModal') closeModal();
+    });
+  </script>
+</body>
+</html>

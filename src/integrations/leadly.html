@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leadly CRM Dashboard - LanaAI</title>
+  <script src="../js/tailwind-loader.js"></script>
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/menu.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <!-- Sidebar -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col h-full">
+    <div class="flex items-center justify-between h-16 px-6 border-b border-gray-800 flex-shrink-0">
+      <a href="../index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
+      <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
+      <!-- Menu will be dynamically rendered by menu.js -->
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="lg:ml-64">
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
+      <div class="flex items-center justify-between h-16 px-4 lg:px-8">
+        <div class="flex items-center gap-4">
+          <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+          </button>
+          <a href="connector-crm.html" class="text-gray-500 hover:text-gray-700">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+          </a>
+          <div>
+            <h1 class="text-xl font-semibold text-gray-900">Leadly CRM Dashboard</h1>
+            <p class="text-sm text-gray-500">GoHighLevel integration - Read-only analytics</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <span id="lastSyncTime" class="text-sm text-gray-500"></span>
+          <button onclick="loadDashboard()" class="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            Refresh
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="p-4 lg:p-8">
+      <!-- Not Configured State -->
+      <div id="notConfigured" class="hidden">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+          <div class="text-center mb-8">
+            <div class="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <svg class="w-10 h-10 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-900 mb-2">Connect GoHighLevel</h2>
+            <p class="text-gray-500 max-w-md mx-auto">Enter your GoHighLevel credentials to sync contacts, opportunities, and conversation data for AI-powered analysis.</p>
+          </div>
+
+          <!-- Configuration Form -->
+          <form id="configForm" class="max-w-lg mx-auto space-y-6">
+            <div>
+              <label for="location_id" class="block text-sm font-medium text-gray-700 mb-1">Location ID *</label>
+              <input type="text" id="location_id" name="location_id" required
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="e.g., fBnFx7iiO8tTUzzIlQdB">
+              <p class="mt-1 text-xs text-gray-500">Find this in GoHighLevel Settings > Business Profile</p>
+            </div>
+
+            <div>
+              <label for="api_key" class="block text-sm font-medium text-gray-700 mb-1">API Key *</label>
+              <input type="password" id="api_key" name="api_key" required
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="pit-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+              <p class="mt-1 text-xs text-gray-500">Private Integration Token from Settings > Integrations > API Keys</p>
+            </div>
+
+            <div>
+              <label for="sync_frequency" class="block text-sm font-medium text-gray-700 mb-1">Sync Frequency</label>
+              <select id="sync_frequency" name="sync_frequency"
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                <option value="hourly" selected>Hourly</option>
+                <option value="realtime">Real-time</option>
+                <option value="daily">Daily</option>
+                <option value="manual">Manual only</option>
+              </select>
+            </div>
+
+            <div class="border-t pt-4">
+              <p class="text-sm font-medium text-gray-700 mb-3">Data to Sync</p>
+              <div class="grid grid-cols-2 gap-3">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" id="sync_contacts" name="sync_contacts" checked class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                  <span class="text-sm text-gray-600">Contacts</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" id="sync_opportunities" name="sync_opportunities" checked class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                  <span class="text-sm text-gray-600">Opportunities</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" id="sync_pipelines" name="sync_pipelines" checked class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                  <span class="text-sm text-gray-600">Pipelines</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" id="sync_conversations" name="sync_conversations" checked class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                  <span class="text-sm text-gray-600">Conversations</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" id="sync_tasks" name="sync_tasks" checked class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                  <span class="text-sm text-gray-600">Tasks</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" id="sync_calendars" name="sync_calendars" checked class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                  <span class="text-sm text-gray-600">Calendar Events</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="flex gap-3 pt-4">
+              <button type="button" onclick="testConnection()" id="testBtn"
+                class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">
+                Test Connection
+              </button>
+              <button type="submit" id="saveBtn"
+                class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">
+                Save & Connect
+              </button>
+            </div>
+
+            <div id="connectionStatus" class="hidden text-center py-3 rounded-lg"></div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Dashboard Content -->
+      <div id="dashboardContent" class="hidden">
+        <!-- Summary Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <!-- Contacts -->
+          <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-gray-500">Total Contacts</p>
+                <p id="statContacts" class="text-3xl font-bold text-gray-900">-</p>
+              </div>
+              <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+              </div>
+            </div>
+            <p id="statContactsNew" class="text-sm text-green-600 mt-2">-</p>
+          </div>
+
+          <!-- Pipeline Value -->
+          <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-gray-500">Pipeline Value</p>
+                <p id="statPipelineValue" class="text-3xl font-bold text-gray-900">-</p>
+              </div>
+              <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              </div>
+            </div>
+            <p id="statWonValue" class="text-sm text-green-600 mt-2">-</p>
+          </div>
+
+          <!-- Open Opportunities -->
+          <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-gray-500">Open Opportunities</p>
+                <p id="statOpenOpps" class="text-3xl font-bold text-gray-900">-</p>
+              </div>
+              <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+              </div>
+            </div>
+            <p id="statWonLost" class="text-sm text-gray-500 mt-2">-</p>
+          </div>
+
+          <!-- Conversations -->
+          <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-gray-500">Active Conversations</p>
+                <p id="statConversations" class="text-3xl font-bold text-gray-900">-</p>
+              </div>
+              <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+              </div>
+            </div>
+            <p id="statUnread" class="text-sm text-red-600 mt-2">-</p>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-8">
+          <div class="border-b border-gray-200">
+            <nav class="flex -mb-px">
+              <button onclick="switchTab('contacts')" id="tab-contacts" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-indigo-600 text-indigo-600">
+                Contacts
+              </button>
+              <button onclick="switchTab('opportunities')" id="tab-opportunities" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                Opportunities
+              </button>
+              <button onclick="switchTab('pipelines')" id="tab-pipelines" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                Pipelines
+              </button>
+              <button onclick="switchTab('conversations')" id="tab-conversations" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                Conversations
+              </button>
+              <button onclick="switchTab('tasks')" id="tab-tasks" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                Tasks
+              </button>
+            </nav>
+          </div>
+
+          <!-- Tab Content -->
+          <div id="tabContent" class="p-6">
+            <!-- Content loaded dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div id="loadingState" class="flex items-center justify-center py-12">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    if (!api.requireAuth()) throw new Error('Not authenticated');
+
+    // Load full user profile with roles before rendering menu
+    (async () => {
+      try {
+        await api.loadUserProfile();
+      } catch (error) {
+        console.error('Failed to load user profile:', error);
+      }
+
+      // Render dynamic menu (will now have access to roles)
+      renderMenu('#mainNav', { menuType: 'integrations' });
+    })();
+
+    // Sidebar toggle
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('openSidebar').addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+    document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+
+    let dashboardData = null;
+    let currentTab = 'contacts';
+    let syncAttempted = false; // Prevent infinite sync loop
+
+    // Format currency
+    function formatCurrency(amount) {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount || 0);
+    }
+
+    // Format number
+    function formatNumber(num) {
+      return new Intl.NumberFormat('en-US').format(num || 0);
+    }
+
+    // Perform initial sync when configured but no local data
+    async function performInitialSync() {
+      const loadingState = document.getElementById('loadingState');
+
+      // Show syncing UI
+      loadingState.innerHTML = `
+        <div class="text-center">
+          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <h3 class="text-lg font-semibold text-gray-900 mb-2">Syncing with GoHighLevel</h3>
+          <p class="text-gray-500 mb-4">Fetching your contacts, pipelines, and opportunities...</p>
+          <p id="syncProgress" class="text-sm text-indigo-600">Starting sync...</p>
+        </div>
+      `;
+
+      try {
+        const result = await api.post('/api/v1/leadly/sync', {});
+
+        const stats = result.stats || {};
+        document.getElementById('syncProgress').textContent =
+          `Synced ${stats.contacts?.created || 0} contacts, ${stats.pipelines?.created || 0} pipelines, ${stats.opportunities?.created || 0} opportunities`;
+
+        // Brief pause to show completion
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        // Restore normal loading spinner
+        loadingState.innerHTML = `<div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>`;
+      } catch (error) {
+        loadingState.innerHTML = `
+          <div class="text-center">
+            <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">Sync Failed</h3>
+            <p class="text-red-600 mb-4">${error.message}</p>
+            <button onclick="loadDashboard()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Retry</button>
+          </div>
+        `;
+        throw error; // Re-throw to prevent loadDashboard from continuing
+      }
+    }
+
+    // Load dashboard data
+    async function loadDashboard() {
+      document.getElementById('loadingState').classList.remove('hidden');
+      document.getElementById('dashboardContent').classList.add('hidden');
+      document.getElementById('notConfigured').classList.add('hidden');
+
+      try {
+        const result = await api.get('/api/v1/leadly/dashboard');
+        dashboardData = result;
+
+        if (!result.configured) {
+          document.getElementById('loadingState').classList.add('hidden');
+          document.getElementById('notConfigured').classList.remove('hidden');
+          return;
+        }
+
+        // Check if we need to auto-sync (configured but no local data)
+        const stats = result.stats;
+        const hasNoLocalData = stats.contacts.total === 0 &&
+                               stats.opportunities.total === 0;
+
+        if (hasNoLocalData && !syncAttempted) {
+          syncAttempted = true; // Prevent infinite loop
+          // Show syncing state and trigger sync
+          await performInitialSync();
+          // Reload dashboard after sync
+          return loadDashboard();
+        }
+
+        // Update stats
+        document.getElementById('statContacts').textContent = formatNumber(stats.contacts.total);
+        document.getElementById('statContactsNew').textContent = `+${formatNumber(stats.contacts.new_last_7_days)} this week`;
+
+        document.getElementById('statPipelineValue').textContent = formatCurrency(stats.opportunities.total_pipeline_value);
+        document.getElementById('statWonValue').textContent = `${formatCurrency(stats.opportunities.won_value)} won`;
+
+        document.getElementById('statOpenOpps').textContent = formatNumber(stats.opportunities.open);
+        document.getElementById('statWonLost').textContent = `${formatNumber(stats.opportunities.won)} won / ${formatNumber(stats.opportunities.lost)} lost`;
+
+        document.getElementById('statConversations').textContent = formatNumber(stats.conversations.active);
+        document.getElementById('statUnread').textContent = `${formatNumber(stats.conversations.unread)} unread`;
+
+        // Update last sync time
+        if (result.last_sync) {
+          document.getElementById('lastSyncTime').textContent = `Last sync: ${timeAgo(result.last_sync.started_at)}`;
+        }
+
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('dashboardContent').classList.remove('hidden');
+
+        // Load current tab
+        loadTabContent(currentTab);
+      } catch (error) {
+        document.getElementById('loadingState').classList.add('hidden');
+        Toast.error('Failed to load dashboard: ' + error.message);
+      }
+    }
+
+    // Switch tab
+    function switchTab(tab) {
+      currentTab = tab;
+
+      // Update tab styles
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('border-indigo-600', 'text-indigo-600');
+        btn.classList.add('border-transparent', 'text-gray-500');
+      });
+      document.getElementById(`tab-${tab}`).classList.remove('border-transparent', 'text-gray-500');
+      document.getElementById(`tab-${tab}`).classList.add('border-indigo-600', 'text-indigo-600');
+
+      loadTabContent(tab);
+    }
+
+    // Load tab content
+    async function loadTabContent(tab) {
+      const content = document.getElementById('tabContent');
+      content.innerHTML = '<div class="flex justify-center py-8"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>';
+
+      try {
+        switch (tab) {
+          case 'contacts':
+            await loadContacts();
+            break;
+          case 'opportunities':
+            await loadOpportunities();
+            break;
+          case 'pipelines':
+            await loadPipelines();
+            break;
+          case 'conversations':
+            await loadConversations();
+            break;
+          case 'tasks':
+            await loadTasks();
+            break;
+        }
+      } catch (error) {
+        content.innerHTML = `<div class="text-center text-red-600 py-8">Failed to load data: ${error.message}</div>`;
+      }
+    }
+
+    // Load contacts
+    async function loadContacts() {
+      const result = await api.get('/api/v1/leadly/contacts?limit=25');
+      const content = document.getElementById('tabContent');
+
+      if (result.contacts.length === 0) {
+        content.innerHTML = '<div class="text-center text-gray-500 py-8">No contacts found</div>';
+        return;
+      }
+
+      content.innerHTML = `
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tags</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              ${result.contacts.map(c => `
+                <tr class="hover:bg-gray-50">
+                  <td class="px-4 py-3">
+                    <div class="font-medium text-gray-900">${c.full_name || c.first_name || 'Unknown'}</div>
+                    ${c.company_name ? `<div class="text-sm text-gray-500">${c.company_name}</div>` : ''}
+                  </td>
+                  <td class="px-4 py-3 text-sm text-gray-600">${c.email || '-'}</td>
+                  <td class="px-4 py-3 text-sm text-gray-600">${c.phone || '-'}</td>
+                  <td class="px-4 py-3"><span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700">${c.source || 'Unknown'}</span></td>
+                  <td class="px-4 py-3">
+                    ${(c.tags || []).slice(0, 2).map(t => `<span class="px-2 py-1 text-xs rounded-full bg-indigo-100 text-indigo-700 mr-1">${t}</span>`).join('')}
+                    ${(c.tags || []).length > 2 ? `<span class="text-xs text-gray-500">+${c.tags.length - 2}</span>` : ''}
+                  </td>
+                  <td class="px-4 py-3 text-sm text-gray-500">${c.ghl_created_at ? timeAgo(c.ghl_created_at) : '-'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-4 text-sm text-gray-500 text-center">Showing ${result.contacts.length} of ${result.pagination.total} contacts</div>
+      `;
+    }
+
+    // Load opportunities
+    async function loadOpportunities() {
+      const result = await api.get('/api/v1/leadly/opportunities?limit=25');
+      const content = document.getElementById('tabContent');
+
+      if (result.opportunities.length === 0) {
+        content.innerHTML = '<div class="text-center text-gray-500 py-8">No opportunities found</div>';
+        return;
+      }
+
+      const statusColors = {
+        open: 'bg-blue-100 text-blue-800',
+        won: 'bg-green-100 text-green-800',
+        lost: 'bg-red-100 text-red-800',
+        abandoned: 'bg-gray-100 text-gray-800'
+      };
+
+      content.innerHTML = `
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Opportunity</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pipeline / Stage</th>
+                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Value</th>
+                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              ${result.opportunities.map(o => `
+                <tr class="hover:bg-gray-50">
+                  <td class="px-4 py-3 font-medium text-gray-900">${o.name || 'Untitled'}</td>
+                  <td class="px-4 py-3">
+                    <div class="text-sm text-gray-900">${o.contact_name || 'Unknown'}</div>
+                    <div class="text-xs text-gray-500">${o.contact_email || ''}</div>
+                  </td>
+                  <td class="px-4 py-3">
+                    <div class="text-sm text-gray-900">${o.pipeline_name || '-'}</div>
+                    <div class="text-xs text-gray-500">${o.stage_name || '-'}</div>
+                  </td>
+                  <td class="px-4 py-3 text-right font-medium text-gray-900">${formatCurrency(o.monetary_value)}</td>
+                  <td class="px-4 py-3 text-center">
+                    <span class="px-2 py-1 text-xs font-medium rounded-full ${statusColors[o.status] || 'bg-gray-100'}">${o.status || 'unknown'}</span>
+                  </td>
+                  <td class="px-4 py-3 text-sm text-gray-500">${o.ghl_created_at ? timeAgo(o.ghl_created_at) : '-'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-4 text-sm text-gray-500 text-center">Showing ${result.opportunities.length} of ${result.pagination.total} opportunities</div>
+      `;
+    }
+
+    // Load pipelines
+    async function loadPipelines() {
+      const result = await api.get('/api/v1/leadly/pipelines');
+      const content = document.getElementById('tabContent');
+
+      if (result.pipelines.length === 0) {
+        content.innerHTML = '<div class="text-center text-gray-500 py-8">No pipelines found</div>';
+        return;
+      }
+
+      content.innerHTML = result.pipelines.map(p => `
+        <div class="mb-6 last:mb-0">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">${p.name}</h3>
+            <span class="text-sm text-gray-500">${p.stages.length} stages</span>
+          </div>
+          <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            ${p.stages.map(s => `
+              <div class="bg-gray-50 rounded-lg p-4 text-center">
+                <div class="text-sm font-medium text-gray-700 mb-2">${s.name}</div>
+                <div class="text-2xl font-bold text-gray-900">${formatNumber(s.opportunity_count)}</div>
+                <div class="text-xs text-gray-500">${formatCurrency(s.total_value)}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `).join('<hr class="my-6 border-gray-200">');
+    }
+
+    // Load conversations
+    async function loadConversations() {
+      const result = await api.get('/api/v1/leadly/conversations?limit=25');
+      const content = document.getElementById('tabContent');
+
+      if (result.conversations.length === 0) {
+        content.innerHTML = '<div class="text-center text-gray-500 py-8">No conversations found</div>';
+        return;
+      }
+
+      const channelIcons = {
+        SMS: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>',
+        Email: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>',
+        default: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"></path></svg>'
+      };
+
+      content.innerHTML = `
+        <div class="space-y-4">
+          ${result.conversations.map(c => `
+            <div class="flex items-start gap-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+              <div class="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600">
+                ${channelIcons[c.type] || channelIcons.default}
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between">
+                  <div class="font-medium text-gray-900">${c.contact_name || 'Unknown'}</div>
+                  <span class="text-xs text-gray-500">${c.last_message_date ? timeAgo(c.last_message_date) : ''}</span>
+                </div>
+                <div class="text-sm text-gray-500">${c.contact_email || c.contact_phone || ''}</div>
+                <p class="text-sm text-gray-600 truncate mt-1">${c.last_message_body || 'No messages'}</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-1 text-xs rounded-full ${c.inbox_status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}">${c.inbox_status || 'unknown'}</span>
+                ${c.unread_count > 0 ? `<span class="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">${c.unread_count} unread</span>` : ''}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="mt-4 text-sm text-gray-500 text-center">Showing ${result.conversations.length} of ${result.pagination.total} conversations</div>
+      `;
+    }
+
+    // Load tasks
+    async function loadTasks() {
+      const result = await api.get('/api/v1/leadly/tasks?limit=25');
+      const content = document.getElementById('tabContent');
+
+      if (result.tasks.length === 0) {
+        content.innerHTML = '<div class="text-center text-gray-500 py-8">No tasks found</div>';
+        return;
+      }
+
+      content.innerHTML = `
+        <div class="space-y-3">
+          ${result.tasks.map(t => {
+            const isOverdue = !t.completed && t.due_date && new Date(t.due_date) < new Date();
+            return `
+              <div class="flex items-start gap-4 p-4 bg-gray-50 rounded-lg ${isOverdue ? 'border-l-4 border-red-500' : ''}">
+                <div class="w-6 h-6 rounded-full border-2 flex items-center justify-center ${t.completed ? 'bg-green-100 border-green-500' : 'border-gray-300'}">
+                  ${t.completed ? '<svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>' : ''}
+                </div>
+                <div class="flex-1">
+                  <div class="font-medium text-gray-900 ${t.completed ? 'line-through text-gray-500' : ''}">${t.title || 'Untitled Task'}</div>
+                  ${t.body ? `<p class="text-sm text-gray-500 mt-1">${t.body}</p>` : ''}
+                  <div class="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                    ${t.contact_name ? `<span>Contact: ${t.contact_name}</span>` : ''}
+                    ${t.due_date ? `<span class="${isOverdue ? 'text-red-600 font-medium' : ''}">Due: ${new Date(t.due_date).toLocaleDateString()}</span>` : ''}
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+        <div class="mt-4 text-sm text-gray-500 text-center">Showing ${result.tasks.length} of ${result.pagination.total} tasks</div>
+      `;
+    }
+
+    // Test connection
+    async function testConnection() {
+      const locationId = document.getElementById('location_id').value.trim();
+      const apiKey = document.getElementById('api_key').value.trim();
+      const statusEl = document.getElementById('connectionStatus');
+      const testBtn = document.getElementById('testBtn');
+
+      if (!locationId || !apiKey) {
+        statusEl.className = 'text-center py-3 rounded-lg bg-yellow-100 text-yellow-800';
+        statusEl.textContent = 'Please enter both Location ID and API Key';
+        statusEl.classList.remove('hidden');
+        return;
+      }
+
+      testBtn.disabled = true;
+      testBtn.textContent = 'Testing...';
+      statusEl.className = 'text-center py-3 rounded-lg bg-gray-100 text-gray-600';
+      statusEl.textContent = 'Connecting to GoHighLevel...';
+      statusEl.classList.remove('hidden');
+
+      try {
+        const result = await api.post('/api/v1/leadly/config/test', {
+          location_id: locationId,
+          api_key: apiKey
+        });
+
+        if (result.success) {
+          statusEl.className = 'text-center py-3 rounded-lg bg-green-100 text-green-800';
+          statusEl.textContent = `Connected to ${result.location?.name || 'GoHighLevel'}`;
+        } else {
+          statusEl.className = 'text-center py-3 rounded-lg bg-red-100 text-red-800';
+          statusEl.textContent = result.message || 'Connection failed';
+        }
+      } catch (error) {
+        statusEl.className = 'text-center py-3 rounded-lg bg-red-100 text-red-800';
+        statusEl.textContent = error.message || 'Connection failed';
+      } finally {
+        testBtn.disabled = false;
+        testBtn.textContent = 'Test Connection';
+      }
+    }
+
+    // Save configuration
+    async function saveConfiguration(e) {
+      e.preventDefault();
+
+      const saveBtn = document.getElementById('saveBtn');
+      const statusEl = document.getElementById('connectionStatus');
+
+      const config = {
+        location_id: document.getElementById('location_id').value.trim(),
+        api_key: document.getElementById('api_key').value.trim(),
+        sync_frequency: document.getElementById('sync_frequency').value,
+        sync_contacts: document.getElementById('sync_contacts').checked,
+        sync_opportunities: document.getElementById('sync_opportunities').checked,
+        sync_pipelines: document.getElementById('sync_pipelines').checked,
+        sync_conversations: document.getElementById('sync_conversations').checked,
+        sync_tasks: document.getElementById('sync_tasks').checked,
+        sync_calendars: document.getElementById('sync_calendars').checked
+      };
+
+      if (!config.location_id || !config.api_key) {
+        statusEl.className = 'text-center py-3 rounded-lg bg-yellow-100 text-yellow-800';
+        statusEl.textContent = 'Please enter both Location ID and API Key';
+        statusEl.classList.remove('hidden');
+        return;
+      }
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+      statusEl.className = 'text-center py-3 rounded-lg bg-gray-100 text-gray-600';
+      statusEl.textContent = 'Saving configuration...';
+      statusEl.classList.remove('hidden');
+
+      try {
+        await api.post('/api/v1/leadly/config', config);
+
+        statusEl.className = 'text-center py-3 rounded-lg bg-green-100 text-green-800';
+        statusEl.textContent = 'Configuration saved! Loading dashboard...';
+
+        // Reload dashboard after short delay
+        setTimeout(() => {
+          loadDashboard();
+        }, 1000);
+      } catch (error) {
+        statusEl.className = 'text-center py-3 rounded-lg bg-red-100 text-red-800';
+        statusEl.textContent = error.message || 'Failed to save configuration';
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save & Connect';
+      }
+    }
+
+    // Setup form handler
+    document.getElementById('configForm').addEventListener('submit', saveConfiguration);
+
+    // Initialize
+    loadDashboard();
+  </script>
+</body>
+</html>

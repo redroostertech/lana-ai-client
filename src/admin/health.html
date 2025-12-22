@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>System Health - LanaAI</title>
+  <script src="../js/tailwind-loader.js"></script>
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/notifications.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <!-- Sidebar -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
+    <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
+      <a href="../index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
+      <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
+      <!-- Menu will be dynamically rendered by menu.js -->
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="lg:ml-64">
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
+      <div class="flex items-center justify-between h-16 px-4 lg:px-8">
+        <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+        <div class="flex-1 px-4 lg:px-0">
+          <h1 class="text-xl font-semibold text-gray-900">System Health</h1>
+        </div>
+        <div class="flex items-center gap-4">
+          <span id="lastUpdated" class="text-sm text-gray-500"></span>
+          <!-- Refresh Button -->
+          <button id="refreshBtn" class="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            Refresh
+          </button>
+
+          <!-- Notifications -->
+          <button id="notificationBtn" class="relative text-gray-500 hover:text-gray-700">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+            </svg>
+            <span id="notificationBadge" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">0</span>
+          </button>
+
+          <!-- User Menu -->
+          <div class="relative" id="userMenu">
+            <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900">
+              <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                <span id="userInitials" class="text-sm font-medium text-indigo-600">U</span>
+              </div>
+              <span id="userName" class="hidden sm:block text-sm font-medium">User</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            </button>
+            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+              <a href="../settings.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
+              <hr class="my-1">
+              <button id="logoutBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sign out</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Notification Panel Overlay -->
+    <div id="notificationOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
+
+    <!-- Notification Slide-out Panel -->
+    <div id="notificationPanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
+      <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
+        <h2 class="text-lg font-semibold text-gray-900">Notifications</h2>
+        <div class="flex items-center gap-3">
+          <button id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium hidden">Mark all read</button>
+          <button id="refreshNotificationsBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+          </button>
+          <button id="closeNotificationPanel" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+      </div>
+      <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
+        <button id="filterAll" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">All</button>
+        <button id="filterUnread" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Unread</button>
+      </div>
+      <div id="notificationList" class="flex-1 overflow-y-auto">
+        <div id="notificationLoading" class="p-8 text-center">
+          <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+          <p class="text-gray-500 mt-3 text-sm">Loading notifications...</p>
+        </div>
+      </div>
+      <div id="notificationLoadingMore" class="hidden p-4 border-t border-gray-100 text-center flex-shrink-0">
+        <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+      </div>
+    </div>
+
+    <main class="p-4 lg:p-8">
+      <!-- Overall Status -->
+      <div id="overallStatus" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900">Overall System Status</h2>
+            <p class="text-gray-500 mt-1">All services are operational</p>
+          </div>
+          <div id="statusBadge"></div>
+        </div>
+      </div>
+
+      <!-- Services Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <div id="serviceCards">
+          <!-- Service cards will be loaded here -->
+        </div>
+      </div>
+
+      <!-- Metrics -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- System Metrics -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">System Metrics</h3>
+          <div id="systemMetrics" class="space-y-4">
+            <!-- System metrics will be loaded here -->
+          </div>
+        </div>
+
+        <!-- Process Metrics -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">Process Metrics</h3>
+          <div id="processMetrics" class="space-y-4">
+            <!-- Process metrics will be loaded here -->
+          </div>
+        </div>
+
+        <!-- Database Metrics -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">Database Metrics</h3>
+          <div id="databaseMetrics" class="space-y-4">
+            <!-- Database metrics will be loaded here -->
+          </div>
+        </div>
+
+        <!-- CPU Info -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">CPU Information</h3>
+          <div id="cpuInfo" class="space-y-4">
+            <!-- CPU info will be loaded here -->
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    if (!api.requireAuth()) throw new Error('Not authenticated');
+    
+    // Load full user profile with roles before rendering menu
+    (async () => {
+      try {
+        await api.loadUserProfile();
+      } catch (error) {
+        console.error('Failed to load user profile:', error);
+      }
+      
+      // Render dynamic menu (will now have access to roles)
+      renderMenu('#mainNav');
+    })();
+
+    // Initialize notifications panel
+    NotificationPanel.init();
+
+    // Load user info
+    function loadUserInfo() {
+      const user = api.user;
+      if (user) {
+        const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+        const initials = (user.firstName?.[0] || '') + (user.lastName?.[0] || '') || user.email[0].toUpperCase();
+        document.getElementById('userName').textContent = name;
+        document.getElementById('userInitials').textContent = initials;
+      }
+    }
+    loadUserInfo();
+
+    // User menu toggle
+    const userMenu = document.getElementById('userMenu');
+    const userDropdown = document.getElementById('userDropdown');
+    userMenu.addEventListener('click', (e) => {
+      e.stopPropagation();
+      userDropdown.classList.toggle('hidden');
+    });
+    document.addEventListener('click', (e) => {
+      if (!userMenu.contains(e.target)) userDropdown.classList.add('hidden');
+    });
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      await api.logout();
+      window.location.href = '../login.html';
+    });
+
+    // Sidebar toggle
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('openSidebar').addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+    document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+
+    // Load health data
+    async function loadHealth() {
+      try {
+        const [summary, services, metrics] = await Promise.all([
+          api.getHealthSummary(),
+          api.getHealthServices(),
+          api.getHealthMetrics()
+        ]);
+
+        // Overall status
+        const statusEl = document.getElementById('statusBadge');
+        const statusColors = {
+          healthy: 'bg-green-100 text-green-800',
+          degraded: 'bg-yellow-100 text-yellow-800',
+          unhealthy: 'bg-red-100 text-red-800'
+        };
+        statusEl.innerHTML = `<span class="px-4 py-2 text-lg font-semibold rounded-full ${statusColors[summary.status] || 'bg-gray-100 text-gray-800'}">${summary.status?.toUpperCase()}</span>`;
+
+        document.getElementById('overallStatus').querySelector('p').textContent =
+          summary.status === 'healthy' ? 'All services are operational' :
+          summary.status === 'degraded' ? 'Some services are experiencing issues' :
+          'System is experiencing problems';
+
+        // Service cards
+        const serviceCardsEl = document.getElementById('serviceCards');
+        const servicesList = services.services || [];
+        serviceCardsEl.innerHTML = servicesList.map(service => `
+          <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 col-span-1">
+            <div class="flex items-center justify-between mb-2">
+              <span class="font-medium text-gray-900">${service.name}</span>
+              ${statusBadge(service.status)}
+            </div>
+            <div class="text-sm text-gray-500">
+              <p>Type: ${service.type || 'Unknown'}</p>
+              ${service.latency_ms ? `<p>Latency: ${service.latency_ms}ms</p>` : ''}
+              ${service.version ? `<p>Version: ${service.version}</p>` : ''}
+              ${service.error ? `<p class="text-red-600">Error: ${service.error}</p>` : ''}
+            </div>
+          </div>
+        `).join('');
+
+        // Update service cards grid
+        serviceCardsEl.className = 'col-span-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4';
+
+        // System metrics
+        const sys = metrics.system || {};
+        const mem = sys.memory || {};
+        document.getElementById('systemMetrics').innerHTML = `
+          <div>
+            <div class="flex justify-between text-sm mb-1">
+              <span class="text-gray-500">Memory Usage</span>
+              <span class="font-medium">${mem.usage_percent || 0}%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+              <div class="bg-blue-600 h-2 rounded-full" style="width: ${mem.usage_percent || 0}%"></div>
+            </div>
+            <p class="text-xs text-gray-400 mt-1">${mem.used_mb || 0} MB / ${mem.total_mb || 0} MB</p>
+          </div>
+          <div class="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p class="text-gray-500">Platform</p>
+              <p class="font-medium">${sys.platform || '-'}</p>
+            </div>
+            <div>
+              <p class="text-gray-500">Architecture</p>
+              <p class="font-medium">${sys.arch || '-'}</p>
+            </div>
+            <div>
+              <p class="text-gray-500">Hostname</p>
+              <p class="font-medium">${sys.hostname || '-'}</p>
+            </div>
+            <div>
+              <p class="text-gray-500">Uptime</p>
+              <p class="font-medium">${formatUptime(sys.uptime_seconds)}</p>
+            </div>
+          </div>
+        `;
+
+        // Process metrics
+        const proc = metrics.process || {};
+        const procMem = proc.memory || {};
+        document.getElementById('processMetrics').innerHTML = `
+          <div class="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p class="text-gray-500">PID</p>
+              <p class="font-medium">${proc.pid || '-'}</p>
+            </div>
+            <div>
+              <p class="text-gray-500">Process Uptime</p>
+              <p class="font-medium">${formatUptime(proc.uptime_seconds)}</p>
+            </div>
+            <div>
+              <p class="text-gray-500">Heap Used</p>
+              <p class="font-medium">${procMem.heap_used_mb || 0} MB</p>
+            </div>
+            <div>
+              <p class="text-gray-500">Heap Total</p>
+              <p class="font-medium">${procMem.heap_total_mb || 0} MB</p>
+            </div>
+            <div>
+              <p class="text-gray-500">RSS Memory</p>
+              <p class="font-medium">${procMem.rss_mb || 0} MB</p>
+            </div>
+            <div>
+              <p class="text-gray-500">External Memory</p>
+              <p class="font-medium">${procMem.external_mb || 0} MB</p>
+            </div>
+          </div>
+        `;
+
+        // Database metrics
+        const db = metrics.database || {};
+        document.getElementById('databaseMetrics').innerHTML = `
+          <div class="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p class="text-gray-500">Active Connections</p>
+              <p class="font-medium">${db.active_connections || 0}</p>
+            </div>
+            <div>
+              <p class="text-gray-500">Cache Hit Ratio</p>
+              <p class="font-medium">${db.cache_hit_ratio || 'N/A'}</p>
+            </div>
+            <div>
+              <p class="text-gray-500">Transactions Committed</p>
+              <p class="font-medium">${(db.transactions_committed || 0).toLocaleString()}</p>
+            </div>
+            <div>
+              <p class="text-gray-500">Transactions Rolled Back</p>
+              <p class="font-medium">${(db.transactions_rolled_back || 0).toLocaleString()}</p>
+            </div>
+          </div>
+        `;
+
+        // CPU info
+        const cpu = sys.cpu || {};
+        document.getElementById('cpuInfo').innerHTML = `
+          <div class="grid grid-cols-2 gap-4 text-sm">
+            <div class="col-span-2">
+              <p class="text-gray-500">CPU Model</p>
+              <p class="font-medium text-xs">${cpu.model || '-'}</p>
+            </div>
+            <div>
+              <p class="text-gray-500">Cores</p>
+              <p class="font-medium">${cpu.cores || '-'}</p>
+            </div>
+            <div>
+              <p class="text-gray-500">Load (1m)</p>
+              <p class="font-medium">${cpu.load_avg_1min || '-'}</p>
+            </div>
+            <div>
+              <p class="text-gray-500">Load (5m)</p>
+              <p class="font-medium">${cpu.load_avg_5min || '-'}</p>
+            </div>
+            <div>
+              <p class="text-gray-500">Load (15m)</p>
+              <p class="font-medium">${cpu.load_avg_15min || '-'}</p>
+            </div>
+          </div>
+        `;
+
+        // Last updated
+        document.getElementById('lastUpdated').textContent = `Updated: ${formatDateTime(new Date())}`;
+
+      } catch (error) {
+        Toast.error('Failed to load health data');
+      }
+    }
+
+    function formatUptime(seconds) {
+      if (!seconds) return '-';
+      const days = Math.floor(seconds / 86400);
+      const hours = Math.floor((seconds % 86400) / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      const parts = [];
+      if (days > 0) parts.push(`${days}d`);
+      if (hours > 0) parts.push(`${hours}h`);
+      if (minutes > 0) parts.push(`${minutes}m`);
+      return parts.join(' ') || '< 1m';
+    }
+
+    // Refresh button
+    document.getElementById('refreshBtn').addEventListener('click', loadHealth);
+
+    // Initialize
+    loadHealth();
+
+    // Auto-refresh every 30 seconds
+    setInterval(loadHealth, 30000);
+  </script>
+</body>
+</html>

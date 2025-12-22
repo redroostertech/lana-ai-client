@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Insights - LanaAI</title>
+  <script src="../js/tailwind-loader.js"></script>
+  <script src="../js/error-reporter.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/notifications.js"></script>
+  <script src="../js/insights.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <!-- Sidebar -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
+    <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
+      <a href="../index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
+      <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
+      <!-- Menu will be dynamically rendered by menu.js -->
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="lg:ml-64">
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
+      <div class="flex items-center justify-between h-16 px-4 lg:px-8">
+        <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+        <div class="flex-1 px-4 lg:px-0">
+          <h1 class="text-xl font-semibold text-gray-900">AI Insights Dashboard</h1>
+          <p class="text-sm text-gray-500">Business intelligence powered by artificial intelligence</p>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <!-- Date Range Filter -->
+          <select id="dateRange" class="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+            <option value="7">Last 7 days</option>
+            <option value="30" selected>Last 30 days</option>
+            <option value="90">Last 90 days</option>
+          </select>
+
+          <!-- Notifications -->
+          <button id="notificationBtn" class="relative text-gray-500 hover:text-gray-700">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+            </svg>
+            <span id="notificationBadge" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">0</span>
+          </button>
+
+          <!-- User Menu -->
+          <div class="relative" id="userMenu">
+            <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900">
+              <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                <span id="userInitials" class="text-sm font-medium text-indigo-600">U</span>
+              </div>
+              <span id="userName" class="hidden sm:block text-sm font-medium">User</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            </button>
+            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+              <a href="../settings.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
+              <hr class="my-1">
+              <button id="logoutBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sign out</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Notification Panel Overlay -->
+    <div id="notificationOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
+
+    <!-- Notification Slide-out Panel -->
+    <div id="notificationPanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
+      <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
+        <h2 class="text-lg font-semibold text-gray-900">Notifications</h2>
+        <div class="flex items-center gap-3">
+          <button id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium hidden">Mark all read</button>
+          <button id="refreshNotificationsBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+          </button>
+          <button id="closeNotificationPanel" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
+        <button id="filterAll" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">All</button>
+        <button id="filterUnread" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Unread</button>
+      </div>
+      <div id="notificationList" class="flex-1 overflow-y-auto">
+        <div id="notificationLoading" class="p-8 text-center">
+          <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+          <p class="text-gray-500 mt-3 text-sm">Loading notifications...</p>
+        </div>
+      </div>
+      <div id="notificationLoadingMore" class="hidden p-4 border-t border-gray-100 text-center flex-shrink-0">
+        <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+      </div>
+    </div>
+
+    <main class="p-4 lg:p-8">
+      <!-- Alert Banner -->
+      <div id="alertBanner" class="hidden bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+        <div class="flex items-start gap-3">
+          <svg class="w-6 h-6 text-red-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+          <div class="flex-1">
+            <h3 class="font-semibold text-red-800">Action Required</h3>
+            <p id="alertMessage" class="text-sm text-red-700 mt-1"></p>
+          </div>
+          <button onclick="dismissAlert()" class="text-red-400 hover:text-red-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI Cards Loading State -->
+      <div id="kpiLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+            <div class="h-6 bg-gray-200 rounded-full w-16"></div>
+          </div>
+          <div class="h-4 bg-gray-200 rounded w-28 mb-2"></div>
+          <div class="h-8 bg-gray-200 rounded w-16"></div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+            <div class="h-6 bg-gray-200 rounded-full w-16"></div>
+          </div>
+          <div class="h-4 bg-gray-200 rounded w-28 mb-2"></div>
+          <div class="h-8 bg-gray-200 rounded w-16"></div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+            <div class="h-6 bg-gray-200 rounded-full w-16"></div>
+          </div>
+          <div class="h-4 bg-gray-200 rounded w-28 mb-2"></div>
+          <div class="h-8 bg-gray-200 rounded w-16"></div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+            <div class="h-6 bg-gray-200 rounded-full w-16"></div>
+          </div>
+          <div class="h-4 bg-gray-200 rounded w-28 mb-2"></div>
+          <div class="h-8 bg-gray-200 rounded w-16"></div>
+        </div>
+      </div>
+
+      <!-- KPI Cards -->
+      <div id="kpiCards" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <!-- Open Opportunities -->
+        <a href="aging-analysis.html" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+            </div>
+            <span class="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-full">View All</span>
+          </div>
+          <p class="text-sm text-gray-500">Open Opportunities</p>
+          <p id="kpiOpenOpportunities" class="text-3xl font-bold text-gray-900">-</p>
+        </a>
+
+        <!-- Aging Opportunities -->
+        <a href="aging-analysis.html?filter=aging" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+            <span id="agingTrend" class="text-xs font-medium text-yellow-600 bg-yellow-50 px-2 py-1 rounded-full">14+ days</span>
+          </div>
+          <p class="text-sm text-gray-500">Aging Opportunities</p>
+          <p id="kpiAgingOpportunities" class="text-3xl font-bold text-yellow-600">-</p>
+        </a>
+
+        <!-- Missed Follow-ups -->
+        <a href="missed-followups.html" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+            <span class="text-xs font-medium text-red-600 bg-red-50 px-2 py-1 rounded-full">This Week</span>
+          </div>
+          <p class="text-sm text-gray-500">Missed Follow-ups</p>
+          <p id="kpiMissedFollowups" class="text-3xl font-bold text-red-600">-</p>
+        </a>
+
+        <!-- Predicted No-Shows -->
+        <a href="predictions.html" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
+            </div>
+            <span class="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-1 rounded-full">Today</span>
+          </div>
+          <p class="text-sm text-gray-500">Predicted No-Shows</p>
+          <p id="kpiPredictedNoShows" class="text-3xl font-bold text-purple-600">-</p>
+        </a>
+      </div>
+
+      <!-- Charts Loading State -->
+      <div id="chartsLoading" class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 animate-pulse">
+          <div class="flex items-center justify-between mb-6">
+            <div>
+              <div class="h-5 bg-gray-200 rounded w-32 mb-2"></div>
+              <div class="h-4 bg-gray-200 rounded w-48"></div>
+            </div>
+            <div class="h-4 bg-gray-200 rounded w-20"></div>
+          </div>
+          <div class="grid grid-cols-3 gap-4">
+            <div class="text-center p-4 bg-gray-50 rounded-lg">
+              <div class="h-4 bg-gray-200 rounded w-16 mx-auto mb-2"></div>
+              <div class="h-7 bg-gray-200 rounded w-20 mx-auto"></div>
+            </div>
+            <div class="text-center p-4 bg-gray-50 rounded-lg">
+              <div class="h-4 bg-gray-200 rounded w-16 mx-auto mb-2"></div>
+              <div class="h-7 bg-gray-200 rounded w-20 mx-auto"></div>
+            </div>
+            <div class="text-center p-4 bg-gray-50 rounded-lg">
+              <div class="h-4 bg-gray-200 rounded w-16 mx-auto mb-2"></div>
+              <div class="h-7 bg-gray-200 rounded w-20 mx-auto"></div>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 animate-pulse">
+          <div class="flex items-center justify-between mb-6">
+            <div>
+              <div class="h-5 bg-gray-200 rounded w-36 mb-2"></div>
+              <div class="h-4 bg-gray-200 rounded w-40"></div>
+            </div>
+            <div class="h-4 bg-gray-200 rounded w-16"></div>
+          </div>
+          <div class="h-48 bg-gray-100 rounded-lg flex items-center justify-center">
+            <div class="w-32 h-32 bg-gray-200 rounded-full"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Revenue Forecast & Aging Chart Row -->
+      <div id="chartsContent" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <!-- Revenue Forecast -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div class="flex items-center justify-between mb-6">
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900">Revenue Forecast</h3>
+              <p class="text-sm text-gray-500">AI-predicted revenue projections</p>
+            </div>
+            <a href="predictions.html" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">View Details</a>
+          </div>
+          <div class="grid grid-cols-3 gap-4">
+            <div class="text-center p-4 bg-gray-50 rounded-lg">
+              <p class="text-sm text-gray-500 mb-1">30 Days</p>
+              <p id="forecast30" class="text-2xl font-bold text-gray-900">-</p>
+              <p id="forecast30Trend" class="text-xs text-green-600 mt-1"></p>
+            </div>
+            <div class="text-center p-4 bg-gray-50 rounded-lg">
+              <p class="text-sm text-gray-500 mb-1">60 Days</p>
+              <p id="forecast60" class="text-2xl font-bold text-gray-900">-</p>
+              <p id="forecast60Trend" class="text-xs text-green-600 mt-1"></p>
+            </div>
+            <div class="text-center p-4 bg-gray-50 rounded-lg">
+              <p class="text-sm text-gray-500 mb-1">90 Days</p>
+              <p id="forecast90" class="text-2xl font-bold text-gray-900">-</p>
+              <p id="forecast90Trend" class="text-xs text-green-600 mt-1"></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Aging Buckets -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div class="flex items-center justify-between mb-6">
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900">Opportunity Aging</h3>
+              <p class="text-sm text-gray-500">Days since last contact</p>
+            </div>
+            <a href="aging-analysis.html" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">View All</a>
+          </div>
+          <div class="h-48">
+            <canvas id="agingChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table Loading State -->
+      <div id="tableLoading" class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 animate-pulse">
+          <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div>
+              <div class="h-5 bg-gray-200 rounded w-48 mb-2"></div>
+              <div class="h-4 bg-gray-200 rounded w-36"></div>
+            </div>
+            <div class="h-4 bg-gray-200 rounded w-16"></div>
+          </div>
+          <div class="p-6 space-y-4">
+            <div class="flex items-center gap-4">
+              <div class="h-10 bg-gray-200 rounded flex-1"></div>
+              <div class="h-10 bg-gray-200 rounded w-20"></div>
+              <div class="h-10 bg-gray-200 rounded w-16"></div>
+              <div class="h-10 bg-gray-200 rounded w-20"></div>
+              <div class="h-10 bg-gray-200 rounded w-20"></div>
+            </div>
+            <div class="flex items-center gap-4">
+              <div class="h-10 bg-gray-200 rounded flex-1"></div>
+              <div class="h-10 bg-gray-200 rounded w-20"></div>
+              <div class="h-10 bg-gray-200 rounded w-16"></div>
+              <div class="h-10 bg-gray-200 rounded w-20"></div>
+              <div class="h-10 bg-gray-200 rounded w-20"></div>
+            </div>
+            <div class="flex items-center gap-4">
+              <div class="h-10 bg-gray-200 rounded flex-1"></div>
+              <div class="h-10 bg-gray-200 rounded w-20"></div>
+              <div class="h-10 bg-gray-200 rounded w-16"></div>
+              <div class="h-10 bg-gray-200 rounded w-20"></div>
+              <div class="h-10 bg-gray-200 rounded w-20"></div>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 animate-pulse">
+          <div class="h-5 bg-gray-200 rounded w-36 mb-4"></div>
+          <div class="space-y-4">
+            <div class="flex items-center justify-between py-3 border-b border-gray-100">
+              <div class="h-4 bg-gray-200 rounded w-24"></div>
+              <div class="h-5 bg-gray-200 rounded w-12"></div>
+            </div>
+            <div class="flex items-center justify-between py-3 border-b border-gray-100">
+              <div class="h-4 bg-gray-200 rounded w-28"></div>
+              <div class="h-5 bg-gray-200 rounded w-10"></div>
+            </div>
+            <div class="flex items-center justify-between py-3 border-b border-gray-100">
+              <div class="h-4 bg-gray-200 rounded w-32"></div>
+              <div class="h-5 bg-gray-200 rounded w-16"></div>
+            </div>
+            <div class="flex items-center justify-between py-3">
+              <div class="h-4 bg-gray-200 rounded w-36"></div>
+              <div class="h-5 bg-gray-200 rounded w-12"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions & Recent Alerts -->
+      <div id="tableContent" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <!-- Top Aging Opportunities -->
+        <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100">
+          <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div>
+              <h3 class="font-semibold text-gray-900">Opportunities Needing Attention</h3>
+              <p class="text-sm text-gray-500">Oldest opportunities first</p>
+            </div>
+            <a href="aging-analysis.html" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">View All</a>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Days</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+                </tr>
+              </thead>
+              <tbody id="topAgingTable" class="divide-y divide-gray-200">
+                <!-- Populated by JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h3 class="font-semibold text-gray-900 mb-4">Performance Snapshot</h3>
+          <div class="space-y-4">
+            <div class="flex items-center justify-between py-3 border-b border-gray-100">
+              <span class="text-sm text-gray-500">Conversion Rate</span>
+              <span id="conversionRate" class="text-lg font-semibold text-gray-900">-</span>
+            </div>
+            <div class="flex items-center justify-between py-3 border-b border-gray-100">
+              <span class="text-sm text-gray-500">Avg Response Time</span>
+              <span id="avgResponseTime" class="text-lg font-semibold text-gray-900">-</span>
+            </div>
+            <div class="flex items-center justify-between py-3 border-b border-gray-100">
+              <span class="text-sm text-gray-500">Total Pipeline Value</span>
+              <span id="pipelineValue" class="text-lg font-semibold text-gray-900">-</span>
+            </div>
+            <div class="flex items-center justify-between py-3">
+              <span class="text-sm text-gray-500">Follow-up Completion</span>
+              <span id="followupCompletion" class="text-lg font-semibold text-gray-900">-</span>
+            </div>
+          </div>
+          <div class="mt-6 grid grid-cols-2 gap-3">
+            <a href="attribution.html" class="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-sm font-medium rounded-lg text-center transition-colors">
+              Attribution
+            </a>
+            <a href="funnel-analysis.html" class="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-sm font-medium rounded-lg text-center transition-colors">
+              Funnel
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Channel Performance Loading State -->
+      <div id="channelLoading" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 animate-pulse">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <div class="h-5 bg-gray-200 rounded w-36 mb-2"></div>
+            <div class="h-4 bg-gray-200 rounded w-48"></div>
+          </div>
+          <div class="h-4 bg-gray-200 rounded w-20"></div>
+        </div>
+        <div class="h-64 bg-gray-100 rounded-lg flex items-end justify-around px-8 pb-8">
+          <div class="w-12 h-32 bg-gray-200 rounded-t"></div>
+          <div class="w-12 h-48 bg-gray-200 rounded-t"></div>
+          <div class="w-12 h-24 bg-gray-200 rounded-t"></div>
+          <div class="w-12 h-40 bg-gray-200 rounded-t"></div>
+          <div class="w-12 h-20 bg-gray-200 rounded-t"></div>
+        </div>
+      </div>
+
+      <!-- Channel Performance -->
+      <div id="channelContent" class="hidden bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900">Channel Performance</h3>
+            <p class="text-sm text-gray-500">Marketing attribution by channel</p>
+          </div>
+          <a href="attribution.html" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">View Details</a>
+        </div>
+        <div class="h-64">
+          <canvas id="channelChart"></canvas>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    if (!api.requireAuth()) throw new Error('Not authenticated');
+
+    // Load full user profile with roles before rendering menu
+    (async () => {
+      try {
+        await api.loadUserProfile();
+      } catch (error) {
+        console.error('Failed to load user profile:', error);
+      }
+      
+      // Render dynamic menu (will now have access to roles)
+      renderMenu('#mainNav');
+    })();
+
+    // Initialize notifications panel
+    NotificationPanel.init();
+
+    // Load user info
+    function loadUserInfo() {
+      const user = api.user;
+      if (user) {
+        const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+        const initials = (user.firstName?.[0] || '') + (user.lastName?.[0] || '') || user.email[0].toUpperCase();
+        document.getElementById('userName').textContent = name;
+        document.getElementById('userInitials').textContent = initials;
+      }
+    }
+    loadUserInfo();
+
+    // User menu toggle
+    const userMenu = document.getElementById('userMenu');
+    const userDropdown = document.getElementById('userDropdown');
+    userMenu.addEventListener('click', () => userDropdown.classList.toggle('hidden'));
+    document.addEventListener('click', (e) => {
+      if (!userMenu.contains(e.target)) userDropdown.classList.add('hidden');
+    });
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      await api.logout();
+      window.location.href = '../login.html';
+    });
+
+    // Sidebar toggle
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('openSidebar').addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+    document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+
+    let agingChart = null;
+    let channelChart = null;
+
+    // Format currency
+    function formatCurrency(value) {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
+    }
+
+    // Get status badge
+    function getStatusBadge(status) {
+      const colors = {
+        green: 'bg-green-100 text-green-800',
+        yellow: 'bg-yellow-100 text-yellow-800',
+        red: 'bg-red-100 text-red-800'
+      };
+      return `<span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${colors[status]}">${status === 'green' ? '0-7d' : status === 'yellow' ? '8-14d' : '15+d'}</span>`;
+    }
+
+    // Dismiss alert
+    function dismissAlert() {
+      document.getElementById('alertBanner').classList.add('hidden');
+    }
+
+    // Show alert
+    function showAlert(message) {
+      document.getElementById('alertMessage').textContent = message;
+      document.getElementById('alertBanner').classList.remove('hidden');
+    }
+
+    // Render aging chart
+    function renderAgingChart(data) {
+      const ctx = document.getElementById('agingChart').getContext('2d');
+
+      if (agingChart) agingChart.destroy();
+
+      agingChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Green (0-7 days)', 'Yellow (8-14 days)', 'Red (15+ days)'],
+          datasets: [{
+            data: [data.green, data.yellow, data.red],
+            backgroundColor: ['#22c55e', '#eab308', '#ef4444'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '60%',
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { boxWidth: 12, padding: 15 }
+            }
+          }
+        }
+      });
+    }
+
+    // Render channel chart
+    function renderChannelChart(channels) {
+      const ctx = document.getElementById('channelChart').getContext('2d');
+
+      if (channelChart) channelChart.destroy();
+
+      const topChannels = channels.slice(0, 5);
+
+      channelChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: topChannels.map(c => c.channel),
+          datasets: [
+            {
+              label: 'Leads',
+              data: topChannels.map(c => c.leads),
+              backgroundColor: '#818cf8'
+            },
+            {
+              label: 'Clients',
+              data: topChannels.map(c => c.clients),
+              backgroundColor: '#22c55e'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { boxWidth: 12, padding: 15 }
+            }
+          },
+          scales: {
+            y: { beginAtZero: true }
+          }
+        }
+      });
+    }
+
+    // Render top aging table
+    function renderTopAgingTable(opportunities) {
+      const tbody = document.getElementById('topAgingTable');
+      const top5 = opportunities.slice(0, 5);
+
+      tbody.innerHTML = top5.map(opp => `
+        <tr class="hover:bg-gray-50">
+          <td class="px-6 py-4 whitespace-nowrap">
+            <div>
+              <p class="font-medium text-gray-900">${opp.name}</p>
+              <p class="text-sm text-gray-500">${opp.practiceArea}</p>
+            </div>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${opp.source}</td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            ${getStatusBadge(opp.status)}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${formatCurrency(opp.value)}</td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <button onclick="createTask('${opp.id}')" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
+              Follow Up
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // Create task from opportunity
+    async function createTask(opportunityId) {
+      try {
+        await Insights.createTaskFromOpportunity(opportunityId, 'follow_up');
+        Toast.success('Follow-up task created');
+      } catch (error) {
+        Toast.error('Failed to create task');
+      }
+    }
+
+    // Show/hide loading states
+    function showLoadingStates() {
+      document.getElementById('kpiLoading').classList.remove('hidden');
+      document.getElementById('kpiCards').classList.add('hidden');
+      document.getElementById('chartsLoading').classList.remove('hidden');
+      document.getElementById('chartsContent').classList.add('hidden');
+      document.getElementById('tableLoading').classList.remove('hidden');
+      document.getElementById('tableContent').classList.add('hidden');
+      document.getElementById('channelLoading').classList.remove('hidden');
+      document.getElementById('channelContent').classList.add('hidden');
+    }
+
+    function hideLoadingStates() {
+      document.getElementById('kpiLoading').classList.add('hidden');
+      document.getElementById('kpiCards').classList.remove('hidden');
+      document.getElementById('chartsLoading').classList.add('hidden');
+      document.getElementById('chartsContent').classList.remove('hidden');
+      document.getElementById('tableLoading').classList.add('hidden');
+      document.getElementById('tableContent').classList.remove('hidden');
+      document.getElementById('channelLoading').classList.add('hidden');
+      document.getElementById('channelContent').classList.remove('hidden');
+    }
+
+    // Load all dashboard data
+    async function loadDashboard() {
+      // Show loading skeletons
+      showLoadingStates();
+
+      try {
+        const [kpi, aging, followups, predictions, attribution] = await Promise.all([
+          Insights.getKPISummary(),
+          Insights.getAgingOpportunities(),
+          Insights.getMissedFollowups(),
+          Insights.getPredictions(),
+          Insights.getAttributionData()
+        ]);
+
+        // Update KPIs
+        document.getElementById('kpiOpenOpportunities').textContent = kpi.openOpportunities;
+        document.getElementById('kpiAgingOpportunities').textContent = kpi.agingOpportunities;
+        document.getElementById('kpiMissedFollowups').textContent = kpi.missedFollowups;
+        document.getElementById('kpiPredictedNoShows').textContent = predictions.noShows?.length || kpi.predictedNoShows;
+
+        // Revenue forecasts
+        document.getElementById('forecast30').textContent = formatCurrency(predictions.forecasts?.['30_day']?.value || kpi.revenueForecast30);
+        document.getElementById('forecast60').textContent = formatCurrency(predictions.forecasts?.['60_day']?.value || kpi.revenueForecast60);
+        document.getElementById('forecast90').textContent = formatCurrency(predictions.forecasts?.['90_day']?.value || kpi.revenueForecast90);
+
+        if (predictions.forecasts) {
+          document.getElementById('forecast30Trend').textContent = `+${predictions.forecasts['30_day'].comparisonLastPeriod}% vs prior`;
+          document.getElementById('forecast60Trend').textContent = `+${predictions.forecasts['60_day'].comparisonLastPeriod}% vs prior`;
+          document.getElementById('forecast90Trend').textContent = `+${predictions.forecasts['90_day'].comparisonLastPeriod}% vs prior`;
+        }
+
+        // Quick stats
+        document.getElementById('conversionRate').textContent = `${kpi.conversionRate}%`;
+        document.getElementById('avgResponseTime').textContent = `${kpi.avgResponseTime}h`;
+        document.getElementById('pipelineValue').textContent = formatCurrency(aging.summary.totalValue);
+        document.getElementById('followupCompletion').textContent = `${Math.round((1 - followups.summary.total / 50) * 100)}%`;
+
+        // Charts
+        renderAgingChart(aging.summary);
+        renderChannelChart(attribution.channels);
+
+        // Top aging table
+        renderTopAgingTable(aging.opportunities);
+
+        // Hide loading skeletons, show content
+        hideLoadingStates();
+
+        // Show alert if there are critical issues
+        if (aging.summary.red > 5 || followups.summary.high > 3) {
+          showAlert(`You have ${aging.summary.red} opportunities in the red zone and ${followups.summary.high} high-priority missed follow-ups that need immediate attention.`);
+        }
+
+      } catch (error) {
+        // Hide loading even on error so user sees something
+        hideLoadingStates();
+        Toast.error('Failed to load dashboard data');
+        console.error(error);
+      }
+    }
+
+    // Date range change handler
+    document.getElementById('dateRange').addEventListener('change', loadDashboard);
+
+    // Initialize dynamic menu
+    renderMenu('#mainNav');
+
+    // Initialize
+    loadDashboard();
+  </script>
+</body>
+</html>

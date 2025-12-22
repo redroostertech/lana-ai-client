@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Execution Logs - LanaAI</title>
+  <script src="../js/tailwind-loader.js"></script>
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/workflows.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
+    <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
+      <a href="../index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
+      <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
+      <!-- Menu will be dynamically rendered by menu.js -->
+    </nav>
+  </aside>
+
+  <div class="lg:ml-64">
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
+      <div class="flex items-center justify-between h-16 px-4 lg:px-8">
+        <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+        <div class="flex-1 px-4 lg:px-0">
+          <h1 class="text-xl font-semibold text-gray-900">Execution Logs</h1>
+          <p class="text-sm text-gray-500">Detailed history of workflow executions</p>
+        </div>
+        <button onclick="refreshLogs()" class="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+          Refresh
+        </button>
+      </div>
+    </header>
+
+    <main class="p-4 lg:p-8">
+      <!-- Stats Cards Loading Skeleton -->
+      <div id="statsLoading" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-4 animate-pulse">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-gray-200 rounded-lg"></div>
+            <div>
+              <div class="h-6 bg-gray-200 rounded w-12 mb-1"></div>
+              <div class="h-3 bg-gray-200 rounded w-24"></div>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-4 animate-pulse">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-gray-200 rounded-lg"></div>
+            <div>
+              <div class="h-6 bg-gray-200 rounded w-12 mb-1"></div>
+              <div class="h-3 bg-gray-200 rounded w-20"></div>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-4 animate-pulse">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-gray-200 rounded-lg"></div>
+            <div>
+              <div class="h-6 bg-gray-200 rounded w-12 mb-1"></div>
+              <div class="h-3 bg-gray-200 rounded w-16"></div>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-4 animate-pulse">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-gray-200 rounded-lg"></div>
+            <div>
+              <div class="h-6 bg-gray-200 rounded w-12 mb-1"></div>
+              <div class="h-3 bg-gray-200 rounded w-20"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats Cards -->
+      <div id="statsCards" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 hidden">
+        <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+              <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+            </div>
+            <div>
+              <p id="totalExecutions" class="text-xl font-bold text-gray-900">-</p>
+              <p class="text-xs text-gray-500">Total Executions</p>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+              <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            </div>
+            <div>
+              <p id="successCount" class="text-xl font-bold text-green-600">-</p>
+              <p class="text-xs text-gray-500">Successful</p>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+              <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </div>
+            <div>
+              <p id="failedCount" class="text-xl font-bold text-red-600">-</p>
+              <p class="text-xs text-gray-500">Failed</p>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+              <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+            </div>
+            <div>
+              <p id="avgDuration" class="text-xl font-bold text-gray-900">-</p>
+              <p class="text-xs text-gray-500">Avg Duration</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
+        <div class="flex flex-wrap items-center gap-4">
+          <div class="flex gap-2">
+            <button onclick="filterStatus('all')" class="status-btn px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-900 text-white" data-status="all">All</button>
+            <button onclick="filterStatus('success')" class="status-btn px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200" data-status="success">Success</button>
+            <button onclick="filterStatus('error')" class="status-btn px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200" data-status="error">Failed</button>
+          </div>
+          <div class="flex-1"></div>
+          <select id="workflowFilter" onchange="handleWorkflowFilter()" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+            <option value="">All Workflows</option>
+          </select>
+          <select id="triggerFilter" onchange="handleTriggerFilter()" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+            <option value="">All Triggers</option>
+            <option value="scheduled">Scheduled</option>
+            <option value="event">Event</option>
+            <option value="manual">Manual</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Logs Table Loading Skeleton -->
+      <div id="tableLoading" class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="p-6 space-y-4">
+          <div class="flex items-center gap-4 animate-pulse">
+            <div class="flex-1"><div class="h-4 bg-gray-200 rounded w-32 mb-1"></div><div class="h-3 bg-gray-200 rounded w-20"></div></div>
+            <div class="h-6 bg-gray-200 rounded-full w-16"></div>
+            <div class="flex-1"><div class="h-4 bg-gray-200 rounded w-28 mb-1"></div><div class="h-3 bg-gray-200 rounded w-16"></div></div>
+            <div class="h-4 bg-gray-200 rounded w-12"></div>
+            <div class="h-4 bg-gray-200 rounded w-8"></div>
+            <div class="h-6 bg-gray-200 rounded-full w-20"></div>
+            <div class="h-4 bg-gray-200 rounded w-20"></div>
+          </div>
+          <div class="flex items-center gap-4 animate-pulse">
+            <div class="flex-1"><div class="h-4 bg-gray-200 rounded w-40 mb-1"></div><div class="h-3 bg-gray-200 rounded w-24"></div></div>
+            <div class="h-6 bg-gray-200 rounded-full w-16"></div>
+            <div class="flex-1"><div class="h-4 bg-gray-200 rounded w-28 mb-1"></div><div class="h-3 bg-gray-200 rounded w-16"></div></div>
+            <div class="h-4 bg-gray-200 rounded w-12"></div>
+            <div class="h-4 bg-gray-200 rounded w-8"></div>
+            <div class="h-6 bg-gray-200 rounded-full w-20"></div>
+            <div class="h-4 bg-gray-200 rounded w-20"></div>
+          </div>
+          <div class="flex items-center gap-4 animate-pulse">
+            <div class="flex-1"><div class="h-4 bg-gray-200 rounded w-36 mb-1"></div><div class="h-3 bg-gray-200 rounded w-20"></div></div>
+            <div class="h-6 bg-gray-200 rounded-full w-16"></div>
+            <div class="flex-1"><div class="h-4 bg-gray-200 rounded w-28 mb-1"></div><div class="h-3 bg-gray-200 rounded w-16"></div></div>
+            <div class="h-4 bg-gray-200 rounded w-12"></div>
+            <div class="h-4 bg-gray-200 rounded w-8"></div>
+            <div class="h-6 bg-gray-200 rounded-full w-20"></div>
+            <div class="h-4 bg-gray-200 rounded w-20"></div>
+          </div>
+          <div class="flex items-center gap-4 animate-pulse">
+            <div class="flex-1"><div class="h-4 bg-gray-200 rounded w-28 mb-1"></div><div class="h-3 bg-gray-200 rounded w-20"></div></div>
+            <div class="h-6 bg-gray-200 rounded-full w-16"></div>
+            <div class="flex-1"><div class="h-4 bg-gray-200 rounded w-28 mb-1"></div><div class="h-3 bg-gray-200 rounded w-16"></div></div>
+            <div class="h-4 bg-gray-200 rounded w-12"></div>
+            <div class="h-4 bg-gray-200 rounded w-8"></div>
+            <div class="h-6 bg-gray-200 rounded-full w-20"></div>
+            <div class="h-4 bg-gray-200 rounded w-20"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Logs Table -->
+      <div id="tableContent" class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hidden">
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Workflow</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Started</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Records</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trigger</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="logsTable" class="divide-y divide-gray-200">
+              <!-- Populated by JavaScript -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div id="emptyState" class="hidden text-center py-16">
+        <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+        </div>
+        <h3 class="text-lg font-medium text-gray-900 mb-1">No execution logs found</h3>
+        <p class="text-gray-500">Logs will appear here once workflows start running</p>
+      </div>
+    </main>
+  </div>
+
+  <!-- Log Details Modal -->
+  <div id="logModal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="p-6 border-b border-gray-100">
+        <div class="flex items-start justify-between">
+          <div>
+            <h3 id="logTitle" class="text-lg font-semibold text-gray-900">Execution Details</h3>
+            <p id="logWorkflow" class="text-sm text-gray-500 mt-1">Workflow Name</p>
+          </div>
+          <button onclick="closeLogModal()" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+      </div>
+      <div class="p-6">
+        <div class="grid grid-cols-2 gap-4 mb-6">
+          <div class="p-4 bg-gray-50 rounded-lg">
+            <p class="text-xs text-gray-500 mb-1">Status</p>
+            <p id="logStatus" class="font-medium">-</p>
+          </div>
+          <div class="p-4 bg-gray-50 rounded-lg">
+            <p class="text-xs text-gray-500 mb-1">Trigger</p>
+            <p id="logTrigger" class="font-medium">-</p>
+          </div>
+          <div class="p-4 bg-gray-50 rounded-lg">
+            <p class="text-xs text-gray-500 mb-1">Duration</p>
+            <p id="logDuration" class="font-medium">-</p>
+          </div>
+          <div class="p-4 bg-gray-50 rounded-lg">
+            <p class="text-xs text-gray-500 mb-1">Records Processed</p>
+            <p id="logRecords" class="font-medium">-</p>
+          </div>
+        </div>
+
+        <div class="space-y-4 mb-6">
+          <div class="flex items-center justify-between py-3 border-b border-gray-100">
+            <span class="text-sm text-gray-500">Execution ID</span>
+            <code id="logId" class="text-sm font-mono bg-gray-100 px-2 py-1 rounded">-</code>
+          </div>
+          <div class="flex items-center justify-between py-3 border-b border-gray-100">
+            <span class="text-sm text-gray-500">Started At</span>
+            <span id="logStarted" class="text-sm font-medium text-gray-900">-</span>
+          </div>
+          <div class="flex items-center justify-between py-3 border-b border-gray-100">
+            <span class="text-sm text-gray-500">Completed At</span>
+            <span id="logCompleted" class="text-sm font-medium text-gray-900">-</span>
+          </div>
+        </div>
+
+        <div id="errorSection" class="hidden mb-6">
+          <h4 class="text-sm font-medium text-gray-900 mb-2">Error Details</h4>
+          <div class="p-4 bg-red-50 border border-red-200 rounded-lg">
+            <pre id="logError" class="text-sm text-red-700 whitespace-pre-wrap font-mono">-</pre>
+          </div>
+        </div>
+
+        <div class="flex gap-3">
+          <button onclick="retryExecution()" class="flex-1 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">
+            Retry Execution
+          </button>
+          <button onclick="closeLogModal()" class="px-4 py-3 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    if (!api.requireAuth()) throw new Error('Not authenticated');
+    renderMenu('#mainNav');
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('openSidebar').addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+    document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+
+    let allLogs = [];
+    let allWorkflows = [];
+    let selectedLog = null;
+    let activeStatus = 'all';
+    let workflowFilter = '';
+    let triggerFilter = '';
+
+    function getStatusBadge(status) {
+      const config = {
+        success: { bg: 'bg-green-100', text: 'text-green-800', icon: '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>' },
+        error: { bg: 'bg-red-100', text: 'text-red-800', icon: '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>' },
+        running: { bg: 'bg-blue-100', text: 'text-blue-800', icon: '<svg class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>' }
+      };
+      const c = config[status] || config.success;
+      return `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${c.bg} ${c.text}">${c.icon} ${status}</span>`;
+    }
+
+    function getTriggerBadge(trigger) {
+      const colors = {
+        scheduled: 'bg-blue-100 text-blue-800',
+        event: 'bg-purple-100 text-purple-800',
+        manual: 'bg-gray-100 text-gray-800'
+      };
+      return `<span class="px-2 py-1 text-xs font-medium rounded-full ${colors[trigger] || colors.manual}">${trigger}</span>`;
+    }
+
+    function formatDuration(ms) {
+      if (ms < 1000) return `${ms}ms`;
+      if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+      return `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
+    }
+
+    function filterStatus(status) {
+      activeStatus = status;
+      document.querySelectorAll('.status-btn').forEach(btn => {
+        if (btn.dataset.status === status) {
+          btn.className = 'status-btn px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-900 text-white';
+        } else {
+          btn.className = 'status-btn px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200';
+        }
+      });
+      renderLogs();
+    }
+
+    function handleWorkflowFilter() {
+      workflowFilter = document.getElementById('workflowFilter').value;
+      renderLogs();
+    }
+
+    function handleTriggerFilter() {
+      triggerFilter = document.getElementById('triggerFilter').value;
+      renderLogs();
+    }
+
+    function renderLogs() {
+      let logs = allLogs;
+
+      if (activeStatus !== 'all') {
+        logs = logs.filter(l => l.status === activeStatus);
+      }
+
+      if (workflowFilter) {
+        logs = logs.filter(l => l.workflowId === workflowFilter);
+      }
+
+      if (triggerFilter) {
+        logs = logs.filter(l => l.trigger === triggerFilter);
+      }
+
+      const tbody = document.getElementById('logsTable');
+      const emptyState = document.getElementById('emptyState');
+
+      if (logs.length === 0) {
+        tbody.innerHTML = '';
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+      tbody.innerHTML = logs.map(l => `
+        <tr class="hover:bg-gray-50">
+          <td class="px-6 py-4">
+            <p class="font-medium text-gray-900">${l.workflowName}</p>
+            <p class="text-xs text-gray-500">${l.id}</p>
+          </td>
+          <td class="px-6 py-4">${getStatusBadge(l.status)}</td>
+          <td class="px-6 py-4">
+            <p class="text-sm text-gray-900">${formatDate(l.startedAt)}</p>
+            <p class="text-xs text-gray-500">${timeAgo(l.startedAt)}</p>
+          </td>
+          <td class="px-6 py-4 text-sm text-gray-900">${formatDuration(l.duration)}</td>
+          <td class="px-6 py-4 text-sm text-gray-900">${l.recordsProcessed}</td>
+          <td class="px-6 py-4">${getTriggerBadge(l.trigger)}</td>
+          <td class="px-6 py-4">
+            <button onclick="showLogDetails('${l.id}')" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
+              View Details
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function updateStats() {
+      const successCount = allLogs.filter(l => l.status === 'success').length;
+      const failedCount = allLogs.filter(l => l.status === 'error').length;
+      const totalDuration = allLogs.reduce((sum, l) => sum + l.duration, 0);
+      const avgDuration = allLogs.length > 0 ? totalDuration / allLogs.length : 0;
+
+      document.getElementById('totalExecutions').textContent = allLogs.length;
+      document.getElementById('successCount').textContent = successCount;
+      document.getElementById('failedCount').textContent = failedCount;
+      document.getElementById('avgDuration').textContent = formatDuration(avgDuration);
+    }
+
+    function populateWorkflowFilter() {
+      const select = document.getElementById('workflowFilter');
+      const options = allWorkflows.map(w => `<option value="${w.id}">${w.name}</option>`).join('');
+      select.innerHTML = '<option value="">All Workflows</option>' + options;
+    }
+
+    function showLogDetails(logId) {
+      selectedLog = allLogs.find(l => l.id === logId);
+      if (!selectedLog) return;
+
+      document.getElementById('logTitle').textContent = `Execution #${selectedLog.id}`;
+      document.getElementById('logWorkflow').textContent = selectedLog.workflowName;
+      document.getElementById('logStatus').innerHTML = getStatusBadge(selectedLog.status);
+      document.getElementById('logTrigger').innerHTML = getTriggerBadge(selectedLog.trigger);
+      document.getElementById('logDuration').textContent = formatDuration(selectedLog.duration);
+      document.getElementById('logRecords').textContent = selectedLog.recordsProcessed;
+      document.getElementById('logId').textContent = selectedLog.id;
+      document.getElementById('logStarted').textContent = formatDate(selectedLog.startedAt);
+      document.getElementById('logCompleted').textContent = selectedLog.completedAt ? formatDate(selectedLog.completedAt) : '-';
+
+      const errorSection = document.getElementById('errorSection');
+      if (selectedLog.error) {
+        errorSection.classList.remove('hidden');
+        document.getElementById('logError').textContent = selectedLog.error;
+      } else {
+        errorSection.classList.add('hidden');
+      }
+
+      document.getElementById('logModal').classList.remove('hidden');
+    }
+
+    function closeLogModal() {
+      document.getElementById('logModal').classList.add('hidden');
+      selectedLog = null;
+    }
+
+    async function retryExecution() {
+      if (!selectedLog) return;
+      try {
+        Toast.info('Retrying workflow...');
+        const result = await Workflows.execute(selectedLog.workflowId);
+        Toast.success(`Workflow completed. Processed ${result.recordsProcessed} records.`);
+        closeLogModal();
+        await refreshLogs();
+      } catch (error) {
+        Toast.error('Workflow execution failed');
+      }
+    }
+
+    async function refreshLogs() {
+      try {
+        const [logsData, workflowsData] = await Promise.all([
+          Workflows.getExecutionLogs(),
+          Workflows.getAll()
+        ]);
+        allLogs = logsData.logs;
+        allWorkflows = workflowsData.workflows;
+        populateWorkflowFilter();
+        updateStats();
+        renderLogs();
+        Toast.success('Logs refreshed');
+      } catch (error) {
+        Toast.error('Failed to refresh logs');
+        console.error(error);
+      }
+    }
+
+    document.getElementById('logModal').addEventListener('click', (e) => {
+      if (e.target.id === 'logModal') closeLogModal();
+    });
+
+    function showLoadingStates() {
+      document.getElementById('statsLoading').classList.remove('hidden');
+      document.getElementById('statsCards').classList.add('hidden');
+      document.getElementById('tableLoading').classList.remove('hidden');
+      document.getElementById('tableContent').classList.add('hidden');
+      document.getElementById('emptyState').classList.add('hidden');
+    }
+
+    function hideLoadingStates() {
+      document.getElementById('statsLoading').classList.add('hidden');
+      document.getElementById('statsCards').classList.remove('hidden');
+      document.getElementById('tableLoading').classList.add('hidden');
+      document.getElementById('tableContent').classList.remove('hidden');
+    }
+
+    async function loadData() {
+      showLoadingStates();
+      try {
+        const [logsData, workflowsData] = await Promise.all([
+          Workflows.getExecutionLogs(),
+          Workflows.getAll()
+        ]);
+        allLogs = logsData.logs;
+        allWorkflows = workflowsData.workflows;
+        populateWorkflowFilter();
+        updateStats();
+        hideLoadingStates();
+        renderLogs();
+      } catch (error) {
+        hideLoadingStates();
+        Toast.error('Failed to load execution logs');
+        console.error(error);
+      }
+    }
+
+    loadData();
+  </script>
+</body>
+</html>

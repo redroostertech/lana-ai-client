@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - LanaAI</title>
+  <script src="js/tailwind-loader.js"></script>
+  <script src="js/error-reporter.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/mock-data.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/components.js"></script>
+  <script src="js/menu.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/activity.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <!-- Sidebar -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
+    <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
+      <span class="text-xl font-bold text-indigo-400">LanaAI</span>
+      <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+
+    <nav id="mainNav" class="flex-1 mt-6 px-3 overflow-hidden">
+      <!-- Menu will be dynamically rendered by menu.js -->
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="lg:ml-64">
+    <!-- Top Bar -->
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
+      <div class="flex items-center justify-between h-16 px-4 lg:px-8">
+        <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+          </svg>
+        </button>
+
+        <div class="flex-1 px-4 lg:px-0">
+          <h1 class="text-xl font-semibold text-gray-900">Dashboard</h1>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <!-- Notifications -->
+          <button id="notificationBtn" class="relative text-gray-500 hover:text-gray-700">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+            </svg>
+            <span id="notificationBadge" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">0</span>
+          </button>
+
+          <!-- User Menu -->
+          <div class="relative" id="userMenu">
+            <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900">
+              <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                <span id="userInitials" class="text-sm font-medium text-indigo-600">U</span>
+              </div>
+              <span id="userName" class="hidden sm:block text-sm font-medium">User</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            </button>
+            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1">
+              <a href="settings.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
+              <hr class="my-1">
+              <button id="logoutBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sign out</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Notification Panel Overlay -->
+    <div id="notificationOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
+
+    <!-- Notification Slide-out Panel -->
+    <div id="notificationPanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
+      <!-- Panel Header -->
+      <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
+        <h2 class="text-lg font-semibold text-gray-900">Notifications</h2>
+        <div class="flex items-center gap-3">
+          <button id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium hidden">Mark all read</button>
+          <button id="refreshNotificationsBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+          </button>
+          <button id="closeNotificationPanel" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Filter Tabs -->
+      <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
+        <button id="filterAll" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">All</button>
+        <button id="filterUnread" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Unread</button>
+      </div>
+
+      <!-- Notifications List -->
+      <div id="notificationList" class="flex-1 overflow-y-auto">
+        <!-- Loading State -->
+        <div id="notificationLoading" class="p-8 text-center">
+          <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+          <p class="text-gray-500 mt-3 text-sm">Loading notifications...</p>
+        </div>
+      </div>
+
+      <!-- Loading More Indicator -->
+      <div id="notificationLoadingMore" class="hidden p-4 border-t border-gray-100 text-center flex-shrink-0">
+        <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+      </div>
+    </div>
+
+    <!-- Activity Panel Overlay -->
+    <div id="activityOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
+
+    <!-- Activity Slide-out Panel -->
+    <div id="activityPanel" class="fixed inset-y-0 right-0 w-full sm:w-[28rem] bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
+      <!-- Panel Header -->
+      <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
+        <h2 class="text-lg font-semibold text-gray-900">Activity</h2>
+        <div class="flex items-center gap-3">
+          <button id="refreshActivityBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+          </button>
+          <button id="closeActivityPanel" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Activity List -->
+      <div id="activityList" class="flex-1 overflow-y-auto">
+        <!-- Loading State -->
+        <div id="activityLoading" class="p-8 text-center">
+          <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+          <p class="text-gray-500 mt-3 text-sm">Loading activity...</p>
+        </div>
+      </div>
+
+      <!-- Loading More Indicator -->
+      <div id="activityLoadingMore" class="hidden p-4 border-t border-gray-100 text-center">
+        <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+      </div>
+    </div>
+
+    <!-- Page Content -->
+    <main class="p-4 lg:p-8">
+      <!-- Welcome Banner -->
+      <div class="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-6 mb-8 text-white">
+        <h2 class="text-2xl font-bold mb-2">Welcome back, <span id="welcomeName">User</span>!</h2>
+        <p class="text-indigo-100">Here's what's happening with your organization today.</p>
+      </div>
+
+      <!-- Stats Grid - Loading State -->
+      <div id="statsLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+          </div>
+          <div class="h-8 bg-gray-200 rounded w-16 mb-2"></div>
+          <div class="h-4 bg-gray-200 rounded w-24"></div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+          </div>
+          <div class="h-8 bg-gray-200 rounded w-12 mb-2"></div>
+          <div class="h-4 bg-gray-200 rounded w-20"></div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+          </div>
+          <div class="h-8 bg-gray-200 rounded w-14 mb-2"></div>
+          <div class="h-4 bg-gray-200 rounded w-20"></div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+          </div>
+          <div class="h-8 bg-gray-200 rounded w-20 mb-2"></div>
+          <div class="h-4 bg-gray-200 rounded w-24"></div>
+        </div>
+      </div>
+
+      <!-- Stats Grid - Content -->
+      <div id="statsContent" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
+              </svg>
+            </div>
+          </div>
+          <h3 class="text-2xl font-bold text-gray-900" id="statMatters">-</h3>
+          <p class="text-gray-500 text-sm" id="statMattersLabel">My Matters</p>
+        </div>
+
+        <div id="statUsersCard" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 hidden">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+              </svg>
+            </div>
+          </div>
+          <h3 class="text-2xl font-bold text-gray-900" id="statUsers">-</h3>
+          <p class="text-gray-500 text-sm">Active Users</p>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+            </div>
+          </div>
+          <h3 class="text-2xl font-bold text-gray-900" id="statDocuments">-</h3>
+          <p class="text-gray-500 text-sm">Documents</p>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+              </svg>
+            </div>
+          </div>
+          <h3 class="text-2xl font-bold text-gray-900" id="statStorage">-</h3>
+          <p class="text-gray-500 text-sm">Storage Used</p>
+        </div>
+      </div>
+
+      <!-- Two Column Layout -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Recent Activity -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+          <div class="p-6 border-b border-gray-100 flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-gray-900">Recent Activity</h3>
+            <div class="flex items-center gap-3">
+              <button id="refreshActivityFeedBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+              </button>
+              <button id="viewAllActivityHeaderBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">View all</button>
+            </div>
+          </div>
+          <!-- Activity Loading Skeleton -->
+          <div id="activityFeedLoading" class="divide-y divide-gray-100">
+            <div class="p-4 animate-pulse">
+              <div class="flex items-start gap-3">
+                <div class="w-10 h-10 bg-gray-200 rounded-full flex-shrink-0"></div>
+                <div class="flex-1">
+                  <div class="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                  <div class="h-3 bg-gray-200 rounded w-1/2 mb-2"></div>
+                  <div class="h-3 bg-gray-200 rounded w-24"></div>
+                </div>
+              </div>
+            </div>
+            <div class="p-4 animate-pulse">
+              <div class="flex items-start gap-3">
+                <div class="w-10 h-10 bg-gray-200 rounded-full flex-shrink-0"></div>
+                <div class="flex-1">
+                  <div class="h-4 bg-gray-200 rounded w-2/3 mb-2"></div>
+                  <div class="h-3 bg-gray-200 rounded w-1/3 mb-2"></div>
+                  <div class="h-3 bg-gray-200 rounded w-20"></div>
+                </div>
+              </div>
+            </div>
+            <div class="p-4 animate-pulse">
+              <div class="flex items-start gap-3">
+                <div class="w-10 h-10 bg-gray-200 rounded-full flex-shrink-0"></div>
+                <div class="flex-1">
+                  <div class="h-4 bg-gray-200 rounded w-4/5 mb-2"></div>
+                  <div class="h-3 bg-gray-200 rounded w-2/5 mb-2"></div>
+                  <div class="h-3 bg-gray-200 rounded w-28"></div>
+                </div>
+              </div>
+            </div>
+            <div class="p-4 animate-pulse">
+              <div class="flex items-start gap-3">
+                <div class="w-10 h-10 bg-gray-200 rounded-full flex-shrink-0"></div>
+                <div class="flex-1">
+                  <div class="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
+                  <div class="h-3 bg-gray-200 rounded w-1/4 mb-2"></div>
+                  <div class="h-3 bg-gray-200 rounded w-16"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Activity Content -->
+          <div id="activityFeed" class="hidden divide-y divide-gray-100 max-h-96 overflow-y-auto">
+          </div>
+        </div>
+
+        <!-- System Status (System Admin Only) -->
+        <div id="systemStatusSection" class="bg-white rounded-xl shadow-sm border border-gray-100 hidden">
+          <div class="p-6 border-b border-gray-100">
+            <h3 class="text-lg font-semibold text-gray-900">System Status</h3>
+          </div>
+          <!-- System Status Loading Skeleton -->
+          <div id="systemStatusLoading" class="p-6 animate-pulse">
+            <div class="flex items-center justify-between mb-6">
+              <div class="h-4 bg-gray-200 rounded w-24"></div>
+              <div class="h-6 bg-gray-200 rounded-full w-16"></div>
+            </div>
+            <div class="space-y-4">
+              <div class="flex items-center justify-between">
+                <div class="h-4 bg-gray-200 rounded w-20"></div>
+                <div class="h-5 bg-gray-200 rounded-full w-14"></div>
+              </div>
+              <div class="flex items-center justify-between">
+                <div class="h-4 bg-gray-200 rounded w-16"></div>
+                <div class="h-5 bg-gray-200 rounded-full w-14"></div>
+              </div>
+              <div class="flex items-center justify-between">
+                <div class="h-4 bg-gray-200 rounded w-24"></div>
+                <div class="h-5 bg-gray-200 rounded-full w-14"></div>
+              </div>
+              <div class="flex items-center justify-between">
+                <div class="h-4 bg-gray-200 rounded w-14"></div>
+                <div class="h-5 bg-gray-200 rounded-full w-14"></div>
+              </div>
+            </div>
+            <div class="h-3 bg-gray-200 rounded w-40 mt-4"></div>
+          </div>
+          <!-- System Status Content -->
+          <div id="systemStatus" class="hidden p-6">
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Overlay for mobile sidebar -->
+  <div id="sidebarOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden lg:hidden"></div>
+
+  <script>
+    // Auth check with retry for race condition on first login
+    function checkAuthWithRetry(retries = 3) {
+      // Re-read from localStorage in case it wasn't ready when api.js loaded
+      const token = localStorage.getItem('token');
+      if (token) {
+        api.token = token;
+        api.user = JSON.parse(localStorage.getItem('user') || 'null');
+      }
+      
+      if (!api.isAuthenticated()) {
+        if (retries > 0) {
+          // Small delay and retry - handles race condition on first login
+          setTimeout(() => checkAuthWithRetry(retries - 1), 100);
+          return;
+        }
+        window.location.href = 'login.html';
+        return;
+      }
+      
+      // Auth successful - initialize the page
+      initializePage();
+    }
+
+    // Start auth check
+    checkAuthWithRetry();
+
+    async function initializePage() {
+    // Load full user profile with roles before rendering menu
+    try {
+      await api.loadUserProfile();
+    } catch (error) {
+      console.error('Failed to load user profile:', error);
+    }
+    
+    // Render dynamic menu (will now have access to roles)
+    renderMenu('#mainNav');
+    
+    // UI Elements
+    const sidebar = document.getElementById('sidebar');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+    const openSidebar = document.getElementById('openSidebar');
+    const closeSidebar = document.getElementById('closeSidebar');
+    const userMenu = document.getElementById('userMenu');
+    const userDropdown = document.getElementById('userDropdown');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    // Sidebar toggle
+    openSidebar.addEventListener('click', () => {
+      sidebar.classList.remove('-translate-x-full');
+      sidebarOverlay.classList.remove('hidden');
+    });
+
+    closeSidebar.addEventListener('click', () => {
+      sidebar.classList.add('-translate-x-full');
+      sidebarOverlay.classList.add('hidden');
+    });
+
+    sidebarOverlay.addEventListener('click', () => {
+      sidebar.classList.add('-translate-x-full');
+      sidebarOverlay.classList.add('hidden');
+    });
+
+    // User menu toggle
+    userMenu.addEventListener('click', () => {
+      userDropdown.classList.toggle('hidden');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!userMenu.contains(e.target)) {
+        userDropdown.classList.add('hidden');
+      }
+    });
+
+    // Logout
+    logoutBtn.addEventListener('click', async () => {
+      await api.logout();
+      window.location.href = 'login.html';
+    });
+
+    // Initialize notification panel
+    NotificationPanel.init();
+
+    // Initialize activity panel
+    ActivityPanel.init();
+
+    // Activity header buttons
+    const refreshActivityFeedBtn = document.getElementById('refreshActivityFeedBtn');
+    const viewAllActivityHeaderBtn = document.getElementById('viewAllActivityHeaderBtn');
+
+    if (refreshActivityFeedBtn) {
+      refreshActivityFeedBtn.addEventListener('click', async () => {
+        const activityLoading = document.getElementById('activityFeedLoading');
+        const activityFeed = document.getElementById('activityFeed');
+        
+        refreshActivityFeedBtn.classList.add('animate-spin');
+        // Show loading skeleton
+        activityLoading.classList.remove('hidden');
+        activityFeed.classList.add('hidden');
+        
+        try {
+          await ActivityPanel.loadDashboardFeed(10);
+          activityLoading.classList.add('hidden');
+          activityFeed.classList.remove('hidden');
+        } catch (error) {
+          activityLoading.classList.add('hidden');
+          activityFeed.classList.remove('hidden');
+        } finally {
+          setTimeout(() => refreshActivityFeedBtn.classList.remove('animate-spin'), 300);
+        }
+      });
+    }
+
+    if (viewAllActivityHeaderBtn) {
+      viewAllActivityHeaderBtn.addEventListener('click', () => {
+        ActivityPanel.open();
+      });
+    }
+
+    // Check if user is system admin
+    function isSystemAdmin() {
+      const user = api.user;
+      if (!user) return false;
+      const roles = user.roles || [];
+      return roles.includes('system_admin') || roles.some(r => r?.name === 'system_admin');
+    }
+
+    // Check if user is org admin or system admin (can view system status)
+    function canViewSystemStatus() {
+      const user = api.user;
+      if (!user) return false;
+      const roles = user.roles || [];
+      return roles.includes('system_admin') || 
+             roles.includes('org_admin') || 
+             roles.some(r => r?.name === 'system_admin' || r?.name === 'org_admin');
+    }
+
+    // Load user info
+    function loadUserInfo() {
+      const user = api.user;
+      if (user) {
+        const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+        const initials = (user.firstName?.[0] || '') + (user.lastName?.[0] || '') || user.email[0].toUpperCase();
+
+        document.getElementById('userName').textContent = name;
+        document.getElementById('userInitials').textContent = initials;
+        document.getElementById('welcomeName').textContent = user.firstName || 'User';
+
+        // Show System Status section for system admins and org admins
+        if (canViewSystemStatus()) {
+          document.getElementById('systemStatusSection').classList.remove('hidden');
+        }
+      }
+    }
+
+    // Load dashboard stats
+    async function loadStats() {
+      const statsLoading = document.getElementById('statsLoading');
+      const statsContent = document.getElementById('statsContent');
+      const isAdmin = canViewSystemStatus(); // org_admin or system_admin
+
+      try {
+        if (isAdmin) {
+          // Admins see org-wide stats
+          const orgId = api.user?.organizationId;
+          if (orgId) {
+            const result = await api.getOrganizationStats(orgId);
+            const stats = result.statistics || result;
+            document.getElementById('statMatters').textContent = stats.total_matters || 0;
+            document.getElementById('statMattersLabel').textContent = 'Total Matters';
+            document.getElementById('statUsers').textContent = stats.total_users || 0;
+            document.getElementById('statUsersCard').classList.remove('hidden');
+            document.getElementById('statDocuments').textContent = stats.total_documents || 0;
+            document.getElementById('statStorage').textContent = formatBytes(stats.total_storage_bytes || stats.storage_used || 0);
+          }
+        } else {
+          // Regular users see their own matters count
+          const mattersResult = await api.getMatters(1, 10); // Get first page to verify count
+          // Use actual returned matters length if pagination total seems wrong
+          const returnedCount = mattersResult.matters?.length || 0;
+          const paginationTotal = mattersResult.pagination?.total || 0;
+          // If pagination says there are matters but none returned, trust the returned count
+          const myMattersCount = returnedCount === 0 ? 0 : paginationTotal;
+          document.getElementById('statMatters').textContent = myMattersCount;
+          document.getElementById('statMattersLabel').textContent = 'My Matters';
+          // Hide users card for non-admins
+          document.getElementById('statUsersCard').classList.add('hidden');
+          // Documents and storage can still show (will be user's own documents via API)
+          document.getElementById('statDocuments').textContent = '-';
+          document.getElementById('statStorage').textContent = '-';
+        }
+        // Hide loading, show content
+        statsLoading.classList.add('hidden');
+        statsContent.classList.remove('hidden');
+      } catch (error) {
+        console.error('Failed to load stats:', error);
+        // Show dashes on error
+        document.getElementById('statMatters').textContent = '-';
+        document.getElementById('statUsers').textContent = '-';
+        document.getElementById('statDocuments').textContent = '-';
+        document.getElementById('statStorage').textContent = '-';
+        // Still show content with error values
+        statsLoading.classList.add('hidden');
+        statsContent.classList.remove('hidden');
+      }
+    }
+
+    // Load activity feed using ActivityPanel
+    async function loadActivity() {
+      const activityLoading = document.getElementById('activityFeedLoading');
+      const activityFeed = document.getElementById('activityFeed');
+      
+      try {
+        await ActivityPanel.loadDashboardFeed(10);
+        // Hide loading, show content
+        activityLoading.classList.add('hidden');
+        activityFeed.classList.remove('hidden');
+      } catch (error) {
+        console.error('Failed to load activity:', error);
+        activityLoading.classList.add('hidden');
+        activityFeed.classList.remove('hidden');
+        activityFeed.innerHTML = '<div class="p-6 text-center text-gray-500">Failed to load activity</div>';
+      }
+    }
+
+    // Load system status
+    async function loadSystemStatus() {
+      const container = document.getElementById('systemStatus');
+      const loading = document.getElementById('systemStatusLoading');
+      
+      try {
+        const health = await api.getHealthSummary();
+
+        container.innerHTML = `
+          <div class="flex items-center justify-between mb-6">
+            <span class="text-sm font-medium text-gray-700">Overall Status</span>
+            ${statusBadge(health.status)}
+          </div>
+          <div class="space-y-4">
+            ${Object.entries(health.services || {}).map(([name, service]) => `
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-600 capitalize">${name.replace('_', ' ')}</span>
+                <div class="flex items-center gap-2">
+                  ${service.latency_ms ? `<span class="text-xs text-gray-400">${service.latency_ms}ms</span>` : ''}
+                  ${statusBadge(service.status)}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+          <p class="text-xs text-gray-400 mt-4">Last updated: ${formatDateTime(health.timestamp)}</p>
+        `;
+        // Hide loading, show content
+        loading.classList.add('hidden');
+        container.classList.remove('hidden');
+      } catch (error) {
+        container.innerHTML = '<div class="text-center text-gray-500">Failed to load system status</div>';
+        loading.classList.add('hidden');
+        container.classList.remove('hidden');
+      }
+    }
+
+    // Format bytes helper
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    // Initialize
+    loadUserInfo();
+    loadStats();
+    loadActivity();
+    
+    // Only load system status for system admins and org admins
+    if (canViewSystemStatus()) {
+      loadSystemStatus();
+      // Refresh data periodically
+      setInterval(loadSystemStatus, 60000);
+    }
+    } // End initializePage function
+  </script>
+</body>
+</html>

@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lana AI API Test Runner</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #4ecca3;
+    }
+
+    .config-panel {
+      background: #16213e;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+
+    .config-panel h2 {
+      margin-bottom: 15px;
+      color: #4ecca3;
+      font-size: 1.2rem;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+    }
+
+    .form-group {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 0.9rem;
+      color: #aaa;
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #333;
+      border-radius: 4px;
+      background: #0f0f23;
+      color: #fff;
+      font-size: 14px;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: #4ecca3;
+    }
+
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .checkbox-group input {
+      width: auto;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: #4ecca3;
+      color: #1a1a2e;
+    }
+
+    .btn-primary:hover {
+      background: #3db892;
+    }
+
+    .btn-secondary {
+      background: #393e46;
+      color: #fff;
+    }
+
+    .btn-secondary:hover {
+      background: #4a4f57;
+    }
+
+    .btn-danger {
+      background: #e74c3c;
+      color: #fff;
+    }
+
+    .btn-danger:hover {
+      background: #c0392b;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .stats-panel {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: #16213e;
+      padding: 20px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .stat-card .value {
+      font-size: 2rem;
+      font-weight: bold;
+    }
+
+    .stat-card .label {
+      color: #aaa;
+      font-size: 0.9rem;
+      margin-top: 5px;
+    }
+
+    .stat-card.passed .value {
+      color: #4ecca3;
+    }
+
+    .stat-card.failed .value {
+      color: #e74c3c;
+    }
+
+    .stat-card.skipped .value {
+      color: #f39c12;
+    }
+
+    .stat-card.total .value {
+      color: #3498db;
+    }
+
+    .progress-bar {
+      height: 8px;
+      background: #333;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+
+    .progress-bar .fill {
+      height: 100%;
+      background: #4ecca3;
+      transition: width 0.3s;
+    }
+
+    .results-panel {
+      background: #16213e;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .results-header {
+      padding: 15px 20px;
+      background: #0f0f23;
+      border-bottom: 1px solid #333;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .results-header h2 {
+      color: #4ecca3;
+      font-size: 1.1rem;
+    }
+
+    .filter-btns {
+      display: flex;
+      gap: 5px;
+    }
+
+    .filter-btn {
+      padding: 5px 12px;
+      border: 1px solid #333;
+      border-radius: 4px;
+      background: transparent;
+      color: #aaa;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .filter-btn.active {
+      border-color: #4ecca3;
+      color: #4ecca3;
+    }
+
+    .results-list {
+      max-height: 500px;
+      overflow-y: auto;
+    }
+
+    .result-item {
+      padding: 12px 20px;
+      border-bottom: 1px solid #222;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .result-item:hover {
+      background: #1e2a45;
+    }
+
+    .result-status {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .result-status.passed {
+      background: #4ecca3;
+    }
+
+    .result-status.failed {
+      background: #e74c3c;
+    }
+
+    .result-status.skipped {
+      background: #f39c12;
+    }
+
+    .result-info {
+      flex: 1;
+    }
+
+    .result-name {
+      font-weight: 500;
+      margin-bottom: 3px;
+    }
+
+    .result-details {
+      font-size: 0.85rem;
+      color: #888;
+    }
+
+    .result-duration {
+      color: #888;
+      font-size: 0.85rem;
+    }
+
+    .log-panel {
+      background: #0f0f23;
+      border-radius: 8px;
+      margin-top: 20px;
+      overflow: hidden;
+    }
+
+    .log-header {
+      padding: 10px 15px;
+      background: #16213e;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .log-header h3 {
+      font-size: 0.95rem;
+      color: #4ecca3;
+    }
+
+    .log-content {
+      padding: 15px;
+      max-height: 300px;
+      overflow-y: auto;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 12px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+
+    .log-content .info {
+      color: #3498db;
+    }
+
+    .log-content .success {
+      color: #4ecca3;
+    }
+
+    .log-content .error {
+      color: #e74c3c;
+    }
+
+    .log-content .warn {
+      color: #f39c12;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+
+    @media (max-width: 768px) {
+      .form-row {
+        flex-direction: column;
+      }
+
+      .form-group {
+        min-width: 100%;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>Lana AI API Test Runner</h1>
+
+    <div class="config-panel">
+      <h2>Configuration</h2>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Base URL</label>
+          <input type="text" id="baseUrl" value="http://localhost:8080/">
+        </div>
+        <div class="form-group">
+          <label>Auth Token</label>
+          <input type="text" id="authToken" value="4414cf512ab0efdb918f0f82e769ac87494acf27"
+            placeholder="JWT token (optional)">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Test Email</label>
+          <input type="email" id="testEmail" value="test@example.com">
+        </div>
+        <div class="form-group">
+          <label>Test Password</label>
+          <input type="password" id="testPassword" value="testpassword123">
+        </div>
+        <div class="form-group">
+          <label>Test Suite</label>
+          <select id="testSuite">
+            <option value="all">All Tests</option>
+            <option value="auth">Authentication</option>
+            <option value="users">Admin Users</option>
+            <option value="roles">User Roles</option>
+            <option value="rbac">RBAC</option>
+            <option value="matters">Matters</option>
+            <option value="audit">Audit</option>
+            <option value="health">Health</option>
+            <option value="plugins">Plugins</option>
+            <option value="profile">User Profile</option>
+            <option value="mfa">MFA</option>
+            <option value="organizations">Organizations</option>
+            <option value="activity">Activity</option>
+            <option value="groups">Groups</option>
+            <option value="notifications">Notifications</option>
+            <option value="sessions">Sessions</option>
+            <option value="chat">Chat</option>
+            <option value="connectors">Connectors</option>
+            <option value="workflows">Workflows</option>
+            <option value="templates">Document Templates</option>
+            <option value="automation">Document Automation</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <div class="checkbox-group">
+            <input type="checkbox" id="logResponses" checked>
+            <label for="logResponses">Log API Responses</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <div class="checkbox-group">
+            <input type="checkbox" id="stopOnFailure">
+            <label for="stopOnFailure">Stop on First Failure</label>
+          </div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="runTests">Run Tests</button>
+        <button class="btn btn-secondary" id="loginFirst">Login First</button>
+        <button class="btn btn-danger" id="clearResults">Clear Results</button>
+      </div>
+    </div>
+
+    <div class="stats-panel">
+      <div class="stat-card passed">
+        <div class="value" id="statPassed">0</div>
+        <div class="label">Passed</div>
+      </div>
+      <div class="stat-card failed">
+        <div class="value" id="statFailed">0</div>
+        <div class="label">Failed</div>
+      </div>
+      <div class="stat-card skipped">
+        <div class="value" id="statSkipped">0</div>
+        <div class="label">Skipped</div>
+      </div>
+      <div class="stat-card total">
+        <div class="value" id="statTotal">0</div>
+        <div class="label">Total</div>
+      </div>
+    </div>
+
+    <div class="progress-bar">
+      <div class="fill" id="progressFill" style="width: 0%"></div>
+    </div>
+
+    <div class="results-panel">
+      <div class="results-header">
+        <h2>Test Results</h2>
+        <div class="filter-btns">
+          <button class="filter-btn active" data-filter="all">All</button>
+          <button class="filter-btn" data-filter="passed">Passed</button>
+          <button class="filter-btn" data-filter="failed">Failed</button>
+          <button class="filter-btn" data-filter="skipped">Skipped</button>
+        </div>
+      </div>
+      <div class="results-list" id="resultsList">
+        <div class="empty-state">No tests run yet. Click "Run Tests" to begin.</div>
+      </div>
+    </div>
+
+    <div class="log-panel">
+      <div class="log-header">
+        <h3>Console Log</h3>
+        <button class="btn btn-secondary" id="clearLog" style="padding: 5px 10px; font-size: 12px;">Clear</button>
+      </div>
+      <div class="log-content" id="logContent"></div>
+    </div>
+  </div>
+
+  <script src="api-tests.js"></script>
+  <script>
+    // DOM elements
+    const baseUrlInput = document.getElementById('baseUrl');
+    const authTokenInput = document.getElementById('authToken');
+    const testEmailInput = document.getElementById('testEmail');
+    const testPasswordInput = document.getElementById('testPassword');
+    const testSuiteSelect = document.getElementById('testSuite');
+    const logResponsesCheckbox = document.getElementById('logResponses');
+    const stopOnFailureCheckbox = document.getElementById('stopOnFailure');
+    const runTestsBtn = document.getElementById('runTests');
+    const loginFirstBtn = document.getElementById('loginFirst');
+    const clearResultsBtn = document.getElementById('clearResults');
+    const resultsList = document.getElementById('resultsList');
+    const logContent = document.getElementById('logContent');
+    const progressFill = document.getElementById('progressFill');
+    const filterBtns = document.querySelectorAll('.filter-btn');
+
+    // Stats elements
+    const statPassed = document.getElementById('statPassed');
+    const statFailed = document.getElementById('statFailed');
+    const statSkipped = document.getElementById('statSkipped');
+    const statTotal = document.getElementById('statTotal');
+
+    // State
+    let currentFilter = 'all';
+    let allResults = [];
+
+    // Override console.log to capture output
+    const originalLog = console.log;
+    console.log = function (...args) {
+      originalLog.apply(console, args);
+      const message = args.map(arg =>
+        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+      ).join(' ');
+
+      let className = 'info';
+      if (message.includes('[PASS]')) className = 'success';
+      else if (message.includes('[FAIL]')) className = 'error';
+      else if (message.includes('[WARN]') || message.includes('[SKIP]')) className = 'warn';
+
+      const cleanMessage = message
+        .replace(/\x1b\[\d+m/g, '')  // Remove ANSI codes
+        .replace(/\[INFO\]/g, '<span class="info">[INFO]</span>')
+        .replace(/\[PASS\]/g, '<span class="success">[PASS]</span>')
+        .replace(/\[FAIL\]/g, '<span class="error">[FAIL]</span>')
+        .replace(/\[WARN\]/g, '<span class="warn">[WARN]</span>')
+        .replace(/\[SKIP\]/g, '<span class="warn">[SKIP]</span>');
+
+      logContent.innerHTML += cleanMessage + '\n';
+      logContent.scrollTop = logContent.scrollHeight;
+    };
+
+    // Update configuration
+    function updateConfig() {
+      if (baseUrlInput.value.trim()) {
+        ApiTester.CONFIG.BASE_URL = baseUrlInput.value.trim();
+      }
+      ApiTester.CONFIG.AUTH_TOKEN = authTokenInput.value || null;
+      ApiTester.CONFIG.TEST_USER.email = testEmailInput.value;
+      ApiTester.CONFIG.TEST_USER.password = testPasswordInput.value;
+      ApiTester.CONFIG.LOG_RESPONSES = logResponsesCheckbox.checked;
+      ApiTester.CONFIG.STOP_ON_FAILURE = stopOnFailureCheckbox.checked;
+    }
+
+    // Update stats display
+    function updateStats() {
+      const results = ApiTester.TestResults;
+      statPassed.textContent = results.passed;
+      statFailed.textContent = results.failed;
+      statSkipped.textContent = results.skipped;
+      statTotal.textContent = results.passed + results.failed + results.skipped;
+
+      const total = results.passed + results.failed + results.skipped;
+      const progress = total > 0 ? ((results.passed + results.skipped) / total) * 100 : 0;
+      progressFill.style.width = `${progress}%`;
+      progressFill.style.background = results.failed > 0 ? '#e74c3c' : '#4ecca3';
+    }
+
+    // Render results list
+    function renderResults() {
+      allResults = ApiTester.TestResults.results;
+
+      const filtered = currentFilter === 'all'
+        ? allResults
+        : allResults.filter(r => r.status === currentFilter);
+
+      if (filtered.length === 0) {
+        resultsList.innerHTML = '<div class="empty-state">No results to display.</div>';
+        return;
+      }
+
+      resultsList.innerHTML = filtered.map(result => `
+        <div class="result-item">
+          <div class="result-status ${result.status}"></div>
+          <div class="result-info">
+            <div class="result-name">${result.name}</div>
+            <div class="result-details">
+              ${result.status === 'passed' ? `Status: ${result.status}` : ''}
+              ${result.status === 'failed' ? `Error: ${result.error || result.statusText || 'Unknown error'}` : ''}
+              ${result.status === 'skipped' ? `Reason: ${result.reason || 'N/A'}` : ''}
+            </div>
+          </div>
+          ${result.duration ? `<div class="result-duration">${result.duration}ms</div>` : ''}
+        </div>
+      `).join('');
+    }
+
+    // Filter buttons
+    filterBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        filterBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentFilter = btn.dataset.filter;
+        renderResults();
+      });
+    });
+
+    // Run tests button
+    runTestsBtn.addEventListener('click', async () => {
+      updateConfig();
+      runTestsBtn.disabled = true;
+      runTestsBtn.textContent = 'Running...';
+      logContent.innerHTML = '';
+      resultsList.innerHTML = '<div class="empty-state">Running tests...</div>';
+
+      try {
+        const suite = testSuiteSelect.value;
+        if (suite === 'all') {
+          await ApiTester.runAllTests();
+        } else {
+          await ApiTester.runTestSuite(suite);
+        }
+      } catch (error) {
+        console.log(`Error: ${error.message}`);
+      }
+
+      updateStats();
+      renderResults();
+      runTestsBtn.disabled = false;
+      runTestsBtn.textContent = 'Run Tests';
+    });
+
+    // Login first button
+    loginFirstBtn.addEventListener('click', async () => {
+      updateConfig();
+      loginFirstBtn.disabled = true;
+      loginFirstBtn.textContent = 'Logging in...';
+
+      try {
+        const result = await ApiTester.AuthTests.testLogin();
+        if (result.success && result.data?.token) {
+          authTokenInput.value = result.data.token;
+          ApiTester.CONFIG.AUTH_TOKEN = result.data.token;
+          console.log('Login successful! Token acquired.');
+        } else {
+          console.log('Login failed:', result.error || result.statusText);
+        }
+      } catch (error) {
+        console.log(`Login error: ${error.message}`);
+      }
+
+      updateStats();
+      renderResults();
+      loginFirstBtn.disabled = false;
+      loginFirstBtn.textContent = 'Login First';
+    });
+
+    // Clear results button
+    clearResultsBtn.addEventListener('click', () => {
+      ApiTester.TestResults.passed = 0;
+      ApiTester.TestResults.failed = 0;
+      ApiTester.TestResults.skipped = 0;
+      ApiTester.TestResults.results = [];
+      allResults = [];
+      updateStats();
+      resultsList.innerHTML = '<div class="empty-state">No tests run yet. Click "Run Tests" to begin.</div>';
+      progressFill.style.width = '0%';
+    });
+
+    // Clear log button
+    document.getElementById('clearLog').addEventListener('click', () => {
+      logContent.innerHTML = '';
+    });
+
+    // Load saved config
+    const savedBaseUrl = localStorage.getItem('apiTester_baseUrl');
+    const savedToken = localStorage.getItem('apiTester_authToken');
+    if (savedBaseUrl) baseUrlInput.value = savedBaseUrl;
+    if (savedToken) authTokenInput.value = savedToken;
+
+    // Save config on change
+    baseUrlInput.addEventListener('change', () => {
+      localStorage.setItem('apiTester_baseUrl', baseUrlInput.value);
+    });
+    authTokenInput.addEventListener('change', () => {
+      localStorage.setItem('apiTester_authToken', authTokenInput.value);
+    });
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Device Setup - Lana AI</title>
+    <script src="js/tailwind-loader.js"></script>
+  <script src="js/error-reporter.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/mock-data.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/components.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="min-h-screen flex flex-col items-center justify-center py-12 px-4">
+        <div class="max-w-lg w-full">
+            <!-- Logo -->
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-gray-900">Lana<span class="text-blue-600">AI</span></h1>
+                <p class="text-gray-600 mt-2">Device Setup & Enrollment</p>
+            </div>
+
+            <!-- Progress Steps -->
+            <div class="mb-8">
+                <div class="flex items-center justify-center">
+                    <div class="flex items-center">
+                        <div id="step1Indicator" class="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-semibold">1</div>
+                        <div id="step1Line" class="w-16 h-1 bg-gray-300"></div>
+                    </div>
+                    <div class="flex items-center">
+                        <div id="step2Indicator" class="w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-semibold">2</div>
+                        <div id="step2Line" class="w-16 h-1 bg-gray-300"></div>
+                    </div>
+                    <div class="flex items-center">
+                        <div id="step3Indicator" class="w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-semibold">3</div>
+                    </div>
+                </div>
+                <div class="flex justify-between mt-2 text-sm text-gray-600 px-4">
+                    <span>Verify</span>
+                    <span>Trust</span>
+                    <span>Complete</span>
+                </div>
+            </div>
+
+            <!-- Step 1: Device Verification -->
+            <div id="step1" class="bg-white rounded-lg shadow-lg p-8">
+                <div class="text-center mb-6">
+                    <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-laptop text-blue-600 text-2xl"></i>
+                    </div>
+                    <h2 class="text-xl font-bold text-gray-900">New Device Detected</h2>
+                    <p class="text-gray-600 mt-2">We don't recognize this device. Let's verify it's really you.</p>
+                </div>
+
+                <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                    <h3 class="font-medium text-gray-900 mb-3">Device Information</h3>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">Browser:</span>
+                            <span class="text-gray-900" id="browserInfo">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">Operating System:</span>
+                            <span class="text-gray-900" id="osInfo">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">Location:</span>
+                            <span class="text-gray-900" id="locationInfo">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <form id="verifyForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Verification Code</label>
+                        <p class="text-sm text-gray-500 mb-2">Enter the 6-digit code sent to your email</p>
+                        <div class="flex gap-2 justify-center">
+                            <input type="text" maxlength="1" class="w-12 h-12 text-center text-xl font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 code-input" data-index="0">
+                            <input type="text" maxlength="1" class="w-12 h-12 text-center text-xl font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 code-input" data-index="1">
+                            <input type="text" maxlength="1" class="w-12 h-12 text-center text-xl font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 code-input" data-index="2">
+                            <input type="text" maxlength="1" class="w-12 h-12 text-center text-xl font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 code-input" data-index="3">
+                            <input type="text" maxlength="1" class="w-12 h-12 text-center text-xl font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 code-input" data-index="4">
+                            <input type="text" maxlength="1" class="w-12 h-12 text-center text-xl font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 code-input" data-index="5">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed" id="verifyBtn">
+                        Verify Device
+                    </button>
+
+                    <button type="button" id="resendBtn" class="w-full text-blue-600 py-2 px-4 hover:underline text-sm">
+                        Didn't receive the code? Resend
+                    </button>
+                </form>
+            </div>
+
+            <!-- Step 2: Trust Device -->
+            <div id="step2" class="bg-white rounded-lg shadow-lg p-8" style="display: none;">
+                <div class="text-center mb-6">
+                    <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-shield-alt text-green-600 text-2xl"></i>
+                    </div>
+                    <h2 class="text-xl font-bold text-gray-900">Trust This Device?</h2>
+                    <p class="text-gray-600 mt-2">Would you like to remember this device for future logins?</p>
+                </div>
+
+                <div class="space-y-4 mb-6">
+                    <div class="bg-gray-50 rounded-lg p-4 border-2 border-transparent hover:border-blue-500 cursor-pointer transition" id="trustOption" onclick="selectTrustOption(true)">
+                        <div class="flex items-start">
+                            <input type="radio" name="trust" value="yes" class="mt-1 mr-3" checked>
+                            <div>
+                                <p class="font-medium text-gray-900">Yes, trust this device</p>
+                                <p class="text-sm text-gray-500">You won't need to verify this device again for 30 days</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-50 rounded-lg p-4 border-2 border-transparent hover:border-blue-500 cursor-pointer transition" id="noTrustOption" onclick="selectTrustOption(false)">
+                        <div class="flex items-start">
+                            <input type="radio" name="trust" value="no" class="mt-1 mr-3">
+                            <div>
+                                <p class="font-medium text-gray-900">No, don't trust this device</p>
+                                <p class="text-sm text-gray-500">You'll need to verify again next time you log in</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Device Name (Optional)</label>
+                    <input type="text" id="deviceName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., Work Laptop, Home Desktop">
+                </div>
+
+                <button type="button" onclick="completeStep2()" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition">
+                    Continue
+                </button>
+            </div>
+
+            <!-- Step 3: Complete -->
+            <div id="step3" class="bg-white rounded-lg shadow-lg p-8" style="display: none;">
+                <div class="text-center mb-6">
+                    <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-check-circle text-green-600 text-2xl"></i>
+                    </div>
+                    <h2 class="text-xl font-bold text-gray-900">Device Setup Complete!</h2>
+                    <p class="text-gray-600 mt-2">Your device has been successfully enrolled.</p>
+                </div>
+
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                    <div class="flex items-start">
+                        <i class="fas fa-check-circle text-green-600 mt-0.5 mr-3"></i>
+                        <div>
+                            <p class="text-sm text-green-800 font-medium">Security Enhanced</p>
+                            <p class="text-sm text-green-700 mt-1">
+                                This device is now registered to your account. You can manage your trusted devices from your account settings.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <a href="/index.html" class="block w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition text-center">
+                    <i class="fas fa-home mr-2"></i>Go to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script>
+        const api = new ApiClient();
+        let trustDevice = true;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Detect device info
+            detectDeviceInfo();
+
+            // Setup code input auto-advance
+            setupCodeInputs();
+        });
+
+        function detectDeviceInfo() {
+            const ua = navigator.userAgent;
+
+            // Browser detection
+            let browser = 'Unknown';
+            if (ua.includes('Chrome')) browser = 'Chrome';
+            else if (ua.includes('Firefox')) browser = 'Firefox';
+            else if (ua.includes('Safari')) browser = 'Safari';
+            else if (ua.includes('Edge')) browser = 'Edge';
+            document.getElementById('browserInfo').textContent = browser;
+
+            // OS detection
+            let os = 'Unknown';
+            if (ua.includes('Windows')) os = 'Windows';
+            else if (ua.includes('Mac')) os = 'macOS';
+            else if (ua.includes('Linux')) os = 'Linux';
+            else if (ua.includes('Android')) os = 'Android';
+            else if (ua.includes('iOS')) os = 'iOS';
+            document.getElementById('osInfo').textContent = os;
+
+            // Location will be determined server-side
+            document.getElementById('locationInfo').textContent = 'Detecting...';
+
+            // Get location from IP (would be done via API)
+            fetchLocation();
+        }
+
+        async function fetchLocation() {
+            try {
+                // This would typically call your backend which uses IP geolocation
+                document.getElementById('locationInfo').textContent = 'Based on your IP address';
+            } catch (e) {
+                document.getElementById('locationInfo').textContent = 'Unknown';
+            }
+        }
+
+        function setupCodeInputs() {
+            const inputs = document.querySelectorAll('.code-input');
+
+            inputs.forEach((input, index) => {
+                input.addEventListener('input', (e) => {
+                    const value = e.target.value;
+                    if (value.length === 1 && index < inputs.length - 1) {
+                        inputs[index + 1].focus();
+                    }
+                });
+
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Backspace' && !e.target.value && index > 0) {
+                        inputs[index - 1].focus();
+                    }
+                });
+
+                input.addEventListener('paste', (e) => {
+                    e.preventDefault();
+                    const paste = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+                    paste.split('').forEach((char, i) => {
+                        if (inputs[i]) inputs[i].value = char;
+                    });
+                    if (paste.length === 6) {
+                        inputs[5].focus();
+                    }
+                });
+            });
+        }
+
+        function getCode() {
+            const inputs = document.querySelectorAll('.code-input');
+            return Array.from(inputs).map(i => i.value).join('');
+        }
+
+        document.getElementById('verifyForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const code = getCode();
+
+            if (code.length !== 6) {
+                alert('Please enter a 6-digit code');
+                return;
+            }
+
+            const btn = document.getElementById('verifyBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Verifying...';
+
+            try {
+                const params = new URLSearchParams(window.location.search);
+                const token = params.get('token');
+
+                await api.request('/api/auth/verify-device', {
+                    method: 'POST',
+                    body: JSON.stringify({ code, token })
+                });
+
+                goToStep(2);
+            } catch (error) {
+                alert(error.message || 'Invalid verification code');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Verify Device';
+            }
+        });
+
+        document.getElementById('resendBtn').addEventListener('click', async function() {
+            const btn = this;
+            btn.disabled = true;
+            btn.textContent = 'Sending...';
+
+            try {
+                const params = new URLSearchParams(window.location.search);
+                const token = params.get('token');
+
+                await api.request('/api/auth/resend-device-code', {
+                    method: 'POST',
+                    body: JSON.stringify({ token })
+                });
+
+                btn.textContent = 'Code sent!';
+                setTimeout(() => {
+                    btn.textContent = "Didn't receive the code? Resend";
+                    btn.disabled = false;
+                }, 3000);
+            } catch (error) {
+                btn.textContent = 'Failed to send. Try again';
+                btn.disabled = false;
+            }
+        });
+
+        function selectTrustOption(trust) {
+            trustDevice = trust;
+            document.getElementById('trustOption').classList.toggle('border-blue-500', trust);
+            document.getElementById('noTrustOption').classList.toggle('border-blue-500', !trust);
+            document.querySelector('input[value="yes"]').checked = trust;
+            document.querySelector('input[value="no"]').checked = !trust;
+        }
+
+        async function completeStep2() {
+            try {
+                const deviceName = document.getElementById('deviceName').value;
+                const params = new URLSearchParams(window.location.search);
+                const token = params.get('token');
+
+                await api.request('/api/auth/trust-device', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        token,
+                        trust: trustDevice,
+                        deviceName: deviceName || undefined
+                    })
+                });
+
+                goToStep(3);
+            } catch (error) {
+                alert(error.message || 'Failed to complete setup');
+            }
+        }
+
+        function goToStep(step) {
+            // Hide all steps
+            document.getElementById('step1').style.display = 'none';
+            document.getElementById('step2').style.display = 'none';
+            document.getElementById('step3').style.display = 'none';
+
+            // Show current step
+            document.getElementById('step' + step).style.display = 'block';
+
+            // Update indicators
+            for (let i = 1; i <= 3; i++) {
+                const indicator = document.getElementById('step' + i + 'Indicator');
+                if (i < step) {
+                    indicator.className = 'w-10 h-10 rounded-full bg-green-500 text-white flex items-center justify-center font-semibold';
+                    indicator.innerHTML = '<i class="fas fa-check"></i>';
+                } else if (i === step) {
+                    indicator.className = 'w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-semibold';
+                    indicator.textContent = i;
+                } else {
+                    indicator.className = 'w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-semibold';
+                    indicator.textContent = i;
+                }
+
+                if (i < 3) {
+                    const line = document.getElementById('step' + i + 'Line');
+                    line.className = i < step ? 'w-16 h-1 bg-green-500' : 'w-16 h-1 bg-gray-300';
+                }
+            }
+        }
+    </script>
+</body>
+</html>

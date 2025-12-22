@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workflow Builder - LanaAI</title>
+  <script src="../js/tailwind-loader.js"></script>
+  <script src="../js/error-reporter.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jerosoler/Drawflow/dist/drawflow.min.css">
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/workflows.js"></script>
+  <script src="../js/workflow-builder.js"></script>
+  <style>
+    /* Drawflow customizations */
+    #drawflow {
+      background: #f9fafb;
+      background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+    .drawflow .connection .main-path {
+      stroke: #6366f1;
+      stroke-width: 3;
+    }
+    .drawflow .connection .main-path:hover {
+      stroke: #4f46e5;
+      stroke-width: 4;
+    }
+    .drawflow .drawflow-node {
+      background: transparent;
+      border: none;
+      padding: 0;
+    }
+    .drawflow .drawflow-node.selected {
+      box-shadow: none;
+    }
+    .drawflow .drawflow-node.selected .workflow-node {
+      box-shadow: 0 0 0 3px #6366f1;
+    }
+    .drawflow .drawflow-node .inputs, .drawflow .drawflow-node .outputs {
+      position: absolute;
+    }
+    .drawflow .drawflow-node .input, .drawflow .drawflow-node .output {
+      width: 14px;
+      height: 14px;
+      background: #6366f1;
+      border: 2px solid white;
+      border-radius: 50%;
+    }
+    .drawflow .drawflow-node .input:hover, .drawflow .drawflow-node .output:hover {
+      background: #4f46e5;
+    }
+    .drawflow .drawflow-node .output_2 {
+      background: #f59e0b;
+    }
+    .node-item {
+      cursor: grab;
+      transition: all 0.2s;
+    }
+    .node-item:hover {
+      transform: translateX(4px);
+    }
+    .node-item:active {
+      cursor: grabbing;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <!-- Sidebar Navigation -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
+    <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
+      <a href="../index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
+      <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
+      <!-- Menu will be dynamically rendered by menu.js -->
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="lg:ml-64 flex flex-col h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20 flex-shrink-0">
+      <div class="flex items-center justify-between h-16 px-4 lg:px-6">
+        <div class="flex items-center gap-4">
+          <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+          </button>
+          <a href="dashboard.html" class="text-gray-500 hover:text-gray-700">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+          </a>
+          <div>
+            <input type="text" id="workflowName" value="New Workflow" class="text-lg font-semibold text-gray-900 bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded px-2 -ml-2">
+            <p class="text-sm text-gray-500 px-2">Visual workflow builder</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="loadFromTemplate()" class="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+            Load Template
+          </button>
+          <button onclick="testWorkflow()" class="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            Test
+          </button>
+          <button onclick="saveWorkflow()" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+            Save & Deploy
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Builder Area -->
+    <div class="flex flex-1 overflow-hidden">
+      <!-- Node Palette -->
+      <div class="w-64 bg-white border-r border-gray-200 overflow-y-auto flex-shrink-0">
+        <div class="p-4">
+          <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Triggers</h3>
+          <div class="space-y-2" id="triggerNodes">
+            <!-- Populated by JS -->
+          </div>
+
+          <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 mt-6">Conditions</h3>
+          <div class="space-y-2" id="conditionNodes">
+            <!-- Populated by JS -->
+          </div>
+
+          <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 mt-6">Actions</h3>
+          <div class="space-y-2" id="actionNodes">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- Zoom Controls -->
+        <div class="p-4 border-t border-gray-200">
+          <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">View</p>
+          <div class="flex gap-2">
+            <button onclick="workflowBuilder.zoomIn()" class="flex-1 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg">
+              <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"></path></svg>
+            </button>
+            <button onclick="workflowBuilder.zoomOut()" class="flex-1 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg">
+              <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"></path></svg>
+            </button>
+            <button onclick="workflowBuilder.zoomReset()" class="flex-1 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg text-xs">
+              Reset
+            </button>
+          </div>
+          <button onclick="clearCanvas()" class="w-full mt-3 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg">
+            Clear Canvas
+          </button>
+        </div>
+      </div>
+
+      <!-- Canvas -->
+      <div class="flex-1 relative">
+        <div id="drawflow" class="w-full h-full"></div>
+
+        <!-- Drop Hint -->
+        <div id="dropHint" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div class="text-center text-gray-400">
+            <svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path></svg>
+            <p class="text-lg font-medium">Drag nodes here to build your workflow</p>
+            <p class="text-sm mt-1">Start with a Trigger, add Conditions, and end with Actions</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Node Configuration Panel -->
+      <div id="nodeConfigPanel" class="w-80 bg-white border-l border-gray-200 overflow-y-auto hidden flex-shrink-0">
+        <!-- Populated by JS when node is selected -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Template Selection Modal -->
+  <div id="templateModal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
+      <div class="p-6 border-b border-gray-100">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-semibold text-gray-900">Load from Template</h3>
+          <button onclick="closeTemplateModal()" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+      </div>
+      <div class="p-6 overflow-y-auto max-h-[60vh]">
+        <div id="templateList" class="grid grid-cols-2 gap-4">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/gh/jerosoler/Drawflow/dist/drawflow.min.js"></script>
+  <script>
+    if (!api.requireAuth()) throw new Error('Not authenticated');
+    renderMenu('#mainNav');
+
+    // Sidebar toggle
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('openSidebar').addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+    document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+
+    // Initialize workflow builder
+    let workflowBuilder;
+
+    function initBuilder() {
+      workflowBuilder = new WorkflowBuilder('drawflow');
+      workflowBuilder.init();
+
+      // Render node palette
+      renderNodePalette();
+
+      // Setup drag and drop
+      setupDragAndDrop();
+
+      // Hide drop hint when nodes are added
+      workflowBuilder.editor.on('nodeCreated', () => {
+        document.getElementById('dropHint').classList.add('hidden');
+      });
+
+      // Show drop hint if canvas is empty
+      workflowBuilder.editor.on('nodeRemoved', () => {
+        const data = workflowBuilder.editor.export();
+        if (!data.drawflow?.Home?.data || Object.keys(data.drawflow.Home.data).length === 0) {
+          document.getElementById('dropHint').classList.remove('hidden');
+        }
+      });
+
+      // Check URL for template parameter
+      const urlParams = new URLSearchParams(window.location.search);
+      const templateId = urlParams.get('template');
+      if (templateId) {
+        loadTemplateById(templateId);
+      }
+    }
+
+    function renderNodePalette() {
+      // Render triggers
+      const triggerContainer = document.getElementById('triggerNodes');
+      triggerContainer.innerHTML = WorkflowNodeTypes.triggers.map(node => createPaletteNode(node)).join('');
+
+      // Render conditions
+      const conditionContainer = document.getElementById('conditionNodes');
+      conditionContainer.innerHTML = WorkflowNodeTypes.conditions.map(node => createPaletteNode(node)).join('');
+
+      // Render actions
+      const actionContainer = document.getElementById('actionNodes');
+      actionContainer.innerHTML = WorkflowNodeTypes.actions.map(node => createPaletteNode(node)).join('');
+    }
+
+    function createPaletteNode(node) {
+      const colors = NodeColors[node.color] || NodeColors.blue;
+      const icon = NodeIcons[node.icon] || NodeIcons.document;
+
+      return `
+        <div class="node-item flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 cursor-grab"
+             draggable="true"
+             data-node-type="${node.type}">
+          <div class="w-8 h-8 ${colors.bg} rounded-lg flex items-center justify-center ${colors.icon}">
+            ${icon}
+          </div>
+          <div>
+            <p class="text-sm font-medium text-gray-900">${node.name}</p>
+            <p class="text-xs text-gray-500">${node.description}</p>
+          </div>
+        </div>
+      `;
+    }
+
+    function setupDragAndDrop() {
+      const canvas = document.getElementById('drawflow');
+
+      // Handle drag start
+      document.querySelectorAll('.node-item').forEach(item => {
+        item.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('nodeType', e.currentTarget.dataset.nodeType);
+        });
+      });
+
+      // Handle drop on canvas
+      canvas.addEventListener('dragover', (e) => {
+        e.preventDefault();
+      });
+
+      canvas.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const nodeType = e.dataTransfer.getData('nodeType');
+        if (nodeType) {
+          // Get position relative to canvas
+          const rect = canvas.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+
+          // Adjust for zoom and pan
+          const zoom = workflowBuilder.editor.zoom;
+          const canvasX = (x / zoom) - (workflowBuilder.editor.canvas_x / zoom);
+          const canvasY = (y / zoom) - (workflowBuilder.editor.canvas_y / zoom);
+
+          workflowBuilder.addNode(nodeType, canvasX, canvasY);
+        }
+      });
+    }
+
+    // Save workflow
+    async function saveWorkflow() {
+      const validation = workflowBuilder.validate();
+      if (!validation.valid) {
+        Toast.error(validation.errors.join('\n'));
+        return;
+      }
+
+      const name = document.getElementById('workflowName').value || 'Untitled Workflow';
+      workflowBuilder.workflowName = name;
+
+      const workflowData = workflowBuilder.exportWorkflow();
+
+      try {
+        Toast.info('Saving workflow...');
+
+        if (workflowBuilder.workflowId) {
+          await Workflows.update(workflowBuilder.workflowId, {
+            name: workflowData.name,
+            description: workflowData.description,
+            graphData: workflowData
+          });
+        } else {
+          const result = await Workflows.create({
+            name: workflowData.name,
+            description: workflowData.description,
+            trigger: { type: 'manual', config: {} },
+            graphData: workflowData
+          });
+          if (result.workflow) {
+            workflowBuilder.workflowId = result.workflow.id;
+          }
+        }
+
+        workflowBuilder.isDirty = false;
+        Toast.success('Workflow saved successfully!');
+      } catch (error) {
+        Toast.error('Failed to save workflow');
+        console.error(error);
+      }
+    }
+
+    // Test workflow
+    function testWorkflow() {
+      const validation = workflowBuilder.validate();
+      if (!validation.valid) {
+        Toast.error('Workflow has errors:\n' + validation.errors.join('\n'));
+        return;
+      }
+
+      Toast.success('Workflow validation passed! Ready to deploy.');
+    }
+
+    // Clear canvas
+    function clearCanvas() {
+      if (confirm('Are you sure you want to clear the canvas? This cannot be undone.')) {
+        workflowBuilder.clear();
+        document.getElementById('dropHint').classList.remove('hidden');
+        Toast.info('Canvas cleared');
+      }
+    }
+
+    // Load from template
+    async function loadFromTemplate() {
+      try {
+        const data = await Workflows.getTemplates();
+        renderTemplateList(data.templates);
+        document.getElementById('templateModal').classList.remove('hidden');
+      } catch (error) {
+        Toast.error('Failed to load templates');
+        console.error(error);
+      }
+    }
+
+    function renderTemplateList(templates) {
+      const container = document.getElementById('templateList');
+      container.innerHTML = templates.map(t => `
+        <div class="p-4 border border-gray-200 rounded-lg hover:border-indigo-300 hover:bg-indigo-50 cursor-pointer transition-colors"
+             onclick="selectTemplate('${t.id}')">
+          <div class="flex items-center gap-3 mb-2">
+            <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600">
+              ${getTemplateIcon(t.icon)}
+            </div>
+            <div>
+              <p class="font-medium text-gray-900">${t.name}</p>
+              <p class="text-xs text-gray-500">${t.category}</p>
+            </div>
+          </div>
+          <p class="text-sm text-gray-600">${t.description}</p>
+          <div class="mt-2 text-xs text-gray-400">${t.nodes} steps</div>
+        </div>
+      `).join('');
+    }
+
+    function getTemplateIcon(iconName) {
+      const icons = {
+        'clock': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+        'document': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>',
+        'calendar': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>',
+        'currency': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+        'user-plus': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>',
+        'star': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path></svg>',
+        'refresh': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>',
+        'document-text': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>'
+      };
+      return icons[iconName] || icons['document'];
+    }
+
+    function selectTemplate(templateId) {
+      closeTemplateModal();
+      loadTemplateById(templateId);
+    }
+
+    async function loadTemplateById(templateId) {
+      // For demo, we'll create a sample workflow based on template type
+      const templates = WorkflowsMockData.templates;
+      const template = templates.find(t => t.id === templateId);
+
+      if (!template) {
+        Toast.error('Template not found');
+        return;
+      }
+
+      // Clear current canvas
+      workflowBuilder.clear();
+      document.getElementById('dropHint').classList.add('hidden');
+
+      // Set workflow name
+      document.getElementById('workflowName').value = template.name;
+      workflowBuilder.workflowName = template.name;
+
+      // Create sample nodes based on template category
+      const sampleWorkflows = {
+        'Lead Management': [
+          { type: 'trigger-event', x: 100, y: 150 },
+          { type: 'condition-age', x: 350, y: 150 },
+          { type: 'action-email', x: 600, y: 80 },
+          { type: 'action-task', x: 600, y: 220 }
+        ],
+        'Client Intake': [
+          { type: 'trigger-event', x: 100, y: 150 },
+          { type: 'action-email', x: 350, y: 100 },
+          { type: 'action-task', x: 350, y: 200 },
+          { type: 'action-document', x: 600, y: 150 }
+        ],
+        'Appointments': [
+          { type: 'trigger-event', x: 100, y: 150 },
+          { type: 'action-sms', x: 350, y: 100 },
+          { type: 'action-notify', x: 350, y: 200 }
+        ],
+        'Billing': [
+          { type: 'trigger-schedule', x: 100, y: 150 },
+          { type: 'condition-age', x: 350, y: 150 },
+          { type: 'action-email', x: 600, y: 100 },
+          { type: 'action-escalate', x: 600, y: 200 }
+        ],
+        'Marketing': [
+          { type: 'trigger-event', x: 100, y: 150 },
+          { type: 'condition-status', x: 350, y: 150 },
+          { type: 'action-retarget', x: 600, y: 150 }
+        ],
+        'Documents': [
+          { type: 'trigger-event', x: 100, y: 150 },
+          { type: 'action-document', x: 350, y: 100 },
+          { type: 'action-email', x: 350, y: 200 }
+        ]
+      };
+
+      const nodes = sampleWorkflows[template.category] || sampleWorkflows['Lead Management'];
+      const nodeIds = [];
+
+      nodes.forEach(n => {
+        const id = workflowBuilder.addNode(n.type, n.x, n.y);
+        nodeIds.push(id);
+      });
+
+      // Create connections (simple chain)
+      setTimeout(() => {
+        for (let i = 0; i < nodeIds.length - 1; i++) {
+          try {
+            workflowBuilder.editor.addConnection(nodeIds[i], nodeIds[i + 1], 'output_1', 'input_1');
+          } catch (e) {
+            // Ignore connection errors for condition nodes with 2 outputs
+          }
+        }
+        Toast.success(`Loaded "${template.name}" template`);
+      }, 100);
+    }
+
+    function closeTemplateModal() {
+      document.getElementById('templateModal').classList.add('hidden');
+    }
+
+    // Close modal on backdrop click
+    document.getElementById('templateModal').addEventListener('click', (e) => {
+      if (e.target.id === 'templateModal') closeTemplateModal();
+    });
+
+    // Initialize
+    initBuilder();
+  </script>
+</body>
+</html>

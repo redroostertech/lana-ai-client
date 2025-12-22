@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Communications Connectors - LanaAI</title>
+  <script src="../js/tailwind-loader.js"></script>
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/connectors.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <!-- Sidebar -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col h-full">
+    <div class="flex items-center justify-between h-16 px-6 border-b border-gray-800 flex-shrink-0">
+      <a href="../index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
+      <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
+      <!-- Menu will be dynamically rendered by menu.js -->
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="lg:ml-64">
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
+      <div class="flex items-center justify-between h-16 px-4 lg:px-8">
+        <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+        <div class="flex items-center gap-4 flex-1 px-4 lg:px-0">
+          <a href="connectors.html" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+          </a>
+          <div>
+            <h1 class="text-xl font-semibold text-gray-900">Communications Connectors</h1>
+            <p class="text-sm text-gray-500">Connect call logs, calendars, SMS, and email</p>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="p-4 lg:p-8">
+      <!-- Connector Cards Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <!-- Google Calendar -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden" id="card-comm-gcal">
+          <div class="p-6">
+            <div class="flex items-start justify-between mb-4">
+              <div class="flex items-center gap-4">
+                <div class="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                </div>
+                <div>
+                  <h3 class="text-lg font-semibold text-gray-900">Google Calendar</h3>
+                  <p class="text-sm text-gray-500">Calendar and scheduling sync</p>
+                </div>
+              </div>
+              <span id="status-comm-gcal" class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">Loading...</span>
+            </div>
+            <div id="details-comm-gcal" class="text-sm text-gray-500 mb-4"></div>
+            <div class="flex gap-3">
+              <button onclick="configureConnector('comm-gcal')" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">
+                Configure
+              </button>
+              <button onclick="testConnection('comm-gcal')" class="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-lg transition-colors">
+                Test
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Outlook Calendar -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden" id="card-comm-outlook">
+          <div class="p-6">
+            <div class="flex items-start justify-between mb-4">
+              <div class="flex items-center gap-4">
+                <div class="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <svg class="w-8 h-8 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                </div>
+                <div>
+                  <h3 class="text-lg font-semibold text-gray-900">Outlook Calendar</h3>
+                  <p class="text-sm text-gray-500">Microsoft calendar integration</p>
+                </div>
+              </div>
+              <span id="status-comm-outlook" class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">Loading...</span>
+            </div>
+            <div id="details-comm-outlook" class="text-sm text-gray-500 mb-4"></div>
+            <div class="flex gap-3">
+              <button onclick="configureConnector('comm-outlook')" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">
+                Configure
+              </button>
+              <button onclick="testConnection('comm-outlook')" class="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-lg transition-colors">
+                Test
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Twilio SMS (Coming Soon) -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden opacity-50 cursor-not-allowed" id="card-comm-twilio">
+          <div class="p-6">
+            <div class="flex items-start justify-between mb-4">
+              <div class="flex items-center gap-4">
+                <div class="w-14 h-14 bg-gradient-to-br from-gray-400 to-gray-500 rounded-xl flex items-center justify-center">
+                  <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+                </div>
+                <div>
+                  <h3 class="text-lg font-semibold text-gray-500">Twilio SMS</h3>
+                  <p class="text-sm text-gray-400">SMS and voice communications</p>
+                </div>
+              </div>
+              <span class="px-3 py-1 text-sm font-medium rounded-full bg-gray-200 text-gray-500">Coming Soon</span>
+            </div>
+            <div class="text-center py-4">
+              <p class="text-gray-400">Twilio SMS integration coming soon</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- CallRail (Coming Soon) -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden opacity-50 cursor-not-allowed" id="card-comm-callrail">
+          <div class="p-6">
+            <div class="flex items-start justify-between mb-4">
+              <div class="flex items-center gap-4">
+                <div class="w-14 h-14 bg-gradient-to-br from-gray-400 to-gray-500 rounded-xl flex items-center justify-center">
+                  <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
+                </div>
+                <div>
+                  <h3 class="text-lg font-semibold text-gray-500">CallRail</h3>
+                  <p class="text-sm text-gray-400">Call tracking and analytics</p>
+                </div>
+              </div>
+              <span class="px-3 py-1 text-sm font-medium rounded-full bg-gray-200 text-gray-500">Coming Soon</span>
+            </div>
+            <div class="text-center py-4">
+              <p class="text-gray-400">CallRail integration coming soon</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Configuration Modal -->
+      <div id="configModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <h3 id="modalTitle" class="text-lg font-semibold text-gray-900">Configure Connector</h3>
+            <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+          </div>
+          <form id="configForm" class="p-6 space-y-6">
+            <div id="formFields">
+              <!-- Dynamic form fields will be inserted here -->
+            </div>
+            <div class="flex gap-3 pt-4 border-t border-gray-100">
+              <button type="button" onclick="closeModal()" class="flex-1 px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-lg transition-colors">
+                Cancel
+              </button>
+              <button type="submit" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">
+                Save Configuration
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    if (!api.requireAuth()) throw new Error('Not authenticated');
+
+    // Load full user profile with roles before rendering menu
+    (async () => {
+      try {
+        await api.loadUserProfile();
+      } catch (error) {
+        console.error('Failed to load user profile:', error);
+      }
+
+      // Render dynamic menu (will now have access to roles)
+      renderMenu('#mainNav', { menuType: 'integrations' });
+    })();
+
+    // Sidebar toggle
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('openSidebar').addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+    document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+
+    let currentConnectorId = null;
+    let connectorData = {};
+
+    // Status badge helper
+    function getStatusBadge(status) {
+      const styles = {
+        connected: 'bg-green-100 text-green-800',
+        disconnected: 'bg-gray-100 text-gray-600',
+        error: 'bg-red-100 text-red-800'
+      };
+      return `<span class="px-2 py-1 text-xs font-medium rounded-full ${styles[status] || styles.disconnected}">${status}</span>`;
+    }
+
+    // Get form fields for connector type
+    function getFormFields(connectorId) {
+      const fields = {
+        'comm-gcal': [
+          { type: 'oauth', label: 'Connect with Google', provider: 'google' },
+          { type: 'multiselect', name: 'calendars', label: 'Calendars to Sync', options: ['Primary', 'Consultations', 'Court Dates', 'Meetings'] },
+          { type: 'select', name: 'sync_frequency', label: 'Sync Frequency', options: ['Real-time', 'Every 15 minutes', 'Hourly'] }
+        ],
+        'comm-outlook': [
+          { type: 'oauth', label: 'Connect with Microsoft', provider: 'microsoft' },
+          { type: 'multiselect', name: 'calendars', label: 'Calendars to Sync', options: ['Calendar', 'Appointments', 'Shared Calendar'] },
+          { type: 'select', name: 'sync_frequency', label: 'Sync Frequency', options: ['Real-time', 'Every 15 minutes', 'Hourly'] }
+        ],
+        'comm-twilio': [
+          { type: 'text', name: 'account_sid', label: 'Account SID', placeholder: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' },
+          { type: 'password', name: 'auth_token', label: 'Auth Token', placeholder: 'Enter your Twilio Auth Token' },
+          { type: 'text', name: 'phone_number', label: 'Twilio Phone Number', placeholder: '+1234567890' },
+          { type: 'select', name: 'sync_frequency', label: 'Sync Frequency', options: ['Real-time', 'Every 15 minutes', 'Hourly', 'Daily'] },
+          { type: 'checkbox', name: 'sync_inbound', label: 'Sync inbound messages' },
+          { type: 'checkbox', name: 'sync_outbound', label: 'Sync outbound messages' }
+        ],
+        'comm-callrail': [
+          { type: 'text', name: 'api_key', label: 'API Key', placeholder: 'Enter your CallRail API Key' },
+          { type: 'text', name: 'account_id', label: 'Account ID', placeholder: 'Enter your Account ID' },
+          { type: 'select', name: 'sync_frequency', label: 'Sync Frequency', options: ['Real-time', 'Every 15 minutes', 'Hourly', 'Daily'] },
+          { type: 'checkbox', name: 'sync_calls', label: 'Sync call logs' },
+          { type: 'checkbox', name: 'sync_texts', label: 'Sync text messages' },
+          { type: 'checkbox', name: 'sync_forms', label: 'Sync form submissions' }
+        ]
+      };
+      return fields[connectorId] || [];
+    }
+
+    // Render form fields
+    function renderFormFields(connectorId) {
+      const fields = getFormFields(connectorId);
+      const container = document.getElementById('formFields');
+      container.innerHTML = fields.map(field => {
+        switch (field.type) {
+          case 'oauth':
+            return `
+              <div class="bg-gray-50 rounded-lg p-4 text-center">
+                <button type="button" onclick="startOAuth('${field.provider}')" class="inline-flex items-center gap-2 px-6 py-3 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg font-medium text-gray-700 shadow-sm">
+                  <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                    ${field.provider === 'google' ? '<path d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/>' : '<path d="M12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zm0 1.5c4.687 0 8.5 3.813 8.5 8.5s-3.813 8.5-8.5 8.5-8.5-3.813-8.5-8.5 3.813-8.5 8.5-8.5z"/>'}
+                  </svg>
+                  ${field.label}
+                </button>
+                <p class="mt-2 text-sm text-gray-500">You'll be redirected to authorize access</p>
+              </div>
+            `;
+          case 'text':
+          case 'password':
+            return `
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">${field.label}</label>
+                <input type="${field.type}" name="${field.name}" placeholder="${field.placeholder || ''}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+              </div>
+            `;
+          case 'select':
+            return `
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">${field.label}</label>
+                <select name="${field.name}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                  ${field.options.map(opt => `<option value="${opt.toLowerCase().replace(/\s+/g, '_')}">${opt}</option>`).join('')}
+                </select>
+              </div>
+            `;
+          case 'multiselect':
+            return `
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">${field.label}</label>
+                <div class="space-y-2">
+                  ${field.options.map(opt => `
+                    <label class="flex items-center gap-2">
+                      <input type="checkbox" name="${field.name}" value="${opt.toLowerCase().replace(/\s+/g, '_')}" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                      <span class="text-sm text-gray-700">${opt}</span>
+                    </label>
+                  `).join('')}
+                </div>
+              </div>
+            `;
+          case 'checkbox':
+            return `
+              <label class="flex items-center gap-2">
+                <input type="checkbox" name="${field.name}" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                <span class="text-sm text-gray-700">${field.label}</span>
+              </label>
+            `;
+          default:
+            return '';
+        }
+      }).join('');
+    }
+
+    // Open configuration modal
+    function configureConnector(connectorId) {
+      currentConnectorId = connectorId;
+      const connector = connectorData[connectorId];
+      document.getElementById('modalTitle').textContent = `Configure ${connector?.name || connectorId}`;
+      renderFormFields(connectorId);
+      document.getElementById('configModal').classList.remove('hidden');
+    }
+
+    // Close modal
+    function closeModal() {
+      document.getElementById('configModal').classList.add('hidden');
+      currentConnectorId = null;
+    }
+
+    // Start OAuth flow
+    function startOAuth(provider) {
+      if (api.isDemoMode()) {
+        Toast.success(`OAuth with ${provider} simulated in demo mode`);
+        closeModal();
+        loadConnectors();
+        return;
+      }
+      const redirectUri = encodeURIComponent(window.location.href);
+      window.location.href = Connectors.getOAuthUrl(currentConnectorId, redirectUri);
+    }
+
+    // Handle form submission
+    document.getElementById('configForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const config = {};
+
+      for (const [key, value] of formData.entries()) {
+        if (config[key]) {
+          if (!Array.isArray(config[key])) config[key] = [config[key]];
+          config[key].push(value);
+        } else {
+          config[key] = value;
+        }
+      }
+
+      try {
+        await Connectors.configure(currentConnectorId, config);
+        Toast.success('Connector configured successfully');
+        closeModal();
+        loadConnectors();
+      } catch (error) {
+        Toast.error('Failed to configure connector: ' + error.message);
+      }
+    });
+
+    // Test connection
+    async function testConnection(connectorId) {
+      try {
+        Toast.info('Testing connection...');
+        const result = await Connectors.testConnection(connectorId, {});
+        Toast.success(result.message || 'Connection successful');
+      } catch (error) {
+        Toast.error('Connection test failed: ' + error.message);
+      }
+    }
+
+    // Update connector card UI
+    function updateConnectorCard(connector) {
+      const statusEl = document.getElementById(`status-${connector.id}`);
+      const detailsEl = document.getElementById(`details-${connector.id}`);
+
+      if (statusEl) {
+        statusEl.outerHTML = getStatusBadge(connector.status);
+        document.getElementById(`card-${connector.id}`).querySelector('.px-2').id = `status-${connector.id}`;
+      }
+
+      if (detailsEl) {
+        if (connector.status === 'connected') {
+          detailsEl.innerHTML = `
+            <div class="flex items-center gap-4">
+              <span>${(connector.records || 0).toLocaleString()} records</span>
+              <span>Last sync: ${connector.lastSync ? timeAgo(connector.lastSync) : 'Never'}</span>
+            </div>
+          `;
+        } else {
+          detailsEl.innerHTML = '<span class="text-gray-400">Not connected</span>';
+        }
+      }
+    }
+
+    // Load connectors data
+    async function loadConnectors() {
+      try {
+        const { connectors } = await Connectors.getByCategory('communications');
+        connectors.forEach(c => {
+          connectorData[c.id] = c;
+          updateConnectorCard(c);
+        });
+      } catch (error) {
+        Toast.error('Failed to load connectors');
+        console.error(error);
+      }
+    }
+
+    // Close modal on escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeModal();
+    });
+
+    // Initialize
+    loadConnectors();
+  </script>
+</body>
+</html>

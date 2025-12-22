@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Activate Account - LanaAI</title>
+  <script src="js/tailwind-loader.js"></script>
+  <script src="js/error-reporter.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/mock-data.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/components.js"></script>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+  <div class="w-full max-w-md">
+    <div class="text-center mb-8">
+      <h1 class="text-4xl font-bold text-indigo-600">LanaAI</h1>
+      <p class="text-gray-600 mt-2">Account Activation</p>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-xl p-8">
+      <div id="activateForm">
+        <h2 class="text-2xl font-semibold text-gray-900 mb-2">Activate your account</h2>
+        <p class="text-gray-600 mb-6">Enter your activation code and set up your password to get started.</p>
+
+        <form id="accountActivationForm" class="space-y-5">
+          <div>
+            <label for="activationCode" class="block text-sm font-medium text-gray-700 mb-1">Activation Code</label>
+            <input type="text" id="activationCode" name="activationCode" required
+              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+              placeholder="Enter your activation code">
+          </div>
+
+          <div>
+            <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Create Password</label>
+            <div class="relative">
+              <input type="password" id="password" name="password" required minlength="8"
+                class="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                placeholder="At least 8 characters">
+              <button type="button" id="togglePassword" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none" aria-label="Toggle password visibility">
+                <svg id="eyeIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                </svg>
+                <svg id="eyeOffIcon" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label for="confirmPassword" class="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+            <div class="relative">
+              <input type="password" id="confirmPassword" name="confirmPassword" required minlength="8"
+                class="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                placeholder="Re-enter your password">
+              <button type="button" id="toggleConfirmPassword" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none" aria-label="Toggle password visibility">
+                <svg id="eyeIconConfirm" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                </svg>
+                <svg id="eyeOffIconConfirm" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h4 class="text-sm font-medium text-blue-800 mb-2">Password requirements:</h4>
+            <ul class="text-sm text-blue-700 space-y-1">
+              <li class="flex items-center gap-2">
+                <span id="req-length" class="w-4 h-4 rounded-full bg-gray-300"></span>
+                At least 12 characters
+              </li>
+              <li class="flex items-center gap-2">
+                <span id="req-upper" class="w-4 h-4 rounded-full bg-gray-300"></span>
+                One uppercase letter
+              </li>
+              <li class="flex items-center gap-2">
+                <span id="req-lower" class="w-4 h-4 rounded-full bg-gray-300"></span>
+                One lowercase letter
+              </li>
+              <li class="flex items-center gap-2">
+                <span id="req-number" class="w-4 h-4 rounded-full bg-gray-300"></span>
+                One number
+              </li>
+              <li class="flex items-center gap-2">
+                <span id="req-special" class="w-4 h-4 rounded-full bg-gray-300"></span>
+                One special character (!@#$%^&* etc.)
+              </li>
+            </ul>
+          </div>
+
+          <button type="submit" id="submitBtn"
+            class="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors">
+            Activate Account
+          </button>
+        </form>
+      </div>
+
+      <div id="successMessage" class="hidden text-center">
+        <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+        </div>
+        <h3 class="text-xl font-semibold text-gray-900 mb-2">Account activated!</h3>
+        <p class="text-gray-600 mb-6">Your account has been successfully activated. You can now log in.</p>
+        <a href="login.html" class="inline-block py-3 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors">
+          Go to Login
+        </a>
+      </div>
+
+      <div class="mt-6 text-center">
+        <p class="text-sm text-gray-600">
+          Already have an account?
+          <a href="login.html" class="text-indigo-600 hover:text-indigo-500 font-medium">Sign in</a>
+        </p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <p class="text-center text-gray-500 text-sm mt-8">
+      &copy; 2024 LanaAI. All rights reserved.
+    </p>
+    <p id="app-version" class="text-center text-gray-400 text-xs mt-2"></p>
+  </div>
+
+  <script>
+    // Set app version from config
+    document.getElementById('app-version').textContent = 'v' + (window.LanaConfig?.APP_VERSION || '2.0.0');
+
+    // Check for activation code in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const codeFromUrl = urlParams.get('code');
+    if (codeFromUrl) {
+      document.getElementById('activationCode').value = codeFromUrl;
+    }
+
+    const form = document.getElementById('accountActivationForm');
+    const passwordInput = document.getElementById('password');
+    const confirmInput = document.getElementById('confirmPassword');
+    const submitBtn = document.getElementById('submitBtn');
+
+    // Password visibility toggle for main password field
+    const togglePassword = document.getElementById('togglePassword');
+    const eyeIcon = document.getElementById('eyeIcon');
+    const eyeOffIcon = document.getElementById('eyeOffIcon');
+
+    togglePassword.addEventListener('click', () => {
+      const isPassword = passwordInput.type === 'password';
+      passwordInput.type = isPassword ? 'text' : 'password';
+      eyeIcon.classList.toggle('hidden', isPassword);
+      eyeOffIcon.classList.toggle('hidden', !isPassword);
+    });
+
+    // Password visibility toggle for confirm password field
+    const toggleConfirmPassword = document.getElementById('toggleConfirmPassword');
+    const eyeIconConfirm = document.getElementById('eyeIconConfirm');
+    const eyeOffIconConfirm = document.getElementById('eyeOffIconConfirm');
+
+    toggleConfirmPassword.addEventListener('click', () => {
+      const isPassword = confirmInput.type === 'password';
+      confirmInput.type = isPassword ? 'text' : 'password';
+      eyeIconConfirm.classList.toggle('hidden', isPassword);
+      eyeOffIconConfirm.classList.toggle('hidden', !isPassword);
+    });
+
+    // Password requirements checker
+    function checkPasswordRequirements(password) {
+      return {
+        length: password.length >= 12,
+        upper: /[A-Z]/.test(password),
+        lower: /[a-z]/.test(password),
+        number: /[0-9]/.test(password),
+        special: /[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]/.test(password)
+      };
+    }
+
+    function updateRequirementIndicators(requirements) {
+      const reqMap = {
+        'req-length': requirements.length,
+        'req-upper': requirements.upper,
+        'req-lower': requirements.lower,
+        'req-number': requirements.number,
+        'req-special': requirements.special
+      };
+
+      Object.entries(reqMap).forEach(([id, met]) => {
+        const el = document.getElementById(id);
+        el.className = `w-4 h-4 rounded-full transition-colors ${met ? 'bg-green-500' : 'bg-gray-300'}`;
+      });
+    }
+
+    function allRequirementsMet(requirements) {
+      return requirements.length && requirements.upper && requirements.lower && requirements.number && requirements.special;
+    }
+
+    passwordInput.addEventListener('input', () => {
+      const requirements = checkPasswordRequirements(passwordInput.value);
+      updateRequirementIndicators(requirements);
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const activationCode = document.getElementById('activationCode').value;
+      const password = passwordInput.value;
+      const confirmPassword = confirmInput.value;
+
+      // Check all password requirements
+      const requirements = checkPasswordRequirements(password);
+      updateRequirementIndicators(requirements);
+
+      if (!allRequirementsMet(requirements)) {
+        Toast.error('Please ensure your password meets all requirements');
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        Toast.error('Passwords do not match');
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Activating...';
+
+      try {
+        await api.activateAccount(activationCode, password);
+        document.getElementById('activateForm').classList.add('hidden');
+        document.getElementById('successMessage').classList.remove('hidden');
+      } catch (error) {
+        Toast.error(error.message || 'Activation failed. Please check your code.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Activate Account';
+      }
+    });
+  </script>
+</body>
+</html>

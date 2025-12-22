@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Data Connectors - LanaAI</title>
+  <script src="../js/tailwind-loader.js"></script>
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/notifications.js"></script>
+  <script src="../js/connectors.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <!-- Sidebar -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
+    <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
+      <a href="../index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
+      <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
+      <!-- Menu will be dynamically rendered by menu.js -->
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="lg:ml-64">
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
+      <div class="flex items-center justify-between h-16 px-4 lg:px-8">
+        <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+        <div class="flex-1 px-4 lg:px-0">
+          <h1 class="text-xl font-semibold text-gray-900">Data Connectors</h1>
+          <p class="text-sm text-gray-500">Connect your business data sources to create a unified view</p>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <!-- View Sync Status Button -->
+          <a href="sync-status.html" class="flex items-center gap-2 px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+          View Sync Status
+        </a>
+
+          <!-- Notifications -->
+          <button id="notificationBtn" class="relative text-gray-500 hover:text-gray-700">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+            </svg>
+            <span id="notificationBadge" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">0</span>
+          </button>
+
+          <!-- User Menu -->
+          <div class="relative" id="userMenu">
+            <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900">
+              <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                <span id="userInitials" class="text-sm font-medium text-indigo-600">U</span>
+              </div>
+              <span id="userName" class="hidden sm:block text-sm font-medium">User</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            </button>
+            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+              <a href="../settings.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
+              <hr class="my-1">
+              <button id="logoutBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sign out</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Notification Panel Overlay -->
+    <div id="notificationOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
+
+    <!-- Notification Slide-out Panel -->
+    <div id="notificationPanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
+      <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
+        <h2 class="text-lg font-semibold text-gray-900">Notifications</h2>
+        <div class="flex items-center gap-3">
+          <button id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium hidden">Mark all read</button>
+          <button id="refreshNotificationsBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+          </button>
+          <button id="closeNotificationPanel" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
+        <button id="filterAll" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">All</button>
+        <button id="filterUnread" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Unread</button>
+      </div>
+      <div id="notificationList" class="flex-1 overflow-y-auto">
+        <div id="notificationLoading" class="p-8 text-center">
+          <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+          <p class="text-gray-500 mt-3 text-sm">Loading notifications...</p>
+        </div>
+      </div>
+      <div id="notificationLoadingMore" class="hidden p-4 border-t border-gray-100 text-center flex-shrink-0">
+        <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+      </div>
+    </div>
+
+    <main class="p-4 lg:p-8">
+      <!-- Info Banner -->
+      <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-lg mb-8">
+        <div class="flex items-center gap-6 p-6">
+          <div class="flex-1">
+            <h2 class="text-2xl font-bold text-white mb-2">Connect Your Business Data</h2>
+            <p class="text-indigo-100 text-sm leading-relaxed">
+              Connectors bridge your existing business systems with LanaAI, automatically syncing data across CRMs, case management, financial tools, and more. Once connected, your team gets unified access to all your business data while LanaAI gains the context needed to provide intelligent assistance across your entire operation.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Summary Stats - Loading -->
+      <div id="statsLoading" class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="h-4 bg-gray-200 rounded w-28 mb-2"></div>
+              <div class="h-8 bg-gray-200 rounded w-12"></div>
+            </div>
+            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+              <div class="h-8 bg-gray-200 rounded w-16"></div>
+            </div>
+            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="h-4 bg-gray-200 rounded w-20 mb-2"></div>
+              <div class="h-8 bg-gray-200 rounded w-20"></div>
+            </div>
+            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+              <div class="h-8 bg-gray-200 rounded w-8"></div>
+            </div>
+            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Summary Stats - Content -->
+      <div id="statsContent" class="hidden grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm text-gray-500">Connected Sources</p>
+              <p id="connectedCount" class="text-2xl font-bold text-gray-900">-</p>
+            </div>
+            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm text-gray-500">Total Records</p>
+              <p id="totalRecords" class="text-2xl font-bold text-gray-900">-</p>
+            </div>
+            <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path></svg>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm text-gray-500">Last Sync</p>
+              <p id="lastSync" class="text-2xl font-bold text-gray-900">-</p>
+            </div>
+            <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm text-gray-500">Sync Errors</p>
+              <p id="syncErrors" class="text-2xl font-bold text-gray-900">-</p>
+            </div>
+            <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Connector Categories - Loading -->
+      <div id="connectorsLoading" class="space-y-8">
+        <!-- CRM Connectors Loading -->
+        <section>
+          <div class="flex items-center justify-between mb-4">
+            <div class="h-6 bg-gray-200 rounded w-48 animate-pulse"></div>
+            <div class="h-4 bg-gray-200 rounded w-16 animate-pulse"></div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 animate-pulse">
+              <div class="flex items-start justify-between mb-4">
+                <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+                <div class="h-6 bg-gray-200 rounded-full w-20"></div>
+              </div>
+              <div class="h-5 bg-gray-200 rounded w-24 mb-2"></div>
+              <div class="h-4 bg-gray-200 rounded w-full mb-3"></div>
+              <div class="flex justify-between">
+                <div class="h-3 bg-gray-200 rounded w-20"></div>
+                <div class="h-3 bg-gray-200 rounded w-24"></div>
+              </div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 animate-pulse">
+              <div class="flex items-start justify-between mb-4">
+                <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+                <div class="h-6 bg-gray-200 rounded-full w-20"></div>
+              </div>
+              <div class="h-5 bg-gray-200 rounded w-20 mb-2"></div>
+              <div class="h-4 bg-gray-200 rounded w-full mb-3"></div>
+              <div class="h-9 bg-gray-200 rounded w-full"></div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 animate-pulse hidden md:block">
+              <div class="flex items-start justify-between mb-4">
+                <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+                <div class="h-6 bg-gray-200 rounded-full w-20"></div>
+              </div>
+              <div class="h-5 bg-gray-200 rounded w-28 mb-2"></div>
+              <div class="h-4 bg-gray-200 rounded w-full mb-3"></div>
+              <div class="h-9 bg-gray-200 rounded w-full"></div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 animate-pulse hidden lg:block">
+              <div class="flex items-start justify-between mb-4">
+                <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+                <div class="h-6 bg-gray-200 rounded-full w-20"></div>
+              </div>
+              <div class="h-5 bg-gray-200 rounded w-24 mb-2"></div>
+              <div class="h-4 bg-gray-200 rounded w-full mb-3"></div>
+              <div class="h-9 bg-gray-200 rounded w-full"></div>
+            </div>
+          </div>
+        </section>
+        <!-- Case Management Loading -->
+        <section>
+          <div class="flex items-center justify-between mb-4">
+            <div class="h-6 bg-gray-200 rounded w-40 animate-pulse"></div>
+            <div class="h-4 bg-gray-200 rounded w-16 animate-pulse"></div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 animate-pulse">
+              <div class="flex items-start justify-between mb-4">
+                <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+                <div class="h-6 bg-gray-200 rounded-full w-20"></div>
+              </div>
+              <div class="h-5 bg-gray-200 rounded w-24 mb-2"></div>
+              <div class="h-4 bg-gray-200 rounded w-full mb-3"></div>
+              <div class="h-9 bg-gray-200 rounded w-full"></div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 animate-pulse">
+              <div class="flex items-start justify-between mb-4">
+                <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+                <div class="h-6 bg-gray-200 rounded-full w-20"></div>
+              </div>
+              <div class="h-5 bg-gray-200 rounded w-16 mb-2"></div>
+              <div class="h-4 bg-gray-200 rounded w-full mb-3"></div>
+              <div class="h-9 bg-gray-200 rounded w-full"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Connector Categories - Content -->
+      <div id="connectorsContent" class="hidden space-y-8">
+        <!-- CRM Connectors -->
+        <section>
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-900">CRM & Lead Management</h2>
+            <a href="connector-crm.html" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">View All</a>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="crmConnectors">
+            <!-- Connector cards will be rendered here -->
+          </div>
+        </section>
+
+        <!-- Case Management Connectors -->
+        <section>
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-900">Case Management</h2>
+            <a href="connector-case.html" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">View All</a>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="caseConnectors">
+            <!-- Connector cards will be rendered here -->
+          </div>
+        </section>
+
+        <!-- Financial Connectors -->
+        <section>
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-900">Financial & Accounting</h2>
+            <a href="connector-financial.html" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">View All</a>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="financialConnectors">
+            <!-- Connector cards will be rendered here -->
+          </div>
+        </section>
+
+        <!-- Communications Connectors -->
+        <section>
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-900">Communications</h2>
+            <a href="connector-communications.html" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">View All</a>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="commsConnectors">
+            <!-- Connector cards will be rendered here -->
+          </div>
+        </section>
+
+        <!-- Document Connectors -->
+        <section>
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-900">Documents & Storage</h2>
+            <a href="connector-documents.html" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">View All</a>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="docConnectors">
+            <!-- Connector cards will be rendered here -->
+          </div>
+        </section>
+      </div>
+      <!-- End connectorsContent -->
+    </main>
+  </div>
+
+  <script>
+    if (!api.requireAuth()) throw new Error('Not authenticated');
+
+    // Load full user profile with roles before rendering menu
+    (async () => {
+      try {
+        await api.loadUserProfile();
+      } catch (error) {
+        console.error('Failed to load user profile:', error);
+      }
+
+      // Render dynamic menu (will now have access to roles)
+      renderMenu('#mainNav');
+    })();
+
+    // Initialize notifications panel
+    NotificationPanel.init();
+
+    // Load user info
+    function loadUserInfo() {
+      const user = api.user;
+      if (user) {
+        const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+        const initials = (user.firstName?.[0] || '') + (user.lastName?.[0] || '') || user.email[0].toUpperCase();
+        document.getElementById('userName').textContent = name;
+        document.getElementById('userInitials').textContent = initials;
+      }
+    }
+    loadUserInfo();
+
+    // User menu toggle
+    const userMenu = document.getElementById('userMenu');
+    const userDropdown = document.getElementById('userDropdown');
+    userMenu.addEventListener('click', () => userDropdown.classList.toggle('hidden'));
+    document.addEventListener('click', (e) => {
+      if (!userMenu.contains(e.target)) userDropdown.classList.add('hidden');
+    });
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      await api.logout();
+      window.location.href = '../login.html';
+    });
+
+    // Sidebar toggle
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('openSidebar').addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+    document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+
+    // Render connector card
+    function renderConnectorCard(connector) {
+      const statusColors = {
+        connected: 'bg-green-100 text-green-800',
+        disconnected: 'bg-gray-100 text-gray-600',
+        error: 'bg-red-100 text-red-800',
+        syncing: 'bg-blue-100 text-blue-800'
+      };
+
+      const statusIcons = {
+        connected: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>',
+        disconnected: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>',
+        error: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+        syncing: '<svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>'
+      };
+
+      return `
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow cursor-pointer" onclick="openConnector('${connector.id}', '${connector.category}')">
+          <div class="flex items-start justify-between mb-4">
+            <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+              ${connector.logo || `<span class="text-lg font-bold text-gray-400">${connector.name.charAt(0)}</span>`}
+            </div>
+            <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${statusColors[connector.status]}">
+              ${statusIcons[connector.status]}
+              ${connector.status}
+            </span>
+          </div>
+          <h3 class="font-semibold text-gray-900 mb-1">${connector.name}</h3>
+          <p class="text-sm text-gray-500 mb-3">${connector.description}</p>
+          ${connector.status === 'connected' ? `
+            <div class="flex items-center justify-between text-xs text-gray-400">
+              <span>${connector.records?.toLocaleString() || 0} records</span>
+              <span>Last sync: ${connector.lastSync ? timeAgo(connector.lastSync) : 'Never'}</span>
+            </div>
+          ` : `
+            <button class="w-full mt-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
+              Connect
+            </button>
+          `}
+        </div>
+      `;
+    }
+
+    // Open connector configuration
+    function openConnector(connectorId, category) {
+      const pages = {
+        crm: 'connector-crm.html',
+        case: 'connector-case.html',
+        financial: 'connector-financial.html',
+        communications: 'connector-communications.html',
+        documents: 'connector-documents.html'
+      };
+      window.location.href = `${pages[category]}?id=${connectorId}`;
+    }
+
+    // Load connectors data
+    async function loadConnectors() {
+      const statsLoading = document.getElementById('statsLoading');
+      const statsContent = document.getElementById('statsContent');
+      const connectorsLoading = document.getElementById('connectorsLoading');
+      const connectorsContent = document.getElementById('connectorsContent');
+      
+      try {
+        const data = await Connectors.getAll();
+
+        // Update stats
+        const connected = data.connectors.filter(c => c.status === 'connected');
+        document.getElementById('connectedCount').textContent = connected.length;
+        document.getElementById('totalRecords').textContent = connected.reduce((sum, c) => sum + (c.records || 0), 0).toLocaleString();
+        document.getElementById('syncErrors').textContent = data.connectors.filter(c => c.status === 'error').length;
+
+        const lastSynced = connected.filter(c => c.lastSync).sort((a, b) => new Date(b.lastSync) - new Date(a.lastSync))[0];
+        document.getElementById('lastSync').textContent = lastSynced ? timeAgo(lastSynced.lastSync) : 'Never';
+
+        // Render by category
+        const categories = {
+          crmConnectors: data.connectors.filter(c => c.category === 'crm'),
+          caseConnectors: data.connectors.filter(c => c.category === 'case'),
+          financialConnectors: data.connectors.filter(c => c.category === 'financial'),
+          commsConnectors: data.connectors.filter(c => c.category === 'communications'),
+          docConnectors: data.connectors.filter(c => c.category === 'documents')
+        };
+
+        for (const [containerId, connectors] of Object.entries(categories)) {
+          const container = document.getElementById(containerId);
+          container.innerHTML = connectors.map(renderConnectorCard).join('');
+        }
+        
+        // Hide loading, show content
+        statsLoading.classList.add('hidden');
+        statsContent.classList.remove('hidden');
+        connectorsLoading.classList.add('hidden');
+        connectorsContent.classList.remove('hidden');
+      } catch (error) {
+        // Hide loading, show content with error
+        statsLoading.classList.add('hidden');
+        statsContent.classList.remove('hidden');
+        connectorsLoading.classList.add('hidden');
+        connectorsContent.classList.remove('hidden');
+        Toast.error('Failed to load connectors');
+        console.error(error);
+      }
+    }
+
+    // Initialize
+    loadConnectors();
+  </script>
+</body>
+</html>

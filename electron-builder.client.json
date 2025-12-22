@@ -1,0 +1,112 @@
+{
+  "appId": "com.redroostertech.lana-ai-client",
+  "productName": "Lana AI Client",
+  "copyright": "Copyright © 2025 Red Rooster Technologies",
+  "directories": {
+    "output": "dist",
+    "buildResources": "build"
+  },
+  "extraMetadata": {
+    "main": "electron-main.js"
+  },
+  "artifactName": "LanaAI--genesis--02.0.0.${ext}",
+  "publish": {
+    "provider": "github",
+    "owner": "redroostertech",
+    "repo": "lana-ai-client",
+    "releaseType": "release"
+  },
+  "files": [
+    {
+      "from": "electron-dist",
+      "to": ".",
+      "filter": ["*.js"]
+    },
+    "public_html/**/*",
+    {
+      "from": "electron-dist",
+      "to": ".",
+      "filter": ["package.json"]
+    },
+    "node_modules/electron-store/**/*",
+    "node_modules/conf/**/*",
+    "node_modules/atomically/**/*",
+    "node_modules/dot-prop/**/*",
+    "node_modules/env-paths/**/*",
+    "node_modules/json-schema-typed/**/*",
+    "node_modules/ajv/**/*",
+    "node_modules/ajv-formats/**/*",
+    "node_modules/fast-deep-equal/**/*",
+    "node_modules/json-schema-traverse/**/*",
+    "node_modules/require-from-string/**/*",
+    "node_modules/uri-js/**/*",
+    "node_modules/semver/**/*",
+    "!**/{.DS_Store,.git,.hg,.svn,.gitignore,.gitattributes}",
+    "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs}"
+  ],
+  "asar": true,
+  "npmRebuild": true,
+  "mac": {
+    "category": "public.app-category.business",
+    "artifactName": "LanaAI--genesis--02.0.0-${arch}.${ext}",
+    "target": ["dmg", "zip"],
+    "icon": "build/icon.icns",
+    "hardenedRuntime": true,
+    "gatekeeperAssess": false,
+    "entitlements": "build/entitlements.mac.plist",
+    "entitlementsInherit": "build/entitlements.mac.plist",
+    "notarize": true
+  },
+  "win": {
+    "artifactName": "LanaAI--genesis--02.0.0.${ext}",
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      },
+      {
+        "target": "zip",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "build/icon.ico"
+  },
+  "linux": {
+    "artifactName": "LanaAI--genesis--02.0.0.${ext}",
+    "target": [
+      "AppImage",
+      "deb"
+    ],
+    "category": "Office",
+    "icon": "build/icons/"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Lana AI Client",
+    "artifactName": "LanaAI--genesis--02.0.0-setup.${ext}"
+  },
+  "dmg": {
+    "artifactName": "LanaAI--genesis--02.0.0-${arch}.${ext}",
+    "contents": [
+      {
+        "x": 130,
+        "y": 220
+      },
+      {
+        "x": 410,
+        "y": 220,
+        "type": "link",
+        "path": "/Applications"
+      }
+    ],
+    "window": {
+      "width": 540,
+      "height": 400
+    },
+    "title": "Lana AI Client ${version}"
+  }
+}
+

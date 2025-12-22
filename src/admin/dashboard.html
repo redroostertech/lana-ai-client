@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Lana AI</title>
+    <script src="../js/tailwind-loader.js"></script>
+  <script src="../js/error-reporter.js"></script>
+    <script src="../js/config.js"></script>
+    <script src="../js/mock-data.js"></script>
+    <script src="../js/api.js"></script>
+    <script src="../js/components.js"></script>
+    <script src="../js/menu.js"></script>
+    <script src="../js/notifications.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-100">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
+            <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
+                <a href="../index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
+                <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
+                <!-- Menu will be dynamically rendered by menu.js -->
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Header -->
+            <header class="bg-white shadow-sm border-b border-gray-200">
+                <div class="flex items-center justify-between px-6 py-4">
+                    <div class="flex items-center">
+                        <button id="sidebarToggle" class="md:hidden mr-4 text-gray-600">
+                            <i class="fas fa-bars text-xl"></i>
+                        </button>
+                        <h2 class="text-xl font-semibold text-gray-800">Admin Dashboard</h2>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <!-- Notification Button -->
+                        <button id="notificationBtn" class="relative text-gray-500 hover:text-gray-700">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                            </svg>
+                            <span id="notificationBadge" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">0</span>
+                        </button>
+                        <!-- User Menu -->
+                        <div class="relative" id="userMenu">
+                            <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900">
+                                <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                                    <span id="userInitials" class="text-sm font-medium text-indigo-600">U</span>
+                                </div>
+                                <span id="userName" class="hidden sm:block text-sm font-medium">User</span>
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                                <a href="../settings.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
+                                <hr class="my-1">
+                                <button id="logoutBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sign out</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Notification Panel Overlay -->
+            <div id="notificationOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
+
+            <!-- Notification Slide-out Panel -->
+            <div id="notificationPanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
+                <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
+                    <h2 class="text-lg font-semibold text-gray-900">Notifications</h2>
+                    <div class="flex items-center gap-3">
+                        <button id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium hidden">Mark all read</button>
+                        <button id="refreshNotificationsBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        </button>
+                        <button id="closeNotificationPanel" class="text-gray-400 hover:text-gray-600">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
+                    <button id="filterAll" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">All</button>
+                    <button id="filterUnread" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Unread</button>
+                </div>
+                <div id="notificationList" class="flex-1 overflow-y-auto">
+                    <div id="notificationLoading" class="p-8 text-center">
+                        <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+                        <p class="text-gray-500 mt-3 text-sm">Loading notifications...</p>
+                    </div>
+                </div>
+                <div id="notificationLoadingMore" class="hidden p-4 border-t border-gray-100 text-center flex-shrink-0">
+                    <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+                </div>
+            </div>
+
+            <!-- Content -->
+            <main class="flex-1 overflow-y-auto p-6">
+                <!-- Quick Actions -->
+                <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
+                    <h3 class="text-sm font-medium text-gray-500 mb-3">Quick Actions</h3>
+                    <div class="flex flex-wrap gap-3">
+                        <button onclick="openModal('createUserModal')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm">
+                            <i class="fas fa-user-plus mr-2"></i>Create User
+                        </button>
+                        <button onclick="openModal('createOrgModal')" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm">
+                            <i class="fas fa-building mr-2"></i>Create Organization
+                        </button>
+                        <button onclick="openModal('createMatterModal')" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition text-sm">
+                            <i class="fas fa-briefcase mr-2"></i>Create Matter
+                        </button>
+                        <a href="/admin/health.html" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition text-sm">
+                            <i class="fas fa-heartbeat mr-2"></i>Run Health Check
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Stats Grid (Admin Only) -->
+                <div id="adminStatsSection" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6 hidden">
+                    <div class="bg-white rounded-lg shadow-sm p-6">
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-users text-blue-600 text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm text-gray-500">Total Users</p>
+                                <p class="text-2xl font-bold text-gray-900" id="totalUsers">-</p>
+                                <p class="text-xs text-green-600" id="activeUsers">- active</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-sm p-6">
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-building text-green-600 text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm text-gray-500">Organizations</p>
+                                <p class="text-2xl font-bold text-gray-900" id="totalOrgs">-</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-sm p-6">
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-briefcase text-purple-600 text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm text-gray-500">Matters</p>
+                                <p class="text-2xl font-bold text-gray-900" id="totalMatters">-</p>
+                                <p class="text-xs text-gray-500" id="activeMatters">- active</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-sm p-6">
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-hdd text-orange-600 text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm text-gray-500">Storage Used</p>
+                                <p class="text-2xl font-bold text-gray-900" id="storageUsed">-</p>
+                                <p class="text-xs text-gray-500" id="storageTotal">of - total</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <!-- Health Status (System Admin Only) -->
+                    <div id="systemHealthSection" class="bg-white rounded-lg shadow-sm p-6 hidden">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-900">System Health</h3>
+                            <a href="/admin/health.html" class="text-blue-600 hover:underline text-sm">View Details</a>
+                        </div>
+                        <div class="space-y-3" id="healthStatus">
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <span class="text-gray-600">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Activity (User's own activity) -->
+                    <div class="bg-white rounded-lg shadow-sm p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-900">Recent Activity</h3>
+                            <a href="/settings.html" class="text-blue-600 hover:underline text-sm">View All</a>
+                        </div>
+                        <div class="space-y-3" id="recentActivity">
+                            <div class="text-gray-500 text-sm">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Users & Matters -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Recent Users (Admin Only) -->
+                    <div id="recentUsersSection" class="bg-white rounded-lg shadow-sm p-6 hidden">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-900">Recent Users</h3>
+                            <a href="/admin/users.html" class="text-blue-600 hover:underline text-sm">View All</a>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead class="text-left text-sm text-gray-500 border-b">
+                                    <tr>
+                                        <th class="pb-2">User</th>
+                                        <th class="pb-2">Status</th>
+                                        <th class="pb-2">Joined</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recentUsers" class="text-sm">
+                                    <tr><td colspan="3" class="py-4 text-gray-500">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Recent Matters -->
+                    <div class="bg-white rounded-lg shadow-sm p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-900">Recent Matters</h3>
+                            <a href="/matters.html" class="text-blue-600 hover:underline text-sm">View All</a>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead class="text-left text-sm text-gray-500 border-b">
+                                    <tr>
+                                        <th class="pb-2">Matter</th>
+                                        <th class="pb-2">Status</th>
+                                        <th class="pb-2">Created</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recentMatters" class="text-sm">
+                                    <tr><td colspan="3" class="py-4 text-gray-500">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Create User Modal -->
+    <div id="createUserModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div class="p-6 border-b border-gray-200">
+                <h3 class="text-lg font-semibold">Create New User</h3>
+            </div>
+            <form id="createUserForm" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input type="email" name="email" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                    <input type="text" name="username" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                        <input type="text" name="first_name" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                        <input type="text" name="last_name" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button type="button" onclick="closeModal('createUserModal')" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Create User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Create Organization Modal -->
+    <div id="createOrgModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div class="p-6 border-b border-gray-200">
+                <h3 class="text-lg font-semibold">Create New Organization</h3>
+            </div>
+            <form id="createOrgForm" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Organization Name</label>
+                    <input type="text" name="name" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Slug</label>
+                    <input type="text" name="slug" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="organization-slug">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea name="description" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button type="button" onclick="closeModal('createOrgModal')" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Create Organization</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Create Matter Modal -->
+    <div id="createMatterModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div class="p-6 border-b border-gray-200">
+                <h3 class="text-lg font-semibold">Create New Matter</h3>
+            </div>
+            <form id="createMatterForm" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Matter Name</label>
+                    <input type="text" name="name" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Organization</label>
+                    <select name="organization_id" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" id="matterOrgSelect">
+                        <option value="">Select organization...</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea name="description" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button type="button" onclick="closeModal('createMatterModal')" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">Create Matter</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+
+        document.addEventListener('DOMContentLoaded', async function() {
+            checkAuth();
+            
+            // Load full user profile with roles before rendering menu
+            try {
+                await api.loadUserProfile();
+            } catch (error) {
+                console.error('Failed to load user profile:', error);
+            }
+            
+            // Render dynamic admin menu (will now have access to roles)
+            renderMenu('#adminNav', { menuType: 'admin' });
+
+            // Initialize notifications panel
+            NotificationPanel.init();
+
+            // Load user info for header
+            function loadUserInfo() {
+              const user = api.user;
+              if (user) {
+                const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+                const initials = (user.firstName?.[0] || '') + (user.lastName?.[0] || '') || user.email[0].toUpperCase();
+                document.getElementById('userName').textContent = name;
+                document.getElementById('userInitials').textContent = initials;
+              }
+            }
+            loadUserInfo();
+
+            // User menu toggle
+            const userMenu = document.getElementById('userMenu');
+            const userDropdown = document.getElementById('userDropdown');
+            userMenu.addEventListener('click', (e) => {
+              e.stopPropagation();
+              userDropdown.classList.toggle('hidden');
+            });
+            document.addEventListener('click', (e) => {
+              if (!userMenu.contains(e.target)) userDropdown.classList.add('hidden');
+            });
+
+            // Logout handler
+            document.getElementById('logoutBtn').addEventListener('click', async () => {
+              await api.logout();
+              window.location.href = '../login.html';
+            });
+
+            // Sidebar toggle
+            const sidebar = document.getElementById('sidebar');
+            const sidebarToggle = document.getElementById('sidebarToggle');
+            const closeSidebar = document.getElementById('closeSidebar');
+            if (sidebarToggle) sidebarToggle.addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+            if (closeSidebar) closeSidebar.addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+            
+            loadDashboard();
+        });
+
+        let isSystemAdmin = false;
+        let isOrgAdmin = false;
+
+        function checkAuth() {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = '/login.html';
+                return;
+            }
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            document.getElementById('userName').textContent = user.username || user.first_name || 'User';
+            
+            // Check user roles for admin access
+            const roles = user.roles || [];
+            isSystemAdmin = roles.includes('system_admin') || roles.some(r => r.name === 'system_admin');
+            isOrgAdmin = roles.includes('org_admin') || roles.some(r => r.name === 'org_admin') || isSystemAdmin;
+            
+            // Show/hide admin sections based on role
+            if (isSystemAdmin || isOrgAdmin) {
+                document.getElementById('adminStatsSection').classList.remove('hidden');
+                document.getElementById('recentUsersSection').classList.remove('hidden');
+                document.getElementById('systemHealthSection').classList.remove('hidden');
+            }
+        }
+
+        async function loadDashboard() {
+            const promises = [
+                loadRecentActivity(),
+                loadRecentMatters(),
+                loadOrganizations()
+            ];
+            
+            // Only load admin data if user has permissions
+            if (isSystemAdmin || isOrgAdmin) {
+                promises.push(loadStats());
+                promises.push(loadRecentUsers());
+                promises.push(loadHealthStatus());
+            }
+            
+            await Promise.all(promises);
+        }
+
+        async function loadStats() {
+            try {
+                // Load users stats
+                try {
+                    const usersRes = await api.getUsers({ limit: 1 });
+                    document.getElementById('totalUsers').textContent = usersRes.total || 0;
+                    document.getElementById('activeUsers').textContent = `${usersRes.active || 0} active`;
+                } catch (e) {
+                    if (e.status === 403) {
+                        // Hide users stat if no permission
+                        document.getElementById('totalUsers').parentElement.parentElement.parentElement.style.display = 'none';
+                    }
+                }
+
+                // Load matters stats
+                try {
+                    const mattersRes = await api.getMatters({ limit: 1 });
+                    document.getElementById('totalMatters').textContent = mattersRes.total || mattersRes.matters?.length || 0;
+                } catch (e) {
+                    console.error('Failed to load matters stats:', e);
+                }
+
+                // Load organizations count
+                try {
+                    const orgsRes = await api.get('/api/v1/admin/organizations');
+                    document.getElementById('totalOrgs').textContent = orgsRes.total || orgsRes.organizations?.length || 0;
+                } catch (e) {
+                    if (e.status === 403) {
+                        // Hide orgs stat if no permission
+                        document.getElementById('totalOrgs').parentElement.parentElement.parentElement.style.display = 'none';
+                    }
+                }
+
+                // Load storage (from health endpoint) - for system admin and org admin
+                if (isSystemAdmin || isOrgAdmin) {
+                    try {
+                        const health = await api.getHealthSummary();
+                        if (health.storage) {
+                            document.getElementById('storageUsed').textContent = formatBytes(health.storage.used);
+                            document.getElementById('storageTotal').textContent = `of ${formatBytes(health.storage.total)} total`;
+                        }
+                    } catch (e) {
+                        // Hide storage stat if no permission
+                        document.getElementById('storageUsed').parentElement.parentElement.parentElement.style.display = 'none';
+                    }
+                } else {
+                    // Hide storage stat for non-admin users
+                    document.getElementById('storageUsed').parentElement.parentElement.parentElement.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+            }
+        }
+
+        async function loadHealthStatus() {
+            try {
+                const health = await api.getHealthSummary();
+                const container = document.getElementById('healthStatus');
+
+                const services = [
+                    { name: 'Database', key: 'database', icon: 'database' },
+                    { name: 'MinIO Storage', key: 'minio', icon: 'hdd' },
+                    { name: 'Job Queue', key: 'pgboss', icon: 'tasks' },
+                    { name: 'Vector DB', key: 'pgvector', icon: 'project-diagram' }
+                ];
+
+                container.innerHTML = services.map(service => {
+                    const status = health.services?.[service.key] || health[service.key] || 'unknown';
+                    const isHealthy = status === 'healthy' || status === 'ok' || status === true;
+                    return `
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div class="flex items-center">
+                                <i class="fas fa-${service.icon} text-gray-400 w-5 mr-3"></i>
+                                <span class="text-gray-700">${service.name}</span>
+                            </div>
+                            <span class="px-2 py-1 text-xs rounded-full ${isHealthy ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                ${isHealthy ? 'Healthy' : 'Unhealthy'}
+                            </span>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                // Hide the section if we don't have permission
+                if (error.status === 403) {
+                    document.getElementById('systemHealthSection').classList.add('hidden');
+                } else {
+                    document.getElementById('healthStatus').innerHTML = `
+                        <div class="text-gray-500 text-sm">Unable to load health status</div>
+                    `;
+                }
+            }
+        }
+
+        async function loadRecentActivity() {
+            try {
+                // Use user's own activity feed instead of admin audit logs
+                const result = await api.get('/api/v1/activity/my?limit=5');
+                const container = document.getElementById('recentActivity');
+                const activities = result.activities || [];
+
+                if (activities.length === 0) {
+                    container.innerHTML = '<div class="text-gray-500 text-sm">No recent activity</div>';
+                    return;
+                }
+
+                container.innerHTML = activities.map(activity => `
+                    <div class="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
+                        <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-${getActivityIcon(activity.event_type)} text-blue-600 text-xs"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm text-gray-900 truncate">${formatActivityEvent(activity)}</p>
+                            <p class="text-xs text-gray-500">${activity.resource_name || activity.resource_type || ''} • ${timeAgo(activity.created_at)}</p>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load activity:', error);
+                document.getElementById('recentActivity').innerHTML = `
+                    <div class="text-gray-500 text-sm">No recent activity</div>
+                `;
+            }
+        }
+
+        function formatActivityEvent(activity) {
+            const eventType = activity.event_type || '';
+            const resourceType = activity.resource_type || '';
+            
+            // Format event type to human readable
+            const action = eventType.split('.').pop() || eventType;
+            const actionFormatted = action.charAt(0).toUpperCase() + action.slice(1).replace(/_/g, ' ');
+            
+            if (resourceType) {
+                return `${actionFormatted} ${resourceType}`;
+            }
+            return actionFormatted;
+        }
+
+        async function loadRecentUsers() {
+            try {
+                const res = await api.getUsers({ limit: 5, sort: 'created_at', order: 'desc' });
+                const container = document.getElementById('recentUsers');
+
+                if (!res.users || res.users.length === 0) {
+                    container.innerHTML = '<tr><td colspan="3" class="py-4 text-gray-500">No users yet</td></tr>';
+                    return;
+                }
+
+                container.innerHTML = res.users.map(user => `
+                    <tr class="border-b border-gray-100">
+                        <td class="py-3">
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center mr-3">
+                                    <span class="text-gray-600 text-xs font-medium">${(user.first_name?.[0] || user.username?.[0] || 'U').toUpperCase()}</span>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-gray-900">${user.first_name || ''} ${user.last_name || user.username || ''}</p>
+                                    <p class="text-xs text-gray-500">${user.email}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="py-3">
+                            <span class="px-2 py-1 text-xs rounded-full ${user.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+                                ${user.is_active ? 'Active' : 'Inactive'}
+                            </span>
+                        </td>
+                        <td class="py-3 text-gray-500">${formatDate(user.created_at)}</td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                // Hide the section if we don't have permission
+                if (error.status === 403) {
+                    document.getElementById('recentUsersSection').classList.add('hidden');
+                } else {
+                    document.getElementById('recentUsers').innerHTML = '<tr><td colspan="3" class="py-4 text-gray-500">Unable to load users</td></tr>';
+                }
+            }
+        }
+
+        async function loadRecentMatters() {
+            try {
+                const res = await api.getMatters({ limit: 5 });
+                const container = document.getElementById('recentMatters');
+                const matters = res.matters || res;
+
+                if (!matters || matters.length === 0) {
+                    container.innerHTML = '<tr><td colspan="3" class="py-4 text-gray-500">No matters yet</td></tr>';
+                    return;
+                }
+
+                container.innerHTML = matters.map(matter => `
+                    <tr class="border-b border-gray-100">
+                        <td class="py-3">
+                            <p class="font-medium text-gray-900">${matter.name}</p>
+                            <p class="text-xs text-gray-500">${matter.organization_name || ''}</p>
+                        </td>
+                        <td class="py-3">
+                            <span class="px-2 py-1 text-xs rounded-full ${getStatusClass(matter.status)}">
+                                ${matter.status || 'active'}
+                            </span>
+                        </td>
+                        <td class="py-3 text-gray-500">${formatDate(matter.created_at)}</td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                document.getElementById('recentMatters').innerHTML = '<tr><td colspan="3" class="py-4 text-red-500">Failed to load</td></tr>';
+            }
+        }
+
+        async function loadOrganizations() {
+            try {
+                const orgs = await api.request('/api/organizations');
+                const select = document.getElementById('matterOrgSelect');
+                const orgList = orgs.organizations || orgs;
+
+                orgList.forEach(org => {
+                    const option = document.createElement('option');
+                    option.value = org.id;
+                    option.textContent = org.name;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Failed to load organizations:', error);
+            }
+        }
+
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+            document.getElementById(id).classList.add('flex');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+            document.getElementById(id).classList.remove('flex');
+        }
+
+        document.getElementById('createUserForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            try {
+                const data = Object.fromEntries(new FormData(this));
+                await api.createUser(data);
+                Toast.success('User created successfully');
+                closeModal('createUserModal');
+                this.reset();
+                loadRecentUsers();
+                loadStats();
+            } catch (error) {
+                Toast.error(error.message || 'Failed to create user');
+            }
+        });
+
+        document.getElementById('createOrgForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            try {
+                const data = Object.fromEntries(new FormData(this));
+                await api.request('/api/organizations', {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+                Toast.success('Organization created successfully');
+                closeModal('createOrgModal');
+                this.reset();
+                loadOrganizations();
+                loadStats();
+            } catch (error) {
+                Toast.error(error.message || 'Failed to create organization');
+            }
+        });
+
+        document.getElementById('createMatterForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            try {
+                const data = Object.fromEntries(new FormData(this));
+                await api.createMatter(data);
+                Toast.success('Matter created successfully');
+                closeModal('createMatterModal');
+                this.reset();
+                loadRecentMatters();
+                loadStats();
+            } catch (error) {
+                Toast.error(error.message || 'Failed to create matter');
+            }
+        });
+
+        function getActivityIcon(action) {
+            if (!action) return 'circle';
+            const a = action.toLowerCase();
+            if (a.includes('login')) return 'sign-in-alt';
+            if (a.includes('logout')) return 'sign-out-alt';
+            if (a.includes('create') || a.includes('created')) return 'plus';
+            if (a.includes('update') || a.includes('updated') || a.includes('edit')) return 'edit';
+            if (a.includes('delete') || a.includes('deleted') || a.includes('remove')) return 'trash';
+            if (a.includes('upload')) return 'upload';
+            if (a.includes('download')) return 'download';
+            if (a.includes('view') || a.includes('read')) return 'eye';
+            if (a.includes('share')) return 'share-alt';
+            if (a.includes('chat') || a.includes('message') || a.includes('query')) return 'comment';
+            if (a.includes('document') || a.includes('file')) return 'file-alt';
+            if (a.includes('matter')) return 'briefcase';
+            if (a.includes('user')) return 'user';
+            return 'circle';
+        }
+
+        function getStatusClass(status) {
+            switch (status) {
+                case 'active': return 'bg-green-100 text-green-800';
+                case 'archived': return 'bg-gray-100 text-gray-800';
+                case 'closed': return 'bg-red-100 text-red-800';
+                default: return 'bg-blue-100 text-blue-800';
+            }
+        }
+
+        function formatBytes(bytes) {
+            if (!bytes) return '0 B';
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return parseFloat((bytes / Math.pow(1024, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+    </script>
+</body>
+</html>

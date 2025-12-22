@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Active Workflows - LanaAI</title>
+  <script src="../js/tailwind-loader.js"></script>
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/workflows.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
+    <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
+      <a href="../index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
+      <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
+      <!-- Menu will be dynamically rendered by menu.js -->
+    </nav>
+  </aside>
+
+  <div class="lg:ml-64">
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
+      <div class="flex items-center justify-between h-16 px-4 lg:px-8">
+        <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+        <div class="flex-1 px-4 lg:px-0">
+          <h1 class="text-xl font-semibold text-gray-900">Active Workflows</h1>
+          <p class="text-sm text-gray-500">Manage your running automation workflows</p>
+        </div>
+        <a href="templates.html" class="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+          Add Workflow
+        </a>
+      </div>
+    </header>
+
+    <main class="p-4 lg:p-8">
+      <!-- Status Filter -->
+      <div class="mb-6 flex flex-wrap items-center gap-4">
+        <div class="flex gap-2">
+          <button onclick="filterStatus('all')" class="status-btn px-4 py-2 text-sm font-medium rounded-lg bg-gray-900 text-white" data-status="all">All</button>
+          <button onclick="filterStatus('active')" class="status-btn px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200" data-status="active">Active</button>
+          <button onclick="filterStatus('paused')" class="status-btn px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200" data-status="paused">Paused</button>
+          <button onclick="filterStatus('error')" class="status-btn px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200" data-status="error">Error</button>
+        </div>
+        <div class="flex-1"></div>
+        <div class="relative">
+          <input type="text" id="searchInput" placeholder="Search workflows..." class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-64" onkeyup="handleSearch()">
+          <svg class="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+        </div>
+      </div>
+
+      <!-- Workflows List Loading Skeleton -->
+      <div id="workflowsLoading" class="space-y-4">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 animate-pulse">
+          <div class="flex items-start justify-between">
+            <div class="flex-1">
+              <div class="flex items-center gap-3 mb-2">
+                <div class="h-5 bg-gray-200 rounded w-48"></div>
+                <div class="h-6 bg-gray-200 rounded-full w-16"></div>
+              </div>
+              <div class="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
+              <div class="flex items-center gap-4">
+                <div class="h-4 bg-gray-200 rounded w-28"></div>
+                <div class="h-4 bg-gray-200 rounded w-20"></div>
+                <div class="h-4 bg-gray-200 rounded w-24"></div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 ml-4">
+              <div class="w-9 h-9 bg-gray-200 rounded-lg"></div>
+              <div class="w-9 h-9 bg-gray-200 rounded-lg"></div>
+              <div class="w-9 h-9 bg-gray-200 rounded-lg"></div>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 animate-pulse">
+          <div class="flex items-start justify-between">
+            <div class="flex-1">
+              <div class="flex items-center gap-3 mb-2">
+                <div class="h-5 bg-gray-200 rounded w-40"></div>
+                <div class="h-6 bg-gray-200 rounded-full w-16"></div>
+              </div>
+              <div class="h-4 bg-gray-200 rounded w-2/3 mb-4"></div>
+              <div class="flex items-center gap-4">
+                <div class="h-4 bg-gray-200 rounded w-28"></div>
+                <div class="h-4 bg-gray-200 rounded w-20"></div>
+                <div class="h-4 bg-gray-200 rounded w-24"></div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 ml-4">
+              <div class="w-9 h-9 bg-gray-200 rounded-lg"></div>
+              <div class="w-9 h-9 bg-gray-200 rounded-lg"></div>
+              <div class="w-9 h-9 bg-gray-200 rounded-lg"></div>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 animate-pulse">
+          <div class="flex items-start justify-between">
+            <div class="flex-1">
+              <div class="flex items-center gap-3 mb-2">
+                <div class="h-5 bg-gray-200 rounded w-52"></div>
+                <div class="h-6 bg-gray-200 rounded-full w-16"></div>
+              </div>
+              <div class="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
+              <div class="flex items-center gap-4">
+                <div class="h-4 bg-gray-200 rounded w-28"></div>
+                <div class="h-4 bg-gray-200 rounded w-20"></div>
+                <div class="h-4 bg-gray-200 rounded w-24"></div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 ml-4">
+              <div class="w-9 h-9 bg-gray-200 rounded-lg"></div>
+              <div class="w-9 h-9 bg-gray-200 rounded-lg"></div>
+              <div class="w-9 h-9 bg-gray-200 rounded-lg"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Workflows List -->
+      <div id="workflowsList" class="space-y-4 hidden">
+        <!-- Populated by JavaScript -->
+      </div>
+
+      <!-- Empty State -->
+      <div id="emptyState" class="hidden text-center py-16">
+        <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6z"></path></svg>
+        </div>
+        <h3 class="text-lg font-medium text-gray-900 mb-1">No workflows found</h3>
+        <p class="text-gray-500 mb-4">Get started by creating a new workflow from our templates</p>
+        <a href="templates.html" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg">
+          Browse Templates
+        </a>
+      </div>
+    </main>
+  </div>
+
+  <!-- Workflow Details Modal -->
+  <div id="detailsModal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="p-6 border-b border-gray-100">
+        <div class="flex items-start justify-between">
+          <div>
+            <h3 id="detailsTitle" class="text-lg font-semibold text-gray-900">Workflow Name</h3>
+            <p id="detailsDescription" class="text-sm text-gray-500 mt-1">Description</p>
+          </div>
+          <button onclick="closeDetailsModal()" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+      </div>
+      <div class="p-6">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div class="text-center p-4 bg-gray-50 rounded-lg">
+            <p id="detailsStatus" class="text-lg font-bold">-</p>
+            <p class="text-xs text-gray-500">Status</p>
+          </div>
+          <div class="text-center p-4 bg-gray-50 rounded-lg">
+            <p id="detailsSuccessRate" class="text-lg font-bold text-green-600">-</p>
+            <p class="text-xs text-gray-500">Success Rate</p>
+          </div>
+          <div class="text-center p-4 bg-gray-50 rounded-lg">
+            <p id="detailsExecutions" class="text-lg font-bold text-gray-900">-</p>
+            <p class="text-xs text-gray-500">Total Runs</p>
+          </div>
+          <div class="text-center p-4 bg-gray-50 rounded-lg">
+            <p id="detailsTrigger" class="text-lg font-bold text-indigo-600">-</p>
+            <p class="text-xs text-gray-500">Trigger Type</p>
+          </div>
+        </div>
+
+        <div class="space-y-4 mb-6">
+          <div class="flex items-center justify-between py-3 border-b border-gray-100">
+            <span class="text-sm text-gray-500">Last Run</span>
+            <span id="detailsLastRun" class="text-sm font-medium text-gray-900">-</span>
+          </div>
+          <div class="flex items-center justify-between py-3 border-b border-gray-100">
+            <span class="text-sm text-gray-500">Next Scheduled Run</span>
+            <span id="detailsNextRun" class="text-sm font-medium text-gray-900">-</span>
+          </div>
+          <div class="flex items-center justify-between py-3 border-b border-gray-100">
+            <span class="text-sm text-gray-500">Created</span>
+            <span id="detailsCreated" class="text-sm font-medium text-gray-900">-</span>
+          </div>
+        </div>
+
+        <div id="errorSection" class="hidden mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div class="flex items-start gap-3">
+            <svg class="w-5 h-5 text-red-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <div>
+              <p class="text-sm font-medium text-red-800">Error Message</p>
+              <p id="detailsError" class="text-sm text-red-700 mt-1">-</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex gap-3">
+          <button id="toggleBtn" onclick="toggleWorkflowFromModal()" class="flex-1 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">
+            Pause Workflow
+          </button>
+          <button onclick="runWorkflowFromModal()" class="px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors">
+            Run Now
+          </button>
+          <button onclick="deleteWorkflowFromModal()" class="px-4 py-3 border border-red-300 text-red-600 font-medium rounded-lg hover:bg-red-50 transition-colors">
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    if (!api.requireAuth()) throw new Error('Not authenticated');
+    renderMenu('#mainNav');
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('openSidebar').addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+    document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+
+    let allWorkflows = [];
+    let selectedWorkflow = null;
+    let activeStatus = 'all';
+    let searchQuery = '';
+
+    function getStatusBadge(status) {
+      const config = {
+        active: { bg: 'bg-green-100', text: 'text-green-800', label: 'Active' },
+        paused: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Paused' },
+        error: { bg: 'bg-red-100', text: 'text-red-800', label: 'Error' }
+      };
+      const c = config[status] || config.paused;
+      return `<span class="px-2 py-1 text-xs font-medium rounded-full ${c.bg} ${c.text}">${c.label}</span>`;
+    }
+
+    function filterStatus(status) {
+      activeStatus = status;
+      document.querySelectorAll('.status-btn').forEach(btn => {
+        if (btn.dataset.status === status) {
+          btn.className = 'status-btn px-4 py-2 text-sm font-medium rounded-lg bg-gray-900 text-white';
+        } else {
+          btn.className = 'status-btn px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200';
+        }
+      });
+      renderWorkflows();
+    }
+
+    function handleSearch() {
+      searchQuery = document.getElementById('searchInput').value.toLowerCase();
+      renderWorkflows();
+    }
+
+    function renderWorkflows() {
+      let workflows = allWorkflows;
+
+      if (activeStatus !== 'all') {
+        workflows = workflows.filter(w => w.status === activeStatus);
+      }
+
+      if (searchQuery) {
+        workflows = workflows.filter(w =>
+          w.name.toLowerCase().includes(searchQuery) ||
+          w.description.toLowerCase().includes(searchQuery)
+        );
+      }
+
+      const container = document.getElementById('workflowsList');
+      const emptyState = document.getElementById('emptyState');
+
+      if (workflows.length === 0) {
+        container.innerHTML = '';
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+      container.innerHTML = workflows.map(w => `
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+          <div class="flex items-start justify-between">
+            <div class="flex-1 cursor-pointer" onclick="showWorkflowDetails('${w.id}')">
+              <div class="flex items-center gap-3 mb-2">
+                <h3 class="font-semibold text-gray-900">${w.name}</h3>
+                ${getStatusBadge(w.status)}
+              </div>
+              <p class="text-sm text-gray-500 mb-4">${w.description}</p>
+              <div class="flex flex-wrap items-center gap-4 text-sm text-gray-500">
+                <span class="flex items-center gap-1">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                  Last run: ${w.lastRun ? timeAgo(w.lastRun) : 'Never'}
+                </span>
+                <span class="flex items-center gap-1">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                  ${w.executionCount} runs
+                </span>
+                <span class="flex items-center gap-1">
+                  <svg class="w-4 h-4 ${w.successRate >= 90 ? 'text-green-500' : w.successRate >= 70 ? 'text-yellow-500' : 'text-red-500'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                  ${w.successRate.toFixed(1)}% success
+                </span>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 ml-4">
+              <button onclick="toggleWorkflow('${w.id}', ${w.status !== 'active'})" class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg" title="${w.status === 'active' ? 'Pause' : 'Activate'}">
+                ${w.status === 'active' ?
+                  '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>' :
+                  '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>'
+                }
+              </button>
+              <button onclick="runWorkflow('${w.id}')" class="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg" title="Run Now">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+              </button>
+              <button onclick="deleteWorkflow('${w.id}')" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Delete">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function showWorkflowDetails(workflowId) {
+      selectedWorkflow = allWorkflows.find(w => w.id === workflowId);
+      if (!selectedWorkflow) return;
+
+      document.getElementById('detailsTitle').textContent = selectedWorkflow.name;
+      document.getElementById('detailsDescription').textContent = selectedWorkflow.description;
+      document.getElementById('detailsStatus').innerHTML = getStatusBadge(selectedWorkflow.status);
+      document.getElementById('detailsSuccessRate').textContent = `${selectedWorkflow.successRate.toFixed(1)}%`;
+      document.getElementById('detailsExecutions').textContent = selectedWorkflow.executionCount;
+      document.getElementById('detailsTrigger').textContent = selectedWorkflow.trigger?.type || 'Manual';
+      document.getElementById('detailsLastRun').textContent = selectedWorkflow.lastRun ? formatDate(selectedWorkflow.lastRun) : 'Never';
+      document.getElementById('detailsNextRun').textContent = selectedWorkflow.nextRun ? formatDate(selectedWorkflow.nextRun) : 'Not scheduled';
+      document.getElementById('detailsCreated').textContent = formatDate(selectedWorkflow.createdAt);
+
+      const toggleBtn = document.getElementById('toggleBtn');
+      if (selectedWorkflow.status === 'active') {
+        toggleBtn.textContent = 'Pause Workflow';
+        toggleBtn.className = 'flex-1 px-4 py-3 bg-yellow-600 hover:bg-yellow-700 text-white font-medium rounded-lg transition-colors';
+      } else {
+        toggleBtn.textContent = 'Activate Workflow';
+        toggleBtn.className = 'flex-1 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors';
+      }
+
+      const errorSection = document.getElementById('errorSection');
+      if (selectedWorkflow.errorMessage) {
+        errorSection.classList.remove('hidden');
+        document.getElementById('detailsError').textContent = selectedWorkflow.errorMessage;
+      } else {
+        errorSection.classList.add('hidden');
+      }
+
+      document.getElementById('detailsModal').classList.remove('hidden');
+    }
+
+    function closeDetailsModal() {
+      document.getElementById('detailsModal').classList.add('hidden');
+      selectedWorkflow = null;
+    }
+
+    async function toggleWorkflow(id, enabled) {
+      try {
+        await Workflows.toggle(id, enabled);
+        Toast.success(`Workflow ${enabled ? 'activated' : 'paused'}`);
+        await loadWorkflows();
+      } catch (error) {
+        Toast.error('Failed to update workflow');
+      }
+    }
+
+    async function toggleWorkflowFromModal() {
+      if (!selectedWorkflow) return;
+      const enabled = selectedWorkflow.status !== 'active';
+      await toggleWorkflow(selectedWorkflow.id, enabled);
+      closeDetailsModal();
+    }
+
+    async function runWorkflow(id) {
+      try {
+        Toast.info('Running workflow...');
+        const result = await Workflows.execute(id);
+        Toast.success(`Workflow completed. Processed ${result.recordsProcessed} records.`);
+        await loadWorkflows();
+      } catch (error) {
+        Toast.error('Workflow execution failed');
+      }
+    }
+
+    async function runWorkflowFromModal() {
+      if (!selectedWorkflow) return;
+      await runWorkflow(selectedWorkflow.id);
+      closeDetailsModal();
+    }
+
+    async function deleteWorkflow(id) {
+      if (!confirm('Are you sure you want to delete this workflow? This action cannot be undone.')) return;
+      try {
+        await Workflows.delete(id);
+        Toast.success('Workflow deleted');
+        await loadWorkflows();
+      } catch (error) {
+        Toast.error('Failed to delete workflow');
+      }
+    }
+
+    async function deleteWorkflowFromModal() {
+      if (!selectedWorkflow) return;
+      await deleteWorkflow(selectedWorkflow.id);
+      closeDetailsModal();
+    }
+
+    document.getElementById('detailsModal').addEventListener('click', (e) => {
+      if (e.target.id === 'detailsModal') closeDetailsModal();
+    });
+
+    function showLoadingStates() {
+      document.getElementById('workflowsLoading').classList.remove('hidden');
+      document.getElementById('workflowsList').classList.add('hidden');
+      document.getElementById('emptyState').classList.add('hidden');
+    }
+
+    function hideLoadingStates() {
+      document.getElementById('workflowsLoading').classList.add('hidden');
+      document.getElementById('workflowsList').classList.remove('hidden');
+    }
+
+    async function loadWorkflows() {
+      showLoadingStates();
+      try {
+        const data = await Workflows.getAll();
+        allWorkflows = data.workflows;
+        hideLoadingStates();
+        renderWorkflows();
+      } catch (error) {
+        hideLoadingStates();
+        Toast.error('Failed to load workflows');
+        console.error(error);
+      }
+    }
+
+    loadWorkflows();
+  </script>
+</body>
+</html>
