@@ -269,6 +269,25 @@ function createApplicationMenu() {
     {
       label: 'View',
       submenu: [
+        {
+          label: 'Back',
+          accelerator: process.platform === 'darwin' ? 'Cmd+[' : 'Alt+Left',
+          click: () => {
+            if (mainWindow && mainWindow.webContents.canGoBack()) {
+              mainWindow.webContents.goBack();
+            }
+          }
+        },
+        {
+          label: 'Forward',
+          accelerator: process.platform === 'darwin' ? 'Cmd+]' : 'Alt+Right',
+          click: () => {
+            if (mainWindow && mainWindow.webContents.canGoForward()) {
+              mainWindow.webContents.goForward();
+            }
+          }
+        },
+        { type: 'separator' },
         { role: 'reload' },
         { role: 'forceReload' },
         { type: 'separator' },
