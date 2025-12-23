@@ -11,6 +11,7 @@
   <script src="../js/api.js"></script>
   <script src="../js/components.js"></script>
   <script src="../js/menu.js"></script>
+  <script src="../js/chunked-uploader.js"></script>
 </head>
 <body class="bg-gray-50 min-h-screen">
   <!-- Sidebar -->
@@ -173,20 +174,14 @@
               <button onclick="switchTab('overview')" id="tab-overview" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-emerald-600 text-emerald-600 whitespace-nowrap">
                 Overview
               </button>
-              <button onclick="switchTab('configuration')" id="tab-configuration" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+              <button onclick="switchTab('configuration')" id="tab-configuration" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap hidden">
                 Configuration
               </button>
-              <button onclick="switchTab('matters')" id="tab-matters" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
-                Matters
+              <button onclick="switchTab('upload')" id="tab-upload" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                Upload
               </button>
-              <button onclick="switchTab('participants')" id="tab-participants" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
-                Participants
-              </button>
-              <button onclick="switchTab('tasks')" id="tab-tasks" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
-                Tasks
-              </button>
-              <button onclick="switchTab('notes')" id="tab-notes" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
-                File Notes
+              <button onclick="switchTab('output')" id="tab-output" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                Output
               </button>
               <button onclick="switchTab('logs')" id="tab-logs" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
                 Execution Logs
@@ -354,6 +349,9 @@
 
       // Render dynamic menu (will now have access to roles)
       renderMenu('#mainNav', { menuType: 'integrations' });
+
+      // Initialize permissions (show/hide Configuration tab based on role)
+      initializePermissions();
     })();
 
     // Sidebar toggle
@@ -460,6 +458,12 @@
           case 'configuration':
             await loadConfiguration();
             break;
+          case 'upload':
+            await loadUploadTab();
+            break;
+          case 'output':
+            await loadOutputTab();
+            break;
           case 'matters':
             await loadMatters();
             break;
@@ -487,6 +491,660 @@
       } catch (error) {
         content.innerHTML = `<div class="text-center text-red-600 py-8">Failed to load data: ${error.message}</div>`;
       }
+    }
+
+    // Initialize permissions (check roles and show/hide Configuration tab)
+    function initializePermissions() {
+      const user = api.user;
+      const hasRole = (roleName) => {
+        if (!user || !user.roles) return false;
+        return user.roles.some(role => {
+          if (typeof role === 'string') return role === roleName;
+          if (typeof role === 'object' && role.name) return role.name === roleName;
+          return false;
+        });
+      };
+
+      const isAdmin = hasRole('system_admin') || hasRole('org_admin');
+
+      const configTab = document.getElementById('tab-configuration');
+      if (isAdmin) {
+        configTab.classList.remove('hidden');
+      } else {
+        configTab.classList.add('hidden');
+        // If user is on configuration tab and not admin, redirect to overview
+        if (currentTab === 'configuration') {
+          switchTab('overview');
+        }
+      }
+    }
+
+    // Global uploader instance
+    let chunkedUploader = null;
+    let uploadEventListenersInitialized = false;
+
+    // Load Upload Tab
+    async function loadUploadTab() {
+      const content = document.getElementById('tabContent');
+
+      content.innerHTML = `
+        <div class="max-w-4xl">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">Upload ActionStep Export</h3>
+          <p class="text-sm text-gray-600 mb-6">
+            Upload a ZIP file containing your ActionStep export data. The system supports files up to 10GB.
+            After upload, the ZIP will be automatically extracted and the CSV files will be processed.
+          </p>
+
+          <!-- Upload Zone -->
+          <div id="uploadZone" class="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center hover:border-emerald-500 transition-colors cursor-pointer">
+            <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+              <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <p class="mt-2 text-sm text-gray-600">
+              <span class="font-medium text-emerald-600">Click to select</span> or drag and drop
+            </p>
+            <p class="text-xs text-gray-500 mt-1">ZIP files up to 10GB</p>
+            <input type="file" id="fileInput" accept=".zip" class="hidden" />
+          </div>
+
+          <!-- Upload Progress -->
+          <div id="uploadProgressSection" class="hidden mt-6">
+            <div class="bg-gray-50 rounded-lg p-6">
+              <div class="flex items-center justify-between mb-2">
+                <span id="uploadFileName" class="text-sm font-medium text-gray-900">-</span>
+                <span id="uploadFileSize" class="text-sm text-gray-500">-</span>
+              </div>
+
+              <div class="w-full bg-gray-200 rounded-full h-3 mb-2">
+                <div id="uploadProgressBar" class="bg-emerald-600 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+              </div>
+
+              <div class="flex items-center justify-between text-xs text-gray-600">
+                <span id="uploadProgressText">Preparing upload...</span>
+                <span id="uploadProgressPercent">0%</span>
+              </div>
+
+              <div class="mt-4 grid grid-cols-3 gap-4 text-sm">
+                <div>
+                  <span class="text-gray-500">Uploaded:</span>
+                  <span id="uploadedBytes" class="ml-2 font-medium text-gray-900">0 B</span>
+                </div>
+                <div>
+                  <span class="text-gray-500">Speed:</span>
+                  <span id="uploadSpeed" class="ml-2 font-medium text-gray-900">-</span>
+                </div>
+                <div>
+                  <span class="text-gray-500">Time Remaining:</span>
+                  <span id="uploadTimeRemaining" class="ml-2 font-medium text-gray-900">-</span>
+                </div>
+              </div>
+
+              <div class="mt-4 flex gap-2">
+                <button id="pauseBtn" class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-medium rounded-lg transition-colors hidden">
+                  Pause
+                </button>
+                <button id="resumeBtn" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors hidden">
+                  Resume
+                </button>
+                <button id="cancelBtn" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Upload Complete -->
+          <div id="uploadCompleteSection" class="hidden mt-6">
+            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-6">
+              <div class="flex items-start gap-3">
+                <svg class="w-6 h-6 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <div>
+                  <h4 class="font-medium text-emerald-900">Upload Complete!</h4>
+                  <p class="text-sm text-emerald-700 mt-1">
+                    Your ActionStep export has been uploaded and is being processed.
+                    Check the <button onclick="switchTab('output')" class="underline hover:text-emerald-900">Output tab</button> to view imported data.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Setup drag-and-drop (only once to prevent duplicate event listeners)
+      if (!uploadEventListenersInitialized) {
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+
+        uploadZone.addEventListener('click', () => {
+          const currentFileInput = document.getElementById('fileInput');
+          if (currentFileInput) currentFileInput.click();
+        });
+
+        uploadZone.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          const currentUploadZone = document.getElementById('uploadZone');
+          if (currentUploadZone) {
+            currentUploadZone.classList.add('border-emerald-500', 'bg-emerald-50');
+          }
+        });
+
+        uploadZone.addEventListener('dragleave', () => {
+          const currentUploadZone = document.getElementById('uploadZone');
+          if (currentUploadZone) {
+            currentUploadZone.classList.remove('border-emerald-500', 'bg-emerald-50');
+          }
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+          e.preventDefault();
+          const currentUploadZone = document.getElementById('uploadZone');
+          if (currentUploadZone) {
+            currentUploadZone.classList.remove('border-emerald-500', 'bg-emerald-50');
+          }
+
+          const files = e.dataTransfer.files;
+          if (files.length > 0 && files[0].name.toLowerCase().endsWith('.zip')) {
+            handleFileUpload(files[0]);
+          } else {
+            alert('Please select a ZIP file');
+          }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+          if (e.target.files.length > 0) {
+            handleFileUpload(e.target.files[0]);
+          }
+        });
+
+        uploadEventListenersInitialized = true;
+      }
+    }
+
+    // Handle file upload
+    async function handleFileUpload(file) {
+      const uploadZone = document.getElementById('uploadZone');
+      const progressSection = document.getElementById('uploadProgressSection');
+      const completeSection = document.getElementById('uploadCompleteSection');
+
+      // Hide upload zone, show progress
+      uploadZone.classList.add('hidden');
+      progressSection.classList.remove('hidden');
+      completeSection.classList.add('hidden');
+
+      // Update file info
+      document.getElementById('uploadFileName').textContent = file.name;
+      document.getElementById('uploadFileSize').textContent = ChunkedUploader.formatBytes(file.size);
+
+      const startTime = Date.now();
+      let lastUpdate = Date.now();
+      let lastBytes = 0;
+
+      // Create uploader instance
+      chunkedUploader = new ChunkedUploader({
+        onProgress: (progress) => {
+          // Update progress bar
+          document.getElementById('uploadProgressBar').style.width = `${progress.percentage}%`;
+          document.getElementById('uploadProgressPercent').textContent = `${progress.percentage}%`;
+          document.getElementById('uploadProgressText').textContent =
+            progress.status === 'uploading' ? 'Uploading...' :
+            progress.status === 'assembling' ? 'Assembling file...' :
+            progress.status === 'completed' ? 'Processing...' : 'Preparing...';
+
+          // Update uploaded bytes
+          document.getElementById('uploadedBytes').textContent = ChunkedUploader.formatBytes(progress.uploadedBytes);
+
+          // Calculate speed (update every 2 seconds)
+          const now = Date.now();
+          if (now - lastUpdate >= 2000) {
+            const timeDiff = (now - lastUpdate) / 1000; // seconds
+            const bytesDiff = progress.uploadedBytes - lastBytes;
+            const speed = bytesDiff / timeDiff; // bytes per second
+            document.getElementById('uploadSpeed').textContent = ChunkedUploader.formatBytes(speed) + '/s';
+
+            // Calculate time remaining
+            if (progress.uploadedBytes > 0 && progress.uploadedBytes < progress.totalBytes) {
+              const remaining = ChunkedUploader.calculateTimeRemaining(
+                progress.uploadedBytes,
+                progress.totalBytes,
+                startTime
+              );
+              document.getElementById('uploadTimeRemaining').textContent = remaining;
+            }
+
+            lastUpdate = now;
+            lastBytes = progress.uploadedBytes;
+          }
+        }
+      });
+
+      try {
+        const result = await chunkedUploader.upload(file, {
+          matter_id: null, // Will be processed for all matters
+          extract_zip: true,
+          trigger_processing: true,
+          metadata: {
+            connector_type: 'actionstep'
+          }
+        });
+
+        // Upload complete
+        progressSection.classList.add('hidden');
+        completeSection.classList.remove('hidden');
+
+        // Refresh dashboard
+        setTimeout(() => {
+          loadDashboard();
+        }, 2000);
+
+      } catch (error) {
+        progressSection.classList.add('hidden');
+        uploadZone.classList.remove('hidden');
+        alert(`Upload failed: ${error.message}`);
+      }
+    }
+
+    // Global variables for output tab state
+    let currentOutputDataType = 'matters';
+    let outputCurrentPage = 1;
+    let outputPageSize = 25;
+    let outputTotalRecords = 0;
+
+    // Load Output Tab
+    async function loadOutputTab() {
+      const content = document.getElementById('tabContent');
+
+      content.innerHTML = `
+        <div class="flex gap-6">
+          <!-- Left Sidebar - Data Type Navigator -->
+          <div class="w-64 flex-shrink-0">
+            <div class="bg-gray-50 rounded-lg p-4">
+              <h3 class="text-sm font-semibold text-gray-700 mb-3">Data Types</h3>
+              <nav class="space-y-1">
+                <button onclick="loadOutputData('matters')" id="output-nav-matters" class="output-nav-btn w-full text-left px-4 py-3 rounded-lg bg-emerald-600 text-white font-medium">
+                  <div class="flex items-center justify-between">
+                    <span>Matters</span>
+                    <span id="output-count-matters" class="text-sm">-</span>
+                  </div>
+                </button>
+                <button onclick="loadOutputData('participants')" id="output-nav-participants" class="output-nav-btn w-full text-left px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors">
+                  <div class="flex items-center justify-between">
+                    <span>Participants</span>
+                    <span id="output-count-participants" class="text-sm text-gray-500">-</span>
+                  </div>
+                </button>
+                <button onclick="loadOutputData('tasks')" id="output-nav-tasks" class="output-nav-btn w-full text-left px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors">
+                  <div class="flex items-center justify-between">
+                    <span>Tasks</span>
+                    <span id="output-count-tasks" class="text-sm text-gray-500">-</span>
+                  </div>
+                </button>
+                <button onclick="loadOutputData('notes')" id="output-nav-notes" class="output-nav-btn w-full text-left px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors">
+                  <div class="flex items-center justify-between">
+                    <span>File Notes</span>
+                    <span id="output-count-notes" class="text-sm text-gray-500">-</span>
+                  </div>
+                </button>
+                <button onclick="loadOutputData('documents')" id="output-nav-documents" class="output-nav-btn w-full text-left px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors">
+                  <div class="flex items-center justify-between">
+                    <span>Documents</span>
+                    <span id="output-count-documents" class="text-sm text-gray-500">-</span>
+                  </div>
+                </button>
+              </nav>
+            </div>
+          </div>
+
+          <!-- Right Panel - Data Table -->
+          <div class="flex-1 min-w-0">
+            <!-- Search and Filter Controls -->
+            <div class="mb-4 flex gap-4">
+              <div class="flex-1">
+                <input
+                  type="text"
+                  id="outputSearchInput"
+                  placeholder="Search..."
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+              <div>
+                <select
+                  id="outputFilterSelect"
+                  class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="">All Status</option>
+                  <option value="active">Active</option>
+                  <option value="closed">Closed</option>
+                  <option value="pending">Pending</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Data Panel -->
+            <div id="outputDataPanel">
+              <!-- Data will be loaded here -->
+              <div class="flex items-center justify-center py-12">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+              </div>
+            </div>
+
+            <!-- Pagination Controls -->
+            <div id="outputPagination" class="mt-4 flex items-center justify-between hidden">
+              <div class="text-sm text-gray-500">
+                <span id="outputPaginationInfo">Showing 0 of 0</span>
+              </div>
+              <div class="flex gap-2">
+                <button
+                  id="outputPrevBtn"
+                  onclick="changeOutputPage(-1)"
+                  class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled
+                >
+                  Previous
+                </button>
+                <button
+                  id="outputNextBtn"
+                  onclick="changeOutputPage(1)"
+                  class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Load initial counts
+      await updateOutputCounts();
+
+      // Setup search and filter event listeners
+      const searchInput = document.getElementById('outputSearchInput');
+      const filterSelect = document.getElementById('outputFilterSelect');
+
+      let searchTimeout;
+      searchInput.addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+          outputCurrentPage = 1; // Reset to first page on search
+          loadOutputData(currentOutputDataType);
+        }, 500); // Debounce 500ms
+      });
+
+      filterSelect.addEventListener('change', () => {
+        outputCurrentPage = 1; // Reset to first page on filter change
+        loadOutputData(currentOutputDataType);
+      });
+
+      // Load initial data (matters)
+      await loadOutputData('matters');
+    }
+
+    // Update output counts
+    async function updateOutputCounts() {
+      try {
+        if (!dashboardData || !dashboardData.stats) {
+          return;
+        }
+
+        const stats = dashboardData.stats;
+        document.getElementById('output-count-matters').textContent = formatNumber(stats.matters?.total || 0);
+        document.getElementById('output-count-participants').textContent = formatNumber(stats.participants?.total || 0);
+        document.getElementById('output-count-tasks').textContent = formatNumber(stats.tasks?.total || 0);
+        document.getElementById('output-count-notes').textContent = formatNumber(stats.file_notes?.total || 0);
+        document.getElementById('output-count-documents').textContent = formatNumber(stats.documents?.total || 0);
+      } catch (error) {
+        console.error('Failed to update output counts:', error);
+      }
+    }
+
+    // Change output page
+    function changeOutputPage(delta) {
+      outputCurrentPage += delta;
+      loadOutputData(currentOutputDataType);
+    }
+
+    // Update pagination controls
+    function updateOutputPagination(total) {
+      outputTotalRecords = total;
+      const pagination = document.getElementById('outputPagination');
+      const prevBtn = document.getElementById('outputPrevBtn');
+      const nextBtn = document.getElementById('outputNextBtn');
+      const info = document.getElementById('outputPaginationInfo');
+
+      if (total > 0) {
+        pagination.classList.remove('hidden');
+
+        const start = (outputCurrentPage - 1) * outputPageSize + 1;
+        const end = Math.min(outputCurrentPage * outputPageSize, total);
+        info.textContent = `Showing ${start}-${end} of ${total}`;
+
+        prevBtn.disabled = outputCurrentPage === 1;
+        nextBtn.disabled = end >= total;
+      } else {
+        pagination.classList.add('hidden');
+      }
+    }
+
+    // Load output data for specific type
+    async function loadOutputData(dataType) {
+      currentOutputDataType = dataType;
+
+      // Update navigation active state
+      document.querySelectorAll('.output-nav-btn').forEach(btn => {
+        btn.classList.remove('bg-emerald-600', 'text-white', 'font-medium');
+        btn.classList.add('text-gray-700', 'hover:bg-gray-200');
+      });
+      document.getElementById(`output-nav-${dataType}`).classList.remove('text-gray-700', 'hover:bg-gray-200');
+      document.getElementById(`output-nav-${dataType}`).classList.add('bg-emerald-600', 'text-white', 'font-medium');
+
+      const panel = document.getElementById('outputDataPanel');
+      panel.innerHTML = '<div class="flex items-center justify-center py-12"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div></div>';
+
+      // Get search and filter values
+      const searchInput = document.getElementById('outputSearchInput');
+      const filterSelect = document.getElementById('outputFilterSelect');
+      const searchTerm = searchInput ? searchInput.value : '';
+      const statusFilter = filterSelect ? filterSelect.value : '';
+
+      try {
+        switch (dataType) {
+          case 'matters':
+            await loadMattersInOutput(searchTerm, statusFilter);
+            break;
+          case 'participants':
+            await loadParticipantsInOutput(searchTerm, statusFilter);
+            break;
+          case 'tasks':
+            await loadTasksInOutput(searchTerm, statusFilter);
+            break;
+          case 'notes':
+            await loadFileNotesInOutput(searchTerm, statusFilter);
+            break;
+          case 'documents':
+            await loadDocumentsInOutput(searchTerm, statusFilter);
+            break;
+        }
+      } catch (error) {
+        panel.innerHTML = `<div class="text-center text-red-600 py-8">Failed to load ${dataType}: ${error.message}</div>`;
+      }
+    }
+
+    // Load matters in output panel
+    async function loadMattersInOutput(searchTerm = '', statusFilter = '') {
+      const panel = document.getElementById('outputDataPanel');
+
+      // Build query parameters
+      const params = new URLSearchParams({
+        page: outputCurrentPage,
+        limit: outputPageSize
+      });
+
+      if (searchTerm) {
+        params.append('search', searchTerm);
+      }
+
+      if (statusFilter) {
+        params.append('status', statusFilter);
+      }
+
+      const result = await api.get(`/api/v1/actionstep/matters?${params.toString()}`);
+
+      if (!result.matters || result.matters.length === 0) {
+        panel.innerHTML = '<div class="text-center text-gray-500 py-8">No matters found</div>';
+        updateOutputPagination(0);
+        return;
+      }
+
+      // Update pagination
+      const total = result.pagination?.total || result.matters.length;
+      updateOutputPagination(total);
+
+      // Render table
+      let html = `
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reference</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+      `;
+
+      result.matters.forEach(matter => {
+        html += `
+          <tr class="hover:bg-gray-50">
+            <td class="px-6 py-4 text-sm font-medium text-gray-900">${matter.name || '-'}</td>
+            <td class="px-6 py-4 text-sm text-gray-500">${matter.reference || '-'}</td>
+            <td class="px-6 py-4 text-sm text-gray-500">${matter.status || '-'}</td>
+            <td class="px-6 py-4 text-sm text-gray-500">${matter.client_name || '-'}</td>
+          </tr>
+        `;
+      });
+
+      html += `
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      panel.innerHTML = html;
+    }
+
+    // Similar functions for other data types
+    async function loadParticipantsInOutput() {
+      const panel = document.getElementById('outputDataPanel');
+      const result = await api.get('/api/v1/actionstep/participants?limit=25');
+
+      if (!result.participants || result.participants.length === 0) {
+        panel.innerHTML = '<div class="text-center text-gray-500 py-8">No participants found</div>';
+        return;
+      }
+
+      let html = '<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr>';
+      html += '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>';
+      html += '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>';
+      html += '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>';
+      html += '</tr></thead><tbody class="bg-white divide-y divide-gray-200">';
+
+      result.participants.forEach(p => {
+        html += `<tr class="hover:bg-gray-50">
+          <td class="px-6 py-4 text-sm font-medium text-gray-900">${p.name || '-'}</td>
+          <td class="px-6 py-4 text-sm text-gray-500">${p.type || '-'}</td>
+          <td class="px-6 py-4 text-sm text-gray-500">${p.email || '-'}</td>
+        </tr>`;
+      });
+
+      html += '</tbody></table></div>';
+      panel.innerHTML = html;
+    }
+
+    async function loadTasksInOutput() {
+      const panel = document.getElementById('outputDataPanel');
+      const result = await api.get('/api/v1/actionstep/tasks?limit=25');
+
+      if (!result.tasks || result.tasks.length === 0) {
+        panel.innerHTML = '<div class="text-center text-gray-500 py-8">No tasks found</div>';
+        return;
+      }
+
+      let html = '<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr>';
+      html += '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>';
+      html += '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>';
+      html += '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Due Date</th>';
+      html += '</tr></thead><tbody class="bg-white divide-y divide-gray-200">';
+
+      result.tasks.forEach(t => {
+        html += `<tr class="hover:bg-gray-50">
+          <td class="px-6 py-4 text-sm font-medium text-gray-900">${t.name || '-'}</td>
+          <td class="px-6 py-4 text-sm text-gray-500">${t.status || '-'}</td>
+          <td class="px-6 py-4 text-sm text-gray-500">${t.due_date || '-'}</td>
+        </tr>`;
+      });
+
+      html += '</tbody></table></div>';
+      panel.innerHTML = html;
+    }
+
+    async function loadFileNotesInOutput() {
+      const panel = document.getElementById('outputDataPanel');
+      const result = await api.get('/api/v1/actionstep/file-notes?limit=25');
+
+      if (!result.file_notes || result.file_notes.length === 0) {
+        panel.innerHTML = '<div class="text-center text-gray-500 py-8">No file notes found</div>';
+        return;
+      }
+
+      let html = '<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr>';
+      html += '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subject</th>';
+      html += '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Matter</th>';
+      html += '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>';
+      html += '</tr></thead><tbody class="bg-white divide-y divide-gray-200">';
+
+      result.file_notes.forEach(note => {
+        html += `<tr class="hover:bg-gray-50">
+          <td class="px-6 py-4 text-sm font-medium text-gray-900">${note.subject || '-'}</td>
+          <td class="px-6 py-4 text-sm text-gray-500">${note.matter_name || '-'}</td>
+          <td class="px-6 py-4 text-sm text-gray-500">${note.created_at ? new Date(note.created_at).toLocaleDateString() : '-'}</td>
+        </tr>`;
+      });
+
+      html += '</tbody></table></div>';
+      panel.innerHTML = html;
+    }
+
+    async function loadDocumentsInOutput() {
+      const panel = document.getElementById('outputDataPanel');
+      const result = await api.get('/api/v1/actionstep/documents?limit=25');
+
+      if (!result.documents || result.documents.length === 0) {
+        panel.innerHTML = '<div class="text-center text-gray-500 py-8">No documents found</div>';
+        return;
+      }
+
+      let html = '<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr>';
+      html += '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Filename</th>';
+      html += '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Matter</th>';
+      html += '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Size</th>';
+      html += '</tr></thead><tbody class="bg-white divide-y divide-gray-200">';
+
+      result.documents.forEach(doc => {
+        html += `<tr class="hover:bg-gray-50">
+          <td class="px-6 py-4 text-sm font-medium text-gray-900">${doc.filename || '-'}</td>
+          <td class="px-6 py-4 text-sm text-gray-500">${doc.matter_name || '-'}</td>
+          <td class="px-6 py-4 text-sm text-gray-500">${doc.file_size ? ChunkedUploader.formatBytes(doc.file_size) : '-'}</td>
+        </tr>`;
+      });
+
+      html += '</tbody></table></div>';
+      panel.innerHTML = html;
     }
 
     // Load matters
