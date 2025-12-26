@@ -97,7 +97,7 @@
           <a href="#contact-support" class="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-full text-sm transition-colors">
             Contact Support
           </a>
-          <a href="https://www.youtube.com/@redroostertec" target="_blank" class="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-full text-sm transition-colors">
+          <a href="https://www.youtube.com/@redroostertec" target="_blank" class="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-full text-sm transition-colors" style="display: none;">
             Video Tutorials
           </a>
         </div>
@@ -148,39 +148,10 @@
 
           <!-- Contact Form -->
           <form id="contactSupportForm" class="space-y-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label for="contactName" class="block text-sm font-medium text-gray-700 mb-2">Name *</label>
-                <input
-                  type="text"
-                  id="contactName"
-                  required
-                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="John Doe"
-                />
-              </div>
-
-              <div>
-                <label for="contactEmail" class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
-                <input
-                  type="email"
-                  id="contactEmail"
-                  required
-                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="john.doe@lawfirm.com"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label for="contactOrganization" class="block text-sm font-medium text-gray-700 mb-2">Organization</label>
-              <input
-                type="text"
-                id="contactOrganization"
-                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="ABC Law Firm"
-              />
-            </div>
+            <!-- Hidden fields for user data (auto-populated from session) -->
+            <input type="hidden" id="contactName" />
+            <input type="hidden" id="contactEmail" />
+            <input type="hidden" id="contactOrganization" />
 
             <div>
               <label for="contactSubject" class="block text-sm font-medium text-gray-700 mb-2">Subject *</label>
@@ -279,32 +250,6 @@
               </button>
             </div>
           </form>
-
-          <!-- Alternative Contact Methods -->
-          <div class="mt-8 pt-8 border-t border-gray-200">
-            <p class="text-sm font-medium text-gray-700 mb-4">Other ways to reach us:</p>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div class="flex items-start gap-3">
-                <svg class="w-5 h-5 text-gray-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-                </svg>
-                <div>
-                  <p class="text-sm font-medium text-gray-900">Email</p>
-                  <a href="mailto:support@redroostertec.com" class="text-sm text-indigo-600 hover:text-indigo-800">support@redroostertec.com</a>
-                </div>
-              </div>
-
-              <div class="flex items-start gap-3">
-                <svg class="w-5 h-5 text-gray-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-                <div>
-                  <p class="text-sm font-medium text-gray-900">Documentation</p>
-                  <a href="https://docs.redroostertec.com/lana-ai" target="_blank" class="text-sm text-indigo-600 hover:text-indigo-800">docs.redroostertec.com</a>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </main>

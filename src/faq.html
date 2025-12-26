@@ -12,6 +12,24 @@
   <script src="js/components.js"></script>
   <script src="js/menu.js"></script>
   <script src="js/faq.js"></script>
+  <style>
+    /* Smooth accordion transitions */
+    .faq-answer {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out;
+    }
+    .faq-answer.open {
+      max-height: 2000px;
+      transition: max-height 0.5s ease-in;
+    }
+    .faq-chevron {
+      transition: transform 0.2s ease;
+    }
+    .faq-chevron.open {
+      transform: rotate(180deg);
+    }
+  </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
   <!-- Sidebar -->
@@ -41,7 +59,10 @@
           </svg>
         </button>
 
-        <div class="flex-1 px-4 lg:px-0">
+        <div class="flex items-center gap-3">
+          <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
           <h1 class="text-xl font-semibold text-gray-900">Frequently Asked Questions</h1>
         </div>
 
@@ -68,39 +89,74 @@
     </header>
 
     <!-- Page Content -->
-    <main class="p-4 lg:p-8">
-      <!-- Header -->
-      <div class="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-8 mb-8 text-white">
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h2 class="text-3xl font-bold mb-2">Frequently Asked Questions</h2>
-            <p class="text-indigo-100">Find quick answers to common questions</p>
-          </div>
-          <a href="help.html" class="inline-flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors w-fit">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-            </svg>
-            <span>View Help Articles</span>
-          </a>
-        </div>
+    <main class="p-4 lg:p-8 max-w-5xl mx-auto">
+      <!-- Breadcrumb -->
+      <nav class="flex items-center gap-2 text-sm text-gray-600 mb-6">
+        <a href="index.html" class="hover:text-indigo-600">Home</a>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+        </svg>
+        <span class="text-gray-900 font-medium">FAQ</span>
+      </nav>
+
+      <!-- Header Section -->
+      <div class="mb-8">
+        <h1 class="text-4xl font-bold text-gray-900 mb-3">How can we help you?</h1>
+        <p class="text-lg text-gray-600 mb-6">Search our frequently asked questions or browse by category</p>
 
         <!-- Search Bar -->
-        <div class="relative max-w-2xl mt-6">
+        <div class="relative">
+          <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+          </div>
           <input
             type="text"
             id="faqSearch"
-            placeholder="Search FAQs..."
-            class="w-full px-4 py-3 pr-12 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            placeholder="Search for answers..."
+            class="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900"
           />
-          <button class="absolute right-3 top-3 text-gray-400 hover:text-gray-600">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-            </svg>
-          </button>
         </div>
+      </div>
 
-        <!-- Search Tips -->
-        <p class="text-xs text-indigo-100 mt-2">Try searching: "upload documents", "data security", "connectors", "pricing"</p>
+      <!-- Quick Links -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <a href="help.html" class="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-lg hover:border-indigo-500 hover:shadow-md transition-all">
+          <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+            </svg>
+          </div>
+          <div>
+            <div class="font-medium text-gray-900">Help Center</div>
+            <div class="text-sm text-gray-600">Guides & Tutorials</div>
+          </div>
+        </a>
+
+        <a href="help.html#contact-support" class="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-lg hover:border-indigo-500 hover:shadow-md transition-all">
+          <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+            </svg>
+          </div>
+          <div>
+            <div class="font-medium text-gray-900">Contact Support</div>
+            <div class="text-sm text-gray-600">Get personalized help</div>
+          </div>
+        </a>
+
+        <a href="https://www.youtube.com/@redroostertec" target="_blank" class="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-lg hover:border-indigo-500 hover:shadow-md transition-all" style="display: none;">
+          <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+          <div>
+            <div class="font-medium text-gray-900">Video Tutorials</div>
+            <div class="text-sm text-gray-600">Watch & learn</div>
+          </div>
+        </a>
       </div>
 
       <!-- Loading State -->
@@ -122,28 +178,35 @@
 
       <!-- FAQ Content -->
       <div id="faqContent" class="hidden">
-        <!-- Category Filters -->
-        <div id="categoryFilters" class="flex flex-wrap gap-2 mb-6">
-          <!-- Dynamically populated -->
-        </div>
-
         <!-- Search Results Info -->
-        <div id="searchResults" class="hidden bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <div id="searchResults" class="hidden bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex items-center justify-between">
           <p class="text-sm text-blue-800">
             <span class="font-medium" id="searchResultCount">0</span> results found for "<span id="searchQuery" class="font-medium"></span>"
-            <button id="clearSearch" class="ml-2 text-blue-600 hover:text-blue-800 underline">Clear search</button>
           </p>
+          <button id="clearSearch" class="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+            Clear
+          </button>
+        </div>
+
+        <!-- Category Tabs -->
+        <div id="categoryTabs" class="border-b border-gray-200 mb-6">
+          <nav class="flex gap-2 overflow-x-auto">
+            <!-- Dynamically populated -->
+          </nav>
         </div>
 
         <!-- Popular FAQs -->
-        <div id="popularFaqs" class="mb-8">
-          <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+        <div id="popularFaqsSection" class="mb-8">
+          <div class="flex items-center gap-2 mb-4">
             <svg class="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
               <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
             </svg>
-            Most Popular Questions
-          </h3>
-          <div id="popularFaqsList" class="space-y-3">
+            <h2 class="text-xl font-bold text-gray-900">Popular Questions</h2>
+          </div>
+          <div id="popularFaqsList" class="space-y-2">
             <!-- Dynamically populated -->
           </div>
         </div>
@@ -165,22 +228,29 @@
       </div>
 
       <!-- Still Have Questions -->
-      <div class="mt-12 bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
-        <h3 class="text-xl font-semibold text-gray-900 mb-2">Still have questions?</h3>
-        <p class="text-gray-600 mb-6">Can't find the answer you're looking for? Our support team is here to help.</p>
-        <div class="flex flex-col sm:flex-row gap-3 justify-center">
-          <a href="help.html#contact-support" class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+      <div class="mt-12 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-8 border border-indigo-100">
+        <div class="text-center max-w-2xl mx-auto">
+          <div class="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"></path>
             </svg>
-            Contact Support
-          </a>
-          <a href="help.html" class="inline-flex items-center justify-center gap-2 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-            </svg>
-            View Help Articles
-          </a>
+          </div>
+          <h3 class="text-2xl font-bold text-gray-900 mb-2">Still have questions?</h3>
+          <p class="text-gray-600 mb-6">Can't find the answer you're looking for? Our support team is here to help.</p>
+          <div class="flex flex-col sm:flex-row gap-3 justify-center">
+            <a href="help.html#contact-support" class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+              </svg>
+              Contact Support
+            </a>
+            <a href="help.html" class="inline-flex items-center justify-center gap-2 px-6 py-3 border-2 border-indigo-600 text-indigo-600 rounded-lg hover:bg-indigo-50 transition-colors font-medium">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+              </svg>
+              Browse Help Articles
+            </a>
+          </div>
         </div>
       </div>
     </main>

@@ -1,0 +1,663 @@
+openapi: 3.0.3
+info:
+  title: LANA AI Help & Support API
+  description: |
+    API endpoints for LANA AI's help and support system, including help articles, FAQs, and support contact forms.
+
+    **Deployment:**
+    - Production: https://redroostertec.com/lana-ai/v1/
+    - Development: http://localhost:3001/lana-ai/v1/
+
+    **Architecture:**
+    - Static JSON files hosted on S3/CloudFront OR
+    - Express/Node.js server with JSON responses OR
+    - Headless CMS (Contentful, Strapi)
+  version: 1.0.0
+  contact:
+    name: Red Rooster Technologies
+    email: support@redroostertec.com
+
+servers:
+  - url: https://redroostertec.com/lana-ai/v1
+    description: Production server
+  - url: http://localhost:3001/lana-ai/v1
+    description: Development server
+
+tags:
+  - name: Help
+    description: Help articles and documentation
+  - name: FAQ
+    description: Frequently asked questions
+  - name: Support
+    description: Support contact and ticketing
+
+paths:
+  /help:
+    get:
+      tags:
+        - Help
+      summary: Get all help content
+      description: |
+        Returns structured help content including sections, articles, and quick links.
+        Articles are written in Markdown format.
+      operationId: getHelpContent
+      parameters:
+        - name: If-None-Match
+          in: header
+          description: ETag from previous response for cache validation
+          schema:
+            type: string
+          example: "33a64df551425fcc55e4d42a148795d9f25f89d4"
+      responses:
+        '200':
+          description: Help content retrieved successfully
+          headers:
+            ETag:
+              description: Entity tag for cache validation
+              schema:
+                type: string
+            Cache-Control:
+              description: Cache control header
+              schema:
+                type: string
+                example: "public, max-age=3600"
+            Last-Modified:
+              description: Last modification date
+              schema:
+                type: string
+                format: date-time
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HelpContent'
+        '304':
+          description: Not Modified - Content hasn't changed since last request
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /faq:
+    get:
+      tags:
+        - FAQ
+      summary: Get FAQ content
+      description: |
+        Returns all frequently asked questions organized by category.
+        Supports filtering by category.
+      operationId: getFAQContent
+      parameters:
+        - name: category
+          in: query
+          description: Filter FAQs by category ID
+          schema:
+            type: string
+            enum: [general, getting-started, features, security, troubleshooting, billing]
+          example: "getting-started"
+        - name: If-None-Match
+          in: header
+          description: ETag from previous response for cache validation
+          schema:
+            type: string
+      responses:
+        '200':
+          description: FAQ content retrieved successfully
+          headers:
+            ETag:
+              description: Entity tag for cache validation
+              schema:
+                type: string
+            Cache-Control:
+              description: Cache control header
+              schema:
+                type: string
+                example: "public, max-age=3600"
+            Last-Modified:
+              description: Last modification date
+              schema:
+                type: string
+                format: date-time
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FAQContent'
+        '304':
+          description: Not Modified
+        '400':
+          description: Bad Request - Invalid category parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /support/contact:
+    post:
+      tags:
+        - Support
+      summary: Submit support request
+      description: |
+        Allows users to submit support inquiries from the help page.
+        Rate limited to prevent abuse.
+      operationId: submitSupportRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupportRequest'
+      responses:
+        '201':
+          description: Support request created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportResponse'
+        '400':
+          description: Bad Request - Invalid or missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missingField:
+                  value:
+                    error: "Validation Error"
+                    message: "Missing required field: email"
+                    code: "VALIDATION_ERROR"
+                invalidEmail:
+                  value:
+                    error: "Validation Error"
+                    message: "Invalid email address format"
+                    code: "INVALID_EMAIL"
+                messageTooShort:
+                  value:
+                    error: "Validation Error"
+                    message: "Message must be at least 20 characters"
+                    code: "MESSAGE_TOO_SHORT"
+        '429':
+          description: Too Many Requests - Rate limit exceeded
+          headers:
+            X-RateLimit-Limit:
+              description: Maximum requests allowed per hour
+              schema:
+                type: integer
+                example: 5
+            X-RateLimit-Remaining:
+              description: Requests remaining in current window
+              schema:
+                type: integer
+                example: 0
+            X-RateLimit-Reset:
+              description: Time when rate limit resets (Unix timestamp)
+              schema:
+                type: integer
+                example: 1703174400
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Rate Limit Exceeded"
+                message: "You've exceeded the maximum number of support requests. Please try again in 1 hour."
+                code: "RATE_LIMIT_EXCEEDED"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    HelpContent:
+      type: object
+      required:
+        - version
+        - lastUpdated
+        - sections
+        - quickLinks
+      properties:
+        version:
+          type: string
+          description: API version (semantic versioning)
+          example: "1.0.0"
+        lastUpdated:
+          type: string
+          format: date-time
+          description: Timestamp when content was last updated
+          example: "2025-12-22T10:00:00Z"
+        sections:
+          type: array
+          description: Help content organized by sections
+          items:
+            $ref: '#/components/schemas/HelpSection'
+        quickLinks:
+          type: array
+          description: Quick access links displayed at top of help page
+          items:
+            $ref: '#/components/schemas/QuickLink'
+
+    HelpSection:
+      type: object
+      required:
+        - id
+        - title
+        - description
+        - icon
+        - order
+        - articles
+      properties:
+        id:
+          type: string
+          description: Unique section identifier (kebab-case)
+          example: "getting-started"
+          pattern: "^[a-z0-9-]+$"
+        title:
+          type: string
+          description: Section display title
+          example: "Getting Started"
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          description: Brief section description
+          example: "Learn the basics of LANA AI"
+          minLength: 1
+          maxLength: 200
+        icon:
+          type: string
+          description: Heroicon name for section
+          enum: [rocket, sparkles, wrench, shield, info, play, zap, lock, tool]
+          example: "rocket"
+        order:
+          type: integer
+          description: Display order (1-based)
+          minimum: 1
+          example: 1
+        articles:
+          type: array
+          description: Articles within this section
+          items:
+            $ref: '#/components/schemas/Article'
+          minItems: 1
+
+    Article:
+      type: object
+      required:
+        - id
+        - title
+        - summary
+        - content
+        - readTime
+        - lastUpdated
+      properties:
+        id:
+          type: string
+          description: Unique article identifier (kebab-case)
+          example: "quick-start-guide"
+          pattern: "^[a-z0-9-]+$"
+        title:
+          type: string
+          description: Article title
+          example: "Quick Start Guide"
+          minLength: 1
+          maxLength: 200
+        summary:
+          type: string
+          description: Brief article summary
+          example: "Get up and running with LANA AI in minutes"
+          minLength: 1
+          maxLength: 300
+        content:
+          type: string
+          description: Full article content in Markdown format
+          example: "## Quick Start Guide\n\nWelcome to LANA AI!..."
+          minLength: 50
+        tags:
+          type: array
+          description: Tags for search and filtering
+          items:
+            type: string
+            pattern: "^[a-z0-9-]+$"
+          example: ["beginner", "setup", "getting-started"]
+        readTime:
+          type: integer
+          description: Estimated read time in minutes
+          minimum: 1
+          maximum: 60
+          example: 5
+        lastUpdated:
+          type: string
+          format: date-time
+          description: When article was last updated
+          example: "2025-12-20T15:30:00Z"
+        relatedArticles:
+          type: array
+          description: IDs of related articles
+          items:
+            type: string
+          example: ["first-login", "navigating-dashboard"]
+
+    QuickLink:
+      type: object
+      required:
+        - title
+        - description
+        - href
+        - icon
+      properties:
+        title:
+          type: string
+          description: Link title
+          example: "Contact Support"
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          description: Link description
+          example: "Get help from our support team"
+          minLength: 1
+          maxLength: 200
+        href:
+          type: string
+          description: Link URL or anchor
+          example: "#contact-support"
+        icon:
+          type: string
+          description: Heroicon name
+          enum: [mail, video, activity, code, book, play]
+          example: "mail"
+        external:
+          type: boolean
+          description: Whether link opens in new tab
+          default: false
+        hidden:
+          type: boolean
+          description: Whether link is hidden from display
+          default: false
+
+    FAQContent:
+      type: object
+      required:
+        - version
+        - lastUpdated
+        - categories
+        - popularFaqs
+      properties:
+        version:
+          type: string
+          description: API version
+          example: "1.0.0"
+        lastUpdated:
+          type: string
+          format: date-time
+          description: When FAQ content was last updated
+          example: "2025-12-22T10:00:00Z"
+        categories:
+          type: array
+          description: FAQ categories
+          items:
+            $ref: '#/components/schemas/FAQCategory'
+          minItems: 1
+        popularFaqs:
+          type: array
+          description: IDs of most helpful/viewed FAQs
+          items:
+            type: string
+          example: ["what-is-lana", "data-security", "chat-capabilities"]
+
+    FAQCategory:
+      type: object
+      required:
+        - id
+        - title
+        - description
+        - icon
+        - order
+        - faqs
+      properties:
+        id:
+          type: string
+          description: Category identifier
+          example: "general"
+          pattern: "^[a-z0-9-]+$"
+        title:
+          type: string
+          description: Category display title
+          example: "General Questions"
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          description: Category description
+          example: "Common questions about LANA AI"
+          minLength: 1
+          maxLength: 200
+        icon:
+          type: string
+          description: Heroicon name
+          enum: [info, play, zap, lock, tool, credit-card]
+          example: "info"
+        order:
+          type: integer
+          description: Display order
+          minimum: 1
+          example: 1
+        faqs:
+          type: array
+          description: FAQ items in this category
+          items:
+            $ref: '#/components/schemas/FAQ'
+          minItems: 1
+
+    FAQ:
+      type: object
+      required:
+        - id
+        - question
+        - answer
+        - helpful
+        - notHelpful
+        - lastUpdated
+      properties:
+        id:
+          type: string
+          description: Unique FAQ identifier
+          example: "what-is-lana"
+          pattern: "^[a-z0-9-]+$"
+        question:
+          type: string
+          description: The question
+          example: "What is LANA AI?"
+          minLength: 5
+          maxLength: 300
+        answer:
+          type: string
+          description: The answer (supports Markdown)
+          example: "LANA AI is an enterprise legal AI platform..."
+          minLength: 10
+        tags:
+          type: array
+          description: Tags for filtering
+          items:
+            type: string
+            pattern: "^[a-z0-9-]+$"
+          example: ["general", "overview"]
+        helpful:
+          type: integer
+          description: Number of "helpful" votes
+          minimum: 0
+          example: 245
+        notHelpful:
+          type: integer
+          description: Number of "not helpful" votes
+          minimum: 0
+          example: 12
+        lastUpdated:
+          type: string
+          format: date-time
+          description: When FAQ was last updated
+          example: "2025-12-15T10:00:00Z"
+        relatedFaqs:
+          type: array
+          description: IDs of related FAQs
+          items:
+            type: string
+          example: ["how-does-ai-work", "pricing"]
+
+    SupportRequest:
+      type: object
+      required:
+        - name
+        - email
+        - subject
+        - category
+        - priority
+        - message
+      properties:
+        name:
+          type: string
+          description: User's full name
+          example: "John Doe"
+          minLength: 2
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: "john.doe@lawfirm.com"
+        organization:
+          type: string
+          description: Organization name
+          example: "ABC Law Firm"
+          maxLength: 200
+        subject:
+          type: string
+          description: Support request subject
+          example: "Question about data connectors"
+          minLength: 5
+          maxLength: 200
+        category:
+          type: string
+          description: Request category
+          enum:
+            - technical
+            - billing
+            - feature-request
+            - bug-report
+            - general
+          example: "technical"
+        priority:
+          type: string
+          description: Request priority
+          enum:
+            - low
+            - normal
+            - high
+            - urgent
+          example: "normal"
+        message:
+          type: string
+          description: Detailed support message
+          example: "I'm having trouble setting up the SharePoint connector..."
+          minLength: 20
+          maxLength: 5000
+        userAgent:
+          type: string
+          description: Browser user agent string
+          example: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)..."
+        appVersion:
+          type: string
+          description: LANA AI client version
+          example: "2.0.0"
+          pattern: "^\\d+\\.\\d+\\.\\d+$"
+        deploymentId:
+          type: string
+          description: Customer deployment identifier
+          example: "customer-abc-123"
+        attachments:
+          type: array
+          description: File attachments (future enhancement)
+          items:
+            type: object
+            properties:
+              filename:
+                type: string
+              contentType:
+                type: string
+              size:
+                type: integer
+              url:
+                type: string
+                format: uri
+
+    SupportResponse:
+      type: object
+      required:
+        - success
+        - ticketId
+        - message
+      properties:
+        success:
+          type: boolean
+          description: Whether request was successful
+          example: true
+        ticketId:
+          type: string
+          description: Generated support ticket ID
+          example: "LANA-2025-001234"
+          pattern: "^LANA-\\d{4}-\\d{6}$"
+        message:
+          type: string
+          description: Success message
+          example: "Support request submitted successfully. We'll respond within 24 hours."
+        estimatedResponseTime:
+          type: string
+          description: Estimated response time
+          example: "24 hours"
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+        - code
+      properties:
+        error:
+          type: string
+          description: Error type
+          example: "Validation Error"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Missing required field: email"
+        code:
+          type: string
+          description: Machine-readable error code
+          enum:
+            - VALIDATION_ERROR
+            - INVALID_EMAIL
+            - MESSAGE_TOO_SHORT
+            - RATE_LIMIT_EXCEEDED
+            - INTERNAL_ERROR
+            - NOT_FOUND
+          example: "VALIDATION_ERROR"
+        details:
+          type: object
+          description: Additional error details
+          additionalProperties: true
+
+  securitySchemes: {}
+    # No authentication required for public endpoints
+    # Support endpoint may add authentication in future
+
+security: []
+  # Endpoints are publicly accessible

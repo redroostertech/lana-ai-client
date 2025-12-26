@@ -1,7 +1,7 @@
 /**
  * LANA AI FAQ System
  *
- * Loads and renders FAQ content with search, filtering, and voting
+ * Loads and renders FAQ content with accordion-style expansion, search, and filtering
  */
 
 const FAQSystem = (function() {
@@ -9,6 +9,7 @@ const FAQSystem = (function() {
   let searchIndex = null;
   let currentFilter = 'all';
   let currentSearchQuery = '';
+  let currentlyOpenFaqId = null;
 
   /**
    * Initialize the FAQ system
@@ -28,20 +29,29 @@ const FAQSystem = (function() {
    * Load FAQ content from API or mock data
    */
   async function loadFAQContent() {
-    const apiUrl = `${window.LanaConfig.CONNECTOR_REGISTRY_URL}/lana-ai/v1/faq`;
+    const apiUrl = 'https://redroostertec.com/lana-ai/v1/faq';
 
     try {
       // Try to fetch from API
       const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${api.token}`
         }
       });
 
       if (response.ok) {
-        faqData = await response.json();
-        console.log('Loaded FAQ content from API');
+        const apiData = await response.json();
+
+        // Check if API returned empty data
+        if (!apiData.categories || apiData.categories.length === 0) {
+          console.warn('API returned empty data, using mock data');
+          faqData = await loadMockFAQData();
+        } else {
+          faqData = apiData;
+          console.log('Loaded FAQ content from API');
+        }
       } else {
         throw new Error('API returned error');
       }
@@ -86,6 +96,9 @@ const FAQSystem = (function() {
           question: faq.question,
           answer: faq.answer,
           tags: faq.tags || [],
+          helpful: faq.helpful || 0,
+          notHelpful: faq.notHelpful || 0,
+          relatedFaqs: faq.relatedFaqs || [],
           searchText: `${faq.question} ${faq.answer} ${(faq.tags || []).join(' ')}`.toLowerCase()
         });
       });
@@ -96,7 +109,7 @@ const FAQSystem = (function() {
    * Render FAQ content
    */
   function renderFAQContent() {
-    renderCategoryFilters();
+    renderCategoryTabs();
     renderPopularFAQs();
     renderFAQCategories();
 
@@ -106,37 +119,38 @@ const FAQSystem = (function() {
   }
 
   /**
-   * Render category filters
+   * Render category tabs
    */
-  function renderCategoryFilters() {
-    const container = document.getElementById('categoryFilters');
+  function renderCategoryTabs() {
+    const container = document.getElementById('categoryTabs');
     if (!container || !faqData.categories) return;
 
-    const filters = [
-      { id: 'all', title: 'All Categories', icon: null }
-    ].concat(faqData.categories);
+    const tabs = [
+      { id: 'all', title: 'All Categories' }
+    ].concat(faqData.categories.map(c => ({ id: c.id, title: c.title })));
 
-    container.innerHTML = filters.map(filter => {
-      const isActive = currentFilter === filter.id;
+    const nav = container.querySelector('nav');
+    nav.innerHTML = tabs.map(tab => {
+      const isActive = currentFilter === tab.id;
       return `
         <button
-          class="category-filter px-4 py-2 rounded-lg font-medium transition-colors ${
+          class="category-tab px-4 py-2 whitespace-nowrap font-medium transition-all ${
             isActive
-              ? 'bg-indigo-600 text-white'
-              : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+              ? 'text-indigo-600 border-b-2 border-indigo-600'
+              : 'text-gray-600 border-b-2 border-transparent hover:text-gray-900 hover:border-gray-300'
           }"
-          data-category="${filter.id}"
+          data-category="${tab.id}"
         >
-          ${filter.title}
+          ${tab.title}
         </button>
       `;
     }).join('');
 
     // Attach click handlers
-    container.querySelectorAll('.category-filter').forEach(btn => {
+    container.querySelectorAll('.category-tab').forEach(btn => {
       btn.addEventListener('click', () => {
         currentFilter = btn.dataset.category;
-        renderCategoryFilters();
+        renderCategoryTabs();
         if (currentSearchQuery) {
           performSearch(currentSearchQuery);
         } else {
@@ -151,42 +165,28 @@ const FAQSystem = (function() {
    */
   function renderPopularFAQs() {
     const container = document.getElementById('popularFaqsList');
+    const section = document.getElementById('popularFaqsSection');
     if (!container || !faqData.popularFaqs) return;
+
+    // Only show when no filter or search
+    if (currentFilter !== 'all' || currentSearchQuery) {
+      if (section) section.style.display = 'none';
+      return;
+    } else {
+      if (section) section.style.display = 'block';
+    }
 
     const popularFaqs = faqData.popularFaqs.map(id => {
       for (const category of faqData.categories) {
         const faq = category.faqs.find(f => f.id === id);
         if (faq) {
-          return { ...faq, categoryId: category.id };
+          return { ...faq, categoryId: category.id, categoryTitle: category.title };
         }
       }
       return null;
     }).filter(Boolean);
 
-    container.innerHTML = popularFaqs.map(faq => `
-      <button
-        class="block w-full text-left p-4 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow faq-item"
-        data-faq-id="${faq.id}"
-        data-category-id="${faq.categoryId}"
-      >
-        <div class="flex items-start justify-between gap-3">
-          <div class="flex-1">
-            <h4 class="font-medium text-gray-900 mb-1">${faq.question}</h4>
-            <p class="text-sm text-gray-600 line-clamp-2">${faq.answer}</p>
-          </div>
-          <svg class="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-          </svg>
-        </div>
-      </button>
-    `).join('');
-
-    // Attach click handlers
-    container.querySelectorAll('.faq-item').forEach(item => {
-      item.addEventListener('click', () => {
-        showFAQModal(item.dataset.categoryId, item.dataset.faqId);
-      });
-    });
+    container.innerHTML = popularFaqs.map(faq => renderFAQItem(faq, faq.categoryId)).join('');
   }
 
   /**
@@ -196,126 +196,115 @@ const FAQSystem = (function() {
     const container = document.getElementById('faqCategories');
     if (!container || !faqData.categories) return;
 
-    // Show popular section only when not filtered
-    const popularSection = document.getElementById('popularFaqs');
-    if (popularSection) {
-      popularSection.style.display = currentFilter === 'all' ? 'block' : 'none';
-    }
-
     // Filter categories
     const categories = currentFilter === 'all'
       ? faqData.categories
       : faqData.categories.filter(c => c.id === currentFilter);
 
     const iconMap = {
-      info: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
-      play: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
-      zap: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>',
-      lock: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>',
-      tool: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path></svg>',
-      'credit-card': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>'
+      info: '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+      play: '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+      zap: '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>',
+      lock: '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>',
+      tool: '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path></svg>',
+      'credit-card': '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>'
     };
 
     container.innerHTML = categories.map(category => `
-      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-        <div class="flex items-center gap-3 mb-6">
-          <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600">
-            ${iconMap[category.icon] || iconMap.info}
-          </div>
-          <div>
-            <h2 class="text-xl font-bold text-gray-900">${category.title}</h2>
-            <p class="text-sm text-gray-600">${category.description}</p>
+      <div class="bg-white rounded-lg border border-gray-200 overflow-hidden mb-6">
+        <div class="bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-4 border-b border-gray-200">
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 bg-white rounded-lg flex items-center justify-center text-indigo-600 shadow-sm">
+              ${iconMap[category.icon] || iconMap.info}
+            </div>
+            <div>
+              <h2 class="text-xl font-bold text-gray-900">${category.title}</h2>
+              <p class="text-sm text-gray-600">${category.description} • ${category.faqs.length} questions</p>
+            </div>
           </div>
         </div>
 
-        <div class="space-y-3">
-          ${category.faqs.map(faq => `
-            <button
-              class="block w-full text-left p-4 border border-gray-200 rounded-lg hover:border-indigo-300 hover:bg-indigo-50/50 transition-colors faq-item"
-              data-faq-id="${faq.id}"
-              data-category-id="${category.id}"
-            >
-              <div class="flex items-start justify-between gap-3">
-                <div class="flex-1">
-                  <h3 class="font-medium text-gray-900">${faq.question}</h3>
-                </div>
-                <svg class="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-              </div>
-            </button>
-          `).join('')}
+        <div class="divide-y divide-gray-200">
+          ${category.faqs.map(faq => renderFAQItem(faq, category.id)).join('')}
         </div>
       </div>
     `).join('');
-
-    // Attach click handlers
-    document.querySelectorAll('.faq-item').forEach(item => {
-      item.addEventListener('click', () => {
-        showFAQModal(item.dataset.categoryId, item.dataset.faqId);
-      });
-    });
   }
 
   /**
-   * Show FAQ in modal
+   * Render a single FAQ item (accordion style)
    */
-  function showFAQModal(categoryId, faqId) {
-    const category = faqData.categories.find(c => c.id === categoryId);
-    const faq = category?.faqs.find(f => f.id === faqId);
+  function renderFAQItem(faq, categoryId) {
+    const faqId = `${categoryId}-${faq.id}`;
+    const isOpen = currentlyOpenFaqId === faqId;
 
-    if (!faq) return;
-
-    // Create modal
-    const modal = document.createElement('div');
-    modal.className = 'fixed inset-0 z-50 overflow-y-auto';
-    modal.innerHTML = `
-      <div class="min-h-screen px-4 flex items-center justify-center">
-        <div class="fixed inset-0 bg-black opacity-50" id="faqModalOverlay"></div>
-        <div class="relative bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-          <!-- Header -->
-          <div class="flex items-start justify-between p-6 border-b border-gray-200">
-            <div class="flex-1">
-              <div class="text-sm text-indigo-600 font-medium mb-2">${category.title}</div>
-              <h2 class="text-2xl font-bold text-gray-900">${faq.question}</h2>
-            </div>
-            <button id="closeFaqModal" class="text-gray-400 hover:text-gray-600">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-              </svg>
-            </button>
+    return `
+      <div class="faq-item" data-faq-id="${faq.id}" data-category-id="${categoryId}" data-full-id="${faqId}">
+        <button class="faq-question w-full px-6 py-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors">
+          <div class="flex-1 pr-4">
+            <h3 class="font-medium text-gray-900">${faq.question}</h3>
           </div>
+          <svg class="w-5 h-5 text-gray-400 flex-shrink-0 faq-chevron ${isOpen ? 'open' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+          </svg>
+        </button>
 
-          <!-- Content -->
-          <div class="flex-1 overflow-y-auto p-6">
-            <div class="prose prose-indigo max-w-none">
+        <div class="faq-answer ${isOpen ? 'open' : ''} px-6 bg-gray-50">
+          <div class="pb-4">
+            <div class="prose prose-sm max-w-none text-gray-700 mb-4">
               ${formatFAQAnswer(faq.answer)}
             </div>
 
             ${faq.tags && faq.tags.length > 0 ? `
-              <div class="mt-6 pt-6 border-t border-gray-200">
-                <p class="text-sm font-medium text-gray-700 mb-2">Tags:</p>
-                <div class="flex flex-wrap gap-2">
-                  ${faq.tags.map(tag => `
-                    <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">${tag}</span>
-                  `).join('')}
-                </div>
+              <div class="flex flex-wrap gap-2 mb-4">
+                ${faq.tags.map(tag => `
+                  <span class="px-2 py-1 bg-gray-200 text-gray-700 rounded-full text-xs">${tag}</span>
+                `).join('')}
               </div>
             ` : ''}
 
+            <div class="flex items-center justify-between pt-4 border-t border-gray-200">
+              <div class="flex items-center gap-2">
+                <span class="text-sm text-gray-600">Was this helpful?</span>
+                <button
+                  class="vote-btn p-2 rounded hover:bg-green-100 transition-colors"
+                  data-vote="helpful"
+                  data-faq-id="${faq.id}"
+                  title="Yes, this was helpful"
+                >
+                  <svg class="w-4 h-4 text-gray-600 hover:text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"></path>
+                  </svg>
+                </button>
+                <button
+                  class="vote-btn p-2 rounded hover:bg-red-100 transition-colors"
+                  data-vote="not-helpful"
+                  data-faq-id="${faq.id}"
+                  title="No, this wasn't helpful"
+                >
+                  <svg class="w-4 h-4 text-gray-600 hover:text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.096c.5 0 .905-.405.905-.904 0-.715.211-1.413.608-2.008L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5"></path>
+                  </svg>
+                </button>
+              </div>
+              <div class="text-xs text-gray-500">
+                ${faq.helpful || 0} helpful • ${faq.notHelpful || 0} not helpful
+              </div>
+            </div>
+
             ${faq.relatedFaqs && faq.relatedFaqs.length > 0 ? `
-              <div class="mt-6 pt-6 border-t border-gray-200">
-                <p class="text-sm font-medium text-gray-700 mb-3">Related Questions:</p>
-                <div class="space-y-2">
+              <div class="mt-4 pt-4 border-t border-gray-200">
+                <p class="text-sm font-medium text-gray-700 mb-2">Related Questions:</p>
+                <div class="space-y-1">
                   ${faq.relatedFaqs.map(relatedId => {
                     const related = findFAQById(relatedId);
                     return related ? `
                       <button
-                        class="block w-full text-left px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded text-sm text-indigo-600 hover:text-indigo-800 related-faq-link"
+                        class="block w-full text-left text-sm text-indigo-600 hover:text-indigo-800 hover:underline related-faq-link"
                         data-faq-id="${related.id}"
                         data-category-id="${related.categoryId}"
                       >
-                        ${related.question} →
+                        → ${related.question}
                       </button>
                     ` : '';
                   }).join('')}
@@ -323,71 +312,41 @@ const FAQSystem = (function() {
               </div>
             ` : ''}
           </div>
-
-          <!-- Footer - Helpful? -->
-          <div class="border-t border-gray-200 p-6">
-            <div class="flex items-center justify-between">
-              <span class="text-sm font-medium text-gray-700">Was this helpful?</span>
-              <div class="flex gap-2">
-                <button
-                  class="vote-btn px-4 py-2 border border-gray-300 rounded-lg hover:bg-green-50 hover:border-green-500 transition-colors flex items-center gap-2"
-                  data-vote="helpful"
-                  data-faq-id="${faq.id}"
-                >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"></path>
-                  </svg>
-                  Yes
-                </button>
-                <button
-                  class="vote-btn px-4 py-2 border border-gray-300 rounded-lg hover:bg-red-50 hover:border-red-500 transition-colors flex items-center gap-2"
-                  data-vote="not-helpful"
-                  data-faq-id="${faq.id}"
-                >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.096c.5 0 .905-.405.905-.904 0-.715.211-1.413.608-2.008L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5"></path>
-                  </svg>
-                  No
-                </button>
-              </div>
-            </div>
-            <div id="voteMessage" class="hidden mt-3 p-3 bg-blue-50 rounded text-sm text-blue-800">
-              Thank you for your feedback!
-            </div>
-          </div>
         </div>
       </div>
     `;
+  }
 
-    document.body.appendChild(modal);
+  /**
+   * Toggle FAQ accordion
+   */
+  function toggleFAQ(faqElement) {
+    const fullId = faqElement.dataset.fullId;
+    const answer = faqElement.querySelector('.faq-answer');
+    const chevron = faqElement.querySelector('.faq-chevron');
 
-    // Close handlers
-    document.getElementById('closeFaqModal').addEventListener('click', () => {
-      document.body.removeChild(modal);
-    });
+    // Close currently open FAQ if different
+    if (currentlyOpenFaqId && currentlyOpenFaqId !== fullId) {
+      const openElement = document.querySelector(`[data-full-id="${currentlyOpenFaqId}"]`);
+      if (openElement) {
+        openElement.querySelector('.faq-answer').classList.remove('open');
+        openElement.querySelector('.faq-chevron').classList.remove('open');
+      }
+    }
 
-    document.getElementById('faqModalOverlay').addEventListener('click', () => {
-      document.body.removeChild(modal);
-    });
+    // Toggle current FAQ
+    const isOpening = !answer.classList.contains('open');
+    answer.classList.toggle('open');
+    chevron.classList.toggle('open');
 
-    // Vote handlers
-    modal.querySelectorAll('.vote-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        handleVote(btn.dataset.faqId, btn.dataset.vote);
-        // Show thank you message
-        document.getElementById('voteMessage').classList.remove('hidden');
-        // Disable vote buttons
-        modal.querySelectorAll('.vote-btn').forEach(b => b.disabled = true);
-      });
-    });
+    currentlyOpenFaqId = isOpening ? fullId : null;
 
-    // Related FAQ handlers
-    modal.querySelectorAll('.related-faq-link').forEach(link => {
-      link.addEventListener('click', () => {
-        document.body.removeChild(modal);
-        showFAQModal(link.dataset.categoryId, link.dataset.faqId);
-      });
-    });
+    // Smooth scroll to question if opening
+    if (isOpening) {
+      setTimeout(() => {
+        faqElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 100);
+    }
   }
 
   /**
@@ -409,7 +368,7 @@ const FAQSystem = (function() {
   function formatFAQAnswer(answer) {
     return answer
       .split('\n\n')
-      .map(para => `<p class="mb-4">${para}</p>`)
+      .map(para => `<p class="mb-3 last:mb-0">${para}</p>`)
       .join('');
   }
 
@@ -419,17 +378,58 @@ const FAQSystem = (function() {
   async function handleVote(faqId, vote) {
     console.log(`Vote for FAQ ${faqId}: ${vote}`);
 
-    // In a real implementation, this would send the vote to the API
-    // For now, just log it
+    // Show feedback
+    const voteBtn = event.target.closest('.vote-btn');
+    const originalHTML = voteBtn.innerHTML;
+
+    voteBtn.innerHTML = `
+      <svg class="w-4 h-4 text-green-600 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+      </svg>
+    `;
+
+    // Disable the button
+    voteBtn.disabled = true;
+
+    // Send vote to API
     try {
-      // await fetch(`${window.LanaConfig.CONNECTOR_REGISTRY_URL}/lana-ai/v1/faq/${faqId}/vote`, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ vote: vote === 'helpful' ? 'helpful' : 'not-helpful' })
-      // });
+      const response = await fetch(`https://redroostertec.com/lana-ai/v1/faq/${faqId}/feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${api.token}`
+        },
+        body: JSON.stringify({
+          feedback: vote === 'helpful' ? 'helpful' : 'not_helpful'
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Vote submitted successfully:', result);
+
+        // Update the count display if backend returns updated counts
+        if (result.helpful !== undefined && result.not_helpful !== undefined) {
+          const countsElement = voteBtn.closest('.faq-answer').querySelector('.text-xs.text-gray-500');
+          if (countsElement) {
+            countsElement.textContent = `${result.helpful} helpful • ${result.not_helpful} not helpful`;
+          }
+        }
+      } else {
+        throw new Error('Failed to submit vote');
+      }
     } catch (error) {
       console.error('Failed to submit vote:', error);
+      // Revert button state on error
+      voteBtn.innerHTML = originalHTML;
+      voteBtn.disabled = false;
     }
+
+    // Keep the checkmark for 2 seconds, then revert
+    setTimeout(() => {
+      if (!voteBtn.disabled) return;
+      voteBtn.innerHTML = originalHTML;
+    }, 2000);
   }
 
   /**
@@ -493,17 +493,59 @@ const FAQSystem = (function() {
         location.reload();
       });
     }
+
+    // FAQ click handlers (using event delegation)
+    document.addEventListener('click', (e) => {
+      // FAQ question click
+      const questionBtn = e.target.closest('.faq-question');
+      if (questionBtn) {
+        const faqItem = questionBtn.closest('.faq-item');
+        if (faqItem) {
+          toggleFAQ(faqItem);
+        }
+      }
+
+      // Vote button click
+      const voteBtn = e.target.closest('.vote-btn');
+      if (voteBtn) {
+        e.stopPropagation();
+        handleVote(voteBtn.dataset.faqId, voteBtn.dataset.vote);
+      }
+
+      // Related FAQ link click
+      const relatedLink = e.target.closest('.related-faq-link');
+      if (relatedLink) {
+        e.preventDefault();
+        // Find and open the related FAQ
+        const faqItem = document.querySelector(`[data-faq-id="${relatedLink.dataset.faqId}"][data-category-id="${relatedLink.dataset.categoryId}"]`);
+        if (faqItem) {
+          toggleFAQ(faqItem);
+          setTimeout(() => {
+            faqItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 100);
+        }
+      }
+    });
   }
 
   /**
    * Perform search
    */
   function performSearch(query) {
+    const resultsInfo = document.getElementById('searchResults');
+    const noResults = document.getElementById('noResults');
+    const popularSection = document.getElementById('popularFaqsSection');
+
     if (!query || query.length < 2) {
-      document.getElementById('searchResults').classList.add('hidden');
-      document.getElementById('noResults').classList.add('hidden');
+      resultsInfo.classList.add('hidden');
+      noResults.classList.add('hidden');
       renderFAQCategories();
       return;
+    }
+
+    // Hide popular section during search
+    if (popularSection) {
+      popularSection.style.display = 'none';
     }
 
     const results = searchFAQs(query);
@@ -517,12 +559,6 @@ const FAQSystem = (function() {
     const resultsInfo = document.getElementById('searchResults');
     const noResults = document.getElementById('noResults');
     const container = document.getElementById('faqCategories');
-    const popularSection = document.getElementById('popularFaqs');
-
-    // Hide popular section during search
-    if (popularSection) {
-      popularSection.style.display = 'none';
-    }
 
     if (results.length === 0) {
       resultsInfo.classList.add('hidden');
@@ -552,46 +588,16 @@ const FAQSystem = (function() {
 
     // Render grouped results
     container.innerHTML = Object.values(byCategory).map(group => `
-      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-        <h2 class="text-xl font-bold text-gray-900 mb-4">${group.categoryTitle}</h2>
-        <div class="space-y-3">
-          ${group.faqs.map(faq => `
-            <button
-              class="block w-full text-left p-4 border border-gray-200 rounded-lg hover:border-indigo-300 hover:bg-indigo-50/50 transition-colors faq-item"
-              data-faq-id="${faq.id}"
-              data-category-id="${faq.categoryId}"
-            >
-              <div class="flex items-start justify-between gap-3">
-                <div class="flex-1">
-                  <h3 class="font-medium text-gray-900 mb-2">${highlightQuery(faq.question, query)}</h3>
-                  <p class="text-sm text-gray-600 line-clamp-2">${highlightQuery(faq.answer, query)}</p>
-                </div>
-                <svg class="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-              </div>
-            </button>
-          `).join('')}
+      <div class="bg-white rounded-lg border border-gray-200 overflow-hidden mb-6">
+        <div class="bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-4 border-b border-gray-200">
+          <h2 class="text-xl font-bold text-gray-900">${group.categoryTitle}</h2>
+          <p class="text-sm text-gray-600">${group.faqs.length} result${group.faqs.length === 1 ? '' : 's'}</p>
+        </div>
+        <div class="divide-y divide-gray-200">
+          ${group.faqs.map(faq => renderFAQItem(faq, faq.categoryId)).join('')}
         </div>
       </div>
     `).join('');
-
-    // Attach click handlers
-    document.querySelectorAll('.faq-item').forEach(item => {
-      item.addEventListener('click', () => {
-        showFAQModal(item.dataset.categoryId, item.dataset.faqId);
-      });
-    });
-  }
-
-  /**
-   * Highlight search query in text
-   */
-  function highlightQuery(text, query) {
-    if (!query || query.length < 2) return text;
-
-    const regex = new RegExp(`(${query})`, 'gi');
-    return text.replace(regex, '<mark class="bg-yellow-200">$1</mark>');
   }
 
   /**

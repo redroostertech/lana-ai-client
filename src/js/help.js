@@ -16,6 +16,7 @@ const HelpSystem = (function() {
     try {
       await loadHelpContent();
       renderHelpContent();
+      prefillContactForm();
       attachEventListeners();
     } catch (error) {
       console.error('Failed to initialize help system:', error);
@@ -27,20 +28,29 @@ const HelpSystem = (function() {
    * Load help content from API or mock data
    */
   async function loadHelpContent() {
-    const apiUrl = `${window.LanaConfig.CONNECTOR_REGISTRY_URL}/lana-ai/v1/help`;
+    const apiUrl = 'https://redroostertec.com/lana-ai/v1/help';
 
     try {
       // Try to fetch from API
       const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${api.token}`
         }
       });
 
       if (response.ok) {
-        helpData = await response.json();
-        console.log('Loaded help content from API');
+        const apiData = await response.json();
+
+        // Check if API returned empty data
+        if (!apiData.sections || apiData.sections.length === 0) {
+          console.warn('API returned empty data, using mock data');
+          helpData = await loadMockHelpData();
+        } else {
+          helpData = apiData;
+          console.log('Loaded help content from API');
+        }
       } else {
         throw new Error('API returned error');
       }
@@ -119,7 +129,10 @@ const HelpSystem = (function() {
       code: '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>'
     };
 
-    container.innerHTML = helpData.quickLinks.map(link => `
+    // Filter out hidden links
+    const visibleLinks = helpData.quickLinks.filter(link => !link.hidden);
+
+    container.innerHTML = visibleLinks.map(link => `
       <a href="${link.href}" ${link.external ? 'target="_blank" rel="noopener"' : ''} class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
         <div class="flex items-start gap-4">
           <div class="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0 text-indigo-600">
@@ -193,9 +206,18 @@ const HelpSystem = (function() {
   }
 
   /**
-   * Show article in modal
+   * Navigate to article page
    */
   function showArticleModal(sectionId, articleId) {
+    // Navigate to dedicated article page
+    const articlePath = typeof getPagePath === 'function' ? getPagePath('article.html') : 'article.html';
+    window.location.href = `${articlePath}?section=${sectionId}&id=${articleId}`;
+  }
+
+  /**
+   * Show article in modal (legacy - no longer used)
+   */
+  function showArticleModalLegacy(sectionId, articleId) {
     const section = helpData.sections.find(s => s.id === sectionId);
     const article = section?.articles.find(a => a.id === articleId);
 
@@ -344,6 +366,32 @@ const HelpSystem = (function() {
   }
 
   /**
+   * Pre-fill contact form with user data
+   */
+  function prefillContactForm() {
+    const user = api?.user;
+    if (!user) return;
+
+    // Pre-fill name
+    const nameField = document.getElementById('contactName');
+    if (nameField && user.firstName && user.lastName) {
+      nameField.value = `${user.firstName} ${user.lastName}`;
+    }
+
+    // Pre-fill email
+    const emailField = document.getElementById('contactEmail');
+    if (emailField && user.email) {
+      emailField.value = user.email;
+    }
+
+    // Pre-fill organization
+    const orgField = document.getElementById('contactOrganization');
+    if (orgField && user.organizationName) {
+      orgField.value = user.organizationName;
+    }
+  }
+
+  /**
    * Attach event listeners
    */
   function attachEventListeners() {
@@ -462,9 +510,28 @@ const HelpSystem = (function() {
     `;
 
     // Collect form data
+    const name = document.getElementById('contactName').value;
+    const email = document.getElementById('contactEmail').value;
+
+    // Validate that user data is populated
+    if (!name || !email) {
+      console.error('User data not populated. Name:', name, 'Email:', email);
+      errorMsg.classList.remove('hidden');
+      document.getElementById('contactErrorMessage').textContent =
+        'Unable to retrieve your account information. Please refresh the page and try again.';
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = `
+        <span>Send Message</span>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+        </svg>
+      `;
+      return;
+    }
+
     const formData = {
-      name: document.getElementById('contactName').value,
-      email: document.getElementById('contactEmail').value,
+      name: name,
+      email: email,
       organization: document.getElementById('contactOrganization').value || undefined,
       subject: document.getElementById('contactSubject').value,
       category: document.getElementById('contactCategory').value,
@@ -475,29 +542,40 @@ const HelpSystem = (function() {
       deploymentId: undefined // TODO: Get from config if available
     };
 
+    console.log('Submitting contact form with data:', formData);
+
     try {
-      const response = await fetch(`${window.LanaConfig.CONNECTOR_REGISTRY_URL}/lana-ai/v1/support/contact`, {
+      const response = await fetch('https://redroostertec.com/lana-ai/v1/support/contact', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${api.token}`
         },
         body: JSON.stringify(formData)
       });
 
+      console.log('Contact form response status:', response.status);
+
       if (response.ok) {
         const result = await response.json();
+        console.log('Contact form success:', result);
 
         // Show success
-        document.getElementById('ticketId').textContent = result.ticketId || 'N/A';
+        document.getElementById('ticketId').textContent = result.ticket_id || result.ticketId || 'N/A';
         successMsg.classList.remove('hidden');
 
         // Reset form
         form.reset();
 
+        // Re-fill user data
+        prefillContactForm();
+
         // Scroll to success message
         successMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
       } else {
-        throw new Error('Failed to submit');
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Contact form API error:', errorData);
+        throw new Error(errorData.message || errorData.error || 'Failed to submit');
       }
     } catch (error) {
       console.error('Contact form submission error:', error);

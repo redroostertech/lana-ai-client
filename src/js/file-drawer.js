@@ -387,7 +387,8 @@ const FileDrawer = {
 
     // Small delay to show toast, then redirect
     setTimeout(() => {
-      window.location.href = `matters.html?open=${encodeURIComponent(currentMatterId)}&tab=documents`;
+      const mattersPath = typeof getPagePath === 'function' ? getPagePath('matters.html') : 'matters.html';
+      window.location.href = `${mattersPath}?open=${encodeURIComponent(currentMatterId)}&tab=documents`;
     }, 500);
   },
 

@@ -1,6 +1,48 @@
 // api.js - API Client for LanaAI
 // Supports configurable API_BASE_URL and Demo Mode
 
+/**
+ * Get the correct relative path from any page
+ * Handles being in subdirectories like /integrations/
+ *
+ * @param {string} targetPage - The target HTML file (e.g., 'login.html', 'matters.html')
+ * @returns {string} The correct relative path
+ */
+function getPagePath(targetPage) {
+  const currentPath = window.location.pathname;
+
+  // Extract just the filename from current path
+  const currentFile = currentPath.split('/').pop();
+
+  // Check if we're in a subdirectory by seeing if path contains a directory before the file
+  // For file:// protocol: /Users/redroostertechnologies/Desktop/lana-client/public_html/integrations/connectors.html
+  // For http:// protocol: /integrations/connectors.html
+
+  // For file:// protocol, find the base directory (public_html or src)
+  if (window.location.protocol === 'file:') {
+    // Check if we're in a subdirectory within public_html or src
+    if (currentPath.includes('/integrations/') ||
+        currentPath.includes('/admin/') ||
+        currentPath.includes('/workflows/') ||
+        currentPath.includes('/insights/')) {
+      return '../' + targetPage;
+    }
+    return targetPage;
+  }
+
+  // For http/https protocol, use the standard depth calculation
+  const depth = (currentPath.match(/\//g) || []).length - 1;
+  const upLevels = Math.max(0, depth - 1);
+  return upLevels > 0 ? '../'.repeat(upLevels) + targetPage : targetPage;
+}
+
+/**
+ * Get the correct path to login.html from any page
+ */
+function getLoginPath() {
+  return getPagePath('login.html');
+}
+
 class ApiClient {
   constructor() {
     // Get configuration from config.js (must be loaded before this script)
@@ -97,20 +139,27 @@ class ApiClient {
   }
 
   showSessionExpiredModal() {
+    // Check if DOM is ready
+    if (!document.body) {
+      console.warn('[LanaAPI] DOM not ready, redirecting immediately');
+      window.location.href = getLoginPath();
+      return;
+    }
+
     // Prevent multiple modals
     if (document.getElementById('sessionExpiredModal')) return;
-    
+
     // Clear local storage
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     this.token = null;
     this.user = null;
-    
+
     // Create modal overlay
     const overlay = document.createElement('div');
     overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
     overlay.id = 'sessionExpiredModal';
-    
+
     overlay.innerHTML = `
       <div class="bg-white rounded-xl shadow-xl p-8 max-w-md mx-4 text-center">
         <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -123,7 +172,7 @@ class ApiClient {
         <div class="text-3xl font-bold text-indigo-600" id="sessionCountdown">3</div>
       </div>
     `;
-    
+
     document.body.appendChild(overlay);
     
     // Countdown and redirect
@@ -136,7 +185,7 @@ class ApiClient {
       
       if (countdown <= 0) {
         clearInterval(interval);
-        window.location.href = 'login.html';
+        window.location.href = getLoginPath();
       }
     }, 1000);
   }
@@ -1464,7 +1513,7 @@ class ApiClient {
       return true;
     }
     if (!this.isAuthenticated()) {
-      window.location.href = 'login.html';
+      window.location.href = getLoginPath();
       return false;
     }
     return true;
