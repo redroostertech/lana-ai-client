@@ -238,7 +238,7 @@
 
     // State
     let currentPage = 1;
-    const pageSize = 50;
+    const pageSize = 10;
     let logs = [];
     let eventTypes = [];
 
@@ -255,7 +255,11 @@
           label: 'Event Type',
           render: (val) => `<span class="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded font-mono">${val}</span>`
         },
-        { key: 'user_email', label: 'User' },
+        {
+          key: 'user_email',
+          label: 'User',
+          render: (val) => `<div class="max-w-xs break-words">${val || '-'}</div>`
+        },
         {
           key: 'ip_address',
           label: 'IP Address',
@@ -346,8 +350,10 @@
 
         const result = await api.getAuditLogs(currentPage, pageSize, filters);
         logs = result.logs || [];
-        table.setData(logs, result.total || logs.length);
+        const total = result.pagination?.total || result.total || logs.length;
+        table.setData(logs, total);
       } catch (error) {
+        console.error('Failed to load audit logs:', error);
         Toast.error('Failed to load audit logs');
       }
     }

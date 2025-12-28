@@ -244,8 +244,17 @@ class ApiClient {
       ...options
     };
 
+    // Handle different data types
     if (data && method !== 'GET') {
-      config.body = JSON.stringify(data);
+      if (data instanceof FormData) {
+        // FormData: let browser set Content-Type with boundary
+        config.body = data;
+        // Remove Content-Type header - browser will set it with multipart boundary
+        delete config.headers['Content-Type'];
+      } else {
+        // JSON data
+        config.body = JSON.stringify(data);
+      }
     }
 
     this.log(`${method} ${endpoint}`, data);
@@ -634,8 +643,9 @@ class ApiClient {
       return { success: true };
     }
 
-    if (path === '/api/v1/notifications/read-all') {
-      return { success: true };
+    // Mark all notifications as read
+    if (path === '/api/v1/notifications/mark-all-read' && method === 'POST') {
+      return { success: true, marked_read: 0 };
     }
 
     if (path === '/api/v1/notifications/admin' && method === 'POST') {
@@ -1118,13 +1128,32 @@ class ApiClient {
   }
 
   /**
-   * Delete a document
-   * @param {string} fileId - The file ID
-   * @param {string} matterId - The matter ID
+   * Delete a document (Universal endpoint - works for all sources)
+   * @param {string} documentId - The document ID
    * @returns {Promise<Object>} Deletion result
    */
-  async deleteDocument(fileId, matterId) {
-    return this.delete(`/api/v1/storage/files/${fileId}?matter_id=${matterId}`);
+  async deleteDocument(documentId) {
+    return this.delete(`/api/v1/storage/${documentId}`);
+  }
+
+  /**
+   * Replace/update a document file (Universal endpoint - works for all sources)
+   * Triggers re-vectorization automatically
+   * @param {string} documentId - The document ID to replace
+   * @param {File} file - The new file to upload
+   * @param {Function} onProgress - Optional progress callback
+   * @returns {Promise<Object>} Update result
+   */
+  async replaceDocument(documentId, file, onProgress = null) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    return this.put(`/api/v1/storage/${documentId}`, formData, {
+      onUploadProgress: onProgress ? (progressEvent) => {
+        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        onProgress(percentCompleted);
+      } : undefined
+    });
   }
 
   /**
@@ -1246,7 +1275,8 @@ class ApiClient {
   // Audit
   // ============================================================
   async getAuditLogs(page = 1, pageSize = 50, filters = {}) {
-    const params = new URLSearchParams({ page, page_size: pageSize, ...filters });
+    const offset = (page - 1) * pageSize;
+    const params = new URLSearchParams({ limit: pageSize, offset: offset, ...filters });
     return this.get(`/api/v1/audit/logs?${params}`);
   }
 
@@ -1472,7 +1502,8 @@ class ApiClient {
   }
 
   async markAllNotificationsRead() {
-    return this.put('/api/v1/notifications/read-all');
+    // Use POST to bulk mark endpoint
+    return this.post('/api/v1/notifications/mark-all-read');
   }
 
   async createAdminNotification(type, title, body, actionUrl = null) {
