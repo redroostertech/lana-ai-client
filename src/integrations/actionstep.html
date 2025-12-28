@@ -56,50 +56,8 @@
     <main class="p-4 lg:p-8">
       <!-- Dashboard Content (Always Visible) -->
       <div id="dashboardContent" class="hidden">
-        <!-- Import Actions -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
-          <div class="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h2 class="text-lg font-semibold text-gray-900">Quick Import (Local Files)</h2>
-              <p class="text-sm text-gray-500">Import CSV/documents from your local ActionStep export folder</p>
-            </div>
-            <div class="flex flex-wrap gap-3">
-              <button onclick="syncCSVData()" id="syncCSVBtn" class="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-                Sync Local CSV
-              </button>
-              <button onclick="importDocuments()" id="importDocsBtn" class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                Sync Local Documents
-              </button>
-              <button onclick="switchTab('upload')" class="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-                Upload ZIP File
-              </button>
-              <button onclick="showSettings()" class="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                Settings
-              </button>
-            </div>
-          </div>
-
-          <!-- Import Progress (hidden by default) -->
-          <div id="importProgress" class="hidden mt-6 p-4 bg-gray-50 rounded-lg">
-            <div class="flex items-center gap-4">
-              <div id="importSpinner" class="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600"></div>
-              <div class="flex-1">
-                <p id="importProgressText" class="font-medium text-gray-900">Importing...</p>
-                <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
-                  <div id="importProgressBar" class="bg-emerald-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
-                </div>
-                <div id="importProgressDetails" class="mt-3 grid grid-cols-3 md:grid-cols-6 gap-2 text-xs"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <!-- Summary Stats -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
           <!-- Matters -->
           <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
             <div class="flex items-center justify-between">
@@ -171,6 +129,33 @@
           </div>
         </div>
 
+        <!-- AI Analysis Card - Full Width -->
+        <div class="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl shadow-sm p-6 border border-indigo-200 mb-8">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                </svg>
+              </div>
+              <div>
+                <p class="text-sm font-medium text-indigo-900">AI Analysis</p>
+                <p id="aiAnalysisStatus" class="text-xs text-indigo-600 mt-1">Never run</p>
+              </div>
+            </div>
+            <button onclick="triggerAIIngestion()" id="aiIngestionBtn" class="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-sm font-semibold rounded-lg transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02]">
+              <svg id="aiIngestionBtnIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+              </svg>
+              <span id="aiIngestionBtnText">Start Analysis</span>
+              <svg id="aiIngestionSpinner" class="hidden animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
         <!-- Tabs -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-8">
           <div class="border-b border-gray-200">
@@ -189,9 +174,6 @@
               </button>
               <button onclick="switchTab('logs')" id="tab-logs" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
                 Execution Logs
-              </button>
-              <button onclick="switchTab('documentation')" id="tab-documentation" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
-                Documentation
               </button>
               <button onclick="switchTab('workflows')" id="tab-workflows" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
                 Workflows
@@ -368,7 +350,24 @@
 
     // Format number
     function formatNumber(num) {
-      return new Intl.NumberFormat('en-US').format(num || 0);
+      if (!num || num === 0) return '0';
+
+      const absNum = Math.abs(num);
+
+      // Less than 1,000 - show as is
+      if (absNum < 1000) {
+        return num.toString();
+      }
+
+      // 1,000 to 999,999 - show as K (e.g., 7.3K, 12.8K)
+      if (absNum < 1000000) {
+        const k = num / 1000;
+        return (k % 1 === 0) ? k.toFixed(0) + 'K' : k.toFixed(1) + 'K';
+      }
+
+      // 1,000,000+ - show as M (e.g., 1.2M, 15M)
+      const m = num / 1000000;
+      return (m % 1 === 0) ? m.toFixed(0) + 'M' : m.toFixed(1) + 'M';
     }
 
     // Load dashboard data
@@ -404,6 +403,9 @@
         if (result.last_sync) {
           document.getElementById('lastSyncTime').textContent = `Last sync: ${timeAgo(result.last_sync.completed_at || result.last_sync.started_at)}`;
         }
+
+        // Load AI ingestion status
+        await loadAIIngestionStatus();
 
         document.getElementById('loadingState').classList.add('hidden');
         document.getElementById('dashboardContent').classList.remove('hidden');
@@ -483,9 +485,6 @@
           case 'logs':
             await loadExecutionLogs();
             break;
-          case 'documentation':
-            await loadDocumentation();
-            break;
           case 'workflows':
             await loadWorkflows();
             break;
@@ -525,7 +524,6 @@
 
     // Global uploader instance
     let chunkedUploader = null;
-    let uploadEventListenersInitialized = false;
 
     // Load Upload Tab
     async function loadUploadTab() {
@@ -541,10 +539,10 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
               </svg>
             </div>
-            <h3 class="text-xl font-semibold text-gray-900 mb-2">Configuration Required</h3>
+            <h3 class="text-xl font-semibold text-gray-900 mb-2">Setup Required</h3>
             <p class="text-gray-600 mb-6">
-              The ActionStep integration must be configured before you can upload data.
-              Please complete the configuration first.
+              Before you can upload files, you need to set up the storage folder where files will be saved.
+              Go to the Configuration tab to complete the setup.
             </p>
             <button onclick="switchTab('configuration')" class="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -559,10 +557,11 @@
 
       content.innerHTML = `
         <div class="max-w-4xl">
-          <h3 class="text-lg font-semibold text-gray-900 mb-4">Upload Large ZIP Files</h3>
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">Upload ActionStep Files</h3>
           <p class="text-sm text-gray-600 mb-6">
-            Upload large ZIP files containing your ActionStep export data. The system uses chunked upload technology to support files up to 10GB.
-            After upload, the ZIP will be automatically extracted and the CSV files will be processed.
+            Upload ZIP files containing your ActionStep export data (up to 10GB).
+            Files will be saved to your configured storage folder and automatically processed.
+            This is the easiest way to get your data into the system if you're uploading from your computer.
           </p>
 
           <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
@@ -571,8 +570,11 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
               </svg>
               <div class="text-sm text-blue-900">
-                <p class="font-medium mb-1">💡 For Faster Local Imports</p>
-                <p class="text-blue-700">If your CSV files are already on this machine, use the <strong>"Sync Local CSV"</strong> button on the Dashboard tab for faster processing (no upload needed).</p>
+                <p class="font-medium mb-1">💡 When to use each option:</p>
+                <ul class="list-disc list-inside space-y-1 text-blue-700 ml-2">
+                  <li><strong>Upload:</strong> Use this when you have files on your computer that need to be transferred to the server</li>
+                  <li><strong>Sync Local CSV:</strong> If your system admin already placed files in the storage folder, use the "Sync Local CSV" button on the Overview tab instead</li>
+                </ul>
               </div>
             </div>
           </div>
@@ -593,7 +595,10 @@
           <div id="uploadProgressSection" class="hidden mt-6">
             <div class="bg-gray-50 rounded-lg p-6">
               <div class="flex items-center justify-between mb-2">
-                <span id="uploadFileName" class="text-sm font-medium text-gray-900">-</span>
+                <div class="flex items-center gap-2">
+                  <span id="uploadFileName" class="text-sm font-medium text-gray-900">-</span>
+                  <span id="uploadJobId" class="text-xs font-mono text-gray-500 bg-gray-200 px-2 py-0.5 rounded hidden"></span>
+                </div>
                 <span id="uploadFileSize" class="text-sm text-gray-500">-</span>
               </div>
 
@@ -604,6 +609,19 @@
               <div class="flex items-center justify-between text-xs text-gray-600">
                 <span id="uploadProgressText">Preparing upload...</span>
                 <span id="uploadProgressPercent">0%</span>
+              </div>
+
+              <!-- Warning: Don't navigate away -->
+              <div id="uploadWarning" class="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg hidden">
+                <div class="flex items-start">
+                  <svg class="w-5 h-5 text-yellow-600 mt-0.5 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                  </svg>
+                  <div class="text-sm text-yellow-800">
+                    <strong class="font-semibold">Please don't navigate away from this page.</strong>
+                    <p class="mt-1">Your upload is still in progress. Leaving this page will cancel the upload and you'll need to start over.</p>
+                  </div>
+                </div>
               </div>
 
               <div class="mt-4 grid grid-cols-3 gap-4 text-sm">
@@ -645,8 +663,8 @@
                 <div>
                   <h4 class="font-medium text-emerald-900">Upload Complete!</h4>
                   <p class="text-sm text-emerald-700 mt-1">
-                    Your ActionStep export has been uploaded and is being processed.
-                    Check the <button onclick="switchTab('output')" class="underline hover:text-emerald-900">Output tab</button> to view imported data.
+                    Your files have been saved to the storage folder and are being processed automatically.
+                    Check the <button onclick="switchTab('output')" class="underline hover:text-emerald-900">Output tab</button> to view imported data or the <button onclick="switchTab('logs')" class="underline hover:text-emerald-900">Execution Logs</button> to track progress.
                   </p>
                 </div>
               </div>
@@ -655,11 +673,11 @@
         </div>
       `;
 
-      // Setup drag-and-drop (only once to prevent duplicate event listeners)
-      if (!uploadEventListenersInitialized) {
-        const uploadZone = document.getElementById('uploadZone');
-        const fileInput = document.getElementById('fileInput');
+      // Setup drag-and-drop
+      const uploadZone = document.getElementById('uploadZone');
+      const fileInput = document.getElementById('fileInput');
 
+      if (uploadZone && fileInput) {
         uploadZone.addEventListener('click', () => {
           const currentFileInput = document.getElementById('fileInput');
           if (currentFileInput) currentFileInput.click();
@@ -700,9 +718,47 @@
             handleFileUpload(e.target.files[0]);
           }
         });
-
-        uploadEventListenersInitialized = true;
       }
+    }
+
+    // Show upload error modal
+    function showUploadErrorModal(title, message, isWarning = false) {
+      const iconColor = isWarning ? 'text-yellow-600' : 'text-red-600';
+      const bgColor = isWarning ? 'bg-yellow-50 border-yellow-200' : 'bg-red-50 border-red-200';
+      const icon = isWarning
+        ? `<path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>`
+        : `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>`;
+
+      const modal = document.createElement('div');
+      modal.className = 'fixed inset-0 z-50 overflow-y-auto';
+      modal.innerHTML = `
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+          <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onclick="this.parentElement.parentElement.remove()"></div>
+          <div class="inline-block overflow-hidden text-left align-bottom bg-white rounded-lg shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+              <div class="sm:flex sm:items-start">
+                <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full ${bgColor} sm:mx-0 sm:h-10 sm:w-10">
+                  <svg class="h-6 w-6 ${iconColor}" fill="currentColor" viewBox="0 0 20 20">
+                    ${icon}
+                  </svg>
+                </div>
+                <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                  <h3 class="text-lg leading-6 font-medium text-gray-900">${title}</h3>
+                  <div class="mt-2">
+                    <p class="text-sm text-gray-500">${message}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+              <button type="button" onclick="this.closest('.fixed').remove()" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-emerald-600 text-base font-medium text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 sm:ml-3 sm:w-auto sm:text-sm">
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
     }
 
     // Handle file upload
@@ -711,14 +767,16 @@
       const progressSection = document.getElementById('uploadProgressSection');
       const completeSection = document.getElementById('uploadCompleteSection');
 
-      // Hide upload zone, show progress
-      uploadZone.classList.add('hidden');
-      progressSection.classList.remove('hidden');
-      completeSection.classList.add('hidden');
+      // Hide upload zone, show progress (with null checks)
+      if (uploadZone) uploadZone.classList.add('hidden');
+      if (progressSection) progressSection.classList.remove('hidden');
+      if (completeSection) completeSection.classList.add('hidden');
 
-      // Update file info
-      document.getElementById('uploadFileName').textContent = file.name;
-      document.getElementById('uploadFileSize').textContent = ChunkedUploader.formatBytes(file.size);
+      // Update file info (with null checks)
+      const fileNameEl = document.getElementById('uploadFileName');
+      const fileSizeEl = document.getElementById('uploadFileSize');
+      if (fileNameEl) fileNameEl.textContent = file.name;
+      if (fileSizeEl) fileSizeEl.textContent = ChunkedUploader.formatBytes(file.size);
 
       const startTime = Date.now();
       let lastUpdate = Date.now();
@@ -726,17 +784,44 @@
 
       // Create uploader instance
       chunkedUploader = new ChunkedUploader({
+        apiBaseUrl: `${api.baseUrl}/api/v1/storage`,
         onProgress: (progress) => {
-          // Update progress bar
-          document.getElementById('uploadProgressBar').style.width = `${progress.percentage}%`;
-          document.getElementById('uploadProgressPercent').textContent = `${progress.percentage}%`;
-          document.getElementById('uploadProgressText').textContent =
-            progress.status === 'uploading' ? 'Uploading...' :
-            progress.status === 'assembling' ? 'Assembling file...' :
-            progress.status === 'completed' ? 'Processing...' : 'Preparing...';
+          // Update progress bar (with null checks)
+          const progressBar = document.getElementById('uploadProgressBar');
+          const progressPercent = document.getElementById('uploadProgressPercent');
+          const progressText = document.getElementById('uploadProgressText');
+          const uploadedBytesEl = document.getElementById('uploadedBytes');
+
+          if (progressBar) progressBar.style.width = `${progress.percentage}%`;
+          if (progressPercent) progressPercent.textContent = `${progress.percentage}%`;
+          if (progressText) {
+            progressText.textContent =
+              progress.status === 'uploading' ? 'Uploading...' :
+              progress.status === 'assembling' ? 'Assembling file...' :
+              progress.status === 'completed' ? 'Processing...' : 'Preparing...';
+          }
+
+          // Show/hide warning based on upload status
+          const uploadWarning = document.getElementById('uploadWarning');
+          if (uploadWarning) {
+            if (progress.status === 'uploading') {
+              uploadWarning.classList.remove('hidden');
+            } else {
+              uploadWarning.classList.add('hidden');
+            }
+          }
+
+          // Display job ID (last 6 characters)
+          const jobIdEl = document.getElementById('uploadJobId');
+          if (jobIdEl && chunkedUploader.uploadSession) {
+            const uploadId = chunkedUploader.uploadSession.upload_id;
+            const shortId = uploadId.slice(-6);
+            jobIdEl.textContent = `ID: ${shortId}`;
+            jobIdEl.classList.remove('hidden');
+          }
 
           // Update uploaded bytes
-          document.getElementById('uploadedBytes').textContent = ChunkedUploader.formatBytes(progress.uploadedBytes);
+          if (uploadedBytesEl) uploadedBytesEl.textContent = ChunkedUploader.formatBytes(progress.uploadedBytes);
 
           // Calculate speed (update every 2 seconds)
           const now = Date.now();
@@ -744,7 +829,9 @@
             const timeDiff = (now - lastUpdate) / 1000; // seconds
             const bytesDiff = progress.uploadedBytes - lastBytes;
             const speed = bytesDiff / timeDiff; // bytes per second
-            document.getElementById('uploadSpeed').textContent = ChunkedUploader.formatBytes(speed) + '/s';
+
+            const speedEl = document.getElementById('uploadSpeed');
+            if (speedEl) speedEl.textContent = ChunkedUploader.formatBytes(speed) + '/s';
 
             // Calculate time remaining
             if (progress.uploadedBytes > 0 && progress.uploadedBytes < progress.totalBytes) {
@@ -753,7 +840,8 @@
                 progress.totalBytes,
                 startTime
               );
-              document.getElementById('uploadTimeRemaining').textContent = remaining;
+              const timeRemainingEl = document.getElementById('uploadTimeRemaining');
+              if (timeRemainingEl) timeRemainingEl.textContent = remaining;
             }
 
             lastUpdate = now;
@@ -772,9 +860,9 @@
           }
         });
 
-        // Upload complete
-        progressSection.classList.add('hidden');
-        completeSection.classList.remove('hidden');
+        // Upload complete (with null checks)
+        if (progressSection) progressSection.classList.add('hidden');
+        if (completeSection) completeSection.classList.remove('hidden');
 
         // Refresh dashboard
         setTimeout(() => {
@@ -782,9 +870,29 @@
         }, 2000);
 
       } catch (error) {
-        progressSection.classList.add('hidden');
-        uploadZone.classList.remove('hidden');
-        alert(`Upload failed: ${error.message}`);
+        console.error('Upload error:', error);
+
+        // Handle error (with null checks)
+        if (progressSection) progressSection.classList.add('hidden');
+        if (uploadZone) uploadZone.classList.remove('hidden');
+
+        // Provide context-specific error messages
+        let errorTitle = 'Upload Issue';
+        let errorMessage = error.message;
+        let isWarning = false;
+
+        // Check if error is due to navigation/cancellation (harmless)
+        if (error.message.includes('cancelled') || error.message.includes('aborted')) {
+          errorTitle = 'Upload Cancelled';
+          errorMessage = 'The upload was cancelled. You can start a new upload when ready.';
+          isWarning = true;
+        } else if (error.message.includes('fetch') || error.message.includes('network')) {
+          errorTitle = 'Connection Issue';
+          errorMessage = 'There was a network issue during upload. Please check your connection and try again.';
+        }
+
+        // Show friendly modal instead of alert
+        showUploadErrorModal(errorTitle, errorMessage, isWarning);
       }
     }
 
@@ -1062,7 +1170,9 @@
 
       result.matters.forEach(matter => {
         html += `
-          <tr class="hover:bg-gray-50">
+          <tr class="hover:bg-gray-50 cursor-pointer transition-colors"
+              data-matter-id="${matter.id}"
+              onclick="openMatterDetail('${matter.id}')">
             <td class="px-6 py-4 text-sm font-medium text-gray-900">${matter.name || '-'}</td>
             <td class="px-6 py-4 text-sm text-gray-500">${matter.reference || '-'}</td>
             <td class="px-6 py-4 text-sm text-gray-500">${matter.status || '-'}</td>
@@ -1411,143 +1521,270 @@
       `;
     }
 
-    // Load Overview tab
+    // Load Overview tab - Documentation style with Configuration Status
     async function loadOverview() {
       const content = document.getElementById('tabContent');
       const isConfigured = dashboardData?.configured !== false;
-
-      if (!isConfigured) {
-        // Not configured state
-        content.innerHTML = `
-          <div class="text-center py-12">
-            <div class="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <svg class="w-10 h-10 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-              </svg>
-            </div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-2">ActionStep Not Configured</h2>
-            <p class="text-gray-500 max-w-md mx-auto mb-6">${dashboardData?.message || 'The ActionStep integration requires server configuration.'}</p>
-            <button onclick="switchTab('configuration')" class="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors">
-              Configure Integration
-            </button>
-          </div>
-        `;
-        return;
-      }
-
-      // Configured state
+      const config = dashboardData?.config || {};
       const stats = dashboardData?.stats || {};
-      content.innerHTML = `
-        <div class="space-y-6">
-          <!-- Integration Status -->
-          <div class="bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg p-6 border border-emerald-100">
-            <div class="flex items-start justify-between">
-              <div>
-                <h3 class="text-lg font-semibold text-gray-900 mb-2">ActionStep Integration</h3>
-                <p class="text-gray-600 mb-4">Syncing matters, participants, tasks, file notes, and documents from your ActionStep export directory.</p>
 
-                <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
-                  <div>
-                    <p class="text-sm text-gray-500">Status</p>
-                    <p class="font-medium text-green-600">Connected</p>
+      content.innerHTML = `
+        <div class="max-w-5xl space-y-8">
+          <!-- Configuration Status Section -->
+          <div class="bg-white rounded-lg border border-gray-200">
+            <div class="px-6 py-4 border-b border-gray-200">
+              <h3 class="text-lg font-semibold text-gray-900">Configuration Status</h3>
+            </div>
+            <div class="p-6">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Status -->
+                <div>
+                  <div class="flex items-center gap-3 mb-4">
+                    ${isConfigured ? `
+                      <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                      </div>
+                      <div>
+                        <p class="font-medium text-gray-900">Configured</p>
+                        <p class="text-sm text-gray-500">Integration is active</p>
+                      </div>
+                    ` : `
+                      <div class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        </svg>
+                      </div>
+                      <div>
+                        <p class="font-medium text-gray-900">Not Configured</p>
+                        <p class="text-sm text-gray-500">Setup required</p>
+                      </div>
+                    `}
                   </div>
+
+                  ${!isConfigured ? `
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                      <p class="text-sm font-medium text-yellow-900 mb-1">Configuration Required</p>
+                      <p class="text-sm text-yellow-700">This integration needs to be configured by your system administrator before you can use it. Please contact your administrator to complete the setup.</p>
+                    </div>
+                    <button onclick="switchTab('configuration')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors">
+                      Go to Configuration
+                    </button>
+                  ` : `
+                    <div class="space-y-3">
+                      <div class="flex justify-between items-center text-sm">
+                        <span class="text-gray-500">Import Directory</span>
+                        <code class="px-2 py-1 bg-gray-100 rounded text-xs font-mono text-gray-900">${config.import_dir || 'Not set'}</code>
+                      </div>
+                      <div class="flex justify-between items-center text-sm">
+                        <span class="text-gray-500">Sync Frequency</span>
+                        <span class="font-medium text-gray-900">${config.sync_frequency || 'Daily'}</span>
+                      </div>
+                      <div class="flex justify-between items-center text-sm">
+                        <span class="text-gray-500">Last Sync</span>
+                        <span class="font-medium text-gray-900" id="overviewLastSync">Loading...</span>
+                      </div>
+                    </div>
+                  `}
+                </div>
+
+                <!-- Data Statistics -->
+                ${isConfigured ? `
                   <div>
-                    <p class="text-sm text-gray-500">Last Sync</p>
-                    <p class="font-medium text-gray-900" id="overviewLastSync">Loading...</p>
+                    <h4 class="text-sm font-medium text-gray-900 mb-3">Imported Data</h4>
+                    <div class="space-y-2">
+                      <div class="flex justify-between items-center text-sm">
+                        <span class="text-gray-600">Matters</span>
+                        <span class="font-semibold text-gray-900">${formatNumber(stats.matters?.total || 0)}</span>
+                      </div>
+                      <div class="flex justify-between items-center text-sm">
+                        <span class="text-gray-600">Participants</span>
+                        <span class="font-semibold text-gray-900">${formatNumber(stats.participants?.total || 0)}</span>
+                      </div>
+                      <div class="flex justify-between items-center text-sm">
+                        <span class="text-gray-600">Tasks</span>
+                        <span class="font-semibold text-gray-900">${formatNumber(stats.tasks?.total || 0)}</span>
+                      </div>
+                      <div class="flex justify-between items-center text-sm">
+                        <span class="text-gray-600">File Notes</span>
+                        <span class="font-semibold text-gray-900">${formatNumber(stats.file_notes?.total || 0)}</span>
+                      </div>
+                      <div class="flex justify-between items-center text-sm">
+                        <span class="text-gray-600">Documents</span>
+                        <span class="font-semibold text-gray-900">${formatNumber(stats.documents?.total || 0)}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p class="text-sm text-gray-500">Sync Frequency</p>
-                    <p class="font-medium text-gray-900">Daily</p>
+                ` : `
+                  <div class="flex items-center justify-center bg-gray-50 rounded-lg p-8">
+                    <div class="text-center">
+                      <svg class="w-12 h-12 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                      </svg>
+                      <p class="text-sm text-gray-500">No data imported yet</p>
+                    </div>
                   </div>
+                `}
+              </div>
+            </div>
+          </div>
+
+          <!-- Documentation Sections -->
+          <div class="prose prose-sm max-w-none">
+            <h2 class="text-2xl font-bold text-gray-900 mb-4">ActionStep Integration</h2>
+
+            <section class="mb-8">
+              <h3 class="text-lg font-semibold text-gray-900 mb-3">Overview</h3>
+              <p class="text-gray-600 leading-relaxed mb-4">
+                The ActionStep integration enables seamless import of legal case data from ActionStep into LanaAI for AI-powered analysis, search, and insights. Import matters, participants, tasks, file notes, and documents to leverage LanaAI's advanced capabilities.
+              </p>
+              <p class="text-gray-600 leading-relaxed">
+                This integration supports both local file imports and large-scale ZIP file uploads for efficient data transfer.
+              </p>
+            </section>
+
+            <section class="mb-8">
+              <h3 class="text-lg font-semibold text-gray-900 mb-3">Key Features</h3>
+              <ul class="list-disc list-inside space-y-2 text-gray-600">
+                <li>Import legal matters with full metadata and relationships</li>
+                <li>Sync participants, contacts, and company information</li>
+                <li>Track tasks, deadlines, and case milestones</li>
+                <li>Capture file notes and communications</li>
+                <li>Process documents with RAG (Retrieval-Augmented Generation)</li>
+                <li>Support for chunked upload of large files (up to 10GB+)</li>
+                <li>Real-time job monitoring and progress tracking</li>
+              </ul>
+            </section>
+
+            <section class="mb-8">
+              <h3 class="text-lg font-semibold text-gray-900 mb-3">Data Types</h3>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <h4 class="font-medium text-gray-900 mb-2 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    Matters
+                  </h4>
+                  <p class="text-sm text-gray-600">Legal cases and matters with client information, status, and dates</p>
+                </div>
+
+                <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <h4 class="font-medium text-gray-900 mb-2 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                    Participants
+                  </h4>
+                  <p class="text-sm text-gray-600">Clients, contacts, companies and their relationships</p>
+                </div>
+
+                <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <h4 class="font-medium text-gray-900 mb-2 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                    </svg>
+                    Tasks
+                  </h4>
+                  <p class="text-sm text-gray-600">Case tasks, deadlines, and assignments</p>
+                </div>
+
+                <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <h4 class="font-medium text-gray-900 mb-2 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path>
+                    </svg>
+                    File Notes
+                  </h4>
+                  <p class="text-sm text-gray-600">Case notes, memos, and communications</p>
                 </div>
               </div>
-              <div class="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
-                <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-              </div>
-            </div>
-          </div>
+            </section>
 
-          <!-- Quick Actions -->
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <button onclick="syncCSVData()" class="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-lg hover:border-emerald-300 hover:shadow-sm transition-all">
-              <div class="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-                <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                </svg>
-              </div>
-              <div class="text-left">
-                <p class="font-medium text-gray-900">Import CSV Data</p>
-                <p class="text-xs text-gray-500">Sync latest changes</p>
-              </div>
-            </button>
+            <section class="mb-8">
+              <h3 class="text-lg font-semibold text-gray-900 mb-3">Getting Started</h3>
+              <ol class="list-decimal list-inside space-y-2 text-gray-600">
+                <li>Ensure the integration is configured (contact your system administrator if needed)</li>
+                <li>Export your ActionStep data as CSV files (actions.csv, participants.csv, etc.)</li>
+                <li>Go to the <a href="#" onclick="switchTab('upload'); return false;" class="text-emerald-600 hover:text-emerald-700">Upload tab</a> to upload ActionStep export ZIP files</li>
+                <li>Monitor progress in the <a href="#" onclick="switchTab('logs'); return false;" class="text-emerald-600 hover:text-emerald-700">Execution Logs tab</a></li>
+                <li>View imported data in the <a href="#" onclick="switchTab('output'); return false;" class="text-emerald-600 hover:text-emerald-700">Output tab</a></li>
+              </ol>
+            </section>
 
-            <button onclick="switchTab('configuration')" class="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-lg hover:border-emerald-300 hover:shadow-sm transition-all">
-              <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                </svg>
+            <section class="mb-8">
+              <h3 class="text-lg font-semibold text-gray-900 mb-3">Required Files</h3>
+              <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <ul class="space-y-2 text-sm">
+                  <li class="flex items-start gap-2">
+                    <code class="bg-gray-200 px-2 py-1 rounded text-xs font-mono">data/actions.csv</code>
+                    <span class="text-gray-600">Matter/case information</span>
+                  </li>
+                  <li class="flex items-start gap-2">
+                    <code class="bg-gray-200 px-2 py-1 rounded text-xs font-mono">data/participants.csv</code>
+                    <span class="text-gray-600">Contacts and participants</span>
+                  </li>
+                  <li class="flex items-start gap-2">
+                    <code class="bg-gray-200 px-2 py-1 rounded text-xs font-mono">data/tasks.csv</code>
+                    <span class="text-gray-600">Tasks and to-dos</span>
+                  </li>
+                  <li class="flex items-start gap-2">
+                    <code class="bg-gray-200 px-2 py-1 rounded text-xs font-mono">data/file_notes.csv</code>
+                    <span class="text-gray-600">Case notes and communications</span>
+                  </li>
+                  <li class="flex items-start gap-2">
+                    <code class="bg-gray-200 px-2 py-1 rounded text-xs font-mono">documents/</code>
+                    <span class="text-gray-600">PDF and document files for RAG</span>
+                  </li>
+                </ul>
               </div>
-              <div class="text-left">
-                <p class="font-medium text-gray-900">Settings</p>
-                <p class="text-xs text-gray-500">View configuration</p>
-              </div>
-            </button>
+            </section>
 
-            <button onclick="switchTab('logs')" class="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-lg hover:border-emerald-300 hover:shadow-sm transition-all">
-              <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
+            <section class="mb-8">
+              <h3 class="text-lg font-semibold text-gray-900 mb-3">Troubleshooting</h3>
+              <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p class="text-sm font-medium text-blue-900 mb-2">Common Issues:</p>
+                <ul class="list-disc list-inside space-y-1 text-sm text-blue-700 ml-4">
+                  <li><strong>Import shows "Not Configured":</strong> Contact your system administrator to complete the server setup</li>
+                  <li><strong>Upload fails:</strong> Check that your export files are in the correct format (CSV files and documents)</li>
+                  <li><strong>No data appears:</strong> Review the <a href="#" onclick="switchTab('logs'); return false;" class="text-blue-800 hover:text-blue-900 underline">Execution Logs</a> for error details</li>
+                  <li><strong>File access errors:</strong> Ensure you have the necessary permissions to upload files</li>
+                </ul>
               </div>
-              <div class="text-left">
-                <p class="font-medium text-gray-900">View Logs</p>
-                <p class="text-xs text-gray-500">Import history</p>
-              </div>
-            </button>
-          </div>
+            </section>
 
-          <!-- Data Summary -->
-          <div>
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Data Summary</h3>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div class="bg-white border border-gray-200 rounded-lg p-4">
-                <p class="text-sm text-gray-500 mb-1">Matters</p>
-                <p class="text-2xl font-bold text-gray-900">${formatNumber(stats.matters?.total || 0)}</p>
-                <p class="text-xs text-emerald-600 mt-1">${formatNumber(stats.matters?.active || 0)} active</p>
-              </div>
-              <div class="bg-white border border-gray-200 rounded-lg p-4">
-                <p class="text-sm text-gray-500 mb-1">Participants</p>
-                <p class="text-2xl font-bold text-gray-900">${formatNumber(stats.participants?.total || 0)}</p>
-                <p class="text-xs text-gray-500 mt-1">${formatNumber(stats.participants?.companies || 0)} companies</p>
-              </div>
-              <div class="bg-white border border-gray-200 rounded-lg p-4">
-                <p class="text-sm text-gray-500 mb-1">Tasks</p>
-                <p class="text-2xl font-bold text-gray-900">${formatNumber(stats.tasks?.total || 0)}</p>
-                <p class="text-xs text-gray-500 mt-1">${formatNumber(stats.tasks?.overdue || 0)} overdue</p>
-              </div>
-              <div class="bg-white border border-gray-200 rounded-lg p-4">
-                <p class="text-sm text-gray-500 mb-1">Documents</p>
-                <p class="text-2xl font-bold text-gray-900">${formatNumber(stats.documents?.total || 0)}</p>
-                <p class="text-xs text-gray-500 mt-1">${formatNumber(stats.documents?.processing || 0)} processing</p>
-              </div>
-            </div>
+            <section>
+              <h3 class="text-lg font-semibold text-gray-900 mb-3">Support</h3>
+              <p class="text-gray-600 mb-3">
+                Need help with the ActionStep integration? Our support team is here to assist you.
+              </p>
+              <button onclick="window.location.href='/help.html'" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors">
+                Submit Support Ticket
+              </button>
+            </section>
           </div>
         </div>
       `;
 
-      // Load last sync time
-      try {
-        const result = await api.get('/api/v1/actionstep/sync-logs?limit=1');
-        if (result.logs && result.logs.length > 0) {
-          document.getElementById('overviewLastSync').textContent = timeAgo(result.logs[0].started_at);
-        } else {
-          document.getElementById('overviewLastSync').textContent = 'Never';
+      // Load last sync time if configured
+      if (isConfigured) {
+        try {
+          const result = await api.get('/api/v1/actionstep/sync-logs?limit=1');
+          const lastSyncEl = document.getElementById('overviewLastSync');
+          if (lastSyncEl) {
+            if (result.logs && result.logs.length > 0) {
+              lastSyncEl.textContent = timeAgo(result.logs[0].started_at);
+            } else {
+              lastSyncEl.textContent = 'Never';
+            }
+          }
+        } catch (error) {
+          const lastSyncEl = document.getElementById('overviewLastSync');
+          if (lastSyncEl) {
+            lastSyncEl.textContent = 'Unknown';
+          }
         }
-      } catch (error) {
-        document.getElementById('overviewLastSync').textContent = 'Unknown';
       }
     }
 
@@ -1559,29 +1796,145 @@
 
       content.innerHTML = `
         <div class="max-w-4xl">
-          <h3 class="text-lg font-semibold text-gray-900 mb-4">ActionStep Configuration</h3>
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">ActionStep Setup</h3>
+
+          <!-- Current Configuration Status -->
+          <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+            <h4 class="font-semibold text-gray-900 mb-4">Current Setup</h4>
+
+            <dl class="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <dt class="text-sm font-medium text-gray-500">Status</dt>
+                <dd class="mt-1">
+                  <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${isConfigured ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+                    ${isConfigured ? 'Ready' : 'Needs Setup'}
+                    ${!isConfigured ? `
+                      <button
+                        onclick="showSetupRequiredModal(event)"
+                        class="inline-flex items-center hover:bg-yellow-200 rounded-full p-0.5 transition-colors"
+                        title="Why is setup required?"
+                      >
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                      </button>
+                    ` : ''}
+                  </span>
+                </dd>
+              </div>
+              <div>
+                <dt class="text-sm font-medium text-gray-500">Where settings come from</dt>
+                <dd class="mt-1 text-sm text-gray-900">
+                  ${currentConfig.source || 'None'}
+                </dd>
+              </div>
+              <div>
+                <dt class="text-sm font-medium text-gray-500">Check for files</dt>
+                <dd class="mt-1 text-sm text-gray-900">
+                  ${currentConfig.sync_frequency || 'Not set'}
+                </dd>
+              </div>
+              ${isConfigured ? `
+                <div>
+                  <dt class="text-sm font-medium text-gray-500">Actions</dt>
+                  <dd class="mt-1">
+                    <button
+                      onclick="showDeleteConfigDialog()"
+                      class="inline-flex items-center gap-2 text-sm text-red-600 hover:text-red-800 transition-colors"
+                      title="Delete configuration"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                      </svg>
+                      Delete
+                    </button>
+                  </dd>
+                </div>
+              ` : ''}
+            </dl>
+          </div>
 
           ${!isConfigured ? `
-            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-              <div class="flex gap-3">
-                <svg class="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            <!-- Quick Setup Option -->
+            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-6">
+              <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                 </svg>
-                <div>
-                  <p class="font-medium text-yellow-900">Integration Not Configured</p>
-                  <p class="text-sm text-yellow-800 mt-1">Configure the import directory below to enable ActionStep integration.</p>
+                <div class="flex-1">
+                  <p class="font-medium text-emerald-900 mb-1">Quick Setup (Recommended)</p>
+                  <p class="text-sm text-emerald-800 mb-3">Let the system automatically configure a temporary import directory using default locations. This works for most users.</p>
+                  <button
+                    onclick="autoConfigureActionStep()"
+                    id="autoConfigureBtn"
+                    class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Auto-Configure
+                  </button>
+                  <div id="autoConfigStatus" class="mt-2 text-sm"></div>
                 </div>
               </div>
             </div>
           ` : ''}
 
-          <!-- Configuration Form -->
-          <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
-            <h4 class="font-semibold text-gray-900 mb-4">Integration Settings</h4>
+          ${!isConfigured ? `
+            <!-- Divider -->
+            <div class="relative mb-6">
+              <div class="absolute inset-0 flex items-center">
+                <div class="w-full border-t border-gray-200"></div>
+              </div>
+              <div class="relative flex justify-center text-sm">
+                <span class="px-3 bg-gray-50 text-gray-500">or configure manually</span>
+              </div>
+            </div>
+          ` : ''}
 
-            <form id="actionstepConfigForm" class="space-y-6">
+          <!-- Configuration Form -->
+          <div class="bg-white border border-gray-200 rounded-lg mb-6">
+            <!-- Collapsible header -->
+            <button
+              type="button"
+              onclick="toggleSetupInstructions()"
+              class="w-full flex items-center justify-between p-6 text-left hover:bg-gray-50 transition-colors rounded-t-lg"
+            >
+              <h4 class="font-semibold text-gray-900">Setup Instructions</h4>
+              <svg
+                id="setupToggleIcon"
+                class="w-5 h-5 text-gray-500 transition-transform"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            </button>
+
+            <!-- Collapsible content -->
+            <div id="setupInstructionsContent" class="px-6 pb-6 hidden">
+              <!-- How it works info box -->
+              <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <div class="flex gap-3">
+                  <svg class="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  <div class="text-sm">
+                    <p class="font-medium text-blue-900 mb-2">How it works:</p>
+                    <p class="text-blue-700 mb-2">This folder is where your ActionStep files are stored. Files can arrive here in two ways:</p>
+                    <ul class="list-disc list-inside space-y-1 text-blue-700 ml-2">
+                      <li><strong>Upload:</strong> Use the Upload tab to upload ZIP files through your web browser</li>
+                      <li><strong>Manual:</strong> Your system admin can copy files directly to this folder on the server</li>
+                    </ul>
+                    <p class="text-blue-700 mt-2">Either way, the system will automatically process files found in this folder.</p>
+                  </div>
+                </div>
+              </div>
+
+              <form id="actionstepConfigForm" class="space-y-6">
               <div>
-                <label for="import_dir" class="block text-sm font-medium text-gray-700 mb-2">Import Directory *</label>
+                <label for="import_dir" class="block text-sm font-medium text-gray-700 mb-2">Where should ActionStep files be stored? *</label>
                 <div class="flex gap-2">
                   <input
                     type="text"
@@ -1603,33 +1956,33 @@
                     Browse
                   </button>
                 </div>
-                <p class="mt-1 text-xs text-gray-500">Select a directory from available volumes or enter a custom path</p>
+                <p class="mt-1 text-xs text-gray-500">Click Browse to choose a folder, or type the path where files will be stored</p>
               </div>
 
               <div>
-                <label for="sync_frequency" class="block text-sm font-medium text-gray-700 mb-2">Sync Frequency</label>
+                <label for="sync_frequency" class="block text-sm font-medium text-gray-700 mb-2">How often should we check for new files?</label>
                 <select
                   id="sync_frequency"
                   name="sync_frequency"
                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 >
-                  <option value="realtime" ${currentConfig.sync_frequency === 'realtime' ? 'selected' : ''}>Real-time (when files change)</option>
-                  <option value="hourly" ${currentConfig.sync_frequency === 'hourly' ? 'selected' : ''}>Hourly</option>
-                  <option value="daily" ${currentConfig.sync_frequency === 'daily' || !currentConfig.sync_frequency ? 'selected' : ''}>Daily</option>
-                  <option value="manual" ${currentConfig.sync_frequency === 'manual' ? 'selected' : ''}>Manual Only</option>
+                  <option value="realtime" ${currentConfig.sync_frequency === 'realtime' ? 'selected' : ''}>Right away (when files change)</option>
+                  <option value="hourly" ${currentConfig.sync_frequency === 'hourly' ? 'selected' : ''}>Every hour</option>
+                  <option value="daily" ${currentConfig.sync_frequency === 'daily' || !currentConfig.sync_frequency ? 'selected' : ''}>Once a day</option>
+                  <option value="manual" ${currentConfig.sync_frequency === 'manual' ? 'selected' : ''}>Only when I click Upload</option>
                 </select>
               </div>
 
               <div class="bg-gray-50 rounded-lg p-4">
-                <p class="text-sm font-medium text-gray-900 mb-3">The import directory should contain:</p>
+                <p class="text-sm font-medium text-gray-900 mb-3">What should be in this folder?</p>
                 <ul class="text-sm text-gray-600 space-y-2">
                   <li class="flex items-start gap-2">
                     <svg class="w-4 h-4 text-gray-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
                     <div>
-                      <code class="bg-gray-200 px-1.5 py-0.5 rounded text-xs">data/</code> - CSV files from ActionStep export
-                      <p class="text-xs text-gray-500 mt-1">actions.csv, participants.csv, filenotes.csv, etc.</p>
+                      <code class="bg-gray-200 px-1.5 py-0.5 rounded text-xs">data/</code> folder - Contains your ActionStep files
+                      <p class="text-xs text-gray-500 mt-1">Look for files like actions.csv, participants.csv, filenotes.csv</p>
                     </div>
                   </li>
                   <li class="flex items-start gap-2">
@@ -1637,8 +1990,8 @@
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
                     <div>
-                      <code class="bg-gray-200 px-1.5 py-0.5 rounded text-xs">documents/</code> - Document files for RAG processing (optional)
-                      <p class="text-xs text-gray-500 mt-1">PDFs, Word docs, and other matter documents</p>
+                      <code class="bg-gray-200 px-1.5 py-0.5 rounded text-xs">documents/</code> folder - For case documents (optional)
+                      <p class="text-xs text-gray-500 mt-1">PDFs, Word files, and other case documents go here</p>
                     </div>
                   </li>
                 </ul>
@@ -1651,46 +2004,20 @@
                   id="testPathBtn"
                   class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
                 >
-                  Test Path
+                  Check if it works
                 </button>
                 <button
                   type="submit"
                   id="saveConfigBtn"
                   class="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors"
                 >
-                  Save Configuration
+                  Save Setup
                 </button>
               </div>
 
               <div id="configStatus" class="hidden text-center py-3 rounded-lg"></div>
-            </form>
-          </div>
-
-          <!-- Current Configuration Status -->
-          <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
-            <h4 class="font-semibold text-gray-900 mb-4">Current Configuration</h4>
-            <dl class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <dt class="text-sm font-medium text-gray-500">Status</dt>
-                <dd class="mt-1">
-                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${isConfigured ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
-                    ${isConfigured ? 'Configured' : 'Not Configured'}
-                  </span>
-                </dd>
-              </div>
-              <div>
-                <dt class="text-sm font-medium text-gray-500">Config Source</dt>
-                <dd class="mt-1 text-sm text-gray-900">
-                  ${currentConfig.source || 'None'}
-                </dd>
-              </div>
-              <div>
-                <dt class="text-sm font-medium text-gray-500">Sync Frequency</dt>
-                <dd class="mt-1 text-sm text-gray-900">
-                  ${currentConfig.sync_frequency || 'Not set'}
-                </dd>
-              </div>
-            </dl>
+              </form>
+            </div>
           </div>
         </div>
       `;
@@ -1728,8 +2055,17 @@
         });
 
         if (result.valid && result.exists && result.is_directory) {
-          statusEl.className = 'text-center py-3 rounded-lg bg-green-100 text-green-800';
-          statusEl.textContent = `✓ Path is valid and accessible${result.writable ? ' (writable)' : ' (read-only)'}`;
+          let message = `✓ Path is valid and accessible${result.writable ? ' (writable)' : ' (read-only)'}`;
+
+          if (result.has_actionstep_data) {
+            statusEl.className = 'text-center py-3 rounded-lg bg-green-100 text-green-800';
+            message += `\n✓ Found ActionStep data: ${result.actionstep_files.join(', ')}`;
+          } else {
+            statusEl.className = 'text-center py-3 rounded-lg bg-blue-100 text-blue-800';
+            message += '\nℹ No ActionStep files detected yet. Upload files here after saving.';
+          }
+
+          statusEl.innerHTML = message.replace(/\n/g, '<br>');
         } else if (!result.exists) {
           statusEl.className = 'text-center py-3 rounded-lg bg-yellow-100 text-yellow-800';
           statusEl.textContent = 'Path does not exist. It will be created when you save.';
@@ -1752,11 +2088,11 @@
       const saveBtn = document.getElementById('saveConfigBtn');
 
       const config = {
-        import_dir: document.getElementById('import_dir').value.trim(),
+        import_directory: document.getElementById('import_dir').value.trim(),
         sync_frequency: document.getElementById('sync_frequency').value
       };
 
-      if (!config.import_dir) {
+      if (!config.import_directory) {
         statusEl.className = 'text-center py-3 rounded-lg bg-yellow-100 text-yellow-800';
         statusEl.textContent = 'Please enter an import directory path';
         statusEl.classList.remove('hidden');
@@ -1788,89 +2124,753 @@
       }
     }
 
-    // Load Execution Logs tab
-    async function loadExecutionLogs() {
-      // Reuse the existing sync history function
-      await loadSyncHistory();
+    // Auto-configure ActionStep with default tmp directory
+    async function autoConfigureActionStep() {
+      const statusEl = document.getElementById('autoConfigStatus');
+      const btn = document.getElementById('autoConfigureBtn');
+
+      try {
+        btn.disabled = true;
+        btn.innerHTML = `
+          <svg class="animate-spin w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Configuring...
+        `;
+
+        statusEl.className = 'mt-2 text-sm text-gray-600';
+        statusEl.textContent = 'Setting up temporary directory...';
+
+        const result = await api.post('/api/v1/actionstep/config/auto-configure');
+
+        if (result.success) {
+          statusEl.className = 'mt-2 text-sm text-emerald-700 font-medium';
+          statusEl.innerHTML = `✓ Configuration complete!<br><span class="text-xs text-emerald-600">Import directory: ${result.config.import_directory}</span>`;
+
+          Toast.success('ActionStep configured successfully!');
+
+          // Reload dashboard after short delay
+          setTimeout(() => {
+            loadDashboard();
+          }, 1500);
+        } else {
+          throw new Error(result.error || 'Auto-configuration failed');
+        }
+      } catch (error) {
+        statusEl.className = 'mt-2 text-sm text-red-700';
+        statusEl.textContent = error.message || 'Failed to auto-configure';
+
+        btn.disabled = false;
+        btn.innerHTML = `
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+          Auto-Configure
+        `;
+
+        Toast.error(error.message || 'Failed to auto-configure ActionStep');
+      }
     }
 
-    // Load Documentation tab
-    async function loadDocumentation() {
+    // Load Execution Logs tab with Active Jobs, Pending Review, and Job History
+    let logsRefreshInterval = null;
+    let logsHistoryPage = 1;
+    const logsHistoryPageSize = 20;
+    let logsHistorySortBy = 'updated_at';  // Default sort by most recently updated
+    let logsHistorySortDir = 'desc';
+    let logsHistoryFilterStatus = 'all';
+    let logsHistoryFilterType = 'all';
+
+    async function loadExecutionLogs() {
       const content = document.getElementById('tabContent');
+
+      // Stop any existing refresh interval
+      if (logsRefreshInterval) {
+        clearInterval(logsRefreshInterval);
+        logsRefreshInterval = null;
+      }
+
       content.innerHTML = `
-        <div class="prose max-w-none">
-          <h3 class="text-lg font-semibold text-gray-900 mb-4">ActionStep Integration Documentation</h3>
-
-          <div class="space-y-6">
-            <section>
-              <h4 class="font-semibold text-gray-900 mb-2">Overview</h4>
-              <p class="text-gray-600">
-                The ActionStep integration allows you to import legal case data from ActionStep into LanaAI for analysis and AI-powered insights.
-              </p>
-            </section>
-
-            <section>
-              <h4 class="font-semibold text-gray-900 mb-2">Setup Instructions</h4>
-              <ol class="list-decimal list-inside space-y-2 text-gray-600">
-                <li>Export your ActionStep data as CSV files (actions.csv, participants.csv, etc.)</li>
-                <li>Place the exported files in the configured import directory on your server</li>
-                <li>Add documents to the documents/ subdirectory for RAG processing</li>
-                <li>Click "Import CSV Data" to start the sync process</li>
-                <li>Monitor the sync progress and check execution logs for any errors</li>
-              </ol>
-            </section>
-
-            <section>
-              <h4 class="font-semibold text-gray-900 mb-2">Required Files</h4>
-              <div class="bg-gray-50 rounded-lg p-4">
-                <ul class="space-y-2 text-sm">
-                  <li class="flex items-start gap-2">
-                    <code class="bg-gray-200 px-2 py-1 rounded text-xs">data/actions.csv</code>
-                    <span class="text-gray-600">Matter/case information</span>
-                  </li>
-                  <li class="flex items-start gap-2">
-                    <code class="bg-gray-200 px-2 py-1 rounded text-xs">data/participants.csv</code>
-                    <span class="text-gray-600">Contacts and participants</span>
-                  </li>
-                  <li class="flex items-start gap-2">
-                    <code class="bg-gray-200 px-2 py-1 rounded text-xs">data/tasks.csv</code>
-                    <span class="text-gray-600">Tasks and to-dos</span>
-                  </li>
-                  <li class="flex items-start gap-2">
-                    <code class="bg-gray-200 px-2 py-1 rounded text-xs">data/file_notes.csv</code>
-                    <span class="text-gray-600">Case notes and communications</span>
-                  </li>
-                  <li class="flex items-start gap-2">
-                    <code class="bg-gray-200 px-2 py-1 rounded text-xs">documents/</code>
-                    <span class="text-gray-600">PDF and document files for RAG</span>
-                  </li>
-                </ul>
+        <div class="space-y-6">
+          <!-- Active Jobs Section -->
+          <div class="bg-white rounded-lg border border-gray-200">
+            <div class="px-6 py-4 border-b border-gray-200">
+              <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-900">Active Jobs</h3>
+                <button onclick="refreshExecutionLogs()" class="text-sm text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                  </svg>
+                  Refresh
+                </button>
               </div>
-            </section>
-
-            <section>
-              <h4 class="font-semibold text-gray-900 mb-2">Troubleshooting</h4>
-              <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p class="text-sm text-blue-800 mb-2"><strong>Import fails or shows "Not Configured":</strong></p>
-                <ul class="list-disc list-inside space-y-1 text-sm text-blue-700 ml-4">
-                  <li>Verify the ACTIONSTEP_IMPORT_DIR environment variable is set correctly</li>
-                  <li>Ensure the import directory exists and contains the data/ folder</li>
-                  <li>Check file permissions - the server must have read access to the directory</li>
-                  <li>Review execution logs for specific error messages</li>
-                </ul>
+            </div>
+            <div id="activeJobsContent" class="p-6">
+              <!-- Active jobs will be loaded here -->
+              <div class="flex items-center justify-center py-8">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
               </div>
-            </section>
+            </div>
+          </div>
 
-            <section>
-              <h4 class="font-semibold text-gray-900 mb-2">Support</h4>
-              <p class="text-gray-600">
-                For additional help, contact your system administrator or refer to the
-                <a href="https://docs.lanaai.com/integrations/actionstep" target="_blank" class="text-emerald-600 hover:text-emerald-700">full ActionStep integration documentation</a>.
-              </p>
-            </section>
+          <!-- Pending Review Section -->
+          <div class="bg-white rounded-lg border border-gray-200">
+            <div class="px-6 py-4 border-b border-gray-200">
+              <h3 class="text-lg font-semibold text-gray-900">Pending Review</h3>
+              <p class="text-sm text-gray-500 mt-1">Classification jobs awaiting your review and approval</p>
+            </div>
+            <div id="pendingReviewContent" class="p-6">
+              <!-- Pending review items will be loaded here -->
+              <div class="flex items-center justify-center py-8">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Job History Section -->
+          <div class="bg-white rounded-lg border border-gray-200">
+            <div class="px-6 py-4 border-b border-gray-200">
+              <h3 class="text-lg font-semibold text-gray-900">Job History</h3>
+              <p class="text-sm text-gray-500 mt-1">Past upload, import, and classification jobs</p>
+            </div>
+            <div id="jobHistoryContent" class="p-6">
+              <!-- Job history will be loaded here -->
+              <div class="flex items-center justify-center py-8">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+              </div>
+            </div>
+            <!-- Pagination -->
+            <div id="jobHistoryPagination" class="px-6 py-4 border-t border-gray-200 flex items-center justify-between hidden">
+              <div class="text-sm text-gray-500">
+                <span id="jobHistoryInfo">Showing 0-0 of 0</span>
+              </div>
+              <div class="flex gap-2">
+                <button
+                  onclick="changeJobHistoryPage(-1)"
+                  id="jobHistoryPrevBtn"
+                  class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled
+                >
+                  Previous
+                </button>
+                <button
+                  onclick="changeJobHistoryPage(1)"
+                  id="jobHistoryNextBtn"
+                  class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       `;
+
+      // Load all sections
+      await Promise.all([
+        loadActiveJobs(),
+        loadPendingReview(),
+        loadJobHistory()
+      ]);
+
+      // Auto-refresh active jobs every 5 seconds
+      logsRefreshInterval = setInterval(async () => {
+        await loadActiveJobs();
+      }, 5000);
+    }
+
+    // Refresh all logs sections
+    async function refreshExecutionLogs() {
+      await Promise.all([
+        loadActiveJobs(),
+        loadPendingReview(),
+        loadJobHistory()
+      ]);
+    }
+
+    // Load active jobs (uploads + ingestions + running jobs)
+    async function loadActiveJobs() {
+      try {
+        // Fetch both active ingestion jobs and active upload sessions
+        const [ingestJobs, uploadSessions] = await Promise.all([
+          api.get('/api/v1/ingest/jobs?status=pending,running&limit=20'),
+          api.get('/api/v1/storage/upload-sessions?limit=20')
+        ]);
+
+        const container = document.getElementById('activeJobsContent');
+
+        // Element might not exist if user navigated away from this tab
+        if (!container) {
+          return;
+        }
+
+        // Filter upload sessions to only active ones (uploading, assembling, processing)
+        const activeUploadSessions = (uploadSessions.sessions || [])
+          .filter(s => ['uploading', 'assembling', 'processing'].includes(s.status));
+
+        // Map upload sessions to job format for display
+        const uploadJobs = activeUploadSessions.map(session => {
+          // Calculate progress for uploads
+          let progress = 0;
+          if (session.status === 'uploading' && session.total_chunks > 0) {
+            progress = Math.round((session.received_chunks / session.total_chunks) * 100);
+          } else if (session.status === 'assembling') {
+            progress = 95; // Show near complete
+          } else if (session.status === 'processing') {
+            progress = 98; // Show very near complete
+          }
+
+          // Determine job type
+          let jobType = 'File Upload';
+          if (session.status === 'assembling') jobType = 'Assembling File';
+          else if (session.status === 'processing') jobType = 'Extracting ZIP';
+
+          return {
+            id: session.id,
+            filename: session.filename,
+            job_type: jobType,
+            status: 'running',
+            created_at: session.created_at,
+            progress_percentage: progress,
+            processed_count: session.received_chunks && session.total_chunks
+              ? `${session.received_chunks}/${session.total_chunks} chunks`
+              : null,
+            _isUpload: true
+          };
+        });
+
+        // Merge jobs
+        const allJobs = [...(ingestJobs.jobs || []), ...uploadJobs];
+
+        if (!allJobs || allJobs.length === 0) {
+          container.innerHTML = `
+            <div class="text-center py-8 text-gray-500">
+              <svg class="w-12 h-12 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <p>No active jobs</p>
+            </div>
+          `;
+          return;
+        }
+
+        const jobsHTML = allJobs.map(job => {
+          const statusColor = job.status === 'running' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800';
+          const progress = job.progress_percentage || 0;
+
+          // Calculate time remaining
+          let timeRemaining = '';
+          if (progress > 0 && progress < 100 && job.created_at) {
+            const elapsed = (Date.now() - new Date(job.created_at).getTime()) / 1000; // seconds
+            const estimatedTotal = elapsed / (progress / 100);
+            const remaining = Math.max(0, estimatedTotal - elapsed);
+
+            if (remaining < 60) {
+              timeRemaining = `~${Math.round(remaining)}s remaining`;
+            } else if (remaining < 3600) {
+              timeRemaining = `~${Math.round(remaining / 60)}m remaining`;
+            } else {
+              timeRemaining = `~${Math.round(remaining / 3600)}h remaining`;
+            }
+          }
+
+          return `
+            <div class="border border-gray-200 rounded-lg p-4 mb-3 last:mb-0">
+              <div class="flex items-start justify-between mb-2">
+                <div class="flex-1">
+                  <div class="flex items-center gap-2 mb-1">
+                    <h4 class="font-medium text-gray-900">${job.filename || job.job_type || 'Job'}</h4>
+                    <span class="px-2 py-1 text-xs font-medium rounded-full ${statusColor}">${job.status}</span>
+                  </div>
+                  <p class="text-sm text-gray-500">
+                    ${job.job_type || 'Processing'} • Started ${timeAgo(job.created_at)}${timeRemaining ? ` • ${timeRemaining}` : ''}
+                  </p>
+                </div>
+                <button
+                  onclick="cancelJob('${job.id}', ${job._isUpload || false})"
+                  class="text-sm text-red-600 hover:text-red-700"
+                  title="Cancel job"
+                >
+                  Cancel
+                </button>
+              </div>
+
+              <!-- Progress Bar -->
+              ${progress > 0 ? `
+                <div class="mt-3">
+                  <div class="flex justify-between text-xs text-gray-600 mb-1">
+                    <span>${progress}% complete</span>
+                    ${job.processed_count ? `<span>${typeof job.processed_count === 'string' ? job.processed_count : formatNumber(job.processed_count) + ' processed'}</span>` : ''}
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-emerald-600 h-2 rounded-full transition-all duration-300" style="width: ${progress}%"></div>
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }).join('');
+
+        container.innerHTML = jobsHTML;
+      } catch (error) {
+        console.error('Failed to load active jobs:', error);
+        const errorContainer = document.getElementById('activeJobsContent');
+        if (errorContainer) {
+          errorContainer.innerHTML = `
+            <div class="text-center py-8 text-red-500">
+              Failed to load active jobs
+            </div>
+          `;
+        }
+      }
+    }
+
+    // Load pending review items (classification jobs awaiting review)
+    async function loadPendingReview() {
+      try {
+        // For now, show placeholder - will be implemented when classification workflow is ready
+        const container = document.getElementById('pendingReviewContent');
+
+        container.innerHTML = `
+          <div class="text-center py-8 text-gray-500">
+            <svg class="w-12 h-12 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+            </svg>
+            <p>No items pending review</p>
+          </div>
+        `;
+      } catch (error) {
+        console.error('Failed to load pending review:', error);
+      }
+    }
+
+    // Load job history with pagination
+    async function loadJobHistory() {
+      try {
+        const offset = (logsHistoryPage - 1) * logsHistoryPageSize;
+
+        // Fetch both ingest jobs and upload sessions in parallel
+        const [ingestResult, uploadResult] = await Promise.all([
+          api.get(`/api/v1/ingest/jobs?status=completed,failed,cancelled&limit=${logsHistoryPageSize}&offset=${offset}&order_by=created_at&order_dir=desc`),
+          api.get(`/api/v1/storage/upload-sessions?limit=${logsHistoryPageSize}&offset=${offset}`)
+        ]);
+
+        const container = document.getElementById('jobHistoryContent');
+        const pagination = document.getElementById('jobHistoryPagination');
+
+        // Map upload sessions to job format
+        const uploadJobs = (uploadResult.sessions || []).map(session => {
+          // Determine job type based on status
+          let jobType = 'File Upload';
+          if (session.status === 'assembling') jobType = 'File Assembly';
+          else if (session.status === 'processing') jobType = 'File Extraction';
+
+          // Map upload session status to job status
+          let status = session.status;
+          if (status === 'uploading' || status === 'assembling' || status === 'processing') status = 'pending';
+
+          return {
+            id: session.id,
+            filename: session.filename,
+            job_type: jobType,
+            status: status,
+            created_at: session.created_at,
+            completed_at: session.completed_at,
+            processed_count: session.received_chunks && session.total_chunks
+              ? `${session.received_chunks}/${session.total_chunks} chunks`
+              : null,
+            error_message: session.error_message,
+            _isUpload: true
+          };
+        });
+
+        // Merge all jobs
+        let allJobs = [...(ingestResult.jobs || []), ...uploadJobs];
+
+        // Apply status filter
+        if (logsHistoryFilterStatus !== 'all') {
+          allJobs = allJobs.filter(job => job.status === logsHistoryFilterStatus);
+        }
+
+        // Apply type filter
+        if (logsHistoryFilterType !== 'all') {
+          allJobs = allJobs.filter(job => job.job_type === logsHistoryFilterType);
+        }
+
+        // Apply sorting
+        allJobs.sort((a, b) => {
+          let aVal, bVal;
+
+          switch(logsHistorySortBy) {
+            case 'updated_at':
+              aVal = new Date(a.updated_at || a.created_at);
+              bVal = new Date(b.updated_at || b.created_at);
+              break;
+            case 'created_at':
+              aVal = new Date(a.created_at);
+              bVal = new Date(b.created_at);
+              break;
+            case 'filename':
+              aVal = (a.filename || a.id || '').toLowerCase();
+              bVal = (b.filename || b.id || '').toLowerCase();
+              break;
+            case 'status':
+              aVal = a.status || '';
+              bVal = b.status || '';
+              break;
+            case 'job_type':
+              aVal = a.job_type || '';
+              bVal = b.job_type || '';
+              break;
+            default:
+              aVal = new Date(a.updated_at || a.created_at);
+              bVal = new Date(b.updated_at || b.created_at);
+          }
+
+          if (logsHistorySortDir === 'asc') {
+            return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+          } else {
+            return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+          }
+        });
+
+        const total = allJobs.length;
+
+        // Apply pagination
+        const paginatedJobs = allJobs.slice(offset, offset + logsHistoryPageSize);
+
+        if (!allJobs || allJobs.length === 0) {
+          container.innerHTML = `
+            <div class="text-center py-8 text-gray-500">
+              <svg class="w-12 h-12 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <p>No job history</p>
+            </div>
+          `;
+          pagination.classList.add('hidden');
+          return;
+        }
+
+        const statusColors = {
+          'completed': 'bg-green-100 text-green-800',
+          'failed': 'bg-red-100 text-red-800',
+          'cancelled': 'bg-gray-100 text-gray-800'
+        };
+
+        const statusIcons = {
+          'completed': `<svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`,
+          'failed': `<svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`,
+          'cancelled': `<svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>`
+        };
+
+        // Build filter/sort controls
+        const controlsHTML = `
+          <div class="mb-4 flex flex-wrap gap-3 items-center">
+            <div class="flex items-center gap-2">
+              <label class="text-sm font-medium text-gray-700">Status:</label>
+              <select id="jobHistoryFilterStatus" class="text-sm border-gray-300 rounded-md">
+                <option value="all">All</option>
+                <option value="completed">Completed</option>
+                <option value="failed">Failed</option>
+                <option value="cancelled">Cancelled</option>
+                <option value="pending">Pending</option>
+              </select>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-sm font-medium text-gray-700">Sort by:</label>
+              <select id="jobHistorySortBy" class="text-sm border-gray-300 rounded-md">
+                <option value="updated_at">Last Updated</option>
+                <option value="created_at">Created</option>
+                <option value="filename">Filename</option>
+                <option value="status">Status</option>
+                <option value="job_type">Type</option>
+              </select>
+              <button id="jobHistorySortDir" class="p-1 hover:bg-gray-100 rounded" title="Toggle sort direction">
+                <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${logsHistorySortDir === 'desc' ? 'M19 9l-7 7-7-7' : 'M5 15l7-7 7 7'}"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        `;
+
+        const jobsHTML = `
+          ${controlsHTML}
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase w-8"></th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Job</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Started</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
+                  <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Processed</th>
+                  <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                ${paginatedJobs.map((job, index) => {
+                  const duration = job.completed_at && job.created_at
+                    ? Math.round((new Date(job.completed_at) - new Date(job.created_at)) / 1000) + 's'
+                    : '-';
+
+                  const jobRowId = `job-row-${index}`;
+                  const jobDetailsId = `job-details-${index}`;
+
+                  return `
+                    <tr class="hover:bg-gray-50 cursor-pointer" onclick="toggleJobDetails('${jobDetailsId}', '${jobRowId}', event)">
+                      <td class="px-2 py-3">
+                        <button class="expand-btn text-gray-400 hover:text-gray-600" id="${jobRowId}">
+                          <svg class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                          </svg>
+                        </button>
+                      </td>
+                      <td class="px-4 py-3">
+                        <div class="font-medium text-gray-900">${job.filename || job.id.substring(0, 8)}</div>
+                        ${job.error_message ? `<div class="text-xs text-red-600 mt-1">${job.error_message}</div>` : ''}
+                      </td>
+                      <td class="px-4 py-3 text-sm text-gray-600">${job.job_type || 'Processing'}</td>
+                      <td class="px-4 py-3 text-sm text-gray-600">${timeAgo(job.created_at)}</td>
+                      <td class="px-4 py-3 text-sm text-gray-600">${duration}</td>
+                      <td class="px-4 py-3 text-sm text-right text-gray-600">${typeof job.processed_count === 'string' ? job.processed_count : formatNumber(job.processed_count || 0)}</td>
+                      <td class="px-4 py-3 text-center">
+                        <div class="flex items-center justify-center gap-2">
+                          ${statusIcons[job.status] || ''}
+                          <span class="px-2 py-1 text-xs font-medium rounded-full ${statusColors[job.status] || 'bg-gray-100 text-gray-800'}">${job.status}</span>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr id="${jobDetailsId}" class="hidden bg-gray-50">
+                      <td colspan="7" class="px-6 py-4">
+                        ${generateJobPipeline(job)}
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+
+        container.innerHTML = jobsHTML;
+
+        // Set filter/sort control values
+        document.getElementById('jobHistoryFilterStatus').value = logsHistoryFilterStatus;
+        document.getElementById('jobHistorySortBy').value = logsHistorySortBy;
+
+        // Add event listeners for filter/sort controls
+        document.getElementById('jobHistoryFilterStatus').addEventListener('change', (e) => {
+          logsHistoryFilterStatus = e.target.value;
+          logsHistoryPage = 1; // Reset to first page
+          loadJobHistory();
+        });
+
+        document.getElementById('jobHistorySortBy').addEventListener('change', (e) => {
+          logsHistorySortBy = e.target.value;
+          loadJobHistory();
+        });
+
+        document.getElementById('jobHistorySortDir').addEventListener('click', () => {
+          logsHistorySortDir = logsHistorySortDir === 'desc' ? 'asc' : 'desc';
+          loadJobHistory();
+        });
+
+        // Update pagination
+        if (total > logsHistoryPageSize) {
+          pagination.classList.remove('hidden');
+          const start = offset + 1;
+          const end = Math.min(offset + logsHistoryPageSize, total);
+          document.getElementById('jobHistoryInfo').textContent = `Showing ${start}-${end} of ${total}`;
+          document.getElementById('jobHistoryPrevBtn').disabled = logsHistoryPage === 1;
+          document.getElementById('jobHistoryNextBtn').disabled = end >= total;
+        } else {
+          pagination.classList.add('hidden');
+        }
+      } catch (error) {
+        console.error('Failed to load job history:', error);
+        document.getElementById('jobHistoryContent').innerHTML = `
+          <div class="text-center py-8 text-red-500">
+            Failed to load job history
+          </div>
+        `;
+      }
+    }
+
+    // Change job history page
+    function changeJobHistoryPage(delta) {
+      logsHistoryPage += delta;
+      loadJobHistory();
+    }
+
+    // Cancel a job
+    async function cancelJob(jobId, isUpload = false) {
+      if (!confirm('Are you sure you want to cancel this job?')) {
+        return;
+      }
+
+      try {
+        if (isUpload) {
+          // Cancel upload session
+          await api.delete(`/api/v1/storage/upload/${jobId}`);
+        } else {
+          // Cancel ingest job
+          await api.post(`/api/v1/ingest/jobs/${jobId}/cancel`, {});
+        }
+
+        Toast.success('Job cancelled successfully');
+        await loadActiveJobs();
+        await loadJobHistory();
+      } catch (error) {
+        console.error('Failed to cancel job:', error);
+        Toast.error('Failed to cancel job: ' + error.message);
+      }
+    }
+
+    // Toggle job details visibility
+    function toggleJobDetails(detailsId, rowId, event) {
+      // Prevent event bubbling if clicking on interactive elements within the row
+      if (event && event.target.closest('button, a')) {
+        event.stopPropagation();
+        return;
+      }
+
+      const detailsRow = document.getElementById(detailsId);
+      const expandBtn = document.getElementById(rowId);
+
+      if (!detailsRow || !expandBtn) return;
+
+      const svg = expandBtn.querySelector('svg');
+
+      if (detailsRow.classList.contains('hidden')) {
+        detailsRow.classList.remove('hidden');
+        if (svg) svg.style.transform = 'rotate(90deg)';
+      } else {
+        detailsRow.classList.add('hidden');
+        if (svg) svg.style.transform = 'rotate(0deg)';
+      }
+    }
+
+    // Generate job pipeline visualization
+    function generateJobPipeline(job) {
+      const stages = [];
+
+      // Determine job type and build appropriate pipeline
+      if (job._isUpload || job.total_chunks) {
+        // Upload session pipeline
+        const hasExtraction = job.filename && (job.filename.endsWith('.zip') || job.filename.endsWith('.7z'));
+
+        // Stage 1: Upload
+        if (job.total_chunks) {
+          const uploadComplete = job.status !== 'uploading';
+          stages.push({
+            name: 'Upload',
+            status: uploadComplete ? 'completed' : 'in_progress',
+            detail: `${job.received_chunks || 0}/${job.total_chunks} chunks`,
+            duration: uploadComplete ? 'Completed' : 'In progress'
+          });
+        }
+
+        // Stage 2: Assembly
+        if (job.status === 'assembling' || ['processing', 'completed', 'failed'].includes(job.status)) {
+          const assemblyComplete = ['processing', 'completed', 'failed'].includes(job.status);
+          stages.push({
+            name: 'Assembly',
+            status: job.status === 'assembling' ? 'in_progress' : (assemblyComplete ? 'completed' : 'pending'),
+            detail: job.status === 'assembling' ? 'Combining chunks' : 'Chunks combined',
+            duration: assemblyComplete ? 'Completed' : (job.status === 'assembling' ? 'In progress' : 'Pending')
+          });
+        }
+
+        // Stage 3: Extraction (if ZIP file)
+        if (hasExtraction) {
+          const extractionComplete = ['completed'].includes(job.status);
+          const extractionInProgress = job.status === 'processing';
+          stages.push({
+            name: 'Extraction',
+            status: extractionComplete ? 'completed' : (extractionInProgress ? 'in_progress' : 'pending'),
+            detail: extractionInProgress ? 'Extracting files' : (extractionComplete ? 'Files extracted' : 'Pending'),
+            duration: extractionComplete ? 'Completed' : (extractionInProgress ? 'In progress' : 'Pending')
+          });
+        }
+
+        // Stage 4: Processing
+        if (job.status === 'completed' || job.status === 'failed') {
+          stages.push({
+            name: 'Processing',
+            status: job.status === 'completed' ? 'completed' : 'failed',
+            detail: job.status === 'completed' ? 'CSV import completed' : (job.error_message || 'Import failed'),
+            duration: job.status === 'completed' ? 'Completed' : 'Failed'
+          });
+        }
+
+        // Stage 5: AI Ingestion (for completed jobs)
+        if (job.status === 'completed') {
+          stages.push({
+            name: 'AI Ingestion',
+            status: 'completed',  // Assumes AI ingestion completes with CSV import
+            detail: 'Data prepared for AI analysis',
+            duration: 'Completed'
+          });
+        }
+      } else {
+        // Regular ingestion job pipeline
+        stages.push({
+          name: job.job_type || 'Processing',
+          status: job.status === 'completed' ? 'completed' : (job.status === 'failed' ? 'failed' : 'in_progress'),
+          detail: job.processed_count ? `${formatNumber(job.processed_count)} records` : 'Processing',
+          duration: job.completed_at && job.created_at
+            ? formatDuration(new Date(job.completed_at) - new Date(job.created_at))
+            : 'In progress'
+        });
+      }
+
+      // Generate HTML for pipeline
+      const stageStatusIcons = {
+        completed: `<svg class="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>`,
+        in_progress: `<svg class="w-5 h-5 text-blue-600 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`,
+        failed: `<svg class="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path></svg>`,
+        pending: `<svg class="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm0-2a6 6 0 100-12 6 6 0 000 12z" clip-rule="evenodd"></path></svg>`
+      };
+
+      return `
+        <div class="py-2">
+          <h4 class="text-sm font-semibold text-gray-700 mb-3">Processing Pipeline</h4>
+          <div class="space-y-1">
+            ${stages.map((stage, idx) => `
+              <div class="flex items-start gap-3 ${idx < stages.length - 1 ? 'pb-2' : ''}">
+                <div class="flex-shrink-0 flex flex-col items-center">
+                  <div class="mt-0.5">
+                    ${stageStatusIcons[stage.status]}
+                  </div>
+                  ${idx < stages.length - 1 ? `<div class="w-0.5 h-6 bg-gray-200 mt-1"></div>` : ''}
+                </div>
+                <div class="flex-1 min-w-0 pt-0.5">
+                  <div class="flex items-center justify-between">
+                    <p class="text-sm font-medium text-gray-900">${stage.name}</p>
+                    <span class="text-xs text-gray-500">${stage.duration}</span>
+                  </div>
+                  <p class="text-sm text-gray-600 mt-0.5">${stage.detail}</p>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    // Format duration helper
+    function formatDuration(ms) {
+      const seconds = Math.floor(ms / 1000);
+      if (seconds < 60) return `${seconds}s`;
+      const minutes = Math.floor(seconds / 60);
+      if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
+      const hours = Math.floor(minutes / 60);
+      return `${hours}h ${minutes % 60}m`;
     }
 
     // Load Workflows tab
@@ -2265,6 +3265,20 @@
     let selectedVolume = '';
     let availableVolumes = [];
 
+    // Toggle setup instructions visibility
+    function toggleSetupInstructions() {
+      const content = document.getElementById('setupInstructionsContent');
+      const icon = document.getElementById('setupToggleIcon');
+
+      if (content.classList.contains('hidden')) {
+        content.classList.remove('hidden');
+        icon.classList.add('rotate-180');
+      } else {
+        content.classList.add('hidden');
+        icon.classList.remove('rotate-180');
+      }
+    }
+
     // Open directory browser modal
     async function openDirectoryBrowser() {
       const modal = document.getElementById('directoryBrowserModal');
@@ -2304,6 +3318,16 @@
 
       // Reset manual path input
       document.getElementById('manualPathInput').value = '';
+
+      // Reset current path display to original value
+      const currentConfig = dashboardData?.config || {};
+      document.getElementById('currentPath').value = currentConfig.import_dir || '';
+
+      // Reset selected path display
+      const selectedPathEl = document.getElementById('selectedPath');
+      if (selectedPathEl) {
+        selectedPathEl.textContent = currentConfig.import_dir || '(enter path)';
+      }
     }
 
     // Volume changed
@@ -2344,9 +3368,28 @@
 
         console.log('Browse result:', result);
         const directories = result.directories || [];
+        const parentPath = result.parent_path;
+
+        // Build parent directory item if available
+        let parentItem = '';
+        if (parentPath) {
+          parentItem = `
+            <div class="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors group border-b border-gray-200 mb-2" onclick="navigateToDirectory('${parentPath}')">
+              <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+              </svg>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-gray-700">...</p>
+              </div>
+              <svg class="w-4 h-4 text-gray-400 group-hover:text-gray-600 transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+              </svg>
+            </div>
+          `;
+        }
 
         if (directories.length === 0) {
-          directoryList.innerHTML = `
+          directoryList.innerHTML = parentItem + `
             <div class="text-center py-8 text-gray-500">
               <svg class="w-12 h-12 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
@@ -2358,7 +3401,7 @@
           return;
         }
 
-        directoryList.innerHTML = directories.map(dir => `
+        directoryList.innerHTML = parentItem + directories.map(dir => `
           <div class="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors group" onclick="navigateToDirectory('${dir.path}')">
             <svg class="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
@@ -2423,14 +3466,64 @@
 
     // Create new folder
     async function createNewFolder() {
-      const folderName = prompt('Enter folder name:');
-      if (!folderName) return;
+      // Show inline input dialog
+      const dialogHtml = `
+        <div id="folderNameDialog" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="z-index: 10000;">
+          <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Create New Folder</h3>
+            <input
+              type="text"
+              id="folderNameInput"
+              placeholder="Enter folder name"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 mb-2"
+              autofocus
+            />
+            <p class="text-xs text-gray-500 mb-4">Only letters, numbers, hyphens, and underscores allowed</p>
+            <div class="flex gap-3 justify-end">
+              <button onclick="cancelFolderCreation()" class="px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50">
+                Cancel
+              </button>
+              <button onclick="confirmFolderCreation()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg">
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.body.insertAdjacentHTML('beforeend', dialogHtml);
+
+      // Focus input and handle Enter key
+      const input = document.getElementById('folderNameInput');
+      input.focus();
+      input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          confirmFolderCreation();
+        }
+      });
+    }
+
+    function cancelFolderCreation() {
+      const dialog = document.getElementById('folderNameDialog');
+      if (dialog) dialog.remove();
+    }
+
+    async function confirmFolderCreation() {
+      const folderName = document.getElementById('folderNameInput').value.trim();
+
+      if (!folderName) {
+        Toast.error('Please enter a folder name');
+        return;
+      }
 
       // Validate folder name
       if (!/^[a-zA-Z0-9_-]+$/.test(folderName)) {
         Toast.error('Folder name can only contain letters, numbers, hyphens, and underscores');
         return;
       }
+
+      // Remove dialog
+      cancelFolderCreation();
 
       try {
         const newPath = `${currentBrowsePath}/${folderName}`.replace(/\/+/g, '/');
@@ -2479,8 +3572,565 @@
       Toast.success('Directory selected: ' + selectedPath);
     }
 
+    // Setup Required modal
+    function showSetupRequiredModal(event) {
+      event?.stopPropagation(); // Prevent event bubbling
+
+      const modalHtml = `
+        <div id="setupRequiredModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="z-index: 10000;" onclick="closeSetupRequiredModal()">
+          <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4" onclick="event.stopPropagation()">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center flex-shrink-0">
+                <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900">Setup Required</h3>
+              </div>
+            </div>
+
+            <div class="mb-6">
+              <p class="text-sm text-gray-700">Set up the folder where your ActionStep files will be stored and processed. This only takes a minute.</p>
+            </div>
+
+            <div class="flex justify-end">
+              <button onclick="closeSetupRequiredModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg">
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.body.insertAdjacentHTML('beforeend', modalHtml);
+    }
+
+    function closeSetupRequiredModal() {
+      const modal = document.getElementById('setupRequiredModal');
+      if (modal) modal.remove();
+    }
+
+    // Delete configuration dialog
+    function showDeleteConfigDialog() {
+      const dialogHtml = `
+        <div id="deleteConfigDialog" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="z-index: 10000;">
+          <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900">Delete Configuration</h3>
+                <p class="text-sm text-gray-600 mt-1">This action cannot be undone</p>
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <p class="text-sm text-gray-700 mb-3">This will delete your ActionStep configuration settings. Your synced data (matters, participants, etc.) will <strong>NOT</strong> be deleted.</p>
+              <p class="text-sm text-gray-700 mb-3">To confirm, type <strong>DELETE</strong> in the box below:</p>
+              <input
+                type="text"
+                id="deleteConfirmInput"
+                placeholder="Type DELETE"
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                autofocus
+              />
+            </div>
+
+            <div class="flex gap-3 justify-end">
+              <button onclick="closeDeleteConfigDialog()" class="px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50">
+                Cancel
+              </button>
+              <button onclick="confirmDeleteConfig()" id="confirmDeleteBtn" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                Delete Configuration
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.body.insertAdjacentHTML('beforeend', dialogHtml);
+
+      // Focus input and enable button when DELETE is typed
+      const input = document.getElementById('deleteConfirmInput');
+      const confirmBtn = document.getElementById('confirmDeleteBtn');
+
+      input.addEventListener('input', (e) => {
+        confirmBtn.disabled = e.target.value !== 'DELETE';
+      });
+
+      input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && e.target.value === 'DELETE') {
+          confirmDeleteConfig();
+        }
+      });
+    }
+
+    function closeDeleteConfigDialog() {
+      const dialog = document.getElementById('deleteConfigDialog');
+      if (dialog) {
+        dialog.remove();
+      }
+    }
+
+    async function confirmDeleteConfig() {
+      const confirmBtn = document.getElementById('confirmDeleteBtn');
+
+      try {
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = 'Deleting...';
+
+        await api.delete('/api/v1/actionstep/config');
+
+        closeDeleteConfigDialog();
+        Toast.success('Configuration deleted successfully');
+
+        // Reload the dashboard to show "Needs Setup" state
+        setTimeout(() => {
+          loadDashboard();
+        }, 500);
+      } catch (error) {
+        Toast.error(error.message || 'Failed to delete configuration');
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Delete Configuration';
+      }
+    }
+
+    // ========================================
+    // AI Ingestion Functions
+    // ========================================
+
+    // Load and display AI ingestion status
+    async function loadAIIngestionStatus() {
+      try {
+        const status = await api.get('/api/v1/actionstep/ingest-ai/status');
+        const statusEl = document.getElementById('aiAnalysisStatus');
+        const btnText = document.getElementById('aiIngestionBtnText');
+        const btnIcon = document.getElementById('aiIngestionBtnIcon');
+
+        if (status.status === 'not_started') {
+          statusEl.textContent = 'Never run';
+          statusEl.className = 'text-xs text-indigo-600 mt-1';
+          btnText.textContent = 'Start Analysis';
+        } else if (status.status === 'running' || status.status === 'created' || status.status === 'active') {
+          const progress = status.progress_percent || 0;
+          statusEl.innerHTML = `<span class="inline-flex items-center gap-1"><svg class="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Processing ${progress}%</span>`;
+          statusEl.className = 'text-xs text-amber-600 mt-1 font-medium';
+          btnText.textContent = 'Processing...';
+          btnIcon.innerHTML = '<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>';
+          btnIcon.classList.add('animate-spin');
+        } else if (status.status === 'completed') {
+          const completedTime = status.completed_at ? timeAgo(status.completed_at) : 'recently';
+          statusEl.textContent = `Last run: ${completedTime}`;
+          statusEl.className = 'text-xs text-emerald-600 mt-1';
+          btnText.textContent = 'Re-analyze';
+        } else if (status.status === 'failed') {
+          const failedTime = status.completed_at ? timeAgo(status.completed_at) : 'recently';
+          statusEl.textContent = `Failed: ${failedTime}`;
+          statusEl.className = 'text-xs text-red-600 mt-1';
+          btnText.textContent = 'Retry Analysis';
+        }
+      } catch (error) {
+        console.error('Failed to load AI ingestion status:', error);
+        // Silently fail - card will show default state
+      }
+    }
+
+    // Trigger AI ingestion for all ActionStep matters
+    async function triggerAIIngestion() {
+      const btn = document.getElementById('aiIngestionBtn');
+      const btnText = document.getElementById('aiIngestionBtnText');
+      const spinner = document.getElementById('aiIngestionSpinner');
+      const btnIcon = document.getElementById('aiIngestionBtnIcon');
+
+      // Disable button and show loading state
+      btn.disabled = true;
+      btnIcon.classList.add('hidden');
+      spinner.classList.remove('hidden');
+      btnText.textContent = 'Starting...';
+
+      try {
+        // Call AI ingestion endpoint
+        const result = await api.post('/api/v1/actionstep/ingest-ai');
+
+        // Show success message with info about background processing
+        Toast.success(`AI analysis started! Processing ${result.total_matters || 0} matters in background. This may take 10-15 minutes.`);
+
+        // Update status immediately to show "processing"
+        await loadAIIngestionStatus();
+
+        // Optionally poll for updates
+        const pollInterval = setInterval(async () => {
+          await loadAIIngestionStatus();
+          const currentStatus = await api.get('/api/v1/actionstep/ingest-ai/status');
+          if (currentStatus.status === 'completed' || currentStatus.status === 'failed') {
+            clearInterval(pollInterval);
+            Toast.success('AI analysis completed!');
+            loadDashboard();
+          }
+        }, 10000); // Check every 10 seconds
+
+      } catch (error) {
+        console.error('AI ingestion failed:', error);
+        Toast.error(error.message || 'Failed to trigger AI analysis');
+      } finally {
+        // Re-enable button
+        btn.disabled = false;
+        spinner.classList.add('hidden');
+        btnIcon.classList.remove('hidden');
+      }
+    }
+
+    // ========================================
+    // Matter Detail Side Panel Functions
+    // ========================================
+
+    // Open matter detail panel and fetch data
+    async function openMatterDetail(matterId) {
+      const panel = document.getElementById('matterDetailPanel');
+      const overlay = document.getElementById('matterDetailOverlay');
+      const content = document.getElementById('matterDetailContent');
+
+      // Show panel and overlay with slide-in animation
+      overlay.classList.remove('hidden');
+      setTimeout(() => {
+        panel.classList.remove('translate-x-full');
+      }, 10);
+
+      // Show loading state
+      content.innerHTML = `
+        <div class="flex items-center justify-center py-12">
+          <svg class="animate-spin h-8 w-8 text-indigo-600" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+      `;
+
+      try {
+        // Fetch matter details from API
+        const result = await api.get(`/api/v1/actionstep/matters/${matterId}`);
+
+        if (!result || !result.matter) {
+          throw new Error('Matter not found');
+        }
+
+        // Render matter details
+        renderMatterDetail(result);
+      } catch (error) {
+        console.error('Failed to load matter details:', error);
+        content.innerHTML = `
+          <div class="text-center py-12">
+            <svg class="w-16 h-16 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <p class="text-red-600 font-medium">Failed to load matter details</p>
+            <p class="text-gray-500 text-sm mt-2">${error.message}</p>
+          </div>
+        `;
+      }
+    }
+
+    // Close matter detail panel
+    function closeMatterDetail() {
+      const panel = document.getElementById('matterDetailPanel');
+      const overlay = document.getElementById('matterDetailOverlay');
+
+      panel.classList.add('translate-x-full');
+      setTimeout(() => {
+        overlay.classList.add('hidden');
+      }, 300);
+    }
+
+    // Render matter detail content
+    function renderMatterDetail(data) {
+      const { matter, participants = [], file_notes = [], tasks = [], documents = [] } = data;
+      const content = document.getElementById('matterDetailContent');
+
+      let html = `
+        <!-- Core Matter Information -->
+        <div class="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl p-6 text-white mb-6">
+          <h3 class="text-2xl font-bold mb-2">${matter.name || 'Unnamed Matter'}</h3>
+          <div class="grid grid-cols-2 gap-4 mt-4">
+            <div>
+              <p class="text-indigo-100 text-sm">Reference</p>
+              <p class="font-semibold">${matter.reference || '-'}</p>
+            </div>
+            <div>
+              <p class="text-indigo-100 text-sm">Status</p>
+              <p class="font-semibold">${matter.status || '-'}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Matter Details Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          ${renderDetailCard('Client Information', [
+            { label: 'Client Name', value: matter.client_name },
+            { label: 'Client ID', value: matter.client_id },
+            { label: 'File Number', value: matter.filenumber },
+            { label: 'Action Type', value: matter.action_type_name }
+          ])}
+
+          ${renderDetailCard('Assignment & Tracking', [
+            { label: 'Assigned To', value: matter.assigned_to_display_name },
+            { label: 'Assigned To ID', value: matter.assigned_to_participant_id },
+            { label: 'Created At', value: formatDate(matter.created_at) },
+            { label: 'Updated At', value: formatDate(matter.updated_at) }
+          ])}
+        </div>
+
+        ${renderDetailCard('Additional Information', [
+          { label: 'Description', value: matter.description, fullWidth: true },
+          { label: 'Timestamp', value: formatDate(matter.timestamp) },
+          { label: 'Organization ID', value: matter.organization_id },
+          { label: 'Source', value: matter.source }
+        ])}
+
+        <!-- Participants Section -->
+        ${renderListSection('Participants', participants, (p) => `
+          <div class="flex items-start gap-3 p-4 bg-gray-50 rounded-lg">
+            <div class="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+              </svg>
+            </div>
+            <div class="flex-1">
+              <p class="font-medium text-gray-900">${p.display_name || p.first_name + ' ' + p.last_name}</p>
+              <p class="text-sm text-gray-500">${p.email || '-'}</p>
+              <p class="text-sm text-gray-500">${p.company_name || ''}</p>
+            </div>
+          </div>
+        `)}
+
+        <!-- Tasks Section -->
+        ${renderListSection('Tasks', tasks, (t) => `
+          <div class="p-4 bg-gray-50 rounded-lg border-l-4 ${(t.current_status || '').toLowerCase() === 'completed' ? 'border-green-500' : 'border-yellow-500'}">
+            <div class="flex items-start justify-between">
+              <div class="flex-1">
+                <p class="font-medium text-gray-900">${t.task_name || 'Unnamed Task'}</p>
+                <p class="text-sm text-gray-600 mt-1">${t.description || t.notes || ''}</p>
+                <div class="flex gap-4 mt-2 text-xs text-gray-500">
+                  <span>Due: ${formatDate(t.due_date)}</span>
+                  <span>Priority: ${t.priority || 'Normal'}</span>
+                  ${t.assigned_to_name ? `<span>Assigned to: ${t.assigned_to_name}</span>` : ''}
+                </div>
+              </div>
+              <span class="px-2 py-1 text-xs font-medium rounded ${(t.current_status || '').toLowerCase() === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+                ${t.current_status || 'Pending'}
+              </span>
+            </div>
+          </div>
+        `)}
+
+        <!-- File Notes Section -->
+        ${renderListSection('File Notes', file_notes, (n) => `
+          <div class="p-4 bg-gray-50 rounded-lg">
+            <div class="flex items-start gap-3">
+              <svg class="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path>
+              </svg>
+              <div class="flex-1">
+                <p class="text-sm text-gray-700">${n.note_text || 'No content'}</p>
+                ${n.entered_by_name ? `<p class="text-xs text-gray-500 mt-1">By: ${n.entered_by_name}</p>` : ''}
+                <p class="text-xs text-gray-500 mt-1">${formatDate(n.note_timestamp || n.entered_timestamp || n.created_at)}</p>
+              </div>
+            </div>
+          </div>
+        `)}
+
+        <!-- Documents Section -->
+        ${renderListSection('Documents', documents, (d) => `
+          <div class="flex items-center gap-3 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+            <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+            </svg>
+            <div class="flex-1">
+              <p class="font-medium text-gray-900">${d.filename || d.name}</p>
+              <p class="text-xs text-gray-500">${formatFileSize(d.file_size)} • ${formatDate(d.created_at)}</p>
+            </div>
+          </div>
+        `)}
+
+        <!-- Custom Fields (if any) -->
+        ${matter.custom_fields ? renderCustomFields(matter.custom_fields) : ''}
+
+        <!-- Raw Data (Collapsible) -->
+        <div class="mt-6">
+          <button onclick="toggleRawData()" class="w-full flex items-center justify-between p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+            <span class="font-medium text-gray-700">View Raw Data</span>
+            <svg id="rawDataChevron" class="w-5 h-5 text-gray-500 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+          </button>
+          <div id="rawDataContent" class="hidden mt-2 p-4 bg-gray-900 rounded-lg overflow-x-auto">
+            <pre class="text-xs text-green-400">${JSON.stringify(data, null, 2)}</pre>
+          </div>
+        </div>
+      `;
+
+      content.innerHTML = html;
+    }
+
+    // Helper function to render detail cards
+    function renderDetailCard(title, fields) {
+      const fieldsHtml = fields.map(field => {
+        if (field.fullWidth) {
+          return `
+            <div class="col-span-2">
+              <p class="text-sm font-medium text-gray-500 mb-1">${field.label}</p>
+              <p class="text-gray-900">${field.value || '-'}</p>
+            </div>
+          `;
+        }
+        return `
+          <div>
+            <p class="text-sm font-medium text-gray-500 mb-1">${field.label}</p>
+            <p class="text-gray-900">${field.value || '-'}</p>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="bg-white rounded-xl border border-gray-200 p-6">
+          <h4 class="text-lg font-semibold text-gray-900 mb-4">${title}</h4>
+          <div class="grid grid-cols-2 gap-4">
+            ${fieldsHtml}
+          </div>
+        </div>
+      `;
+    }
+
+    // Helper function to render list sections
+    function renderListSection(title, items, renderItem) {
+      if (!items || items.length === 0) {
+        return `
+          <div class="bg-white rounded-xl border border-gray-200 p-6 mt-6">
+            <h4 class="text-lg font-semibold text-gray-900 mb-4">${title}</h4>
+            <p class="text-gray-500 text-center py-8">No ${title.toLowerCase()} found</p>
+          </div>
+        `;
+      }
+
+      const itemsHtml = items.map(renderItem).join('');
+
+      return `
+        <div class="bg-white rounded-xl border border-gray-200 p-6 mt-6">
+          <h4 class="text-lg font-semibold text-gray-900 mb-4">${title} (${items.length})</h4>
+          <div class="space-y-3">
+            ${itemsHtml}
+          </div>
+        </div>
+      `;
+    }
+
+    // Helper function to render custom fields
+    function renderCustomFields(customFields) {
+      try {
+        const fields = typeof customFields === 'string' ? JSON.parse(customFields) : customFields;
+        const entries = Object.entries(fields);
+
+        if (entries.length === 0) return '';
+
+        const fieldsHtml = entries.map(([key, value]) => `
+          <div>
+            <p class="text-sm font-medium text-gray-500 mb-1">${key}</p>
+            <p class="text-gray-900">${value || '-'}</p>
+          </div>
+        `).join('');
+
+        return `
+          <div class="bg-white rounded-xl border border-gray-200 p-6 mt-6">
+            <h4 class="text-lg font-semibold text-gray-900 mb-4">Custom Fields</h4>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              ${fieldsHtml}
+            </div>
+          </div>
+        `;
+      } catch (error) {
+        return '';
+      }
+    }
+
+    // Toggle raw data visibility
+    function toggleRawData() {
+      const content = document.getElementById('rawDataContent');
+      const chevron = document.getElementById('rawDataChevron');
+
+      if (content.classList.contains('hidden')) {
+        content.classList.remove('hidden');
+        chevron.classList.add('rotate-180');
+      } else {
+        content.classList.add('hidden');
+        chevron.classList.remove('rotate-180');
+      }
+    }
+
+    // Helper function to format dates
+    function formatDate(dateString) {
+      if (!dateString) return '-';
+      try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } catch (error) {
+        return dateString;
+      }
+    }
+
+    // Helper function to format file sizes
+    function formatFileSize(bytes) {
+      if (!bytes) return '-';
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    // Add ESC key listener to close panel
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeMatterDetail();
+      }
+    });
+
     // Initialize
     loadDashboard();
   </script>
+
+  <!-- Matter Detail Side Panel -->
+  <div id="matterDetailPanel" class="fixed inset-y-0 right-0 w-full lg:w-2/3 xl:w-1/2 bg-white shadow-2xl transform translate-x-full transition-transform duration-300 z-50 overflow-y-auto">
+    <!-- Panel Header -->
+    <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
+      <h2 class="text-xl font-semibold text-gray-900">Matter Details</h2>
+      <button onclick="closeMatterDetail()" class="text-gray-400 hover:text-gray-600 transition-colors">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Panel Content -->
+    <div id="matterDetailContent" class="p-6">
+      <!-- Loading state -->
+      <div class="flex items-center justify-center py-12">
+        <svg class="animate-spin h-8 w-8 text-indigo-600" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- Overlay (click to close panel) -->
+  <div id="matterDetailOverlay" class="fixed inset-0 bg-black bg-opacity-50 hidden z-40" onclick="closeMatterDetail()"></div>
+
 </body>
 </html>
