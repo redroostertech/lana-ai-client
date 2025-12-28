@@ -465,6 +465,7 @@
         </div>
         <iframe id="viewerIframe" class="hidden w-full h-full bg-white rounded-lg shadow-sm"></iframe>
         <pre id="viewerText" class="hidden w-full h-full bg-white rounded-lg shadow-sm p-6 overflow-auto text-sm font-mono whitespace-pre-wrap"></pre>
+        <div id="viewerTable" class="hidden w-full h-full bg-white rounded-lg shadow-sm overflow-auto"></div>
         <img id="viewerImage" class="hidden max-w-full max-h-full mx-auto rounded-lg shadow-sm object-contain">
       </div>
     </div>
@@ -1611,6 +1612,10 @@
                           Cancel
                         </button>
                       ` : ''}
+                      <button onclick="replaceDrawerDocument('${doc.id}', '${matter.matter_id}')" class="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1" title="Replace file and re-index">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                        Replace
+                      </button>
                       <button onclick="deleteDrawerDocument('${doc.id}', '${matter.matter_id}')" class="text-xs text-red-600 hover:text-red-800 font-medium flex items-center gap-1">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                         Delete
@@ -1900,17 +1905,48 @@
       }
     }
 
-    // Delete document from drawer
+    // Delete document from drawer (Universal endpoint)
     window.deleteDrawerDocument = async function(fileId, matterId) {
       Modal.confirm('Delete Document', 'Are you sure you want to delete this document? This action cannot be undone.', async () => {
         try {
-          await api.deleteDocument(fileId, matterId);
-          Toast.success('Document deleted');
+          await api.deleteDocument(fileId); // Using universal endpoint - no matterId needed
+          Toast.success('Document deleted successfully');
           await refreshDrawerDocuments(matterId);
         } catch (error) {
           Toast.error(error.message || 'Failed to delete document');
         }
       });
+    }
+
+    // Replace document file (Universal endpoint - triggers re-vectorization)
+    window.replaceDrawerDocument = async function(fileId, matterId) {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.pdf,.doc,.docx,.txt,.html,.rtf';
+
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        Modal.confirm(
+          'Replace Document',
+          `Replace document with "${file.name}"? This will re-process the document and update all embeddings for search.`,
+          async () => {
+            try {
+              Toast.info('Replacing document...');
+              const result = await api.replaceDocument(fileId, file, (progress) => {
+                console.log(`Upload progress: ${progress}%`);
+              });
+              Toast.success('Document replaced successfully. Re-processing for search...');
+              await refreshDrawerDocuments(matterId);
+            } catch (error) {
+              Toast.error(error.message || 'Failed to replace document');
+            }
+          }
+        );
+      };
+
+      input.click();
     }
 
     // Document Metadata Modal Setup
@@ -2080,6 +2116,7 @@
     const viewerError = document.getElementById('viewerError');
     const viewerIframe = document.getElementById('viewerIframe');
     const viewerText = document.getElementById('viewerText');
+    const viewerTable = document.getElementById('viewerTable');
     const viewerImage = document.getElementById('viewerImage');
 
     document.getElementById('closeDocumentViewer').addEventListener('click', closeDocumentViewer);
@@ -2111,6 +2148,102 @@
       return `${size.toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
     }
 
+    // Render CSV as HTML table
+    function renderCSVTable(csvText) {
+      const viewerTable = document.getElementById('viewerTable');
+
+      // Parse CSV (simple parser - handles quoted fields with commas)
+      const rows = [];
+      let currentRow = [];
+      let currentField = '';
+      let insideQuotes = false;
+
+      for (let i = 0; i < csvText.length; i++) {
+        const char = csvText[i];
+        const nextChar = csvText[i + 1];
+
+        if (char === '"') {
+          if (insideQuotes && nextChar === '"') {
+            // Escaped quote
+            currentField += '"';
+            i++;
+          } else {
+            // Toggle quote mode
+            insideQuotes = !insideQuotes;
+          }
+        } else if (char === ',' && !insideQuotes) {
+          // End of field
+          currentRow.push(currentField.trim());
+          currentField = '';
+        } else if ((char === '\n' || char === '\r') && !insideQuotes) {
+          // End of row
+          if (char === '\r' && nextChar === '\n') {
+            i++; // Skip \r\n
+          }
+          if (currentField || currentRow.length > 0) {
+            currentRow.push(currentField.trim());
+            rows.push(currentRow);
+            currentRow = [];
+            currentField = '';
+          }
+        } else {
+          currentField += char;
+        }
+      }
+
+      // Add last field/row if exists
+      if (currentField || currentRow.length > 0) {
+        currentRow.push(currentField.trim());
+        rows.push(currentRow);
+      }
+
+      // Filter empty rows
+      const filteredRows = rows.filter(row => row.some(cell => cell !== ''));
+
+      if (filteredRows.length === 0) {
+        viewerTable.innerHTML = '<p class="p-6 text-gray-500">Empty CSV file</p>';
+        return;
+      }
+
+      // Build HTML table
+      const headers = filteredRows[0];
+      const dataRows = filteredRows.slice(1);
+
+      let html = `
+        <table class="min-w-full divide-y divide-gray-200 text-sm">
+          <thead class="bg-gray-50 sticky top-0">
+            <tr>
+              ${headers.map(header => `
+                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-200 whitespace-nowrap">
+                  ${escapeHtml(header)}
+                </th>
+              `).join('')}
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            ${dataRows.map((row, rowIndex) => `
+              <tr class="${rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-indigo-50">
+                ${row.map((cell, cellIndex) => `
+                  <td class="px-4 py-2 ${cellIndex === 0 ? 'font-medium text-gray-900' : 'text-gray-600'} border-r border-gray-100 whitespace-nowrap">
+                    ${escapeHtml(cell)}
+                  </td>
+                `).join('')}
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+
+      viewerTable.innerHTML = html;
+    }
+
+    // Helper: Escape HTML
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
     // View document in modal
     window.viewDocument = async function(fileId, matterId, filename, contentType, fileSize) {
       // Show modal with loading state
@@ -2119,6 +2252,7 @@
       viewerError.classList.add('hidden');
       viewerIframe.classList.add('hidden');
       viewerText.classList.add('hidden');
+      viewerTable.classList.add('hidden');
       viewerImage.classList.add('hidden');
 
       // Set file info
@@ -2169,7 +2303,12 @@
           // PDF files - use iframe
           viewerIframe.src = url;
           viewerIframe.classList.remove('hidden');
-        } else if (type.startsWith('text/') || type === 'application/json' || type === 'application/xml' || filename.match(/\.(txt|md|json|xml|csv|log|js|ts|py|html|css|yaml|yml)$/i)) {
+        } else if (filename.match(/\.csv$/i) || type.includes('csv')) {
+          // CSV files - render as spreadsheet table
+          const text = await blob.text();
+          renderCSVTable(text);
+          viewerTable.classList.remove('hidden');
+        } else if (type.startsWith('text/') || type === 'application/json' || type === 'application/xml' || filename.match(/\.(txt|md|json|xml|log|js|ts|py|html|css|yaml|yml)$/i)) {
           // Text-based files
           const text = await blob.text();
           viewerText.textContent = text;
