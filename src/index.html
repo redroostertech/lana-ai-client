@@ -165,6 +165,32 @@
         <p class="text-indigo-100">Here's what's happening with your organization today.</p>
       </div>
 
+      <!-- Global Search Bar -->
+      <div class="mb-8">
+        <div class="relative max-w-3xl mx-auto">
+          <input
+            type="text"
+            id="globalSearchInput"
+            class="w-full px-6 py-4 text-lg border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-lg bg-white text-gray-900"
+            placeholder="Search across all your connected data sources..."
+            autocomplete="off"
+            onkeypress="if(event.key==='Enter'){const q=document.getElementById('globalSearchInput').value; if(q.trim()) window.location.href='search-results.html?q='+encodeURIComponent(q);}"
+          />
+          <button
+            type="button"
+            class="absolute right-2 top-1/2 transform -translate-y-1/2 bg-indigo-600 text-white px-6 py-2 rounded-full hover:bg-indigo-700 transition-colors"
+            onclick="const q=document.getElementById('globalSearchInput').value; if(q.trim()) window.location.href='search-results.html?q='+encodeURIComponent(q);"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+          </button>
+        </div>
+        <p class="text-center mt-3 text-sm text-gray-500">
+          Powered by AI semantic search • Search across ActionStep, SharePoint, Google Drive, and more
+        </p>
+      </div>
+
       <!-- Stats Grid - Loading State -->
       <div id="statsLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
@@ -220,7 +246,17 @@
             </div>
           </div>
           <h3 class="text-2xl font-bold text-gray-900" id="statUsers">-</h3>
-          <p class="text-gray-500 text-sm">Active Users</p>
+          <p class="text-gray-500 text-sm">Total Users</p>
+          <div id="userBreakdown" class="mt-3 pt-3 border-t border-gray-200 text-xs text-gray-600 space-y-1 hidden">
+            <div class="flex justify-between">
+              <span>Active:</span>
+              <span id="activeUsers" class="font-medium text-gray-900">-</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Other:</span>
+              <span id="otherUsers" class="font-medium text-gray-600">-</span>
+            </div>
+          </div>
         </div>
 
         <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
@@ -233,18 +269,37 @@
           </div>
           <h3 class="text-2xl font-bold text-gray-900" id="statDocuments">-</h3>
           <p class="text-gray-500 text-sm">Documents</p>
+          <div id="documentBreakdown" class="mt-3 pt-3 border-t border-gray-200 text-xs text-gray-600 space-y-1 hidden">
+            <div class="flex justify-between">
+              <span>Active:</span>
+              <span id="activeDocuments" class="font-medium text-gray-900">-</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Marked for deletion:</span>
+              <span id="deletedDocuments" class="font-medium text-orange-600">-</span>
+            </div>
+          </div>
         </div>
 
-        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <div id="statStorageCard" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 hidden">
           <div class="flex items-center justify-between mb-4">
             <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
               <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path>
               </svg>
             </div>
           </div>
           <h3 class="text-2xl font-bold text-gray-900" id="statStorage">-</h3>
-          <p class="text-gray-500 text-sm">Storage Used</p>
+          <p class="text-gray-500 text-sm">Total Storage <span id="storageRemaining" class="font-semibold"></span></p>
+          <div id="storageBreakdown" class="mt-3 pt-3 border-t border-gray-200 text-xs text-gray-600 space-y-1 hidden">
+            <div class="flex justify-between">
+              <span>Database:</span>
+              <span id="databaseStorage" class="font-medium text-gray-900">-</span>
+            </div>
+            <div id="volumeStorageList" class="space-y-1">
+              <!-- Volume items will be added dynamically -->
+            </div>
+          </div>
         </div>
       </div>
 
@@ -347,6 +402,7 @@
           </div>
         </div>
       </div>
+
     </main>
   </div>
 
@@ -375,6 +431,10 @@
       
       // Auth successful - initialize the page
       initializePage();
+      // Wait for DOM to be fully ready before attaching search handler
+      setTimeout(() => {
+        initializeSearchForm();
+      }, 100);
     }
 
     // Start auth check
@@ -525,8 +585,135 @@
             document.getElementById('statMattersLabel').textContent = 'Total Matters';
             document.getElementById('statUsers').textContent = stats.total_users || 0;
             document.getElementById('statUsersCard').classList.remove('hidden');
-            document.getElementById('statDocuments').textContent = stats.total_documents || 0;
-            document.getElementById('statStorage').textContent = formatBytes(stats.total_storage_bytes || stats.storage_used || 0);
+
+            // Show user breakdown if available
+            if (stats.active_users !== undefined || stats.other_users !== undefined) {
+              const activeUsers = parseInt(stats.active_users || 0);
+              const otherUsers = parseInt(stats.other_users || 0);
+
+              document.getElementById('activeUsers').textContent = activeUsers.toLocaleString();
+              document.getElementById('otherUsers').textContent = otherUsers.toLocaleString();
+
+              // Always show breakdown for admins (even if 0/0)
+              document.getElementById('userBreakdown').classList.remove('hidden');
+            }
+
+            // Fetch enhanced storage stats for document breakdown
+            try {
+              const storageStats = await api.get('/api/v1/storage/stats');
+              const totalFiles = parseInt(storageStats.total_files || 0);
+              const deletedFiles = parseInt(storageStats.deleted_files || 0);
+              const totalDocs = totalFiles + deletedFiles;
+              const totalSizeBytes = parseInt(storageStats.total_size_bytes || 0);
+              const deletedSizeBytes = parseInt(storageStats.deleted_size_bytes || 0);
+              const totalSize = totalSizeBytes + deletedSizeBytes;
+
+              document.getElementById('statDocuments').textContent = totalDocs.toLocaleString();
+              document.getElementById('statStorage').textContent = formatBytes(totalSize);
+
+              // Always show document breakdown for admins (even if 0/0)
+              document.getElementById('activeDocuments').textContent = totalFiles.toLocaleString();
+              document.getElementById('deletedDocuments').textContent = deletedFiles.toLocaleString();
+              document.getElementById('documentBreakdown').classList.remove('hidden');
+            } catch (storageError) {
+              // Fallback to basic stats if enhanced endpoint fails
+              console.error('Failed to load enhanced storage stats:', storageError);
+              document.getElementById('statDocuments').textContent = stats.total_documents || 0;
+              document.getElementById('statStorage').textContent = formatBytes(stats.total_storage_bytes || stats.storage_used || 0);
+            }
+
+            // Load system storage information for storage card breakdown
+            try {
+              const storageInfo = await api.get('/api/v1/admin/health/storage');
+
+              // Show storage card
+              document.getElementById('statStorageCard').classList.remove('hidden');
+
+              // Display database size in breakdown
+              if (storageInfo.database && !storageInfo.database.error) {
+                const dbSizeGB = parseFloat(storageInfo.database.size_gb);
+                document.getElementById('databaseStorage').textContent = dbSizeGB.toFixed(2) + ' GB';
+              }
+
+              // Display volumes in breakdown and calculate total remaining
+              const volumeList = document.getElementById('volumeStorageList');
+              volumeList.innerHTML = ''; // Clear existing content
+
+              let totalUsedBytes = 0;
+              let totalCapacityBytes = 0;
+
+              if (storageInfo.volumes && storageInfo.volumes.length > 0) {
+                storageInfo.volumes.forEach(volume => {
+                  if (volume.status !== 'not_available') {
+                    const usedGB = parseFloat(volume.used_gb || 0);
+                    const totalGB = parseFloat(volume.total_gb || 0);
+                    const usagePercent = volume.usage_percent || 0;
+
+                    // Accumulate totals
+                    totalUsedBytes += parseFloat(volume.used_bytes || 0);
+                    totalCapacityBytes += parseFloat(volume.total_bytes || 0);
+
+                    // Color based on usage
+                    let textColor = 'text-gray-900';
+                    if (usagePercent > 80) textColor = 'text-red-600';
+                    else if (usagePercent > 60) textColor = 'text-yellow-600';
+
+                    volumeList.innerHTML += `
+                      <div class="flex justify-between">
+                        <span>${volume.name || volume.mount_point}:</span>
+                        <span class="font-medium ${textColor}">${usedGB.toFixed(1)}/${totalGB.toFixed(1)} GB (${usagePercent}%)</span>
+                      </div>
+                    `;
+                  }
+                });
+              }
+
+              // If no volumes available, show root filesystem
+              if (volumeList.innerHTML === '' && storageInfo.root_filesystem && !storageInfo.root_filesystem.error) {
+                const root = storageInfo.root_filesystem;
+                const usedGB = parseFloat(root.used_gb || 0);
+                const totalGB = parseFloat(root.total_gb || 0);
+                const usagePercent = root.usage_percent || 0;
+
+                // Use root filesystem for totals
+                totalUsedBytes = parseFloat(root.used_bytes || 0);
+                totalCapacityBytes = parseFloat(root.total_bytes || 0);
+
+                let textColor = 'text-gray-900';
+                if (usagePercent > 80) textColor = 'text-red-600';
+                else if (usagePercent > 60) textColor = 'text-yellow-600';
+
+                volumeList.innerHTML = `
+                  <div class="flex justify-between">
+                    <span>Root:</span>
+                    <span class="font-medium ${textColor}">${usedGB.toFixed(1)}/${totalGB.toFixed(1)} GB (${usagePercent}%)</span>
+                  </div>
+                `;
+              }
+
+              // Calculate and display overall remaining percentage
+              if (totalCapacityBytes > 0) {
+                const remainingBytes = totalCapacityBytes - totalUsedBytes;
+                const remainingPercent = (remainingBytes / totalCapacityBytes) * 100;
+
+                // Color code based on remaining space
+                let remainingColor = 'text-green-600';
+                if (remainingPercent < 20) remainingColor = 'text-red-600';
+                else if (remainingPercent < 40) remainingColor = 'text-yellow-600';
+
+                document.getElementById('storageRemaining').innerHTML = `
+                  <span class="${remainingColor}">(${remainingPercent.toFixed(1)}% remaining)</span>
+                `;
+              }
+
+              // Show breakdown if we have data
+              if (storageInfo.database || volumeList.innerHTML !== '') {
+                document.getElementById('storageBreakdown').classList.remove('hidden');
+              }
+            } catch (storageInfoError) {
+              console.error('Failed to load system storage:', storageInfoError);
+              // Don't show storage card if we can't load the data
+            }
           }
         } else {
           // Regular users see their own matters count
@@ -627,7 +814,7 @@
     loadUserInfo();
     loadStats();
     loadActivity();
-    
+
     // Only load system status for system admins and org admins
     if (canViewSystemStatus()) {
       loadSystemStatus();
@@ -635,6 +822,37 @@
       setInterval(loadSystemStatus, 60000);
     }
     } // End initializePage function
+
+    // Global search form handler
+    function initializeSearchForm() {
+      console.log('[Search] initializeSearchForm called');
+      const searchForm = document.getElementById('globalSearchForm');
+      console.log('[Search] Form element:', searchForm);
+
+      if (searchForm) {
+        searchForm.addEventListener('submit', (e) => {
+          console.log('[Search] Form submitted, preventing default');
+          e.preventDefault();
+          e.stopPropagation();
+
+          const query = document.getElementById('globalSearchInput').value;
+          console.log('[Search] Query:', query);
+
+          if (query.trim()) {
+            const url = `search-results.html?q=${encodeURIComponent(query)}`;
+            console.log('[Search] Navigating to:', url);
+            window.location.href = url;
+          } else {
+            console.log('[Search] Query is empty');
+          }
+
+          return false;
+        });
+        console.log('[Search] Form handler attached successfully');
+      } else {
+        console.error('[Search] Form element not found - DOM might not be ready');
+      }
+    }
   </script>
 </body>
 </html>
