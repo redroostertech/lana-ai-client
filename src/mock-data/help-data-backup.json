@@ -1,0 +1,192 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2025-12-22T10:00:00Z",
+  "sections": [
+    {
+      "id": "getting-started",
+      "title": "Getting Started",
+      "description": "Learn the basics of LANA AI",
+      "icon": "rocket",
+      "order": 1,
+      "articles": [
+        {
+          "id": "quick-start",
+          "title": "Quick Start Guide",
+          "summary": "Get up and running with LANA AI in minutes",
+          "content": "## Quick Start Guide\n\nWelcome to LANA AI! This guide will help you get started quickly.\n\n### Step 1: First Login\n\nWhen you first log in to LANA AI, you'll see the dashboard. This is your central hub for all activities.\n\n### Step 2: Complete Your Profile\n\nNavigate to **Settings** → **Profile** and fill in your information:\n- Name and contact details\n- Profile picture (optional)\n- Notification preferences\n\n### Step 3: Create Your First Matter\n\n1. Click **Matters** in the sidebar\n2. Click **New Matter**\n3. Enter matter details (name, client, type)\n4. Click **Create**\n\n### Step 4: Upload Documents\n\n1. Open your newly created matter\n2. Click the **Upload** button\n3. Select files or drag and drop\n4. Wait for processing to complete\n\n### Step 5: Start Chatting\n\nNavigate to the **Chat** page and ask LANA AI questions about your documents!\n\n**Next Steps:**\n- Explore data connectors to sync external files\n- Set up workflows to automate tasks\n- Invite team members to collaborate",
+          "tags": ["beginner", "setup"],
+          "readTime": 5,
+          "lastUpdated": "2025-12-20T15:30:00Z",
+          "relatedArticles": ["first-login", "navigating-dashboard"]
+        },
+        {
+          "id": "first-login",
+          "title": "Your First Login",
+          "summary": "What to expect when you first log in",
+          "content": "## Your First Login\n\nWhen you first access LANA AI, here's what you'll encounter:\n\n### The Login Screen\n\nEnter the credentials provided by your administrator:\n- **Username or Email**\n- **Password**\n\nIf this is your first login, you may be prompted to:\n1. Change your password\n2. Set up multi-factor authentication (if enabled)\n3. Review and accept terms of service\n\n### The Dashboard\n\nAfter logging in, you'll see:\n- **Welcome banner** with your name\n- **Quick stats** showing your matters, documents, and activity\n- **Recent activity** feed\n- **Quick actions** to create matters or upload documents\n\n### Navigation\n\nThe sidebar provides access to:\n- **Dashboard** - Overview and quick stats\n- **Chat** - AI conversation interface\n- **Matters** - Case and matter management\n- **Data Connectors** - Integration with external systems\n- **Sync Status** - Monitor data synchronization\n- **AI Insights** - Analytics and predictions\n- **Workflows** - Automation tools\n\n### Getting Help\n\nIf you need assistance:\n- Visit **Help & Support** in the sidebar\n- Click the **?** icon for contextual help\n- Contact your system administrator",
+          "tags": ["beginner", "authentication"],
+          "readTime": 3,
+          "lastUpdated": "2025-12-18T09:00:00Z",
+          "relatedArticles": ["quick-start", "account-setup"]
+        },
+        {
+          "id": "navigating-dashboard",
+          "title": "Navigating the Dashboard",
+          "summary": "Learn how to use the LANA AI dashboard effectively",
+          "content": "## Navigating the Dashboard\n\nThe LANA AI dashboard is your command center.\n\n### Dashboard Overview\n\n**Top Bar:**\n- Notification bell - View system notifications\n- User menu - Access settings and logout\n\n**Stats Cards:**\n- Total Matters - Number of active matters\n- Active Users - Team members online (admins only)\n- Documents - Total documents processed\n- Storage Used - Current storage consumption\n\n**Recent Activity:**\n- See what your team has been working on\n- Track document uploads and edits\n- Monitor AI usage\n\n**System Status (Admins):**\n- View health of backend services\n- Monitor database, AI, and storage systems\n\n### Keyboard Shortcuts\n\n- `Ctrl/Cmd + K` - Quick search\n- `Ctrl/Cmd + /` - Open help\n- `Ctrl/Cmd + ,` - Open settings\n\n### Customization\n\nYou can customize your dashboard by:\n- Setting default views in Settings\n- Choosing which stats to display\n- Configuring notification preferences",
+          "tags": ["beginner", "navigation"],
+          "readTime": 4,
+          "lastUpdated": "2025-12-15T11:00:00Z",
+          "relatedArticles": ["first-login", "quick-start"]
+        }
+      ]
+    },
+    {
+      "id": "features",
+      "title": "Features",
+      "description": "Explore LANA AI's powerful features",
+      "icon": "sparkles",
+      "order": 2,
+      "articles": [
+        {
+          "id": "chat-interface",
+          "title": "Using the Chat Interface",
+          "summary": "Learn how to interact with LANA AI's conversational interface",
+          "content": "## Chat Interface\n\nThe LANA AI chat interface allows you to have natural conversations with your documents.\n\n### Starting a Conversation\n\n1. Navigate to the **Chat** page\n2. Select a matter from the dropdown (optional but recommended)\n3. Type your question in the input box\n4. Press Enter or click Send\n\n### What You Can Ask\n\n**Document Analysis:**\n- \"Summarize the Smith contract\"\n- \"What are the key terms in the lease agreement?\"\n- \"Find all references to indemnification\"\n\n**Comparison:**\n- \"Compare version 1 and version 2 of the agreement\"\n- \"What changed between drafts?\"\n\n**Research:**\n- \"Find relevant case law for this scenario\"\n- \"What precedents support this argument?\"\n\n**Drafting:**\n- \"Draft a response letter to this complaint\"\n- \"Create a summary of findings\"\n\n### File Drawer\n\nClick the **file drawer icon** to:\n- Select specific documents for the AI to reference\n- Upload new files for immediate analysis\n- View document metadata\n\n### Chat History\n\nAll conversations are saved. You can:\n- Review past conversations\n- Continue previous threads\n- Export chat transcripts\n\n### Best Practices\n\n- **Be specific** - Provide context and details\n- **Use matter context** - Select the relevant matter for better results\n- **Ask follow-ups** - The AI remembers conversation context\n- **Verify important information** - Always review AI outputs",
+          "tags": ["chat", "ai", "features"],
+          "readTime": 7,
+          "lastUpdated": "2025-12-15T14:00:00Z",
+          "relatedArticles": ["document-analysis", "context-awareness"]
+        },
+        {
+          "id": "matter-management",
+          "title": "Managing Matters",
+          "summary": "Organize your cases and legal matters efficiently",
+          "content": "## Matter Management\n\nLANA AI helps you organize matters (cases, clients, projects) with ease.\n\n### Creating a Matter\n\n1. Go to **Matters** page\n2. Click **New Matter**\n3. Fill in details:\n   - Matter name\n   - Client name\n   - Matter type (litigation, transactional, etc.)\n   - Status (open, pending, closed)\n   - Assigned team members\n4. Click **Create**\n\n### Matter Dashboard\n\nEach matter has:\n- **Documents** - All files related to this matter\n- **Activity** - Timeline of actions\n- **Team** - Assigned users\n- **Notes** - Internal comments\n- **AI Insights** - Analytics and predictions\n\n### Uploading Documents\n\nWithin a matter:\n1. Click **Upload Documents**\n2. Select files or drag-and-drop\n3. Supported formats: PDF, DOCX, TXT, XLSX, PPTX\n4. Wait for AI processing\n\n### Organization\n\n**Folders:**\n- Create folders to organize documents\n- Drag and drop to move files\n\n**Tags:**\n- Add tags for easy filtering\n- Use predefined or custom tags\n\n**Search:**\n- Full-text search across all documents\n- Filter by date, type, or tag\n\n### Permissions\n\nControl who can access each matter:\n- Assign users with specific roles\n- Set view-only or edit permissions\n- Admins have full access to all matters\n\n### Archiving\n\nWhen a matter is complete:\n1. Open the matter\n2. Click **Actions** → **Archive**\n3. Archived matters are hidden but searchable",
+          "tags": ["matters", "organization"],
+          "readTime": 10,
+          "lastUpdated": "2025-12-10T11:00:00Z",
+          "relatedArticles": ["document-upload", "matter-insights"]
+        },
+        {
+          "id": "document-upload",
+          "title": "Uploading Documents",
+          "summary": "Learn how to upload and manage documents",
+          "content": "## Document Upload\n\nTo upload documents to LANA AI:\n\n### Upload Methods\n\n**Drag and Drop:**\n1. Navigate to a matter\n2. Drag files from your computer\n3. Drop them in the upload area\n\n**File Picker:**\n1. Click the **Upload** button\n2. Browse and select files\n3. Click **Open**\n\n**Bulk Upload:**\n- Select multiple files at once\n- Upload entire folders (desktop app only)\n\n### Supported Formats\n\n- **Documents:** PDF, DOCX, DOC, TXT, RTF\n- **Spreadsheets:** XLSX, XLS, CSV\n- **Presentations:** PPTX, PPT\n- **Images:** PNG, JPG, JPEG (with OCR)\n- **Archives:** ZIP (extracts automatically)\n\n### Processing\n\nAfter upload, LANA AI:\n1. **Extracts text** - OCR for images and scanned PDFs\n2. **Chunks content** - Breaks into semantic sections\n3. **Generates embeddings** - Creates vector representations\n4. **Indexes** - Makes searchable\n\n**Processing Time:**\n- Small documents (< 10 pages): Seconds\n- Medium documents (10-100 pages): 1-3 minutes\n- Large documents (> 100 pages): 5-10 minutes\n\n### Upload Limits\n\n- Max file size: **100 MB** per file\n- Max total storage: Set by your organization plan\n\n### Troubleshooting\n\n**Upload fails:**\n- Check file size\n- Ensure supported format\n- Verify network connection\n\n**Slow processing:**\n- Large files take longer\n- Server load may affect speed\n- Check System Status page",
+          "tags": ["documents", "upload"],
+          "readTime": 5,
+          "lastUpdated": "2025-12-08T16:00:00Z",
+          "relatedArticles": ["matter-management", "document-search"]
+        },
+        {
+          "id": "data-connectors",
+          "title": "Data Connectors",
+          "summary": "Connect LANA AI to your existing systems",
+          "content": "## Data Connectors\n\nLANA AI can integrate with external systems to automatically sync documents.\n\n### Available Connectors\n\n- **Microsoft SharePoint**\n- **Google Drive**\n- **OneDrive**\n- **Dropbox**\n- **Box**\n- More coming soon!\n\n### Setting Up a Connector\n\n1. Go to **Data Connectors** page\n2. Click **Install Connector**\n3. Select the connector type\n4. Click **Authorize**\n5. Sign in to the external service\n6. Grant permissions\n7. Configure sync settings:\n   - Select folders/libraries to sync\n   - Set sync frequency (hourly, daily, weekly)\n   - Choose matter to sync to\n8. Click **Save**\n\n### OAuth Authorization\n\nMost connectors use OAuth 2.0:\n- You'll be redirected to the service login\n- Sign in with your account\n- Grant LANA AI read access\n- You'll be redirected back\n\n**Token Expiry:**\n- OAuth tokens expire after 90 days (varies by service)\n- Re-authorize when prompted\n\n### Sync Process\n\nWhen a connector syncs:\n1. Fetches new/updated files from source\n2. Downloads to LANA AI server\n3. Processes documents (text extraction, embedding)\n4. Indexes for search and AI\n\n### Monitoring\n\nView sync status:\n- **Sync Status** page shows all connectors\n- Last sync time\n- Records processed\n- Any errors\n\n### Troubleshooting\n\n**Connector not syncing:**\n- Check OAuth token hasn't expired\n- Verify permissions to source folders\n- Review error logs in Sync Status\n\n**Missing files:**\n- Check folder selection\n- Ensure files are in supported formats\n- Verify file permissions in source system",
+          "tags": ["connectors", "integrations"],
+          "readTime": 8,
+          "lastUpdated": "2025-12-05T13:00:00Z",
+          "relatedArticles": ["sharepoint-connector", "google-drive-connector"]
+        }
+      ]
+    },
+    {
+      "id": "troubleshooting",
+      "title": "Troubleshooting",
+      "description": "Solutions to common issues",
+      "icon": "wrench",
+      "order": 3,
+      "articles": [
+        {
+          "id": "login-issues",
+          "title": "Can't Log In?",
+          "summary": "Troubleshoot login and authentication problems",
+          "content": "## Login Issues\n\nIf you're experiencing login problems, try these solutions:\n\n### Incorrect Password\n\n1. Verify Caps Lock is off\n2. Try typing password in notepad first, then copy/paste\n3. Click **Forgot Password** to reset\n\n### Account Locked\n\nAfter 5 failed login attempts, your account locks for 15 minutes.\n\n**To unlock:**\n- Wait 15 minutes\n- Or contact your system administrator\n\n### Email Not Found\n\n- Verify you're using the correct email\n- Check for typos\n- Contact your admin to verify your account exists\n\n### Multi-Factor Authentication (MFA)\n\n**Not receiving code:**\n- Check spam folder\n- Verify phone number is correct\n- Use authenticator app backup codes\n\n**Authenticator app issues:**\n- Ensure device time is synchronized\n- Try regenerating codes in Settings\n\n### Browser Issues\n\n**Clear cache and cookies:**\n1. Open browser settings\n2. Clear browsing data\n3. Select \"Cookies\" and \"Cached images\"\n4. Clear from \"All time\"\n\n**Try incognito/private mode:**\n- Opens fresh session\n- Bypasses extensions that may interfere\n\n**Supported browsers:**\n- Chrome 90+\n- Firefox 88+\n- Safari 14+\n- Edge 90+\n\n### Network Issues\n\n**Can't reach server:**\n- Verify you're on the correct network\n- Check VPN connection if remote\n- Ping server IP address\n- Contact IT if firewall may be blocking\n\n### Still Can't Log In?\n\nContact your system administrator with:\n- Your email address\n- Screenshot of error message\n- Browser and operating system details",
+          "tags": ["troubleshooting", "authentication"],
+          "readTime": 4,
+          "lastUpdated": "2025-12-01T10:00:00Z",
+          "relatedArticles": ["password-reset", "account-locked"]
+        },
+        {
+          "id": "slow-performance",
+          "title": "Performance Issues",
+          "summary": "Fix slow loading and performance problems",
+          "content": "## Performance Troubleshooting\n\nIf LANA AI is running slowly, try these solutions:\n\n### Check Network Connection\n\n**Test connection:**\n1. Open System Status page\n2. Check latency to server\n3. Ideal: < 50ms, Acceptable: < 200ms, Slow: > 500ms\n\n**Improve connection:**\n- Use wired Ethernet instead of WiFi\n- Ensure you're on same network as server\n- Close bandwidth-heavy apps (video streaming, downloads)\n\n### Browser Optimization\n\n**Close unnecessary tabs:**\n- Each tab uses memory\n- Keep only essential tabs open\n\n**Clear cache:**\n1. Browser settings → Privacy\n2. Clear cached images and files\n3. Keep cookies to stay logged in\n\n**Disable extensions:**\n- Some extensions slow page load\n- Try disabling ad blockers, privacy tools\n- Re-enable one by one to identify culprit\n\n**Update browser:**\n- Use latest version\n- Newer versions have performance improvements\n\n### System Resources\n\n**Check RAM usage:**\n- LANA AI works best with 8GB+ RAM\n- Close other memory-intensive apps\n\n**Check CPU:**\n- Background processes may be consuming resources\n- Restart computer if it's been running for days\n\n### Server Load\n\n**Check system status:**\n- Navigate to Admin → System Health\n- High CPU/memory on server may slow responses\n\n**Peak usage times:**\n- Performance may be slower when many users are active\n- Consider scheduling heavy tasks (bulk uploads) for off-hours\n\n### Large Documents\n\n**Processing time:**\n- 100+ page PDFs take longer to process\n- Scanned documents require OCR (slower)\n- Be patient during upload processing\n\n**Optimization:**\n- Split very large documents into smaller files\n- Use searchable PDFs instead of scanned images when possible\n\n### AI Response Time\n\n**Chat response delays:**\n- Complex questions take longer (30-60 seconds normal)\n- Large context (many documents) increases processing time\n- Streaming output shows progress\n\n**Optimize queries:**\n- Be specific to reduce search scope\n- Select specific documents in file drawer\n- Use matter context to limit search space\n\n### Contact Support\n\nIf performance issues persist:\n- Note specific slow actions\n- Check System Health page\n- Report to administrator with details",
+          "tags": ["troubleshooting", "performance"],
+          "readTime": 6,
+          "lastUpdated": "2025-11-28T14:30:00Z",
+          "relatedArticles": ["system-requirements", "browser-compatibility"]
+        },
+        {
+          "id": "connector-sync-errors",
+          "title": "Connector Sync Errors",
+          "summary": "Resolve data connector synchronization issues",
+          "content": "## Connector Sync Troubleshooting\n\nWhen connectors fail to sync, follow these steps:\n\n### Check Sync Status\n\n1. Go to **Sync Status** page\n2. Find your connector\n3. View error details\n\n### Common Errors\n\n**\"OAuth token expired\"**\n- Tokens expire after 60-90 days\n- **Solution:** Re-authorize the connector\n  1. Go to Data Connectors\n  2. Click **Re-authorize**\n  3. Sign in again\n\n**\"Permission denied\"**\n- LANA AI can't access the folder/library\n- **Solution:** Check permissions\n  1. Verify you have access to the source folder\n  2. Ensure folder sharing is enabled\n  3. Re-authorize with account that has access\n\n**\"Network error\"**\n- Can't reach external service\n- **Solution:**\n  1. Check internet connection\n  2. Verify external service isn't down\n  3. Check firewall isn't blocking\n  4. Retry sync manually\n\n**\"Rate limit exceeded\"**\n- Too many API requests\n- **Solution:** Wait and retry\n  - Most services reset limits hourly\n  - Reduce sync frequency if recurring\n\n**\"Invalid configuration\"**\n- Connector settings are incorrect\n- **Solution:**\n  1. Edit connector settings\n  2. Verify folder/library paths\n  3. Re-save configuration\n\n### Manual Sync\n\nForce an immediate sync:\n1. Go to Sync Status\n2. Find connector\n3. Click **Sync Now**\n4. Monitor progress\n\n### Sync Logs\n\nView detailed sync history:\n1. Click connector name in Sync Status\n2. View log entries\n3. Look for:\n   - Records processed\n   - Records created\n   - Records updated\n   - Error messages\n\n### Re-create Connector\n\nIf issues persist:\n1. Delete the connector\n2. Create a new one\n3. Re-authorize\n4. Re-configure settings\n\n### Service-Specific Issues\n\n**SharePoint:**\n- Ensure site collection access\n- Verify library permissions\n- Check if library is locked\n\n**Google Drive:**\n- Verify Google account access\n- Check if files are in \"Shared with me\" (requires different permissions)\n- Ensure Drive API is enabled\n\n**OneDrive:**\n- Personal vs. Business accounts use different APIs\n- Verify correct account type\n- Check sharing settings\n\n### Contact Support\n\nIf you can't resolve the issue:\n- Export sync logs\n- Screenshot error messages\n- Note connector type and configuration\n- Contact support with details",
+          "tags": ["troubleshooting", "connectors"],
+          "readTime": 7,
+          "lastUpdated": "2025-11-25T09:00:00Z",
+          "relatedArticles": ["data-connectors", "oauth-authorization"]
+        }
+      ]
+    },
+    {
+      "id": "admin",
+      "title": "Administration",
+      "description": "Admin guides and best practices",
+      "icon": "shield",
+      "order": 4,
+      "articles": [
+        {
+          "id": "user-management",
+          "title": "Managing Users",
+          "summary": "Add, remove, and manage user accounts",
+          "content": "## User Management\n\nAs an administrator, you can manage user accounts.\n\n### Adding Users\n\n1. Go to **Admin → Users**\n2. Click **Add User**\n3. Fill in details:\n   - Email (required, used for login)\n   - First and last name\n   - Role (see Roles & Permissions)\n   - Status (active, pending, suspended)\n4. Click **Create**\n5. User receives invitation email\n\n### User Roles\n\n- **System Admin** - Full system access, can manage everything\n- **Org Admin** - Organization-wide access, can manage users and settings\n- **Manager** - Can manage matters and team members\n- **User** - Standard user, can create matters and upload documents\n- **Viewer** - Read-only access\n\n### Editing Users\n\n1. Find user in list\n2. Click **Edit**\n3. Modify fields\n4. Click **Save**\n\n### Suspending Users\n\n**Temporarily disable access:**\n1. Edit user\n2. Set status to **Suspended**\n3. User cannot log in\n4. Data remains intact\n\n**Reactivate:**\n1. Edit user\n2. Set status to **Active**\n\n### Deleting Users\n\n⚠️ **Warning:** This permanently removes the user and may affect associated data.\n\n1. Edit user\n2. Click **Delete User**\n3. Confirm deletion\n4. User's matters and documents are preserved\n\n### Password Reset\n\nHelp users who forgot passwords:\n1. Find user\n2. Click **Actions → Reset Password**\n3. Choose method:\n   - **Email reset link** (if email configured)\n   - **Set temporary password** (provide to user)\n4. User must change password on next login\n\n### Bulk Operations\n\n**Import users from CSV:**\n1. Prepare CSV with columns: email, firstName, lastName, role\n2. Go to Users page\n3. Click **Import Users**\n4. Upload CSV\n5. Review and confirm\n\n**Export users:**\n1. Click **Export Users**\n2. Download CSV\n3. Contains all user data\n\n### User Limits\n\nYour organization plan includes a maximum number of users. To add more:\n- Contact your account manager\n- Upgrade your plan\n\n### Best Practices\n\n- **Use clear role assignments** - Don't give unnecessary permissions\n- **Regular audits** - Review user list quarterly\n- **Remove inactive users** - Suspend or delete accounts no longer needed\n- **Document naming conventions** - Use consistent email format (@company.com)\n- **Onboarding process** - Have a checklist for new users",
+          "tags": ["admin", "users"],
+          "readTime": 10,
+          "lastUpdated": "2025-11-20T11:00:00Z",
+          "relatedArticles": ["roles-permissions", "organization-settings"]
+        },
+        {
+          "id": "roles-permissions",
+          "title": "Roles & Permissions",
+          "summary": "Configure user roles and access control",
+          "content": "## Roles & Permissions\n\nLANA AI uses role-based access control (RBAC).\n\n### Default Roles\n\n**System Admin:**\n- Full access to all features\n- Manage users and organizations\n- Configure system settings\n- View audit logs\n- Access all matters\n\n**Org Admin:**\n- Manage users within organization\n- Configure organization settings\n- View organization-wide statistics\n- Access all matters in organization\n\n**Manager:**\n- Create and manage matters\n- Assign users to matters\n- View team activity\n- Upload and manage documents\n\n**User:**\n- Create personal matters\n- Upload documents to assigned matters\n- Use chat and AI features\n- View own activity\n\n**Viewer:**\n- Read-only access\n- View assigned matters\n- Cannot create, edit, or delete\n\n### Creating Custom Roles\n\n1. Go to **Admin → Roles**\n2. Click **Create Role**\n3. Name the role\n4. Select permissions:\n\n**Available Permissions:**\n- `matters:read` - View matters\n- `matters:write` - Create/edit matters\n- `matters:delete` - Delete matters\n- `documents:read` - View documents\n- `documents:write` - Upload documents\n- `documents:delete` - Delete documents\n- `chat:access` - Use AI chat\n- `admin:access` - Access admin panel\n- `users:read` - View users\n- `users:write` - Manage users\n- `settings:read` - View settings\n- `settings:write` - Modify settings\n- `connectors:read` - View connectors\n- `connectors:write` - Manage connectors\n- `workflows:read` - View workflows\n- `workflows:write` - Create workflows\n- `workflows:execute` - Run workflows\n\n5. Click **Save**\n\n### Assigning Roles\n\n**To individual users:**\n1. Edit user\n2. Select role from dropdown\n3. Save\n\n**Bulk assignment:**\n1. Select multiple users\n2. Click **Bulk Actions → Change Role**\n3. Select new role\n4. Confirm\n\n### Matter-Level Permissions\n\nIn addition to roles, you can grant specific access per matter:\n\n1. Open matter\n2. Go to **Permissions** tab\n3. Click **Add User**\n4. Select user and permission level:\n   - **Owner** - Full control\n   - **Editor** - Can edit and upload\n   - **Viewer** - Read-only\n5. Save\n\n### Permission Inheritance\n\n- Org Admins automatically have access to all matters\n- System Admins have access across all organizations\n- Users only see matters they're assigned to\n\n### Auditing Permissions\n\nView who has access to what:\n1. Go to **Admin → Audit Logs**\n2. Filter by \"permission changes\"\n3. See all role and access modifications\n\n### Best Practices\n\n- **Principle of least privilege** - Give minimum necessary permissions\n- **Regular reviews** - Audit permissions quarterly\n- **Document custom roles** - Maintain documentation of what each role can do\n- **Test changes** - Verify permissions work as expected\n- **Use matter permissions** - For sensitive matters, explicitly control access",
+          "tags": ["admin", "security"],
+          "readTime": 12,
+          "lastUpdated": "2025-11-18T15:00:00Z",
+          "relatedArticles": ["user-management", "audit-logs"]
+        }
+      ]
+    }
+  ],
+  "quickLinks": [
+    {
+      "title": "Contact Support",
+      "description": "Get help from our support team",
+      "href": "#contact-support",
+      "icon": "mail"
+    },
+    {
+      "title": "Video Tutorials",
+      "description": "Watch step-by-step video guides",
+      "href": "https://www.youtube.com/@redroostertec",
+      "icon": "video",
+      "external": true,
+      "hidden": true
+    },
+    {
+      "title": "System Status",
+      "description": "Check current system status",
+      "href": "https://status.redroostertec.com",
+      "icon": "activity",
+      "external": true
+    },
+    {
+      "title": "API Documentation",
+      "description": "Developer API reference",
+      "href": "https://docs.redroostertec.com/lana-ai/api",
+      "icon": "code",
+      "external": true
+    }
+  ]
+}

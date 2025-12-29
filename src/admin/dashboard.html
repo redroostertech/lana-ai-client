@@ -166,10 +166,20 @@
                             <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
                                 <i class="fas fa-hdd text-orange-600 text-xl"></i>
                             </div>
-                            <div class="ml-4">
+                            <div class="ml-4 flex-1">
                                 <p class="text-sm text-gray-500">Storage Used</p>
                                 <p class="text-2xl font-bold text-gray-900" id="storageUsed">-</p>
                                 <p class="text-xs text-gray-500" id="storageTotal">of - total</p>
+                                <div id="documentStatsBreakdown" class="mt-2 pt-2 border-t border-gray-200 text-xs text-gray-600 space-y-1 hidden">
+                                    <div class="flex justify-between">
+                                        <span>Active docs:</span>
+                                        <span id="activeDocsCount" class="font-medium">-</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>Marked for deletion:</span>
+                                        <span id="deletedDocsCount" class="font-medium text-orange-600">-</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -245,6 +255,24 @@
                                 </tbody>
                             </table>
                         </div>
+                    </div>
+                </div>
+
+                <!-- System Storage Overview (System Admin / Org Admin Only) -->
+                <div id="systemStorageSection" class="bg-white rounded-lg shadow-sm p-6 mt-6 hidden">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">System Storage</h3>
+
+                    <!-- Database Storage -->
+                    <div class="mb-6">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-gray-700">Database</span>
+                            <span id="databaseSize" class="text-sm font-semibold text-gray-900">-</span>
+                        </div>
+                    </div>
+
+                    <!-- Volumes Grid -->
+                    <div id="volumesGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Volume cards will be dynamically inserted here -->
                     </div>
                 </div>
             </main>
@@ -472,17 +500,70 @@
                     }
                 }
 
-                // Load storage (from health endpoint) - for system admin and org admin
+                // Load storage stats - for system admin and org admin
                 if (isSystemAdmin || isOrgAdmin) {
                     try {
-                        const health = await api.getHealthSummary();
-                        if (health.storage) {
-                            document.getElementById('storageUsed').textContent = formatBytes(health.storage.used);
-                            document.getElementById('storageTotal').textContent = `of ${formatBytes(health.storage.total)} total`;
+                        // Fetch storage stats to get document breakdown
+                        const storageStats = await api.get('/api/v1/storage/stats');
+                        const totalFiles = parseInt(storageStats.total_files || 0);
+                        const deletedFiles = parseInt(storageStats.deleted_files || 0);
+                        const totalSizeBytes = parseInt(storageStats.total_size_bytes || 0);
+                        const deletedSizeBytes = parseInt(storageStats.deleted_size_bytes || 0);
+                        const totalDocs = totalFiles + deletedFiles;
+                        const totalSize = totalSizeBytes + deletedSizeBytes;
+
+                        document.getElementById('storageUsed').textContent = formatBytes(totalSize);
+                        document.getElementById('storageTotal').textContent = `${totalDocs.toLocaleString()} documents`;
+
+                        // Show document breakdown
+                        if (totalDocs > 0) {
+                            document.getElementById('activeDocsCount').textContent = totalFiles.toLocaleString();
+                            document.getElementById('deletedDocsCount').textContent = deletedFiles.toLocaleString();
+                            document.getElementById('documentStatsBreakdown').classList.remove('hidden');
                         }
                     } catch (e) {
+                        console.error('Failed to load storage stats:', e);
                         // Hide storage stat if no permission
                         document.getElementById('storageUsed').parentElement.parentElement.parentElement.style.display = 'none';
+                    }
+
+                    // Load system storage information
+                    try {
+                        const storageInfo = await api.get('/api/v1/admin/health/storage');
+
+                        // Show storage overview section
+                        document.getElementById('systemStorageSection').classList.remove('hidden');
+
+                        // Display database size
+                        if (storageInfo.database && !storageInfo.database.error) {
+                            const dbSizeGB = parseFloat(storageInfo.database.size_gb);
+                            document.getElementById('databaseSize').textContent = dbSizeGB.toFixed(2) + ' GB';
+                        }
+
+                        // Display volumes
+                        const volumesGrid = document.getElementById('volumesGrid');
+                        volumesGrid.innerHTML = ''; // Clear existing content
+
+                        if (storageInfo.volumes && storageInfo.volumes.length > 0) {
+                            storageInfo.volumes.forEach(volume => {
+                                if (volume.status !== 'not_available') {
+                                    const volumeCard = createVolumeCard(volume);
+                                    volumesGrid.innerHTML += volumeCard;
+                                }
+                            });
+                        }
+
+                        // If no volumes available, show root filesystem
+                        if (volumesGrid.innerHTML === '' && storageInfo.root_filesystem && !storageInfo.root_filesystem.error) {
+                            const rootCard = createVolumeCard(storageInfo.root_filesystem);
+                            volumesGrid.innerHTML = rootCard;
+                        }
+                    } catch (e) {
+                        console.error('Failed to load system storage:', e);
+                        // Hide the section if we don't have permission
+                        if (e.status === 403) {
+                            document.getElementById('systemStorageSection').classList.add('hidden');
+                        }
                     }
                 } else {
                     // Hide storage stat for non-admin users
@@ -756,6 +837,45 @@
             const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
             const i = Math.floor(Math.log(bytes) / Math.log(1024));
             return parseFloat((bytes / Math.pow(1024, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Create volume card HTML
+        function createVolumeCard(volume) {
+            const usagePercent = volume.usage_percent || 0;
+            const remainingPercent = volume.remaining_percent || (100 - usagePercent);
+            const usedGB = parseFloat(volume.used_gb || 0);
+            const totalGB = parseFloat(volume.total_gb || 0);
+            const availableGB = parseFloat(volume.available_gb || 0);
+
+            // Determine color based on usage
+            let barColor = 'bg-green-500';
+            let textColor = 'text-green-700';
+            if (usagePercent > 80) {
+                barColor = 'bg-red-500';
+                textColor = 'text-red-700';
+            } else if (usagePercent > 60) {
+                barColor = 'bg-yellow-500';
+                textColor = 'text-yellow-700';
+            }
+
+            return `
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium text-gray-700">${volume.name || volume.mount_point}</span>
+                        <span class="text-sm font-semibold ${textColor}">${usagePercent}% used</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2">
+                        <div class="${barColor} h-2.5 rounded-full" style="width: ${usagePercent}%"></div>
+                    </div>
+                    <div class="flex items-center justify-between text-xs text-gray-600">
+                        <span>${usedGB.toFixed(1)} GB used</span>
+                        <span>${availableGB.toFixed(1)} GB free of ${totalGB.toFixed(1)} GB</span>
+                    </div>
+                    <div class="mt-2 text-xs text-gray-500">
+                        ${remainingPercent.toFixed(1)}% remaining
+                    </div>
+                </div>
+            `;
         }
 
     </script>

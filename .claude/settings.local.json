@@ -7,7 +7,10 @@
       "Bash(git commit:*)",
       "Bash(git checkout:*)",
       "Bash(awk:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(cat:*)",
+      "Bash(curl:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

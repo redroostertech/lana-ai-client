@@ -34,7 +34,7 @@
           <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
           </button>
-          <a href="connector-crm.html" class="text-gray-500 hover:text-gray-700">
+          <a href="connectors.html" class="text-gray-500 hover:text-gray-700">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
           </a>
           <div>
@@ -203,21 +203,36 @@
         <!-- Tabs -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-8">
           <div class="border-b border-gray-200">
-            <nav class="flex -mb-px">
-              <button onclick="switchTab('contacts')" id="tab-contacts" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-indigo-600 text-indigo-600">
+            <nav class="flex -mb-px overflow-x-auto">
+              <button onclick="switchTab('overview')" id="tab-overview" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-indigo-600 text-indigo-600 whitespace-nowrap">
+                Overview
+              </button>
+              <button onclick="switchTab('configuration')" id="tab-configuration" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                Configuration
+              </button>
+              <button onclick="switchTab('contacts')" id="tab-contacts" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
                 Contacts
               </button>
-              <button onclick="switchTab('opportunities')" id="tab-opportunities" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+              <button onclick="switchTab('opportunities')" id="tab-opportunities" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
                 Opportunities
               </button>
-              <button onclick="switchTab('pipelines')" id="tab-pipelines" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+              <button onclick="switchTab('pipelines')" id="tab-pipelines" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
                 Pipelines
               </button>
-              <button onclick="switchTab('conversations')" id="tab-conversations" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+              <button onclick="switchTab('conversations')" id="tab-conversations" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
                 Conversations
               </button>
-              <button onclick="switchTab('tasks')" id="tab-tasks" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+              <button onclick="switchTab('tasks')" id="tab-tasks" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
                 Tasks
+              </button>
+              <button onclick="switchTab('logs')" id="tab-logs" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                Execution Logs
+              </button>
+              <button onclick="switchTab('documentation')" id="tab-documentation" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                Documentation
+              </button>
+              <button onclick="switchTab('workflows')" id="tab-workflows" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                Workflows
               </button>
             </nav>
           </div>
@@ -257,7 +272,7 @@
     document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
 
     let dashboardData = null;
-    let currentTab = 'contacts';
+    let currentTab = 'overview';
     let syncAttempted = false; // Prevent infinite sync loop
 
     // Format currency
@@ -391,6 +406,12 @@
 
       try {
         switch (tab) {
+          case 'overview':
+            await loadOverview();
+            break;
+          case 'configuration':
+            await loadConfiguration();
+            break;
           case 'contacts':
             await loadContacts();
             break;
@@ -406,10 +427,492 @@
           case 'tasks':
             await loadTasks();
             break;
+          case 'logs':
+            await loadExecutionLogs();
+            break;
+          case 'documentation':
+            await loadDocumentation();
+            break;
+          case 'workflows':
+            await loadWorkflows();
+            break;
+          default:
+            await loadOverview();
         }
       } catch (error) {
         content.innerHTML = `<div class="text-center text-red-600 py-8">Failed to load data: ${error.message}</div>`;
       }
+    }
+
+    // Load overview
+    async function loadOverview() {
+      const content = document.getElementById('tabContent');
+
+      const stats = dashboardData?.stats || {};
+
+      content.innerHTML = `
+        <div class="space-y-6">
+          <!-- Integration Status -->
+          <div class="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg p-6 border border-indigo-100">
+            <div class="flex items-start justify-between">
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">GoHighLevel Integration</h3>
+                <p class="text-gray-600 mb-4">Syncing contacts, opportunities, pipelines, conversations, and tasks from your GoHighLevel account.</p>
+
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+                  <div>
+                    <p class="text-sm text-gray-500">Status</p>
+                    <p class="font-medium text-green-600">Connected</p>
+                  </div>
+                  <div>
+                    <p class="text-sm text-gray-500">Last Sync</p>
+                    <p class="font-medium text-gray-900">${dashboardData?.last_sync?.started_at ? timeAgo(dashboardData.last_sync.started_at) : 'Never'}</p>
+                  </div>
+                  <div>
+                    <p class="text-sm text-gray-500">Sync Frequency</p>
+                    <p class="font-medium text-gray-900">Hourly</p>
+                  </div>
+                </div>
+              </div>
+              <div class="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+                <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button onclick="loadDashboard()" class="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-lg hover:border-indigo-300 hover:shadow-sm transition-all">
+              <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+              </div>
+              <div class="text-left">
+                <p class="font-medium text-gray-900">Sync Now</p>
+                <p class="text-xs text-gray-500">Refresh all data</p>
+              </div>
+            </button>
+
+            <button onclick="switchTab('configuration')" class="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-lg hover:border-indigo-300 hover:shadow-sm transition-all">
+              <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+              </div>
+              <div class="text-left">
+                <p class="font-medium text-gray-900">Settings</p>
+                <p class="text-xs text-gray-500">Configure sync</p>
+              </div>
+            </button>
+
+            <button onclick="switchTab('logs')" class="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-lg hover:border-indigo-300 hover:shadow-sm transition-all">
+              <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+              </div>
+              <div class="text-left">
+                <p class="font-medium text-gray-900">View Logs</p>
+                <p class="text-xs text-gray-500">Sync history</p>
+              </div>
+            </button>
+          </div>
+
+          <!-- Data Summary -->
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Data Summary</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div class="bg-white border border-gray-200 rounded-lg p-4">
+                <p class="text-sm text-gray-500 mb-1">Total Contacts</p>
+                <p class="text-2xl font-bold text-gray-900">${formatNumber(stats.contacts?.total || 0)}</p>
+                <p class="text-xs text-green-600 mt-1">+${formatNumber(stats.contacts?.new_last_7_days || 0)} this week</p>
+              </div>
+              <div class="bg-white border border-gray-200 rounded-lg p-4">
+                <p class="text-sm text-gray-500 mb-1">Opportunities</p>
+                <p class="text-2xl font-bold text-gray-900">${formatNumber(stats.opportunities?.open || 0)}</p>
+                <p class="text-xs text-gray-500 mt-1">${formatCurrency(stats.opportunities?.total_pipeline_value || 0)} value</p>
+              </div>
+              <div class="bg-white border border-gray-200 rounded-lg p-4">
+                <p class="text-sm text-gray-500 mb-1">Pipelines</p>
+                <p class="text-2xl font-bold text-gray-900">${formatNumber(stats.pipelines?.total || 0)}</p>
+                <p class="text-xs text-gray-500 mt-1">Active stages</p>
+              </div>
+              <div class="bg-white border border-gray-200 rounded-lg p-4">
+                <p class="text-sm text-gray-500 mb-1">Conversations</p>
+                <p class="text-2xl font-bold text-gray-900">${formatNumber(stats.conversations?.active || 0)}</p>
+                <p class="text-xs text-red-600 mt-1">${formatNumber(stats.conversations?.unread || 0)} unread</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Load configuration
+    async function loadConfiguration() {
+      const content = document.getElementById('tabContent');
+
+      // Get current configuration from backend
+      let currentConfig = {};
+      try {
+        const result = await api.get('/api/v1/leadly/config');
+        currentConfig = result.config || {};
+      } catch (error) {
+        console.error('Failed to load config:', error);
+      }
+
+      content.innerHTML = `
+        <div class="max-w-3xl">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">GoHighLevel Configuration</h3>
+
+          <form id="configurationForm" class="space-y-6">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Location ID</label>
+              <input type="text" id="config_location_id" value="${currentConfig.location_id || ''}"
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="e.g., fBnFx7iiO8tTUzzIlQdB">
+              <p class="mt-1 text-xs text-gray-500">Find this in GoHighLevel Settings > Business Profile</p>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">API Key</label>
+              <input type="password" id="config_api_key" value="${currentConfig.api_key ? '***hidden***' : ''}"
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="pit-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+              <p class="mt-1 text-xs text-gray-500">Private Integration Token from Settings > Integrations > API Keys</p>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Sync Frequency</label>
+              <select id="config_sync_frequency" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                <option value="realtime" ${currentConfig.sync_frequency === 'realtime' ? 'selected' : ''}>Real-time</option>
+                <option value="hourly" ${currentConfig.sync_frequency === 'hourly' ? 'selected' : ''}>Hourly</option>
+                <option value="daily" ${currentConfig.sync_frequency === 'daily' ? 'selected' : ''}>Daily</option>
+                <option value="manual" ${currentConfig.sync_frequency === 'manual' ? 'selected' : ''}>Manual only</option>
+              </select>
+            </div>
+
+            <div class="flex gap-3">
+              <button type="button" onclick="testLeadlyConnection()" class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">
+                Test Connection
+              </button>
+              <button type="submit" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">
+                Save Changes
+              </button>
+            </div>
+
+            <div id="configStatus" class="hidden text-center py-3 rounded-lg"></div>
+          </form>
+        </div>
+      `;
+
+      // Setup form handler
+      document.getElementById('configurationForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const statusEl = document.getElementById('configStatus');
+
+        try {
+          statusEl.className = 'text-center py-3 rounded-lg bg-gray-100 text-gray-600';
+          statusEl.textContent = 'Saving configuration...';
+          statusEl.classList.remove('hidden');
+
+          const config = {
+            location_id: document.getElementById('config_location_id').value.trim(),
+            api_key: document.getElementById('config_api_key').value.trim(),
+            sync_frequency: document.getElementById('config_sync_frequency').value
+          };
+
+          // Only include API key if it's not the masked value
+          if (config.api_key === '***hidden***') {
+            delete config.api_key;
+          }
+
+          await api.post('/api/v1/leadly/config', config);
+
+          statusEl.className = 'text-center py-3 rounded-lg bg-green-100 text-green-800';
+          statusEl.textContent = 'Configuration saved successfully!';
+
+          setTimeout(() => {
+            statusEl.classList.add('hidden');
+          }, 3000);
+        } catch (error) {
+          statusEl.className = 'text-center py-3 rounded-lg bg-red-100 text-red-800';
+          statusEl.textContent = error.message || 'Failed to save configuration';
+        }
+      });
+    }
+
+    // Test Leadly connection
+    async function testLeadlyConnection() {
+      const statusEl = document.getElementById('configStatus');
+      const locationId = document.getElementById('config_location_id').value.trim();
+      const apiKey = document.getElementById('config_api_key').value.trim();
+
+      if (!locationId || !apiKey || apiKey === '***hidden***') {
+        statusEl.className = 'text-center py-3 rounded-lg bg-yellow-100 text-yellow-800';
+        statusEl.textContent = 'Please enter both Location ID and API Key';
+        statusEl.classList.remove('hidden');
+        return;
+      }
+
+      try {
+        statusEl.className = 'text-center py-3 rounded-lg bg-gray-100 text-gray-600';
+        statusEl.textContent = 'Testing connection...';
+        statusEl.classList.remove('hidden');
+
+        const result = await api.post('/api/v1/leadly/config/test', {
+          location_id: locationId,
+          api_key: apiKey
+        });
+
+        if (result.success) {
+          statusEl.className = 'text-center py-3 rounded-lg bg-green-100 text-green-800';
+          statusEl.textContent = `Connected to ${result.location?.name || 'GoHighLevel'}`;
+        } else {
+          statusEl.className = 'text-center py-3 rounded-lg bg-red-100 text-red-800';
+          statusEl.textContent = result.message || 'Connection failed';
+        }
+      } catch (error) {
+        statusEl.className = 'text-center py-3 rounded-lg bg-red-100 text-red-800';
+        statusEl.textContent = error.message || 'Connection test failed';
+      }
+    }
+
+    // Load execution logs
+    async function loadExecutionLogs() {
+      const content = document.getElementById('tabContent');
+
+      try {
+        const result = await api.get('/api/v1/leadly/sync/history?limit=20');
+        const logs = result.syncs || [];
+
+        if (logs.length === 0) {
+          content.innerHTML = `
+            <div class="text-center py-12">
+              <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+              </div>
+              <p class="text-gray-500">No sync history available</p>
+            </div>
+          `;
+          return;
+        }
+
+        const statusColors = {
+          completed: 'bg-green-100 text-green-800',
+          failed: 'bg-red-100 text-red-800',
+          running: 'bg-blue-100 text-blue-800'
+        };
+
+        content.innerHTML = `
+          <div class="space-y-4">
+            ${logs.map(log => `
+              <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
+                <div class="flex items-start justify-between mb-3">
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <span class="px-2 py-1 text-xs font-medium rounded-full ${statusColors[log.status] || 'bg-gray-100 text-gray-600'}">
+                        ${log.status || 'unknown'}
+                      </span>
+                      <span class="text-sm text-gray-500">${log.started_at ? timeAgo(log.started_at) : 'Unknown'}</span>
+                    </div>
+                    ${log.completed_at ? `
+                      <p class="text-xs text-gray-500 mt-1">
+                        Duration: ${Math.round((new Date(log.completed_at) - new Date(log.started_at)) / 1000)}s
+                      </p>
+                    ` : ''}
+                  </div>
+                </div>
+
+                ${log.stats ? `
+                  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                    <div>
+                      <p class="text-gray-500">Contacts</p>
+                      <p class="font-medium text-gray-900">
+                        ${log.stats.contacts?.created || 0} created,
+                        ${log.stats.contacts?.updated || 0} updated
+                      </p>
+                    </div>
+                    <div>
+                      <p class="text-gray-500">Opportunities</p>
+                      <p class="font-medium text-gray-900">
+                        ${log.stats.opportunities?.created || 0} created,
+                        ${log.stats.opportunities?.updated || 0} updated
+                      </p>
+                    </div>
+                    <div>
+                      <p class="text-gray-500">Pipelines</p>
+                      <p class="font-medium text-gray-900">
+                        ${log.stats.pipelines?.created || 0} created,
+                        ${log.stats.pipelines?.updated || 0} updated
+                      </p>
+                    </div>
+                    <div>
+                      <p class="text-gray-500">Conversations</p>
+                      <p class="font-medium text-gray-900">
+                        ${log.stats.conversations?.created || 0} created
+                      </p>
+                    </div>
+                  </div>
+                ` : ''}
+
+                ${log.error_message ? `
+                  <div class="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p class="text-sm text-red-800">${log.error_message}</p>
+                  </div>
+                ` : ''}
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } catch (error) {
+        content.innerHTML = `
+          <div class="text-center py-8 text-red-600">
+            Failed to load sync history: ${error.message}
+          </div>
+        `;
+      }
+    }
+
+    // Load documentation
+    async function loadDocumentation() {
+      const content = document.getElementById('tabContent');
+
+      content.innerHTML = `
+        <div class="prose prose-sm max-w-none">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">GoHighLevel Integration Documentation</h3>
+
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div class="flex gap-3">
+              <svg class="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <div>
+                <p class="font-medium text-blue-900">About This Integration</p>
+                <p class="text-sm text-blue-800 mt-1">
+                  This integration connects to your GoHighLevel account to sync contacts, opportunities, pipelines, conversations, and tasks.
+                  All data is read-only and synced automatically based on your configured frequency.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <h4 class="font-semibold text-gray-900 mb-3">Setup Instructions</h4>
+          <ol class="list-decimal list-inside space-y-2 text-gray-700 mb-6">
+            <li>Log into your GoHighLevel account</li>
+            <li>Navigate to Settings > Business Profile to find your Location ID</li>
+            <li>Go to Settings > Integrations > API Keys</li>
+            <li>Create a new Private Integration Token (PIT)</li>
+            <li>Copy both the Location ID and API Key</li>
+            <li>Enter them in the Configuration tab above</li>
+            <li>Click "Test Connection" to verify credentials</li>
+            <li>Save your configuration</li>
+          </ol>
+
+          <h4 class="font-semibold text-gray-900 mb-3">Data Synced</h4>
+          <ul class="list-disc list-inside space-y-1 text-gray-700 mb-6">
+            <li><strong>Contacts:</strong> Name, email, phone, tags, custom fields, and source</li>
+            <li><strong>Opportunities:</strong> Deal name, value, stage, pipeline, and associated contact</li>
+            <li><strong>Pipelines:</strong> Pipeline structure, stages, and stage values</li>
+            <li><strong>Conversations:</strong> SMS and email conversations with contacts</li>
+            <li><strong>Tasks:</strong> Task assignments, due dates, and completion status</li>
+          </ul>
+
+          <h4 class="font-semibold text-gray-900 mb-3">Sync Frequency Options</h4>
+          <ul class="list-disc list-inside space-y-1 text-gray-700 mb-6">
+            <li><strong>Real-time:</strong> Syncs immediately when changes are detected (requires webhook setup)</li>
+            <li><strong>Hourly:</strong> Runs a full sync every hour</li>
+            <li><strong>Daily:</strong> Runs a full sync once per day at midnight</li>
+            <li><strong>Manual:</strong> Only syncs when you click the "Sync Now" button</li>
+          </ul>
+
+          <h4 class="font-semibold text-gray-900 mb-3">Troubleshooting</h4>
+          <div class="bg-gray-50 rounded-lg p-4">
+            <p class="font-medium text-gray-900 mb-2">Connection Failed</p>
+            <ul class="list-disc list-inside space-y-1 text-sm text-gray-700 mb-4">
+              <li>Verify your Location ID and API Key are correct</li>
+              <li>Ensure your API Key has not expired</li>
+              <li>Check that your GoHighLevel account is active</li>
+            </ul>
+
+            <p class="font-medium text-gray-900 mb-2">No Data Showing</p>
+            <ul class="list-disc list-inside space-y-1 text-sm text-gray-700">
+              <li>Click "Sync Now" to trigger an initial sync</li>
+              <li>Check the Execution Logs tab for sync errors</li>
+              <li>Verify data exists in your GoHighLevel account</li>
+            </ul>
+          </div>
+        </div>
+      `;
+    }
+
+    // Load workflows
+    async function loadWorkflows() {
+      const content = document.getElementById('tabContent');
+
+      content.innerHTML = `
+        <div>
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">Workflows Using This Connector</h3>
+
+          <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+            <div class="flex gap-3">
+              <svg class="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <div>
+                <p class="font-medium text-yellow-900">Workflow Integration</p>
+                <p class="text-sm text-yellow-800 mt-1">
+                  This section will show which workflows are using data from this connector. Workflow integration is coming soon.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-4">
+            <div class="bg-white border border-gray-200 rounded-lg p-4">
+              <div class="flex items-start gap-4">
+                <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                  </svg>
+                </div>
+                <div class="flex-1">
+                  <h4 class="font-medium text-gray-900 mb-1">Example: Lead Qualification</h4>
+                  <p class="text-sm text-gray-600 mb-3">Automatically qualify new leads from GoHighLevel based on contact tags and opportunity values</p>
+                  <div class="flex items-center gap-2 text-xs">
+                    <span class="px-2 py-1 bg-green-100 text-green-800 rounded">Active</span>
+                    <span class="text-gray-500">Uses: Contacts, Opportunities</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-white border border-gray-200 rounded-lg p-4">
+              <div class="flex items-start gap-4">
+                <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                  </svg>
+                </div>
+                <div class="flex-1">
+                  <h4 class="font-medium text-gray-900 mb-1">Example: Conversation Analysis</h4>
+                  <p class="text-sm text-gray-600 mb-3">Analyze conversation sentiment and generate follow-up recommendations using AI</p>
+                  <div class="flex items-center gap-2 text-xs">
+                    <span class="px-2 py-1 bg-gray-100 text-gray-600 rounded">Coming Soon</span>
+                    <span class="text-gray-500">Uses: Conversations, Contacts</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
     }
 
     // Load contacts

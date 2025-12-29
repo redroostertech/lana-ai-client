@@ -125,94 +125,6 @@
         </div>
       </div>
 
-      <!-- Summary Stats - Loading -->
-      <div id="statsLoading" class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
-          <div class="flex items-center justify-between">
-            <div>
-              <div class="h-4 bg-gray-200 rounded w-28 mb-2"></div>
-              <div class="h-8 bg-gray-200 rounded w-12"></div>
-            </div>
-            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
-          </div>
-        </div>
-        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
-          <div class="flex items-center justify-between">
-            <div>
-              <div class="h-4 bg-gray-200 rounded w-24 mb-2"></div>
-              <div class="h-8 bg-gray-200 rounded w-16"></div>
-            </div>
-            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
-          </div>
-        </div>
-        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
-          <div class="flex items-center justify-between">
-            <div>
-              <div class="h-4 bg-gray-200 rounded w-20 mb-2"></div>
-              <div class="h-8 bg-gray-200 rounded w-20"></div>
-            </div>
-            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
-          </div>
-        </div>
-        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
-          <div class="flex items-center justify-between">
-            <div>
-              <div class="h-4 bg-gray-200 rounded w-24 mb-2"></div>
-              <div class="h-8 bg-gray-200 rounded w-8"></div>
-            </div>
-            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Summary Stats - Content -->
-      <div id="statsContent" class="hidden grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm text-gray-500">Connected Sources</p>
-              <p id="connectedCount" class="text-2xl font-bold text-gray-900">-</p>
-            </div>
-            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-            </div>
-          </div>
-        </div>
-        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm text-gray-500">Total Records</p>
-              <p id="totalRecords" class="text-2xl font-bold text-gray-900">-</p>
-            </div>
-            <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path></svg>
-            </div>
-          </div>
-        </div>
-        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm text-gray-500">Last Sync</p>
-              <p id="lastSync" class="text-2xl font-bold text-gray-900">-</p>
-            </div>
-            <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-              <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            </div>
-          </div>
-        </div>
-        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm text-gray-500">Sync Errors</p>
-              <p id="syncErrors" class="text-2xl font-bold text-gray-900">-</p>
-            </div>
-            <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-              <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <!-- Connector Categories - Loading -->
       <div id="connectorsLoading" class="space-y-8">
         <!-- CRM Connectors Loading -->
@@ -309,20 +221,95 @@
 
         <!-- Available Connectors from Registry -->
         <section id="availableConnectorsSection" class="hidden">
-          <div class="flex items-center justify-between mb-4">
-            <div>
-              <h2 class="text-lg font-semibold text-gray-900">Available to Install</h2>
-              <p class="text-sm text-gray-500 mt-1">Connectors available from the registry</p>
-            </div>
-            <span id="registryStatus" class="text-xs text-gray-400"></span>
+          <div class="mb-4">
+            <h2 class="text-lg font-semibold text-gray-900">Available to Install</h2>
+            <p class="text-sm text-gray-500 mt-1">Ready-to-install connectors from the registry</p>
           </div>
+
+          <!-- Search and Filter Controls -->
+          <div class="mb-6 flex flex-col md:flex-row gap-4">
+            <!-- Search Input -->
+            <div class="flex-1">
+              <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                  </svg>
+                </div>
+                <input type="text" id="connectorSearch" placeholder="Search connectors by name, vendor, or description..."
+                  class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+              </div>
+            </div>
+
+            <!-- Category Filter -->
+            <div class="w-full md:w-48">
+              <select id="categoryFilter" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                <option value="">All Categories</option>
+                <option value="crm">CRM</option>
+                <option value="case">Case Management</option>
+                <option value="documents">Documents</option>
+                <option value="communications">Communications</option>
+                <option value="financial">Financial</option>
+              </select>
+            </div>
+
+            <!-- Auth Type Filter -->
+            <div class="w-full md:w-48">
+              <select id="authTypeFilter" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                <option value="">All Auth Types</option>
+                <option value="oauth2">OAuth 2.0</option>
+                <option value="api_key">API Key</option>
+              </select>
+            </div>
+          </div>
+
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="availableConnectors">
             <!-- Available connector cards from registry will be rendered here -->
+          </div>
+
+          <!-- No Results Message -->
+          <div id="noResultsMessage" class="hidden text-center py-12">
+            <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <p class="text-gray-500 font-medium mb-1">No connectors found</p>
+            <p class="text-sm text-gray-400">Try adjusting your search or filters</p>
           </div>
         </section>
       </div>
       <!-- End connectorsContent -->
     </main>
+  </div>
+
+  <!-- Connector Details Modal -->
+  <div id="connectorDetailsModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div class="p-6 border-b border-gray-200 flex items-start justify-between flex-shrink-0">
+        <div class="flex items-center gap-4">
+          <div id="detailsLogo" class="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center"></div>
+          <div>
+            <h3 id="detailsName" class="text-xl font-semibold text-gray-900"></h3>
+            <p id="detailsVendor" class="text-sm text-gray-500"></p>
+          </div>
+        </div>
+        <button onclick="closeDetailsModal()" class="text-gray-400 hover:text-gray-600">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <div class="p-6 overflow-y-auto flex-1">
+        <div id="detailsContent" class="space-y-6">
+          <!-- Content will be dynamically inserted -->
+        </div>
+      </div>
+      <div class="p-6 border-t border-gray-200 flex gap-3 flex-shrink-0">
+        <button id="detailsActionBtn" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">
+          Connect
+        </button>
+        <button onclick="closeDetailsModal()" class="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-lg transition-colors">
+          Close
+        </button>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -376,6 +363,9 @@
 
     // Render connector card
     function renderConnectorCard(connector) {
+      // Apply defaults for system-level integrations
+      connector = getConnectorWithDefaults(connector);
+
       // Normalize connector data - handle backend field variations
       const normalizedConnector = {
         id: connector.id || connector.connector_id || 'unknown',
@@ -385,59 +375,103 @@
         category: connector.category || connector.connector_category || 'unknown',
         records: connector.records || connector.total_records || 0,
         lastSync: connector.lastSync || connector.last_sync_at || null,
-        logo: connector.logo || connector.icon || null
+        logo_url: connector.logo_url || connector.logo || connector.icon || null,
+        vendor: connector.vendor || null,
+        auth_type: connector.auth_type || 'unknown',
+        capabilities: connector.capabilities || [],
+        tags: connector.tags || [],
+        documentation_url: connector.documentation_url || null
       };
 
       const statusColors = {
         connected: 'bg-green-100 text-green-800',
+        active: 'bg-green-100 text-green-800',
         disconnected: 'bg-gray-100 text-gray-600',
         error: 'bg-red-100 text-red-800',
         syncing: 'bg-blue-100 text-blue-800',
-        active: 'bg-green-100 text-green-800'  // Map 'active' to 'connected' styling
+        coming_soon: 'bg-yellow-100 text-yellow-800'
       };
 
       const statusIcons = {
         connected: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>',
+        active: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>',
         disconnected: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>',
         error: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
         syncing: '<svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>',
-        active: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>'
+        coming_soon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>'
       };
 
       const displayStatus = normalizedConnector.status;
       const statusColor = statusColors[displayStatus] || statusColors.disconnected;
       const statusIcon = statusIcons[displayStatus] || statusIcons.disconnected;
+      const statusLabel = displayStatus === 'coming_soon' ? 'Coming Soon' : displayStatus.replace('_', ' ');
+      const isComingSoon = displayStatus === 'coming_soon';
+      const isActive = ['connected', 'active'].includes(displayStatus);
+
+      // Logo rendering
+      const logoHtml = normalizedConnector.logo_url
+        ? `<img src="${normalizedConnector.logo_url}" alt="${normalizedConnector.name}" class="w-10 h-10 object-contain" onerror="this.parentElement.innerHTML='<span class=\\'text-lg font-bold text-gray-400\\'>${normalizedConnector.name.charAt(0)}</span>'">`
+        : `<span class="text-lg font-bold text-gray-400">${normalizedConnector.name.charAt(0)}</span>`;
 
       return `
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow cursor-pointer" onclick="openConnector('${normalizedConnector.id}', '${normalizedConnector.category}')">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 ${isComingSoon ? 'opacity-60' : 'hover:shadow-md'} transition-shadow ${isComingSoon ? '' : 'cursor-pointer'}" ${isComingSoon ? '' : `onclick="openConnector('${normalizedConnector.id}', '${normalizedConnector.category}')"`}>
           <div class="flex items-start justify-between mb-4">
             <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-              ${normalizedConnector.logo || `<span class="text-lg font-bold text-gray-400">${normalizedConnector.name.charAt(0)}</span>`}
+              ${logoHtml}
             </div>
             <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${statusColor}">
               ${statusIcon}
-              ${displayStatus}
+              ${statusLabel}
             </span>
           </div>
           <h3 class="font-semibold text-gray-900 mb-1">${normalizedConnector.name}</h3>
-          <p class="text-sm text-gray-500 mb-3">${normalizedConnector.description}</p>
-          ${normalizedConnector.status === 'connected' || normalizedConnector.status === 'active' ? `
-            <div class="flex items-center justify-between text-xs text-gray-400">
+          ${normalizedConnector.vendor ? `<p class="text-xs text-gray-400 mb-2">${normalizedConnector.vendor}</p>` : ''}
+          <p class="text-sm text-gray-500 mb-3 line-clamp-2">${normalizedConnector.description}</p>
+
+          ${isActive ? `
+            <div class="flex items-center justify-between text-xs text-gray-400 mb-3">
               <span>${normalizedConnector.records?.toLocaleString() || 0} records</span>
               <span>Last sync: ${normalizedConnector.lastSync ? timeAgo(normalizedConnector.lastSync) : 'Never'}</span>
             </div>
-          ` : `
-            <button class="w-full mt-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
-              Connect
+          ` : ''}
+
+          ${isComingSoon ? `
+            <button onclick="showConnectorDetails('${normalizedConnector.id}', event)" class="w-full px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors">
+              View Details
             </button>
+          ` : isActive ? `
+            <!-- Active Connector - Manage + Info -->
+            <div class="flex gap-2">
+              <button onclick="openConnectorManage('${normalizedConnector.id}'); event.stopPropagation();" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
+                Manage
+              </button>
+              <button onclick="showConnectorDetails('${normalizedConnector.id}', event)" class="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              </button>
+            </div>
+          ` : `
+            <!-- Disconnected Connector - Connect + Info -->
+            <div class="flex gap-2">
+              <button onclick="openConnectorManage('${normalizedConnector.id}'); event.stopPropagation();" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
+                Connect
+              </button>
+              <button onclick="showConnectorDetails('${normalizedConnector.id}', event)" class="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              </button>
+            </div>
           `}
         </div>
       `;
     }
 
-    // Open connector configuration
-    function openConnector(connectorId, category) {
-      // Special routing for system-level integrations with dedicated pages
+    // Open connector management page (unified page with config, docs, flows, output, logs)
+    function openConnectorManage(connectorId) {
+      // Find the connector in our global array to get its type
+      const connector = findConnectorById(connectorId);
+      const connectorType = connector?.connector_type || connector?.connector_id || connectorId;
+
+      // System-level integrations have dedicated comprehensive pages
+      // These pages include: Overview, Configuration, Documentation, Workflows, Output Data, Execution Logs
       const specialPages = {
         'case-actionstep': 'actionstep.html',
         'crm-leadly': 'leadly.html',
@@ -445,55 +479,102 @@
         // Add more system-level integrations here as they're built
       };
 
-      // Check if this connector has a dedicated page
-      if (specialPages[connectorId]) {
-        window.location.href = `${specialPages[connectorId]}?id=${connectorId}`;
+      // Check if this connector has a dedicated page (use connector_type for matching)
+      if (specialPages[connectorType]) {
+        window.location.href = `${specialPages[connectorType]}?id=${connectorId}`;
         return;
       }
 
-      // All other connectors (registry-based) use the generic integration config page
-      window.location.href = `integration-config.html?id=${connectorId}`;
+      // All other connectors (registry-based) use the generic integration management page
+      window.location.href = `integration-manage.html?id=${connectorId}`;
+    }
+
+    // Backward compatibility - keep openConnector as alias
+    function openConnector(connectorId, category) {
+      openConnectorManage(connectorId);
     }
 
     // Render available connector card from registry
     function renderAvailableConnectorCard(connector, installedConnectors) {
       const isInstalled = ConnectorRegistry.isConnectorInstalled(connector.id, installedConnectors);
+      const isComingSoon = connector.status === 'coming_soon';
+      const isActive = connector.status === 'active' || !connector.status;
+
+      // Logo rendering
+      const logoHtml = connector.logo_url
+        ? `<img src="${connector.logo_url}" alt="${connector.name}" class="w-10 h-10 object-contain" onerror="this.parentElement.innerHTML='<span class=\\'text-lg font-bold text-indigo-600\\'>${connector.name.charAt(0)}</span>'">`
+        : `<span class="text-lg font-bold text-indigo-600">${connector.name.charAt(0)}</span>`;
+
+      // Status badge
+      let statusBadge = '';
+      if (isInstalled) {
+        statusBadge = `
+          <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            Installed
+          </span>
+        `;
+      } else if (isComingSoon) {
+        statusBadge = `
+          <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            Coming Soon
+          </span>
+        `;
+      } else {
+        statusBadge = `
+          <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-600">
+            Available
+          </span>
+        `;
+      }
+
+      // Action button
+      let actionButton = '';
+      if (isInstalled) {
+        actionButton = `
+          <button disabled class="w-full px-4 py-2 bg-gray-100 text-gray-400 text-sm font-medium rounded-lg cursor-not-allowed">
+            Already Installed
+          </button>
+        `;
+      } else if (isComingSoon) {
+        actionButton = `
+          <button onclick="showConnectorDetails('${connector.id}', event)" class="w-full px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors">
+            View Details
+          </button>
+        `;
+      } else {
+        actionButton = `
+          <div class="flex gap-2">
+            <button onclick="installConnector('${connector.id}')" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
+              Install
+            </button>
+            <button onclick="showConnectorDetails('${connector.id}', event)" class="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </button>
+          </div>
+        `;
+      }
 
       return `
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 ${isComingSoon ? 'opacity-75' : 'hover:shadow-md'} transition-shadow">
           <div class="flex items-start justify-between mb-4">
             <div class="w-12 h-12 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-lg flex items-center justify-center">
-              <span class="text-lg font-bold text-indigo-600">${connector.name.charAt(0)}</span>
+              ${logoHtml}
             </div>
-            ${isInstalled ? `
-              <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                Installed
-              </span>
-            ` : `
-              <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
-                Available
-              </span>
-            `}
+            ${statusBadge}
           </div>
           <h3 class="font-semibold text-gray-900 mb-1">${connector.name}</h3>
+          ${connector.vendor ? `<p class="text-xs text-gray-400 mb-2">${connector.vendor}</p>` : ''}
           <p class="text-sm text-gray-500 mb-3 line-clamp-2">${connector.description}</p>
           <div class="flex items-center justify-between text-xs text-gray-400 mb-3">
             <span class="inline-flex items-center gap-1">
               <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
-              ${connector.category.replace('_', ' ')}
+              ${formatText(connector.category)}
             </span>
-            <span>v${connector.version}</span>
+            ${connector.version ? `<span>v${connector.version}</span>` : ''}
           </div>
-          ${isInstalled ? `
-            <button disabled class="w-full px-4 py-2 bg-gray-100 text-gray-400 text-sm font-medium rounded-lg cursor-not-allowed">
-              Already Installed
-            </button>
-          ` : `
-            <button onclick="installConnector('${connector.id}')" class="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
-              Install Connector
-            </button>
-          `}
+          ${actionButton}
         </div>
       `;
     }
@@ -548,10 +629,357 @@
       }
     }
 
+    // Store connectors globally for modal access
+    let allConnectors = [];
+    let allAvailableConnectors = [];
+    let currentInstalledConnectors = [];
+
+    // Static system-level connectors (always available)
+    const staticSystemConnectors = [
+      {
+        id: 'case-actionstep',
+        connector_type: 'case-actionstep',
+        name: 'ActionStep Integration',
+        description: 'Integrate with ActionStep legal practice management software to sync matters, contacts, documents, and billing information. Streamline your legal workflow with automated data synchronization.',
+        category: 'case_management',
+        vendor: 'ActionStep',
+        auth_type: 'api_key',
+        capabilities: ['matter_sync', 'contact_sync', 'document_sync', 'billing_integration', 'task_management'],
+        tags: ['legal', 'practice management', 'case management', 'billing'],
+        documentation_url: 'https://www.actionstep.com/api-documentation',
+        status: 'disconnected',
+        records: 0,
+        lastSync: null
+      },
+      {
+        id: 'crm-leadly',
+        connector_type: 'crm-leadly',
+        name: 'Leadly CRM',
+        description: 'Connect with Leadly CRM to sync leads, contacts, and opportunities. Automate your sales pipeline and maintain up-to-date customer information across platforms.',
+        category: 'crm',
+        vendor: 'Leadly',
+        auth_type: 'oauth2',
+        capabilities: ['lead_sync', 'contact_sync', 'opportunity_tracking', 'pipeline_management'],
+        tags: ['crm', 'sales', 'lead management'],
+        documentation_url: null,
+        status: 'disconnected',
+        records: 0,
+        lastSync: null
+      },
+      {
+        id: 'crm-gohighlevel',
+        connector_type: 'crm-gohighlevel',
+        name: 'GoHighLevel CRM',
+        description: 'Integrate with GoHighLevel all-in-one CRM and marketing platform. Sync contacts, opportunities, calendars, and automate your marketing workflows.',
+        category: 'crm',
+        vendor: 'GoHighLevel',
+        auth_type: 'oauth2',
+        capabilities: ['contact_sync', 'opportunity_sync', 'calendar_sync', 'marketing_automation', 'pipeline_management'],
+        tags: ['crm', 'marketing automation', 'sales', 'appointments'],
+        documentation_url: 'https://highlevel.com/api-docs',
+        status: 'disconnected',
+        records: 0,
+        lastSync: null
+      }
+    ];
+
+    // Default metadata lookup for merging with backend data
+    const systemIntegrationDefaults = {
+      'case-actionstep': staticSystemConnectors[0],
+      'crm-leadly': staticSystemConnectors[1],
+      'crm-gohighlevel': staticSystemConnectors[2]
+    };
+
+    // Helper function to find connector by ID
+    function findConnectorById(connectorId) {
+      return allConnectors.find(c =>
+        (c.id === connectorId) ||
+        (c.connector_id === connectorId)
+      );
+    }
+
+    // Helper function to get connector with defaults
+    function getConnectorWithDefaults(connector) {
+      // Try multiple fields to find the connector type ID
+      // Backend might use connector_type, connector_id, or name field
+      const possibleIds = [
+        connector.connector_type,
+        connector.connector_id,
+        connector.id,
+        connector.name?.toLowerCase().replace(/\s+/g, '-')
+      ].filter(Boolean);
+
+      // Find matching defaults
+      let defaults = null;
+      for (const possibleId of possibleIds) {
+        if (systemIntegrationDefaults[possibleId]) {
+          defaults = systemIntegrationDefaults[possibleId];
+          break;
+        }
+      }
+
+      if (defaults) {
+        return {
+          ...defaults,
+          ...connector,
+          // Preserve the original ID from backend
+          id: connector.id,
+          // Store the connector type for routing
+          connector_type: connector.connector_type || Object.keys(systemIntegrationDefaults).find(k => systemIntegrationDefaults[k] === defaults),
+          // Override with defaults if connector values are missing or 'unknown'
+          description: connector.description || connector.connector_description || defaults.description,
+          category: (connector.category && connector.category !== 'unknown') ? connector.category : defaults.category,
+          vendor: connector.vendor || defaults.vendor,
+          auth_type: (connector.auth_type && connector.auth_type !== 'unknown') ? connector.auth_type : defaults.auth_type,
+          capabilities: connector.capabilities?.length > 0 ? connector.capabilities : defaults.capabilities,
+          tags: connector.tags?.length > 0 ? connector.tags : defaults.tags,
+          documentation_url: connector.documentation_url || defaults.documentation_url
+        };
+      }
+
+      return connector;
+    }
+
+    // Helper function to format text nicely
+    function formatText(text) {
+      return text
+        .replace(/_/g, ' ')
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+    }
+
+    // Show connector details modal
+    function showConnectorDetails(connectorId, event) {
+      event?.stopPropagation();
+
+      // Find connector data
+      let connector = findConnectorById(connectorId);
+      if (!connector) {
+        console.error('Connector not found:', connectorId);
+        return;
+      }
+
+      // Apply defaults for system-level integrations
+      connector = getConnectorWithDefaults(connector);
+
+      // Normalize connector data
+      const normalizedConnector = {
+        id: connector.id || connector.connector_id || 'unknown',
+        name: connector.name || connector.connector_name || 'Unknown Connector',
+        description: connector.description || connector.connector_description || 'No description available',
+        status: connector.status || connector.auth_status || 'disconnected',
+        category: connector.category || connector.connector_category || 'unknown',
+        logo_url: connector.logo_url || connector.logo || connector.icon || null,
+        vendor: connector.vendor || null,
+        auth_type: connector.auth_type || 'unknown',
+        capabilities: connector.capabilities || [],
+        tags: connector.tags || [],
+        documentation_url: connector.documentation_url || null
+      };
+
+      // Populate modal header
+      document.getElementById('detailsName').textContent = normalizedConnector.name;
+      document.getElementById('detailsVendor').textContent = normalizedConnector.vendor || '';
+
+      // Populate logo
+      const logoEl = document.getElementById('detailsLogo');
+      if (normalizedConnector.logo_url) {
+        logoEl.innerHTML = `<img src="${normalizedConnector.logo_url}" alt="${normalizedConnector.name}" class="w-12 h-12 object-contain" onerror="this.innerHTML='<span class=\\'text-2xl font-bold text-gray-400\\'>${normalizedConnector.name.charAt(0)}</span>'">`;
+      } else {
+        logoEl.innerHTML = `<span class="text-2xl font-bold text-gray-400">${normalizedConnector.name.charAt(0)}</span>`;
+      }
+
+      // Build content HTML
+      const contentParts = [];
+
+      // Description
+      contentParts.push(`
+        <div>
+          <h4 class="font-semibold text-gray-900 mb-2">Description</h4>
+          <p class="text-gray-600">${normalizedConnector.description}</p>
+        </div>
+      `);
+
+      // Category
+      contentParts.push(`
+        <div>
+          <h4 class="font-semibold text-gray-900 mb-2">Category</h4>
+          <span class="inline-flex items-center px-3 py-1 rounded-full text-sm bg-gray-100 text-gray-800">
+            ${formatText(normalizedConnector.category)}
+          </span>
+        </div>
+      `);
+
+      // Authentication Type
+      const authTypeLabel = normalizedConnector.auth_type === 'oauth2' ? 'OAuth 2.0' :
+                            normalizedConnector.auth_type === 'api_key' ? 'API Key' :
+                            formatText(normalizedConnector.auth_type);
+      contentParts.push(`
+        <div>
+          <h4 class="font-semibold text-gray-900 mb-2">Authentication</h4>
+          <span class="inline-flex items-center px-3 py-1 rounded-full text-sm ${normalizedConnector.auth_type === 'oauth2' ? 'bg-blue-100 text-blue-800' : normalizedConnector.auth_type === 'api_key' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'}">
+            ${authTypeLabel}
+          </span>
+        </div>
+      `);
+
+      // Capabilities
+      if (normalizedConnector.capabilities && normalizedConnector.capabilities.length > 0) {
+        contentParts.push(`
+          <div>
+            <h4 class="font-semibold text-gray-900 mb-2">Capabilities</h4>
+            <div class="flex flex-wrap gap-2">
+              ${normalizedConnector.capabilities.map(cap => `
+                <span class="inline-flex items-center px-2 py-1 bg-indigo-50 text-indigo-700 rounded text-sm">
+                  ${formatText(cap)}
+                </span>
+              `).join('')}
+            </div>
+          </div>
+        `);
+      }
+
+      // Tags
+      if (normalizedConnector.tags && normalizedConnector.tags.length > 0) {
+        contentParts.push(`
+          <div>
+            <h4 class="font-semibold text-gray-900 mb-2">Tags</h4>
+            <div class="flex flex-wrap gap-2">
+              ${normalizedConnector.tags.map(tag => `
+                <span class="inline-flex items-center px-2 py-1 bg-gray-100 text-gray-600 rounded text-sm">
+                  ${tag}
+                </span>
+              `).join('')}
+            </div>
+          </div>
+        `);
+      }
+
+      // Documentation Link
+      if (normalizedConnector.documentation_url) {
+        contentParts.push(`
+          <div>
+            <a href="${normalizedConnector.documentation_url}" target="_blank" class="inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-700">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+              View Documentation
+            </a>
+          </div>
+        `);
+      }
+
+      // Insert content
+      document.getElementById('detailsContent').innerHTML = contentParts.join('');
+
+      // Update action button based on status
+      const actionBtn = document.getElementById('detailsActionBtn');
+      if (normalizedConnector.status === 'coming_soon') {
+        actionBtn.style.display = 'none';
+      } else {
+        actionBtn.style.display = 'block';
+        actionBtn.textContent = normalizedConnector.status === 'connected' || normalizedConnector.status === 'active' ? 'Manage Connector' : 'Connect';
+        actionBtn.onclick = () => {
+          closeDetailsModal();
+          openConnectorManage(normalizedConnector.id);
+        };
+      }
+
+      // Show modal
+      document.getElementById('connectorDetailsModal').classList.remove('hidden');
+    }
+
+    // Close connector details modal
+    function closeDetailsModal() {
+      document.getElementById('connectorDetailsModal').classList.add('hidden');
+    }
+
+    // Close modal on escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeDetailsModal();
+      }
+    });
+
+    // Close modal on background click
+    document.getElementById('connectorDetailsModal').addEventListener('click', (e) => {
+      if (e.target.id === 'connectorDetailsModal') {
+        closeDetailsModal();
+      }
+    });
+
+    // Search and filter available connectors
+    function filterAvailableConnectors() {
+      const searchTerm = document.getElementById('connectorSearch').value.toLowerCase();
+      const categoryFilter = document.getElementById('categoryFilter').value;
+      const authTypeFilter = document.getElementById('authTypeFilter').value;
+
+      const filtered = allAvailableConnectors.filter(connector => {
+        // Search filter (name, vendor, description, tags)
+        if (searchTerm) {
+          const matchesSearch =
+            (connector.name || '').toLowerCase().includes(searchTerm) ||
+            (connector.vendor || '').toLowerCase().includes(searchTerm) ||
+            (connector.description || '').toLowerCase().includes(searchTerm) ||
+            (connector.tags || []).some(tag => tag.toLowerCase().includes(searchTerm));
+
+          if (!matchesSearch) return false;
+        }
+
+        // Category filter
+        if (categoryFilter && connector.category !== categoryFilter) {
+          return false;
+        }
+
+        // Auth type filter
+        if (authTypeFilter && connector.auth_type !== authTypeFilter) {
+          return false;
+        }
+
+        return true;
+      });
+
+      renderAvailableConnectors(filtered);
+    }
+
+    // Render available connectors
+    function renderAvailableConnectors(connectors) {
+      const availableContainer = document.getElementById('availableConnectors');
+      const noResultsMessage = document.getElementById('noResultsMessage');
+
+      if (connectors.length === 0) {
+        availableContainer.innerHTML = '';
+        noResultsMessage.classList.remove('hidden');
+      } else {
+        availableContainer.innerHTML = connectors
+          .map(c => renderAvailableConnectorCard(c, currentInstalledConnectors))
+          .join('');
+        noResultsMessage.classList.add('hidden');
+      }
+    }
+
+    // Setup search and filter event listeners
+    function setupSearchAndFilters() {
+      const searchInput = document.getElementById('connectorSearch');
+      const categoryFilter = document.getElementById('categoryFilter');
+      const authTypeFilter = document.getElementById('authTypeFilter');
+
+      // Debounce search input
+      let searchTimeout;
+      searchInput.addEventListener('input', () => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(filterAvailableConnectors, 300);
+      });
+
+      // Immediate filter on dropdown change
+      categoryFilter.addEventListener('change', filterAvailableConnectors);
+      authTypeFilter.addEventListener('change', filterAvailableConnectors);
+    }
+
+    // Initialize search and filters
+    setupSearchAndFilters();
+
     // Load connectors data
     async function loadConnectors() {
-      const statsLoading = document.getElementById('statsLoading');
-      const statsContent = document.getElementById('statsContent');
       const connectorsLoading = document.getElementById('connectorsLoading');
       const connectorsContent = document.getElementById('connectorsContent');
 
@@ -565,16 +993,70 @@
         // Process installed connectors
         let installedConnectors = [];
         if (installedData.status === 'fulfilled') {
-          installedConnectors = installedData.value.connectors;
+          const backendConnectors = installedData.value.connectors || [];
 
-          // Update stats
-          const connected = installedConnectors.filter(c => c.status === 'connected');
-          document.getElementById('connectedCount').textContent = connected.length;
-          document.getElementById('totalRecords').textContent = connected.reduce((sum, c) => sum + (c.records || 0), 0).toLocaleString();
-          document.getElementById('syncErrors').textContent = installedConnectors.filter(c => c.status === 'error').length;
+          // Helper to check if a backend connector matches a static one
+          const isSystemConnector = (backendConnector, staticConnector) => {
+            // Check connector_type field
+            if (backendConnector.connector_type === staticConnector.connector_type) return true;
+            if (backendConnector.connector_id === staticConnector.id) return true;
+            if (backendConnector.id === staticConnector.id) return true;
 
-          const lastSynced = connected.filter(c => c.lastSync).sort((a, b) => new Date(b.lastSync) - new Date(a.lastSync))[0];
-          document.getElementById('lastSync').textContent = lastSynced ? timeAgo(lastSynced.lastSync) : 'Never';
+            // Check by name matching
+            const backendName = (backendConnector.name || '').toLowerCase().trim();
+            const staticName = (staticConnector.name || '').toLowerCase().trim();
+
+            // Exact match
+            if (backendName === staticName) return true;
+
+            // Partial match for common variations
+            if (backendName.includes('actionstep') && staticName.includes('actionstep')) return true;
+            if (backendName.includes('leadly') && staticName.includes('leadly')) return true;
+            if (backendName.includes('gohighlevel') && staticName.includes('gohighlevel')) return true;
+
+            return false;
+          };
+
+          // Merge static system connectors with backend data
+          const matchedBackendIds = new Set();
+          installedConnectors = staticSystemConnectors.map(staticConnector => {
+            // Find matching backend connector
+            const backendMatch = backendConnectors.find(bc => isSystemConnector(bc, staticConnector));
+
+            // If backend has data for this connector, merge it
+            if (backendMatch) {
+              matchedBackendIds.add(backendMatch.id);
+              return {
+                ...staticConnector,
+                // Override status, records, sync info from backend
+                status: backendMatch.status || backendMatch.auth_status || staticConnector.status,
+                records: backendMatch.records || backendMatch.total_records || staticConnector.records,
+                lastSync: backendMatch.lastSync || backendMatch.last_sync_at || staticConnector.lastSync,
+                // Keep backend ID for API calls
+                backend_id: backendMatch.id,
+                // Keep the friendly ID from static for routing
+                id: staticConnector.id,
+                connector_type: staticConnector.connector_type
+              };
+            }
+
+            // No backend data - return static connector as is (disconnected)
+            return staticConnector;
+          });
+
+          // Add any other backend connectors that aren't system-level
+          const additionalConnectors = backendConnectors.filter(bc => {
+            // Skip if already matched to a static connector
+            if (matchedBackendIds.has(bc.id)) return false;
+
+            // Skip if it matches any static connector
+            return !staticSystemConnectors.some(sc => isSystemConnector(bc, sc));
+          });
+
+          installedConnectors = [...installedConnectors, ...additionalConnectors];
+
+          // Store in global array for modal access
+          allConnectors = [...installedConnectors];
 
           // Render all installed connectors
           const installedContainer = document.getElementById('installedConnectors');
@@ -583,7 +1065,17 @@
           }
         } else {
           console.error('Failed to fetch installed connectors:', installedData.reason);
-          Toast.warning('Could not load installed connectors');
+          Toast.warning('Could not load backend connectors. Showing system-level connectors only.');
+
+          // Even if backend fails, show static system connectors
+          installedConnectors = [...staticSystemConnectors];
+          allConnectors = [...installedConnectors];
+
+          // Render static connectors
+          const installedContainer = document.getElementById('installedConnectors');
+          if (installedContainer) {
+            installedContainer.innerHTML = installedConnectors.map(renderConnectorCard).join('');
+          }
         }
 
         // Process registry connectors
@@ -591,28 +1083,33 @@
           const availableConnectors = registryData.value.connectors;
 
           if (availableConnectors && availableConnectors.length > 0) {
-            const availableSection = document.getElementById('availableConnectorsSection');
-            const availableContainer = document.getElementById('availableConnectors');
-            const registryStatus = document.getElementById('registryStatus');
+            // Add available connectors to global array (avoid duplicates)
+            availableConnectors.forEach(ac => {
+              if (!allConnectors.find(c => (c.id === ac.id || c.connector_id === ac.id))) {
+                allConnectors.push(ac);
+              }
+            });
 
-            // Filter out already installed connectors
+            const availableSection = document.getElementById('availableConnectorsSection');
+
+            // Filter out already installed connectors and coming_soon connectors
             const notInstalledConnectors = availableConnectors.filter(ac =>
-              !ConnectorRegistry.isConnectorInstalled(ac.id, installedConnectors)
+              !ConnectorRegistry.isConnectorInstalled(ac.id, installedConnectors) &&
+              ac.status !== 'coming_soon'
             );
 
-            if (notInstalledConnectors.length > 0) {
-              availableContainer.innerHTML = notInstalledConnectors
-                .map(c => renderAvailableConnectorCard(c, installedConnectors))
-                .join('');
-              availableSection.classList.remove('hidden');
+            // Store for filtering
+            allAvailableConnectors = notInstalledConnectors;
+            currentInstalledConnectors = installedConnectors;
 
-              // Show registry version info
-              registryStatus.textContent = `Registry v${registryData.value.registry_version} • Updated ${timeAgo(registryData.value.updated_at)}`;
+            if (notInstalledConnectors.length > 0) {
+              // Use the search/filter rendering function
+              renderAvailableConnectors(notInstalledConnectors);
+              availableSection.classList.remove('hidden');
             } else {
-              // All connectors are already installed
-              const availableSection = document.getElementById('availableConnectorsSection');
+              // All connectors are already installed or coming soon
               const availableContainer = document.getElementById('availableConnectors');
-              availableContainer.innerHTML = '<p class="text-sm text-gray-500 text-center py-8">All available connectors are already installed.</p>';
+              availableContainer.innerHTML = '<p class="text-sm text-gray-500 text-center py-8 col-span-full">All available connectors are already installed.</p>';
               availableSection.classList.remove('hidden');
             }
           }
@@ -636,14 +1133,10 @@
         }
 
         // Hide loading, show content
-        statsLoading.classList.add('hidden');
-        statsContent.classList.remove('hidden');
         connectorsLoading.classList.add('hidden');
         connectorsContent.classList.remove('hidden');
       } catch (error) {
         // Hide loading, show content with error
-        statsLoading.classList.add('hidden');
-        statsContent.classList.remove('hidden');
         connectorsLoading.classList.add('hidden');
         connectorsContent.classList.remove('hidden');
         Toast.error('Failed to load connectors');
