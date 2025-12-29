@@ -390,10 +390,11 @@
         document.getElementById('statOpportunitiesWon').textContent = 'last 90 days';
 
         // Pipeline Value
-        const pipelineValue = stats.pipeline_value || 0;
-        document.getElementById('statPipelineValue').textContent = formatCurrency(pipelineValue);
-        const wonValue = stats.won_value || 0;
-        document.getElementById('statPipelineWon').textContent = `$${formatNumber(wonValue)} won`;
+        const totalPipelineValue = stats.opportunities?.total_pipeline_value || 0;
+        document.getElementById('statPipelineValue').textContent = formatCurrency(totalPipelineValue);
+        const wonValue = stats.opportunities?.won_value || 0;
+        const openValue = stats.opportunities?.open_value || 0;
+        document.getElementById('statPipelineWon').textContent = `${formatCurrency(wonValue)} won vs ${formatCurrency(openValue)} open`;
 
         // Conversations
         document.getElementById('statConversations').textContent = formatNumber(stats.conversations?.total || 0);
@@ -429,7 +430,7 @@
         document.getElementById('statOpportunities').textContent = '0';
         document.getElementById('statOpportunitiesWon').textContent = 'last 90 days';
         document.getElementById('statPipelineValue').textContent = '$0';
-        document.getElementById('statPipelineWon').textContent = '$0 won';
+        document.getElementById('statPipelineWon').textContent = '$0 won vs $0 open';
         document.getElementById('statConversations').textContent = '0';
         document.getElementById('statConversationsUnread').textContent = 'No unread';
         document.getElementById('statTasks').textContent = '0';
