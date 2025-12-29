@@ -72,7 +72,7 @@
             <ul class="text-sm text-blue-700 space-y-1">
               <li class="flex items-center gap-2">
                 <span id="req-length" class="w-4 h-4 rounded-full bg-gray-300"></span>
-                At least 12 characters
+                At least 8 characters
               </li>
               <li class="flex items-center gap-2">
                 <span id="req-upper" class="w-4 h-4 rounded-full bg-gray-300"></span>
@@ -171,7 +171,7 @@
     // Password requirements checker
     function checkPasswordRequirements(password) {
       return {
-        length: password.length >= 12,
+        length: password.length >= 8,
         upper: /[A-Z]/.test(password),
         lower: /[a-z]/.test(password),
         number: /[0-9]/.test(password),
