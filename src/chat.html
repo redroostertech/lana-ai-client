@@ -334,6 +334,16 @@
               </div>
             </div>
           </div>
+
+          <!-- Conversations Panel Footer -->
+          <div class="p-3 border-t border-gray-200 flex-shrink-0">
+            <button onclick="openHelpMenu()" class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 font-medium rounded-lg transition-colors">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <span>Show Help</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -351,13 +361,25 @@
                 <p class="text-xs text-yellow-600 mt-0.5">Generation started <span id="generationDuration">a moment ago</span></p>
               </div>
             </div>
-            <button
-              id="stopGenerationBtn"
-              onclick="stopOngoingGeneration()"
-              class="px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-lg hover:bg-yellow-700 transition-colors"
-            >
-              Stop Generation
-            </button>
+            <div class="flex items-center gap-2">
+              <button
+                id="viewReasoningBtn"
+                onclick="openReasoningModal()"
+                class="hidden px-4 py-2 bg-white border border-yellow-600 text-yellow-700 text-sm font-medium rounded-lg hover:bg-yellow-50 transition-colors flex items-center gap-2"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                </svg>
+                View Reasoning
+              </button>
+              <button
+                id="stopGenerationBtn"
+                onclick="stopOngoingGeneration()"
+                class="px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-lg hover:bg-yellow-700 transition-colors"
+              >
+                Stop Generation
+              </button>
+            </div>
           </div>
         </div>
 
@@ -372,6 +394,25 @@
           <div id="messagesLoading" class="messages-loading hidden">
             <div class="messages-loading-spinner"></div>
             <p class="mt-3 text-sm text-gray-500">Loading conversation...</p>
+          </div>
+          <!-- Tip Banner for Document Management -->
+          <div id="documentTipBanner" class="bg-indigo-50 border-l-4 border-indigo-500 p-4 mb-4 rounded-r-lg hidden">
+            <div class="flex items-start gap-3">
+              <div class="flex-shrink-0">
+                <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+              </div>
+              <div class="flex-1">
+                <h4 class="text-sm font-semibold text-indigo-900 mb-1">Chat with Your Documents</h4>
+                <p class="text-sm text-indigo-800">To begin chatting with documents, click on the <span class="inline-flex items-center px-1.5 py-0.5 bg-indigo-600 text-white rounded text-xs font-medium">+</span> button in the text input field below.</p>
+              </div>
+              <button onclick="dismissDocumentTip()" class="flex-shrink-0 text-indigo-600 hover:text-indigo-800 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
           </div>
           <!-- Welcome Message -->
           <div id="welcomeMessage" class="flex justify-center py-8">
@@ -512,7 +553,7 @@
               ></div>
             </div>
             <!-- Context meter (shows token usage for auto-compact) -->
-            <div id="contextMeter" class="mt-2 mb-0">
+            <div id="contextMeter" class="mt-2 mb-0 hidden">
               <div class="flex items-center gap-2">
                 <p id="contextText" class="text-xs text-gray-500">Context available: 100%</p>
                 <button type="button" onclick="openContextInfoModal()" class="text-gray-400 hover:text-gray-600 transition-colors" title="Learn about context usage">
@@ -677,6 +718,127 @@
 
       </div>
 
+  <!-- Help Menu Overlay -->
+  <div id="helpMenuOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden transition-opacity"></div>
+
+  <!-- Help Menu Panel (Slide-out from right) -->
+  <div id="helpMenuPanel" class="fixed top-0 bottom-0 right-0 w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 flex flex-col h-screen">
+    <!-- Header -->
+    <div class="p-4 border-b border-gray-200 flex-shrink-0">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-lg font-semibold text-gray-900">Help & Support</h3>
+        <button id="closeHelpMenu" onclick="closeHelpMenu()" class="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors" title="Close">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <p class="text-sm text-gray-600">Find answers and learn how to use Lana AI</p>
+    </div>
+
+    <!-- Help Topics -->
+    <div class="flex-1 overflow-y-auto p-4">
+      <div class="space-y-3">
+        <!-- Getting Started -->
+        <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4 hover:bg-indigo-100 transition-colors cursor-pointer">
+          <div class="flex items-start gap-3">
+            <div class="flex-shrink-0">
+              <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+              </svg>
+            </div>
+            <div>
+              <h4 class="font-semibold text-gray-900 mb-1">Getting Started</h4>
+              <p class="text-sm text-gray-600">Learn the basics of using Lana AI</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Document Management -->
+        <div class="bg-white border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors cursor-pointer">
+          <div class="flex items-start gap-3">
+            <div class="flex-shrink-0">
+              <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+            </div>
+            <div>
+              <h4 class="font-semibold text-gray-900 mb-1">Document Management</h4>
+              <p class="text-sm text-gray-600">Upload and manage your documents</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chat Features -->
+        <div class="bg-white border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors cursor-pointer">
+          <div class="flex items-start gap-3">
+            <div class="flex-shrink-0">
+              <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+              </svg>
+            </div>
+            <div>
+              <h4 class="font-semibold text-gray-900 mb-1">Chat Features</h4>
+              <p class="text-sm text-gray-600">Tips for effective conversations</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Project Management -->
+        <div class="bg-white border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors cursor-pointer">
+          <div class="flex items-start gap-3">
+            <div class="flex-shrink-0">
+              <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+              </svg>
+            </div>
+            <div>
+              <h4 class="font-semibold text-gray-900 mb-1">Project Management</h4>
+              <p class="text-sm text-gray-600">Organize conversations by matter</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Keyboard Shortcuts -->
+        <div class="bg-white border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors cursor-pointer">
+          <div class="flex items-start gap-3">
+            <div class="flex-shrink-0">
+              <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+              </svg>
+            </div>
+            <div>
+              <h4 class="font-semibold text-gray-900 mb-1">Keyboard Shortcuts</h4>
+              <p class="text-sm text-gray-600">Work faster with shortcuts</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- FAQs -->
+        <div class="bg-white border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors cursor-pointer">
+          <div class="flex items-start gap-3">
+            <div class="flex-shrink-0">
+              <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <div>
+              <h4 class="font-semibold text-gray-900 mb-1">FAQs</h4>
+              <p class="text-sm text-gray-600">Frequently asked questions</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="p-4 border-t border-gray-200 flex-shrink-0">
+      <div class="text-center">
+        <p class="text-xs text-gray-500 mb-2">Need more help?</p>
+        <button class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">Contact Support</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Overlay for mobile sidebar -->
   <div id="sidebarOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden lg:hidden"></div>
@@ -810,6 +972,65 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
               </svg>
               Create Project
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reasoning Modal -->
+    <div id="reasoningModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 9999;" onclick="if(event.target === this) closeReasoningModal()">
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col" onclick="event.stopPropagation()">
+        <!-- Modal Header -->
+        <div class="flex items-center justify-between p-6 border-b border-gray-200">
+          <div class="flex items-center gap-3">
+            <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+            </svg>
+            <div>
+              <h2 class="text-xl font-semibold text-gray-900">AI Reasoning Process</h2>
+              <p class="text-sm text-gray-500 mt-0.5">Real-time view of AI thinking and decision-making</p>
+            </div>
+          </div>
+          <button onclick="closeReasoningModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Model Info Banner -->
+        <div id="reasoningModelInfo" class="px-6 py-3 bg-indigo-50 border-b border-indigo-200">
+          <div class="flex items-center gap-2">
+            <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path>
+            </svg>
+            <span id="reasoningModelName" class="text-sm font-medium text-indigo-900">Model: Loading...</span>
+            <span class="text-xs text-indigo-600 mx-2">•</span>
+            <span id="reasoningEventCount" class="text-sm text-indigo-700">0 reasoning events</span>
+          </div>
+        </div>
+
+        <!-- Reasoning Events List -->
+        <div id="reasoningEventsList" class="flex-1 overflow-y-auto p-6 space-y-3">
+          <div class="text-center py-12 text-gray-400">
+            <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+            </svg>
+            <p class="text-sm">No reasoning events yet</p>
+            <p class="text-xs mt-1">Reasoning events will appear here as the AI processes your query</p>
+          </div>
+        </div>
+
+        <!-- Footer with stats -->
+        <div class="px-6 py-3 border-t border-gray-200 bg-gray-50">
+          <div class="flex items-center justify-between text-xs text-gray-500">
+            <div class="flex items-center gap-4">
+              <span>Started: <span id="reasoningStartTime" class="font-medium text-gray-700">--</span></span>
+              <span>Duration: <span id="reasoningDuration" class="font-medium text-gray-700">--</span></span>
+            </div>
+            <button onclick="clearReasoningLog()" class="text-indigo-600 hover:text-indigo-800 font-medium">
+              Clear Log
             </button>
           </div>
         </div>
@@ -1114,6 +1335,12 @@
     let isGenerating = false;  // Track if AI is currently generating (prevents double submission)
     let generatingConversationId = null;  // Track which conversation is generating (for conversation-aware activity indicator)
     let allConversations = [];
+
+    // Reasoning tracking state
+    let reasoningLog = [];  // Array to store all reasoning/thinking events
+    let reasoningStartTime = null;  // When reasoning started
+    let reasoningDurationInterval = null;  // Interval for updating duration
+    let currentModelName = null;  // Current model being used
     
     // Pagination state for conversations list
     let yourChatsPage = 1;
@@ -1175,6 +1402,63 @@
       document.getElementById('matterSearch').value = '';
     }
 
+    // Help Menu Functions
+    window.openHelpMenu = function() {
+      const panel = document.getElementById('helpMenuPanel');
+      const overlay = document.getElementById('helpMenuOverlay');
+
+      // Show overlay
+      overlay.classList.remove('hidden');
+
+      // Slide in panel
+      setTimeout(() => {
+        panel.classList.remove('translate-x-full');
+      }, 10);
+    }
+
+    window.closeHelpMenu = function() {
+      const panel = document.getElementById('helpMenuPanel');
+      const overlay = document.getElementById('helpMenuOverlay');
+
+      // Slide out panel
+      panel.classList.add('translate-x-full');
+
+      // Hide overlay after transition
+      setTimeout(() => {
+        overlay.classList.add('hidden');
+      }, 300);
+    }
+
+    // Document Tip Banner Functions
+    window.dismissDocumentTip = function() {
+      const banner = document.getElementById('documentTipBanner');
+      banner.classList.add('hidden');
+
+      // Store in localStorage that user dismissed the tip
+      try {
+        localStorage.setItem('lana_document_tip_dismissed', 'true');
+      } catch (e) {
+        console.warn('Could not save tip dismissal to localStorage:', e);
+      }
+    }
+
+    window.showDocumentTip = function() {
+      // Check if user has dismissed the tip before
+      try {
+        const dismissed = localStorage.getItem('lana_document_tip_dismissed');
+        if (dismissed === 'true') {
+          return; // Don't show if previously dismissed
+        }
+      } catch (e) {
+        console.warn('Could not read from localStorage:', e);
+      }
+
+      const banner = document.getElementById('documentTipBanner');
+      if (banner) {
+        banner.classList.remove('hidden');
+      }
+    }
+
     // Context Info Modal Functions
     window.openContextInfoModal = function() {
       const modal = document.getElementById('contextInfoModal');
@@ -1186,6 +1470,219 @@
       const modal = document.getElementById('contextInfoModal');
       modal.classList.add('hidden');
       modal.classList.remove('flex');
+    }
+
+    // Reasoning Modal Functions
+    window.openReasoningModal = function() {
+      const modal = document.getElementById('reasoningModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+
+      // Update modal content with current reasoning log
+      updateReasoningModal();
+
+      // Start duration timer if reasoning is active
+      if (reasoningStartTime && !reasoningDurationInterval) {
+        startReasoningDurationTimer();
+      }
+    }
+
+    window.closeReasoningModal = function() {
+      const modal = document.getElementById('reasoningModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    window.clearReasoningLog = function() {
+      reasoningLog = [];
+      reasoningStartTime = null;
+      updateReasoningModal();
+      Toast.info('Reasoning log cleared');
+    }
+
+    // Capture reasoning events to the log
+    function captureReasoningEvent(type, data) {
+      console.log('[captureReasoningEvent] Called with type:', type, 'data:', data);
+
+      // Initialize reasoning start time on first event
+      if (!reasoningStartTime) {
+        reasoningStartTime = new Date();
+        console.log('[captureReasoningEvent] Initialized reasoningStartTime:', reasoningStartTime);
+      }
+
+      // Create event object
+      const event = {
+        type: type,
+        timestamp: new Date(),
+        data: data
+      };
+
+      // Add to log
+      reasoningLog.push(event);
+      console.log('[captureReasoningEvent] Added event to log. Total events:', reasoningLog.length);
+
+      // Update modal if it's open
+      const modal = document.getElementById('reasoningModal');
+      if (modal && !modal.classList.contains('hidden')) {
+        console.log('[captureReasoningEvent] Modal is open, updating...');
+        updateReasoningModal();
+      } else {
+        console.log('[captureReasoningEvent] Modal is not open, skipping update');
+      }
+
+      console.log('[Reasoning Capture] Successfully captured:', type, 'Total events in log:', reasoningLog.length);
+    }
+
+    // Update reasoning modal content
+    function updateReasoningModal() {
+      const eventsList = document.getElementById('reasoningEventsList');
+      const modelNameEl = document.getElementById('reasoningModelName');
+      const eventCountEl = document.getElementById('reasoningEventCount');
+      const startTimeEl = document.getElementById('reasoningStartTime');
+
+      // Update model name
+      if (modelNameEl) {
+        modelNameEl.textContent = `Model: ${currentModelName || 'Unknown'}`;
+      }
+
+      // Update event count
+      if (eventCountEl) {
+        eventCountEl.textContent = `${reasoningLog.length} reasoning event${reasoningLog.length !== 1 ? 's' : ''}`;
+      }
+
+      // Update start time
+      if (startTimeEl && reasoningStartTime) {
+        startTimeEl.textContent = reasoningStartTime.toLocaleTimeString();
+      }
+
+      // Render events list
+      if (eventsList) {
+        if (reasoningLog.length === 0) {
+          eventsList.innerHTML = `
+            <div class="text-center py-12 text-gray-400">
+              <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+              </svg>
+              <p class="text-sm">No reasoning events yet</p>
+              <p class="text-xs mt-1">Reasoning events will appear here as the AI processes your query</p>
+            </div>
+          `;
+        } else {
+          // Render events in chronological order (oldest first)
+          eventsList.innerHTML = reasoningLog.map((event, index) => {
+            const timeStr = event.timestamp.toLocaleTimeString();
+            const eventTypeLabel = getEventTypeLabel(event.type);
+            const eventIcon = getEventIcon(event.type);
+            const eventColor = getEventColor(event.type);
+
+            let contentHtml = '';
+
+            if (event.type === 'reasoning') {
+              contentHtml = `<p class="text-sm text-gray-700">${escapeHtml(event.data.message || '')}</p>`;
+            } else if (event.type === 'thinking') {
+              contentHtml = `<p class="text-sm text-gray-700 italic">${escapeHtml(event.data.message || '')}</p>`;
+            } else if (event.type === 'progress') {
+              const percent = event.data.percent || 0;
+              const stage = event.data.stage || 'processing';
+              const message = event.data.message || '';
+              contentHtml = `
+                <div class="space-y-1">
+                  <div class="flex items-center justify-between">
+                    <span class="text-sm font-medium text-gray-700">${escapeHtml(stage)}</span>
+                    <span class="text-sm font-semibold text-gray-900">${Math.round(percent)}%</span>
+                  </div>
+                  <div class="bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div class="bg-${eventColor}-500 h-full transition-all duration-300" style="width: ${percent}%"></div>
+                  </div>
+                  ${message ? `<p class="text-xs text-gray-600">${escapeHtml(message)}</p>` : ''}
+                </div>
+              `;
+            }
+
+            return `
+              <div class="bg-white border border-gray-200 rounded-lg p-4 hover:border-${eventColor}-300 hover:shadow-sm transition-all">
+                <div class="flex items-start gap-3">
+                  <div class="flex-shrink-0 w-8 h-8 bg-${eventColor}-100 rounded-full flex items-center justify-center">
+                    ${eventIcon}
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between mb-1">
+                      <span class="text-xs font-semibold text-${eventColor}-700 uppercase">${eventTypeLabel}</span>
+                      <span class="text-xs text-gray-500">${timeStr}</span>
+                    </div>
+                    ${contentHtml}
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+      }
+    }
+
+    // Get event type label
+    function getEventTypeLabel(type) {
+      const labels = {
+        'reasoning': 'Reasoning',
+        'thinking': 'Thinking',
+        'progress': 'Progress'
+      };
+      return labels[type] || type;
+    }
+
+    // Get event icon
+    function getEventIcon(type) {
+      const icons = {
+        'reasoning': '<svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>',
+        'thinking': '<svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>',
+        'progress': '<svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>'
+      };
+      return icons[type] || '<svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+    }
+
+    // Get event color
+    function getEventColor(type) {
+      const colors = {
+        'reasoning': 'indigo',
+        'thinking': 'purple',
+        'progress': 'blue'
+      };
+      return colors[type] || 'gray';
+    }
+
+    // Start duration timer
+    function startReasoningDurationTimer() {
+      const durationEl = document.getElementById('reasoningDuration');
+
+      const updateDuration = () => {
+        if (!reasoningStartTime) return;
+
+        const now = new Date();
+        const elapsed = Math.floor((now - reasoningStartTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+
+        if (durationEl) {
+          durationEl.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
+      };
+
+      updateDuration();
+      reasoningDurationInterval = setInterval(updateDuration, 1000);
+    }
+
+    // Clear reasoning log when new query starts
+    function resetReasoningLog() {
+      reasoningLog = [];
+      reasoningStartTime = null;
+      currentModelName = null;
+
+      if (reasoningDurationInterval) {
+        clearInterval(reasoningDurationInterval);
+        reasoningDurationInterval = null;
+      }
+
+      console.log('[Reasoning] Log reset for new query');
     }
 
     async function loadMatters() {
@@ -1316,6 +1813,9 @@
 
         if (newThreadId) {
           currentConversationId = newThreadId;
+
+          // Enable message input now that a conversation is created
+          enableMessageInput();
 
           // Update URL
           const urlParams = new URLSearchParams(window.location.search);
@@ -1902,10 +2402,14 @@
 
       console.log('Selected conversation:', { threadId, matterId: window.currentMatterId });
 
+      // Enable message input now that a conversation is selected
+      enableMessageInput();
+
       // Hide activity indicator if we're switching away from generating conversation
       if (generatingConversationId && generatingConversationId !== threadId) {
         console.log('[selectConversation] Hiding activity indicator - switched away from generating conversation');
         hideTyping();
+        hideGenerationBanner();
       }
 
       // Reset context meter immediately to clear stale data
@@ -2433,8 +2937,8 @@
       return 'just now';
     }
 
-    // Open document viewer with specific page
-    async function openDocumentViewer(documentId, pageNumber, filename, chunkId) {
+    // Open document viewer with specific page and line highlighting
+    async function openDocumentViewer(documentId, pageNumber, filename, chunkId, startLine, endLine) {
       if (!documentId) {
         Toast.warning('Document ID not available');
         return;
@@ -2444,12 +2948,22 @@
         documentId,
         pageNumber,
         filename,
-        chunkId
+        chunkId,
+        startLine,
+        endLine
       });
 
       try {
-        // Fetch document from API
-        const response = await fetch(`${api.baseUrl}/api/v1/storage/download/${documentId}`, {
+        // Build view URL with matter_id parameter
+        const matterId = window.currentMatterId || '';
+        const viewUrl = matterId
+          ? `${api.baseUrl}/api/v1/storage/files/${documentId}/view?matter_id=${matterId}`
+          : `${api.baseUrl}/api/v1/storage/files/${documentId}/view`;
+
+        console.log('[DocumentViewer] Fetching document from VIEW endpoint:', viewUrl);
+
+        // Fetch document from API using VIEW endpoint (not download)
+        const response = await fetch(viewUrl, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -2521,7 +3035,18 @@
 
         // Update modal content
         document.getElementById('documentViewerTitle').textContent = filename;
-        document.getElementById('documentViewerPage').textContent = pageNumber !== '?' ? `Page ${pageNumber}` : '';
+
+        // Build location info (page and/or lines)
+        const locationParts = [];
+        if (pageNumber && pageNumber !== '?') {
+          locationParts.push(`Page ${pageNumber}`);
+        }
+        if (startLine && endLine) {
+          locationParts.push(`Lines ${startLine}-${endLine}`);
+        } else if (startLine) {
+          locationParts.push(`Line ${startLine}`);
+        }
+        document.getElementById('documentViewerPage').textContent = locationParts.join(' | ');
 
         // Show modal
         modal.classList.remove('hidden');
@@ -2657,26 +3182,51 @@
         document.body.appendChild(modal);
       }
 
-      // Populate citations list
+      // Populate citations list with enhanced details
       const citationsList = modal.querySelector('#allCitationsList');
       citationsList.innerHTML = citations.map((citation, idx) => {
         const filename = citation.filename || 'Unknown Document';
         const page = citation.page_number || citation.page || '?';
         const documentId = citation.document_id || '';
         const chunkId = citation.chunk_id || '';
+        const chunkIndex = citation.chunk_index !== undefined ? citation.chunk_index : '';
+        const startLine = citation.start_line || '';
+        const endLine = citation.end_line || '';
+        const relevanceScore = citation.relevance_score || citation.relevance || 0;
+        const excerpt = citation.chunk_text || citation.excerpt || '';
+
+        // Build detailed info parts
+        const detailsParts = [];
+        if (page !== '?') detailsParts.push(`page ${page}`);
+        if (startLine && endLine) detailsParts.push(`lines ${startLine}-${endLine}`);
+        else if (startLine) detailsParts.push(`line ${startLine}`);
+        if (chunkIndex !== '') detailsParts.push(`chunk ${chunkIndex}`);
+
+        const detailsText = detailsParts.length > 0 ? detailsParts.join(', ') : '';
+        const relevancePercent = Math.round(relevanceScore * 100);
+
         return `
-          <div class="text-sm text-gray-700 flex items-start space-x-2 p-2 hover:bg-gray-50 rounded group">
-            <span class="text-gray-400 font-medium">${idx + 1}.</span>
-            <button
-              class="citation-link flex-1 text-left hover:text-indigo-600 hover:underline cursor-pointer transition-colors"
-              data-document-id="${documentId}"
-              data-page="${page}"
-              data-filename="${escapeHtml(filename)}"
-              data-chunk-id="${chunkId}"
-              title="Click to open ${escapeHtml(filename)} at page ${page}"
-            >
-              ${escapeHtml(filename)}${page !== '?' ? `, page ${page}` : ''}
-            </button>
+          <div class="text-sm text-gray-700 p-3 hover:bg-gray-50 rounded border border-gray-200 hover:border-indigo-300 transition-all">
+            <div class="flex items-start space-x-2">
+              <span class="text-gray-400 font-medium">${idx + 1}.</span>
+              <div class="flex-1">
+                <button
+                  class="citation-link text-left hover:text-indigo-600 hover:underline cursor-pointer transition-colors font-medium"
+                  data-document-id="${documentId}"
+                  data-page="${page}"
+                  data-filename="${escapeHtml(filename)}"
+                  data-chunk-id="${chunkId}"
+                  data-start-line="${startLine || ''}"
+                  data-end-line="${endLine || ''}"
+                  title="Click to open ${escapeHtml(filename)}${detailsText ? ' at ' + detailsText : ''}"
+                >
+                  ${escapeHtml(filename)}
+                </button>
+                ${detailsText ? `<div class="text-xs text-gray-500 mt-1">${detailsText}</div>` : ''}
+                ${relevanceScore > 0 ? `<div class="text-xs text-gray-500 mt-1">Relevance: ${relevancePercent}%</div>` : ''}
+                ${excerpt ? `<div class="text-xs text-gray-400 italic mt-2 bg-gray-50 p-2 rounded border-l-2 border-indigo-200">${escapeHtml(excerpt)}</div>` : ''}
+              </div>
+            </div>
           </div>
         `;
       }).join('');
@@ -2688,9 +3238,11 @@
           const page = parseInt(button.getAttribute('data-page')) || 1;
           const filename = button.getAttribute('data-filename');
           const chunkId = button.getAttribute('data-chunk-id');
+          const startLine = button.getAttribute('data-start-line');
+          const endLine = button.getAttribute('data-end-line');
 
-          console.log('[Citations] Opening document:', { documentId, page, filename, chunkId });
-          openDocumentViewer(documentId, page, filename, chunkId);
+          console.log('[Citations] Opening document:', { documentId, page, filename, chunkId, startLine, endLine });
+          openDocumentViewer(documentId, page, filename, chunkId, startLine, endLine);
           closeAllCitationsModal();
         });
       });
@@ -2746,17 +3298,21 @@
           }
         }
 
+        // Get line numbers if available
+        const startLine = citationEl.getAttribute('data-start-line');
+        const endLine = citationEl.getAttribute('data-end-line');
+
         // Try opening the document
         if (documentId) {
-          console.log('[Citation] Opening document viewer:', documentId, page);
-          openDocumentViewer(documentId, page, filename, chunkId);
+          console.log('[Citation] Opening document viewer:', documentId, page, filename, chunkId, startLine, endLine);
+          openDocumentViewer(documentId, page, filename, chunkId, startLine, endLine);
         } else if (url) {
           // URL available (from inline citation) - extract document ID from URL
           const docIdMatch = url.match(/\/storage\/download\/([^\/\?]+)/);
           if (docIdMatch) {
             const extractedDocId = docIdMatch[1];
             console.log('[Citation] Extracted document ID from URL:', extractedDocId);
-            openDocumentViewer(extractedDocId, page, filename, '');
+            openDocumentViewer(extractedDocId, page, filename, '', startLine, endLine);
           } else {
             console.error('[Citation] Could not extract document ID from URL:', url);
             Toast.error('Failed to open document');
@@ -2931,6 +3487,9 @@
     }
 
     async function sendViaSSE(content, uploadInfo = null) {
+      // Reset reasoning log for new query
+      resetReasoningLog();
+
       // Mark which conversation is generating (for conversation-aware activity indicator)
       generatingConversationId = currentConversationId;
 
@@ -3129,6 +3688,12 @@
                     console.log('[SSE Connected] Session ID:', currentSessionId);
                   }
 
+                  // Capture model name for reasoning modal
+                  if (data.model) {
+                    currentModelName = data.model;
+                    console.log('[SSE Connected] Model:', currentModelName);
+                  }
+
                   // Capture thread_id for new conversations
                   if (data.thread_id && !currentConversationId) {
                     currentConversationId = data.thread_id;
@@ -3203,15 +3768,16 @@
                   const citationsArray = data.citations || [];
                   if (citationsArray.length > 0) {
                     console.log('[SSE] Citations received:', citationsArray.length, 'sources');
-                    
+                    console.log('[SSE] First citation data structure:', citationsArray[0]);
+
                     // Find the last AI message container
                     const lastAiMessageContainer = chatMessages.querySelector('.ai-message-container:last-child .flex-1.max-w-2xl');
                     if (lastAiMessageContainer) {
                       // Check if citations already exist
                       let citationsContainer = lastAiMessageContainer.querySelector('.citations-section');
-                      
+
                       if (!citationsContainer) {
-                        // Create new citations section
+                        // Create new citations section with enhanced details
                         const citationsHtml = `
                           <div class="citations-section mt-2">
                             <div class="text-[11px] font-semibold text-gray-600 mb-1">📄 Sources (${citationsArray.length})</div>
@@ -3221,20 +3787,43 @@
                                 const page = citation.page_number || citation.page || '?';
                                 const documentId = citation.document_id || '';
                                 const chunkId = citation.chunk_id || '';
+                                const chunkIndex = citation.chunk_index !== undefined ? citation.chunk_index : '';
+                                const startLine = citation.start_line || '';
+                                const endLine = citation.end_line || '';
+                                const relevanceScore = citation.relevance_score || citation.relevance || 0;
+                                const excerpt = citation.chunk_text || citation.excerpt || '';
+
+                                // Build detailed info parts
+                                const detailsParts = [];
+                                if (page !== '?') detailsParts.push(`page ${page}`);
+                                if (startLine && endLine) detailsParts.push(`lines ${startLine}-${endLine}`);
+                                else if (startLine) detailsParts.push(`line ${startLine}`);
+                                if (chunkIndex !== '') detailsParts.push(`chunk ${chunkIndex}`);
+
+                                const detailsText = detailsParts.length > 0 ? detailsParts.join(', ') : '';
+                                const relevancePercent = Math.round(relevanceScore * 100);
+
                                 return `
-                                  <div class="text-[10px] text-gray-600 flex items-start space-x-1 group">
-                                    <span class="text-gray-400">${idx + 1}.</span>
-                                    <button
-                                      class="flex-1 text-left hover:text-indigo-600 hover:underline cursor-pointer transition-colors"
-                                      onclick="openDocumentViewer('${documentId}', ${page}, '${escapeHtml(filename)}', '${chunkId}')"
-                                      title="Click to open ${filename} at page ${page}"
-                                    >
-                                      ${filename}${page !== '?' ? `, page ${page}` : ''}
-                                    </button>
+                                  <div class="text-[10px] text-gray-600 group border-l-2 border-gray-200 hover:border-indigo-400 pl-2 py-1 transition-colors">
+                                    <div class="flex items-start space-x-1">
+                                      <span class="text-gray-400 font-semibold">${idx + 1}.</span>
+                                      <div class="flex-1">
+                                        <button
+                                          class="text-left hover:text-indigo-600 hover:underline cursor-pointer transition-colors font-medium"
+                                          onclick="openDocumentViewer('${documentId}', ${page}, '${escapeHtml(filename)}', '${chunkId}')"
+                                          title="Click to open ${filename}${detailsText ? ' at ' + detailsText : ''}"
+                                        >
+                                          ${filename}
+                                        </button>
+                                        ${detailsText ? `<div class="text-gray-500 mt-0.5">${detailsText}</div>` : ''}
+                                        ${relevanceScore > 0 ? `<div class="text-gray-500 mt-0.5">Relevance: ${relevancePercent}%</div>` : ''}
+                                        ${excerpt ? `<div class="text-gray-400 italic mt-0.5 line-clamp-2" title="${escapeHtml(excerpt)}">${escapeHtml(excerpt.substring(0, 100))}${excerpt.length > 100 ? '...' : ''}</div>` : ''}
+                                      </div>
+                                    </div>
                                   </div>
                                 `;
                               }).join('')}
-                              ${citationsArray.length > 5 ? `<div class="text-[10px] text-gray-500 italic">+ ${citationsArray.length - 5} more</div>` : ''}
+                              ${citationsArray.length > 5 ? `<div class="text-[10px] text-gray-500 italic pl-2">+ ${citationsArray.length - 5} more</div>` : ''}
                             </div>
                           </div>
                         `;
@@ -3283,8 +3872,13 @@
 
                 // Handle reasoning event
                 if (currentEvent === 'reasoning') {
-                  console.log('[SSE] Reasoning:', data);
+                  console.log('[SSE] Reasoning event received:', data);
+                  console.log('[SSE] Calling captureReasoningEvent for reasoning');
                   showReasoning(data, responseStarted);
+
+                  // Capture to reasoning log for modal
+                  captureReasoningEvent('reasoning', data);
+                  console.log('[SSE] After captureReasoningEvent, log size:', reasoningLog.length);
                 }
 
                 // Handle unified progress event - show in reasoning drawer with progress bar
@@ -3300,6 +3894,9 @@
 
                   // Pass unified progress event to showReasoning
                   showReasoning(data, responseStarted);
+
+                  // Capture to reasoning log for modal
+                  captureReasoningEvent('progress', data);
                 }
 
                 // Handle document_progress event (legacy - kept for backward compatibility)
@@ -3355,8 +3952,13 @@
 
                 // Handle thinking event - playful rotating words during generation
                 if (currentEvent === 'thinking') {
-                  console.log('Thinking:', data.message);
+                  console.log('[SSE] Thinking event received:', data);
+                  console.log('[SSE] Calling captureReasoningEvent for thinking');
                   updateThinkingMessage(data.message, data.phase || 'thinking');
+
+                  // Capture to reasoning log for modal
+                  captureReasoningEvent('thinking', data);
+                  console.log('[SSE] After captureReasoningEvent, log size:', reasoningLog.length);
                 }
 
                 // Handle done event - hide all activity indicators and finalize message
@@ -4766,6 +5368,40 @@
       }
     }
 
+    // Disable message input when no conversation is selected
+    function disableMessageInput() {
+      const documentsBtn = document.getElementById('documentsBtn');
+
+      messageInput.contentEditable = 'false';
+      messageInput.classList.add('opacity-50', 'cursor-not-allowed');
+      sendBtn.disabled = true;
+      sendBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+      if (documentsBtn) {
+        documentsBtn.disabled = true;
+        documentsBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      }
+
+      console.log('[disableMessageInput] Message input disabled - no conversation selected');
+    }
+
+    // Enable message input when a conversation is selected
+    function enableMessageInput() {
+      const documentsBtn = document.getElementById('documentsBtn');
+
+      messageInput.contentEditable = 'true';
+      messageInput.classList.remove('opacity-50', 'cursor-not-allowed');
+      sendBtn.disabled = false;
+      sendBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+      if (documentsBtn) {
+        documentsBtn.disabled = false;
+        documentsBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+      }
+
+      console.log('[enableMessageInput] Message input enabled - conversation selected');
+    }
+
     // Update context meter with actual usage data
     function updateContextMeter(contextUsage) {
       const contextText = document.getElementById('contextText');
@@ -4900,10 +5536,14 @@
       currentSessionId = null;         // Reset session ID
       window.currentMatterId = null;  // Clear matter context
 
+      // Disable message input since no conversation is selected
+      disableMessageInput();
+
       // Hide activity indicator if we're switching away from generating conversation
       if (generatingConversationId) {
         console.log('[startNewChat] Hiding activity indicator - starting new chat while another generates');
         hideTyping();
+        hideGenerationBanner();
       }
 
       // Reset message pagination state
@@ -4937,6 +5577,25 @@
         <div id="messagesLoading" class="messages-loading hidden">
           <div class="messages-loading-spinner"></div>
           <p class="mt-3 text-sm text-gray-500">Loading conversation...</p>
+        </div>
+        <!-- Tip Banner for Document Management -->
+        <div id="documentTipBanner" class="bg-indigo-50 border-l-4 border-indigo-500 p-4 mb-4 rounded-r-lg hidden">
+          <div class="flex items-start gap-3">
+            <div class="flex-shrink-0">
+              <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <div class="flex-1">
+              <h4 class="text-sm font-semibold text-indigo-900 mb-1">Chat with Your Documents</h4>
+              <p class="text-sm text-indigo-800">To begin chatting with documents, click on the <span class="inline-flex items-center px-1.5 py-0.5 bg-indigo-600 text-white rounded text-xs font-medium">+</span> button in the text input field below.</p>
+            </div>
+            <button onclick="dismissDocumentTip()" class="flex-shrink-0 text-indigo-600 hover:text-indigo-800 transition-colors">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
         </div>
         <!-- Welcome Message -->
         <div id="welcomeMessage" class="flex justify-center py-8">
@@ -4997,6 +5656,9 @@
         </div>
       `;
       // Suggestions removed from UI
+
+      // Show document tip after resetting chat
+      showDocumentTip();
     }
 
     // No auto-resize needed for contenteditable (it grows naturally with max-height and overflow-y-auto)
@@ -5830,6 +6492,17 @@
         initSSE();
       }
 
+      // Disable input by default until a conversation is selected
+      disableMessageInput();
+
+      // Show document tip banner on first load (if not previously dismissed)
+      setTimeout(() => {
+        showDocumentTip();
+      }, 1000);
+
+      // Add event listener to close help menu when clicking overlay
+      document.getElementById('helpMenuOverlay')?.addEventListener('click', closeHelpMenu);
+
       // Check URL for session parameter and load that conversation
       (async function initializeFromURL() {
         const urlParams = new URLSearchParams(window.location.search);
@@ -5840,6 +6513,8 @@
           currentConversationId = sessionId;
           try {
             await loadConversationMessages(sessionId);
+            // Enable input now that conversation is loaded
+            enableMessageInput();
 
             // Check if there's an active generation for this conversation
             await checkForActiveGeneration();
@@ -5853,6 +6528,8 @@
           // Starting a new conversation for a specific matter
           currentConversationId = null;
           window.currentMatterId = matterId;
+          // Enable input for new conversation with matter context
+          enableMessageInput();
           // Show empty chat - wait for user to type first message
           console.log('Ready to start new chat for matter:', matterId);
         }
