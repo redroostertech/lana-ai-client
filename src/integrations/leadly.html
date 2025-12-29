@@ -386,7 +386,7 @@
         document.getElementById('statContactsNew').textContent = withEmail > 0 ? `${formatNumber(withEmail)} with email` : 'No contacts with email';
 
         // Opportunities
-        document.getElementById('statOpportunities').textContent = formatNumber(stats.opportunities?.open || 0);
+        document.getElementById('statOpportunities').textContent = formatNumber(stats.opportunities?.total || 0);
         document.getElementById('statOpportunitiesWon').textContent = 'last 90 days';
 
         // Pipeline Value
