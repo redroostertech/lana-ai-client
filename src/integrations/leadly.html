@@ -378,7 +378,6 @@
 
         // Opportunities
         document.getElementById('statOpportunities').textContent = formatNumber(stats.opportunities?.total || 0);
-        document.getElementById('statOpportunitiesWon').textContent = 'last 90 days';
 
         // Pipeline Value
         const totalPipelineValue = stats.opportunities?.total_pipeline_value || 0;
@@ -391,11 +390,6 @@
         document.getElementById('statConversations').textContent = formatNumber(stats.conversations?.total || 0);
         const unread = stats.conversations?.unread || 0;
         document.getElementById('statConversationsUnread').textContent = unread > 0 ? `${formatNumber(unread)} unread` : 'No unread';
-
-        // Tasks
-        document.getElementById('statTasks').textContent = formatNumber(stats.tasks?.total || 0);
-        const pending = stats.tasks?.pending || 0;
-        document.getElementById('statTasksPending').textContent = pending > 0 ? `${formatNumber(pending)} pending` : 'No pending tasks';
 
         // Update last sync time
         if (result.last_sync) {
@@ -419,13 +413,10 @@
         document.getElementById('statContacts').textContent = '0';
         document.getElementById('statContactsNew').textContent = 'No contacts with email';
         document.getElementById('statOpportunities').textContent = '0';
-        document.getElementById('statOpportunitiesWon').textContent = 'last 90 days';
         document.getElementById('statPipelineValue').textContent = '$0';
         document.getElementById('statPipelineWon').textContent = '$0 won vs $0 open';
         document.getElementById('statConversations').textContent = '0';
         document.getElementById('statConversationsUnread').textContent = 'No unread';
-        document.getElementById('statTasks').textContent = '0';
-        document.getElementById('statTasksPending').textContent = 'No pending tasks';
 
         // Load current tab (will show not configured message)
         loadTabContent(currentTab);
