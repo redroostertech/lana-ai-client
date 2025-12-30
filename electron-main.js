@@ -19,6 +19,24 @@ const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerifi
 const { checkForUpdates, downloadAndInstallUpdate, showOptionalUpdateDialog, showForceUpdateDialog, shouldCheckForUpdates } = require('./electron-updater-custom');
 const { logInfo, logError, exportLogs, getLogFilePath } = require('./electron-logger');
 
+/**
+ * Get app version from centralized version system
+ * @returns {string} Formatted version like "v3.0.0b1"
+ */
+function getAppVersion() {
+  try {
+    const versionModule = require('./src/version.js');
+    return versionModule.displayVersion;
+  } catch (e) {
+    try {
+      const packageJson = require('./package.json');
+      return `v${packageJson.version}`;
+    } catch (e2) {
+      return `v${app.getVersion()}`;
+    }
+  }
+}
+
 // Keep a global reference of the window object to prevent garbage collection
 let mainWindow;
 
@@ -308,7 +326,7 @@ function createApplicationMenu() {
               type: 'info',
               title: 'About Lana AI',
               message: 'Lana AI Desktop Client',
-              detail: `Version: ${app.getVersion()}\nElectron: ${process.versions.electron}\nChrome: ${process.versions.chrome}\nNode: ${process.versions.node}`
+              detail: `Version: ${getAppVersion()}\nElectron: ${process.versions.electron}\nChrome: ${process.versions.chrome}\nNode: ${process.versions.node}`
             });
           }
         },
@@ -392,7 +410,7 @@ ipcMain.handle('renderer-log-info', async (event, message) => {
 // Handle configuration requests
 ipcMain.handle('get-config', async () => {
   return {
-    appVersion: app.getVersion(),
+    appVersion: getAppVersion(),
     platform: process.platform,
     arch: process.arch,
     isDevelopment: process.env.NODE_ENV === 'development'
@@ -410,17 +428,9 @@ ipcMain.handle('load-settings', async () => {
   return getSavedServer();
 });
 
-// Get app version - use package.json version to ensure consistency
+// Get app version - use centralized version system
 ipcMain.handle('get-version', async () => {
-  // In development, app.getVersion() may return Electron version instead of app version
-  // Read from package.json to ensure we always return the correct app version
-  try {
-    const packageJson = require('./package.json');
-    return packageJson.version;
-  } catch (e) {
-    // Fallback to app.getVersion() if package.json can't be read
-    return app.getVersion();
-  }
+  return getAppVersion();
 });
 
 // Connect to server (called after hosted discovery resolves org)
@@ -668,7 +678,14 @@ app.whenReady().then(async () => {
   const Store = require('electron-store');
   const migrationStore = new Store({ name: 'migration-state' });
 
-  const currentVersion = app.getVersion();
+  // Get semantic version for comparison (e.g., "3.0.0" without "v" or release type)
+  let currentVersion;
+  try {
+    const versionModule = require('./src/version.js');
+    currentVersion = versionModule.version; // Use semantic version for comparisons
+  } catch (e) {
+    currentVersion = app.getVersion();
+  }
   const lastVersion = migrationStore.get('lastVersion', '0.0.0');
 
   // Migration: Version 1.0.1+ uses static_ip from TXT record for discovery

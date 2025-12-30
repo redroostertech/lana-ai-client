@@ -696,8 +696,8 @@ class MenuSystem {
 
     // If there are footer sections, wrap in a flex container to push footer to bottom
     if (footerHtml) {
-      // Get version from Electron or fallback
-      const version = window.electronAPI?.getVersion ? 'Loading...' : (window.LanaConfig?.VERSION || '2.0.0');
+      // Get version from centralized version system
+      const version = window.APP_VERSION?.getVersion() || 'Loading...';
 
       return `
         <div class="flex flex-col h-full">
@@ -748,19 +748,26 @@ class MenuSystem {
   }
 
   /**
-   * Fetch and update version from Electron API
+   * Update version display
    */
   async _updateVersionFromElectron() {
     const versionEl = document.getElementById('app-version');
     if (!versionEl) return;
 
+    // Use centralized version if available
+    if (window.APP_VERSION) {
+      versionEl.textContent = window.APP_VERSION.getVersion();
+      return;
+    }
+
+    // Fallback to Electron API if centralized version not available
     try {
       if (window.electronAPI?.getVersion) {
         const version = await window.electronAPI.getVersion();
         versionEl.textContent = `v${version}`;
       }
     } catch (e) {
-      console.error('Failed to get version from Electron:', e);
+      console.error('Failed to get version:', e);
     }
   }
 

@@ -1008,30 +1008,22 @@ class ApiClient {
    */
   async uploadDocument(file, matterId, options = {}) {
     await this._readyPromise;
-    
+
     if (this.demoMode) {
-      // Simulate upload in demo mode
       return {
         success: true,
         document_id: 'doc-' + Date.now(),
+        job_id: 'job-' + Date.now(),
         filename: file.name,
         file_size: file.size,
-        matter_id: matterId,
-        status: 'processing',
-        message: 'Document uploaded successfully (demo mode)'
+        matter_id: matterId
       };
     }
 
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('files', file);  // Changed from 'file' to 'files'
     formData.append('matter_id', matterId);
 
-    if (options.processing_strategy) {
-      formData.append('processing_strategy', options.processing_strategy);
-    }
-    if (options.priority) {
-      formData.append('priority', options.priority);
-    }
     if (options.document_type) {
       formData.append('document_type', options.document_type);
     }
@@ -1042,48 +1034,95 @@ class ApiClient {
       formData.append('notes', options.notes);
     }
 
-    const response = await fetch(`${this.baseUrl}/api/v1/ingest/local`, {
+    // NEW ENDPOINT
+    const response = await fetch(`${this.baseUrl}/api/v1/storage/files/upload`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.token}`
-        // Note: Don't set Content-Type - browser sets it automatically with boundary for FormData
       },
       body: formData
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Upload failed' }));
-      throw new Error(error.detail || error.error || 'Failed to upload document');
+      const error = await response.json();
+      throw new Error(error.detail || error.error || 'Upload failed');
     }
 
-    return response.json();
+    const data = await response.json();
+
+    // Return first result for single file upload
+    const result = data.results[0];
+    return {
+      success: true,
+      job_id: result.job_id,
+      file_id: result.file_id,
+      document_id: result.file_id,
+      matter_id: result.matter_id,
+      filename: result.filename,
+      status: 'queued'
+    };
   }
 
   /**
    * Upload multiple documents to a matter
    * @param {FileList|File[]} files - The files to upload
    * @param {string} matterId - The matter ID
-   * @param {Function} onProgress - Progress callback (index, total, filename)
-   * @returns {Promise<Object[]>} Array of upload results
+   * @param {Function} onProgress - Progress callback (completed, total)
+   * @returns {Promise<Object>} Upload result with stats and results array
    */
   async uploadDocuments(files, matterId, onProgress = null) {
-    const results = [];
+    await this._readyPromise;
+
     const fileArray = Array.from(files);
-    
-    for (let i = 0; i < fileArray.length; i++) {
-      const file = fileArray[i];
-      if (onProgress) {
-        onProgress(i + 1, fileArray.length, file.name);
-      }
-      try {
-        const result = await this.uploadDocument(file, matterId);
-        results.push({ success: true, file: file.name, ...result });
-      } catch (error) {
-        results.push({ success: false, file: file.name, error: error.message });
-      }
+
+    if (this.demoMode) {
+      // Simulate batch upload in demo mode
+      return {
+        status: 'completed',
+        batch_id: 'batch-' + Date.now(),
+        stats: {
+          scanned: fileArray.length,
+          uploaded: fileArray.length,
+          failed: 0
+        },
+        results: fileArray.map(file => ({
+          job_id: 'job-' + Date.now() + '-' + Math.random(),
+          file_id: 'doc-' + Date.now() + '-' + Math.random(),
+          matter_id: matterId,
+          filename: file.name,
+          status: 'queued'
+        }))
+      };
     }
-    
-    return results;
+
+    // Use batch upload endpoint (supports up to 50 files)
+    const formData = new FormData();
+    fileArray.forEach(file => {
+      formData.append('files', file);
+    });
+    formData.append('matter_id', matterId);
+
+    const response = await fetch(`${this.baseUrl}/api/v1/storage/files/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.token}`
+      },
+      body: formData
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Batch upload failed' }));
+      throw new Error(error.detail || error.error || 'Failed to upload documents');
+    }
+
+    const result = await response.json();
+
+    // Notify progress callback if provided
+    if (onProgress && result.stats) {
+      onProgress(result.stats.uploaded, result.stats.scanned);
+    }
+
+    return result;
   }
 
   /**

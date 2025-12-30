@@ -1,6 +1,6 @@
 {
-  "version": "1.0.0",
-  "lastUpdated": "2025-12-22T10:00:00Z",
+  "version": "2.0.0",
+  "lastUpdated": "2025-12-29T00:00:00Z",
   "categories": [
     {
       "id": "general",
@@ -12,14 +12,14 @@
         {
           "id": "what-is-lana",
           "question": "What is LANA AI?",
-          "answer": "LANA AI is an enterprise legal AI platform designed for law firms and legal departments. It combines document intelligence, conversational AI, and workflow automation to streamline legal operations. The system runs entirely on-premises at your office, ensuring complete data security and compliance with legal confidentiality requirements.",
+          "answer": "LANA AI is a computer program that helps lawyers do their work. It can read your files, answer questions about them, and help you finish tasks faster. \n\nThe program runs on a computer at your office. This means your files stay private and never leave your building. This is important for keeping client information safe.",
           "tags": [
             "general",
             "overview"
           ],
           "helpful": 245,
           "notHelpful": 12,
-          "lastUpdated": "2025-12-15T10:00:00Z",
+          "lastUpdated": "2025-12-29T00:00:00Z",
           "relatedFaqs": [
             "how-does-ai-work",
             "pricing"
@@ -28,7 +28,7 @@
         {
           "id": "how-does-ai-work",
           "question": "How does the AI work?",
-          "answer": "LANA AI uses advanced large language models (LLMs) combined with retrieval-augmented generation (RAG) to analyze your documents and provide intelligent responses. When you ask a question, the system: 1) Searches your documents using vector similarity, 2) Retrieves relevant context, 3) Generates a response using the LLM with your specific data. The AI runs entirely on your on-premises server, ensuring your data never leaves your network.",
+          "answer": "When you ask LANA AI a question, here's what happens:\n\n1. **It searches your files** - LANA AI looks through all your documents to find helpful information\n2. **It reads the important parts** - It finds the sections that match your question\n3. **It writes an answer** - Using what it found, it gives you an answer\n\nThink of it like having a helper who has read all your files and can quickly find answers for you. The AI runs on a computer in your office, so your files stay private and safe.",
           "tags": [
             "general",
             "ai",
@@ -36,7 +36,7 @@
           ],
           "helpful": 189,
           "notHelpful": 8,
-          "lastUpdated": "2025-12-10T14:00:00Z",
+          "lastUpdated": "2025-12-29T00:00:00Z",
           "relatedFaqs": [
             "what-is-lana",
             "data-security"
@@ -45,14 +45,14 @@
         {
           "id": "pricing",
           "question": "How much does LANA AI cost?",
-          "answer": "LANA AI pricing is based on your organization's size and needs. Factors include: number of users, storage requirements, and desired features. We offer flexible licensing options including perpetual licenses and annual subscriptions. Contact our sales team at sales@redroostertec.com for a custom quote tailored to your firm.",
+          "answer": "The price depends on how many people will use it and how much space you need. Each law firm is different, so we create a custom price for you.\n\nTo get a price quote, email our sales team at sales@redroostertec.com. They will ask about your firm and give you a fair price.",
           "tags": [
             "general",
             "pricing"
           ],
           "helpful": 156,
           "notHelpful": 23,
-          "lastUpdated": "2025-12-01T09:00:00Z",
+          "lastUpdated": "2025-12-29T00:00:00Z",
           "relatedFaqs": [
             "what-is-lana",
             "trial-available"
@@ -61,14 +61,14 @@
         {
           "id": "who-uses-lana",
           "question": "Who uses LANA AI?",
-          "answer": "LANA AI is used by law firms, corporate legal departments, government agencies, and legal service providers. Our clients range from small boutique firms to large international practices. Any organization that needs to efficiently manage and analyze legal documents can benefit from LANA AI.",
+          "answer": "LANA AI is used by law firms, company legal teams, and government offices. Our users include small law offices and big law firms. \n\nAny group that needs to manage and search through legal files can use LANA AI.",
           "tags": [
             "general",
             "customers"
           ],
           "helpful": 134,
           "notHelpful": 9,
-          "lastUpdated": "2025-11-28T11:00:00Z",
+          "lastUpdated": "2025-12-29T00:00:00Z",
           "relatedFaqs": [
             "what-is-lana"
           ]
@@ -78,21 +78,38 @@
     {
       "id": "getting-started",
       "title": "Getting Started",
-      "description": "Questions about setup and initial use",
+      "description": "Questions about setup and first steps",
       "icon": "play",
       "order": 2,
       "faqs": [
         {
+          "id": "first-time-login",
+          "question": "How do I log in for the first time?",
+          "answer": "Here's how to get started:\n\n**What you need from your administrator:**\n- Organization ID\n- Your email address\n- Activation code (for first-time users)\n\n**Step 1: Connect to your organization**\n- Open LANA AI\n- Type your **Organization ID** in the box\n- The Server URL fills in automatically\n- Click **Connect**\n\n**Step 2: Activate your account (first time only)**\n- On the login screen, click **Activate here** at the bottom\n- Type your **activation code**\n- Type your **email address**\n- Create a strong password (at least 8 characters with letters, numbers, and symbols)\n- Confirm your password\n- Click **Activate**\n\n**Step 3: Log in**\n- Type your email address\n- Type your password\n- Click **Sign in**\n\n**Having problems?** Contact your system administrator for help.\n\nSee the Quick Start Guide in the Help section for more details.",
+          "tags": [
+            "getting-started",
+            "beginner",
+            "authentication"
+          ],
+          "helpful": 245,
+          "notHelpful": 8,
+          "lastUpdated": "2025-12-29T00:00:00Z",
+          "relatedFaqs": [
+            "first-steps",
+            "forgot-password"
+          ]
+        },
+        {
           "id": "first-steps",
-          "question": "What should I do first after logging in?",
-          "answer": "After logging in, we recommend: 1) Complete your profile in Settings (add your name, photo, notification preferences), 2) Create your first matter to organize your work, 3) Upload documents or connect a data source (SharePoint, Google Drive, etc.), 4) Try the chat interface to ask questions about your documents. The Quick Start Guide in the Help section provides detailed step-by-step instructions.",
+          "question": "What should I do after logging in?",
+          "answer": "Here are the best first steps:\n\n1. **Set up your profile** - Go to Settings and add your name and photo\n2. **Create your first case** - Click on 'Matters' and make a new case\n3. **Add some files** - Upload documents to your case\n4. **Try asking a question** - Go to Chat and ask LANA AI about your files\n\nThe Help section has a Quick Start Guide with more details.",
           "tags": [
             "getting-started",
             "beginner"
           ],
           "helpful": 201,
           "notHelpful": 15,
-          "lastUpdated": "2025-11-28T11:00:00Z",
+          "lastUpdated": "2025-12-29T00:00:00Z",
           "relatedFaqs": [
             "upload-documents",
             "create-matter"
@@ -101,14 +118,14 @@
         {
           "id": "upload-documents",
           "question": "How do I upload documents?",
-          "answer": "To upload documents: 1) Navigate to a matter (or create one first), 2) Click the 'Upload Documents' button, 3) Select files from your computer or drag and drop them into the upload area, 4) Wait for processing to complete (you'll see a progress indicator). Supported formats include PDF, DOCX, DOC, TXT, XLSX, PPTX, and more. Large documents may take a few minutes to process.",
+          "answer": "To add files to LANA AI:\n\n1. **Open a case** - Go to the Matters page and click on a case (create one first if you need to)\n2. **Click 'Upload Documents'** - You'll see this button at the top\n3. **Choose your files** - Pick files from your computer or drag and drop them\n4. **Wait for processing** - LANA AI needs a few minutes to read the files\n\nYou can upload PDFs, Word files, Excel sheets, and many other file types. Big files take longer to process.",
           "tags": [
             "getting-started",
             "documents"
           ],
           "helpful": 178,
           "notHelpful": 9,
-          "lastUpdated": "2025-11-25T15:00:00Z",
+          "lastUpdated": "2025-12-29T00:00:00Z",
           "relatedFaqs": [
             "supported-formats",
             "processing-time"
@@ -116,62 +133,77 @@
         },
         {
           "id": "create-matter",
-          "question": "How do I create a new matter?",
-          "answer": "To create a matter: 1) Go to the Matters page from the sidebar, 2) Click 'New Matter' button, 3) Fill in the matter details (matter name, client name, matter type, status), 4) Optionally assign team members, 5) Click 'Create'. You can then start uploading documents and organizing your work within the matter. All AI interactions within a matter will use documents from that matter for context.",
+          "question": "How do I create a new case?",
+          "answer": "To make a new case:\n\n1. **Click 'Matters'** in the menu on the left\n2. **Click 'New Matter'** button\n3. **Fill in the details** - Give it a name, add the client name, and pick the case type\n4. **Click 'Create'**\n\nNow you can add files to this case. When you ask questions, LANA AI will only look at files from this case.",
           "tags": [
             "getting-started",
             "matters"
           ],
           "helpful": 165,
           "notHelpful": 7,
-          "lastUpdated": "2025-11-20T10:00:00Z",
+          "lastUpdated": "2025-12-29T00:00:00Z",
           "relatedFaqs": [
             "upload-documents"
           ]
         },
         {
           "id": "supported-formats",
-          "question": "What file formats are supported?",
-          "answer": "LANA AI supports: Documents (PDF, DOCX, DOC, TXT, RTF), Spreadsheets (XLSX, XLS, CSV), Presentations (PPTX, PPT), Images (PNG, JPG, JPEG - with OCR), and Archives (ZIP - automatically extracts contents). For best results, use searchable PDFs rather than scanned images, though our OCR can handle scanned documents.",
+          "question": "What file types can I upload?",
+          "answer": "LANA AI can read many file types:\n\n**Documents:** PDF, Word (DOCX, DOC), Text files (TXT)\n**Spreadsheets:** Excel (XLSX, XLS), CSV\n**Presentations:** PowerPoint (PPTX, PPT)\n**Images:** Pictures with text (PNG, JPG) - LANA AI can read the words in them\n**Zip files:** Upload a zip and LANA AI will open it automatically\n\nFor best results, use PDFs that have searchable text instead of scanned images.",
           "tags": [
             "getting-started",
             "documents"
           ],
           "helpful": 142,
           "notHelpful": 8,
-          "lastUpdated": "2025-11-18T09:00:00Z",
+          "lastUpdated": "2025-12-29T00:00:00Z",
           "relatedFaqs": [
             "upload-documents"
           ]
         },
         {
           "id": "processing-time",
-          "question": "How long does document processing take?",
-          "answer": "Processing time depends on document size and complexity: Small documents (< 10 pages) process in seconds, Medium documents (10-100 pages) take 1-3 minutes, Large documents (> 100 pages) may take 5-10 minutes. Scanned PDFs requiring OCR take longer than searchable PDFs. You can continue working while documents process in the background.",
+          "question": "How long does it take to process files?",
+          "answer": "It depends on the file size:\n\n**Small files** (less than 10 pages): A few seconds\n**Medium files** (10-100 pages): 1-3 minutes\n**Big files** (more than 100 pages): 5-10 minutes\n\nScanned PDFs take longer because LANA AI has to read the words from the picture.\n\nYou can keep working while your files process in the background.",
           "tags": [
             "getting-started",
             "performance"
           ],
           "helpful": 128,
           "notHelpful": 11,
-          "lastUpdated": "2025-11-15T14:00:00Z",
+          "lastUpdated": "2025-12-29T00:00:00Z",
           "relatedFaqs": [
             "upload-documents"
+          ]
+        },
+        {
+          "id": "desktop-app",
+          "question": "How do I access LANA AI?",
+          "answer": "Most people use the **desktop app** to access LANA AI:\n\n**On Windows:** Double-click the LanaAI icon on your desktop\n**On Mac:** Double-click the LanaAI icon in your Applications folder\n**On Linux:** Click the LanaAI icon in your programs menu\n\nThe app automatically finds the LANA AI computer in your office. If it can't find it, ask your IT person for help.\n\nSome people can also use a web browser by typing in a special address. Ask your administrator if you need to use it this way.",
+          "tags": [
+            "getting-started",
+            "access"
+          ],
+          "helpful": 156,
+          "notHelpful": 11,
+          "lastUpdated": "2025-12-29T00:00:00Z",
+          "relatedFaqs": [
+            "what-is-lana"
           ]
         }
       ]
     },
     {
       "id": "features",
-      "title": "Features & Capabilities",
+      "title": "Features & What You Can Do",
       "description": "Questions about LANA AI features",
       "icon": "zap",
       "order": 3,
       "faqs": [
         {
           "id": "chat-capabilities",
-          "question": "What can I ask the AI in chat?",
-          "answer": "You can ask LANA AI to: Analyze and summarize documents, Extract key information and clauses, Compare multiple documents, Draft legal documents and correspondence, Find relevant precedents and case law, Answer questions about your documents, Generate reports and summaries, Identify risks and issues, and much more. The AI has access to all documents you've uploaded within your selected matter context.",
+          "question": "What can I ask the AI?",
+          "answer": "You can ask LANA AI to help with many tasks:\n\n**Read and summarize:** \"Summarize the Smith contract\" or \"What are the main points?\"\n\n**Find information:** \"Find all mentions of payment terms\" or \"What does it say about deadlines?\"\n\n**Compare files:** \"What changed between version 1 and version 2?\"\n\n**Write documents:** \"Draft a response letter\" or \"Create a summary\"\n\n**Answer questions:** \"What are the client's responsibilities?\" or \"When is the deadline?\"\n\nAlways check the AI's answers to make sure they're correct. The AI is a helper tool, not a replacement for your legal judgment.",
           "tags": [
             "features",
             "chat",
@@ -179,7 +211,7 @@
           ],
           "helpful": 312,
           "notHelpful": 18,
-          "lastUpdated": "2025-12-18T09:00:00Z",
+          "lastUpdated": "2025-12-29T00:00:00Z",
           "relatedFaqs": [
             "how-does-ai-work",
             "context-awareness"
@@ -187,8 +219,8 @@
         },
         {
           "id": "context-awareness",
-          "question": "How does the AI know which documents to use?",
-          "answer": "LANA AI uses the matter context you're working in. When you're in a specific matter and use chat, the AI automatically searches and retrieves relevant information from documents within that matter using vector similarity search. You can also use the file drawer to explicitly select specific documents for the AI to reference. This ensures responses are relevant to your current work.",
+          "question": "How does the AI know which files to look at?",
+          "answer": "LANA AI looks at files based on the case you're working on. When you select a case and ask a question, it only searches files in that case.\n\nYou can also pick specific files for the AI to read. Click the file drawer icon to choose exactly which files you want the AI to use.\n\nThis makes sure the answers match your current work and keeps different cases separate.",
           "tags": [
             "features",
             "ai",
@@ -196,15 +228,15 @@
           ],
           "helpful": 198,
           "notHelpful": 12,
-          "lastUpdated": "2025-12-12T14:00:00Z",
+          "lastUpdated": "2025-12-29T00:00:00Z",
           "relatedFaqs": [
             "chat-capabilities"
           ]
         },
         {
           "id": "data-connectors",
-          "question": "What systems can LANA AI connect to?",
-          "answer": "LANA AI can connect to: Microsoft SharePoint, Google Drive, OneDrive, Dropbox, Box, and more connectors are being added regularly. Data connectors sync documents automatically from these systems so the AI always has access to your latest files. You can configure sync frequency (hourly, daily, weekly) and select specific folders or libraries to sync.",
+          "question": "Can LANA AI get files from other systems?",
+          "answer": "Yes! LANA AI can automatically get files from:\n\n**Currently available:**\n- Microsoft SharePoint\n- Google Drive\n\n**Coming soon:**\n- OneDrive\n- Dropbox\n- Box\n\nYou can tell LANA AI to check these systems every hour, every day, or every week. It will automatically download new files and make them searchable.\n\nNew connections are being added by Red Rooster Technologies. Check the Data Connectors page to see what's available.",
           "tags": [
             "features",
             "connectors",
@@ -212,12 +244,12 @@
           ],
           "helpful": 187,
           "notHelpful": 14,
-          "lastUpdated": "2025-12-05T11:00:00Z"
+          "lastUpdated": "2025-12-29T00:00:00Z"
         },
         {
           "id": "workflows",
-          "question": "Can I automate tasks with LANA AI?",
-          "answer": "Yes! LANA AI includes a powerful workflow automation system that can: Automatically categorize and tag documents, Send follow-up reminders and notifications, Generate documents from templates, Route matters to appropriate team members, Trigger actions based on document content, Schedule recurring tasks, and more. You can create custom workflows using our visual builder or use pre-built templates.",
+          "question": "Can LANA AI automate my work?",
+          "answer": "Yes! LANA AI can do repetitive tasks automatically:\n\n- Sort and tag files automatically\n- Send reminder messages\n- Create documents from templates\n- Assign tasks to team members\n- Take actions based on file content\n\nYou can build your own automated workflows or use the ones we've already created. Look for the Workflows section in the menu.",
           "tags": [
             "features",
             "workflows",
@@ -225,12 +257,12 @@
           ],
           "helpful": 234,
           "notHelpful": 16,
-          "lastUpdated": "2025-11-30T10:00:00Z"
+          "lastUpdated": "2025-12-29T00:00:00Z"
         },
         {
           "id": "insights-analytics",
-          "question": "What analytics and insights does LANA AI provide?",
-          "answer": "LANA AI provides: Matter analytics (aging analysis, status tracking), Staff productivity metrics, Funnel analysis for business development, Attribution reporting, Predictive analytics (outcome predictions, timeline estimates), Document insights, and Custom reports. Admins can access organization-wide dashboards while users see their own activity metrics.",
+          "question": "Can I see reports and statistics?",
+          "answer": "Yes! LANA AI shows you helpful information about your work:\n\n- How long cases have been open\n- Which team members are working on what\n- How many files you've processed\n- Storage space being used\n\nAdministrators can see reports for the whole office. Regular users can see their own activity.\n\nLook for the Insights section in the menu.",
           "tags": [
             "features",
             "analytics",
@@ -238,28 +270,28 @@
           ],
           "helpful": 167,
           "notHelpful": 13,
-          "lastUpdated": "2025-11-28T15:00:00Z"
+          "lastUpdated": "2025-12-29T00:00:00Z"
         }
       ]
     },
     {
       "id": "security",
       "title": "Security & Privacy",
-      "description": "Questions about data security and privacy",
+      "description": "Keeping your data safe",
       "icon": "lock",
       "order": 4,
       "faqs": [
         {
           "id": "data-security",
-          "question": "Is my data secure?",
-          "answer": "Yes. LANA AI is deployed entirely on-premises at your office. All data, documents, AI models, and databases run on your local server - typically a Mac Studio located in your office. Nothing is sent to external cloud services. We use: AES-256 encryption for data at rest, TLS 1.3 for data in transit, Role-based access control (RBAC), Matter-level permissions, Audit logging of all access, and Regular security updates.",
+          "question": "Is my data safe?",
+          "answer": "Yes! Your data is very safe with LANA AI:\n\n**Stays at your office:** All files, cases, and information stay on a computer in your office. Nothing is sent to the internet or cloud services.\n\n**Encrypted:** Your data is scrambled (encrypted) so only you can read it.\n\n**Access controls:** Only people you choose can see each case's files.\n\n**Activity tracking:** The system keeps a record of who looks at what.\n\nBecause everything stays at your office, you have complete control over your data. This helps you follow privacy laws and keep client information confidential.",
           "tags": [
             "security",
             "privacy"
           ],
           "helpful": 289,
           "notHelpful": 5,
-          "lastUpdated": "2025-12-20T13:00:00Z",
+          "lastUpdated": "2025-12-29T00:00:00Z",
           "relatedFaqs": [
             "on-premises",
             "cloud-backup"
@@ -267,15 +299,15 @@
         },
         {
           "id": "on-premises",
-          "question": "What does 'on-premises' mean?",
-          "answer": "On-premises means LANA AI runs on a server physically located at your office. The server (typically a Mac Studio) contains the database, AI models, and all your data. This ensures: Complete data sovereignty, Compliance with regulations (GDPR, HIPAA, bar association rules), No internet dependency for core functions, Full control over your data, and Fast performance on your local network.",
+          "question": "What does 'at your office' mean?",
+          "answer": "LANA AI runs on a computer that sits in your office (usually a Mac Studio). This computer has:\n\n- Your database with all case information\n- Your files and documents\n- The AI that answers questions\n\nThis is different from cloud services where your data is stored somewhere else on the internet.\n\n**Why this matters:**\n- Your data never leaves your building\n- You follow privacy rules for lawyers\n- It works even if the internet is slow or down\n- You control who can access it\n- It's fast because it's on your local network\n\n**What needs internet:**\nThe desktop app can download updates from Red Rooster Technologies. The connections to SharePoint and Google Drive need internet. But your actual case files and data stay at your office.",
           "tags": [
             "security",
             "deployment"
           ],
           "helpful": 176,
           "notHelpful": 8,
-          "lastUpdated": "2025-12-15T09:00:00Z",
+          "lastUpdated": "2025-12-29T00:00:00Z",
           "relatedFaqs": [
             "data-security"
           ]
@@ -283,42 +315,59 @@
         {
           "id": "user-permissions",
           "question": "Can I control who sees what?",
-          "answer": "Yes. LANA AI has comprehensive access controls: Role-based access control (RBAC) with system admin, org admin, manager, user, and viewer roles, Matter-level permissions (assign specific users to specific matters), Document-level visibility (users only see documents in their assigned matters), Custom roles with granular permissions, and Audit logs tracking all access. Admins can configure these permissions to match your organizational structure.",
+          "answer": "Yes! You have lots of control over who can see files:\n\n**By role:**\n- **Admin** - Can see everything and manage users\n- **Manager** - Can create cases and assign people\n- **User** - Can work on their own cases\n- **Viewer** - Can only look, not change anything\n\n**By case:**\nYou can choose specific people to work on each case. Even if someone is a User, they can only see cases you assign to them.\n\n**Activity log:**\nAdmins can see who looked at what files and when.\n\nThis keeps different cases separate and protects confidential information.",
           "tags": [
             "security",
             "permissions"
           ],
           "helpful": 203,
           "notHelpful": 11,
-          "lastUpdated": "2025-12-10T15:00:00Z"
+          "lastUpdated": "2025-12-29T00:00:00Z"
         },
         {
           "id": "compliance",
-          "question": "Does LANA AI comply with legal industry regulations?",
-          "answer": "Yes. LANA AI is designed for the legal industry with compliance in mind: On-premises deployment ensures data never leaves your control, meeting attorney-client privilege requirements. Supports GDPR, HIPAA, and other data protection regulations. Comprehensive audit logging for compliance reporting. Encryption at rest and in transit. Regular security updates. However, you should consult with your compliance team to ensure it meets your specific requirements.",
+          "question": "Does LANA AI follow legal industry rules?",
+          "answer": "Yes. LANA AI is built for law firms with privacy in mind:\n\n- Your data stays at your office, following lawyer-client confidentiality rules\n- Works with GDPR, HIPAA, and other privacy laws\n- Tracks who accesses files for compliance reports\n- Encrypts all data\n- Gets regular security updates from Red Rooster Technologies\n\nYou should still check with your compliance team to make sure it works for your specific needs.",
           "tags": [
             "security",
             "compliance"
           ],
           "helpful": 198,
           "notHelpful": 14,
-          "lastUpdated": "2025-12-08T10:00:00Z",
+          "lastUpdated": "2025-12-29T00:00:00Z",
           "relatedFaqs": [
             "data-security"
           ]
         },
         {
           "id": "cloud-backup",
-          "question": "Can I back up my data to the cloud?",
-          "answer": "While LANA AI runs on-premises, you can configure encrypted backups to your own cloud storage (AWS S3, Azure Blob Storage, etc.) if desired. Backups are encrypted before upload. However, many legal organizations prefer to keep backups on-premises as well using external drives or NAS devices. This is configurable based on your organization's security policies.",
+          "question": "Can I back up my data?",
+          "answer": "Yes. Your IT team should back up the LANA AI computer regularly.\n\n**Default backup:**\nMost firms back up to external hard drives or another computer in the office.\n\n**Cloud backup:**\nSome firms want to back up to the cloud (like Amazon S3 or Microsoft Azure). This is possible but requires your IT team to set it up. The backups would be encrypted before being sent to the cloud.\n\nAsk your IT team or Red Rooster Technologies for help setting up backups that match your security needs.",
           "tags": [
             "security",
             "backup"
           ],
           "helpful": 145,
           "notHelpful": 18,
-          "lastUpdated": "2025-12-01T11:00:00Z",
+          "lastUpdated": "2025-12-29T00:00:00Z",
           "relatedFaqs": [
+            "data-security"
+          ]
+        },
+        {
+          "id": "matter-isolation",
+          "question": "How does LANA AI keep different cases separate?",
+          "answer": "LANA AI uses a **case-based security system**. This means:\n\n**Each case is separate:**\n- Every file belongs to one specific case\n- People can only see files in cases they're assigned to\n- When you ask the AI a question, it only looks at files from the current case\n\n**Why this matters:**\n- Keeps client information private\n- Prevents mixing up different cases\n- Follows ethical rules for lawyers\n- Stops accidental sharing of confidential information\n\nEven admins normally only see files through the case system. This protects everyone's data.",
+          "tags": [
+            "security",
+            "privacy",
+            "matters"
+          ],
+          "helpful": 167,
+          "notHelpful": 9,
+          "lastUpdated": "2025-12-29T00:00:00Z",
+          "relatedFaqs": [
+            "user-permissions",
             "data-security"
           ]
         }
@@ -327,63 +376,63 @@
     {
       "id": "troubleshooting",
       "title": "Troubleshooting",
-      "description": "Solutions to common problems",
+      "description": "Fixing common problems",
       "icon": "tool",
       "order": 5,
       "faqs": [
         {
           "id": "forgot-password",
           "question": "I forgot my password. What do I do?",
-          "answer": "Click 'Forgot Password' on the login page. If your organization has email configured, you'll receive a password reset link. Follow the link to create a new password. If email isn't configured or you don't receive the email, contact your system administrator who can reset your password manually from the Admin panel.",
+          "answer": "Click 'Forgot Password' on the login page. If your office has email set up, you'll get a link to create a new password.\n\nIf you don't get an email, ask your administrator. They can reset your password from the Admin page.",
           "tags": [
             "troubleshooting",
             "authentication"
           ],
           "helpful": 145,
           "notHelpful": 6,
-          "lastUpdated": "2025-12-01T10:00:00Z"
+          "lastUpdated": "2025-12-29T00:00:00Z"
         },
         {
           "id": "slow-upload",
           "question": "Why are my uploads slow?",
-          "answer": "Upload speed depends on several factors: Your network connection to the server (use wired Ethernet for best performance), File size (larger files take longer), Current server load (processing other uploads or AI requests), and Document type (scanned PDFs requiring OCR take longer). Ensure you're on the same local network as the LANA AI server. If uploads are consistently slow, check the System Status page or contact your administrator.",
+          "answer": "Uploads can be slow for a few reasons:\n\n**Network connection:** WiFi is slower than a cable. Try using a network cable if possible.\n\n**File size:** Bigger files take longer.\n\n**Other people using it:** If many people are uploading at once, it takes longer.\n\n**File type:** Scanned PDFs take longer because LANA AI has to read the words from the picture.\n\nMake sure you're connected to the same network as the LANA AI computer. If it's still slow, check the System Status page or ask your administrator.",
           "tags": [
             "troubleshooting",
             "performance"
           ],
           "helpful": 132,
           "notHelpful": 18,
-          "lastUpdated": "2025-11-28T14:00:00Z",
+          "lastUpdated": "2025-12-29T00:00:00Z",
           "relatedFaqs": [
             "processing-time"
           ]
         },
         {
           "id": "connector-not-syncing",
-          "question": "My data connector isn't syncing. Help!",
-          "answer": "Check these common issues: 1) OAuth token expiry - Go to Data Connectors and click 're-authorize' if the token has expired (usually after 60-90 days), 2) Permissions - Ensure you have access to the folders/libraries you're trying to sync, 3) Network connectivity - Verify the server can reach the external service, 4) Service status - Check if the external service (SharePoint, Google Drive, etc.) is experiencing outages. View detailed error messages in the Sync Status page.",
+          "question": "My connection to SharePoint or Google Drive isn't working. Help!",
+          "answer": "Try these fixes:\n\n**1. Re-authorize:**\nGo to Data Connectors and click 're-authorize'. Sign in again. Connections expire after about 2-3 months and need to be renewed.\n\n**2. Check permissions:**\nMake sure you have access to the folders you're trying to sync.\n\n**3. Check internet:**\nMake sure the LANA AI computer can reach the internet.\n\n**4. Check the service:**\nMake sure SharePoint or Google Drive isn't having problems.\n\nYou can see detailed error messages on the Sync Status page. If you can't fix it, ask your administrator for help.",
           "tags": [
             "troubleshooting",
             "connectors"
           ],
           "helpful": 167,
           "notHelpful": 14,
-          "lastUpdated": "2025-11-25T11:00:00Z",
+          "lastUpdated": "2025-12-29T00:00:00Z",
           "relatedFaqs": [
             "data-connectors"
           ]
         },
         {
           "id": "ai-wrong-answer",
-          "question": "The AI gave me an incorrect answer. Why?",
-          "answer": "AI responses may be inaccurate for several reasons: Insufficient context - The AI might not have found the relevant documents. Try selecting specific documents using the file drawer. Ambiguous question - Be more specific in your query. Outdated information - Ensure relevant documents are uploaded and processed. Complex reasoning - The AI may struggle with highly nuanced legal analysis. Always verify important AI outputs and use them as a starting point for your own analysis, not as definitive legal advice.",
+          "question": "The AI gave me a wrong answer. Why?",
+          "answer": "The AI might give wrong answers for several reasons:\n\n**Not enough information:** The AI might not have found the right files. Try selecting specific files using the file drawer.\n\n**Unclear question:** Try being more specific about what you're asking.\n\n**Missing files:** Make sure all the files you need are uploaded and processed.\n\n**Complex question:** The AI might struggle with very complicated legal questions.\n\n**Important reminder:** Always check the AI's answers. Use the AI as a helper and starting point, not as your final answer. Your legal judgment is more important than what the AI says.",
           "tags": [
             "troubleshooting",
             "ai"
           ],
           "helpful": 189,
           "notHelpful": 24,
-          "lastUpdated": "2025-11-22T09:00:00Z",
+          "lastUpdated": "2025-12-29T00:00:00Z",
           "relatedFaqs": [
             "chat-capabilities",
             "context-awareness"
@@ -391,84 +440,100 @@
         },
         {
           "id": "cannot-find-document",
-          "question": "I can't find a document I uploaded. Where is it?",
-          "answer": "Check these locations: 1) Verify you're looking in the correct matter, 2) Use the search function to search by filename or content, 3) Check if the document failed to process (view upload history), 4) Verify you have permissions to view the matter where it was uploaded, 5) Check if the document was deleted (view audit logs if you're an admin). If you still can't find it, contact your administrator.",
+          "question": "I can't find a file I uploaded. Where is it?",
+          "answer": "Try these steps:\n\n1. **Check the right case** - Make sure you're looking in the case where you uploaded it\n2. **Use search** - Type the filename or content in the search box\n3. **Check if it finished** - Look at upload history to see if it failed\n4. **Check permissions** - Make sure you have access to the case\n5. **Check if deleted** - Ask an admin to check the activity log\n\nIf you still can't find it, ask your administrator for help.",
           "tags": [
             "troubleshooting",
             "documents"
           ],
           "helpful": 125,
           "notHelpful": 9,
-          "lastUpdated": "2025-11-20T13:00:00Z",
+          "lastUpdated": "2025-12-29T00:00:00Z",
           "relatedFaqs": [
             "upload-documents"
+          ]
+        },
+        {
+          "id": "desktop-app-wont-connect",
+          "question": "The desktop app can't find the LANA AI computer. What now?",
+          "answer": "If the app can't find the LANA AI computer:\n\n**1. Check your network:**\nMake sure you're connected to the office WiFi or network.\n\n**2. Try entering the address manually:**\nIf auto-discovery doesn't work, you can type in the computer's address. Ask your IT person for the address.\n\n**3. Check with IT:**\nThe firewall might be blocking the connection. Your IT team can check this.\n\n**4. Restart the app:**\nClose the LANA AI app completely and open it again.\n\nIf none of this works, contact your administrator or Red Rooster Technologies support.",
+          "tags": [
+            "troubleshooting",
+            "desktop-app",
+            "connection"
+          ],
+          "helpful": 143,
+          "notHelpful": 12,
+          "lastUpdated": "2025-12-29T00:00:00Z",
+          "relatedFaqs": [
+            "desktop-app"
           ]
         }
       ]
     },
     {
       "id": "billing",
-      "title": "Billing & Account",
-      "description": "Questions about billing and account management",
+      "title": "Billing & Your Account",
+      "description": "Questions about billing and your account",
       "icon": "credit-card",
       "order": 6,
       "faqs": [
         {
           "id": "trial-available",
-          "question": "Is there a free trial?",
-          "answer": "Yes, we offer a 30-day free trial for qualifying organizations. The trial includes full access to all features with a user limit (typically 5-10 users) and storage cap. Contact sales@redroostertec.com to request a trial. We can also arrange a live demo before your trial to ensure LANA AI meets your needs.",
+          "question": "Can I try LANA AI for free?",
+          "answer": "Yes! We offer a 30-day free trial. The trial includes all features with some limits (usually 5-10 people and limited storage).\n\nEmail sales@redroostertec.com to request a trial. We can also show you a demo before you try it.",
           "tags": [
             "billing",
             "trial"
           ],
           "helpful": 98,
           "notHelpful": 7,
-          "lastUpdated": "2025-11-20T09:00:00Z",
+          "lastUpdated": "2025-12-29T00:00:00Z",
           "relatedFaqs": [
             "pricing"
           ]
         },
         {
           "id": "add-users",
-          "question": "How do I add more users?",
-          "answer": "System administrators and org admins can add users from the Admin → Users page. Click 'Add User', enter their details, and assign a role. If you need to exceed your current user license limit, contact your account manager or support@redroostertec.com to purchase additional user licenses. User licenses are typically sold in packs of 5 or 10.",
+          "question": "How do I add more people?",
+          "answer": "Administrators can add people from the Admin → Users page. Click 'Add User', enter their information, and assign them a role.\n\nIf you need more user licenses than your plan allows, email support@redroostertec.com. User licenses usually come in groups of 5 or 10.",
           "tags": [
             "billing",
             "users"
           ],
           "helpful": 114,
           "notHelpful": 5,
-          "lastUpdated": "2025-11-18T13:00:00Z",
+          "lastUpdated": "2025-12-29T00:00:00Z",
           "relatedFaqs": [
             "upgrade-plan"
           ]
         },
         {
           "id": "storage-limits",
-          "question": "What happens if I run out of storage?",
-          "answer": "Your organization plan includes a storage quota (e.g., 100GB, 500GB, 1TB). When you approach the limit (90%), administrators receive notifications. To add storage: Contact your account manager to purchase additional storage, or Delete old/unnecessary documents to free up space. The system will prevent new uploads when you reach 100% of quota until you add capacity or free up space.",
+          "question": "What happens if I run out of space?",
+          "answer": "Your LANA AI computer has a limited amount of space (like 500GB, 1TB, or 2TB). When you get close to full (90%), administrators get a warning.\n\nTo get more space:\n- Ask your IT team to add more hard drive space to the computer\n- Delete old files you don't need anymore\n- Contact Red Rooster Technologies for help\n\nThe system won't let you upload more files when you're completely full.",
           "tags": [
             "billing",
             "storage"
           ],
           "helpful": 107,
           "notHelpful": 8,
-          "lastUpdated": "2025-11-15T10:00:00Z",
+          "lastUpdated": "2025-12-29T00:00:00Z",
           "relatedFaqs": [
             "pricing"
           ]
         },
         {
           "id": "upgrade-plan",
-          "question": "Can I upgrade or downgrade my plan?",
-          "answer": "Yes, you can change your plan at any time. Contact your account manager or support@redroostertec.com to: Upgrade to a higher tier (more users, storage, features), Add individual features (additional AI models, premium connectors), Adjust user count, Increase storage capacity. Upgrades are prorated. Downgrades typically take effect at the end of your current billing period.",
+          "question": "Can I upgrade or get more features?",
+          "answer": "Yes! You can change your plan anytime. Email support@redroostertec.com to:\n\n- Add more users\n- Get more storage space\n- Add new features\n- Get AI improvements\n\nUpgrades happen right away. Downgrades usually happen at the end of your billing period.",
           "tags": [
             "billing",
             "plans"
           ],
           "helpful": 89,
           "notHelpful": 6,
-          "lastUpdated": "2025-11-12T14:00:00Z",
+          "lastUpdated": "2025-12-29T00:00:00Z",
           "relatedFaqs": [
             "pricing",
             "add-users"
@@ -476,15 +541,15 @@
         },
         {
           "id": "payment-methods",
-          "question": "What payment methods do you accept?",
-          "answer": "We accept: Credit cards (Visa, MasterCard, American Express), ACH/bank transfer, Wire transfer for enterprise contracts, and Purchase orders for approved organizations. Payment terms vary by plan size: Monthly subscriptions are paid by credit card, Annual subscriptions can use any method, Enterprise contracts (3+ years) can be invoiced. Contact billing@redroostertec.com for specific arrangements.",
+          "question": "How can I pay?",
+          "answer": "We accept several payment methods:\n\n- Credit cards (Visa, MasterCard, American Express)\n- Bank transfer (ACH)\n- Wire transfer for big contracts\n- Purchase orders for approved companies\n\nEmail billing@redroostertec.com if you have questions about payment.",
           "tags": [
             "billing",
             "payment"
           ],
           "helpful": 76,
           "notHelpful": 4,
-          "lastUpdated": "2025-11-10T09:00:00Z",
+          "lastUpdated": "2025-12-29T00:00:00Z",
           "relatedFaqs": [
             "pricing",
             "trial-available"
@@ -495,9 +560,11 @@
   ],
   "popularFaqs": [
     "what-is-lana",
+    "first-time-login",
     "data-security",
     "chat-capabilities",
     "upload-documents",
-    "connector-not-syncing"
+    "connector-not-syncing",
+    "desktop-app"
   ]
 }

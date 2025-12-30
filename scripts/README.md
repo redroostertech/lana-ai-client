@@ -2,6 +2,80 @@
 
 This directory contains scripts for building and testing the Lana AI Electron desktop client.
 
+## Version Management
+
+### Centralized Version System
+
+LANA AI uses a centralized version management system where the version is set in **ONE location** and automatically propagates everywhere.
+
+**Source of Truth:** `package.json`
+
+```json
+{
+  "version": "3.0.0",
+  "buildNumber": "1",
+  "releaseType": "beta"
+}
+```
+
+**Version Format:** `v{version}{suffix}{buildNumber}`
+- Examples: `v3.0.0b1` (beta build 1), `v3.0.0` (stable), `v3.0.0rc2` (release candidate 2)
+
+**Release Type Suffixes:**
+- `stable` → no suffix (e.g., `v3.0.0`)
+- `beta` → `b` (e.g., `v3.0.0b1`)
+- `alpha` → `a` (e.g., `v3.0.0a1`)
+- `rc` → `rc` (e.g., `v3.0.0rc1`)
+- `dev` → `dev` (e.g., `v3.0.0dev1`)
+- `pre-release` → `pre` (e.g., `v3.0.0pre1`)
+
+### How to Update Version
+
+1. **Edit `package.json`:**
+   ```json
+   {
+     "version": "3.1.0",
+     "buildNumber": "1",
+     "releaseType": "beta"
+   }
+   ```
+
+2. **Run version generator:**
+   ```bash
+   npm run generate-version
+   ```
+
+3. **Version appears everywhere:**
+   - Menu footer (e.g., "v3.1.0b1")
+   - Login page footer
+   - Activation page footer
+   - Password reset pages
+   - Electron About dialog
+   - `.env` file (for backend)
+
+**Auto-generation:** Version files are automatically generated on `npm start` via the `prestart` hook.
+
+**Generated Files:**
+- `public_html/js/version.js` - Frontend version object (`window.APP_VERSION`)
+- `src/version.js` - Backend version module
+- `.env` - Environment variables updated with version info
+
+**Version API:**
+```javascript
+// Frontend (browser)
+window.APP_VERSION.getVersion()           // "v3.0.0b1"
+window.APP_VERSION.getDetailedVersion()   // "v3.0.0b1 (Build 1, Beta)"
+window.APP_VERSION.getSemanticVersion()   // "3.0.0"
+
+// Backend (Node.js)
+const version = require('./src/version.js');
+version.getVersion()           // "v3.0.0b1"
+version.getDetailedVersion()   // "v3.0.0b1 (Build 1, Beta)"
+version.getSemanticVersion()   // "3.0.0"
+```
+
+---
+
 ## Build Scripts
 
 ### `build-client.sh`

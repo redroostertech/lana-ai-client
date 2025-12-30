@@ -1236,12 +1236,6 @@
                     <span id="output-count-opportunities" class="text-sm text-gray-500">-</span>
                   </div>
                 </button>
-                <button onclick="loadOutputData('tasks')" id="output-nav-tasks" class="output-nav-btn w-full text-left px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors">
-                  <div class="flex items-center justify-between">
-                    <span>Tasks</span>
-                    <span id="output-count-tasks" class="text-sm text-gray-500">-</span>
-                  </div>
-                </button>
                 <button onclick="loadOutputData('conversations')" id="output-nav-conversations" class="output-nav-btn w-full text-left px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors">
                   <div class="flex items-center justify-between">
                     <span>Conversations</span>
@@ -1259,12 +1253,6 @@
                 <div class="border-t border-gray-300 my-2"></div>
                 <p class="text-xs text-gray-500 mb-2 px-2">New Entities (Connector Data)</p>
 
-                <button onclick="loadOutputData('campaign')" id="output-nav-campaign" class="output-nav-btn w-full text-left px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors">
-                  <div class="flex items-center justify-between">
-                    <span>Campaigns</span>
-                    <span id="output-count-campaign" class="text-sm text-gray-500">-</span>
-                  </div>
-                </button>
                 <button onclick="loadOutputData('funnel')" id="output-nav-funnel" class="output-nav-btn w-full text-left px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors">
                   <div class="flex items-center justify-between">
                     <span>Funnels</span>
@@ -1389,12 +1377,11 @@
         const stats = dashboardData.stats;
         document.getElementById('output-count-contacts').textContent = formatNumber(stats.contacts?.total || 0);
         document.getElementById('output-count-opportunities').textContent = formatNumber(stats.opportunities?.total || 0);
-        document.getElementById('output-count-tasks').textContent = formatNumber(stats.tasks?.total || 0);
         document.getElementById('output-count-conversations').textContent = formatNumber(stats.conversations?.total || 0);
         document.getElementById('output-count-calendar-events').textContent = formatNumber(stats.calendar_events?.total || 0);
 
         // Fetch counts for new entity types from connector_data
-        const newEntityTypes = ['campaign', 'funnel', 'funnel_page', 'calendar', 'calendar_group'];
+        const newEntityTypes = ['funnel', 'funnel_page', 'calendar', 'calendar_group'];
 
         for (const entityType of newEntityTypes) {
           try {
@@ -1479,9 +1466,6 @@
           case 'opportunities':
             await loadOpportunitiesInOutput(searchTerm, statusFilter);
             break;
-          case 'tasks':
-            await loadTasksInOutput(searchTerm, statusFilter);
-            break;
           case 'conversations':
             await loadConversationsInOutput(searchTerm, statusFilter);
             break;
@@ -1489,7 +1473,6 @@
             await loadCalendarEventsInOutput(searchTerm, statusFilter);
             break;
           // New entity types from connector_data
-          case 'campaign':
           case 'funnel':
           case 'funnel_page':
           case 'calendar':
@@ -2942,16 +2925,13 @@
       ]);
     }
 
-    // Load active jobs (uploads + ingestions + running jobs)
+    // Load active jobs (sync jobs only - Leadly doesn't use document ingestion)
     async function loadActiveJobs() {
       try {
         const offset = (activeJobsPage - 1) * activeJobsPageSize;
 
-        // Fetch both active ingestion jobs and active upload sessions
-        const [ingestJobs, uploadSessions] = await Promise.all([
-          api.get(`/api/v1/ingest/jobs?status=pending,running&limit=100`),
-          api.get(`/api/v1/storage/upload-sessions?limit=100`)
-        ]);
+        // Fetch active sync jobs from leadly.sync_logs
+        const syncJobsResult = await api.get(`/api/v1/leadly/sync-logs?status=running,queued&limit=100&sortBy=started_at&sortOrder=DESC`);
 
         const container = document.getElementById('activeJobsContent');
         const pagination = document.getElementById('activeJobsPagination');
@@ -2961,43 +2941,34 @@
           return;
         }
 
-        // Filter upload sessions to only active ones (uploading, assembling, processing)
-        const activeUploadSessions = (uploadSessions.sessions || [])
-          .filter(s => ['uploading', 'assembling', 'processing'].includes(s.status));
-
-        // Map upload sessions to job format for display
-        const uploadJobs = activeUploadSessions.map(session => {
-          // Calculate progress for uploads
+        // Map sync jobs to job format for display
+        const syncJobs = (syncJobsResult.sync_logs || []).map(syncLog => {
+          // Calculate progress based on status
           let progress = 0;
-          if (session.status === 'uploading' && session.total_chunks > 0) {
-            progress = Math.round((session.received_chunks / session.total_chunks) * 100);
-          } else if (session.status === 'assembling') {
-            progress = 95; // Show near complete
-          } else if (session.status === 'processing') {
-            progress = 98; // Show very near complete
+          if (syncLog.status === 'queued') {
+            progress = 0;
+          } else if (syncLog.status === 'running') {
+            progress = 50; // Show halfway for running syncs
+          } else if (syncLog.status === 'completed') {
+            progress = 100;
           }
 
-          // Determine job type
-          let jobType = 'File Upload';
-          if (session.status === 'assembling') jobType = 'Assembling File';
-          else if (session.status === 'processing') jobType = 'Extracting ZIP';
+          // Format job type display
+          const jobType = `Leadly Sync - ${syncLog.sync_type || 'Full'}`;
 
           return {
-            id: session.id,
-            filename: session.filename,
-            job_type: jobType,
-            status: 'running',
-            created_at: session.created_at,
+            id: syncLog.id,
+            filename: jobType,
+            job_type: 'CRM Sync',
+            status: syncLog.status,
+            created_at: syncLog.started_at || syncLog.created_at,
             progress_percentage: progress,
-            processed_count: session.received_chunks && session.total_chunks
-              ? `${session.received_chunks}/${session.total_chunks} chunks`
-              : null,
-            _isUpload: true
+            processed_count: syncLog.records_fetched ? `${syncLog.records_fetched} fetched` : null,
+            _isSync: true
           };
         });
 
-        // Merge jobs
-        const allJobs = [...(ingestJobs.jobs || []), ...uploadJobs];
+        const allJobs = syncJobs;
         const total = allJobs.length;
 
         if (!allJobs || allJobs.length === 0) {
@@ -3048,13 +3019,13 @@
                     ${job.job_type || 'Processing'} • Started ${timeAgo(job.created_at)}${timeRemaining ? ` • ${timeRemaining}` : ''}
                   </p>
                 </div>
-                <button
+                ${!job._isSync ? `<button
                   onclick="cancelJob('${job.id}', ${job._isUpload || false})"
                   class="text-sm text-red-600 hover:text-red-700"
                   title="Cancel job"
                 >
                   Cancel
-                </button>
+                </button>` : ''}
               </div>
 
               <!-- Progress Bar -->
@@ -3537,7 +3508,7 @@
           await api.delete(`/api/v1/storage/upload/${jobId}`);
         } else {
           // Cancel ingest job
-          await api.post(`/api/v1/ingest/jobs/${jobId}/cancel`, {});
+          await api.post(`/api/v1/storage/jobs/${jobId}/cancel`, {});
         }
 
         Toast.success('Job cancelled successfully');

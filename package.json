@@ -1,7 +1,9 @@
 {
   "name": "lana-ai",
   "productName": "Lana AI",
-  "version": "3.0.0-pre-release",
+  "version": "3.0.0",
+  "buildNumber": "1",
+  "releaseType": "beta",
   "description": "Lana AI - Enterprise AI Platform",
   "main": "src/index.js",
   "author": {
@@ -10,6 +12,8 @@
   },
   "license": "Proprietary",
   "scripts": {
+    "generate-version": "node scripts/generate-version.js",
+    "prestart": "npm run generate-version",
     "start": "node --max-old-space-size=2048 src/index.js",
     "start:prod": "node --max-old-space-size=16384 src/index.js",
     "dev": "nodemon --max-old-space-size=2048 src/index.js",

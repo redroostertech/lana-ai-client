@@ -36,6 +36,12 @@ const ArticleSystem = (function() {
    * Load help content from API or mock data
    */
   async function loadHelpContent() {
+    // TEMPORARILY USING LOCAL MOCK DATA ONLY - REMOVE AFTER API IS UPDATED
+    console.log('Using local mock data for testing');
+    helpData = await loadMockHelpData();
+    return;
+
+    /* COMMENTED OUT - UNCOMMENT AFTER API IS UPDATED
     const apiUrl = 'https://redroostertec.com/lana-ai/v1/help';
 
     try {
@@ -67,6 +73,7 @@ const ArticleSystem = (function() {
       // Fall back to mock data
       helpData = await loadMockHelpData();
     }
+    */
   }
 
   /**

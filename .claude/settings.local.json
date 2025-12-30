@@ -10,7 +10,22 @@
       "Bash(xargs:*)",
       "Bash(cat:*)",
       "Bash(curl:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(./scripts/build-client.sh:*)",
+      "Bash(export APPLE_TEAM_ID=\"2PSWQPK482\")",
+      "Bash(export APPLE_ID=\"mwestbrooksjr@icloud.com\")",
+      "Bash(export APPLE_APP_SPECIFIC_PASSWORD=\"wsqq-hcxa-endf-sxjp\")",
+      "Bash(npm run build:mac-x64:*)",
+      "Bash(git push:*)",
+      "Bash(git tag:*)",
+      "Bash(gh release create:*)",
+      "Bash(dist/macos-arm64/LanaAI--genesis--02.0.0-arm64.dmg )",
+      "Bash(dist/macos-x64/LanaAI--genesis--02.0.0-x64.dmg)",
+      "Bash(brew install:*)",
+      "Bash(gh auth login:*)",
+      "Bash(gh auth:*)",
+      "Bash(export GH_TOKEN=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)",
+      "Bash(gh release:*)"
     ],
     "deny": [],
     "ask": []

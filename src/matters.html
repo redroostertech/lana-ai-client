@@ -1645,7 +1645,7 @@
       console.log(`Starting SSE stream for job ${jobId} (${filename})`);
 
       // EventSource doesn't support custom headers, so we pass token as query param
-      const eventSource = new EventSource(`${api.baseUrl}/api/v1/ingest/status/${jobId}/stream?token=${api.token}`);
+      const eventSource = new EventSource(`${api.baseUrl}/api/v1/storage/jobs/${jobId}/status/stream?token=${api.token}`);
 
       activeSSEConnections.set(jobId, eventSource);
 
@@ -1734,7 +1734,7 @@
     // Cancel document processing
     window.cancelDocumentProcessing = async function(jobId, filename) {
       try {
-        const response = await fetch(`${api.baseUrl}/api/v1/ingest/jobs/${jobId}/cancel`, {
+        const response = await fetch(`${api.baseUrl}/api/v1/storage/jobs/${jobId}/cancel`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${api.token}`,

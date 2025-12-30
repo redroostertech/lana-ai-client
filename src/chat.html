@@ -5825,7 +5825,7 @@
         }
 
         try {
-          const response = await fetch(`${api.baseUrl}/api/v1/ingest/status/${jobId}`, {
+          const response = await fetch(`${api.baseUrl}/api/v1/storage/jobs/${jobId}/status`, {
             headers: {
               'Authorization': `Bearer ${api.token}`
             }

@@ -1207,9 +1207,10 @@
       html += '</tr></thead><tbody class="bg-white divide-y divide-gray-200">';
 
       result.participants.forEach(p => {
-        html += `<tr class="hover:bg-gray-50">
-          <td class="px-6 py-4 text-sm font-medium text-gray-900">${p.name || '-'}</td>
-          <td class="px-6 py-4 text-sm text-gray-500">${p.type || '-'}</td>
+        const participantType = p.is_company ? 'Company' : 'Individual';
+        html += `<tr class="hover:bg-gray-50 cursor-pointer transition-colors" onclick="openParticipantDetail('${p.id}')">
+          <td class="px-6 py-4 text-sm font-medium text-gray-900">${p.display_name || '-'}</td>
+          <td class="px-6 py-4 text-sm text-gray-500">${participantType}</td>
           <td class="px-6 py-4 text-sm text-gray-500">${p.email || '-'}</td>
         </tr>`;
       });
@@ -1234,10 +1235,11 @@
       html += '</tr></thead><tbody class="bg-white divide-y divide-gray-200">';
 
       result.tasks.forEach(t => {
-        html += `<tr class="hover:bg-gray-50">
-          <td class="px-6 py-4 text-sm font-medium text-gray-900">${t.name || '-'}</td>
-          <td class="px-6 py-4 text-sm text-gray-500">${t.status || '-'}</td>
-          <td class="px-6 py-4 text-sm text-gray-500">${t.due_date || '-'}</td>
+        const dueDate = t.due_date ? new Date(t.due_date).toLocaleDateString() : '-';
+        html += `<tr class="hover:bg-gray-50 cursor-pointer transition-colors" onclick="openTaskDetail('${t.id}')">
+          <td class="px-6 py-4 text-sm font-medium text-gray-900">${t.task_name || '-'}</td>
+          <td class="px-6 py-4 text-sm text-gray-500">${t.current_status || '-'}</td>
+          <td class="px-6 py-4 text-sm text-gray-500">${dueDate}</td>
         </tr>`;
       });
 
@@ -1261,8 +1263,10 @@
       html += '</tr></thead><tbody class="bg-white divide-y divide-gray-200">';
 
       result.file_notes.forEach(note => {
-        html += `<tr class="hover:bg-gray-50">
-          <td class="px-6 py-4 text-sm font-medium text-gray-900">${note.subject || '-'}</td>
+        // Use first 100 chars of note_text as subject
+        const subject = note.note_text ? note.note_text.substring(0, 100) + (note.note_text.length > 100 ? '...' : '') : '-';
+        html += `<tr class="hover:bg-gray-50 cursor-pointer transition-colors" onclick="openFileNoteDetail('${note.id}')">
+          <td class="px-6 py-4 text-sm font-medium text-gray-900">${subject}</td>
           <td class="px-6 py-4 text-sm text-gray-500">${note.matter_name || '-'}</td>
           <td class="px-6 py-4 text-sm text-gray-500">${note.created_at ? new Date(note.created_at).toLocaleDateString() : '-'}</td>
         </tr>`;
@@ -2144,6 +2148,7 @@
 
         const result = await api.post('/api/v1/actionstep/config/auto-configure');
 
+        // Handle successful configuration
         if (result.success) {
           statusEl.className = 'mt-2 text-sm text-emerald-700 font-medium';
           statusEl.innerHTML = `✓ Configuration complete!<br><span class="text-xs text-emerald-600">Import directory: ${result.config.import_directory}</span>`;
@@ -2154,22 +2159,51 @@
           setTimeout(() => {
             loadDashboard();
           }, 1500);
-        } else {
+        }
+        // Handle "already configured" case - treat as success
+        else if (!result.success && result.config && result.error?.includes('already exists')) {
+          statusEl.className = 'mt-2 text-sm text-emerald-700 font-medium';
+          statusEl.innerHTML = `✓ Already configured!<br><span class="text-xs text-emerald-600">Import directory: ${result.config.import_directory}</span>`;
+
+          Toast.success('ActionStep is already configured');
+
+          // Reload dashboard after short delay to show current configuration
+          setTimeout(() => {
+            loadDashboard();
+          }, 1500);
+        }
+        else {
           throw new Error(result.error || 'Auto-configuration failed');
         }
       } catch (error) {
-        statusEl.className = 'mt-2 text-sm text-red-700';
-        statusEl.textContent = error.message || 'Failed to auto-configure';
+        // Check if error has config (already configured case from HTTP error)
+        // API client stores response data in error.data
+        if (error.data?.config && error.message?.includes('already exists')) {
+          const config = error.data.config;
+          statusEl.className = 'mt-2 text-sm text-emerald-700 font-medium';
+          statusEl.innerHTML = `✓ Already configured!<br><span class="text-xs text-emerald-600">Import directory: ${config.import_directory}</span>`;
 
-        btn.disabled = false;
-        btn.innerHTML = `
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-          </svg>
-          Auto-Configure
-        `;
+          Toast.success('ActionStep is already configured');
 
-        Toast.error(error.message || 'Failed to auto-configure ActionStep');
+          // Reload dashboard after short delay
+          setTimeout(() => {
+            loadDashboard();
+          }, 1500);
+        } else {
+          // Real error
+          statusEl.className = 'mt-2 text-sm text-red-700';
+          statusEl.textContent = error.message || 'Failed to auto-configure';
+
+          btn.disabled = false;
+          btn.innerHTML = `
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            Auto-Configure
+          `;
+
+          Toast.error(error.message || 'Failed to auto-configure ActionStep');
+        }
       }
     }
 
@@ -2295,7 +2329,7 @@
       try {
         // Fetch both active ingestion jobs and active upload sessions
         const [ingestJobs, uploadSessions] = await Promise.all([
-          api.get('/api/v1/ingest/jobs?status=pending,running&limit=20'),
+          api.get('/api/v1/storage/jobs?status=pending,processing&limit=20'),
           api.get('/api/v1/storage/upload-sessions?limit=20')
         ]);
 
@@ -2451,43 +2485,58 @@
       try {
         const offset = (logsHistoryPage - 1) * logsHistoryPageSize;
 
-        // Fetch both ingest jobs and upload sessions in parallel
-        const [ingestResult, uploadResult] = await Promise.all([
-          api.get(`/api/v1/ingest/jobs?status=completed,failed,cancelled&limit=${logsHistoryPageSize}&offset=${offset}&order_by=created_at&order_dir=desc`),
-          api.get(`/api/v1/storage/upload-sessions?limit=${logsHistoryPageSize}&offset=${offset}`)
+        // Fetch ActionStep-specific job history (sync logs, document imports, AI ingestions)
+        const [syncLogsResult, documentImportsResult] = await Promise.all([
+          api.get(`/api/v1/actionstep/sync-logs?limit=${logsHistoryPageSize}&offset=${offset}`),
+          api.get(`/api/v1/actionstep/documents?limit=${logsHistoryPageSize}&offset=${offset}`)
         ]);
 
         const container = document.getElementById('jobHistoryContent');
         const pagination = document.getElementById('jobHistoryPagination');
 
-        // Map upload sessions to job format
-        const uploadJobs = (uploadResult.sessions || []).map(session => {
-          // Determine job type based on status
-          let jobType = 'File Upload';
-          if (session.status === 'assembling') jobType = 'File Assembly';
-          else if (session.status === 'processing') jobType = 'File Extraction';
-
-          // Map upload session status to job status
-          let status = session.status;
-          if (status === 'uploading' || status === 'assembling' || status === 'processing') status = 'pending';
-
+        // Map ActionStep sync logs to job format
+        const syncJobs = (syncLogsResult.logs || syncLogsResult.sync_logs || []).map(log => {
           return {
-            id: session.id,
-            filename: session.filename,
-            job_type: jobType,
-            status: status,
-            created_at: session.created_at,
-            completed_at: session.completed_at,
-            processed_count: session.received_chunks && session.total_chunks
-              ? `${session.received_chunks}/${session.total_chunks} chunks`
-              : null,
-            error_message: session.error_message,
-            _isUpload: true
+            id: log.id,
+            filename: `${log.sync_type || 'Full'} Sync`,
+            job_type: 'ActionStep Sync',
+            status: log.status,
+            created_at: log.started_at,
+            completed_at: log.completed_at,
+            processed_count: log.records_processed || 0,
+            error_message: log.error_message,
+            _isSync: true,
+            details: {
+              matters: log.matters_imported || 0,
+              participants: log.participants_imported || 0,
+              file_notes: log.file_notes_imported || 0,
+              tasks: log.tasks_imported || 0
+            }
           };
         });
 
-        // Merge all jobs
-        let allJobs = [...(ingestResult.jobs || []), ...uploadJobs];
+        // Map ActionStep document imports to job format
+        const documentJobs = (documentImportsResult.documents || []).map(doc => {
+          return {
+            id: doc.id,
+            filename: doc.original_filename || doc.filename,
+            job_type: 'Document Import',
+            status: doc.status,
+            created_at: doc.created_at,
+            completed_at: doc.updated_at,
+            processed_count: 1,
+            error_message: doc.error_message,
+            _isDocument: true,
+            details: {
+              matter_id: doc.matter_id,
+              document_id: doc.document_id,
+              file_size: doc.file_size
+            }
+          };
+        });
+
+        // Merge all ActionStep-specific jobs
+        let allJobs = [...syncJobs, ...documentJobs];
 
         // Apply status filter
         if (logsHistoryFilterStatus !== 'all') {
@@ -2719,7 +2768,7 @@
           await api.delete(`/api/v1/storage/upload/${jobId}`);
         } else {
           // Cancel ingest job
-          await api.post(`/api/v1/ingest/jobs/${jobId}/cancel`, {});
+          await api.post(`/api/v1/storage/jobs/${jobId}/cancel`, {});
         }
 
         Toast.success('Job cancelled successfully');
@@ -4092,6 +4141,283 @@
       if (bytes < 1024) return bytes + ' B';
       if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
       return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    // ========================================
+    // Participant Detail Functions
+    // ========================================
+    async function openParticipantDetail(participantId) {
+      const panel = document.getElementById('matterDetailPanel');
+      const overlay = document.getElementById('matterDetailOverlay');
+      const content = document.getElementById('matterDetailContent');
+      const panelTitle = panel.querySelector('h2');
+
+      // Update panel title
+      panelTitle.textContent = 'Participant Details';
+
+      // Show panel and overlay
+      overlay.classList.remove('hidden');
+      setTimeout(() => panel.classList.remove('translate-x-full'), 10);
+
+      // Show loading state
+      content.innerHTML = '<div class="flex items-center justify-center py-12"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div></div>';
+
+      try {
+        const result = await api.get(`/api/v1/actionstep/participants/${participantId}`);
+        renderParticipantDetail(result);
+      } catch (error) {
+        content.innerHTML = `<div class="text-center text-red-600 py-8"><p class="font-medium">Failed to load participant details</p><p class="text-sm mt-2">${error.message}</p></div>`;
+      }
+    }
+
+    function renderParticipantDetail(data) {
+      const { participant, matters = [] } = data;
+      const content = document.getElementById('matterDetailContent');
+      const participantType = participant.is_company ? 'Company' : 'Individual';
+
+      let html = `
+        <!-- Participant Header -->
+        <div class="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl p-6 text-white mb-6">
+          <div class="flex items-center gap-3 mb-2">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${participant.is_company ? 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' : 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z'}"></path>
+            </svg>
+            <h3 class="text-2xl font-bold">${participant.display_name || '-'}</h3>
+          </div>
+          <p class="text-emerald-100">${participantType}</p>
+        </div>
+
+        <!-- Contact Information -->
+        ${renderDetailCard('Contact Information', [
+          { label: 'Email', value: participant.email },
+          { label: 'Primary Phone', value: participant.phone_primary },
+          { label: 'Phone Type', value: participant.phone_primary_type },
+          { label: 'Secondary Phone', value: participant.phone_secondary },
+          { label: 'Fax', value: participant.fax },
+          { label: 'Website', value: participant.website }
+        ])}
+
+        <!-- Personal Information -->
+        ${!participant.is_company ? renderDetailCard('Personal Information', [
+          { label: 'Salutation', value: participant.salutation },
+          { label: 'First Name', value: participant.first_name },
+          { label: 'Middle Name', value: participant.middle_name },
+          { label: 'Last Name', value: participant.last_name },
+          { label: 'Preferred Name', value: participant.preferred_name },
+          { label: 'Suffix', value: participant.suffix },
+          { label: 'Gender', value: participant.gender },
+          { label: 'Date of Birth', value: formatDate(participant.date_of_birth) },
+          { label: 'Occupation', value: participant.occupation },
+          { label: 'Marital Status', value: participant.marital_status },
+          { label: 'Tax Number', value: participant.tax_number }
+        ]) : renderDetailCard('Company Information', [
+          { label: 'Company Name', value: participant.company_name },
+          { label: 'Tax Number', value: participant.tax_number }
+        ])}
+
+        <!-- Address Information -->
+        ${renderDetailCard('Address', [
+          { label: 'Street Address', value: participant.address_line_1 },
+          { label: 'Address Line 2', value: participant.address_line_2 },
+          { label: 'City', value: participant.city },
+          { label: 'State/Province', value: participant.state_province },
+          { label: 'Postal Code', value: participant.post_code },
+          { label: 'Country', value: participant.country }
+        ])}
+
+        <!-- Mailing Address -->
+        ${participant.mailing_address_line_1 ? renderDetailCard('Mailing Address', [
+          { label: 'Street Address', value: participant.mailing_address_line_1 },
+          { label: 'Address Line 2', value: participant.mailing_address_line_2 },
+          { label: 'City', value: participant.mailing_city },
+          { label: 'State/Province', value: participant.mailing_state_province },
+          { label: 'Postal Code', value: participant.mailing_post_code },
+          { label: 'Country', value: participant.mailing_country }
+        ]) : ''}
+
+        <!-- Associated Matters -->
+        ${renderListSection('Associated Matters', matters, (m) => `
+          <div class="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors" onclick="openMatterDetail('${m.id}')">
+            <div class="flex items-start justify-between">
+              <div class="flex-1">
+                <p class="font-medium text-gray-900">${m.matter_name || 'Unnamed Matter'}</p>
+                <div class="flex gap-4 mt-2 text-xs text-gray-500">
+                  <span>Role: ${m.participant_type || '-'}</span>
+                  <span>Status: ${m.status || '-'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        `)}
+
+        <!-- System Information -->
+        ${renderDetailCard('System Information', [
+          { label: 'ActionStep ID', value: participant.as_id },
+          { label: 'Created At', value: formatDate(participant.as_created_at) },
+          { label: 'Updated At', value: formatDate(participant.as_updated_at) },
+          { label: 'Synced At', value: formatDate(participant.synced_at) }
+        ])}
+      `;
+
+      content.innerHTML = html;
+    }
+
+    // ========================================
+    // Task Detail Functions
+    // ========================================
+    async function openTaskDetail(taskId) {
+      const panel = document.getElementById('matterDetailPanel');
+      const overlay = document.getElementById('matterDetailOverlay');
+      const content = document.getElementById('matterDetailContent');
+      const panelTitle = panel.querySelector('h2');
+
+      panelTitle.textContent = 'Task Details';
+      overlay.classList.remove('hidden');
+      setTimeout(() => panel.classList.remove('translate-x-full'), 10);
+
+      content.innerHTML = '<div class="flex items-center justify-center py-12"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div></div>';
+
+      try {
+        // Fetch task details - note: you may need to add this endpoint
+        const task = await api.get(`/api/v1/actionstep/tasks/${taskId}`).catch(() => null);
+        if (!task) {
+          // Fallback: fetch all tasks and find the one we need
+          const result = await api.get(`/api/v1/actionstep/tasks?limit=1000`);
+          const foundTask = result.tasks.find(t => t.id === taskId);
+          if (foundTask) {
+            renderTaskDetail({ task: foundTask });
+          } else {
+            throw new Error('Task not found');
+          }
+        } else {
+          renderTaskDetail(task);
+        }
+      } catch (error) {
+        content.innerHTML = `<div class="text-center text-red-600 py-8"><p class="font-medium">Failed to load task details</p><p class="text-sm mt-2">${error.message}</p></div>`;
+      }
+    }
+
+    function renderTaskDetail(data) {
+      const task = data.task || data;
+      const content = document.getElementById('matterDetailContent');
+
+      const statusColors = {
+        'Complete': 'from-green-500 to-emerald-600',
+        'In Progress': 'from-yellow-500 to-orange-600',
+        'Pending': 'from-blue-500 to-indigo-600',
+        'Cancelled': 'from-gray-500 to-gray-600'
+      };
+      const gradientClass = statusColors[task.current_status] || 'from-indigo-500 to-purple-600';
+
+      let html = `
+        <!-- Task Header -->
+        <div class="bg-gradient-to-r ${gradientClass} rounded-xl p-6 text-white mb-6">
+          <div class="flex items-center gap-3 mb-2">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+            </svg>
+            <h3 class="text-2xl font-bold">${task.task_name || 'Unnamed Task'}</h3>
+          </div>
+          <p class="text-white/80">${task.current_status || 'Pending'}</p>
+        </div>
+
+        <!-- Task Information -->
+        ${renderDetailCard('Task Information', [
+          { label: 'Task Type', value: task.task_type_name },
+          { label: 'Status', value: task.current_status },
+          { label: 'Priority', value: task.priority || 'Normal' },
+          { label: 'Due Date', value: formatDate(task.due_date) },
+          { label: 'Assigned To', value: task.assigned_to_name },
+          { label: 'Assigned To ID', value: task.as_assigned_to_id },
+          { label: 'Matter', value: task.matter_name }
+        ])}
+
+        <!-- Description & Notes -->
+        ${task.description || task.notes ? renderDetailCard('Description', [
+          { label: 'Description', value: task.description || task.notes, fullWidth: true }
+        ]) : ''}
+
+        <!-- System Information -->
+        ${renderDetailCard('System Information', [
+          { label: 'ActionStep ID', value: task.as_id },
+          { label: 'Created At', value: formatDate(task.as_created_at) },
+          { label: 'Updated At', value: formatDate(task.as_updated_at) },
+          { label: 'Synced At', value: formatDate(task.synced_at) }
+        ])}
+      `;
+
+      content.innerHTML = html;
+    }
+
+    // ========================================
+    // File Note Detail Functions
+    // ========================================
+    async function openFileNoteDetail(noteId) {
+      const panel = document.getElementById('matterDetailPanel');
+      const overlay = document.getElementById('matterDetailOverlay');
+      const content = document.getElementById('matterDetailContent');
+      const panelTitle = panel.querySelector('h2');
+
+      panelTitle.textContent = 'File Note Details';
+      overlay.classList.remove('hidden');
+      setTimeout(() => panel.classList.remove('translate-x-full'), 10);
+
+      content.innerHTML = '<div class="flex items-center justify-center py-12"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div></div>';
+
+      try {
+        // Fallback: fetch all notes and find the one we need
+        const result = await api.get(`/api/v1/actionstep/file-notes?limit=1000`);
+        const foundNote = result.file_notes.find(n => n.id === noteId);
+        if (foundNote) {
+          renderFileNoteDetail({ file_note: foundNote });
+        } else {
+          throw new Error('File note not found');
+        }
+      } catch (error) {
+        content.innerHTML = `<div class="text-center text-red-600 py-8"><p class="font-medium">Failed to load file note details</p><p class="text-sm mt-2">${error.message}</p></div>`;
+      }
+    }
+
+    function renderFileNoteDetail(data) {
+      const note = data.file_note || data;
+      const content = document.getElementById('matterDetailContent');
+
+      let html = `
+        <!-- Note Header -->
+        <div class="bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl p-6 text-white mb-6">
+          <div class="flex items-center gap-3 mb-2">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <h3 class="text-2xl font-bold">File Note</h3>
+          </div>
+          <p class="text-white/80">${formatDate(note.note_timestamp)}</p>
+        </div>
+
+        <!-- Note Content -->
+        <div class="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+          <h4 class="font-semibold text-gray-900 mb-3">Note Content</h4>
+          <div class="prose max-w-none text-gray-700 whitespace-pre-wrap">${note.note_text || 'No content'}</div>
+        </div>
+
+        <!-- Note Information -->
+        ${renderDetailCard('Note Information', [
+          { label: 'Matter', value: note.matter_name },
+          { label: 'Entered By', value: note.entered_by_name },
+          { label: 'Note Timestamp', value: formatDate(note.note_timestamp) },
+          { label: 'Entry Timestamp', value: formatDate(note.entry_timestamp) }
+        ])}
+
+        <!-- System Information -->
+        ${renderDetailCard('System Information', [
+          { label: 'ActionStep ID', value: note.as_id },
+          { label: 'Synced At', value: formatDate(note.synced_at) },
+          { label: 'Created At', value: formatDate(note.created_at) },
+          { label: 'Updated At', value: formatDate(note.updated_at) }
+        ])}
+      `;
+
+      content.innerHTML = html;
     }
 
     // Add ESC key listener to close panel

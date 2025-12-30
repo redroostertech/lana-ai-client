@@ -9,6 +9,7 @@
 - [Quick Start](#quick-start)
 - [Fresh System Deployment](#fresh-system-deployment)
 - [Desktop Client Build](#desktop-client-build)
+- [Version Management](#version-management)
 - [Customer Onboarding](#customer-onboarding)
 - [Scripts Reference](#scripts-reference)
 - [Service Architecture](#service-architecture)
@@ -372,6 +373,156 @@ Building for all platforms from a single machine has limitations:
 ```bash
 # Build for current Mac architecture only
 ./scripts/build-client.sh --ip 100.64.0.26:8080 --platform mac --arch current
+```
+
+---
+
+## Version Management
+
+LanaAI uses a **centralized version management system** where the version is set in ONE location and automatically propagates to all user-facing locations.
+
+### Quick Start
+
+**To update the version:**
+
+1. Edit `package.json`:
+   ```json
+   {
+     "version": "3.1.0",
+     "buildNumber": "2",
+     "releaseType": "beta"
+   }
+   ```
+
+2. Run the version generator:
+   ```bash
+   npm run generate-version
+   ```
+
+3. The version now appears as `v3.1.0b2` in:
+   - Menu footer
+   - Login page
+   - Activation page
+   - Password reset pages
+   - Electron About dialog
+   - Backend API responses
+
+### Version Format
+
+**Pattern:** `v{version}{suffix}{buildNumber}`
+
+**Examples:**
+- `v3.0.0` - Stable release
+- `v3.0.0b1` - Beta build 1
+- `v3.0.0rc2` - Release candidate 2
+- `v3.0.0a1` - Alpha build 1
+
+**Release Type Mapping:**
+
+| releaseType | Suffix | Example |
+|-------------|--------|---------|
+| `stable` | none | `v3.0.0` |
+| `beta` | `b` | `v3.0.0b1` |
+| `alpha` | `a` | `v3.0.0a1` |
+| `rc` | `rc` | `v3.0.0rc1` |
+| `dev` | `dev` | `v3.0.0dev1` |
+| `pre-release` | `pre` | `v3.0.0pre1` |
+
+### Auto-Generation
+
+Version files are automatically generated when you run:
+
+```bash
+npm start              # Auto-generates via prestart hook
+npm run generate-version  # Manual generation
+```
+
+### Generated Files
+
+| File | Purpose | Usage |
+|------|---------|-------|
+| `public_html/js/version.js` | Frontend version object | `window.APP_VERSION.getVersion()` |
+| `src/version.js` | Backend version module | `require('./src/version.js')` |
+| `.env` | Environment variables | `APP_VERSION`, `APP_BUILD_NUMBER`, etc. |
+
+### Version API
+
+**Frontend (Browser):**
+```javascript
+window.APP_VERSION.getVersion()           // "v3.0.0b1"
+window.APP_VERSION.getDetailedVersion()   // "v3.0.0b1 (Build 1, Beta)"
+window.APP_VERSION.getSemanticVersion()   // "3.0.0"
+```
+
+**Backend (Node.js):**
+```javascript
+const version = require('./src/version.js');
+version.getVersion()           // "v3.0.0b1"
+version.getDetailedVersion()   // "v3.0.0b1 (Build 1, Beta)"
+version.getSemanticVersion()   // "3.0.0"
+```
+
+### Release Workflow
+
+**For Beta Releases:**
+```bash
+# 1. Update version in package.json
+#    "version": "3.1.0"
+#    "buildNumber": "1"
+#    "releaseType": "beta"
+
+# 2. Generate version files
+npm run generate-version
+
+# 3. Commit changes
+git add package.json src/version.js public_html/js/version.js .env
+git commit -m "Release v3.1.0b1"
+
+# 4. Build and distribute
+./scripts/build-client.sh --ip <server-ip> --platform all
+```
+
+**For Stable Releases:**
+```bash
+# 1. Update to stable in package.json
+#    "version": "3.1.0"
+#    "buildNumber": "1"
+#    "releaseType": "stable"
+
+# 2. Generate version files
+npm run generate-version
+
+# 3. Commit and tag
+git add package.json src/version.js public_html/js/version.js .env
+git commit -m "Release v3.1.0"
+git tag v3.1.0
+
+# 4. Build and distribute
+./scripts/build-client.sh --ip <server-ip> --platform all
+```
+
+### Troubleshooting
+
+**Version not updating in UI:**
+```bash
+# Re-generate version files
+npm run generate-version
+
+# Verify generated files
+cat public_html/js/version.js
+cat src/version.js
+
+# Restart application
+./run.sh restart
+```
+
+**Wrong version showing:**
+```bash
+# Check package.json
+cat package.json | grep -A 2 '"version"'
+
+# Re-generate
+npm run generate-version
 ```
 
 ---

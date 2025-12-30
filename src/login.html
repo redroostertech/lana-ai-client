@@ -7,6 +7,7 @@
   <script src="js/tailwind-loader.js"></script>
   <script src="js/error-reporter.js"></script>
   <script src="js/config.js"></script>
+  <script src="js/version.js"></script>
   <script src="js/mock-data.js"></script>
   <script src="js/api.js"></script>
   <script src="js/components.js"></script>
@@ -147,8 +148,8 @@
   </div>
 
   <script>
-    // Set app version from config
-    document.getElementById('app-version').textContent = 'v' + (window.LanaConfig?.APP_VERSION || '2.0.0');
+    // Set app version from centralized version system
+    document.getElementById('app-version').textContent = window.APP_VERSION?.getVersion() || 'v0.0.0';
 
     // Hosted discovery endpoint
     const HOSTED_DISCOVERY_URL = 'https://www.redroostertec.com/lana-ai/v1/discovery';
