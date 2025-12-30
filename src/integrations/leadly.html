@@ -2853,22 +2853,29 @@
               <div class="text-sm text-gray-500">
                 <span id="jobHistoryInfo">Showing 0-0 of 0</span>
               </div>
-              <div class="flex gap-2">
+              <div class="flex items-center gap-2">
                 <button
                   onclick="changeJobHistoryPage(-1)"
                   id="jobHistoryPrevBtn"
-                  class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   disabled
                 >
-                  Previous
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                  </svg>
                 </button>
+                <div id="jobHistoryPageNumbers" class="flex gap-1">
+                  <!-- Page number buttons will be inserted here -->
+                </div>
                 <button
                   onclick="changeJobHistoryPage(1)"
                   id="jobHistoryNextBtn"
-                  class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   disabled
                 >
-                  Next
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                  </svg>
                 </button>
               </div>
             </div>
@@ -3304,6 +3311,8 @@
         });
 
         // Update pagination
+        const totalPages = Math.ceil(total / logsHistoryPageSize);
+
         if (total > logsHistoryPageSize) {
           pagination.classList.remove('hidden');
           const start = offset + 1;
@@ -3311,6 +3320,46 @@
           document.getElementById('jobHistoryInfo').textContent = `Showing ${start}-${end} of ${total}`;
           document.getElementById('jobHistoryPrevBtn').disabled = logsHistoryPage === 1;
           document.getElementById('jobHistoryNextBtn').disabled = end >= total;
+
+          // Generate page number buttons
+          const pageNumbersContainer = document.getElementById('jobHistoryPageNumbers');
+          pageNumbersContainer.innerHTML = '';
+
+          // Calculate page range to show (max 7 buttons)
+          let startPage = Math.max(1, logsHistoryPage - 3);
+          let endPage = Math.min(totalPages, startPage + 6);
+
+          // Adjust start if we're near the end
+          if (endPage - startPage < 6) {
+            startPage = Math.max(1, endPage - 6);
+          }
+
+          // Add first page and ellipsis if needed
+          if (startPage > 1) {
+            pageNumbersContainer.appendChild(createPageButton(1, logsHistoryPage));
+            if (startPage > 2) {
+              const ellipsis = document.createElement('span');
+              ellipsis.className = 'px-3 py-2 text-sm text-gray-500';
+              ellipsis.textContent = '...';
+              pageNumbersContainer.appendChild(ellipsis);
+            }
+          }
+
+          // Add page number buttons
+          for (let i = startPage; i <= endPage; i++) {
+            pageNumbersContainer.appendChild(createPageButton(i, logsHistoryPage));
+          }
+
+          // Add ellipsis and last page if needed
+          if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+              const ellipsis = document.createElement('span');
+              ellipsis.className = 'px-3 py-2 text-sm text-gray-500';
+              ellipsis.textContent = '...';
+              pageNumbersContainer.appendChild(ellipsis);
+            }
+            pageNumbersContainer.appendChild(createPageButton(totalPages, logsHistoryPage));
+          }
         } else {
           pagination.classList.add('hidden');
         }
@@ -3328,6 +3377,27 @@
     function changeJobHistoryPage(delta) {
       logsHistoryPage += delta;
       loadJobHistory();
+    }
+
+    // Go to specific page
+    function goToJobHistoryPage(page) {
+      logsHistoryPage = page;
+      loadJobHistory();
+    }
+
+    // Create page button helper
+    function createPageButton(pageNum, currentPage) {
+      const button = document.createElement('button');
+      button.textContent = pageNum;
+      button.onclick = () => goToJobHistoryPage(pageNum);
+
+      if (pageNum === currentPage) {
+        button.className = 'px-3 py-2 text-sm font-medium text-white bg-emerald-600 border border-emerald-600 rounded-lg';
+      } else {
+        button.className = 'px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors';
+      }
+
+      return button;
     }
 
     // Cancel a job
