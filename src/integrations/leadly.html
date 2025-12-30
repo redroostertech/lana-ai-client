@@ -1491,6 +1491,12 @@
                     <span id="output-count-opportunities" class="text-sm text-gray-500">-</span>
                   </div>
                 </button>
+                <button onclick="loadOutputData('pipelines')" id="output-nav-pipelines" class="output-nav-btn w-full text-left px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors">
+                  <div class="flex items-center justify-between">
+                    <span>Pipelines</span>
+                    <span id="output-count-pipelines" class="text-sm text-gray-500">-</span>
+                  </div>
+                </button>
                 <button onclick="loadOutputData('conversations')" id="output-nav-conversations" class="output-nav-btn w-full text-left px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors">
                   <div class="flex items-center justify-between">
                     <span>Conversations</span>
@@ -1632,6 +1638,7 @@
         const stats = dashboardData.stats;
         document.getElementById('output-count-contacts').textContent = formatNumber(stats.contacts?.total || 0);
         document.getElementById('output-count-opportunities').textContent = formatNumber(stats.opportunities?.total || 0);
+        document.getElementById('output-count-pipelines').textContent = formatNumber(stats.pipelines?.total || 0);
         document.getElementById('output-count-conversations').textContent = formatNumber(stats.conversations?.total || 0);
         document.getElementById('output-count-calendar-events').textContent = formatNumber(stats.calendar_events?.total || 0);
 
@@ -1720,6 +1727,9 @@
             break;
           case 'opportunities':
             await loadOpportunitiesInOutput(searchTerm, statusFilter);
+            break;
+          case 'pipelines':
+            await loadPipelinesInOutput(searchTerm, statusFilter);
             break;
           case 'conversations':
             await loadConversationsInOutput(searchTerm, statusFilter);
@@ -1951,6 +1961,72 @@
             <td class="px-6 py-4 text-sm text-gray-500">${opp.status || '-'}</td>
             <td class="px-6 py-4 text-sm text-gray-500">${formatCurrency(opp.value || 0)}</td>
             <td class="px-6 py-4 text-sm text-gray-500">${opp.stage_name || '-'}</td>
+          </tr>
+        `;
+      });
+
+      html += `
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      panel.innerHTML = html;
+    }
+
+    // Load pipelines in output panel
+    async function loadPipelinesInOutput(searchTerm = '', statusFilter = '') {
+      const panel = document.getElementById('outputDataPanel');
+
+      // Build query parameters
+      const params = new URLSearchParams({
+        page: outputCurrentPage,
+        limit: outputPageSize
+      });
+
+      if (searchTerm) {
+        params.append('search', searchTerm);
+      }
+
+      const result = await api.get(`/api/v1/leadly/pipelines?${params.toString()}`);
+
+      if (!result.pipelines || result.pipelines.length === 0) {
+        panel.innerHTML = '<div class="text-center text-gray-500 py-8">No pipelines found</div>';
+        updateOutputPagination(0);
+        return;
+      }
+
+      // Update pagination
+      const total = result.pagination?.total || result.pipelines.length;
+      updateOutputPagination(total);
+
+      // Render table
+      let html = `
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pipeline Name</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stages</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Opportunities</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Value</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+      `;
+
+      result.pipelines.forEach(pipeline => {
+        const stageCount = pipeline.stages ? pipeline.stages.length : 0;
+        const stageNames = pipeline.stages ? pipeline.stages.map(s => s.name).join(', ') : '-';
+
+        html += `
+          <tr class="hover:bg-gray-50 transition-colors">
+            <td class="px-6 py-4 text-sm font-medium text-gray-900">${pipeline.name || '-'}</td>
+            <td class="px-6 py-4 text-sm text-gray-500" title="${stageNames}">
+              ${stageCount} stage${stageCount !== 1 ? 's' : ''}
+            </td>
+            <td class="px-6 py-4 text-sm text-gray-500">${pipeline.opportunity_count || 0}</td>
+            <td class="px-6 py-4 text-sm text-gray-500">${formatCurrency(pipeline.total_value || 0)}</td>
           </tr>
         `;
       });
