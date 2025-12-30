@@ -3166,9 +3166,10 @@
         const offset = (logsHistoryPage - 1) * logsHistoryPageSize;
 
         // Fetch Leadly CRM-specific job history (sync logs, document imports, AI ingestions)
+        // Fetch a larger set and paginate client-side since we're merging multiple sources
         const [syncLogsResult, documentImportsResult] = await Promise.all([
-          api.get(`/api/v1/leadly/sync-logs?limit=${logsHistoryPageSize}&offset=${offset}`),
-          api.get(`/api/v1/leadly/documents?limit=${logsHistoryPageSize}&offset=${offset}`)
+          api.get(`/api/v1/leadly/sync-logs?limit=100`),
+          api.get(`/api/v1/leadly/documents?limit=100`)
         ]);
 
         const container = document.getElementById('jobHistoryContent');
