@@ -2783,6 +2783,12 @@
 
     // Load Execution Logs tab with Active Jobs, Pending Review, and Job History
     let logsRefreshInterval = null;
+
+    // Active Jobs pagination
+    let activeJobsPage = 1;
+    const activeJobsPageSize = 25;
+
+    // Job History pagination and filters
     let logsHistoryPage = 1;
     const logsHistoryPageSize = 20;
     let logsHistorySortBy = 'updated_at';  // Default sort by most recently updated
@@ -2818,6 +2824,37 @@
               <!-- Active jobs will be loaded here -->
               <div class="flex items-center justify-center py-8">
                 <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+              </div>
+            </div>
+            <!-- Pagination -->
+            <div id="activeJobsPagination" class="px-6 py-4 border-t border-gray-200 flex items-center justify-between hidden">
+              <div class="text-sm text-gray-500">
+                <span id="activeJobsInfo">Showing 0-0 of 0</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <button
+                  onclick="changeActiveJobsPage(-1)"
+                  id="activeJobsPrevBtn"
+                  class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  disabled
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                  </svg>
+                </button>
+                <div id="activeJobsPageNumbers" class="flex gap-1">
+                  <!-- Page number buttons will be inserted here -->
+                </div>
+                <button
+                  onclick="changeActiveJobsPage(1)"
+                  id="activeJobsNextBtn"
+                  class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  disabled
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                  </svg>
+                </button>
               </div>
             </div>
           </div>
@@ -2908,13 +2945,16 @@
     // Load active jobs (uploads + ingestions + running jobs)
     async function loadActiveJobs() {
       try {
+        const offset = (activeJobsPage - 1) * activeJobsPageSize;
+
         // Fetch both active ingestion jobs and active upload sessions
         const [ingestJobs, uploadSessions] = await Promise.all([
-          api.get('/api/v1/ingest/jobs?status=pending,running&limit=20'),
-          api.get('/api/v1/storage/upload-sessions?limit=20')
+          api.get(`/api/v1/ingest/jobs?status=pending,running&limit=100`),
+          api.get(`/api/v1/storage/upload-sessions?limit=100`)
         ]);
 
         const container = document.getElementById('activeJobsContent');
+        const pagination = document.getElementById('activeJobsPagination');
 
         // Element might not exist if user navigated away from this tab
         if (!container) {
@@ -2958,6 +2998,7 @@
 
         // Merge jobs
         const allJobs = [...(ingestJobs.jobs || []), ...uploadJobs];
+        const total = allJobs.length;
 
         if (!allJobs || allJobs.length === 0) {
           container.innerHTML = `
@@ -2968,10 +3009,14 @@
               <p>No active jobs</p>
             </div>
           `;
+          pagination.classList.add('hidden');
           return;
         }
 
-        const jobsHTML = allJobs.map(job => {
+        // Apply pagination
+        const paginatedJobs = allJobs.slice(offset, offset + activeJobsPageSize);
+
+        const jobsHTML = paginatedJobs.map(job => {
           const statusColor = job.status === 'running' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800';
           const progress = job.progress_percentage || 0;
 
@@ -3029,6 +3074,60 @@
         }).join('');
 
         container.innerHTML = jobsHTML;
+
+        // Update pagination
+        const totalPages = Math.ceil(total / activeJobsPageSize);
+
+        if (total > activeJobsPageSize) {
+          pagination.classList.remove('hidden');
+          const start = offset + 1;
+          const end = Math.min(offset + activeJobsPageSize, total);
+          document.getElementById('activeJobsInfo').textContent = `Showing ${start}-${end} of ${total}`;
+          document.getElementById('activeJobsPrevBtn').disabled = activeJobsPage === 1;
+          document.getElementById('activeJobsNextBtn').disabled = end >= total;
+
+          // Generate page number buttons
+          const pageNumbersContainer = document.getElementById('activeJobsPageNumbers');
+          pageNumbersContainer.innerHTML = '';
+
+          // Calculate page range to show (max 7 buttons)
+          let startPage = Math.max(1, activeJobsPage - 3);
+          let endPage = Math.min(totalPages, startPage + 6);
+
+          // Adjust start if we're near the end
+          if (endPage - startPage < 6) {
+            startPage = Math.max(1, endPage - 6);
+          }
+
+          // Add first page and ellipsis if needed
+          if (startPage > 1) {
+            pageNumbersContainer.appendChild(createActiveJobsPageButton(1, activeJobsPage));
+            if (startPage > 2) {
+              const ellipsis = document.createElement('span');
+              ellipsis.className = 'px-3 py-2 text-sm text-gray-500';
+              ellipsis.textContent = '...';
+              pageNumbersContainer.appendChild(ellipsis);
+            }
+          }
+
+          // Add page number buttons
+          for (let i = startPage; i <= endPage; i++) {
+            pageNumbersContainer.appendChild(createActiveJobsPageButton(i, activeJobsPage));
+          }
+
+          // Add ellipsis and last page if needed
+          if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+              const ellipsis = document.createElement('span');
+              ellipsis.className = 'px-3 py-2 text-sm text-gray-500';
+              ellipsis.textContent = '...';
+              pageNumbersContainer.appendChild(ellipsis);
+            }
+            pageNumbersContainer.appendChild(createActiveJobsPageButton(totalPages, activeJobsPage));
+          }
+        } else {
+          pagination.classList.add('hidden');
+        }
       } catch (error) {
         console.error('Failed to load active jobs:', error);
         const errorContainer = document.getElementById('activeJobsContent');
@@ -3385,11 +3484,36 @@
       loadJobHistory();
     }
 
-    // Create page button helper
+    // Create page button helper for Job History
     function createPageButton(pageNum, currentPage) {
       const button = document.createElement('button');
       button.textContent = pageNum;
       button.onclick = () => goToJobHistoryPage(pageNum);
+
+      if (pageNum === currentPage) {
+        button.className = 'px-3 py-2 text-sm font-medium text-white bg-emerald-600 border border-emerald-600 rounded-lg';
+      } else {
+        button.className = 'px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors';
+      }
+
+      return button;
+    }
+
+    // Active Jobs pagination functions
+    function changeActiveJobsPage(delta) {
+      activeJobsPage += delta;
+      loadActiveJobs();
+    }
+
+    function goToActiveJobsPage(page) {
+      activeJobsPage = page;
+      loadActiveJobs();
+    }
+
+    function createActiveJobsPageButton(pageNum, currentPage) {
+      const button = document.createElement('button');
+      button.textContent = pageNum;
+      button.onclick = () => goToActiveJobsPage(pageNum);
 
       if (pageNum === currentPage) {
         button.className = 'px-3 py-2 text-sm font-medium text-white bg-emerald-600 border border-emerald-600 rounded-lg';
