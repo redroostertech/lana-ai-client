@@ -310,6 +310,56 @@
     let dashboardData = null;
     let currentTab = 'overview';
 
+    // Check for running syncs and reconnect to SSE streams
+    async function checkAndReconnectRunningSyncs() {
+      try {
+        // Check for running or queued syncs
+        const syncJobsResult = await api.get('/api/v1/leadly/sync-logs?status=running,queued&limit=10&sortBy=started_at&sortOrder=DESC');
+
+        if (syncJobsResult.sync_logs && syncJobsResult.sync_logs.length > 0) {
+          const runningSync = syncJobsResult.sync_logs[0]; // Get the most recent running sync
+
+          if (runningSync.status === 'running' || runningSync.status === 'queued') {
+            console.log('Found running sync, reconnecting to SSE stream:', runningSync.id);
+
+            // Update UI to show sync is running
+            const statusEl = document.getElementById('runSyncStatus');
+            const runBtn = document.getElementById('runSyncBtn');
+            const progressSection = document.getElementById('syncProgressSection');
+            const completeSection = document.getElementById('syncCompleteSection');
+
+            if (statusEl) {
+              statusEl.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800';
+              statusEl.innerHTML = `
+                <span class="w-1.5 h-1.5 rounded-full bg-yellow-600"></span>
+                ${runningSync.status === 'queued' ? 'Queued' : 'Running'}
+              `;
+            }
+
+            if (runBtn) {
+              runBtn.disabled = true;
+              runBtn.innerHTML = `
+                <svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                ${runningSync.status === 'queued' ? 'Queued...' : 'Running...'}
+              `;
+            }
+
+            if (progressSection) progressSection.classList.remove('hidden');
+            if (completeSection) completeSection.classList.add('hidden');
+
+            // Reconnect to SSE stream
+            await startSyncPollingSSE(runningSync.id);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to check for running syncs:', error);
+        // Don't show error to user - this is a background reconnection attempt
+      }
+    }
+
     // Format number
     function formatNumber(num) {
       if (!num || num === 0) return '0';
@@ -395,6 +445,9 @@
 
         // Load current tab
         loadTabContent(currentTab);
+
+        // Check for running syncs and reconnect to SSE streams
+        checkAndReconnectRunningSyncs();
       } catch (error) {
         console.error('Dashboard load error:', error);
         document.getElementById('loadingState').classList.add('hidden');
@@ -805,6 +858,8 @@
       const progressSection = document.getElementById('syncProgressSection');
       const completeSection = document.getElementById('syncCompleteSection');
 
+      let eventSource = null;
+
       try {
         runBtn.disabled = true;
         runBtn.innerHTML = `
@@ -818,7 +873,7 @@
         statusEl.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800';
         statusEl.innerHTML = `
           <span class="w-1.5 h-1.5 rounded-full bg-yellow-600"></span>
-          Running
+          Starting...
         `;
 
         if (progressSection) progressSection.classList.remove('hidden');
@@ -826,49 +881,249 @@
 
         // Trigger sync
         const result = await api.post('/api/v1/leadly/sync');
+        const syncLogId = result.sync_log_id || result.sync_id;
 
-        // Update progress
+        if (!syncLogId) {
+          throw new Error('No sync log ID returned from server');
+        }
+
+        // Update progress UI elements
         const syncJobIdEl = document.getElementById('syncJobId');
         const syncProgressText = document.getElementById('syncProgressText');
         const syncProgressBar = document.getElementById('syncProgressBar');
         const syncProgressPercent = document.getElementById('syncProgressPercent');
         const syncDetails = document.getElementById('syncDetails');
 
-        if (syncJobIdEl) syncJobIdEl.textContent = `Job ID: ${result.sync_id || 'N/A'}`;
-        if (syncProgressText) syncProgressText.textContent = 'Syncing data from GoHighLevel...';
-        if (syncProgressBar) syncProgressBar.style.width = '50%';
-        if (syncProgressPercent) syncProgressPercent.textContent = '50%';
-        if (syncDetails) syncDetails.innerHTML = '<p>Fetching data from GoHighLevel API...</p>';
+        if (syncJobIdEl) syncJobIdEl.textContent = `Sync ID: ${syncLogId}`;
+        if (syncProgressText) syncProgressText.textContent = 'Queued...';
+        if (syncProgressBar) syncProgressBar.style.width = '0%';
+        if (syncProgressPercent) syncProgressPercent.textContent = '0%';
+        if (syncDetails) syncDetails.innerHTML = '<p>Waiting for sync to start...</p>';
 
-        // Simulate completion (in real implementation, poll for status)
-        setTimeout(() => {
-          if (progressSection) progressSection.classList.add('hidden');
-          if (completeSection) completeSection.classList.remove('hidden');
+        // Get auth token for SSE connection
+        const token = api.token;
+        if (!token) {
+          throw new Error('Not authenticated');
+        }
 
-          statusEl.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800';
-          statusEl.innerHTML = `
-            <span class="w-1.5 h-1.5 rounded-full bg-green-600"></span>
-            Completed
-          `;
+        // Connect to SSE stream for real-time updates
+        // Note: EventSource doesn't support custom headers, so we pass token as query param
+        const baseUrl = api.baseUrl || window.location.origin;
+        const streamUrl = `${baseUrl}/api/v1/leadly/sync/status/${syncLogId}/stream?token=${encodeURIComponent(token)}`;
+        eventSource = new EventSource(streamUrl);
 
-          runBtn.disabled = false;
-          runBtn.innerHTML = `
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-            </svg>
-            Run Sync Now
-          `;
+        eventSource.addEventListener('connected', () => {
+          console.log('SSE stream connected');
+          if (syncProgressText) syncProgressText.textContent = 'Connected...';
+        });
 
-          Toast.success('Sync completed successfully');
+        eventSource.addEventListener('entity_progress', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('Entity progress:', data);
 
-          // Reload dashboard to reflect new data
-          setTimeout(() => {
-            loadDashboard();
-          }, 2000);
-        }, 3000);
+            // Update entity progress in details
+            if (syncDetails) {
+              let detailsHtml = syncDetails.innerHTML;
+              const entityInfo = `<div class="text-xs mt-1"><strong>${data.entity_type}:</strong> ${data.entity_status}`;
+              if (data.entity_stats && (data.entity_stats.processed > 0 || data.entity_stats.created > 0)) {
+                entityInfo += ` (${data.entity_stats.processed} processed, ${data.entity_stats.created} created)`;
+              }
+              if (data.error_message) {
+                entityInfo += ` - <span class="text-red-600">Error: ${data.error_message}</span>`;
+              }
+              entityInfo += '</div>';
+
+              // Replace existing entity info or append
+              const existingEntity = detailsHtml.match(new RegExp(`<div class="text-xs mt-1"><strong>${data.entity_type}:.*?</div>`, 's'));
+              if (existingEntity) {
+                detailsHtml = detailsHtml.replace(existingEntity[0], entityInfo);
+              } else {
+                // Find the closing </p> or </div> and insert before it
+                const insertPos = detailsHtml.lastIndexOf('</div>');
+                if (insertPos > 0) {
+                  detailsHtml = detailsHtml.slice(0, insertPos) + entityInfo + detailsHtml.slice(insertPos);
+                }
+              }
+
+              syncDetails.innerHTML = detailsHtml;
+            }
+          } catch (parseError) {
+            console.error('Failed to parse entity_progress event:', parseError);
+          }
+        });
+
+        eventSource.addEventListener('progress', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('Sync progress:', data);
+
+            // Update status badge
+            const statusClasses = {
+              'queued': 'bg-yellow-100 text-yellow-800',
+              'running': 'bg-blue-100 text-blue-800',
+              'completed': 'bg-green-100 text-green-800',
+              'failed': 'bg-red-100 text-red-800'
+            };
+            const statusDots = {
+              'queued': 'bg-yellow-600',
+              'running': 'bg-blue-600',
+              'completed': 'bg-green-600',
+              'failed': 'bg-red-600'
+            };
+
+            statusEl.className = `inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClasses[data.status] || 'bg-gray-100 text-gray-800'}`;
+            statusEl.innerHTML = `
+              <span class="w-1.5 h-1.5 rounded-full ${statusDots[data.status] || 'bg-gray-600'}"></span>
+              ${data.status.charAt(0).toUpperCase() + data.status.slice(1)}
+            `;
+
+            // Update progress bar
+            const stats = data.stats || {};
+            const processed = stats.processed || 0;
+            const created = stats.created || 0;
+            const failed = stats.failed || 0;
+
+            // Calculate progress percentage (rough estimate)
+            let progressPercent = 0;
+            if (data.status === 'queued') {
+              progressPercent = 5;
+            } else if (data.status === 'running') {
+              // Estimate based on typical sync size (use 50% as running state)
+              progressPercent = Math.min(95, 10 + (processed / 100) * 85);
+            } else if (data.status === 'completed') {
+              progressPercent = 100;
+            }
+
+            if (syncProgressBar) syncProgressBar.style.width = progressPercent + '%';
+            if (syncProgressPercent) syncProgressPercent.textContent = Math.round(progressPercent) + '%';
+
+            // Update progress text
+            if (syncProgressText) {
+              if (data.status === 'queued') {
+                syncProgressText.textContent = 'Queued, waiting to start...';
+              } else if (data.status === 'running') {
+                syncProgressText.textContent = `Syncing... ${formatNumber(processed)} records processed`;
+              } else if (data.status === 'completed') {
+                syncProgressText.textContent = `Complete! ${formatNumber(processed)} processed, ${formatNumber(created)} created`;
+              }
+            }
+
+            // Update details
+            if (syncDetails) {
+              let detailsHtml = '<p>Syncing data from GoHighLevel API...</p>';
+              if (processed > 0 || created > 0 || failed > 0) {
+                detailsHtml = `
+                  <div class="space-y-1 text-sm">
+                    <div>Processed: <strong>${formatNumber(processed)}</strong></div>
+                    <div>Created: <strong class="text-green-600">${formatNumber(created)}</strong></div>
+                    ${failed > 0 ? `<div>Failed: <strong class="text-red-600">${formatNumber(failed)}</strong></div>` : ''}
+                  </div>
+                `;
+              }
+              syncDetails.innerHTML = detailsHtml;
+            }
+          } catch (parseError) {
+            console.error('Failed to parse SSE progress event:', parseError);
+          }
+        });
+
+        eventSource.addEventListener('completed', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('Sync completed:', data);
+
+            // Close SSE connection
+            if (eventSource) {
+              eventSource.close();
+              eventSource = null;
+            }
+
+            // Update UI
+            if (progressSection) progressSection.classList.add('hidden');
+            if (completeSection) completeSection.classList.remove('hidden');
+
+            statusEl.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800';
+            statusEl.innerHTML = `
+              <span class="w-1.5 h-1.5 rounded-full bg-green-600"></span>
+              Completed
+            `;
+
+            runBtn.disabled = false;
+            runBtn.innerHTML = `
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+              </svg>
+              Run Sync Now
+            `;
+
+            const stats = data.stats || {};
+            const message = `Sync completed! ${formatNumber(stats.processed || 0)} processed, ${formatNumber(stats.created || 0)} created`;
+            Toast.success(message);
+
+            // Reload dashboard to reflect new data
+            setTimeout(() => {
+              loadDashboard();
+            }, 1000);
+          } catch (parseError) {
+            console.error('Failed to parse SSE completed event:', parseError);
+          }
+        });
+
+        eventSource.addEventListener('failed', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.error('Sync failed:', data);
+
+            // Close SSE connection
+            if (eventSource) {
+              eventSource.close();
+              eventSource = null;
+            }
+
+            // Update UI
+            if (progressSection) progressSection.classList.add('hidden');
+
+            statusEl.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800';
+            statusEl.innerHTML = `
+              <span class="w-1.5 h-1.5 rounded-full bg-red-600"></span>
+              Failed
+            `;
+
+            runBtn.disabled = false;
+            runBtn.innerHTML = `
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+              </svg>
+              Run Sync Now
+            `;
+
+            Toast.error(data.error_message || 'Sync failed');
+          } catch (parseError) {
+            console.error('Failed to parse SSE failed event:', parseError);
+          }
+        });
+
+        eventSource.addEventListener('error', (event) => {
+          console.error('SSE stream error:', event);
+          // Only close if connection failed completely
+          if (eventSource.readyState === EventSource.CLOSED) {
+            if (eventSource) {
+              eventSource.close();
+              eventSource = null;
+            }
+            Toast.error('Lost connection to sync status stream');
+          }
+        });
 
       } catch (error) {
         console.error('Sync error:', error);
+
+        // Clean up SSE if it was created
+        if (eventSource) {
+          eventSource.close();
+          eventSource = null;
+        }
 
         if (progressSection) progressSection.classList.add('hidden');
 
@@ -2417,6 +2672,18 @@
                     <input type="checkbox" name="sync_entities" value="calendar_event" class="rounded text-emerald-600 focus:ring-emerald-500" />
                     <span class="text-sm">Calendar Events</span>
                   </label>
+                  <label class="flex items-center gap-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <input type="checkbox" name="sync_entities" value="funnel" class="rounded text-emerald-600 focus:ring-emerald-500" />
+                    <span class="text-sm">Funnels</span>
+                  </label>
+                  <label class="flex items-center gap-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <input type="checkbox" name="sync_entities" value="funnel_page" class="rounded text-emerald-600 focus:ring-emerald-500" />
+                    <span class="text-sm">Funnel Pages</span>
+                  </label>
+                  <label class="flex items-center gap-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <input type="checkbox" name="sync_entities" value="calendar_group" class="rounded text-emerald-600 focus:ring-emerald-500" />
+                    <span class="text-sm">Calendar Groups</span>
+                  </label>
                 </div>
               </div>
 
@@ -2655,7 +2922,10 @@
         sync_pipelines: syncEntities.includes('pipeline'),
         sync_conversations: syncEntities.includes('conversation'),
         sync_tasks: syncEntities.includes('task'),
-        sync_calendars: syncEntities.includes('calendar_event')
+        sync_calendars: syncEntities.includes('calendar_event'),
+        sync_funnels: syncEntities.includes('funnel'),
+        sync_funnel_pages: syncEntities.includes('funnel_page'),
+        sync_calendar_groups: syncEntities.includes('calendar_group')
       };
 
       try {
