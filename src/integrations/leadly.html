@@ -105,7 +105,6 @@
                 <div>
                   <p class="text-sm text-gray-600">Total Contacts</p>
                   <p id="statContacts" class="text-2xl font-bold text-gray-900 mt-1">-</p>
-                  <p id="statContactsNew" class="text-xs text-gray-500 mt-1">-</p>
                 </div>
               </div>
               <!-- Conversations -->
@@ -113,7 +112,6 @@
                 <div>
                   <p class="text-sm text-gray-600">Conversations</p>
                   <p id="statConversations" class="text-2xl font-bold text-gray-900 mt-1">-</p>
-                  <p id="statConversationsUnread" class="text-xs text-gray-500 mt-1">-</p>
                 </div>
               </div>
             </div>
@@ -373,8 +371,6 @@
 
         // Contacts
         document.getElementById('statContacts').textContent = formatNumber(stats.contacts?.total || 0);
-        const withEmail = stats.contacts?.with_email || 0;
-        document.getElementById('statContactsNew').textContent = withEmail > 0 ? `${formatNumber(withEmail)} with email` : 'No contacts with email';
 
         // Opportunities
         document.getElementById('statOpportunities').textContent = formatNumber(stats.opportunities?.total || 0);
@@ -388,8 +384,6 @@
 
         // Conversations
         document.getElementById('statConversations').textContent = formatNumber(stats.conversations?.total || 0);
-        const unread = stats.conversations?.unread || 0;
-        document.getElementById('statConversationsUnread').textContent = unread > 0 ? `${formatNumber(unread)} unread` : 'No unread';
 
         // Update last sync time
         if (result.last_sync) {
@@ -411,12 +405,10 @@
 
         // Initialize CRM stats to zero
         document.getElementById('statContacts').textContent = '0';
-        document.getElementById('statContactsNew').textContent = 'No contacts with email';
         document.getElementById('statOpportunities').textContent = '0';
         document.getElementById('statPipelineValue').textContent = '$0';
         document.getElementById('statPipelineWon').textContent = '$0 won vs $0 open';
         document.getElementById('statConversations').textContent = '0';
-        document.getElementById('statConversationsUnread').textContent = 'No unread';
 
         // Load current tab (will show not configured message)
         loadTabContent(currentTab);
