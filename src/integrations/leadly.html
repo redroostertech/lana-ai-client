@@ -88,15 +88,15 @@
             </div>
           </div>
 
-          <!-- Contacts & Conversations Card -->
+          <!-- Contacts Card -->
           <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
             <div class="flex items-center gap-3 mb-6">
               <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
                 <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
               </div>
               <div>
-                <h3 class="text-lg font-semibold text-gray-900">Contacts & Conversations</h3>
-                <p class="text-sm text-gray-500">Communication overview</p>
+                <h3 class="text-lg font-semibold text-gray-900">Contacts</h3>
+                <p class="text-sm text-gray-500">Total contacts synced from last 90 days</p>
               </div>
             </div>
             <div class="space-y-4">
@@ -107,11 +107,15 @@
                   <p id="statContacts" class="text-2xl font-bold text-gray-900 mt-1">-</p>
                 </div>
               </div>
-              <!-- Conversations -->
-              <div class="flex items-center justify-between py-3">
+              <!-- New Contacts -->
+              <div class="grid grid-cols-2 gap-4 py-3">
+                <div class="border-r border-gray-200 pr-4">
+                  <p class="text-sm text-gray-600">Last 30 Days</p>
+                  <p id="statContactsNew30" class="text-2xl font-bold text-gray-900 mt-1">-</p>
+                </div>
                 <div>
-                  <p class="text-sm text-gray-600">Conversations</p>
-                  <p id="statConversations" class="text-2xl font-bold text-gray-900 mt-1">-</p>
+                  <p class="text-sm text-gray-600">Last 7 Days</p>
+                  <p id="statContactsNew7" class="text-2xl font-bold text-gray-900 mt-1">-</p>
                 </div>
               </div>
             </div>
@@ -421,6 +425,8 @@
 
         // Contacts
         document.getElementById('statContacts').textContent = formatNumber(stats.contacts?.total || 0);
+        document.getElementById('statContactsNew30').textContent = formatNumber(stats.contacts?.new_last_30_days || 0);
+        document.getElementById('statContactsNew7').textContent = formatNumber(stats.contacts?.new_last_7_days || 0);
 
         // Opportunities
         document.getElementById('statOpportunities').textContent = formatNumber(stats.opportunities?.total || 0);
@@ -431,9 +437,6 @@
         const wonValue = stats.opportunities?.won_value || 0;
         const openValue = stats.opportunities?.open_value || 0;
         document.getElementById('statPipelineWon').textContent = `${formatCurrency(wonValue)} won vs ${formatCurrency(openValue)} open`;
-
-        // Conversations
-        document.getElementById('statConversations').textContent = formatNumber(stats.conversations?.total || 0);
 
         // Update last sync time
         if (result.last_sync) {
@@ -458,10 +461,11 @@
 
         // Initialize CRM stats to zero
         document.getElementById('statContacts').textContent = '0';
+        document.getElementById('statContactsNew30').textContent = '0';
+        document.getElementById('statContactsNew7').textContent = '0';
         document.getElementById('statOpportunities').textContent = '0';
         document.getElementById('statPipelineValue').textContent = '$0';
         document.getElementById('statPipelineWon').textContent = '$0 won vs $0 open';
-        document.getElementById('statConversations').textContent = '0';
 
         // Load current tab (will show not configured message)
         loadTabContent(currentTab);
@@ -851,14 +855,273 @@
       `;
     }
 
+    // Start SSE polling for sync status updates
+    function startSyncPollingSSE(syncLogId) {
+      return new Promise(async (resolve, reject) => {
+        let eventSource = null;
+
+        try {
+          // Get UI elements
+          const statusEl = document.getElementById('runSyncStatus');
+          const runBtn = document.getElementById('runSyncBtn');
+          const syncJobIdEl = document.getElementById('syncJobId');
+          const syncProgressText = document.getElementById('syncProgressText');
+          const syncProgressBar = document.getElementById('syncProgressBar');
+          const syncProgressPercent = document.getElementById('syncProgressPercent');
+          const syncDetails = document.getElementById('syncDetails');
+
+          // Update initial UI
+          if (syncJobIdEl) syncJobIdEl.textContent = `Sync ID: ${syncLogId}`;
+          if (syncProgressText) syncProgressText.textContent = 'Connecting...';
+          if (syncProgressBar) syncProgressBar.style.width = '0%';
+          if (syncProgressPercent) syncProgressPercent.textContent = '0%';
+          if (syncDetails) syncDetails.innerHTML = '<p>Waiting for sync to start...</p>';
+
+          // Get auth token for SSE connection
+          const token = api.token;
+          if (!token) {
+            throw new Error('Not authenticated');
+          }
+
+          // Connect to SSE stream for real-time updates
+          // Note: EventSource doesn't support custom headers, so we pass token as query param
+          const baseUrl = api.baseUrl || window.location.origin;
+          const streamUrl = `${baseUrl}/api/v1/leadly/sync/status/${syncLogId}/stream?token=${encodeURIComponent(token)}`;
+          eventSource = new EventSource(streamUrl);
+
+          eventSource.addEventListener('connected', () => {
+            console.log('SSE stream connected');
+            if (syncProgressText) syncProgressText.textContent = 'Connected...';
+          });
+
+          eventSource.addEventListener('entity_progress', (event) => {
+            try {
+              const data = JSON.parse(event.data);
+              console.log('Entity progress:', data);
+
+              // Update entity progress in details
+              if (syncDetails) {
+                let detailsHtml = syncDetails.innerHTML;
+                let entityInfo = `<div class="text-xs mt-1"><strong>${data.entity_type}:</strong> ${data.entity_status}`;
+                if (data.entity_stats && (data.entity_stats.processed > 0 || data.entity_stats.created > 0)) {
+                  entityInfo += ` (${data.entity_stats.processed} processed, ${data.entity_stats.created} created)`;
+                }
+                if (data.error_message) {
+                  entityInfo += ` - <span class="text-red-600">Error: ${data.error_message}</span>`;
+                }
+                entityInfo += '</div>';
+
+                // Replace existing entity info or append
+                const existingEntity = detailsHtml.match(new RegExp(`<div class="text-xs mt-1"><strong>${data.entity_type}:.*?</div>`, 's'));
+                if (existingEntity) {
+                  detailsHtml = detailsHtml.replace(existingEntity[0], entityInfo);
+                } else {
+                  detailsHtml += entityInfo;
+                }
+                syncDetails.innerHTML = detailsHtml;
+              }
+            } catch (parseError) {
+              console.error('Failed to parse entity_progress event:', parseError);
+            }
+          });
+
+          eventSource.addEventListener('progress', (event) => {
+            try {
+              const data = JSON.parse(event.data);
+              console.log('Sync progress:', data);
+
+              // Update status badge
+              const statusClasses = {
+                'queued': 'bg-yellow-100 text-yellow-800',
+                'running': 'bg-blue-100 text-blue-800',
+                'completed': 'bg-green-100 text-green-800',
+                'failed': 'bg-red-100 text-red-800'
+              };
+              const statusDots = {
+                'queued': 'bg-yellow-600',
+                'running': 'bg-blue-600',
+                'completed': 'bg-green-600',
+                'failed': 'bg-red-600'
+              };
+
+              if (statusEl) {
+                statusEl.className = `inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClasses[data.status] || 'bg-gray-100 text-gray-800'}`;
+                statusEl.innerHTML = `
+                  <span class="w-1.5 h-1.5 rounded-full ${statusDots[data.status] || 'bg-gray-600'}"></span>
+                  ${data.status.charAt(0).toUpperCase() + data.status.slice(1)}
+                `;
+              }
+
+              // Update progress bar
+              const stats = data.stats || {};
+              const processed = stats.processed || 0;
+              const created = stats.created || 0;
+              const failed = stats.failed || 0;
+
+              // Calculate progress percentage (rough estimate)
+              let progressPercent = 0;
+              if (data.status === 'queued') {
+                progressPercent = 5;
+              } else if (data.status === 'running') {
+                progressPercent = Math.min(95, 10 + (processed / 100) * 85);
+              } else if (data.status === 'completed') {
+                progressPercent = 100;
+              }
+
+              if (syncProgressBar) syncProgressBar.style.width = progressPercent + '%';
+              if (syncProgressPercent) syncProgressPercent.textContent = Math.round(progressPercent) + '%';
+
+              // Update progress text
+              if (syncProgressText) {
+                if (data.status === 'queued') {
+                  syncProgressText.textContent = 'Queued, waiting to start...';
+                } else if (data.status === 'running') {
+                  syncProgressText.textContent = `Syncing... ${formatNumber(processed)} records processed`;
+                } else if (data.status === 'completed') {
+                  syncProgressText.textContent = `Complete! ${formatNumber(processed)} processed, ${formatNumber(created)} created`;
+                }
+              }
+
+              // Update details
+              if (syncDetails) {
+                let detailsHtml = '<p>Syncing data from GoHighLevel API...</p>';
+                if (processed > 0 || created > 0 || failed > 0) {
+                  detailsHtml = `
+                    <div class="space-y-1 text-sm">
+                      <div>Processed: <strong>${formatNumber(processed)}</strong></div>
+                      <div>Created: <strong class="text-green-600">${formatNumber(created)}</strong></div>
+                      ${failed > 0 ? `<div>Failed: <strong class="text-red-600">${formatNumber(failed)}</strong></div>` : ''}
+                    </div>
+                  `;
+                }
+                syncDetails.innerHTML = detailsHtml;
+              }
+            } catch (parseError) {
+              console.error('Failed to parse SSE progress event:', parseError);
+            }
+          });
+
+          eventSource.addEventListener('completed', (event) => {
+            try {
+              const data = JSON.parse(event.data);
+              console.log('Sync completed:', data);
+
+              // Close SSE connection
+              if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+              }
+
+              // Update UI
+              const progressSection = document.getElementById('syncProgressSection');
+              const completeSection = document.getElementById('syncCompleteSection');
+
+              if (progressSection) progressSection.classList.add('hidden');
+              if (completeSection) completeSection.classList.remove('hidden');
+
+              if (statusEl) {
+                statusEl.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800';
+                statusEl.innerHTML = `
+                  <span class="w-1.5 h-1.5 rounded-full bg-green-600"></span>
+                  Completed
+                `;
+              }
+
+              if (runBtn) {
+                runBtn.disabled = false;
+                runBtn.innerHTML = `
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                  </svg>
+                  Run Sync Now
+                `;
+              }
+
+              const stats = data.stats || {};
+              const message = `Sync completed! ${formatNumber(stats.processed || 0)} processed, ${formatNumber(stats.created || 0)} created`;
+              Toast.success(message);
+
+              // Reload dashboard to reflect new data
+              setTimeout(() => {
+                loadDashboard();
+              }, 1000);
+
+              resolve(data);
+            } catch (parseError) {
+              console.error('Failed to parse SSE completed event:', parseError);
+            }
+          });
+
+          eventSource.addEventListener('failed', (event) => {
+            try {
+              const data = JSON.parse(event.data);
+              console.error('Sync failed:', data);
+
+              // Close SSE connection
+              if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+              }
+
+              // Update UI
+              const progressSection = document.getElementById('syncProgressSection');
+              if (progressSection) progressSection.classList.add('hidden');
+
+              if (statusEl) {
+                statusEl.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800';
+                statusEl.innerHTML = `
+                  <span class="w-1.5 h-1.5 rounded-full bg-red-600"></span>
+                  Failed
+                `;
+              }
+
+              if (runBtn) {
+                runBtn.disabled = false;
+                runBtn.innerHTML = `
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                  </svg>
+                  Run Sync Now
+                `;
+              }
+
+              Toast.error(data.error_message || 'Sync failed');
+              reject(new Error(data.error_message || 'Sync failed'));
+            } catch (parseError) {
+              console.error('Failed to parse SSE failed event:', parseError);
+            }
+          });
+
+          eventSource.addEventListener('error', (event) => {
+            console.error('SSE stream error:', event);
+            // Only close if connection failed completely
+            if (eventSource.readyState === EventSource.CLOSED) {
+              if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+              }
+              Toast.error('Lost connection to sync status stream');
+              reject(new Error('Lost connection to sync status stream'));
+            }
+          });
+
+        } catch (error) {
+          console.error('Failed to start SSE polling:', error);
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
+          reject(error);
+        }
+      });
+    }
+
     // Run Manual Sync
     async function runManualSync() {
       const runBtn = document.getElementById('runSyncBtn');
       const statusEl = document.getElementById('runSyncStatus');
       const progressSection = document.getElementById('syncProgressSection');
       const completeSection = document.getElementById('syncCompleteSection');
-
-      let eventSource = null;
 
       try {
         runBtn.disabled = true;
@@ -887,243 +1150,11 @@
           throw new Error('No sync log ID returned from server');
         }
 
-        // Update progress UI elements
-        const syncJobIdEl = document.getElementById('syncJobId');
-        const syncProgressText = document.getElementById('syncProgressText');
-        const syncProgressBar = document.getElementById('syncProgressBar');
-        const syncProgressPercent = document.getElementById('syncProgressPercent');
-        const syncDetails = document.getElementById('syncDetails');
-
-        if (syncJobIdEl) syncJobIdEl.textContent = `Sync ID: ${syncLogId}`;
-        if (syncProgressText) syncProgressText.textContent = 'Queued...';
-        if (syncProgressBar) syncProgressBar.style.width = '0%';
-        if (syncProgressPercent) syncProgressPercent.textContent = '0%';
-        if (syncDetails) syncDetails.innerHTML = '<p>Waiting for sync to start...</p>';
-
-        // Get auth token for SSE connection
-        const token = api.token;
-        if (!token) {
-          throw new Error('Not authenticated');
-        }
-
-        // Connect to SSE stream for real-time updates
-        // Note: EventSource doesn't support custom headers, so we pass token as query param
-        const baseUrl = api.baseUrl || window.location.origin;
-        const streamUrl = `${baseUrl}/api/v1/leadly/sync/status/${syncLogId}/stream?token=${encodeURIComponent(token)}`;
-        eventSource = new EventSource(streamUrl);
-
-        eventSource.addEventListener('connected', () => {
-          console.log('SSE stream connected');
-          if (syncProgressText) syncProgressText.textContent = 'Connected...';
-        });
-
-        eventSource.addEventListener('entity_progress', (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            console.log('Entity progress:', data);
-
-            // Update entity progress in details
-            if (syncDetails) {
-              let detailsHtml = syncDetails.innerHTML;
-              const entityInfo = `<div class="text-xs mt-1"><strong>${data.entity_type}:</strong> ${data.entity_status}`;
-              if (data.entity_stats && (data.entity_stats.processed > 0 || data.entity_stats.created > 0)) {
-                entityInfo += ` (${data.entity_stats.processed} processed, ${data.entity_stats.created} created)`;
-              }
-              if (data.error_message) {
-                entityInfo += ` - <span class="text-red-600">Error: ${data.error_message}</span>`;
-              }
-              entityInfo += '</div>';
-
-              // Replace existing entity info or append
-              const existingEntity = detailsHtml.match(new RegExp(`<div class="text-xs mt-1"><strong>${data.entity_type}:.*?</div>`, 's'));
-              if (existingEntity) {
-                detailsHtml = detailsHtml.replace(existingEntity[0], entityInfo);
-              } else {
-                // Find the closing </p> or </div> and insert before it
-                const insertPos = detailsHtml.lastIndexOf('</div>');
-                if (insertPos > 0) {
-                  detailsHtml = detailsHtml.slice(0, insertPos) + entityInfo + detailsHtml.slice(insertPos);
-                }
-              }
-
-              syncDetails.innerHTML = detailsHtml;
-            }
-          } catch (parseError) {
-            console.error('Failed to parse entity_progress event:', parseError);
-          }
-        });
-
-        eventSource.addEventListener('progress', (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            console.log('Sync progress:', data);
-
-            // Update status badge
-            const statusClasses = {
-              'queued': 'bg-yellow-100 text-yellow-800',
-              'running': 'bg-blue-100 text-blue-800',
-              'completed': 'bg-green-100 text-green-800',
-              'failed': 'bg-red-100 text-red-800'
-            };
-            const statusDots = {
-              'queued': 'bg-yellow-600',
-              'running': 'bg-blue-600',
-              'completed': 'bg-green-600',
-              'failed': 'bg-red-600'
-            };
-
-            statusEl.className = `inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClasses[data.status] || 'bg-gray-100 text-gray-800'}`;
-            statusEl.innerHTML = `
-              <span class="w-1.5 h-1.5 rounded-full ${statusDots[data.status] || 'bg-gray-600'}"></span>
-              ${data.status.charAt(0).toUpperCase() + data.status.slice(1)}
-            `;
-
-            // Update progress bar
-            const stats = data.stats || {};
-            const processed = stats.processed || 0;
-            const created = stats.created || 0;
-            const failed = stats.failed || 0;
-
-            // Calculate progress percentage (rough estimate)
-            let progressPercent = 0;
-            if (data.status === 'queued') {
-              progressPercent = 5;
-            } else if (data.status === 'running') {
-              // Estimate based on typical sync size (use 50% as running state)
-              progressPercent = Math.min(95, 10 + (processed / 100) * 85);
-            } else if (data.status === 'completed') {
-              progressPercent = 100;
-            }
-
-            if (syncProgressBar) syncProgressBar.style.width = progressPercent + '%';
-            if (syncProgressPercent) syncProgressPercent.textContent = Math.round(progressPercent) + '%';
-
-            // Update progress text
-            if (syncProgressText) {
-              if (data.status === 'queued') {
-                syncProgressText.textContent = 'Queued, waiting to start...';
-              } else if (data.status === 'running') {
-                syncProgressText.textContent = `Syncing... ${formatNumber(processed)} records processed`;
-              } else if (data.status === 'completed') {
-                syncProgressText.textContent = `Complete! ${formatNumber(processed)} processed, ${formatNumber(created)} created`;
-              }
-            }
-
-            // Update details
-            if (syncDetails) {
-              let detailsHtml = '<p>Syncing data from GoHighLevel API...</p>';
-              if (processed > 0 || created > 0 || failed > 0) {
-                detailsHtml = `
-                  <div class="space-y-1 text-sm">
-                    <div>Processed: <strong>${formatNumber(processed)}</strong></div>
-                    <div>Created: <strong class="text-green-600">${formatNumber(created)}</strong></div>
-                    ${failed > 0 ? `<div>Failed: <strong class="text-red-600">${formatNumber(failed)}</strong></div>` : ''}
-                  </div>
-                `;
-              }
-              syncDetails.innerHTML = detailsHtml;
-            }
-          } catch (parseError) {
-            console.error('Failed to parse SSE progress event:', parseError);
-          }
-        });
-
-        eventSource.addEventListener('completed', (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            console.log('Sync completed:', data);
-
-            // Close SSE connection
-            if (eventSource) {
-              eventSource.close();
-              eventSource = null;
-            }
-
-            // Update UI
-            if (progressSection) progressSection.classList.add('hidden');
-            if (completeSection) completeSection.classList.remove('hidden');
-
-            statusEl.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800';
-            statusEl.innerHTML = `
-              <span class="w-1.5 h-1.5 rounded-full bg-green-600"></span>
-              Completed
-            `;
-
-            runBtn.disabled = false;
-            runBtn.innerHTML = `
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-              </svg>
-              Run Sync Now
-            `;
-
-            const stats = data.stats || {};
-            const message = `Sync completed! ${formatNumber(stats.processed || 0)} processed, ${formatNumber(stats.created || 0)} created`;
-            Toast.success(message);
-
-            // Reload dashboard to reflect new data
-            setTimeout(() => {
-              loadDashboard();
-            }, 1000);
-          } catch (parseError) {
-            console.error('Failed to parse SSE completed event:', parseError);
-          }
-        });
-
-        eventSource.addEventListener('failed', (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            console.error('Sync failed:', data);
-
-            // Close SSE connection
-            if (eventSource) {
-              eventSource.close();
-              eventSource = null;
-            }
-
-            // Update UI
-            if (progressSection) progressSection.classList.add('hidden');
-
-            statusEl.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800';
-            statusEl.innerHTML = `
-              <span class="w-1.5 h-1.5 rounded-full bg-red-600"></span>
-              Failed
-            `;
-
-            runBtn.disabled = false;
-            runBtn.innerHTML = `
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-              </svg>
-              Run Sync Now
-            `;
-
-            Toast.error(data.error_message || 'Sync failed');
-          } catch (parseError) {
-            console.error('Failed to parse SSE failed event:', parseError);
-          }
-        });
-
-        eventSource.addEventListener('error', (event) => {
-          console.error('SSE stream error:', event);
-          // Only close if connection failed completely
-          if (eventSource.readyState === EventSource.CLOSED) {
-            if (eventSource) {
-              eventSource.close();
-              eventSource = null;
-            }
-            Toast.error('Lost connection to sync status stream');
-          }
-        });
+        // Start SSE polling for real-time sync updates
+        await startSyncPollingSSE(syncLogId);
 
       } catch (error) {
         console.error('Sync error:', error);
-
-        // Clean up SSE if it was created
-        if (eventSource) {
-          eventSource.close();
-          eventSource = null;
-        }
 
         if (progressSection) progressSection.classList.add('hidden');
 
@@ -1232,7 +1263,6 @@
           (responseData.opportunities && Array.isArray(responseData.opportunities) && responseData.opportunities.length > 0) ||
           (responseData.pipelines && Array.isArray(responseData.pipelines) && responseData.pipelines.length > 0) ||
           (responseData.events && Array.isArray(responseData.events) && responseData.events.length > 0) ||
-          (responseData.conversations && Array.isArray(responseData.conversations) && responseData.conversations.length > 0) ||
           (responseData.tasks && Array.isArray(responseData.tasks) && responseData.tasks.length > 0) ||
           (Array.isArray(responseData) && responseData.length > 0);
 
@@ -1319,9 +1349,6 @@
         } else if (responseData.events && Array.isArray(responseData.events)) {
           entityType = 'calendar_events';
           dataArray = responseData.events;
-        } else if (responseData.conversations && Array.isArray(responseData.conversations)) {
-          entityType = 'conversations';
-          dataArray = responseData.conversations;
         } else if (responseData.tasks && Array.isArray(responseData.tasks)) {
           entityType = 'tasks';
           dataArray = responseData.tasks;
@@ -1497,45 +1524,10 @@
                     <span id="output-count-pipelines" class="text-sm text-gray-500">-</span>
                   </div>
                 </button>
-                <button onclick="loadOutputData('conversations')" id="output-nav-conversations" class="output-nav-btn w-full text-left px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors">
-                  <div class="flex items-center justify-between">
-                    <span>Conversations</span>
-                    <span id="output-count-conversations" class="text-sm text-gray-500">-</span>
-                  </div>
-                </button>
-                <button onclick="loadOutputData('calendar_events')" id="output-nav-calendar-events" class="output-nav-btn w-full text-left px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors">
-                  <div class="flex items-center justify-between">
-                    <span>Calendar Events</span>
-                    <span id="output-count-calendar-events" class="text-sm text-gray-500">-</span>
-                  </div>
-                </button>
-
-                <!-- Divider -->
-                <div class="border-t border-gray-300 my-2"></div>
-                <p class="text-xs text-gray-500 mb-2 px-2">New Entities (Connector Data)</p>
-
                 <button onclick="loadOutputData('funnel')" id="output-nav-funnel" class="output-nav-btn w-full text-left px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors">
                   <div class="flex items-center justify-between">
                     <span>Funnels</span>
                     <span id="output-count-funnel" class="text-sm text-gray-500">-</span>
-                  </div>
-                </button>
-                <button onclick="loadOutputData('funnel_page')" id="output-nav-funnel_page" class="output-nav-btn w-full text-left px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors">
-                  <div class="flex items-center justify-between">
-                    <span>Funnel Pages</span>
-                    <span id="output-count-funnel_page" class="text-sm text-gray-500">-</span>
-                  </div>
-                </button>
-                <button onclick="loadOutputData('calendar')" id="output-nav-calendar" class="output-nav-btn w-full text-left px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors">
-                  <div class="flex items-center justify-between">
-                    <span>Calendars</span>
-                    <span id="output-count-calendar" class="text-sm text-gray-500">-</span>
-                  </div>
-                </button>
-                <button onclick="loadOutputData('calendar_group')" id="output-nav-calendar_group" class="output-nav-btn w-full text-left px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors">
-                  <div class="flex items-center justify-between">
-                    <span>Calendar Groups</span>
-                    <span id="output-count-calendar_group" class="text-sm text-gray-500">-</span>
                   </div>
                 </button>
               </nav>
@@ -1639,28 +1631,7 @@
         document.getElementById('output-count-contacts').textContent = formatNumber(stats.contacts?.total || 0);
         document.getElementById('output-count-opportunities').textContent = formatNumber(stats.opportunities?.total || 0);
         document.getElementById('output-count-pipelines').textContent = formatNumber(stats.pipelines?.total || 0);
-        document.getElementById('output-count-conversations').textContent = formatNumber(stats.conversations?.total || 0);
-        document.getElementById('output-count-calendar-events').textContent = formatNumber(stats.calendar_events?.total || 0);
-
-        // Fetch counts for new entity types from connector_data
-        const newEntityTypes = ['funnel', 'funnel_page', 'calendar', 'calendar_group'];
-
-        for (const entityType of newEntityTypes) {
-          try {
-            const result = await api.get(`/api/v1/leadly/data/${entityType}?limit=1`);
-            const count = result.total || 0;
-            const countElement = document.getElementById(`output-count-${entityType}`);
-            if (countElement) {
-              countElement.textContent = formatNumber(count);
-            }
-          } catch (error) {
-            console.error(`Failed to fetch count for ${entityType}:`, error);
-            const countElement = document.getElementById(`output-count-${entityType}`);
-            if (countElement) {
-              countElement.textContent = '0';
-            }
-          }
-        }
+        document.getElementById('output-count-funnel').textContent = formatNumber(stats.funnels?.total || 0);
       } catch (error) {
         console.error('Failed to update output counts:', error);
       }
@@ -1731,18 +1702,8 @@
           case 'pipelines':
             await loadPipelinesInOutput(searchTerm, statusFilter);
             break;
-          case 'conversations':
-            await loadConversationsInOutput(searchTerm, statusFilter);
-            break;
-          case 'calendar_events':
-            await loadCalendarEventsInOutput(searchTerm, statusFilter);
-            break;
-          // New entity types from connector_data
           case 'funnel':
-          case 'funnel_page':
-          case 'calendar':
-          case 'calendar_group':
-            await loadConnectorDataInOutput(dataType, searchTerm);
+            await loadFunnelsInOutput(searchTerm, statusFilter);
             break;
           default:
             panel.innerHTML = `<div class="text-center text-gray-500 py-8">Unknown data type: ${dataType}</div>`;
@@ -1959,7 +1920,7 @@
           <tr class="hover:bg-gray-50 transition-colors">
             <td class="px-6 py-4 text-sm font-medium text-gray-900">${opp.name || '-'}</td>
             <td class="px-6 py-4 text-sm text-gray-500">${opp.status || '-'}</td>
-            <td class="px-6 py-4 text-sm text-gray-500">${formatCurrency(opp.value || 0)}</td>
+            <td class="px-6 py-4 text-sm text-gray-500">${formatCurrency(opp.monetary_value || 0)}</td>
             <td class="px-6 py-4 text-sm text-gray-500">${opp.stage_name || '-'}</td>
           </tr>
         `;
@@ -2019,14 +1980,20 @@
         const stageCount = pipeline.stages ? pipeline.stages.length : 0;
         const stageNames = pipeline.stages ? pipeline.stages.map(s => s.name).join(', ') : '-';
 
+        // Calculate total opportunities and value across all stages
+        const totalOpportunities = pipeline.stages ?
+          pipeline.stages.reduce((sum, stage) => sum + (stage.opportunity_count || 0), 0) : 0;
+        const totalValue = pipeline.stages ?
+          pipeline.stages.reduce((sum, stage) => sum + (stage.total_value || 0), 0) : 0;
+
         html += `
           <tr class="hover:bg-gray-50 transition-colors">
             <td class="px-6 py-4 text-sm font-medium text-gray-900">${pipeline.name || '-'}</td>
             <td class="px-6 py-4 text-sm text-gray-500" title="${stageNames}">
               ${stageCount} stage${stageCount !== 1 ? 's' : ''}
             </td>
-            <td class="px-6 py-4 text-sm text-gray-500">${pipeline.opportunity_count || 0}</td>
-            <td class="px-6 py-4 text-sm text-gray-500">${formatCurrency(pipeline.total_value || 0)}</td>
+            <td class="px-6 py-4 text-sm text-gray-500">${totalOpportunities}</td>
+            <td class="px-6 py-4 text-sm text-gray-500">${formatCurrency(totalValue)}</td>
           </tr>
         `;
       });
@@ -2106,8 +2073,8 @@
       panel.innerHTML = html;
     }
 
-    // Load conversations in output panel
-    async function loadConversationsInOutput(searchTerm = '', statusFilter = '') {
+    // Load funnels in output panel
+    async function loadFunnelsInOutput(searchTerm = '', statusFilter = '') {
       const panel = document.getElementById('outputDataPanel');
 
       // Build query parameters
@@ -2120,20 +2087,16 @@
         params.append('search', searchTerm);
       }
 
-      if (statusFilter) {
-        params.append('status', statusFilter);
-      }
+      const result = await api.get(`/api/v1/leadly/funnels?${params.toString()}`);
 
-      const result = await api.get(`/api/v1/leadly/conversations?${params.toString()}`);
-
-      if (!result.conversations || result.conversations.length === 0) {
-        panel.innerHTML = '<div class="text-center text-gray-500 py-8">No conversations found</div>';
+      if (!result.funnels || result.funnels.length === 0) {
+        panel.innerHTML = '<div class="text-center text-gray-500 py-8">No funnels found</div>';
         updateOutputPagination(0);
         return;
       }
 
       // Update pagination
-      const total = result.pagination?.total || result.conversations.length;
+      const total = result.pagination?.total || result.funnels.length;
       updateOutputPagination(total);
 
       // Render table
@@ -2142,24 +2105,27 @@
           <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
               <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Channel</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Message</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unread</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Activity</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Funnel Name</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Steps</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
       `;
 
-      result.conversations.forEach(conv => {
-        const lastMessage = conv.last_message ? conv.last_message.substring(0, 50) + (conv.last_message.length > 50 ? '...' : '') : '-';
-        const lastActivity = conv.last_message_at ? new Date(conv.last_message_at).toLocaleDateString() : '-';
+      result.funnels.forEach(funnel => {
+        const steps = funnel.steps ? (Array.isArray(funnel.steps) ? funnel.steps.length : Object.keys(funnel.steps).length) : 0;
+        const statusBadge = funnel.is_active
+          ? '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>'
+          : '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Inactive</span>';
+
         html += `
           <tr class="hover:bg-gray-50 transition-colors">
-            <td class="px-6 py-4 text-sm font-medium text-gray-900">${conv.channel || '-'}</td>
-            <td class="px-6 py-4 text-sm text-gray-500">${lastMessage}</td>
-            <td class="px-6 py-4 text-sm text-gray-500">${conv.unread_count || 0}</td>
-            <td class="px-6 py-4 text-sm text-gray-500">${lastActivity}</td>
+            <td class="px-6 py-4 text-sm font-medium text-gray-900">${funnel.name || '-'}</td>
+            <td class="px-6 py-4 text-sm text-gray-500">${funnel.category || '-'}</td>
+            <td class="px-6 py-4 text-sm text-gray-500">${steps} steps</td>
+            <td class="px-6 py-4 text-sm text-gray-500">${statusBadge}</td>
           </tr>
         `;
       });
@@ -2353,7 +2319,7 @@
                       </div>
                       <div class="flex justify-between items-center text-sm">
                         <span class="text-gray-500">Sync Frequency</span>
-                        <span class="font-medium text-gray-900">${config.sync_frequency || 'Daily'}</span>
+                        <span class="font-medium text-gray-900">${formatSyncFrequency(config.sync_frequency)}</span>
                       </div>
                       <div class="flex justify-between items-center text-sm">
                         <span class="text-gray-500">Last Sync</span>
@@ -2362,44 +2328,6 @@
                     </div>
                   `}
                 </div>
-
-                <!-- Data Statistics -->
-                ${isConfigured ? `
-                  <div>
-                    <h4 class="text-sm font-medium text-gray-900 mb-3">Synced Data</h4>
-                    <div class="space-y-2">
-                      <div class="flex justify-between items-center text-sm">
-                        <span class="text-gray-600">Contacts</span>
-                        <span class="font-semibold text-gray-900">${formatNumber(stats.contacts?.total || 0)}</span>
-                      </div>
-                      <div class="flex justify-between items-center text-sm">
-                        <span class="text-gray-600">Opportunities</span>
-                        <span class="font-semibold text-gray-900">${formatNumber(stats.opportunities?.total || 0)}</span>
-                      </div>
-                      <div class="flex justify-between items-center text-sm">
-                        <span class="text-gray-600">Pipelines</span>
-                        <span class="font-semibold text-gray-900">${formatNumber(stats.pipelines?.total || 0)}</span>
-                      </div>
-                      <div class="flex justify-between items-center text-sm">
-                        <span class="text-gray-600">Conversations</span>
-                        <span class="font-semibold text-gray-900">${formatNumber(stats.conversations?.total || 0)}</span>
-                      </div>
-                      <div class="flex justify-between items-center text-sm">
-                        <span class="text-gray-600">Tasks</span>
-                        <span class="font-semibold text-gray-900">${formatNumber(stats.tasks?.total || 0)}</span>
-                      </div>
-                    </div>
-                  </div>
-                ` : `
-                  <div class="flex items-center justify-center bg-gray-50 rounded-lg p-8">
-                    <div class="text-center">
-                      <svg class="w-12 h-12 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                      </svg>
-                      <p class="text-sm text-gray-500">No data imported yet</p>
-                    </div>
-                  </div>
-                `}
               </div>
             </div>
           </div>
@@ -2411,7 +2339,7 @@
             <section class="mb-8">
               <h3 class="text-lg font-semibold text-gray-900 mb-3">Overview</h3>
               <p class="text-gray-600 leading-relaxed mb-4">
-                Leadly CRM connects directly to your GoHighLevel account to provide analytics and insights. Sync contacts, opportunities, pipelines, conversations, and tasks to leverage LanaAI's AI-powered analysis and search capabilities.
+                Leadly CRM connects directly to your GoHighLevel account to provide analytics and insights. Sync contacts, opportunities, pipelines, and funnels to leverage LanaAI's AI-powered analysis and search capabilities.
               </p>
               <p class="text-gray-600 leading-relaxed">
                 Configure your GoHighLevel credentials once, and Leadly will automatically sync your CRM data, providing dashboards, metrics, and AI-driven insights to help you understand your sales pipeline and customer interactions.
@@ -2422,12 +2350,10 @@
               <h3 class="text-lg font-semibold text-gray-900 mb-3">Key Features</h3>
               <ul class="list-disc list-inside space-y-2 text-gray-600">
                 <li>Sync contacts with email, phone, tags, and custom fields from GoHighLevel</li>
-                <li>Track opportunities across multiple pipelines with monetary values</li>
-                <li>Monitor conversations across SMS, email, and other channels</li>
-                <li>Manage tasks and calendar events with automated syncing</li>
-                <li>View pipeline performance metrics and win rates</li>
-                <li>Analyze contact sources and conversation channels</li>
-                <li>Real-time sync monitoring and error logging</li>
+                <li>Track opportunities across multiple pipelines with monetary values and stage tracking</li>
+                <li>Analyze funnel performance and conversion metrics</li>
+                <li>View pipeline performance metrics and opportunity values by stage</li>
+                <li>Analyze contact sources and engagement patterns</li>
               </ul>
             </section>
 
@@ -2466,32 +2392,12 @@
 
                 <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
                   <h4 class="font-medium text-gray-900 mb-2 flex items-center gap-2">
-                    <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                    <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
                     </svg>
-                    Conversations
+                    Funnels
                   </h4>
-                  <p class="text-sm text-gray-600">SMS, email, and chat conversations across multiple channels</p>
-                </div>
-
-                <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <h4 class="font-medium text-gray-900 mb-2 flex items-center gap-2">
-                    <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
-                    </svg>
-                    Tasks
-                  </h4>
-                  <p class="text-sm text-gray-600">To-dos, follow-ups, and task assignments</p>
-                </div>
-
-                <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <h4 class="font-medium text-gray-900 mb-2 flex items-center gap-2">
-                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                    </svg>
-                    Calendar Events
-                  </h4>
-                  <p class="text-sm text-gray-600">Scheduled appointments and calendar bookings</p>
+                  <p class="text-sm text-gray-600">Marketing funnels and conversion flows</p>
                 </div>
               </div>
             </section>
@@ -2501,11 +2407,11 @@
               <ol class="list-decimal list-inside space-y-2 text-gray-600">
                 <li>Go to the <a href="#" onclick="switchTab('configuration'); return false;" class="text-emerald-600 hover:text-emerald-700">Configuration tab</a> (admin access required)</li>
                 <li>Enter your GoHighLevel API key and Location ID</li>
-                <li>Select which data types to sync (contacts, opportunities, etc.)</li>
+                <li>Configure sync settings to import contacts, opportunities, pipelines, and funnels</li>
                 <li>Configure your sync frequency (manual, hourly, daily, etc.)</li>
                 <li>Save your configuration and trigger an initial sync</li>
                 <li>View your synced data in the <a href="#" onclick="switchTab('output'); return false;" class="text-emerald-600 hover:text-emerald-700">Output tab</a></li>
-                <li>Monitor sync status in the <a href="#" onclick="switchTab('logs'); return false;" class="text-emerald-600 hover:text-emerald-700">Execution Logs tab</a></li>
+                <li>Monitor sync status in the <a href="#" onclick="switchTab('run'); return false;" class="text-emerald-600 hover:text-emerald-700">Run tab</a></li>
               </ol>
             </section>
 
@@ -2536,22 +2442,15 @@
         </div>
       `;
 
-      // Load last sync time if configured
+      // Load last sync time from dashboard data
       if (isConfigured) {
-        try {
-          const result = await api.get('/api/v1/leadly/sync-logs?limit=1');
-          const lastSyncEl = document.getElementById('overviewLastSync');
-          if (lastSyncEl) {
-            if (result.logs && result.logs.length > 0) {
-              lastSyncEl.textContent = timeAgo(result.logs[0].started_at);
-            } else {
-              lastSyncEl.textContent = 'Never';
-            }
-          }
-        } catch (error) {
-          const lastSyncEl = document.getElementById('overviewLastSync');
-          if (lastSyncEl) {
-            lastSyncEl.textContent = 'Unknown';
+        const lastSyncEl = document.getElementById('overviewLastSync');
+        if (lastSyncEl) {
+          const lastSync = dashboardData?.last_sync;
+          if (lastSync) {
+            lastSyncEl.textContent = timeAgo(lastSync.completed_at || lastSync.started_at);
+          } else {
+            lastSyncEl.textContent = 'Never';
           }
         }
       }
@@ -2632,6 +2531,12 @@
                       <dt class="text-sm font-medium text-gray-500">Location ID</dt>
                       <dd class="mt-1 text-sm text-gray-900 font-mono">
                         ${currentConfig.location_id || '-'}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt class="text-sm font-medium text-gray-500">Sync Frequency</dt>
+                      <dd class="mt-1 text-sm text-gray-900">
+                        ${formatSyncFrequency(currentConfig.sync_frequency)}
                       </dd>
                     </div>
                   </dl>
@@ -2718,48 +2623,39 @@
                 <p class="mt-1 text-xs text-gray-500">Find this in Settings → Business Profile</p>
               </div>
 
-              <!-- Entity Selection -->
+              <!-- Entity Types - Read-only informational -->
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-3">
-                  Data Types to Sync
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  Data Types Synced
                 </label>
-                <div class="grid grid-cols-2 gap-3">
-                  <label class="flex items-center gap-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-                    <input type="checkbox" name="sync_entities" value="contact" checked class="rounded text-emerald-600 focus:ring-emerald-500" />
-                    <span class="text-sm">Contacts</span>
-                  </label>
-                  <label class="flex items-center gap-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-                    <input type="checkbox" name="sync_entities" value="opportunity" checked class="rounded text-emerald-600 focus:ring-emerald-500" />
-                    <span class="text-sm">Opportunities</span>
-                  </label>
-                  <label class="flex items-center gap-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-                    <input type="checkbox" name="sync_entities" value="pipeline" checked class="rounded text-emerald-600 focus:ring-emerald-500" />
-                    <span class="text-sm">Pipelines</span>
-                  </label>
-                  <label class="flex items-center gap-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-                    <input type="checkbox" name="sync_entities" value="conversation" class="rounded text-emerald-600 focus:ring-emerald-500" />
-                    <span class="text-sm">Conversations</span>
-                  </label>
-                  <label class="flex items-center gap-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-                    <input type="checkbox" name="sync_entities" value="task" class="rounded text-emerald-600 focus:ring-emerald-500" />
-                    <span class="text-sm">Tasks</span>
-                  </label>
-                  <label class="flex items-center gap-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-                    <input type="checkbox" name="sync_entities" value="calendar_event" class="rounded text-emerald-600 focus:ring-emerald-500" />
-                    <span class="text-sm">Calendar Events</span>
-                  </label>
-                  <label class="flex items-center gap-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-                    <input type="checkbox" name="sync_entities" value="funnel" class="rounded text-emerald-600 focus:ring-emerald-500" />
-                    <span class="text-sm">Funnels</span>
-                  </label>
-                  <label class="flex items-center gap-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-                    <input type="checkbox" name="sync_entities" value="funnel_page" class="rounded text-emerald-600 focus:ring-emerald-500" />
-                    <span class="text-sm">Funnel Pages</span>
-                  </label>
-                  <label class="flex items-center gap-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-                    <input type="checkbox" name="sync_entities" value="calendar_group" class="rounded text-emerald-600 focus:ring-emerald-500" />
-                    <span class="text-sm">Calendar Groups</span>
-                  </label>
+                <p class="text-xs text-gray-500 mb-3">
+                  The following data types will be synced from GoHighLevel (all types are automatically included):
+                </p>
+                <div class="flex flex-wrap gap-2">
+                  <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+                    <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                    </svg>
+                    Contacts
+                  </span>
+                  <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+                    <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                    </svg>
+                    Opportunities
+                  </span>
+                  <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+                    <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                    </svg>
+                    Pipelines
+                  </span>
+                  <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+                    <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                    </svg>
+                    Funnels
+                  </span>
                 </div>
               </div>
 
@@ -2773,10 +2669,12 @@
                   name="sync_frequency"
                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 >
+                  <option value="manual" ${currentConfig.sync_frequency === 'manual' ? 'selected' : ''}>Manual Only</option>
+                  <option value="hourly" ${currentConfig.sync_frequency === 'hourly' ? 'selected' : ''}>Hourly</option>
                   <option value="daily" ${currentConfig.sync_frequency === 'daily' || !currentConfig.sync_frequency ? 'selected' : ''}>Daily</option>
-                  <option value="manual" ${currentConfig.sync_frequency === 'manual' ? 'selected' : ''}>Manual only</option>
+                  <option value="realtime" ${currentConfig.sync_frequency === 'realtime' ? 'selected' : ''}>Real-time (Advanced)</option>
                 </select>
-                <p class="mt-1 text-xs text-gray-500">Automatic syncs can be configured in future updates</p>
+                <p class="mt-1 text-xs text-gray-500">Automatic syncs run in the background at the selected interval</p>
               </div>
 
               <!-- Action Buttons -->
@@ -2876,7 +2774,7 @@
 
       if (!apiKey || !locationId) {
         statusEl.className = 'text-center py-3 rounded-lg bg-yellow-100 text-yellow-800';
-        statusEl.textContent = 'Please enter both API Key and Location ID';
+        statusEl.textContent = 'Please enter API Key and Location ID';
         statusEl.classList.remove('hidden');
         return;
       }
@@ -2969,20 +2867,9 @@
       const locationId = document.getElementById('location_id').value.trim();
       const syncFrequency = document.getElementById('sync_frequency').value;
 
-      // Get selected entity types
-      const entityCheckboxes = document.querySelectorAll('input[name="sync_entities"]:checked');
-      const syncEntities = Array.from(entityCheckboxes).map(cb => cb.value);
-
       if (!apiKey || !locationId) {
         statusEl.className = 'text-center py-3 rounded-lg bg-yellow-100 text-yellow-800';
-        statusEl.textContent = 'Please enter both API Key and Location ID';
-        statusEl.classList.remove('hidden');
-        return;
-      }
-
-      if (syncEntities.length === 0) {
-        statusEl.className = 'text-center py-3 rounded-lg bg-yellow-100 text-yellow-800';
-        statusEl.textContent = 'Please select at least one data type to sync';
+        statusEl.textContent = 'Please enter API Key and Location ID';
         statusEl.classList.remove('hidden');
         return;
       }
@@ -2992,16 +2879,15 @@
         api_key: apiKey,
         location_id: locationId,
         sync_frequency: syncFrequency,
-        // Convert array to individual boolean flags for backend
-        sync_contacts: syncEntities.includes('contact'),
-        sync_opportunities: syncEntities.includes('opportunity'),
-        sync_pipelines: syncEntities.includes('pipeline'),
-        sync_conversations: syncEntities.includes('conversation'),
-        sync_tasks: syncEntities.includes('task'),
-        sync_calendars: syncEntities.includes('calendar_event'),
-        sync_funnels: syncEntities.includes('funnel'),
-        sync_funnel_pages: syncEntities.includes('funnel_page'),
-        sync_calendar_groups: syncEntities.includes('calendar_group')
+        // All entity types are synced automatically (for backend compatibility)
+        sync_contacts: true,
+        sync_opportunities: true,
+        sync_pipelines: true,
+        sync_tasks: true,
+        sync_calendars: true,
+        sync_funnels: true,
+        sync_funnel_pages: true,
+        sync_calendar_groups: true
       };
 
       try {
@@ -3501,14 +3387,13 @@
             status: log.status,
             created_at: log.started_at,
             completed_at: log.completed_at,
-            processed_count: log.records_processed || 0,
+            processed_count: log.records_fetched || log.records_processed || 0,
             error_message: log.error_message,
             _isSync: true,
             details: {
-              matters: log.matters_imported || 0,
-              participants: log.participants_imported || 0,
-              file_notes: log.file_notes_imported || 0,
-              tasks: log.tasks_imported || 0
+              records_created: log.records_created || 0,
+              records_updated: log.records_updated || 0,
+              records_failed: log.records_failed || 0
             }
           };
         });
@@ -3952,6 +3837,63 @@
             duration: 'Completed'
           });
         }
+      } else if (job._isSync) {
+        // Leadly CRM Sync pipeline with detailed stages
+        const duration = job.completed_at && job.created_at
+          ? new Date(job.completed_at) - new Date(job.created_at)
+          : null;
+
+        // Stage 1: Queued
+        stages.push({
+          name: 'Queued',
+          status: 'completed',
+          detail: `${job.filename || 'Sync'} initiated`,
+          duration: '<1s'
+        });
+
+        // Stage 2: Fetching Data from GoHighLevel
+        stages.push({
+          name: 'Fetching from GoHighLevel',
+          status: job.status === 'failed' && job.processed_count === 0 ? 'failed' : 'completed',
+          detail: job.status === 'failed' && job.processed_count === 0
+            ? (job.error_message || 'Failed to fetch data')
+            : `Retrieved ${formatNumber(job.processed_count || 0)} records`,
+          duration: duration ? `${Math.floor(duration / 3000)}s` : 'In progress'
+        });
+
+        // Stage 3: Processing & Transformation
+        if (job.processed_count > 0 || job.status === 'completed') {
+          stages.push({
+            name: 'Processing & Transformation',
+            status: job.status === 'completed' ? 'completed' : (job.status === 'failed' ? 'failed' : 'in_progress'),
+            detail: `Transformed ${formatNumber(job.processed_count || 0)} records`,
+            duration: duration ? `${Math.floor(duration / 2000)}s` : 'In progress'
+          });
+        }
+
+        // Stage 4: Saving to Database
+        if (job.status === 'completed' || (job.status === 'failed' && job.processed_count > 0)) {
+          const created = job.details?.records_created || 0;
+          const updated = job.details?.records_updated || 0;
+          stages.push({
+            name: 'Saving to Database',
+            status: job.status === 'completed' ? 'completed' : (job.status === 'failed' ? 'failed' : 'in_progress'),
+            detail: `${formatNumber(created)} created, ${formatNumber(updated)} updated`,
+            duration: duration ? `${Math.floor(duration / 4000)}s` : 'In progress'
+          });
+        }
+
+        // Stage 5: Completed / Failed
+        stages.push({
+          name: job.status === 'completed' ? 'Completed' : (job.status === 'failed' ? 'Failed' : 'Processing'),
+          status: job.status === 'completed' ? 'completed' : (job.status === 'failed' ? 'failed' : 'in_progress'),
+          detail: job.status === 'completed'
+            ? `Successfully synced ${formatNumber(job.processed_count || 0)} records`
+            : job.status === 'failed'
+              ? (job.error_message || 'Sync failed')
+              : 'Processing...',
+          duration: duration ? formatDuration(duration) : 'In progress'
+        });
       } else {
         // Regular ingestion job pipeline
         stages.push({
@@ -4382,11 +4324,22 @@
     }
 
     // Show settings modal
+    // Format sync frequency for display
+    function formatSyncFrequency(freq) {
+      const freqMap = {
+        'manual': 'Manual Only',
+        'hourly': 'Hourly',
+        'daily': 'Daily',
+        'realtime': 'Real-time'
+      };
+      return freqMap[freq] || 'Daily';
+    }
+
     function showSettings() {
       document.getElementById('settingsModal').classList.remove('hidden');
       if (dashboardData?.config) {
         document.getElementById('settingsImportDir').textContent = dashboardData.config.import_directory || 'Not set';
-        document.getElementById('settingsSyncFreq').textContent = (dashboardData.config.sync_frequency || 'daily').charAt(0).toUpperCase() + (dashboardData.config.sync_frequency || 'daily').slice(1);
+        document.getElementById('settingsSyncFreq').textContent = formatSyncFrequency(dashboardData.config.sync_frequency);
       }
     }
 
