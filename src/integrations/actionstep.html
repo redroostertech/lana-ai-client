@@ -370,6 +370,331 @@
       return (m % 1 === 0) ? m.toFixed(0) + 'M' : m.toFixed(1) + 'M';
     }
 
+    // Update entity progress display during import
+    function updateEntityProgress(entityType, status, stats) {
+      const progressDetails = document.getElementById('importProgressDetails');
+
+      if (!progressDetails) return;
+
+      // Map entity types to display names
+      const entityNames = {
+        actionTypes: 'Types',
+        participants: 'Participants',
+        matters: 'Matters',
+        matterParticipants: 'Links',
+        fileNotes: 'Notes',
+        tasks: 'Tasks'
+      };
+
+      const displayName = entityNames[entityType] || entityType;
+      const processed = stats.processed || 0;
+      const created = stats.created || 0;
+      const failed = stats.failed || 0;
+
+      // Determine status class
+      let statusClass = 'bg-gray-100 text-gray-400'; // default
+      if (status === 'running') {
+        statusClass = 'bg-blue-100 text-blue-800';
+      } else if (status === 'completed') {
+        statusClass = 'bg-green-100 text-green-800';
+      } else if (status === 'failed') {
+        statusClass = 'bg-red-100 text-red-800';
+      }
+
+      // Update or create entity progress element
+      let entityElement = progressDetails.querySelector(`[data-entity="${entityType}"]`);
+      if (!entityElement) {
+        entityElement = document.createElement('div');
+        entityElement.className = `p-2 rounded ${statusClass} text-center`;
+        entityElement.setAttribute('data-entity', entityType);
+        progressDetails.appendChild(entityElement);
+      } else {
+        entityElement.className = `p-2 rounded ${statusClass} text-center`;
+      }
+
+      entityElement.innerHTML = `
+        <div class="font-medium">${displayName}</div>
+        <div class="text-xs">
+          ${formatNumber(processed)} processed<br>
+          ${formatNumber(created)} created${failed > 0 ? `, ${formatNumber(failed)} failed` : ''}
+        </div>
+      `;
+
+      // Update progress text to show current entity
+      const progressText = document.getElementById('importProgressText');
+      if (progressText && status === 'running') {
+        progressText.textContent = `Importing ${displayName}...`;
+      }
+    }
+
+    // Update AI ingestion progress display
+    function updateAIIngestionProgress(data) {
+      const btn = document.getElementById('aiIngestionBtn');
+      const btnText = document.getElementById('aiIngestionBtnText');
+      const spinner = document.getElementById('aiIngestionSpinner');
+      const btnIcon = document.getElementById('aiIngestionBtnIcon');
+
+      const stats = data.stats || {};
+      const processed = stats.processed || 0;
+
+      // Update button text to show progress
+      if (data.status === 'running' || data.status === 'active') {
+        btnText.textContent = `Processing ${processed} matters...`;
+      } else if (data.status === 'completed') {
+        btnText.textContent = 'Completed';
+        btn.disabled = false;
+        btnIcon.classList.remove('hidden');
+        spinner.classList.add('hidden');
+      } else if (data.status === 'failed') {
+        btnText.textContent = 'Failed';
+        btn.disabled = false;
+        btnIcon.classList.remove('hidden');
+        spinner.classList.add('hidden');
+      }
+    }
+
+    // Update AI ingestion entity progress display
+    function updateAIIngestionEntityProgress(data) {
+      const entityType = data.entity_type;
+      const entityStatus = data.entity_status;
+      const entityStats = data.entity_stats || {};
+
+      const processed = entityStats.processed || 0;
+      const total = entityStats.total || 0;
+      const failed = entityStats.failed || 0;
+
+      // Update button text with detailed progress
+      const btnText = document.getElementById('aiIngestionBtnText');
+      if (btnText && entityStatus === 'running') {
+        const progressPct = entityStats.progressPct || 0;
+        btnText.textContent = `AI Processing: ${progressPct}% (${processed}/${total})`;
+      }
+    }
+
+    // Check for running operations and reconnect to SSE streams
+    async function checkAndReconnectRunningOperations() {
+      try {
+        // Check for running CSV sync operations
+        const syncResult = await api.get('/api/v1/actionstep/sync-logs?status=running,queued&limit=5&sortBy=started_at&sortOrder=DESC');
+        if (syncResult.sync_logs && syncResult.sync_logs.length > 0) {
+          const runningSync = syncResult.sync_logs[0];
+          if (runningSync.status === 'running' || runningSync.status === 'queued') {
+            console.log('Found running CSV sync, reconnecting to SSE stream:', runningSync.id);
+
+            // Update UI to show sync is running
+            const progress = document.getElementById('importProgress');
+            const progressText = document.getElementById('importProgressText');
+            const progressBar = document.getElementById('importProgressBar');
+            const progressDetails = document.getElementById('importProgressDetails');
+            const syncBtn = document.getElementById('syncCSVBtn');
+
+            if (progress) progress.classList.remove('hidden');
+            if (progressText) progressText.textContent = runningSync.status === 'queued' ? 'Queued...' : 'Importing...';
+            if (progressBar) {
+              progressBar.style.width = runningSync.status === 'queued' ? '10%' : '50%';
+              progressBar.classList.remove('bg-red-600');
+              progressBar.classList.add('bg-emerald-600');
+            }
+            if (progressDetails) progressDetails.innerHTML = '';
+            if (syncBtn) syncBtn.disabled = true;
+
+            // Reconnect to CSV sync SSE stream
+            reconnectToCSVSyncSSE(runningSync.id);
+          }
+        }
+
+        // Check for running AI ingestion operations
+        try {
+          const aiStatus = await api.get('/api/v1/actionstep/ingest-ai/status');
+          if (aiStatus.status === 'running' || aiStatus.status === 'active') {
+            console.log('Found running AI ingestion, reconnecting to SSE stream');
+
+            // Update UI to show AI ingestion is running
+            const btn = document.getElementById('aiIngestionBtn');
+            const btnText = document.getElementById('aiIngestionBtnText');
+            const spinner = document.getElementById('aiIngestionSpinner');
+
+            if (btn) btn.disabled = true;
+            if (btnText) btnText.textContent = 'Processing...';
+            if (spinner) spinner.classList.remove('hidden');
+
+            // Reconnect to AI ingestion SSE stream (if log_id is available)
+            if (aiStatus.log_id) {
+              reconnectToAIIngestionSSE(aiStatus.log_id);
+            }
+          }
+        } catch (aiError) {
+          // AI status endpoint might not exist or fail, ignore
+          console.log('Could not check AI ingestion status:', aiError.message);
+        }
+
+      } catch (error) {
+        console.error('Failed to check for running operations:', error);
+        // Don't show error to user - this is a background reconnection attempt
+      }
+    }
+
+    // Reconnect to CSV sync SSE stream
+    async function reconnectToCSVSyncSSE(syncLogId) {
+      try {
+        const token = api.token;
+        if (!token) return;
+
+        const baseUrl = api.baseUrl || window.location.origin;
+        const streamUrl = `${baseUrl}/api/v1/actionstep/sync/status/${syncLogId}/stream?token=${encodeURIComponent(token)}`;
+
+        const syncEventSource = new EventSource(streamUrl);
+
+        syncEventSource.addEventListener('connected', () => {
+          console.log('Reconnected to CSV sync SSE stream');
+        });
+
+        syncEventSource.addEventListener('progress', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('CSV sync progress (reconnected):', data);
+
+            const stats = data.stats || {};
+            const processed = stats.processed || 0;
+
+            const progressText = document.getElementById('importProgressText');
+            const progressBar = document.getElementById('importProgressBar');
+
+            if (progressText) progressText.textContent = `Processing... (${formatNumber(processed)} total records)`;
+            if (progressBar) progressBar.style.width = '50%';
+          } catch (parseError) {
+            console.error('Failed to parse CSV sync progress event:', parseError);
+          }
+        });
+
+        syncEventSource.addEventListener('entity_progress', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('CSV sync entity progress (reconnected):', data);
+
+            updateEntityProgress(data.entity_type, data.entity_status, data.entity_stats);
+          } catch (parseError) {
+            console.error('Failed to parse CSV sync entity progress event:', parseError);
+          }
+        });
+
+        syncEventSource.addEventListener('completed', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('CSV sync completed (reconnected):', data);
+
+            syncEventSource.close();
+            Toast.success('CSV import completed!');
+            loadDashboard();
+          } catch (parseError) {
+            console.error('Failed to parse CSV sync completed event:', parseError);
+          }
+        });
+
+        syncEventSource.addEventListener('failed', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('CSV sync failed (reconnected):', data);
+
+            syncEventSource.close();
+            Toast.error('CSV import failed: ' + (data.error_message || 'Unknown error'));
+          } catch (parseError) {
+            console.error('Failed to parse CSV sync failed event:', parseError);
+          }
+        });
+
+        syncEventSource.addEventListener('error', (event) => {
+          console.error('CSV sync SSE stream error (reconnected):', event);
+          if (syncEventSource.readyState === EventSource.CLOSED) {
+            syncEventSource.close();
+          }
+        });
+
+        // Store the EventSource so it can be cleaned up if needed
+        window.activeCSVSSEConnection = syncEventSource;
+
+      } catch (error) {
+        console.error('Failed to reconnect to CSV sync SSE:', error);
+      }
+    }
+
+    // Reconnect to AI ingestion SSE stream
+    async function reconnectToAIIngestionSSE(logId) {
+      try {
+        const token = api.token;
+        if (!token) return;
+
+        const baseUrl = api.baseUrl || window.location.origin;
+        const streamUrl = `${baseUrl}/api/v1/actionstep/ingest-ai/status/${logId}/stream?token=${encodeURIComponent(token)}`;
+
+        const ingestionEventSource = new EventSource(streamUrl);
+
+        ingestionEventSource.addEventListener('connected', () => {
+          console.log('Reconnected to AI ingestion SSE stream');
+        });
+
+        ingestionEventSource.addEventListener('progress', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('AI ingestion progress (reconnected):', data);
+
+            updateAIIngestionProgress(data);
+          } catch (parseError) {
+            console.error('Failed to parse AI ingestion progress event:', parseError);
+          }
+        });
+
+        ingestionEventSource.addEventListener('entity_progress', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('AI ingestion entity progress (reconnected):', data);
+
+            updateAIIngestionEntityProgress(data);
+          } catch (parseError) {
+            console.error('Failed to parse AI ingestion entity progress event:', parseError);
+          }
+        });
+
+        ingestionEventSource.addEventListener('completed', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('AI ingestion completed (reconnected):', data);
+
+            ingestionEventSource.close();
+            Toast.success('AI analysis completed!');
+            loadDashboard();
+          } catch (parseError) {
+            console.error('Failed to parse AI ingestion completed event:', parseError);
+          }
+        });
+
+        ingestionEventSource.addEventListener('failed', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('AI ingestion failed (reconnected):', data);
+
+            ingestionEventSource.close();
+            Toast.error('AI analysis failed: ' + (data.error_message || 'Unknown error'));
+          } catch (parseError) {
+            console.error('Failed to parse AI ingestion failed event:', parseError);
+          }
+        });
+
+        ingestionEventSource.addEventListener('error', (event) => {
+          console.error('AI ingestion SSE stream error (reconnected):', event);
+          if (ingestionEventSource.readyState === EventSource.CLOSED) {
+            ingestionEventSource.close();
+          }
+        });
+
+        // Store the EventSource so it can be cleaned up if needed
+        window.activeAISSEConnection = ingestionEventSource;
+
+      } catch (error) {
+        console.error('Failed to reconnect to AI ingestion SSE:', error);
+      }
+    }
+
     // Load dashboard data
     async function loadDashboard() {
       document.getElementById('loadingState').classList.remove('hidden');
@@ -412,6 +737,9 @@
 
         // Load current tab
         loadTabContent(currentTab);
+
+        // Check for running operations and reconnect to SSE streams
+        checkAndReconnectRunningOperations();
       } catch (error) {
         console.error('Dashboard load error:', error);
         document.getElementById('loadingState').classList.add('hidden');
@@ -2503,14 +2831,13 @@
             status: log.status,
             created_at: log.started_at,
             completed_at: log.completed_at,
-            processed_count: log.records_processed || 0,
+            processed_count: log.records_fetched || log.records_processed || 0,
             error_message: log.error_message,
             _isSync: true,
             details: {
-              matters: log.matters_imported || 0,
-              participants: log.participants_imported || 0,
-              file_notes: log.file_notes_imported || 0,
-              tasks: log.tasks_imported || 0
+              records_created: log.records_created || 0,
+              records_updated: log.records_updated || 0,
+              records_failed: log.records_failed || 0
             }
           };
         });
@@ -2866,6 +3193,63 @@
             duration: 'Completed'
           });
         }
+      } else if (job._isSync) {
+        // ActionStep Sync pipeline with detailed stages
+        const duration = job.completed_at && job.created_at
+          ? new Date(job.completed_at) - new Date(job.created_at)
+          : null;
+
+        // Stage 1: Queued
+        stages.push({
+          name: 'Queued',
+          status: 'completed',
+          detail: `${job.filename || 'Sync'} initiated`,
+          duration: '<1s'
+        });
+
+        // Stage 2: Fetching Data from ActionStep
+        stages.push({
+          name: 'Fetching from ActionStep',
+          status: job.status === 'failed' && job.processed_count === 0 ? 'failed' : 'completed',
+          detail: job.status === 'failed' && job.processed_count === 0
+            ? (job.error_message || 'Failed to fetch data')
+            : `Retrieved ${formatNumber(job.processed_count || 0)} records`,
+          duration: duration ? `${Math.floor(duration / 3000)}s` : 'In progress'
+        });
+
+        // Stage 3: Processing & Transformation
+        if (job.processed_count > 0 || job.status === 'completed') {
+          stages.push({
+            name: 'Processing & Transformation',
+            status: job.status === 'completed' ? 'completed' : (job.status === 'failed' ? 'failed' : 'in_progress'),
+            detail: `Transformed ${formatNumber(job.processed_count || 0)} records`,
+            duration: duration ? `${Math.floor(duration / 2000)}s` : 'In progress'
+          });
+        }
+
+        // Stage 4: Saving to Database
+        if (job.status === 'completed' || (job.status === 'failed' && job.processed_count > 0)) {
+          const created = job.details?.records_created || 0;
+          const updated = job.details?.records_updated || 0;
+          stages.push({
+            name: 'Saving to Database',
+            status: job.status === 'completed' ? 'completed' : (job.status === 'failed' ? 'failed' : 'in_progress'),
+            detail: `${formatNumber(created)} created, ${formatNumber(updated)} updated`,
+            duration: duration ? `${Math.floor(duration / 4000)}s` : 'In progress'
+          });
+        }
+
+        // Stage 5: Completed / Failed
+        stages.push({
+          name: job.status === 'completed' ? 'Completed' : (job.status === 'failed' ? 'Failed' : 'Processing'),
+          status: job.status === 'completed' ? 'completed' : (job.status === 'failed' ? 'failed' : 'in_progress'),
+          detail: job.status === 'completed'
+            ? `Successfully synced ${formatNumber(job.processed_count || 0)} records`
+            : job.status === 'failed'
+              ? (job.error_message || 'Sync failed')
+              : 'Processing...',
+          duration: duration ? formatDuration(duration) : 'In progress'
+        });
       } else {
         // Regular ingestion job pipeline
         stages.push({
@@ -2969,14 +3353,15 @@
       `;
     }
 
-    // Sync CSV data with progress polling
-    let importPollingInterval = null;
+    // Sync CSV data with SSE streaming
+    let importEventSource = null;
 
     async function syncCSVData() {
       const btn = document.getElementById('syncCSVBtn');
       const progress = document.getElementById('importProgress');
       const progressText = document.getElementById('importProgressText');
       const progressBar = document.getElementById('importProgressBar');
+      const progressDetails = document.getElementById('importProgressDetails');
 
       btn.disabled = true;
       document.getElementById('importDocsBtn').disabled = true;
@@ -2986,162 +3371,154 @@
       progressBar.classList.remove('bg-red-600');
       progressBar.classList.add('bg-emerald-600');
 
-      // Start polling for progress updates FIRST (before the request)
-      startImportPolling(progressText, progressBar);
+      try {
+        // Start the sync - returns sync_log_id immediately
+        const result = await api.post('/api/v1/actionstep/sync', {});
+        const syncLogId = result.sync_log_id;
 
-      // Start the import - don't stop polling on timeout since import continues on server
-      api.post('/api/v1/actionstep/sync', {})
-        .then(result => {
-          // Import completed successfully via HTTP response
-          stopImportPolling();
-          progressBar.style.width = '100%';
+        if (!syncLogId) {
+          throw new Error('No sync log ID returned from server');
+        }
 
-          const totalProcessed = Object.values(result.stats || {}).reduce((sum, s) => sum + (s.processed || 0), 0);
-          const totalCreated = Object.values(result.stats || {}).reduce((sum, s) => sum + (s.created || 0), 0);
+        // Connect to SSE stream for real-time updates
+        const token = api.token;
+        if (!token) {
+          throw new Error('Not authenticated');
+        }
 
-          progressText.textContent = `Import complete! Processed ${formatNumber(totalProcessed)} records, created ${formatNumber(totalCreated)} new`;
-          Toast.success('CSV data imported successfully');
+        const baseUrl = api.baseUrl || window.location.origin;
+        const streamUrl = `${baseUrl}/api/v1/actionstep/sync/status/${syncLogId}/stream?token=${encodeURIComponent(token)}`;
+        importEventSource = new EventSource(streamUrl);
 
-          setTimeout(() => {
-            progress.classList.add('hidden');
-            btn.disabled = false;
-            document.getElementById('importDocsBtn').disabled = false;
-            loadDashboard();
-          }, 3000);
-        })
-        .catch(error => {
-          // Check if it's a timeout - if so, keep polling since server is still working
-          const isTimeout = error.message?.toLowerCase().includes('timeout') ||
-                           error.message?.toLowerCase().includes('network') ||
-                           error.message?.toLowerCase().includes('aborted');
+        importEventSource.addEventListener('connected', () => {
+          console.log('SSE stream connected for ActionStep sync');
+          progressText.textContent = 'Connected, starting import...';
+        });
 
-          if (isTimeout) {
-            // Don't stop polling - server is still processing
-            console.log('Request timed out, but import continues on server. Polling for status...');
-            progressText.textContent = 'Import in progress (monitoring via polling)...';
-            // Polling will handle completion detection
-          } else {
-            // Real error - stop polling
-            stopImportPolling();
-            progressText.textContent = 'Import failed: ' + error.message;
+        importEventSource.addEventListener('progress', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('ActionStep sync progress:', data);
+
+            // Update overall progress
+            const stats = data.stats || {};
+            const processed = stats.processed || 0;
+            const created = stats.created || 0;
+            const failed = stats.failed || 0;
+
+            if (progressBar) progressBar.style.width = '50%';
+            if (progressText) {
+              progressText.textContent = `Processing... (${formatNumber(processed)} total records)`;
+            }
+          } catch (parseError) {
+            console.error('Failed to parse SSE progress event:', parseError);
+          }
+        });
+
+        // Handle entity-level progress updates
+        importEventSource.addEventListener('entity_progress', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('ActionStep entity progress:', data);
+
+            // Update entity status in UI
+            const entityType = data.entity_type;
+            const entityStatus = data.entity_status;
+            const entityStats = data.entity_stats || {};
+
+            // Update entity display based on status
+            updateEntityProgress(entityType, entityStatus, entityStats);
+          } catch (parseError) {
+            console.error('Failed to parse SSE entity_progress event:', parseError);
+          }
+        });
+
+        importEventSource.addEventListener('completed', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('ActionStep sync completed:', data);
+
+            // Close SSE connection
+            if (importEventSource) {
+              importEventSource.close();
+              importEventSource = null;
+            }
+
+            // Update UI
+            progressBar.style.width = '100%';
+            const stats = data.stats || {};
+            progressText.textContent = `Import complete! Processed ${formatNumber(stats.processed || 0)} records, created ${formatNumber(stats.created || 0)} new`;
+            
+            Toast.success('CSV data imported successfully');
+
+            setTimeout(() => {
+              progress.classList.add('hidden');
+              btn.disabled = false;
+              document.getElementById('importDocsBtn').disabled = false;
+              loadDashboard();
+            }, 3000);
+          } catch (parseError) {
+            console.error('Failed to parse SSE completed event:', parseError);
+          }
+        });
+
+        importEventSource.addEventListener('failed', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.error('ActionStep sync failed:', data);
+
+            // Close SSE connection
+            if (importEventSource) {
+              importEventSource.close();
+              importEventSource = null;
+            }
+
+            // Update UI
+            progressBar.style.width = '100%';
             progressBar.classList.remove('bg-emerald-600');
             progressBar.classList.add('bg-red-600');
-            Toast.error('CSV import failed: ' + error.message);
+            progressText.textContent = 'Import failed: ' + (data.error_message || 'Unknown error');
+            
+            Toast.error('CSV import failed: ' + (data.error_message || 'Unknown error'));
+            btn.disabled = false;
+            document.getElementById('importDocsBtn').disabled = false;
+          } catch (parseError) {
+            console.error('Failed to parse SSE failed event:', parseError);
+          }
+        });
+
+        importEventSource.addEventListener('error', (event) => {
+          console.error('SSE stream error:', event);
+          // Only close if connection failed completely
+          if (importEventSource && importEventSource.readyState === EventSource.CLOSED) {
+            if (importEventSource) {
+              importEventSource.close();
+              importEventSource = null;
+            }
+            Toast.error('Lost connection to sync status stream');
             btn.disabled = false;
             document.getElementById('importDocsBtn').disabled = false;
           }
         });
-    }
 
-    function startImportPolling(progressText, progressBar) {
-      let pollCount = 0;
-      const entityOrder = ['actionTypes', 'participants', 'matters', 'matterParticipants', 'fileNotes', 'tasks'];
-      const entityLabels = {
-        actionTypes: 'Types',
-        participants: 'Participants',
-        matters: 'Matters',
-        matterParticipants: 'Links',
-        fileNotes: 'Notes',
-        tasks: 'Tasks'
-      };
-      const progressDetails = document.getElementById('importProgressDetails');
+      } catch (error) {
+        console.error('Sync error:', error);
 
-      importPollingInterval = setInterval(async () => {
-        try {
-          pollCount++;
-          const result = await api.get('/api/v1/actionstep/sync-logs?limit=1');
-
-          if (result.logs && result.logs.length > 0) {
-            const log = result.logs[0];
-
-            if (log.status === 'completed') {
-              // Import completed - handle it here (in case HTTP request timed out)
-              stopImportPolling();
-              progressBar.style.width = '100%';
-
-              const entityStats = log.entity_stats || {};
-              let totalProcessed = 0;
-              for (const entity of entityOrder) {
-                totalProcessed += entityStats[entity]?.processed || 0;
-              }
-
-              progressText.textContent = `Import complete! Processed ${formatNumber(totalProcessed)} records`;
-              document.getElementById('importSpinner').classList.remove('animate-spin');
-              Toast.success('CSV data imported successfully');
-
-              setTimeout(() => {
-                document.getElementById('importProgress').classList.add('hidden');
-                document.getElementById('syncCSVBtn').disabled = false;
-                document.getElementById('importDocsBtn').disabled = false;
-                document.getElementById('importSpinner').classList.add('animate-spin');
-                loadDashboard();
-              }, 3000);
-              return;
-            }
-
-            if (log.status === 'failed') {
-              stopImportPolling();
-              progressText.textContent = 'Import failed: ' + (log.error_message || 'Unknown error');
-              progressBar.classList.remove('bg-emerald-600');
-              progressBar.classList.add('bg-red-600');
-              document.getElementById('importSpinner').classList.add('hidden');
-              document.getElementById('syncCSVBtn').disabled = false;
-              document.getElementById('importDocsBtn').disabled = false;
-              return;
-            }
-
-            // Parse entity stats to show progress
-            const entityStats = log.entity_stats || {};
-            let currentEntity = 'Starting...';
-            let progressPercent = 5;
-            let totalProcessed = 0;
-            let detailsHtml = '';
-
-            // Find current entity being processed and build details
-            for (let i = 0; i < entityOrder.length; i++) {
-              const entity = entityOrder[i];
-              const stats = entityStats[entity];
-              const processed = stats?.processed || 0;
-              const created = stats?.created || 0;
-              const updated = stats?.updated || 0;
-
-              if (processed > 0) {
-                currentEntity = entityLabels[entity];
-                totalProcessed += processed;
-                // Each entity is ~16% of progress (6 entities)
-                progressPercent = Math.min(95, 5 + ((i + 1) / entityOrder.length) * 90);
-              }
-
-              // Show stat box for each entity
-              const isActive = stats && stats.processed > 0;
-              const isDone = i < entityOrder.length - 1 && entityStats[entityOrder[i + 1]]?.processed > 0;
-              const statusClass = isDone ? 'bg-green-100 text-green-800' : (isActive ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-400');
-
-              detailsHtml += `
-                <div class="p-2 rounded ${statusClass} text-center">
-                  <div class="font-medium">${entityLabels[entity]}</div>
-                  <div>${formatNumber(processed)}</div>
-                </div>
-              `;
-            }
-
-            progressDetails.innerHTML = detailsHtml;
-            progressBar.style.width = progressPercent + '%';
-            progressText.textContent = `Importing ${currentEntity}... (${formatNumber(log.records_processed || totalProcessed)} total records)`;
-          }
-        } catch (e) {
-          // Ignore polling errors, just keep trying
-          console.log('Polling error:', e);
+        // Clean up SSE if it was created
+        if (importEventSource) {
+          importEventSource.close();
+          importEventSource = null;
         }
-      }, 2000); // Poll every 2 seconds
-    }
 
-    function stopImportPolling() {
-      if (importPollingInterval) {
-        clearInterval(importPollingInterval);
-        importPollingInterval = null;
+        progressBar.classList.remove('bg-emerald-600');
+        progressBar.classList.add('bg-red-600');
+        progressText.textContent = 'Import failed: ' + error.message;
+        Toast.error('CSV import failed: ' + error.message);
+        btn.disabled = false;
+        document.getElementById('importDocsBtn').disabled = false;
       }
     }
+
 
     // Import documents with progress polling
     let docImportPollingInterval = null;
@@ -3808,19 +4185,93 @@
         // Show success message with info about background processing
         Toast.success(`AI analysis started! Processing ${result.total_matters || 0} matters in background. This may take 10-15 minutes.`);
 
-        // Update status immediately to show "processing"
-        await loadAIIngestionStatus();
+        // Connect to SSE stream for real-time updates
+        const logId = result.log_id;
+        if (logId) {
+          const streamUrl = `${baseUrl}/api/v1/actionstep/ingest-ai/status/${logId}/stream?token=${encodeURIComponent(token)}`;
+          const ingestionEventSource = new EventSource(streamUrl);
 
-        // Optionally poll for updates
-        const pollInterval = setInterval(async () => {
-          await loadAIIngestionStatus();
-          const currentStatus = await api.get('/api/v1/actionstep/ingest-ai/status');
-          if (currentStatus.status === 'completed' || currentStatus.status === 'failed') {
-            clearInterval(pollInterval);
-            Toast.success('AI analysis completed!');
-            loadDashboard();
-          }
-        }, 10000); // Check every 10 seconds
+          ingestionEventSource.addEventListener('connected', () => {
+            console.log('SSE stream connected for ActionStep AI ingestion');
+          });
+
+          ingestionEventSource.addEventListener('progress', (event) => {
+            try {
+              const data = JSON.parse(event.data);
+              console.log('AI ingestion progress:', data);
+
+              // Update progress display
+              const stats = data.stats || {};
+              const processed = stats.processed || 0;
+              const total = data.total_matters || 0;
+
+              // Update UI with progress
+              updateAIIngestionProgress(data);
+            } catch (parseError) {
+              console.error('Failed to parse AI ingestion progress event:', parseError);
+            }
+          });
+
+          ingestionEventSource.addEventListener('entity_progress', (event) => {
+            try {
+              const data = JSON.parse(event.data);
+              console.log('AI ingestion entity progress:', data);
+
+              // Update entity-specific progress
+              updateAIIngestionEntityProgress(data);
+            } catch (parseError) {
+              console.error('Failed to parse AI ingestion entity progress event:', parseError);
+            }
+          });
+
+          ingestionEventSource.addEventListener('completed', (event) => {
+            try {
+              const data = JSON.parse(event.data);
+              console.log('AI ingestion completed:', data);
+
+              // Close SSE connection
+              ingestionEventSource.close();
+
+              Toast.success('AI analysis completed!');
+              loadDashboard();
+            } catch (parseError) {
+              console.error('Failed to parse AI ingestion completed event:', parseError);
+            }
+          });
+
+          ingestionEventSource.addEventListener('failed', (event) => {
+            try {
+              const data = JSON.parse(event.data);
+              console.log('AI ingestion failed:', data);
+
+              // Close SSE connection
+              ingestionEventSource.close();
+
+              Toast.error('AI analysis failed: ' + (data.error_message || 'Unknown error'));
+            } catch (parseError) {
+              console.error('Failed to parse AI ingestion failed event:', parseError);
+            }
+          });
+
+          ingestionEventSource.addEventListener('error', (event) => {
+            console.error('SSE stream error for AI ingestion:', event);
+
+            if (ingestionEventSource.readyState === EventSource.CLOSED) {
+              console.log('SSE connection closed for AI ingestion');
+            }
+          });
+        } else {
+          // Fallback to polling if no log_id
+          const pollInterval = setInterval(async () => {
+            await loadAIIngestionStatus();
+            const currentStatus = await api.get('/api/v1/actionstep/ingest-ai/status');
+            if (currentStatus.status === 'completed' || currentStatus.status === 'failed') {
+              clearInterval(pollInterval);
+              Toast.success('AI analysis completed!');
+              loadDashboard();
+            }
+          }, 10000); // Check every 10 seconds
+        }
 
       } catch (error) {
         console.error('AI ingestion failed:', error);
