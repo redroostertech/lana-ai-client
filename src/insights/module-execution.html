@@ -907,41 +907,169 @@
       // Store data in window scope for onclick handlers
       window.qualifiedLeadsData = {
         contacts,
-        contactIdsFromOpportunities
+        contactIdsFromOpportunities,
+        currentPage: 1,
+        rowsPerPage: 25,
+        sortColumn: null,
+        sortDirection: 'asc',
+        searchQuery: '',
+        currentFilter: 'all'
       };
 
-      // Function to render filtered table
+      // Function to render filtered table with sorting, filtering, and pagination
       window.renderContactTable = function(filter) {
-        const { contacts, contactIdsFromOpportunities } = window.qualifiedLeadsData;
+        const state = window.qualifiedLeadsData;
+        const { contacts, contactIdsFromOpportunities } = state;
+
+        // Update filter if provided
+        if (filter !== undefined) {
+          state.currentFilter = filter;
+          state.currentPage = 1; // Reset to page 1 when changing filter
+        }
+
         let filteredContacts = contacts;
         let filterTitle = 'All Contacts';
 
-        if (filter === 'qualified') {
+        // Apply category filter
+        if (state.currentFilter === 'qualified') {
           filteredContacts = contacts.filter(c => contactIdsFromOpportunities.has(c.data?.id));
           filterTitle = 'Qualified Contacts (Have Opportunities)';
-        } else if (filter === 'not_qualified') {
+        } else if (state.currentFilter === 'not_qualified') {
           filteredContacts = contacts.filter(c => !contactIdsFromOpportunities.has(c.data?.id));
           filterTitle = 'Not Yet Qualified Contacts (No Opportunities)';
         }
 
+        // Apply search filter
+        if (state.searchQuery) {
+          const query = state.searchQuery.toLowerCase();
+          filteredContacts = filteredContacts.filter(lead => {
+            const name = lead.data?.contactName || lead.data?.name || (lead.data?.firstName && lead.data?.lastName ? lead.data.firstName + ' ' + lead.data.lastName : '');
+            const email = lead.data?.email || '';
+            const phone = lead.data?.phone || '';
+            return name.toLowerCase().includes(query) || email.toLowerCase().includes(query) || phone.toLowerCase().includes(query);
+          });
+        }
+
+        // Apply sorting
+        if (state.sortColumn) {
+          filteredContacts.sort((a, b) => {
+            let aVal, bVal;
+
+            switch(state.sortColumn) {
+              case 'name':
+                aVal = a.data?.contactName || a.data?.name || (a.data?.firstName && a.data?.lastName ? a.data.firstName + ' ' + a.data.lastName : '');
+                bVal = b.data?.contactName || b.data?.name || (b.data?.firstName && b.data?.lastName ? b.data.firstName + ' ' + b.data.lastName : '');
+                break;
+              case 'email':
+                aVal = a.data?.email || '';
+                bVal = b.data?.email || '';
+                break;
+              case 'phone':
+                aVal = a.data?.phone || '';
+                bVal = b.data?.phone || '';
+                break;
+              case 'status':
+                aVal = contactIdsFromOpportunities.has(a.data?.id) ? 1 : 0;
+                bVal = contactIdsFromOpportunities.has(b.data?.id) ? 1 : 0;
+                break;
+              case 'created':
+                aVal = new Date(a.source_created_at).getTime();
+                bVal = new Date(b.source_created_at).getTime();
+                break;
+              default:
+                return 0;
+            }
+
+            if (aVal < bVal) return state.sortDirection === 'asc' ? -1 : 1;
+            if (aVal > bVal) return state.sortDirection === 'asc' ? 1 : -1;
+            return 0;
+          });
+        }
+
+        // Calculate pagination
+        const totalRecords = filteredContacts.length;
+        const totalPages = Math.ceil(totalRecords / state.rowsPerPage);
+        const startIdx = (state.currentPage - 1) * state.rowsPerPage;
+        const endIdx = Math.min(startIdx + state.rowsPerPage, totalRecords);
+        const paginatedContacts = filteredContacts.slice(startIdx, endIdx);
+
+        // Helper function to sort by column
+        window.sortTableBy = function(column) {
+          if (state.sortColumn === column) {
+            state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
+          } else {
+            state.sortColumn = column;
+            state.sortDirection = 'asc';
+          }
+          window.renderContactTable();
+        };
+
+        // Helper function to change page
+        window.goToPage = function(page) {
+          if (page >= 1 && page <= totalPages) {
+            state.currentPage = page;
+            window.renderContactTable();
+          }
+        };
+
+        // Helper function to handle search
+        window.handleSearch = function(event) {
+          state.searchQuery = event.target.value;
+          state.currentPage = 1; // Reset to page 1 when searching
+          window.renderContactTable();
+        };
+
+        // Sort indicator
+        const getSortIcon = (column) => {
+          if (state.sortColumn !== column) {
+            return '<svg class="w-4 h-4 text-gray-400 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path></svg>';
+          }
+          if (state.sortDirection === 'asc') {
+            return '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>';
+          }
+          return '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>';
+        };
+
         const tableHTML = `
           <div class="flex items-center justify-between mb-3">
             <h4 class="font-semibold text-gray-900">${filterTitle}</h4>
-            ${filter !== 'all' ? `<button onclick="window.renderContactTable('all')" class="text-sm text-indigo-600 hover:text-indigo-800">Show All</button>` : ''}
+            ${state.currentFilter !== 'all' ? `<button onclick="window.renderContactTable('all')" class="text-sm text-indigo-600 hover:text-indigo-800">Show All</button>` : ''}
           </div>
-          <div class="overflow-x-auto" style="max-height: 400px;">
+
+          <!-- Search Box -->
+          <div class="mb-4">
+            <input
+              type="text"
+              placeholder="Search by name, email, or phone..."
+              value="${state.searchQuery}"
+              oninput="window.handleSearch(event)"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+          </div>
+
+          <div class="overflow-x-auto" style="max-height: 500px;">
             <table class="min-w-full divide-y divide-gray-200">
               <thead class="bg-gray-50 sticky top-0">
                 <tr>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                  <th onclick="window.sortTableBy('name')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Name ${getSortIcon('name')}
+                  </th>
+                  <th onclick="window.sortTableBy('email')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Email ${getSortIcon('email')}
+                  </th>
+                  <th onclick="window.sortTableBy('phone')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Phone ${getSortIcon('phone')}
+                  </th>
+                  <th onclick="window.sortTableBy('status')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Status ${getSortIcon('status')}
+                  </th>
+                  <th onclick="window.sortTableBy('created')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Created ${getSortIcon('created')}
+                  </th>
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-gray-200">
-                ${filteredContacts.slice(0, 100).map(lead => {
+                ${paginatedContacts.map(lead => {
                   const hasOpportunity = contactIdsFromOpportunities.has(lead.data?.id);
                   const statusBadge = hasOpportunity
                     ? '<span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Qualified</span>'
@@ -962,8 +1090,51 @@
               </tbody>
             </table>
           </div>
-          <div class="mt-4 text-sm text-gray-600 text-center">
-            Showing ${Math.min(100, filteredContacts.length)} of ${filteredContacts.length} ${filterTitle.toLowerCase()}
+
+          <!-- Pagination Controls -->
+          <div class="mt-4 flex items-center justify-between">
+            <div class="text-sm text-gray-600">
+              Showing ${startIdx + 1} to ${endIdx} of ${totalRecords} ${filterTitle.toLowerCase()}
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                onclick="window.goToPage(${state.currentPage - 1})"
+                ${state.currentPage === 1 ? 'disabled' : ''}
+                class="px-3 py-1 text-sm border rounded ${state.currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+              >
+                Previous
+              </button>
+              <div class="flex items-center gap-1">
+                ${Array.from({length: Math.min(totalPages, 7)}, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 7) {
+                    pageNum = i + 1;
+                  } else if (state.currentPage <= 4) {
+                    pageNum = i + 1;
+                  } else if (state.currentPage >= totalPages - 3) {
+                    pageNum = totalPages - 6 + i;
+                  } else {
+                    pageNum = state.currentPage - 3 + i;
+                  }
+
+                  return `
+                    <button
+                      onclick="window.goToPage(${pageNum})"
+                      class="px-3 py-1 text-sm border rounded ${state.currentPage === pageNum ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+                    >
+                      ${pageNum}
+                    </button>
+                  `;
+                }).join('')}
+              </div>
+              <button
+                onclick="window.goToPage(${state.currentPage + 1})"
+                ${state.currentPage === totalPages ? 'disabled' : ''}
+                class="px-3 py-1 text-sm border rounded ${state.currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+              >
+                Next
+              </button>
+            </div>
           </div>
         `;
 
@@ -1031,19 +1202,19 @@
 
           <!-- Reference Information -->
           <div class="grid grid-cols-2 gap-4">
-            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div onclick="window.renderContactTable('all')" class="bg-blue-50 border border-blue-200 rounded-lg p-4 cursor-pointer hover:bg-blue-100 hover:shadow-md transition-all duration-200">
               <div class="flex items-center justify-between mb-2">
                 <p class="text-sm font-medium text-gray-900">ℹ️ Total Contacts</p>
               </div>
               <p class="text-2xl font-bold text-blue-700">${totalContacts}</p>
-              <p class="text-xs text-gray-500 mt-1">Total contact records in system for this period</p>
+              <p class="text-xs text-gray-500 mt-1">Total contact records in system for this period · Click to view</p>
             </div>
-            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div onclick="window.renderContactTable('all')" class="bg-blue-50 border border-blue-200 rounded-lg p-4 cursor-pointer hover:bg-blue-100 hover:shadow-md transition-all duration-200">
               <div class="flex items-center justify-between mb-2">
                 <p class="text-sm font-medium text-gray-900">ℹ️ Total Opportunities</p>
               </div>
               <p class="text-2xl font-bold text-blue-700">${totalOpportunities}</p>
-              <p class="text-xs text-gray-500 mt-1">Total opportunity records in system for this period</p>
+              <p class="text-xs text-gray-500 mt-1">Total opportunity records in system for this period · Click to view</p>
             </div>
           </div>
         </div>
