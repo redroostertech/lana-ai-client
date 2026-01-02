@@ -2850,23 +2850,23 @@
   </script>
 
   <!-- Drill-down Modal -->
-  <div id="drilldownModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-    <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-6xl shadow-lg rounded-xl bg-white">
+  <div id="drilldownModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full z-50">
+    <div class="relative w-full h-full p-6 bg-white">
       <!-- Modal Header -->
-      <div class="flex items-start justify-between mb-4 pb-4 border-b border-gray-200">
-        <h3 id="drilldownTitle" class="text-xl font-semibold text-gray-900"></h3>
+      <div class="flex items-start justify-between mb-6 pb-4 border-b border-gray-200">
+        <h3 id="drilldownTitle" class="text-2xl font-semibold text-gray-900"></h3>
         <button
           onclick="closeDrilldownModal()"
           class="text-gray-400 hover:text-gray-600 transition-colors"
         >
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
           </svg>
         </button>
       </div>
 
       <!-- Modal Content -->
-      <div id="drilldownContent" class="mt-4 max-h-[600px] overflow-y-auto">
+      <div id="drilldownContent" class="mt-4 overflow-y-auto" style="max-height: calc(100vh - 180px);">
         <!-- Content will be dynamically inserted here -->
       </div>
 
