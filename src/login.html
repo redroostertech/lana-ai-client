@@ -404,7 +404,12 @@
           staticIp: data.discovery.static_ip,
           port: data.discovery.port,
           isSecure: isSecure,
-          vpn: vpnInfo  // Include VPN configuration from discovery
+          vpn: vpnInfo,  // Include VPN configuration from discovery
+          // Burst API configuration for direct calls to burst service
+          burstApiKey: data.burst_api_key || null,
+          burstUrl: data.burst_url || null,
+          tier: data.tier || 'standard',
+          rateLimit: data.rate_limit || 100
         };
       } catch (error) {
         if (error.message === 'Failed to fetch') {
@@ -541,7 +546,12 @@
             apiVersion: serverInfo.apiVersion,
             domain: serverInfo.domain,
             host: serverInfo.staticIp,
-            port: serverInfo.port
+            port: serverInfo.port,
+            // Burst API configuration for direct calls
+            burstApiKey: serverInfo.burstApiKey,
+            burstUrl: serverInfo.burstUrl,
+            tier: serverInfo.tier,
+            rateLimit: serverInfo.rateLimit
           });
         }
 
