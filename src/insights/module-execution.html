@@ -1047,9 +1047,20 @@
 
         // Helper function to handle search
         window.handleSearch = function(event) {
-          state.searchQuery = event.target.value;
+          const input = event.target;
+          const cursorPosition = input.selectionStart;
+          state.searchQuery = input.value;
           state.currentPage = 1; // Reset to page 1 when searching
           window.renderContactTable();
+
+          // Restore focus and cursor position after render
+          setTimeout(() => {
+            const newInput = document.querySelector('input[placeholder*="Search"]');
+            if (newInput) {
+              newInput.focus();
+              newInput.setSelectionRange(cursorPosition, cursorPosition);
+            }
+          }, 0);
         };
 
         // Sort indicator
