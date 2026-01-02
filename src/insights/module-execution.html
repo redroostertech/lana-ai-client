@@ -923,6 +923,8 @@
 
       // Function to render filtered table with sorting, filtering, and pagination
       window.renderContactTable = function(filter, viewType) {
+        console.log('[renderContactTable] Called with:', { filter, viewType });
+
         const state = window.qualifiedLeadsData;
         const { contacts, contactIdsFromOpportunities, opportunities } = state;
 
@@ -936,12 +938,22 @@
           state.currentPage = 1;
         }
 
+        console.log('[renderContactTable] State after update:', {
+          currentFilter: state.currentFilter,
+          viewType: state.viewType,
+          currentPage: state.currentPage
+        });
+
         // Render based on view type
         if (state.viewType === 'opportunities') {
+          console.log('[renderContactTable] Rendering opportunities view');
           return window.renderOpportunitiesTable();
         } else if (state.viewType === 'contact_opportunities') {
+          console.log('[renderContactTable] Rendering contact-opportunities view');
           return window.renderContactOpportunitiesTable();
         }
+
+        console.log('[renderContactTable] Rendering contacts view');
 
         // Default: Contacts view
         let filteredContacts = contacts;
@@ -1163,8 +1175,12 @@
 
       // Render opportunities table
       window.renderOpportunitiesTable = function() {
+        console.log('[renderOpportunitiesTable] Called');
+
         const state = window.qualifiedLeadsData;
         const { opportunities } = state;
+
+        console.log('[renderOpportunitiesTable] Total opportunities:', opportunities.length);
 
         let filteredOpportunities = opportunities;
         let filterTitle = 'All Opportunities';
@@ -1341,8 +1357,13 @@
 
       // Render contact-opportunities grouped table
       window.renderContactOpportunitiesTable = function() {
+        console.log('[renderContactOpportunitiesTable] Called');
+
         const state = window.qualifiedLeadsData;
         const { contacts, opportunities, contactIdsFromOpportunities } = state;
+
+        console.log('[renderContactOpportunitiesTable] Total contacts:', contacts.length);
+        console.log('[renderContactOpportunitiesTable] Total opportunities:', opportunities.length);
 
         // Group opportunities by contact ID
         const oppsByContact = {};
