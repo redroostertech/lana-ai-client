@@ -1377,10 +1377,11 @@
         console.log('[renderContactOpportunitiesTable] Called');
 
         const state = window.qualifiedLeadsData;
-        const { contacts, opportunities, contactIdsFromOpportunities } = state;
+        const { contacts, opportunities, contactIdsFromOpportunities, allContactIds } = state;
 
         console.log('[renderContactOpportunitiesTable] Total contacts:', contacts.length);
         console.log('[renderContactOpportunitiesTable] Total opportunities:', opportunities.length);
+        console.log('[renderContactOpportunitiesTable] Unique contact IDs in opportunities:', contactIdsFromOpportunities.size);
 
         // Group opportunities by contact ID
         const oppsByContact = {};
@@ -1394,16 +1395,43 @@
           }
         });
 
-        // Get contacts that have opportunities
-        let contactsWithOpps = contacts.filter(c => contactIdsFromOpportunities.has(c.data?.id));
+        // Build array of all unique contact IDs with their data
+        let allUniqueContacts = [];
+
+        // Add contacts that have records
+        const contactMap = new Map(contacts.map(c => [c.data?.id, c]));
+
+        // For each unique contact ID in opportunities
+        contactIdsFromOpportunities.forEach(contactId => {
+          const contact = contactMap.get(contactId);
+          if (contact) {
+            // Contact record exists
+            allUniqueContacts.push({
+              id: contactId,
+              name: contact.data?.contactName || contact.data?.name || 'N/A',
+              email: contact.data?.email || 'N/A',
+              isMissing: false,
+              contact: contact
+            });
+          } else {
+            // Contact record is missing
+            allUniqueContacts.push({
+              id: contactId,
+              name: 'Missing Contact',
+              email: 'No contact record',
+              isMissing: true,
+              contact: null
+            });
+          }
+        });
+
+        let contactsWithOpps = allUniqueContacts;
 
         // Apply search filter
         if (state.searchQuery) {
           const query = state.searchQuery.toLowerCase();
           contactsWithOpps = contactsWithOpps.filter(contact => {
-            const name = contact.data?.contactName || contact.data?.name || '';
-            const email = contact.data?.email || '';
-            return name.toLowerCase().includes(query) || email.toLowerCase().includes(query);
+            return contact.name.toLowerCase().includes(query) || contact.email.toLowerCase().includes(query);
           });
         }
 
@@ -1416,7 +1444,7 @@
 
         const tableHTML = `
           <div class="flex items-center justify-between mb-3">
-            <h4 class="font-semibold text-gray-900">Contacts with Opportunities</h4>
+            <h4 class="font-semibold text-gray-900">Unique Contact IDs (${totalRecords} total)</h4>
             <button onclick="window.renderContactTable('all', 'contacts')" class="text-sm text-indigo-600 hover:text-indigo-800">Back to Contacts</button>
           </div>
 
@@ -1432,25 +1460,24 @@
 
           <div class="space-y-4" style="max-height: 500px; overflow-y: auto;">
             ${paginatedContacts.map(contact => {
-              const contactName = contact.data?.contactName || contact.data?.name || 'N/A';
-              const contactEmail = contact.data?.email || 'N/A';
-              const contactOpps = oppsByContact[contact.data?.id] || [];
+              const contactOpps = oppsByContact[contact.id] || [];
 
               return `
-                <div class="border border-gray-200 rounded-lg p-4 bg-white">
+                <div class="border ${contact.isMissing ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white'} rounded-lg p-4">
                   <div class="flex items-start justify-between mb-3">
                     <div>
-                      <h5 class="font-semibold text-gray-900">${contactName}</h5>
-                      <p class="text-sm text-gray-500">${contactEmail}</p>
+                      <h5 class="font-semibold ${contact.isMissing ? 'text-red-700' : 'text-gray-900'}">${contact.name}</h5>
+                      <p class="text-sm ${contact.isMissing ? 'text-red-600' : 'text-gray-500'}">${contact.email}</p>
+                      ${contact.isMissing ? `<p class="text-xs text-red-500 mt-1">Contact ID: ${contact.id}</p>` : ''}
                     </div>
-                    <span class="px-2 py-1 text-xs font-medium rounded-full bg-indigo-100 text-indigo-800">
+                    <span class="px-2 py-1 text-xs font-medium rounded-full ${contact.isMissing ? 'bg-red-100 text-red-800' : 'bg-indigo-100 text-indigo-800'}">
                       ${contactOpps.length} ${contactOpps.length === 1 ? 'Opportunity' : 'Opportunities'}
                     </span>
                   </div>
 
                   <div class="space-y-2">
                     ${contactOpps.map(opp => `
-                      <div class="pl-4 border-l-2 border-gray-200 py-2">
+                      <div class="pl-4 border-l-2 ${contact.isMissing ? 'border-red-300' : 'border-gray-200'} py-2">
                         <div class="flex items-start justify-between">
                           <div class="flex-1">
                             <p class="text-sm font-medium text-gray-900">${opp.data?.name || 'Unnamed Opportunity'}</p>
@@ -1475,7 +1502,7 @@
 
           <div class="mt-4 flex items-center justify-between">
             <div class="text-sm text-gray-600">
-              Showing ${startIdx + 1} to ${endIdx} of ${totalRecords} contacts with opportunities
+              Showing ${startIdx + 1} to ${endIdx} of ${totalRecords} unique contact IDs
             </div>
             <div class="flex items-center gap-2">
               <button
@@ -1607,7 +1634,7 @@
           <h4 class="font-semibold text-gray-900 mb-4">Data Quality Insights</h4>
           <div class="grid grid-cols-3 gap-4">
             <!-- Unique Contact IDs in Opportunities -->
-            <div onclick="window.renderContactTable('qualified', 'contacts')" class="bg-purple-50 border border-purple-200 rounded-lg p-4 cursor-pointer hover:bg-purple-100 hover:shadow-md transition-all duration-200">
+            <div onclick="window.renderContactTable('all', 'contact_opportunities')" class="bg-purple-50 border border-purple-200 rounded-lg p-4 cursor-pointer hover:bg-purple-100 hover:shadow-md transition-all duration-200">
               <div class="flex items-center justify-between mb-2">
                 <p class="text-sm font-medium text-gray-900">📋 Unique Contact IDs</p>
               </div>
