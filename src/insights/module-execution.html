@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Module Execution Dashboard - LanaAI</title>
+  <script src="../js/tailwind-loader.js"></script>
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/vendor/chart.js"></script>
+  <script src="../js/vendor/jspdf.umd.min.js"></script>
+  <script src="../js/vendor/jspdf.plugin.autotable.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/notifications.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <!-- Sidebar -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
+    <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
+      <a href="../index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
+      <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
+      <!-- Menu will be dynamically rendered by menu.js -->
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="lg:ml-64">
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
+      <div class="flex items-center justify-between h-16 px-4 lg:px-8">
+        <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+        <div class="flex-1 px-4 lg:px-0">
+          <h1 class="text-xl font-semibold text-gray-900">Module Execution Dashboard</h1>
+          <p class="text-sm text-gray-500">Execute and analyze business intelligence modules</p>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <!-- Notifications -->
+          <button id="notificationBtn" class="relative text-gray-500 hover:text-gray-700">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+            </svg>
+            <span id="notificationBadge" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">0</span>
+          </button>
+
+          <!-- User Menu -->
+          <div class="relative" id="userMenu">
+            <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900">
+              <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                <span id="userInitials" class="text-sm font-medium text-indigo-600">U</span>
+              </div>
+              <span id="userName" class="hidden sm:block text-sm font-medium">User</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            </button>
+            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+              <a href="../settings.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
+              <hr class="my-1">
+              <button id="logoutBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sign out</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Notification Panel Overlay -->
+    <div id="notificationOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
+
+    <!-- Notification Slide-out Panel -->
+    <div id="notificationPanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
+      <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
+        <h2 class="text-lg font-semibold text-gray-900">Notifications</h2>
+        <div class="flex items-center gap-3">
+          <button id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium hidden">Mark all read</button>
+          <button id="refreshNotificationsBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+          </button>
+          <button id="closeNotificationPanel" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
+        <button id="filterAll" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">All</button>
+        <button id="filterUnread" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Unread</button>
+      </div>
+      <div id="notificationList" class="flex-1 overflow-y-auto">
+        <div id="notificationLoading" class="p-8 text-center">
+          <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+          <p class="text-gray-500 mt-3 text-sm">Loading notifications...</p>
+        </div>
+      </div>
+      <div id="notificationLoadingMore" class="hidden p-4 border-t border-gray-100 text-center flex-shrink-0">
+        <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+      </div>
+    </div>
+
+    <!-- Data Override Panel Overlay -->
+    <div id="dataOverrideOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
+
+    <!-- Data Override Slide-out Panel -->
+    <div id="dataOverridePanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
+      <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
+        <h2 class="text-lg font-semibold text-gray-900">Override Metric Data</h2>
+        <button id="closeDataOverridePanel" class="text-gray-400 hover:text-gray-600">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto p-6">
+        <!-- Metric Info -->
+        <div class="mb-6 p-4 bg-indigo-50 rounded-lg border border-indigo-100">
+          <h3 id="overrideMetricName" class="font-semibold text-gray-900 mb-1"></h3>
+          <p id="overrideMetricDescription" class="text-sm text-gray-600"></p>
+          <div class="mt-3 text-xs text-gray-500">
+            <p>Period: <span id="overridePeriodRange" class="font-medium text-gray-700"></span></p>
+          </div>
+        </div>
+
+        <!-- Current Value Display -->
+        <div class="mb-6">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Current Value</label>
+          <div class="p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <p id="overrideCurrentValue" class="text-2xl font-bold text-gray-900">-</p>
+            <p class="text-xs text-gray-500 mt-1">Calculated from data sources</p>
+          </div>
+        </div>
+
+        <!-- Override Form -->
+        <form id="overrideForm" class="space-y-4">
+          <div>
+            <label for="overrideValue" class="block text-sm font-medium text-gray-700 mb-2">
+              Override Value <span class="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              id="overrideValue"
+              step="0.01"
+              required
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="Enter value to override"
+            >
+            <p class="text-xs text-gray-500 mt-1">This value will replace the calculated value for this period.</p>
+          </div>
+
+          <div>
+            <label for="overrideNotes" class="block text-sm font-medium text-gray-700 mb-2">
+              Notes (Optional)
+            </label>
+            <textarea
+              id="overrideNotes"
+              rows="3"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="Why are you overriding this value?"
+            ></textarea>
+          </div>
+
+          <!-- Override Type (Hidden - always 'manual') -->
+          <input type="hidden" id="overrideType" value="manual">
+
+          <!-- Action Buttons -->
+          <div class="flex gap-3 pt-4">
+            <button
+              type="submit"
+              id="saveOverrideBtn"
+              class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+            >
+              <span id="saveOverrideBtnText">Save Override</span>
+              <svg id="saveOverrideBtnSpinner" class="hidden animate-spin inline-block w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </button>
+            <button
+              type="button"
+              onclick="closeDataOverridePanel()"
+              class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+
+        <!-- Existing Overrides -->
+        <div id="existingOverridesSection" class="hidden mt-8 pt-6 border-t border-gray-200">
+          <h3 class="text-sm font-semibold text-gray-900 mb-3">Existing Override</h3>
+          <div id="existingOverridesList" class="space-y-2">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <main class="p-4 lg:p-8">
+      <!-- Module Execution Controls -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Execute Module</h2>
+
+        <!-- Period Presets (Quick Selection) -->
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Quick Select Period</label>
+          <div class="flex flex-wrap gap-2">
+            <button onclick="selectPeriodPreset('last7days')" class="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+              Last 7 Days
+            </button>
+            <button onclick="selectPeriodPreset('last30days')" class="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+              Last 30 Days
+            </button>
+            <button onclick="selectPeriodPreset('thisMonth')" class="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+              This Month
+            </button>
+            <button onclick="selectPeriodPreset('lastMonth')" class="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+              Last Month
+            </button>
+            <button onclick="selectPeriodPreset('thisQuarter')" class="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+              This Quarter
+            </button>
+            <button onclick="selectPeriodPreset('thisYear')" class="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+              This Year
+            </button>
+            <button onclick="selectPeriodPreset('lastYear')" class="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+              Last Year
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+          <!-- Module Selection -->
+          <div>
+            <label for="moduleSelect" class="block text-sm font-medium text-gray-700 mb-2">Module</label>
+            <select id="moduleSelect" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+              <option value="growth-intake-performance">Growth: Intake Performance</option>
+              <option value="growth-lead-quality" disabled>Growth: Lead Quality (Coming Soon)</option>
+              <option value="operations-matter-velocity" disabled>Operations: Matter Velocity (Coming Soon)</option>
+            </select>
+          </div>
+
+          <!-- Start Date -->
+          <div>
+            <label for="periodStart" class="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+            <input type="date" id="periodStart" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+          </div>
+
+          <!-- End Date -->
+          <div>
+            <label for="periodEnd" class="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+            <input type="date" id="periodEnd" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+          </div>
+
+          <!-- Period Type (for comparison calculation) -->
+          <div>
+            <label for="periodType" class="block text-sm font-medium text-gray-700 mb-2">Compare By</label>
+            <select id="periodType" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="quarterly">Quarterly</option>
+              <option value="yearly">Yearly</option>
+            </select>
+          </div>
+
+          <!-- Execute Button -->
+          <div class="flex items-end">
+            <button id="executeBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-6 py-2 rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
+              <span id="executeBtnText">Execute Module</span>
+              <svg id="executeBtnSpinner" class="hidden animate-spin inline-block w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- TODO: Re-enable caching once cache invalidation logic is fixed -->
+        <!-- Cache was disabled because it was returning stale results with N/A prior periods -->
+
+        <!-- Execution Info -->
+        <div id="executionInfo" class="hidden bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div class="flex items-start gap-3">
+            <svg class="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <div class="flex-1">
+              <p class="text-sm text-blue-800" id="executionInfoText"></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Error Display -->
+        <div id="executionError" class="hidden bg-red-50 border border-red-200 rounded-lg p-4">
+          <div class="flex items-start gap-3">
+            <svg class="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <div class="flex-1">
+              <p class="text-sm font-medium text-red-800">Execution Failed</p>
+              <p class="text-sm text-red-700 mt-1" id="executionErrorText"></p>
+            </div>
+            <button onclick="hideError()" class="text-red-400 hover:text-red-600">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Module Results -->
+      <div id="moduleResults" class="hidden">
+        <!-- Module Header -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+          <!-- Top row: Module Title (left) and Export Buttons (right) -->
+          <div class="flex items-start justify-between mb-2">
+            <div>
+              <h2 id="moduleTitle" class="text-xl font-bold text-gray-900"></h2>
+            </div>
+            <div class="flex gap-3">
+              <button onclick="exportToPDF()" class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                </svg>
+                Export PDF
+              </button>
+              <button onclick="exportToCSV()" class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                Export CSV
+              </button>
+            </div>
+          </div>
+
+          <!-- Execution Time row -->
+          <div class="mb-4">
+            <p class="text-sm text-gray-500">Execution Time: <span id="executionTime" class="font-semibold text-gray-900"></span></p>
+          </div>
+
+          <!-- Period Info -->
+          <div class="mt-4 pt-4 border-t border-gray-100">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <p class="text-xs text-gray-500 uppercase tracking-wide">Period Type</p>
+                <p id="resultPeriodType" class="text-sm font-medium text-gray-900 mt-1"></p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 uppercase tracking-wide">Current Period</p>
+                <p id="resultCurrentPeriod" class="text-sm font-medium text-gray-900 mt-1"></p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 uppercase tracking-wide">Prior Period</p>
+                <p id="resultPriorPeriod" class="text-sm font-medium text-gray-900 mt-1"></p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Metrics Grid -->
+        <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+          <!-- Metric cards will be dynamically inserted here -->
+        </div>
+
+        <!-- Time Series Chart (if compareBy is enabled) -->
+        <div id="timeSeriesSection" class="hidden mb-6">
+          <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Metrics Over Time</h3>
+            <div class="h-96">
+              <canvas id="timeSeriesChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Metric Trends Chart -->
+          <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Metric Trends (Current vs Prior)</h3>
+            <div class="h-64">
+              <canvas id="metricTrendsChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Status Distribution Chart -->
+          <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Metric Status Distribution</h3>
+            <div class="h-64">
+              <canvas id="statusDistributionChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    if (!api.requireAuth()) throw new Error('Not authenticated');
+
+    // Load full user profile with roles before rendering menu
+    (async () => {
+      try {
+        await api.loadUserProfile();
+      } catch (error) {
+        console.error('Failed to load user profile:', error);
+      }
+
+      // Render dynamic menu (will now have access to roles)
+      renderMenu('#mainNav');
+    })();
+
+    // Initialize notifications panel
+    NotificationPanel.init();
+
+    // Period preset selection
+    function selectPeriodPreset(preset) {
+      const today = new Date();
+      let startDate, endDate;
+
+      switch (preset) {
+        case 'last7days':
+          endDate = new Date(today);
+          startDate = new Date(today);
+          startDate.setDate(startDate.getDate() - 6);  // 7 days inclusive (today + 6 prior days)
+          break;
+
+        case 'last30days':
+          endDate = new Date(today);
+          startDate = new Date(today);
+          startDate.setDate(startDate.getDate() - 29);  // 30 days inclusive (today + 29 prior days)
+          break;
+
+        case 'thisMonth':
+          startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+          endDate = new Date(today);
+          break;
+
+        case 'lastMonth':
+          startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+          endDate = new Date(today.getFullYear(), today.getMonth(), 0); // Last day of previous month
+          break;
+
+        case 'thisQuarter':
+          const currentQuarter = Math.floor(today.getMonth() / 3);
+          startDate = new Date(today.getFullYear(), currentQuarter * 3, 1);
+          endDate = new Date(today);
+          break;
+
+        case 'thisYear':
+          startDate = new Date(today.getFullYear(), 0, 1);
+          endDate = new Date(today);
+          break;
+
+        case 'lastYear':
+          startDate = new Date(today.getFullYear() - 1, 0, 1); // January 1st of last year
+          endDate = new Date(today.getFullYear() - 1, 11, 31); // December 31st of last year
+          break;
+
+        default:
+          // Default: Last 7 days
+          endDate = new Date(today);
+          startDate = new Date(today);
+          startDate.setDate(startDate.getDate() - 7);
+      }
+
+      // Format dates as YYYY-MM-DD for date inputs
+      const formatDate = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+
+      document.getElementById('periodStart').value = formatDate(startDate);
+      document.getElementById('periodEnd').value = formatDate(endDate);
+
+      // Update "Compare By" options based on date range
+      updateCompareByOptions(startDate, endDate, preset);
+
+      showInfo(`Period set to: ${formatDate(startDate)} to ${formatDate(endDate)}`);
+    }
+
+    // Update "Compare By" dropdown based on selected date range
+    function updateCompareByOptions(startDate, endDate, preset) {
+      const periodTypeSelect = document.getElementById('periodType');
+      const currentValue = periodTypeSelect.value;
+
+      // Calculate the duration in days
+      const durationMs = endDate - startDate;
+      const durationDays = Math.ceil(durationMs / (1000 * 60 * 60 * 24));
+
+      // For "Last Year" preset or full year periods (365-366 days), only show monthly
+      if (preset === 'lastYear' || (durationDays >= 365 && durationDays <= 366)) {
+        periodTypeSelect.innerHTML = `
+          <option value="monthly">Monthly</option>
+        `;
+        periodTypeSelect.value = 'monthly';
+      } else {
+        // For other periods, show all options
+        periodTypeSelect.innerHTML = `
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+          <option value="quarterly">Quarterly</option>
+          <option value="yearly">Yearly</option>
+        `;
+        // Restore previous value if it's still valid
+        if (['daily', 'weekly', 'monthly', 'quarterly', 'yearly'].includes(currentValue)) {
+          periodTypeSelect.value = currentValue;
+        }
+      }
+    }
+
+    // Initialize with default: Last 7 days
+    selectPeriodPreset('last7days');
+
+    // Add event listeners to date inputs to update "Compare By" options when dates change manually
+    document.getElementById('periodStart').addEventListener('change', function() {
+      const startDate = new Date(this.value + 'T00:00:00');
+      const endDateValue = document.getElementById('periodEnd').value;
+      if (endDateValue) {
+        const endDate = new Date(endDateValue + 'T23:59:59');
+        updateCompareByOptions(startDate, endDate, null);
+      }
+    });
+
+    document.getElementById('periodEnd').addEventListener('change', function() {
+      const startDateValue = document.getElementById('periodStart').value;
+      const endDate = new Date(this.value + 'T23:59:59');
+      if (startDateValue) {
+        const startDate = new Date(startDateValue + 'T00:00:00');
+        updateCompareByOptions(startDate, endDate, null);
+      }
+    });
+
+    // Load user info
+    function loadUserInfo() {
+      const user = api.user;
+      if (user) {
+        const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+        const initials = (user.firstName?.[0] || '') + (user.lastName?.[0] || '') || user.email[0].toUpperCase();
+        document.getElementById('userName').textContent = name;
+        document.getElementById('userInitials').textContent = initials;
+      }
+    }
+    loadUserInfo();
+
+    // User menu toggle
+    const userMenu = document.getElementById('userMenu');
+    const userDropdown = document.getElementById('userDropdown');
+    userMenu.addEventListener('click', () => userDropdown.classList.toggle('hidden'));
+    document.addEventListener('click', (e) => {
+      if (!userMenu.contains(e.target)) userDropdown.classList.add('hidden');
+    });
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      await api.logout();
+      window.location.href = '../login.html';
+    });
+
+    // Sidebar toggle
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('openSidebar').addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+    document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+
+    // Format currency
+    function formatCurrency(value) {
+      if (value === null || value === undefined) return 'N/A';
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(value);
+    }
+
+    // Format number
+    function formatNumber(value, decimals = 0) {
+      if (value === null || value === undefined) return 'N/A';
+      return new Intl.NumberFormat('en-US', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+      }).format(value);
+    }
+
+    // Format percentage
+    function formatPercentage(value, decimals = 1) {
+      if (value === null || value === undefined) return 'N/A';
+      return formatNumber(value, decimals) + '%';
+    }
+
+    // Get status color based on target comparison
+    function getStatusColor(current, target, inverseLogic = false) {
+      if (current === null || current === undefined || target === null || target === undefined) {
+        return 'gray';
+      }
+
+      const ratio = current / target;
+
+      if (inverseLogic) {
+        // For metrics like "cost per lead" - lower is better
+        if (ratio <= 1.0) return 'green';  // At or below target (good)
+        if (ratio <= 1.2) return 'yellow'; // Slightly above target (warning)
+        return 'red';                       // Significantly above target (bad)
+      } else {
+        // For metrics like "qualified leads" - higher is better
+        if (ratio >= 1.0) return 'green';  // At or above target (good)
+        if (ratio >= 0.8) return 'yellow'; // Slightly below target (warning)
+        return 'red';                       // Significantly below target (bad)
+      }
+    }
+
+    // Get status badge HTML
+    function getStatusBadge(color) {
+      const colors = {
+        green: { bg: 'bg-green-100', text: 'text-green-800', icon: 'M5 13l4 4L19 7' },
+        yellow: { bg: 'bg-yellow-100', text: 'text-yellow-800', icon: 'M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+        red: { bg: 'bg-red-100', text: 'text-red-800', icon: 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+        gray: { bg: 'bg-gray-100', text: 'text-gray-800', icon: 'M8 7h12M8 12h12M8 17h12' }
+      };
+
+      const c = colors[color] || colors.gray;
+      return `
+        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full ${c.bg} ${c.text}">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${c.icon}"></path>
+          </svg>
+          <span class="text-xs font-medium uppercase">${color}</span>
+        </div>
+      `;
+    }
+
+    // Format date range (using UTC to avoid timezone offset issues)
+    function formatDateRange(start, end) {
+      const startDate = new Date(start);
+      const endDate = new Date(end);
+      const options = { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' };
+      return `${startDate.toLocaleDateString('en-US', options)} - ${endDate.toLocaleDateString('en-US', options)}`;
+    }
+
+    // Hide error
+    function hideError() {
+      document.getElementById('executionError').classList.add('hidden');
+    }
+
+    // Show error
+    function showError(message) {
+      document.getElementById('executionErrorText').textContent = message;
+      document.getElementById('executionError').classList.remove('hidden');
+      document.getElementById('executionInfo').classList.add('hidden');
+    }
+
+    // Show info
+    function showInfo(message) {
+      document.getElementById('executionInfoText').textContent = message;
+      document.getElementById('executionInfo').classList.remove('hidden');
+      document.getElementById('executionError').classList.add('hidden');
+    }
+
+    // Create metric card
+    function createMetricCard(metric) {
+      // Use API-provided formatted values if available
+      const currentValue = metric.formattedCurrent || formatNumber(metric.current, 0);
+      const priorValue = metric.formattedPrior || (metric.prior !== null ? formatNumber(metric.prior, 0) : 'N/A');
+      const targetValue = metric.formattedTarget || formatNumber(metric.target, 0);
+
+      // Use API-provided status or calculate
+      const statusColor = metric.status === 'error' ? 'gray' : (metric.status || 'gray');
+
+      // Use API-provided change values
+      const change = metric.change !== null && metric.change !== undefined ? metric.change : null;
+      const percentChange = metric.changePercent !== null && metric.changePercent !== undefined ? metric.changePercent : null;
+      const changeDirection = metric.changeDirection || 'flat';
+
+      const changeArrow = changeDirection === 'up'
+        ? '<svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>'
+        : changeDirection === 'down'
+        ? '<svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>'
+        : '<svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14"></path></svg>';
+
+      const changeText = metric.formattedChange || (change !== null ? formatNumber(Math.abs(change), 1) : 'N/A');
+
+      // Determine if override button should be shown (for N/A or 0 values, or always show)
+      const showOverrideButton = true; // Show for all metrics - user can override any value
+
+      return `
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+          <!-- Metric Header -->
+          <div class="flex items-start justify-between mb-4">
+            <div class="flex-1">
+              <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide">${metric.name}</h3>
+              <p class="text-xs text-gray-400 mt-1">${metric.description || ''}</p>
+            </div>
+            <div class="flex items-center gap-2">
+              ${getStatusBadge(statusColor)}
+            </div>
+          </div>
+
+          <!-- Current Value -->
+          <div class="mb-4">
+            <div class="flex items-center justify-between mb-1">
+              <p class="text-xs text-gray-500">Current Period</p>
+              ${showOverrideButton ? `
+                <button
+                  onclick="openDataOverridePanel('${metric.key}', '${metric.name}', '${metric.description || ''}', ${metric.current})"
+                  class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1"
+                  title="Override this value"
+                >
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                  </svg>
+                  Override
+                </button>
+              ` : ''}
+            </div>
+            <p class="text-3xl font-bold text-gray-900">${currentValue}</p>
+          </div>
+
+          <!-- Change Indicator -->
+          <div class="flex items-center gap-2 mb-4 pb-4 border-b border-gray-100">
+            ${changeArrow}
+            <span class="text-sm font-medium ${change > 0 ? 'text-green-600' : change < 0 ? 'text-red-600' : 'text-gray-600'}">
+              ${changeText} ${change !== null && change !== 0 ? (change > 0 ? 'increase' : 'decrease') : 'no change'}
+            </span>
+          </div>
+
+          <!-- Prior Period & Target -->
+          <div class="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p class="text-xs text-gray-500 mb-1">Prior Period</p>
+              <p class="font-semibold text-gray-700">${priorValue}</p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500 mb-1">Target</p>
+              <p class="font-semibold text-gray-700">${targetValue}</p>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Render metrics
+    function renderMetrics(metrics) {
+      const grid = document.getElementById('metricsGrid');
+      grid.innerHTML = metrics.map(metric => createMetricCard(metric)).join('');
+    }
+
+    // Execute module
+    async function executeModule() {
+      const moduleKey = document.getElementById('moduleSelect').value;
+      const periodType = document.getElementById('periodType').value;
+      const periodStart = document.getElementById('periodStart').value;
+      const periodEnd = document.getElementById('periodEnd').value;
+      const useCache = false; // Caching disabled - always fetch fresh data
+
+      // Validate inputs
+      if (!periodStart || !periodEnd) {
+        showError('Please select both start and end dates');
+        return;
+      }
+
+      // Validate date range
+      const startDate = new Date(periodStart);
+      const endDate = new Date(periodEnd);
+      if (startDate > endDate) {
+        showError('Start date must be before end date');
+        return;
+      }
+
+      // Convert dates to ISO format with timezone
+      // Start: beginning of day (00:00:00)
+      // End: end of day (23:59:59)
+      const periodStartISO = new Date(periodStart + 'T00:00:00Z').toISOString();
+      const periodEndISO = new Date(periodEnd + 'T23:59:59Z').toISOString();
+
+      // Show loading state
+      const executeBtn = document.getElementById('executeBtn');
+      const executeBtnText = document.getElementById('executeBtnText');
+      const executeBtnSpinner = document.getElementById('executeBtnSpinner');
+
+      executeBtn.disabled = true;
+      executeBtnText.textContent = 'Executing...';
+      executeBtnSpinner.classList.remove('hidden');
+
+      showInfo(`Executing ${moduleKey} from ${periodStart} to ${periodEnd}...`);
+
+      // Hide previous results
+      document.getElementById('moduleResults').classList.add('hidden');
+
+      try {
+        const startTime = Date.now();
+
+        // Call API using api.post() method
+        const data = await api.post(`/api/v1/modules/${moduleKey}/execute`, {
+          periodType: periodType,
+          periodStart: periodStartISO,
+          periodEnd: periodEndISO,
+          compareBy: periodType, // Use periodType as the time-series granularity
+          useCache: useCache
+        });
+
+        const endTime = Date.now();
+        const executionTimeMs = endTime - startTime;
+
+        // Update module header
+        document.getElementById('moduleTitle').textContent = data.moduleName || 'Module Results';
+        document.getElementById('executionTime').textContent = `${executionTimeMs}ms`;
+
+        // Update period info
+        document.getElementById('resultPeriodType').textContent = data.period.type || (periodType.charAt(0).toUpperCase() + periodType.slice(1));
+
+        // Display dates as-is from backend (SQL now uses <= for period_end)
+        document.getElementById('resultCurrentPeriod').textContent = formatDateRange(data.period.start, data.period.end);
+
+        // Display prior period if available
+        if (data.priorPeriod && data.priorPeriod.start && data.priorPeriod.end) {
+          document.getElementById('resultPriorPeriod').textContent = formatDateRange(data.priorPeriod.start, data.priorPeriod.end);
+        } else {
+          document.getElementById('resultPriorPeriod').textContent = 'N/A';
+        }
+
+        // Render metrics (filter out errors)
+        const validMetrics = data.metrics.filter(m => m.status !== 'error');
+        renderMetrics(validMetrics);
+
+        // Render time-series chart if available
+        if (data.timeSeries && data.timeSeries.length > 0) {
+          renderTimeSeriesChart(data.timeSeries, validMetrics);
+        } else {
+          document.getElementById('timeSeriesSection').classList.add('hidden');
+        }
+
+        // Render charts
+        renderCharts(validMetrics);
+
+        // Show results
+        document.getElementById('moduleResults').classList.remove('hidden');
+
+        // Show success info
+        showInfo(`Module executed successfully in ${executionTimeMs}ms. ${data.metrics.length} metrics calculated.`);
+
+      } catch (error) {
+        console.error('Module execution failed:', error);
+        showError(error.message || 'Failed to execute module. Please check your connection and try again.');
+      } finally {
+        // Reset button state
+        executeBtn.disabled = false;
+        executeBtnText.textContent = 'Execute Module';
+        executeBtnSpinner.classList.add('hidden');
+      }
+    }
+
+    // Global variables for charts and data
+    let trendsChart = null;
+    let statusChart = null;
+    let currentModuleData = null;
+
+    // Render charts
+    function renderCharts(metrics) {
+      currentModuleData = metrics; // Store for exports
+
+      // Destroy existing charts
+      if (trendsChart) trendsChart.destroy();
+      if (statusChart) statusChart.destroy();
+
+      // Metric Trends Chart (Current vs Prior)
+      const trendsCtx = document.getElementById('metricTrendsChart').getContext('2d');
+      const metricNames = metrics.map(m => m.name);
+      const currentValues = metrics.map(m => parseFloat(m.current) || 0);
+      const priorValues = metrics.map(m => parseFloat(m.prior) || 0);
+
+      trendsChart = new Chart(trendsCtx, {
+        type: 'bar',
+        data: {
+          labels: metricNames,
+          datasets: [
+            {
+              label: 'Current Period',
+              data: currentValues,
+              backgroundColor: '#818cf8',
+              borderColor: '#6366f1',
+              borderWidth: 1
+            },
+            {
+              label: 'Prior Period',
+              data: priorValues,
+              backgroundColor: '#e5e7eb',
+              borderColor: '#d1d5db',
+              borderWidth: 1
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { boxWidth: 12, padding: 15 }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const metric = metrics[context.dataIndex];
+                  return `${context.dataset.label}: ${metric.formattedCurrent || context.parsed.y}`;
+                }
+              }
+            }
+          },
+          scales: {
+            y: { beginAtZero: true }
+          }
+        }
+      });
+
+      // Status Distribution Chart
+      const statusCtx = document.getElementById('statusDistributionChart').getContext('2d');
+      const statusCounts = {
+        green: metrics.filter(m => m.status === 'green').length,
+        yellow: metrics.filter(m => m.status === 'yellow').length,
+        red: metrics.filter(m => m.status === 'red').length,
+        gray: metrics.filter(m => m.status === 'gray').length
+      };
+
+      statusChart = new Chart(statusCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['On Target (Green)', 'Warning (Yellow)', 'Critical (Red)', 'No Target (Gray)'],
+          datasets: [{
+            data: [statusCounts.green, statusCounts.yellow, statusCounts.red, statusCounts.gray],
+            backgroundColor: ['#22c55e', '#eab308', '#ef4444', '#9ca3af'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '60%',
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { boxWidth: 12, padding: 10 }
+            }
+          }
+        }
+      });
+    }
+
+    // Global variable for time-series chart
+    let timeSeriesChart = null;
+
+    // Render time-series chart
+    function renderTimeSeriesChart(timeSeries, metrics) {
+      // Show the time-series section
+      document.getElementById('timeSeriesSection').classList.remove('hidden');
+
+      // Destroy existing chart
+      if (timeSeriesChart) timeSeriesChart.destroy();
+
+      const ctx = document.getElementById('timeSeriesChart').getContext('2d');
+
+      // Extract labels (dates) from time-series data
+      const labels = timeSeries.map(ts => {
+        const date = new Date(ts.date);
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+      });
+
+      // Create datasets for each metric
+      const datasets = metrics.map((metric, index) => {
+        const colors = [
+          { bg: 'rgba(99, 102, 241, 0.2)', border: '#6366f1' },  // Indigo
+          { bg: 'rgba(16, 185, 129, 0.2)', border: '#10b981' },  // Green
+          { bg: 'rgba(245, 158, 11, 0.2)', border: '#f59e0b' },  // Amber
+          { bg: 'rgba(239, 68, 68, 0.2)', border: '#ef4444' },   // Red
+          { bg: 'rgba(139, 92, 246, 0.2)', border: '#8b5cf6' },  // Purple
+        ];
+        const color = colors[index % colors.length];
+
+        // Extract values for this metric across all time periods
+        const data = timeSeries.map(ts => {
+          const metricData = ts.metrics.find(m => m.key === metric.key);
+          return metricData ? parseFloat(metricData.value) || 0 : 0;
+        });
+
+        return {
+          label: metric.name,
+          data: data,
+          fill: true,
+          backgroundColor: color.bg,
+          borderColor: color.border,
+          borderWidth: 2,
+          tension: 0.4,
+          pointRadius: 4,
+          pointHoverRadius: 6
+        };
+      });
+
+      timeSeriesChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: datasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: {
+            mode: 'index',
+            intersect: false,
+          },
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { boxWidth: 12, padding: 15 }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const metric = metrics[context.datasetIndex];
+                  let label = context.dataset.label || '';
+                  if (label) {
+                    label += ': ';
+                  }
+                  // Format based on metric type
+                  if (metric.type === 'currency') {
+                    label += '$' + context.parsed.y.toFixed(2);
+                  } else if (metric.type === 'percentage') {
+                    label += context.parsed.y.toFixed(1) + '%';
+                  } else {
+                    label += context.parsed.y;
+                  }
+                  return label;
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: function(value) {
+                  // Format based on first metric type (assumption: all metrics same type)
+                  if (metrics.length > 0) {
+                    const firstMetric = metrics[0];
+                    if (firstMetric.type === 'currency') {
+                      return '$' + value.toFixed(0);
+                    } else if (firstMetric.type === 'percentage') {
+                      return value.toFixed(0) + '%';
+                    }
+                  }
+                  return value;
+                }
+              }
+            },
+            x: {
+              ticks: {
+                maxRotation: 45,
+                minRotation: 45
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Export to PDF
+    function exportToPDF() {
+      if (!currentModuleData) {
+        alert('No data to export. Please execute a module first.');
+        return;
+      }
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      // Add title
+      doc.setFontSize(20);
+      doc.text('Module Execution Report', 14, 20);
+
+      // Add module info
+      doc.setFontSize(12);
+      const moduleTitle = document.getElementById('moduleTitle').textContent;
+      const executionTime = document.getElementById('executionTime').textContent;
+      const periodType = document.getElementById('resultPeriodType').textContent;
+      const currentPeriod = document.getElementById('resultCurrentPeriod').textContent;
+
+      doc.text(`Module: ${moduleTitle}`, 14, 35);
+      doc.text(`Execution Time: ${executionTime}`, 14, 42);
+      doc.text(`Period Type: ${periodType}`, 14, 49);
+      doc.text(`Current Period: ${currentPeriod}`, 14, 56);
+
+      // Add metrics table
+      const tableData = currentModuleData.map(m => [
+        m.name,
+        m.formattedCurrent || m.current,
+        m.formattedPrior || m.prior || 'N/A',
+        m.formattedTarget || m.target || 'N/A',
+        m.formattedChange || 'N/A',
+        m.status?.toUpperCase() || 'N/A'
+      ]);
+
+      doc.autoTable({
+        startY: 65,
+        head: [['Metric', 'Current', 'Prior', 'Target', 'Change', 'Status']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { fillColor: [99, 102, 241] },
+        styles: { fontSize: 9 }
+      });
+
+      // Save PDF
+      const fileName = `module-report-${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(fileName);
+
+      showInfo(`Report exported to ${fileName}`);
+    }
+
+    // Export to CSV
+    function exportToCSV() {
+      if (!currentModuleData) {
+        alert('No data to export. Please execute a module first.');
+        return;
+      }
+
+      // Create CSV content
+      const headers = ['Metric', 'Current', 'Prior', 'Target', 'Change', 'Change %', 'Status'];
+      const rows = currentModuleData.map(m => [
+        m.name,
+        m.formattedCurrent || m.current,
+        m.formattedPrior || m.prior || 'N/A',
+        m.formattedTarget || m.target || 'N/A',
+        m.formattedChange || 'N/A',
+        m.changePercent ? `${m.changePercent}%` : 'N/A',
+        m.status?.toUpperCase() || 'N/A'
+      ]);
+
+      let csvContent = headers.join(',') + '\n';
+      rows.forEach(row => {
+        csvContent += row.map(cell => {
+          // Escape cells containing commas or quotes
+          if (typeof cell === 'string' && (cell.includes(',') || cell.includes('"'))) {
+            return `"${cell.replace(/"/g, '""')}"`;
+          }
+          return cell;
+        }).join(',') + '\n';
+      });
+
+      // Create download link
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      const fileName = `module-report-${new Date().toISOString().split('T')[0]}.csv`;
+
+      link.setAttribute('href', url);
+      link.setAttribute('download', fileName);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      showInfo(`Report exported to ${fileName}`);
+    }
+
+    // Execute button click handler
+    document.getElementById('executeBtn').addEventListener('click', executeModule);
+
+    // Allow Enter key to execute
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !document.getElementById('executeBtn').disabled) {
+        executeModule();
+      }
+    });
+
+    // ========================================================================
+    // DATA OVERRIDE PANEL FUNCTIONS
+    // ========================================================================
+
+    // Global state for data override panel
+    let currentOverrideMetric = null;
+    let currentOverrideData = null;
+
+    // Open data override panel
+    function openDataOverridePanel(metricKey, metricName, metricDescription, currentValue) {
+      const moduleKey = document.getElementById('moduleSelect').value;
+      const periodStart = document.getElementById('periodStart').value;
+      const periodEnd = document.getElementById('periodEnd').value;
+
+      if (!periodStart || !periodEnd) {
+        showError('Please select a date range first');
+        return;
+      }
+
+      // Store current metric info
+      currentOverrideMetric = {
+        key: metricKey,
+        name: metricName,
+        description: metricDescription,
+        currentValue: currentValue
+      };
+
+      // Populate panel
+      document.getElementById('overrideMetricName').textContent = metricName;
+      document.getElementById('overrideMetricDescription').textContent = metricDescription || 'No description available';
+      document.getElementById('overridePeriodRange').textContent = formatDateRange(
+        new Date(periodStart + 'T00:00:00Z'),
+        new Date(periodEnd + 'T23:59:59Z')
+      );
+      document.getElementById('overrideCurrentValue').textContent = formatNumber(currentValue, 2);
+
+      // Reset form
+      document.getElementById('overrideForm').reset();
+      document.getElementById('overrideValue').value = '';
+      document.getElementById('overrideNotes').value = '';
+
+      // Load existing overrides for this metric
+      loadExistingOverrides(moduleKey, metricKey, periodStart, periodEnd);
+
+      // Show panel
+      const overlay = document.getElementById('dataOverrideOverlay');
+      const panel = document.getElementById('dataOverridePanel');
+
+      overlay.classList.remove('hidden');
+      panel.classList.remove('translate-x-full');
+
+      // Prevent body scroll
+      document.body.style.overflow = 'hidden';
+    }
+
+    // Close data override panel
+    function closeDataOverridePanel() {
+      const overlay = document.getElementById('dataOverrideOverlay');
+      const panel = document.getElementById('dataOverridePanel');
+
+      panel.classList.add('translate-x-full');
+      overlay.classList.add('hidden');
+
+      // Restore body scroll
+      document.body.style.overflow = '';
+
+      // Clear state
+      currentOverrideMetric = null;
+      currentOverrideData = null;
+    }
+
+    // Close panel when clicking overlay
+    document.getElementById('dataOverrideOverlay').addEventListener('click', closeDataOverridePanel);
+    document.getElementById('closeDataOverridePanel').addEventListener('click', closeDataOverridePanel);
+
+    // Load existing overrides for a metric
+    async function loadExistingOverrides(moduleKey, metricKey, periodStart, periodEnd) {
+      try {
+        const periodStartISO = new Date(periodStart + 'T00:00:00Z').toISOString();
+        const periodEndISO = new Date(periodEnd + 'T23:59:59Z').toISOString();
+
+        const data = await api.get(`/api/v1/modules/${moduleKey}/data-overrides`, {
+          periodStart: periodStartISO,
+          periodEnd: periodEndISO
+        });
+
+        // Filter to current metric
+        const metricOverrides = data.filter(o => o.metric_key === metricKey);
+
+        const existingSection = document.getElementById('existingOverridesSection');
+        const existingList = document.getElementById('existingOverridesList');
+
+        if (metricOverrides.length > 0) {
+          existingSection.classList.remove('hidden');
+          existingList.innerHTML = metricOverrides.map(override => `
+            <div class="p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <div class="flex items-start justify-between mb-2">
+                <div class="flex-1">
+                  <p class="text-sm font-semibold text-gray-900">Override Value: ${formatNumber(override.override_value, 2)}</p>
+                  <p class="text-xs text-gray-500 mt-1">
+                    Period: ${formatDateRange(override.period_start, override.period_end)}
+                  </p>
+                  ${override.notes ? `<p class="text-xs text-gray-600 mt-1 italic">"${override.notes}"</p>` : ''}
+                </div>
+                <button
+                  onclick="deleteOverride('${override.override_id}')"
+                  class="text-red-600 hover:text-red-800 ml-2"
+                  title="Delete override"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                  </svg>
+                </button>
+              </div>
+              <div class="text-xs text-gray-400">
+                Created: ${new Date(override.created_at).toLocaleDateString()}
+              </div>
+            </div>
+          `).join('');
+        } else {
+          existingSection.classList.add('hidden');
+        }
+      } catch (error) {
+        console.error('Failed to load existing overrides:', error);
+        // Non-critical - just hide the section
+        document.getElementById('existingOverridesSection').classList.add('hidden');
+      }
+    }
+
+    // Save data override
+    document.getElementById('overrideForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      if (!currentOverrideMetric) {
+        showError('No metric selected for override');
+        return;
+      }
+
+      const moduleKey = document.getElementById('moduleSelect').value;
+      const periodType = document.getElementById('periodType').value;
+      const periodStart = document.getElementById('periodStart').value;
+      const periodEnd = document.getElementById('periodEnd').value;
+      const overrideValue = parseFloat(document.getElementById('overrideValue').value);
+      const overrideNotes = document.getElementById('overrideNotes').value.trim();
+      const overrideType = document.getElementById('overrideType').value;
+
+      // Validation
+      if (isNaN(overrideValue)) {
+        showError('Please enter a valid numeric value');
+        return;
+      }
+
+      // Convert to ISO
+      const periodStartISO = new Date(periodStart + 'T00:00:00Z').toISOString();
+      const periodEndISO = new Date(periodEnd + 'T23:59:59Z').toISOString();
+
+      // Show loading state
+      const saveBtn = document.getElementById('saveOverrideBtn');
+      const saveBtnText = document.getElementById('saveOverrideBtnText');
+      const saveBtnSpinner = document.getElementById('saveOverrideBtnSpinner');
+
+      saveBtn.disabled = true;
+      saveBtnText.textContent = 'Saving...';
+      saveBtnSpinner.classList.remove('hidden');
+
+      try {
+        await api.post(`/api/v1/modules/${moduleKey}/data-overrides`, {
+          metricKey: currentOverrideMetric.key,
+          periodStart: periodStartISO,
+          periodEnd: periodEndISO,
+          periodType: periodType,
+          overrideValue: overrideValue,
+          overrideType: overrideType,
+          notes: overrideNotes || null
+        });
+
+        showInfo(`Override saved for ${currentOverrideMetric.name}. Re-execute module to see updated values.`);
+
+        // Close panel
+        closeDataOverridePanel();
+
+        // Optionally auto-refresh module execution
+        // await executeModule();
+
+      } catch (error) {
+        console.error('Failed to save override:', error);
+        showError(error.message || 'Failed to save override. Please try again.');
+      } finally {
+        saveBtn.disabled = false;
+        saveBtnText.textContent = 'Save Override';
+        saveBtnSpinner.classList.add('hidden');
+      }
+    });
+
+    // Delete data override
+    async function deleteOverride(overrideId) {
+      if (!confirm('Are you sure you want to delete this override?')) {
+        return;
+      }
+
+      const moduleKey = document.getElementById('moduleSelect').value;
+
+      try {
+        await api.delete(`/api/v1/modules/${moduleKey}/data-overrides/${overrideId}`);
+
+        showInfo('Override deleted successfully. Re-execute module to see updated values.');
+
+        // Reload existing overrides
+        const periodStart = document.getElementById('periodStart').value;
+        const periodEnd = document.getElementById('periodEnd').value;
+        await loadExistingOverrides(moduleKey, currentOverrideMetric.key, periodStart, periodEnd);
+
+      } catch (error) {
+        console.error('Failed to delete override:', error);
+        showError(error.message || 'Failed to delete override. Please try again.');
+      }
+    }
+
+    // Initialize dynamic menu
+    renderMenu('#mainNav');
+  </script>
+</body>
+</html>
