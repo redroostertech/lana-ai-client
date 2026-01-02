@@ -1150,35 +1150,45 @@
 
       const fileArray = Array.from(files);
       let successCount = 0;
-      
-      for (let i = 0; i < fileArray.length; i++) {
-        const file = fileArray[i];
-        uploadProgressText.textContent = `Uploading ${i + 1}/${fileArray.length}: ${file.name}`;
-        
-        try {
-          const result = await api.uploadDocument(file, matterId);
-          
-          // Add to uploaded files list
-          uploadedFiles.push({
-            name: file.name,
-            size: file.size,
-            document_id: result.document_id,
-            status: 'uploaded'
-          });
-          successCount++;
-          renderUploadedFiles();
-        } catch (error) {
-          Toast.error(`Failed to upload ${file.name}: ${error.message}`);
-          
-          // Add as failed
-          uploadedFiles.push({
-            name: file.name,
-            size: file.size,
-            status: 'failed',
-            error: error.message
-          });
-          renderUploadedFiles();
-        }
+      const CONCURRENT_UPLOADS = 3; // Upload 3 files in parallel
+
+      // Process files in batches of 3 for better performance
+      for (let i = 0; i < fileArray.length; i += CONCURRENT_UPLOADS) {
+        const batch = fileArray.slice(i, i + CONCURRENT_UPLOADS);
+
+        // Create promises for this batch
+        const batchPromises = batch.map(async (file, idx) => {
+          const fileIndex = i + idx;
+          uploadProgressText.textContent = `Uploading ${fileIndex + 1}/${fileArray.length}: ${file.name}`;
+
+          try {
+            const result = await api.uploadDocument(file, matterId);
+
+            // Add to uploaded files list
+            uploadedFiles.push({
+              name: file.name,
+              size: file.size,
+              document_id: result.document_id,
+              status: 'uploaded'
+            });
+            successCount++;
+            renderUploadedFiles();
+          } catch (error) {
+            Toast.error(`Failed to upload ${file.name}: ${error.message}`);
+
+            // Add as failed
+            uploadedFiles.push({
+              name: file.name,
+              size: file.size,
+              status: 'failed',
+              error: error.message
+            });
+            renderUploadedFiles();
+          }
+        });
+
+        // Wait for all uploads in this batch to complete
+        await Promise.all(batchPromises);
       }
 
       // Reset upload zone
@@ -1843,26 +1853,36 @@
       if (uploadProgress) uploadProgress.classList.remove('hidden');
 
       let successCount = 0;
+      const CONCURRENT_UPLOADS = 3; // Upload 3 files in parallel
 
-      for (let i = 0; i < fileArray.length; i++) {
-        const file = fileArray[i];
-        if (uploadText) uploadText.textContent = `Uploading ${i + 1}/${fileArray.length}: ${file.name}`;
+      // Process files in batches of 3 for better performance
+      for (let i = 0; i < fileArray.length; i += CONCURRENT_UPLOADS) {
+        const batch = fileArray.slice(i, i + CONCURRENT_UPLOADS);
 
-        try {
-          const result = await api.uploadDocument(file, matterId);
-          successCount++;
+        // Create promises for this batch
+        const batchPromises = batch.map(async (file, idx) => {
+          const fileIndex = i + idx;
+          if (uploadText) uploadText.textContent = `Uploading ${fileIndex + 1}/${fileArray.length}: ${file.name}`;
 
-          // Start SSE stream to monitor processing status
-          if (result.job_id && result.file_id) {
-            console.log(`Starting SSE stream for ${file.name}`, {
-              jobId: result.job_id,
-              fileId: result.file_id
-            });
-            startDocumentStatusStream(result.job_id, result.file_id, matterId, file.name);
+          try {
+            const result = await api.uploadDocument(file, matterId);
+            successCount++;
+
+            // Start SSE stream to monitor processing status
+            if (result.job_id && result.file_id) {
+              console.log(`Starting SSE stream for ${file.name}`, {
+                jobId: result.job_id,
+                fileId: result.file_id
+              });
+              startDocumentStatusStream(result.job_id, result.file_id, matterId, file.name);
+            }
+          } catch (error) {
+            Toast.error(`Failed to upload ${file.name}: ${error.message}`);
           }
-        } catch (error) {
-          Toast.error(`Failed to upload ${file.name}: ${error.message}`);
-        }
+        });
+
+        // Wait for all uploads in this batch to complete
+        await Promise.all(batchPromises);
       }
 
       // Reset UI

@@ -49,6 +49,8 @@ const MenuIcons = {
   search: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>',
   onboarding: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>',
   help: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+  analytics: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>',
+  label: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>',
 };
 
 // ============================================================
@@ -127,6 +129,8 @@ const MenuConfig = {
           { id: 'sessions', label: 'Sessions', href: '/admin/sessions.html', icon: 'sessions' },
           { id: 'audit', label: 'Audit Logs', href: '/admin/audit.html', icon: 'audit' },
           { id: 'health', label: 'System Health', href: '/admin/health.html', icon: 'health' },
+          { id: 'search-analytics', label: 'Search Analytics', href: '/admin/search-analytics.html', icon: 'analytics' },
+          { id: 'relevance-labeling', label: 'Relevance Labeling', href: '/admin/relevance-labeling.html', icon: 'label' },
           // { id: 'integrations', label: 'Integrations', href: '/admin/integrations.html', icon: 'integrations' },
           // { id: 'plugins', label: 'Plugins', href: '/admin/plugins.html', icon: 'plugins' },
           // { id: 'reporting', label: 'Reporting', href: '/admin/reporting.html', icon: 'reporting' },
@@ -306,6 +310,7 @@ const MenuConfig = {
           { id: 'insights-connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
           { id: 'insights-sync', label: 'Sync Status', href: '/integrations/sync-status.html', icon: 'sync' },
           { id: 'insights-dashboard', label: 'AI Insights', href: '/insights/dashboard.html', icon: 'insights' },
+          { id: 'insights-modules', label: 'Module Execution', href: '/insights/module-execution.html', icon: 'dashboard' },
           { id: 'insights-workflows', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
         ]
       },
