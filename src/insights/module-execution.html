@@ -952,6 +952,9 @@
         } else if (state.viewType === 'contact_opportunities') {
           console.log('[renderContactTable] Rendering contact-opportunities view');
           return window.renderContactOpportunitiesTable();
+        } else if (state.viewType === 'unique_contact_ids') {
+          console.log('[renderContactTable] Rendering unique contact IDs view');
+          return window.renderUniqueContactIdsTable();
         }
 
         console.log('[renderContactTable] Rendering contacts view');
@@ -1377,11 +1380,10 @@
         console.log('[renderContactOpportunitiesTable] Called');
 
         const state = window.qualifiedLeadsData;
-        const { contacts, opportunities, contactIdsFromOpportunities, allContactIds } = state;
+        const { contacts, opportunities, contactIdsFromOpportunities } = state;
 
         console.log('[renderContactOpportunitiesTable] Total contacts:', contacts.length);
         console.log('[renderContactOpportunitiesTable] Total opportunities:', opportunities.length);
-        console.log('[renderContactOpportunitiesTable] Unique contact IDs in opportunities:', contactIdsFromOpportunities.size);
 
         // Group opportunities by contact ID
         const oppsByContact = {};
@@ -1395,43 +1397,16 @@
           }
         });
 
-        // Build array of all unique contact IDs with their data
-        let allUniqueContacts = [];
-
-        // Add contacts that have records
-        const contactMap = new Map(contacts.map(c => [c.data?.id, c]));
-
-        // For each unique contact ID in opportunities
-        contactIdsFromOpportunities.forEach(contactId => {
-          const contact = contactMap.get(contactId);
-          if (contact) {
-            // Contact record exists
-            allUniqueContacts.push({
-              id: contactId,
-              name: contact.data?.contactName || contact.data?.name || 'N/A',
-              email: contact.data?.email || 'N/A',
-              isMissing: false,
-              contact: contact
-            });
-          } else {
-            // Contact record is missing
-            allUniqueContacts.push({
-              id: contactId,
-              name: 'Missing Contact',
-              email: 'No contact record',
-              isMissing: true,
-              contact: null
-            });
-          }
-        });
-
-        let contactsWithOpps = allUniqueContacts;
+        // Get contacts that have opportunities
+        let contactsWithOpps = contacts.filter(c => contactIdsFromOpportunities.has(c.data?.id));
 
         // Apply search filter
         if (state.searchQuery) {
           const query = state.searchQuery.toLowerCase();
           contactsWithOpps = contactsWithOpps.filter(contact => {
-            return contact.name.toLowerCase().includes(query) || contact.email.toLowerCase().includes(query);
+            const name = contact.data?.contactName || contact.data?.name || '';
+            const email = contact.data?.email || '';
+            return name.toLowerCase().includes(query) || email.toLowerCase().includes(query);
           });
         }
 
@@ -1444,7 +1419,7 @@
 
         const tableHTML = `
           <div class="flex items-center justify-between mb-3">
-            <h4 class="font-semibold text-gray-900">Unique Contact IDs (${totalRecords} total)</h4>
+            <h4 class="font-semibold text-gray-900">Contacts with Opportunities</h4>
             <button onclick="window.renderContactTable('all', 'contacts')" class="text-sm text-indigo-600 hover:text-indigo-800">Back to Contacts</button>
           </div>
 
@@ -1452,6 +1427,182 @@
             <input
               type="text"
               placeholder="Search by contact name or email..."
+              value="${state.searchQuery}"
+              oninput="window.handleSearch(event)"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+          </div>
+
+          <div class="space-y-4" style="max-height: 500px; overflow-y: auto;">
+            ${paginatedContacts.map(contact => {
+              const contactName = contact.data?.contactName || contact.data?.name || 'N/A';
+              const contactEmail = contact.data?.email || 'N/A';
+              const contactOpps = oppsByContact[contact.data?.id] || [];
+
+              return `
+                <div class="border border-gray-200 rounded-lg p-4 bg-white">
+                  <div class="flex items-start justify-between mb-3">
+                    <div>
+                      <h5 class="font-semibold text-gray-900">${contactName}</h5>
+                      <p class="text-sm text-gray-500">${contactEmail}</p>
+                    </div>
+                    <span class="px-2 py-1 text-xs font-medium rounded-full bg-indigo-100 text-indigo-800">
+                      ${contactOpps.length} ${contactOpps.length === 1 ? 'Opportunity' : 'Opportunities'}
+                    </span>
+                  </div>
+
+                  <div class="space-y-2">
+                    ${contactOpps.map(opp => `
+                      <div class="pl-4 border-l-2 border-gray-200 py-2">
+                        <div class="flex items-start justify-between">
+                          <div class="flex-1">
+                            <p class="text-sm font-medium text-gray-900">${opp.data?.name || 'Unnamed Opportunity'}</p>
+                            <div class="flex items-center gap-4 mt-1">
+                              <span class="text-xs text-gray-500">Value: $${parseFloat(opp.data?.monetaryValue || 0).toLocaleString()}</span>
+                              <span class="px-2 py-0.5 text-xs rounded-full ${
+                                opp.data?.status === 'won' ? 'bg-green-100 text-green-800' :
+                                opp.data?.status === 'lost' ? 'bg-red-100 text-red-800' :
+                                'bg-yellow-100 text-yellow-800'
+                              }">${opp.data?.status || 'N/A'}</span>
+                            </div>
+                          </div>
+                          <span class="text-xs text-gray-400">${new Date(opp.source_created_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+
+          <div class="mt-4 flex items-center justify-between">
+            <div class="text-sm text-gray-600">
+              Showing ${startIdx + 1} to ${endIdx} of ${totalRecords} contacts with opportunities
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                onclick="window.goToPage(${state.currentPage - 1})"
+                ${state.currentPage === 1 ? 'disabled' : ''}
+                class="px-3 py-1 text-sm border rounded ${state.currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+              >
+                Previous
+              </button>
+              <div class="flex items-center gap-1">
+                ${Array.from({length: Math.min(totalPages, 7)}, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 7) {
+                    pageNum = i + 1;
+                  } else if (state.currentPage <= 4) {
+                    pageNum = i + 1;
+                  } else if (state.currentPage >= totalPages - 3) {
+                    pageNum = totalPages - 6 + i;
+                  } else {
+                    pageNum = state.currentPage - 3 + i;
+                  }
+                  return `
+                    <button
+                      onclick="window.goToPage(${pageNum})"
+                      class="px-3 py-1 text-sm border rounded ${state.currentPage === pageNum ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+                    >
+                      ${pageNum}
+                    </button>
+                  `;
+                }).join('')}
+              </div>
+              <button
+                onclick="window.goToPage(${state.currentPage + 1})"
+                ${state.currentPage === totalPages ? 'disabled' : ''}
+                class="px-3 py-1 text-sm border rounded ${state.currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        `;
+
+        const container = document.getElementById('contactTableContainer');
+        if (container) {
+          container.innerHTML = tableHTML;
+        }
+      };
+
+      // Render unique contact IDs table (including missing contacts)
+      window.renderUniqueContactIdsTable = function() {
+        console.log('[renderUniqueContactIdsTable] Called');
+
+        const state = window.qualifiedLeadsData;
+        const { contacts, opportunities, contactIdsFromOpportunities, allContactIds } = state;
+
+        console.log('[renderUniqueContactIdsTable] Unique contact IDs:', contactIdsFromOpportunities.size);
+
+        // Group opportunities by contact ID
+        const oppsByContact = {};
+        opportunities.forEach(opp => {
+          const contactId = opp.data?.contactId;
+          if (contactId) {
+            if (!oppsByContact[contactId]) {
+              oppsByContact[contactId] = [];
+            }
+            oppsByContact[contactId].push(opp);
+          }
+        });
+
+        // Build array of ALL unique contact IDs with their data
+        let allUniqueContacts = [];
+        const contactMap = new Map(contacts.map(c => [c.data?.id, c]));
+
+        // For each unique contact ID in opportunities
+        contactIdsFromOpportunities.forEach(contactId => {
+          const contact = contactMap.get(contactId);
+          if (contact) {
+            // Contact record exists
+            allUniqueContacts.push({
+              id: contactId,
+              name: contact.data?.contactName || contact.data?.name || 'N/A',
+              email: contact.data?.email || 'N/A',
+              isMissing: false
+            });
+          } else {
+            // Contact record is missing
+            allUniqueContacts.push({
+              id: contactId,
+              name: 'Missing Contact',
+              email: 'No contact record',
+              isMissing: true
+            });
+          }
+        });
+
+        let filteredContacts = allUniqueContacts;
+
+        // Apply search filter
+        if (state.searchQuery) {
+          const query = state.searchQuery.toLowerCase();
+          filteredContacts = filteredContacts.filter(contact => {
+            return contact.name.toLowerCase().includes(query) ||
+                   contact.email.toLowerCase().includes(query) ||
+                   contact.id.toLowerCase().includes(query);
+          });
+        }
+
+        // Pagination
+        const totalRecords = filteredContacts.length;
+        const totalPages = Math.ceil(totalRecords / state.rowsPerPage);
+        const startIdx = (state.currentPage - 1) * state.rowsPerPage;
+        const endIdx = Math.min(startIdx + state.rowsPerPage, totalRecords);
+        const paginatedContacts = filteredContacts.slice(startIdx, endIdx);
+
+        const tableHTML = `
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="font-semibold text-gray-900">Unique Contact IDs (${totalRecords} total)</h4>
+            <button onclick="window.renderContactTable('all', 'contacts')" class="text-sm text-indigo-600 hover:text-indigo-800">Back to Contacts</button>
+          </div>
+
+          <div class="mb-4">
+            <input
+              type="text"
+              placeholder="Search by name, email, or contact ID..."
               value="${state.searchQuery}"
               oninput="window.handleSearch(event)"
               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -1524,10 +1675,11 @@
                   } else {
                     pageNum = state.currentPage - 3 + i;
                   }
+                  const isActive = pageNum === state.currentPage;
                   return `
                     <button
                       onclick="window.goToPage(${pageNum})"
-                      class="px-3 py-1 text-sm border rounded ${state.currentPage === pageNum ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+                      class="px-3 py-1 text-sm border rounded ${isActive ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 hover:bg-gray-50'}"
                     >
                       ${pageNum}
                     </button>
@@ -1634,7 +1786,7 @@
           <h4 class="font-semibold text-gray-900 mb-4">Data Quality Insights</h4>
           <div class="grid grid-cols-3 gap-4">
             <!-- Unique Contact IDs in Opportunities -->
-            <div onclick="window.renderContactTable('all', 'contact_opportunities')" class="bg-purple-50 border border-purple-200 rounded-lg p-4 cursor-pointer hover:bg-purple-100 hover:shadow-md transition-all duration-200">
+            <div onclick="window.renderContactTable('all', 'unique_contact_ids')" class="bg-purple-50 border border-purple-200 rounded-lg p-4 cursor-pointer hover:bg-purple-100 hover:shadow-md transition-all duration-200">
               <div class="flex items-center justify-between mb-2">
                 <p class="text-sm font-medium text-gray-900">📋 Unique Contact IDs</p>
               </div>
