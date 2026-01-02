@@ -904,11 +904,15 @@
       const totalQualifiedLeads = contactsWithOpportunities + contactsWithoutOpportunities;
       const gapExplanation = totalQualifiedLeads !== totalContacts ? `(${totalQualifiedLeads} qualified leads vs ${totalContacts} total contacts)` : '';
 
-      // Function to render filtered table
-      let currentFilter = 'all';
+      // Store data in window scope for onclick handlers
+      window.qualifiedLeadsData = {
+        contacts,
+        contactIdsFromOpportunities
+      };
 
-      function renderContactTable(filter) {
-        currentFilter = filter;
+      // Function to render filtered table
+      window.renderContactTable = function(filter) {
+        const { contacts, contactIdsFromOpportunities } = window.qualifiedLeadsData;
         let filteredContacts = contacts;
         let filterTitle = 'All Contacts';
 
@@ -923,7 +927,7 @@
         const tableHTML = `
           <div class="flex items-center justify-between mb-3">
             <h4 class="font-semibold text-gray-900">${filterTitle}</h4>
-            ${filter !== 'all' ? `<button onclick="renderContactTable('all')" class="text-sm text-indigo-600 hover:text-indigo-800">Show All</button>` : ''}
+            ${filter !== 'all' ? `<button onclick="window.renderContactTable('all')" class="text-sm text-indigo-600 hover:text-indigo-800">Show All</button>` : ''}
           </div>
           <div class="overflow-x-auto" style="max-height: 400px;">
             <table class="min-w-full divide-y divide-gray-200">
@@ -963,11 +967,11 @@
           </div>
         `;
 
-        document.getElementById('contactTableContainer').innerHTML = tableHTML;
-      }
-
-      // Make function globally available
-      window.renderContactTable = renderContactTable;
+        const container = document.getElementById('contactTableContainer');
+        if (container) {
+          container.innerHTML = tableHTML;
+        }
+      };
 
       content.innerHTML = `
         <!-- Calculation Explanation -->
@@ -1007,7 +1011,7 @@
           <h4 class="font-semibold text-gray-900 mb-4">Lead Relationship Breakdown</h4>
           <div class="grid grid-cols-2 gap-4 mb-4">
             <!-- Qualified (Have Opportunities) -->
-            <div onclick="renderContactTable('qualified')" class="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer hover:bg-green-100 hover:shadow-md transition-all duration-200">
+            <div onclick="window.renderContactTable('qualified')" class="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer hover:bg-green-100 hover:shadow-md transition-all duration-200">
               <div class="flex items-center justify-between mb-2">
                 <p class="text-sm font-medium text-gray-900">✅ Qualified (Have Opportunities)</p>
               </div>
@@ -1016,7 +1020,7 @@
             </div>
 
             <!-- Not Yet Qualified (No Opportunities) -->
-            <div onclick="renderContactTable('not_qualified')" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 cursor-pointer hover:bg-yellow-100 hover:shadow-md transition-all duration-200">
+            <div onclick="window.renderContactTable('not_qualified')" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 cursor-pointer hover:bg-yellow-100 hover:shadow-md transition-all duration-200">
               <div class="flex items-center justify-between mb-2">
                 <p class="text-sm font-medium text-gray-900">⚠️ Not Yet Qualified (No Opportunities)</p>
               </div>
