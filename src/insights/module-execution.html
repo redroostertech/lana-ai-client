@@ -938,9 +938,9 @@
 
         // Render based on view type
         if (state.viewType === 'opportunities') {
-          return renderOpportunitiesTable();
+          return window.renderOpportunitiesTable();
         } else if (state.viewType === 'contact_opportunities') {
-          return renderContactOpportunitiesTable();
+          return window.renderContactOpportunitiesTable();
         }
 
         // Default: Contacts view
@@ -1162,7 +1162,7 @@
       };
 
       // Render opportunities table
-      function renderOpportunitiesTable() {
+      window.renderOpportunitiesTable = function() {
         const state = window.qualifiedLeadsData;
         const { opportunities } = state;
 
@@ -1337,10 +1337,10 @@
         if (container) {
           container.innerHTML = tableHTML;
         }
-      }
+      };
 
       // Render contact-opportunities grouped table
-      function renderContactOpportunitiesTable() {
+      window.renderContactOpportunitiesTable = function() {
         const state = window.qualifiedLeadsData;
         const { contacts, opportunities, contactIdsFromOpportunities } = state;
 
@@ -1484,7 +1484,7 @@
         if (container) {
           container.innerHTML = tableHTML;
         }
-      }
+      };
 
       content.innerHTML = `
         <!-- Calculation Explanation -->
