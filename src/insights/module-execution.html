@@ -4773,11 +4773,43 @@
       sectionDiv.className = 'mb-8';
       sectionDiv.id = `section-${sectionName}`;
 
-      // Add section title (optional - can be removed if not needed)
+      // Add section title with helpful explanation
       if (sectionName === 'trends') {
         const titleDiv = document.createElement('div');
-        titleDiv.className = 'mb-4';
-        titleDiv.innerHTML = `<h3 class="text-xl font-semibold text-gray-900">Trends & Comparisons</h3>`;
+        titleDiv.className = 'mb-6 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-6 border border-indigo-100';
+        titleDiv.innerHTML = `
+          <h3 class="text-2xl font-bold text-gray-900 mb-3">📊 Trends & Comparisons</h3>
+          <div class="space-y-3 text-sm text-gray-700">
+            <p class="leading-relaxed">
+              <strong>What you're looking at:</strong> These charts compare your current period's performance to the previous period.
+              This helps you see if things are getting better or worse over time.
+            </p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <div class="bg-white rounded-lg p-4 shadow-sm">
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="w-4 h-4 rounded bg-blue-500"></span>
+                  <strong class="text-blue-700">Blue bars = Current Period</strong>
+                </div>
+                <p class="text-xs text-gray-600">This is your performance RIGHT NOW (the time period you selected).</p>
+              </div>
+              <div class="bg-white rounded-lg p-4 shadow-sm">
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="w-4 h-4 rounded bg-gray-400"></span>
+                  <strong class="text-gray-700">Gray bars = Prior Period</strong>
+                </div>
+                <p class="text-xs text-gray-600">This is your performance BEFORE (the same length of time, but earlier).</p>
+              </div>
+            </div>
+            <div class="bg-white rounded-lg p-4 mt-3 border-l-4 border-indigo-500">
+              <p class="text-xs font-medium text-indigo-900 mb-1">💡 How to read the charts:</p>
+              <ul class="text-xs text-gray-600 space-y-1 ml-4">
+                <li>• <strong>Taller blue bar?</strong> You're doing BETTER than before! 🎉</li>
+                <li>• <strong>Taller gray bar?</strong> You were doing better before - time to improve! 📈</li>
+                <li>• <strong>Same height?</strong> Your performance stayed the same.</li>
+              </ul>
+            </div>
+          </div>
+        `;
         sectionDiv.appendChild(titleDiv);
       }
 
@@ -4949,10 +4981,27 @@
       div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
 
       const canvasId = `chart-${uniqueId}`;
+
+      // Add helpful description for the chart
+      const description = viz.description || 'Compare how your metrics changed from the previous period to now.';
+
       div.innerHTML = `
-        <div class="flex items-start justify-between mb-4">
-          <h3 class="text-lg font-semibold text-gray-900">${viz.title || 'Current vs Prior'}</h3>
-          ${viz.infoTooltip ? `<div class="tooltip" title="${viz.infoTooltip}">ℹ️</div>` : ''}
+        <div class="mb-4">
+          <div class="flex items-start justify-between mb-2">
+            <h3 class="text-lg font-semibold text-gray-900">${viz.title || 'Current vs Prior Period'}</h3>
+            ${viz.infoTooltip ? `<div class="tooltip" title="${viz.infoTooltip}">ℹ️</div>` : ''}
+          </div>
+          <p class="text-sm text-gray-600 leading-relaxed">${description}</p>
+          <div class="flex items-center gap-6 mt-3 text-xs">
+            <div class="flex items-center gap-2">
+              <div class="w-3 h-3 rounded bg-blue-500"></div>
+              <span class="text-gray-600">Current Period (Now)</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="w-3 h-3 rounded bg-gray-400"></div>
+              <span class="text-gray-600">Prior Period (Before)</span>
+            </div>
+          </div>
         </div>
         <div class="h-64">
           <canvas id="${canvasId}"></canvas>
@@ -4992,12 +5041,89 @@
             maintainAspectRatio: false,
             plugins: {
               legend: {
-                position: 'bottom'
+                position: 'bottom',
+                labels: {
+                  padding: 15,
+                  font: {
+                    size: 12
+                  }
+                }
+              },
+              tooltip: {
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                padding: 12,
+                titleFont: {
+                  size: 14,
+                  weight: 'bold'
+                },
+                bodyFont: {
+                  size: 13
+                },
+                callbacks: {
+                  title: function(context) {
+                    return context[0].label;
+                  },
+                  label: function(context) {
+                    const label = context.dataset.label || '';
+                    const value = context.parsed.y;
+                    const metric = metrics[context.dataIndex];
+                    const unit = metric?.unit || '';
+
+                    // Format the value with appropriate units
+                    let formattedValue = value.toFixed(1);
+                    if (unit === 'percent' || unit === 'percentage') {
+                      formattedValue = value.toFixed(1) + '%';
+                    } else if (unit === 'days' || unit === 'hours') {
+                      formattedValue = value.toFixed(1) + ' ' + unit;
+                    } else if (unit === 'score') {
+                      formattedValue = value.toFixed(1) + '/100';
+                    } else if (unit === 'leads' || unit === 'consultations') {
+                      formattedValue = Math.round(value) + ' ' + unit;
+                    }
+
+                    return label + ': ' + formattedValue;
+                  },
+                  footer: function(context) {
+                    if (context.length === 2) {
+                      const current = context.find(c => c.dataset.label === 'Current Period')?.parsed.y || 0;
+                      const prior = context.find(c => c.dataset.label === 'Prior Period')?.parsed.y || 0;
+                      const diff = current - prior;
+                      const diffPercent = prior !== 0 ? ((diff / prior) * 100) : 0;
+
+                      if (diff > 0) {
+                        return '↗️ Up ' + Math.abs(diffPercent).toFixed(1) + '% from before';
+                      } else if (diff < 0) {
+                        return '↘️ Down ' + Math.abs(diffPercent).toFixed(1) + '% from before';
+                      } else {
+                        return '➡️ No change';
+                      }
+                    }
+                    return '';
+                  }
+                }
               }
             },
             scales: {
               y: {
-                beginAtZero: true
+                beginAtZero: true,
+                ticks: {
+                  font: {
+                    size: 11
+                  }
+                },
+                grid: {
+                  color: 'rgba(0, 0, 0, 0.05)'
+                }
+              },
+              x: {
+                ticks: {
+                  font: {
+                    size: 11
+                  }
+                },
+                grid: {
+                  display: false
+                }
               }
             }
           }
