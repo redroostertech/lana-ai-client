@@ -368,38 +368,10 @@
           </div>
         </div>
 
-        <!-- Metrics Grid -->
-        <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-          <!-- Metric cards will be dynamically inserted here -->
-        </div>
-
-        <!-- Time Series Chart (if compareBy is enabled) -->
-        <div id="timeSeriesSection" class="hidden mb-6">
-          <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Metrics Over Time</h3>
-            <div class="h-96">
-              <canvas id="timeSeriesChart"></canvas>
-            </div>
-          </div>
-        </div>
-
-        <!-- Charts Section -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <!-- Metric Trends Chart -->
-          <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Metric Trends (Current vs Prior)</h3>
-            <div class="h-64">
-              <canvas id="metricTrendsChart"></canvas>
-            </div>
-          </div>
-
-          <!-- Status Distribution Chart -->
-          <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Metric Status Distribution</h3>
-            <div class="h-64">
-              <canvas id="statusDistributionChart"></canvas>
-            </div>
-          </div>
+        <!-- Dynamic Visualizations Container (Section-based rendering) -->
+        <div id="visualizationsContainer">
+          <!-- Visualizations will be dynamically rendered here based on backend response -->
+          <!-- Structure: Primary Section → Secondary Section → Trends Section -->
         </div>
       </div>
     </main>
@@ -858,6 +830,457 @@
       document.getElementById('drilldownModal').classList.add('hidden');
     }
 
+    // Show drill-down for any metric
+    async function showMetricDrilldown(metricKey, metricName) {
+      const modal = document.getElementById('drilldownModal');
+      const title = document.getElementById('drilldownTitle');
+      const content = document.getElementById('drilldownContent');
+
+      title.textContent = `${metricName} - Details`;
+      content.innerHTML = '<div class="text-center py-8"><div class="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto"></div><p class="text-gray-600 mt-4">Loading data...</p></div>';
+      modal.classList.remove('hidden');
+
+      try {
+        const periodStart = document.getElementById('periodStart').value + 'T00:00:00Z';
+        const periodEnd = document.getElementById('periodEnd').value + 'T23:59:59Z';
+
+        // Different drill-down logic based on metric
+        switch(metricKey) {
+          case 'qualified_leads':
+            await showQualifiedLeadsDrilldown(content, periodStart, periodEnd);
+            break;
+          case 'lead_to_consultation_booking_rate':
+            await showConsultationBookingDrilldown(content, periodStart, periodEnd);
+            break;
+          case 'lead_response_time':
+            await showResponseTimeDrilldown(content, periodStart, periodEnd);
+            break;
+          case 'lead_quality_score':
+            await showQualityScoreDrilldown(content, periodStart, periodEnd);
+            break;
+          case 'consultation_show_rate':
+            await showConsultationShowRateDrilldown(content, periodStart, periodEnd);
+            break;
+          default:
+            content.innerHTML = '<div class="text-center py-8 text-gray-500">Drill-down not available for this metric.</div>';
+        }
+      } catch (error) {
+        console.error('Failed to load metric drilldown:', error);
+        content.innerHTML = `<div class="text-center py-8 text-red-600">Failed to load data: ${error.message || 'Unknown error'}</div>`;
+      }
+    }
+
+    // Drill-down: Qualified Leads (with Contact → Opportunity relationship)
+    async function showQualifiedLeadsDrilldown(content, periodStart, periodEnd) {
+      // Fetch both contacts and opportunities to calculate relationship
+      const [contactsResponse, opportunitiesResponse] = await Promise.all([
+        api.get(`/api/v1/integrations/connector-data?entity_type=contact&start_date=${periodStart}&end_date=${periodEnd}&limit=1000`),
+        api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=1000`)
+      ]);
+
+      const contacts = contactsResponse?.data || [];
+      const opportunities = opportunitiesResponse?.data || [];
+
+      // Build contact ID sets for relationship mapping
+      const contactIdsFromOpportunities = new Set(
+        opportunities
+          .filter(opp => opp.data?.contactId)
+          .map(opp => opp.data.contactId)
+      );
+
+      const allContactIds = new Set(contacts.map(c => c.data?.id).filter(Boolean));
+
+      // Calculate breakdown
+      const contactsWithOpportunities = Array.from(contactIdsFromOpportunities).filter(id => allContactIds.has(id)).length;
+      const contactsWithoutOpportunities = contacts.filter(c => !contactIdsFromOpportunities.has(c.data?.id)).length;
+      const opportunitiesWithoutContacts = opportunities.filter(opp => !opp.data?.contactId || opp.data.contactId === '').length;
+      const totalContacts = contacts.length;
+      const totalOpportunities = opportunities.length;
+      const conversionRate = totalContacts > 0 ? ((contactsWithOpportunities / totalContacts) * 100).toFixed(1) : 0;
+
+      content.innerHTML = `
+        <!-- Calculation Explanation -->
+        <div class="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <h4 class="font-semibold text-gray-900 mb-2">How this is calculated:</h4>
+          <p class="text-sm text-gray-700">
+            Qualified Leads = Contacts with Opportunities + Standalone Contacts (not yet qualified)
+          </p>
+        </div>
+
+        <!-- Conversion Rate Callout -->
+        <div class="mb-6 p-6 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-200">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm text-gray-600 mb-1">Contact → Opportunity Conversion Rate</p>
+              <p class="text-4xl font-bold text-indigo-600">${conversionRate}%</p>
+              <p class="text-xs text-gray-500 mt-1">${contactsWithOpportunities} of ${totalContacts} contacts have opportunities</p>
+            </div>
+            <div class="text-right">
+              <svg class="w-16 h-16 text-indigo-300" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 0l-2 2a1 1 0 101.414 1.414L8 10.414l1.293 1.293a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Relationship Breakdown -->
+        <div class="mb-6">
+          <h4 class="font-semibold text-gray-900 mb-4">Lead Relationship Breakdown</h4>
+          <div class="grid grid-cols-3 gap-4">
+            <!-- Contacts with Opportunities (Qualified) -->
+            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div class="flex items-center justify-between mb-2">
+                <p class="text-xs text-gray-600">Qualified (Have Opportunity)</p>
+                <svg class="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                </svg>
+              </div>
+              <p class="text-3xl font-bold text-green-700">${contactsWithOpportunities}</p>
+              <p class="text-xs text-gray-500 mt-1">Contacts in pipeline</p>
+            </div>
+
+            <!-- Contacts without Opportunities (Not Yet Qualified) -->
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div class="flex items-center justify-between mb-2">
+                <p class="text-xs text-gray-600">Not Yet Qualified</p>
+                <svg class="w-5 h-5 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+                </svg>
+              </div>
+              <p class="text-3xl font-bold text-yellow-700">${contactsWithoutOpportunities}</p>
+              <p class="text-xs text-gray-500 mt-1">Standalone contacts</p>
+            </div>
+
+            <!-- Opportunities without Contacts (Data Quality Issue) -->
+            <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div class="flex items-center justify-between mb-2">
+                <p class="text-xs text-gray-600">Data Quality Issue</p>
+                <svg class="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                </svg>
+              </div>
+              <p class="text-3xl font-bold text-red-700">${opportunitiesWithoutContacts}</p>
+              <p class="text-xs text-gray-500 mt-1">Opps missing contact</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Summary Stats -->
+        <div class="mb-6 grid grid-cols-2 gap-4">
+          <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <p class="text-sm text-gray-600">Total Contacts</p>
+            <p class="text-2xl font-bold text-gray-900">${totalContacts}</p>
+          </div>
+          <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <p class="text-sm text-gray-600">Total Opportunities</p>
+            <p class="text-2xl font-bold text-gray-900">${totalOpportunities}</p>
+          </div>
+        </div>
+
+        <!-- Sample Data Table -->
+        <div class="mt-6">
+          <h4 class="font-semibold text-gray-900 mb-3">Sample Contacts (showing first 50)</h4>
+          <div class="overflow-x-auto max-h-96">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50 sticky top-0">
+                <tr>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                ${contacts.slice(0, 50).map(lead => {
+                  const hasOpportunity = contactIdsFromOpportunities.has(lead.data?.id);
+                  const statusBadge = hasOpportunity
+                    ? '<span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Qualified</span>'
+                    : '<span class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Not Qualified</span>';
+
+                  return `
+                    <tr class="hover:bg-gray-50">
+                      <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                        ${lead.data?.contactName || lead.data?.name || (lead.data?.firstName && lead.data?.lastName ? lead.data.firstName + ' ' + lead.data.lastName : 'N/A')}
+                      </td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${lead.data?.email || 'N/A'}</td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${lead.data?.phone || 'N/A'}</td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm">${statusBadge}</td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${new Date(lead.source_created_at).toLocaleDateString()}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+          <div class="mt-4 text-sm text-gray-600 text-center">
+            Showing ${Math.min(50, contacts.length)} of ${contacts.length} total contacts
+          </div>
+        </div>
+      `;
+    }
+
+    // Drill-down: Consultation Booking Rate
+    async function showConsultationBookingDrilldown(content, periodStart, periodEnd) {
+      const response = await api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=200`);
+
+      if (!response || !response.data || response.data.length === 0) {
+        content.innerHTML = '<div class="text-center py-8 text-gray-500">No opportunities found in this period.</div>';
+        return;
+      }
+
+      const booked = response.data.filter(opp => {
+        const attributions = opp.data?.attributions || [];
+        return Array.isArray(attributions) && attributions.some(attr => attr.medium === 'calendar');
+      });
+      const notBooked = response.data.filter(opp => {
+        const attributions = opp.data?.attributions || [];
+        return !Array.isArray(attributions) || !attributions.some(attr => attr.medium === 'calendar');
+      });
+
+      content.innerHTML = `
+        <div class="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <h4 class="font-semibold text-gray-900 mb-2">How this is calculated:</h4>
+          <p class="text-sm text-gray-700">
+            (Leads with calendar attribution ÷ Total leads) × 100<br>
+            = (${booked.length} ÷ ${response.data.length}) × 100 = ${((booked.length / response.data.length) * 100).toFixed(1)}%
+          </p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-6">
+          <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+            <p class="text-sm text-gray-600">Booked Consultation</p>
+            <p class="text-2xl font-bold text-green-700">${booked.length}</p>
+          </div>
+          <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <p class="text-sm text-gray-600">Did Not Book</p>
+            <p class="text-2xl font-bold text-gray-700">${notBooked.length}</p>
+          </div>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <h4 class="font-semibold text-green-700 mb-2">Booked Consultation (${booked.length})</h4>
+            <div class="max-h-64 overflow-y-auto border rounded">
+              ${booked.map(opp => `
+                <div class="p-3 border-b hover:bg-gray-50">
+                  <p class="font-medium">${opp.data?.name || 'N/A'}</p>
+                  <p class="text-sm text-gray-600">Status: ${opp.data?.status || 'N/A'}</p>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <div>
+            <h4 class="font-semibold text-gray-700 mb-2">Did Not Book (${notBooked.length})</h4>
+            <div class="max-h-64 overflow-y-auto border rounded">
+              ${notBooked.slice(0, 20).map(opp => `
+                <div class="p-3 border-b hover:bg-gray-50">
+                  <p class="font-medium">${opp.data?.name || 'N/A'}</p>
+                  <p class="text-sm text-gray-600">Status: ${opp.data?.status || 'N/A'}</p>
+                </div>
+              `).join('')}
+              ${notBooked.length > 20 ? `<div class="p-3 text-center text-gray-500">...and ${notBooked.length - 20} more</div>` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Drill-down: Lead Response Time
+    async function showResponseTimeDrilldown(content, periodStart, periodEnd) {
+      content.innerHTML = `
+        <div class="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <h4 class="font-semibold text-gray-900 mb-2">How this is calculated:</h4>
+          <p class="text-sm text-gray-700">
+            Average time (in hours) from when a lead was created to when they received their first conversation/response.<br><br>
+            Formula: AVG(first_conversation_time - lead_created_time)
+          </p>
+        </div>
+        <div class="text-center py-8 text-gray-500">
+          <p>This metric shows aggregate response time.</p>
+          <p class="mt-2 text-sm">To see individual lead response times, we need to fetch conversation data for each lead.</p>
+        </div>
+      `;
+    }
+
+    // Drill-down: Lead Quality Score (Estate Planning - NO company field)
+    async function showQualityScoreDrilldown(content, periodStart, periodEnd) {
+      // Fetch opportunities (enriched contact data) and standalone contacts
+      const [opportunitiesResponse, contactsResponse] = await Promise.all([
+        api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=500`),
+        api.get(`/api/v1/integrations/connector-data?entity_type=contact&start_date=${periodStart}&end_date=${periodEnd}&limit=500`)
+      ]);
+
+      const opportunities = opportunitiesResponse?.data || [];
+      const contacts = contactsResponse?.data || [];
+
+      // Get contact IDs from opportunities to avoid duplicates
+      const contactIdsFromOpportunities = new Set(
+        opportunities.filter(opp => opp.data?.contactId).map(opp => opp.data.contactId)
+      );
+
+      // Calculate quality score for each lead
+      const leadsWithScores = [];
+
+      // 1. Process opportunities (use opportunity.contact.* for enriched data)
+      opportunities.forEach(opp => {
+        let score = 0;
+        const contactData = opp.data?.contact || {};
+        const attributions = opp.data?.attributions || [];
+
+        if (contactData.email && contactData.email !== '') score += 25;
+        if (contactData.phone && contactData.phone !== '') score += 25;
+        if (contactData.tags && Array.isArray(contactData.tags) && contactData.tags.length > 0) score += 25;
+        if (attributions && Array.isArray(attributions) && attributions.length > 0) score += 25;
+
+        leadsWithScores.push({
+          name: contactData.name || opp.data?.name || 'N/A',
+          email: contactData.email || 'N/A',
+          phone: contactData.phone || 'N/A',
+          tags: contactData.tags || [],
+          attributions: attributions,
+          source: 'opportunity',
+          qualityScore: score,
+          created_at: opp.source_created_at
+        });
+      });
+
+      // 2. Process standalone contacts (no opportunity)
+      contacts
+        .filter(contact => !contactIdsFromOpportunities.has(contact.data?.id))
+        .forEach(contact => {
+          let score = 0;
+          const attributions = contact.data?.attributions || [];
+
+          if (contact.data?.email && contact.data.email !== '') score += 25;
+          if (contact.data?.phone && contact.data.phone !== '') score += 25;
+          if (contact.data?.tags && Array.isArray(contact.data.tags) && contact.data.tags.length > 0) score += 25;
+          if (attributions && Array.isArray(attributions) && attributions.length > 0) score += 25;
+
+          leadsWithScores.push({
+            name: contact.data?.contactName || contact.data?.name || (contact.data?.firstName && contact.data?.lastName ? `${contact.data.firstName} ${contact.data.lastName}` : 'N/A'),
+            email: contact.data?.email || 'N/A',
+            phone: contact.data?.phone || 'N/A',
+            tags: contact.data?.tags || [],
+            attributions: attributions,
+            source: 'contact',
+            qualityScore: score,
+            created_at: contact.source_created_at
+          });
+        });
+
+      // Sort by score (highest first)
+      leadsWithScores.sort((a, b) => b.qualityScore - a.qualityScore);
+
+      const avgScore = leadsWithScores.length > 0
+        ? (leadsWithScores.reduce((sum, l) => sum + l.qualityScore, 0) / leadsWithScores.length).toFixed(1)
+        : 0;
+
+      content.innerHTML = `
+        <div class="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <h4 class="font-semibold text-gray-900 mb-2">How this is calculated (Estate Planning):</h4>
+          <p class="text-sm text-gray-700">
+            Each lead gets points for complete information:<br>
+            • Has Email: +25 points (required for communication)<br>
+            • Has Phone: +25 points (required for consultations)<br>
+            • Has Tags/Interests: +25 points (e.g., "probate guide", "interest: estate planning")<br>
+            • Has Attribution/Source: +25 points (where they came from)<br><br>
+            <strong>Average Score: ${avgScore}/100</strong><br>
+            <em class="text-xs">Note: Company field excluded (not relevant for estate planning clients)</em>
+          </p>
+        </div>
+
+        <div class="overflow-x-auto max-h-96">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50 sticky top-0">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Score</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tags</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              ${leadsWithScores.slice(0, 100).map(lead => {
+                const scoreColor = lead.qualityScore >= 75 ? 'text-green-600' : lead.qualityScore >= 50 ? 'text-yellow-600' : 'text-red-600';
+                const hasAttribution = lead.attributions && lead.attributions.length > 0;
+                const attributionSource = hasAttribution
+                  ? lead.attributions[0].medium || lead.attributions[0].source || 'Unknown'
+                  : 'None';
+                const tagsDisplay = lead.tags && lead.tags.length > 0
+                  ? `${lead.tags.length} tag${lead.tags.length > 1 ? 's' : ''}`
+                  : 'None';
+
+                return `
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">${lead.name}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm font-bold ${scoreColor}">${lead.qualityScore}/100</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm">${lead.email !== 'N/A' ? '✓' : '✗'}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm">${lead.phone !== 'N/A' ? '✓' : '✗'}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500" title="${lead.tags.join(', ')}">${tagsDisplay}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${hasAttribution ? '✓ ' + attributionSource : '✗'}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-4 text-sm text-gray-600 text-center">
+          Showing ${Math.min(100, leadsWithScores.length)} of ${leadsWithScores.length} total lead${leadsWithScores.length !== 1 ? 's' : ''}
+        </div>
+      `;
+    }
+
+    // Drill-down: Consultation Show-up Rate
+    async function showConsultationShowRateDrilldown(content, periodStart, periodEnd) {
+      const response = await api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=200`);
+
+      if (!response || !response.data || response.data.length === 0) {
+        content.innerHTML = '<div class="text-center py-8 text-gray-500">No consultations found in this period.</div>';
+        return;
+      }
+
+      const scheduled = response.data.filter(opp =>
+        opp.data?.stage === 'consultation_scheduled' ||
+        (opp.data?.pipelineStageId && opp.data.pipelineStageId.toLowerCase().includes('consult'))
+      );
+
+      const completed = response.data.filter(opp =>
+        opp.data?.stage === 'consultation_completed' ||
+        (opp.data?.pipelineStageId && opp.data.pipelineStageId.toLowerCase().includes('completed'))
+      );
+
+      const rate = scheduled.length > 0 ? ((completed.length / scheduled.length) * 100).toFixed(1) : 0;
+
+      content.innerHTML = `
+        <div class="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <h4 class="font-semibold text-gray-900 mb-2">How this is calculated:</h4>
+          <p class="text-sm text-gray-700">
+            (Completed consultations ÷ Scheduled consultations) × 100<br>
+            = (${completed.length} ÷ ${scheduled.length}) × 100 = ${rate}%
+          </p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-6">
+          <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+            <p class="text-sm text-gray-600">Showed Up</p>
+            <p class="text-2xl font-bold text-green-700">${completed.length}</p>
+          </div>
+          <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p class="text-sm text-gray-600">No-Shows</p>
+            <p class="text-2xl font-bold text-red-700">${scheduled.length - completed.length}</p>
+          </div>
+        </div>
+
+        <div class="text-center text-gray-600">
+          ${scheduled.length === 0 ? '<p>No consultations scheduled in this period.</p>' : ''}
+        </div>
+      `;
+    }
+
     // Create distribution metric card (for array results like horizontal bar charts)
     function createDistributionMetricCard(metric) {
       const canvasId = `chart-${metric.key}`;
@@ -876,6 +1299,7 @@
             <div class="flex-1">
               <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide">${metric.name}</h3>
               <p class="text-xs text-gray-400 mt-1">${metric.description || ''}</p>
+              <p class="text-xs text-indigo-600 mt-2 font-medium">Click any bar to see actual leads</p>
             </div>
             <div class="flex items-center gap-2">
               ${getStatusBadge(statusColor)}
@@ -940,6 +1364,17 @@
             </div>
             <div class="flex items-center gap-2">
               ${getStatusBadge(statusColor)}
+              <button
+                onclick="showMetricDrilldown('${metric.key}', '${metric.name}')"
+                class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 transition-colors"
+                title="View details and see how this is calculated"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                </svg>
+                Details
+              </button>
             </div>
           </div>
 
@@ -1000,6 +1435,793 @@
           }
         });
       }, 100);
+    }
+
+    // ========================================================================
+    // SECTION-BASED VISUALIZATION RENDERING (DATA-DRIVEN)
+    // ========================================================================
+
+    let chartInstances = {}; // Store chart instances for cleanup
+
+    /**
+     * Main visualization renderer - reads backend response and renders by section
+     */
+    function renderVisualizations(data) {
+      const container = document.getElementById('visualizationsContainer');
+
+      // Clear existing content and destroy old charts
+      Object.values(chartInstances).forEach(chart => {
+        if (chart && typeof chart.destroy === 'function') chart.destroy();
+      });
+      chartInstances = {};
+      container.innerHTML = '';
+
+      // Group visualizations by section
+      const visualizationsBySection = {
+        primary: [],
+        secondary: [],
+        trends: []
+      };
+
+      (data.visualizations || []).forEach(viz => {
+        const section = viz.section || 'trends';
+        if (visualizationsBySection[section]) {
+          visualizationsBySection[section].push(viz);
+        }
+      });
+
+      // Render sections in order: primary → secondary → trends
+      ['primary', 'secondary', 'trends'].forEach(sectionName => {
+        const visualizations = visualizationsBySection[sectionName];
+        if (visualizations && visualizations.length > 0) {
+          renderSection(sectionName, visualizations, data, container);
+        }
+      });
+    }
+
+    /**
+     * Render a section (primary, secondary, or trends)
+     */
+    function renderSection(sectionName, visualizations, data, container) {
+      // Create section container
+      const sectionDiv = document.createElement('div');
+      sectionDiv.className = 'mb-8';
+      sectionDiv.id = `section-${sectionName}`;
+
+      // Add section title (optional - can be removed if not needed)
+      if (sectionName === 'trends') {
+        const titleDiv = document.createElement('div');
+        titleDiv.className = 'mb-4';
+        titleDiv.innerHTML = `<h3 class="text-xl font-semibold text-gray-900">Trends & Comparisons</h3>`;
+        sectionDiv.appendChild(titleDiv);
+      }
+
+      // Render each visualization in the section
+      visualizations.forEach((viz, index) => {
+        const vizElement = renderVisualization(viz, data, `${sectionName}-${index}`);
+        if (vizElement) {
+          sectionDiv.appendChild(vizElement);
+        }
+      });
+
+      container.appendChild(sectionDiv);
+    }
+
+    /**
+     * Render a single visualization based on its type
+     */
+    function renderVisualization(viz, data, uniqueId) {
+      switch (viz.type) {
+        case 'metric_grid':
+          return renderMetricGrid(viz, uniqueId);
+        case 'trend_chart':
+          return renderTrendChart(viz, data, uniqueId);
+        case 'comparison_chart':
+          return renderComparisonChart(viz, data, uniqueId);
+        case 'pie_chart':
+          return renderPieChart(viz, data, uniqueId);
+        case 'bubble_chart':
+          return renderBubbleChart(viz, data, uniqueId);
+        case 'grouped_bar_chart':
+          return renderGroupedBarChart(viz, data, uniqueId);
+        case 'table':
+          return renderTable(viz, data, uniqueId);
+        default:
+          console.warn('Unknown visualization type:', viz.type);
+          return null;
+      }
+    }
+
+    /**
+     * Render metric_grid visualization
+     */
+    function renderMetricGrid(viz, uniqueId) {
+      const div = document.createElement('div');
+      div.className = 'mb-6';
+
+      const grid = document.createElement('div');
+      grid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6';
+      grid.id = `grid-${uniqueId}`;
+
+      // Render metrics
+      const metricsHTML = viz.metrics.map(metric => createMetricCard(metric)).join('');
+      grid.innerHTML = metricsHTML;
+
+      div.appendChild(grid);
+
+      // After DOM insertion, render any pie charts for distribution metrics
+      setTimeout(() => {
+        viz.metrics.forEach(metric => {
+          if (Array.isArray(metric.current)) {
+            const canvasId = `chart-${metric.key}`;
+            renderMetricChart(metric, canvasId);
+          }
+        });
+      }, 100);
+
+      return div;
+    }
+
+    /**
+     * Render trend_chart visualization (time series)
+     */
+    function renderTrendChart(viz, data, uniqueId) {
+      if (!data.timeSeries || data.timeSeries.length === 0) {
+        return null; // No time series data
+      }
+
+      const div = document.createElement('div');
+      div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
+
+      const canvasId = `chart-${uniqueId}`;
+      div.innerHTML = `
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">${viz.title || 'Metrics Over Time'}</h3>
+        <div class="h-96">
+          <canvas id="${canvasId}"></canvas>
+        </div>
+      `;
+
+      // After DOM insertion, render the chart
+      setTimeout(() => {
+        renderTimeSeriesChartForVisualization(canvasId, data.timeSeries, viz.metrics);
+      }, 100);
+
+      return div;
+    }
+
+    /**
+     * Render time series chart for a specific trend visualization
+     */
+    function renderTimeSeriesChartForVisualization(canvasId, timeSeries, metricKeys) {
+      const ctx = document.getElementById(canvasId);
+      if (!ctx) return;
+
+      // Build datasets for each metric in this visualization
+      const datasets = metricKeys.map((metricKey, index) => {
+        const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+        const color = colors[index % colors.length];
+
+        return {
+          label: metricKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          data: timeSeries.map(point => {
+            const metric = point.metrics.find(m => m.key === metricKey);
+            return metric ? parseFloat(metric.value) || 0 : 0;
+          }),
+          borderColor: color,
+          backgroundColor: color + '20',
+          borderWidth: 2,
+          fill: true,
+          tension: 0.4
+        };
+      });
+
+      const chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: timeSeries.map(point => new Date(point.date).toLocaleDateString()),
+          datasets: datasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: {
+                padding: 15,
+                font: { size: 11 }
+              }
+            },
+            tooltip: {
+              mode: 'index',
+              intersect: false
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              grid: {
+                color: '#f3f4f6'
+              }
+            },
+            x: {
+              grid: {
+                display: false
+              }
+            }
+          }
+        }
+      });
+
+      chartInstances[canvasId] = chart;
+    }
+
+    /**
+     * Render comparison_chart (Current vs Prior)
+     */
+    function renderComparisonChart(viz, data, uniqueId) {
+      const div = document.createElement('div');
+      div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
+
+      const canvasId = `chart-${uniqueId}`;
+      div.innerHTML = `
+        <div class="flex items-start justify-between mb-4">
+          <h3 class="text-lg font-semibold text-gray-900">${viz.title || 'Current vs Prior'}</h3>
+          ${viz.infoTooltip ? `<div class="tooltip" title="${viz.infoTooltip}">ℹ️</div>` : ''}
+        </div>
+        <div class="h-64">
+          <canvas id="${canvasId}"></canvas>
+        </div>
+      `;
+
+      setTimeout(() => {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx) return;
+
+        // Get metrics for this comparison
+        const metrics = data.metrics.filter(m => viz.metrics.includes(m.key));
+
+        const chart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: metrics.map(m => m.name),
+            datasets: [
+              {
+                label: 'Current Period',
+                data: metrics.map(m => parseFloat(m.current) || 0),
+                backgroundColor: '#3b82f6',
+                borderColor: '#2563eb',
+                borderWidth: 1
+              },
+              {
+                label: 'Prior Period',
+                data: metrics.map(m => parseFloat(m.prior) || 0),
+                backgroundColor: '#9ca3af',
+                borderColor: '#6b7280',
+                borderWidth: 1
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: 'bottom'
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true
+              }
+            }
+          }
+        });
+
+        chartInstances[canvasId] = chart;
+      }, 100);
+
+      return div;
+    }
+
+    /**
+     * Render pie_chart visualization
+     */
+    function renderPieChart(viz, data, uniqueId) {
+      const div = document.createElement('div');
+      div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
+
+      const canvasId = `chart-${uniqueId}`;
+      div.innerHTML = `
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">${viz.title || 'Distribution'}</h3>
+        <div class="h-64">
+          <canvas id="${canvasId}"></canvas>
+        </div>
+      `;
+
+      setTimeout(() => {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx) return;
+
+        // Find the metric with distribution data
+        const metric = data.metrics.find(m => viz.metrics.includes(m.key));
+        if (!metric || !Array.isArray(metric.current)) return;
+
+        const distributionData = metric.current;
+
+        const chart = new Chart(ctx, {
+          type: 'pie',
+          data: {
+            labels: distributionData.map(d => d.label),
+            datasets: [{
+              data: distributionData.map(d => d.value),
+              backgroundColor: [
+                '#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+                '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#84cc16'
+              ]
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: 'right',
+                labels: {
+                  padding: 10,
+                  font: { size: 10 }
+                }
+              }
+            }
+          }
+        });
+
+        chartInstances[canvasId] = chart;
+      }, 100);
+
+      return div;
+    }
+
+    /**
+     * Render bubble_chart visualization
+     */
+    function renderBubbleChart(viz, data, uniqueId) {
+      const div = document.createElement('div');
+      div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
+
+      const canvasId = `chart-${uniqueId}`;
+      div.innerHTML = `
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">${viz.title || 'Bubble Chart'}</h3>
+        ${viz.description ? `<p class="text-sm text-gray-500 mb-4">${viz.description}</p>` : ''}
+        <div class="h-96">
+          <canvas id="${canvasId}"></canvas>
+        </div>
+      `;
+
+      setTimeout(() => {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx) return;
+
+        // Check if we have query results
+        if (!viz.data || viz.data.length === 0) {
+          ctx.parentElement.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500">No data available</div>';
+          return;
+        }
+
+        // Transform query results into Chart.js bubble format
+        const bubbleData = viz.data.map(row => {
+          const xField = viz.xAxis?.field || 'avg_quality_score';
+          const yField = viz.yAxis?.field || 'booking_rate';
+          const sizeField = viz.bubbleSize?.field || 'lead_count';
+          const labelField = viz.bubbleLabel?.field || 'source_name';
+
+          return {
+            x: parseFloat(row[xField]) || 0,
+            y: parseFloat(row[yField]) || 0,
+            r: Math.sqrt(parseFloat(row[sizeField]) || 1) * 3, // Scale bubble size
+            label: row[labelField] || 'Unknown'
+          };
+        });
+
+        const chart = new Chart(ctx, {
+          type: 'bubble',
+          data: {
+            datasets: [{
+              label: viz.title,
+              data: bubbleData,
+              backgroundColor: 'rgba(99, 102, 241, 0.6)',
+              borderColor: 'rgba(99, 102, 241, 1)',
+              borderWidth: 1
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    const point = context.raw;
+                    return [
+                      `${point.label}`,
+                      `${viz.xAxis?.label || 'Quality'}: ${point.x}`,
+                      `${viz.yAxis?.label || 'Rate'}: ${point.y}%`,
+                      `${viz.bubbleSize?.label || 'Count'}: ${Math.round((point.r / 3) ** 2)}`
+                    ];
+                  }
+                }
+              }
+            },
+            scales: {
+              x: {
+                title: {
+                  display: true,
+                  text: viz.xAxis?.label || 'X Axis'
+                },
+                min: viz.xAxis?.min || 0,
+                max: viz.xAxis?.max || 100
+              },
+              y: {
+                title: {
+                  display: true,
+                  text: viz.yAxis?.label || 'Y Axis'
+                },
+                min: viz.yAxis?.min || 0,
+                max: viz.yAxis?.max || 100
+              }
+            }
+          }
+        });
+
+        chartInstances[canvasId] = chart;
+      }, 100);
+
+      return div;
+    }
+
+    /**
+     * Render grouped_bar_chart visualization
+     */
+    function renderGroupedBarChart(viz, data, uniqueId) {
+      const div = document.createElement('div');
+      div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
+
+      const canvasId = `chart-${uniqueId}`;
+      div.innerHTML = `
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">${viz.title || 'Grouped Bar Chart'}</h3>
+        ${viz.description ? `<p class="text-sm text-gray-500 mb-4">${viz.description}</p>` : ''}
+        <div class="h-96">
+          <canvas id="${canvasId}"></canvas>
+        </div>
+      `;
+
+      setTimeout(() => {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx) return;
+
+        // Check if we have query results
+        if (!viz.data || viz.data.length === 0) {
+          ctx.parentElement.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500">No data available</div>';
+          return;
+        }
+
+        const xField = viz.xAxis?.field || 'source_name';
+        const labels = viz.data.map(row => row[xField] || 'Unknown');
+
+        // Build datasets from series config
+        const datasets = (viz.series || []).map(serie => {
+          return {
+            label: serie.label,
+            data: viz.data.map(row => parseFloat(row[serie.field]) || 0),
+            backgroundColor: serie.color,
+            borderColor: serie.color,
+            borderWidth: 1
+          };
+        });
+
+        const chart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: datasets
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: 'bottom'
+              },
+              tooltip: {
+                callbacks: {
+                  afterLabel: function(context) {
+                    // Show lead count annotation if available
+                    if (viz.annotations?.field) {
+                      const row = viz.data[context.dataIndex];
+                      const value = row[viz.annotations.field];
+                      return viz.annotations.label.replace('{value}', value);
+                    }
+                    return '';
+                  }
+                }
+              }
+            },
+            scales: {
+              x: {
+                title: {
+                  display: true,
+                  text: viz.xAxis?.label || 'Categories'
+                }
+              },
+              y: {
+                title: {
+                  display: true,
+                  text: viz.yAxis?.label || 'Value'
+                },
+                min: viz.yAxis?.min || 0,
+                max: viz.yAxis?.max || 100,
+                beginAtZero: true
+              }
+            }
+          }
+        });
+
+        chartInstances[canvasId] = chart;
+      }, 100);
+
+      return div;
+    }
+
+    /**
+     * Render table visualization with pagination, sorting, and search
+     */
+    function renderTable(viz, data, uniqueId) {
+      const div = document.createElement('div');
+      div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
+
+      // Find the metric with distribution data
+      const metric = data.metrics.find(m => viz.metrics && viz.metrics.includes(m.key));
+
+      if (!metric || !Array.isArray(metric.current)) {
+        div.innerHTML = `
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">${viz.title || 'Table'}</h3>
+          <div class="text-gray-500 text-center py-8">No data available</div>
+        `;
+        return div;
+      }
+
+      const tableData = metric.current;
+      const columns = viz.columns || [
+        { field: 'label', header: 'Label', align: 'left' },
+        { field: 'count', header: 'Count', align: 'right' },
+        { field: 'value', header: 'Value', align: 'right', format: 'percent' }
+      ];
+
+      // Table state
+      let filteredData = [...tableData];
+      let currentPage = 1;
+      const rowsPerPage = 10;
+      let sortField = null;
+      let sortDirection = 'asc';
+
+      // Build initial HTML structure
+      div.innerHTML = `
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">${viz.title || 'Table'}</h3>
+        ${viz.description ? `<p class="text-sm text-gray-500 mb-4">${viz.description}</p>` : ''}
+
+        <!-- Search box -->
+        <div class="mb-4">
+          <input
+            type="text"
+            id="search-${uniqueId}"
+            placeholder="Search..."
+            class="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+
+        <!-- Table -->
+        <div class="overflow-x-auto mb-4">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr id="table-header-${uniqueId}"></tr>
+            </thead>
+            <tbody id="table-body-${uniqueId}" class="bg-white divide-y divide-gray-200">
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="flex items-center justify-between">
+          <div class="text-sm text-gray-700">
+            Showing <span id="start-${uniqueId}">1</span> to <span id="end-${uniqueId}">10</span> of <span id="total-${uniqueId}">0</span> results
+          </div>
+          <div class="flex gap-2">
+            <button
+              id="prev-${uniqueId}"
+              class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled
+            >
+              Previous
+            </button>
+            <button
+              id="next-${uniqueId}"
+              class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      `;
+
+      // Render table header with sort controls
+      function renderHeader() {
+        const headerRow = div.querySelector(`#table-header-${uniqueId}`);
+        headerRow.innerHTML = columns.map(col => {
+          const isSorted = sortField === col.field;
+          const sortIcon = isSorted
+            ? (sortDirection === 'asc' ? ' ▲' : ' ▼')
+            : ' ⇅';
+
+          return `
+            <th
+              class="px-4 py-3 text-${col.align || 'left'} text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+              data-field="${col.field}"
+            >
+              ${col.header}${sortIcon}
+            </th>
+          `;
+        }).join('');
+
+        // Add click handlers for sorting
+        headerRow.querySelectorAll('th').forEach(th => {
+          th.addEventListener('click', () => {
+            const field = th.dataset.field;
+            if (sortField === field) {
+              sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+              sortField = field;
+              sortDirection = 'asc';
+            }
+            currentPage = 1;
+            render();
+          });
+        });
+      }
+
+      // Format cell value
+      function formatValue(value, column) {
+        if (column.format === 'percent' && typeof value === 'number') {
+          return `${value.toFixed(1)}%`;
+        } else if (typeof value === 'number') {
+          return value.toLocaleString();
+        }
+        return value;
+      }
+
+      // Render table body
+      function renderBody() {
+        const tbody = div.querySelector(`#table-body-${uniqueId}`);
+
+        // Sort data
+        let sortedData = [...filteredData];
+        if (sortField) {
+          sortedData.sort((a, b) => {
+            let aVal = a[sortField];
+            let bVal = b[sortField];
+
+            // Handle numeric sorting
+            if (typeof aVal === 'number' && typeof bVal === 'number') {
+              return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+            }
+
+            // Handle string sorting
+            aVal = String(aVal).toLowerCase();
+            bVal = String(bVal).toLowerCase();
+            if (sortDirection === 'asc') {
+              return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+            } else {
+              return bVal < aVal ? -1 : bVal > aVal ? 1 : 0;
+            }
+          });
+        }
+
+        // Paginate
+        const startIdx = (currentPage - 1) * rowsPerPage;
+        const endIdx = Math.min(startIdx + rowsPerPage, sortedData.length);
+        const pageData = sortedData.slice(startIdx, endIdx);
+
+        // Render rows
+        tbody.innerHTML = pageData.map((row, idx) => {
+          const cellsHTML = columns.map(col => {
+            const value = formatValue(row[col.field], col);
+            return `<td class="px-4 py-3 text-${col.align || 'left'} text-sm text-gray-900">${value}</td>`;
+          }).join('');
+
+          const bgClass = idx % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+          return `<tr class="${bgClass}">${cellsHTML}</tr>`;
+        }).join('');
+
+        // Update pagination info
+        div.querySelector(`#start-${uniqueId}`).textContent = sortedData.length > 0 ? startIdx + 1 : 0;
+        div.querySelector(`#end-${uniqueId}`).textContent = endIdx;
+        div.querySelector(`#total-${uniqueId}`).textContent = sortedData.length;
+
+        // Update pagination buttons
+        const prevBtn = div.querySelector(`#prev-${uniqueId}`);
+        const nextBtn = div.querySelector(`#next-${uniqueId}`);
+
+        prevBtn.disabled = currentPage === 1;
+        nextBtn.disabled = endIdx >= sortedData.length;
+      }
+
+      // Handle search
+      function handleSearch(searchTerm) {
+        const term = searchTerm.toLowerCase().trim();
+
+        if (!term) {
+          filteredData = [...tableData];
+        } else {
+          filteredData = tableData.filter(row => {
+            return columns.some(col => {
+              const value = String(row[col.field]).toLowerCase();
+              return value.includes(term);
+            });
+          });
+        }
+
+        currentPage = 1;
+        render();
+      }
+
+      // Complete render
+      function render() {
+        renderHeader();
+        renderBody();
+      }
+
+      // Set up event listeners after DOM insertion
+      setTimeout(() => {
+        // Search input
+        const searchInput = div.querySelector(`#search-${uniqueId}`);
+        searchInput.addEventListener('input', (e) => handleSearch(e.target.value));
+
+        // Pagination buttons
+        div.querySelector(`#prev-${uniqueId}`).addEventListener('click', () => {
+          if (currentPage > 1) {
+            currentPage--;
+            render();
+          }
+        });
+
+        div.querySelector(`#next-${uniqueId}`).addEventListener('click', () => {
+          const maxPage = Math.ceil(filteredData.length / rowsPerPage);
+          if (currentPage < maxPage) {
+            currentPage++;
+            render();
+          }
+        });
+
+        // Initial render
+        render();
+      }, 0);
+
+      return div;
+    }
+
+    /**
+     * Render placeholder for unimplemented chart types
+     */
+    function renderPlaceholderChart(viz, uniqueId) {
+      const div = document.createElement('div');
+      div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
+      div.innerHTML = `
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">${viz.title || viz.type}</h3>
+        <div class="h-64 flex items-center justify-center bg-gray-50 rounded">
+          <p class="text-gray-500">Chart type "${viz.type}" will be implemented soon</p>
+        </div>
+      `;
+      return div;
     }
 
     // Execute module
@@ -1076,19 +2298,8 @@
           document.getElementById('resultPriorPeriod').textContent = 'N/A';
         }
 
-        // Render metrics (filter out errors)
-        const validMetrics = data.metrics.filter(m => m.status !== 'error');
-        renderMetrics(validMetrics);
-
-        // Render time-series chart if available
-        if (data.timeSeries && data.timeSeries.length > 0) {
-          renderTimeSeriesChart(data.timeSeries, validMetrics);
-        } else {
-          document.getElementById('timeSeriesSection').classList.add('hidden');
-        }
-
-        // Render charts
-        renderCharts(validMetrics);
+        // Render visualizations based on backend response (section-driven)
+        renderVisualizations(data);
 
         // Show results
         document.getElementById('moduleResults').classList.remove('hidden');
