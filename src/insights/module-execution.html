@@ -3002,49 +3002,419 @@
 
     // Drill-down: Consultation Show-up Rate
     async function showConsultationShowRateDrilldown(content, periodStart, periodEnd) {
-      const response = await api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=200`);
+      // Fetch opportunities and pipelines
+      const [oppResponse, pipelineResponse] = await Promise.all([
+        api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=500`),
+        api.get(`/api/v1/integrations/connector-data?entity_type=pipeline&limit=50`)
+      ]);
 
-      if (!response || !response.data || response.data.length === 0) {
+      const opportunities = oppResponse?.data || [];
+      const pipelines = pipelineResponse?.data || [];
+
+      if (opportunities.length === 0) {
         content.innerHTML = '<div class="text-center py-8 text-gray-500">No consultations found in this period.</div>';
         return;
       }
 
-      const scheduled = response.data.filter(opp =>
-        opp.data?.stage === 'consultation_scheduled' ||
-        (opp.data?.pipelineStageId && opp.data.pipelineStageId.toLowerCase().includes('consult'))
-      );
+      // Create pipeline stage lookup
+      const stageMap = {};
+      pipelines.forEach(pipeline => {
+        const pipelineId = pipeline.data?.id;
+        const stages = pipeline.data?.stages || [];
+        stages.forEach(stage => {
+          stageMap[stage.id] = {
+            name: stage.name,
+            position: stage.position,
+            pipelineId: pipelineId,
+            pipelineName: pipeline.data?.name
+          };
+        });
+      });
 
-      const completed = response.data.filter(opp =>
-        opp.data?.stage === 'consultation_completed' ||
-        (opp.data?.pipelineStageId && opp.data.pipelineStageId.toLowerCase().includes('completed'))
-      );
+      // Categorize opportunities by attendance status
+      const showed = [];
+      const noShow = [];
+      const cancelled = [];
+      const pending = [];
+      const other = [];
 
-      const rate = scheduled.length > 0 ? ((completed.length / scheduled.length) * 100).toFixed(1) : 0;
+      opportunities.forEach(opp => {
+        const stageId = opp.data?.pipelineStageId;
+        const stage = stageMap[stageId];
+        const stageName = stage?.name || '';
+        const stagePosition = stage?.position || 0;
 
+        // Determine attendance status
+        if (stageName.includes('Showed') || stageName.includes('Complete') || stageName.includes('Intake Complete')) {
+          showed.push({ ...opp, stageName, stagePosition });
+        } else if (stageName.includes('No-Show')) {
+          noShow.push({ ...opp, stageName, stagePosition });
+        } else if (stageName.includes('Cancelled')) {
+          cancelled.push({ ...opp, stageName, stagePosition });
+        } else if (stageName.includes('Booked')) {
+          pending.push({ ...opp, stageName, stagePosition });
+        } else if (stagePosition >= 7 && !stageName.includes('No-Show') && !stageName.includes('Cancelled') && !stageName.includes('Reschedule')) {
+          // Progressed past the show stage
+          showed.push({ ...opp, stageName, stagePosition });
+        } else {
+          other.push({ ...opp, stageName, stagePosition });
+        }
+      });
+
+      // Calculate stats
+      const totalBooked = opportunities.length;
+      const totalValue = opportunities.reduce((sum, opp) => sum + parseFloat(opp.data?.monetaryValue || 0), 0);
+      const showRate = totalBooked > 0 ? ((showed.length / totalBooked) * 100).toFixed(1) : 0;
+
+      const formatCurrency = (value) => {
+        return new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: 'USD',
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0
+        }).format(value);
+      };
+
+      // Store data for table rendering
+      window.showRateData = {
+        allOpportunities: opportunities,
+        showed: showed,
+        noShow: noShow,
+        cancelled: cancelled,
+        pending: pending,
+        other: other,
+        currentPage: 1,
+        rowsPerPage: 25,
+        sortColumn: 'created_date',
+        sortDirection: 'desc',
+        searchQuery: '',
+        currentFilter: 'all' // 'all', 'showed', 'no_show', 'cancelled', 'pending'
+      };
+
+      // Helper functions
+      window.updateShowRateSearch = (event) => {
+        window.showRateData.searchQuery = event.target.value;
+      };
+
+      window.executeShowRateSearch = () => {
+        window.showRateData.currentPage = 1;
+        window.renderShowRateTable(window.showRateData.currentFilter);
+      };
+
+      window.handleShowRateKeypress = (event) => {
+        if (event.key === 'Enter') {
+          window.executeShowRateSearch();
+        }
+      };
+
+      window.sortShowRateBy = (column) => {
+        const state = window.showRateData;
+        if (state.sortColumn === column) {
+          state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+          state.sortColumn = column;
+          state.sortDirection = 'asc';
+        }
+        window.renderShowRateTable(state.currentFilter);
+      };
+
+      window.goToShowRatePage = (page) => {
+        const state = window.showRateData;
+        const totalPages = Math.ceil(state.filteredOpportunities.length / state.rowsPerPage);
+        if (page >= 1 && page <= totalPages) {
+          state.currentPage = page;
+          window.renderShowRateTable(state.currentFilter);
+        }
+      };
+
+      // Main render function
+      window.renderShowRateTable = function(filter = 'all') {
+        const state = window.showRateData;
+        state.currentFilter = filter;
+
+        // Filter data based on selected filter
+        let displayOpps = [];
+        switch (filter) {
+          case 'showed':
+            displayOpps = state.showed;
+            break;
+          case 'no_show':
+            displayOpps = state.noShow;
+            break;
+          case 'cancelled':
+            displayOpps = state.cancelled;
+            break;
+          case 'pending':
+            displayOpps = state.pending;
+            break;
+          case 'all':
+          default:
+            displayOpps = state.allOpportunities;
+            break;
+        }
+
+        // Apply search filter
+        if (state.searchQuery.trim()) {
+          const query = state.searchQuery.toLowerCase();
+          displayOpps = displayOpps.filter(opp => {
+            const oppName = (opp.data?.name || '').toLowerCase();
+            const contactName = (opp.data?.contact?.name || opp.data?.contact?.firstName || '').toLowerCase();
+            const contactEmail = (opp.data?.contact?.email || '').toLowerCase();
+            return oppName.includes(query) || contactName.includes(query) || contactEmail.includes(query);
+          });
+        }
+
+        state.filteredOpportunities = displayOpps;
+
+        // Apply sorting
+        displayOpps.sort((a, b) => {
+          let aVal, bVal;
+          switch (state.sortColumn) {
+            case 'name':
+              aVal = (a.data?.name || '').toLowerCase();
+              bVal = (b.data?.name || '').toLowerCase();
+              break;
+            case 'contact':
+              aVal = (a.data?.contact?.name || '').toLowerCase();
+              bVal = (b.data?.contact?.name || '').toLowerCase();
+              break;
+            case 'value':
+              aVal = parseFloat(a.data?.monetaryValue || 0);
+              bVal = parseFloat(b.data?.monetaryValue || 0);
+              break;
+            case 'stage':
+              aVal = (a.stageName || '').toLowerCase();
+              bVal = (b.stageName || '').toLowerCase();
+              break;
+            case 'created_date':
+              aVal = new Date(a.source_created_at);
+              bVal = new Date(b.source_created_at);
+              break;
+            default:
+              return 0;
+          }
+          if (aVal < bVal) return state.sortDirection === 'asc' ? -1 : 1;
+          if (aVal > bVal) return state.sortDirection === 'asc' ? 1 : -1;
+          return 0;
+        });
+
+        // Pagination
+        const totalRecords = displayOpps.length;
+        const totalPages = Math.ceil(totalRecords / state.rowsPerPage) || 1;
+        if (state.currentPage > totalPages) state.currentPage = totalPages;
+
+        const startIdx = (state.currentPage - 1) * state.rowsPerPage;
+        const endIdx = Math.min(startIdx + state.rowsPerPage, totalRecords);
+        const paginatedOpps = displayOpps.slice(startIdx, endIdx);
+
+        // Render summary cards with active state
+        const isActive = (cardFilter) => cardFilter === filter ? 'ring-2 ring-indigo-600 shadow-lg' : '';
+        const summaryCardsHTML = `
+          <div onclick="window.renderShowRateTable('all')" class="bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('all')}">
+            <p class="text-sm text-gray-600">Total Booked</p>
+            <p class="text-2xl font-bold text-gray-900">${state.allOpportunities.length}</p>
+            <p class="text-xs text-gray-500">${formatCurrency(totalValue)} total value</p>
+          </div>
+          <div onclick="window.renderShowRateTable('showed')" class="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('showed')}">
+            <p class="text-sm text-green-600 font-medium">✅ Showed</p>
+            <p class="text-2xl font-bold text-green-700">${state.showed.length}</p>
+            <p class="text-xs text-gray-500">${showRate}% show rate</p>
+          </div>
+          <div onclick="window.renderShowRateTable('no_show')" class="bg-red-50 border border-red-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('no_show')}">
+            <p class="text-sm text-red-600 font-medium">❌ No-Show</p>
+            <p class="text-2xl font-bold text-red-700">${state.noShow.length}</p>
+            <p class="text-xs text-gray-500">Missed consultations</p>
+          </div>
+          <div onclick="window.renderShowRateTable('cancelled')" class="bg-orange-50 border border-orange-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('cancelled')}">
+            <p class="text-sm text-orange-600 font-medium">🚫 Cancelled</p>
+            <p class="text-2xl font-bold text-orange-700">${state.cancelled.length}</p>
+            <p class="text-xs text-gray-500">Cancelled appointments</p>
+          </div>
+          <div onclick="window.renderShowRateTable('pending')" class="bg-blue-50 border border-blue-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('pending')}">
+            <p class="text-sm text-blue-600 font-medium">⏳ Pending</p>
+            <p class="text-2xl font-bold text-blue-700">${state.pending.length}</p>
+            <p class="text-xs text-gray-500">Awaiting consultation</p>
+          </div>
+        `;
+
+        document.getElementById('showRateSummaryCards').innerHTML = summaryCardsHTML;
+
+        // Helper functions for table rendering
+        const getSortIcon = (column) => {
+          if (state.sortColumn !== column) return '';
+          return state.sortDirection === 'asc'
+            ? '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>'
+            : '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>';
+        };
+
+        const formatDate = (dateStr) => {
+          if (!dateStr) return 'N/A';
+          const date = new Date(dateStr);
+          return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        };
+
+        const getAttendanceStatus = (opp) => {
+          const stageName = opp.stageName || '';
+          if (stageName.includes('Showed') || stageName.includes('Complete') || stageName.includes('Intake Complete')) {
+            return { label: 'Showed', color: 'bg-green-100 text-green-700' };
+          } else if (stageName.includes('No-Show')) {
+            return { label: 'No-Show', color: 'bg-red-100 text-red-700' };
+          } else if (stageName.includes('Cancelled')) {
+            return { label: 'Cancelled', color: 'bg-orange-100 text-orange-700' };
+          } else if (stageName.includes('Booked')) {
+            return { label: 'Booked (Pending)', color: 'bg-blue-100 text-blue-700' };
+          } else if (opp.stagePosition >= 7) {
+            return { label: 'Showed (Progressed)', color: 'bg-purple-100 text-purple-700' };
+          } else {
+            return { label: 'Other', color: 'bg-gray-100 text-gray-600' };
+          }
+        };
+
+        const tableHTML = `
+          <!-- Search Box -->
+          <div class="mb-4 flex gap-2">
+            <input
+              type="text"
+              placeholder="Search by opportunity name, contact, or email..."
+              value="${state.searchQuery}"
+              oninput="window.updateShowRateSearch(event)"
+              onkeypress="window.handleShowRateKeypress(event)"
+              class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+            <button
+              onclick="window.executeShowRateSearch()"
+              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            >
+              Search
+            </button>
+          </div>
+
+          <!-- Table -->
+          <div class="overflow-x-auto border border-gray-200 rounded-lg">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th onclick="window.sortShowRateBy('name')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Opportunity ${getSortIcon('name')}
+                  </th>
+                  <th onclick="window.sortShowRateBy('contact')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Contact ${getSortIcon('contact')}
+                  </th>
+                  <th onclick="window.sortShowRateBy('value')" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Value ${getSortIcon('value')}
+                  </th>
+                  <th onclick="window.sortShowRateBy('stage')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Current Stage ${getSortIcon('stage')}
+                  </th>
+                  <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                    Attendance Status
+                  </th>
+                  <th onclick="window.sortShowRateBy('created_date')" class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Created ${getSortIcon('created_date')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                ${paginatedOpps.map(opp => {
+                  const value = parseFloat(opp.data?.monetaryValue || 0);
+                  const contactName = opp.data?.contact?.name ||
+                                     (opp.data?.contact?.firstName && opp.data?.contact?.lastName
+                                       ? `${opp.data.contact.firstName} ${opp.data.contact.lastName}`
+                                       : 'Unknown');
+                  const contactEmail = opp.data?.contact?.email || '';
+                  const contactPhone = opp.data?.contact?.phone || '';
+                  const attendanceStatus = getAttendanceStatus(opp);
+                  const stageName = opp.stageName || 'Unknown';
+
+                  return `
+                    <tr class="hover:bg-gray-50">
+                      <td class="px-4 py-3 text-sm font-medium text-gray-900">${opp.data?.name || 'N/A'}</td>
+                      <td class="px-4 py-3 text-sm text-gray-600">
+                        ${contactName}
+                        ${contactEmail ? `<br><span class="text-xs text-gray-500">${contactEmail}</span>` : ''}
+                        ${contactPhone ? `<br><span class="text-xs text-gray-500">${contactPhone}</span>` : ''}
+                      </td>
+                      <td class="px-4 py-3 text-right text-sm font-semibold text-green-600">${formatCurrency(value)}</td>
+                      <td class="px-4 py-3 text-sm text-gray-700">${stageName}</td>
+                      <td class="px-4 py-3 text-center text-sm">
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${attendanceStatus.color}">
+                          ${attendanceStatus.label}
+                        </span>
+                      </td>
+                      <td class="px-4 py-3 text-center text-sm text-gray-500">${formatDate(opp.source_created_at)}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination -->
+          <div class="mt-4 flex items-center justify-between text-sm text-gray-700">
+            <p>Showing ${startIdx + 1}-${endIdx} of ${totalRecords} consultations</p>
+            <div class="flex gap-2">
+              <button
+                onclick="window.goToShowRatePage(${state.currentPage - 1})"
+                ${state.currentPage === 1 ? 'disabled' : ''}
+                class="px-3 py-1 border rounded ${state.currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+              >
+                Previous
+              </button>
+              <span class="px-3 py-1">Page ${state.currentPage} of ${totalPages}</span>
+              <button
+                onclick="window.goToShowRatePage(${state.currentPage + 1})"
+                ${state.currentPage === totalPages ? 'disabled' : ''}
+                class="px-3 py-1 border rounded ${state.currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        `;
+
+        document.getElementById('showRateTableContainer').innerHTML = tableHTML;
+      };
+
+      // Render content
       content.innerHTML = `
         <div class="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-          <h4 class="font-semibold text-gray-900 mb-2">How this is calculated:</h4>
-          <p class="text-sm text-gray-700">
-            (Completed consultations ÷ Scheduled consultations) × 100<br>
-            = (${completed.length} ÷ ${scheduled.length}) × 100 = ${rate}%
+          <h4 class="font-semibold text-gray-900 mb-2">📊 How Consultation Show-up Rate is Calculated</h4>
+          <p class="text-sm text-gray-700 mb-3">
+            This metric tracks what percentage of booked consultations actually had the contact show up.
+            We determine this using pipeline stage progression.
           </p>
+          <div class="bg-white rounded p-3 mb-3 border-l-4 border-green-500">
+            <p class="text-sm text-gray-800 mb-2"><strong>Calculation Formula:</strong></p>
+            <p class="text-sm text-gray-700">
+              Show-up Rate = <strong>(Consultations Showed / Total Booked)</strong> × 100
+            </p>
+            <p class="text-sm text-gray-600 mt-2">
+              = ${showed.length} ÷ ${totalBooked} × 100 = <strong class="text-green-600">${showRate}%</strong>
+            </p>
+          </div>
+          <div class="text-sm text-gray-700 space-y-2">
+            <p><strong>📋 What we count:</strong></p>
+            <ul class="list-disc list-inside space-y-1 ml-2">
+              <li><strong>Showed:</strong> Stages with "Showed", "Complete", "Intake Complete", or progressed past consultation stage</li>
+              <li><strong>No-Show:</strong> Stage contains "No-Show"</li>
+              <li><strong>Cancelled:</strong> Stage contains "Cancelled"</li>
+              <li><strong>Pending:</strong> Stage is "Consultation: Booked" (awaiting consultation)</li>
+            </ul>
+          </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-4 mb-6">
-          <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-            <p class="text-sm text-gray-600">Showed Up</p>
-            <p class="text-2xl font-bold text-green-700">${completed.length}</p>
-          </div>
-          <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p class="text-sm text-gray-600">No-Shows</p>
-            <p class="text-2xl font-bold text-red-700">${scheduled.length - completed.length}</p>
-          </div>
+        <!-- Summary Cards -->
+        <div id="showRateSummaryCards" class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+          <!-- Cards will be rendered by renderShowRateTable to show active state -->
         </div>
 
-        <div class="text-center text-gray-600">
-          ${scheduled.length === 0 ? '<p>No consultations scheduled in this period.</p>' : ''}
+        <div id="showRateTableContainer">
+          <!-- Table will be rendered here -->
         </div>
       `;
+
+      // Initial render
+      window.renderShowRateTable('all');
     }
 
     // Drill-down: Average Case Value
