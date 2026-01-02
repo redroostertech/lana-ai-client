@@ -702,6 +702,7 @@
           scales: {
             x: {
               beginAtZero: true,
+              suggestedMax: Math.ceil(Math.max(...counts) * 1.1), // Add 10% padding above max value
               ticks: {
                 precision: 0
               },
@@ -860,6 +861,12 @@
             break;
           case 'consultation_show_rate':
             await showConsultationShowRateDrilldown(content, periodStart, periodEnd);
+            break;
+          case 'average_case_value':
+            await showAverageCaseValueDrilldown(content, periodStart, periodEnd);
+            break;
+          case 'consultations_held':
+            await showConsultationsHeldDrilldown(content, periodStart, periodEnd);
             break;
           default:
             content.innerHTML = '<div class="text-center py-8 text-gray-500">Drill-down not available for this metric.</div>';
@@ -1886,86 +1893,781 @@
 
     // Drill-down: Consultation Booking Rate
     async function showConsultationBookingDrilldown(content, periodStart, periodEnd) {
-      const response = await api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=200`);
+      const response = await api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=500`);
 
       if (!response || !response.data || response.data.length === 0) {
         content.innerHTML = '<div class="text-center py-8 text-gray-500">No opportunities found in this period.</div>';
         return;
       }
 
-      const booked = response.data.filter(opp => {
+      // Filter only open opportunities (not won/lost/abandoned)
+      const openOpportunities = response.data.filter(opp => opp.data?.status === 'open');
+
+      const booked = openOpportunities.filter(opp => {
         const attributions = opp.data?.attributions || [];
         return Array.isArray(attributions) && attributions.some(attr => attr.medium === 'calendar');
       });
-      const notBooked = response.data.filter(opp => {
+      const notBooked = openOpportunities.filter(opp => {
         const attributions = opp.data?.attributions || [];
         return !Array.isArray(attributions) || !attributions.some(attr => attr.medium === 'calendar');
       });
 
+      const bookingRate = openOpportunities.length > 0
+        ? ((booked.length / openOpportunities.length) * 100).toFixed(1)
+        : 0;
+
+      // Currency formatter
+      const formatCurrency = (value) => {
+        return new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: 'USD',
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0
+        }).format(value);
+      };
+
+      // Calculate potential revenue from not-booked leads
+      const notBookedValue = notBooked.reduce((sum, opp) => sum + parseFloat(opp.data?.monetaryValue || 0), 0);
+      const bookedValue = booked.reduce((sum, opp) => sum + parseFloat(opp.data?.monetaryValue || 0), 0);
+
+      // Store data for table rendering
+      window.consultationBookingData = {
+        allOpportunities: openOpportunities,
+        booked: booked,
+        notBooked: notBooked,
+        currentPage: 1,
+        rowsPerPage: 25,
+        sortColumn: 'name',
+        sortDirection: 'asc',
+        searchQuery: '',
+        currentFilter: 'all' // 'all', 'booked', 'not_booked'
+      };
+
+      // Render table function
+      window.renderConsultationBookingTable = function(filter = 'all') {
+        const state = window.consultationBookingData;
+        state.currentFilter = filter;
+        state.currentPage = 1;
+
+        // Render summary cards with active state
+        const isActive = (cardFilter) => cardFilter === filter ? 'ring-2 ring-indigo-600 shadow-lg' : '';
+        const summaryCardsHTML = `
+          <div onclick="window.renderConsultationBookingTable('all')" class="bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('all')}">
+            <p class="text-sm text-gray-600">Total Opportunities</p>
+            <p class="text-2xl font-bold text-gray-900">${state.allOpportunities.length}</p>
+            <p class="text-xs text-gray-500">${bookingRate}% booking rate</p>
+          </div>
+          <div onclick="window.renderConsultationBookingTable('booked')" class="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('booked')}">
+            <p class="text-sm text-gray-600 flex items-center gap-1">
+              <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              Booked
+            </p>
+            <p class="text-2xl font-bold text-green-700">${state.booked.length}</p>
+            <p class="text-xs text-gray-500">${formatCurrency(bookedValue)}</p>
+          </div>
+          <div onclick="window.renderConsultationBookingTable('not_booked')" class="bg-orange-50 border border-orange-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('not_booked')}">
+            <p class="text-sm text-gray-600 flex items-center gap-1">
+              <svg class="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              Not Booked
+            </p>
+            <p class="text-2xl font-bold text-orange-700">${state.notBooked.length}</p>
+            <p class="text-xs text-orange-500">${formatCurrency(notBookedValue)} at risk</p>
+          </div>
+        `;
+        document.getElementById('consultationSummaryCards').innerHTML = summaryCardsHTML;
+
+        // Apply filter
+        let filteredOpps = state.allOpportunities;
+        if (filter === 'booked') {
+          filteredOpps = state.booked;
+        } else if (filter === 'not_booked') {
+          filteredOpps = state.notBooked;
+        }
+
+        // Apply search
+        if (state.searchQuery) {
+          const query = state.searchQuery.toLowerCase();
+          filteredOpps = filteredOpps.filter(opp =>
+            (opp.data?.name && opp.data.name.toLowerCase().includes(query)) ||
+            (opp.data?.contact?.name && opp.data.contact.name.toLowerCase().includes(query)) ||
+            (opp.data?.contact?.email && opp.data.contact.email.toLowerCase().includes(query))
+          );
+        }
+
+        // Apply sorting
+        if (state.sortColumn) {
+          filteredOpps.sort((a, b) => {
+            let aVal, bVal;
+            if (state.sortColumn === 'name') {
+              aVal = (a.data?.name || '').toLowerCase();
+              bVal = (b.data?.name || '').toLowerCase();
+            } else if (state.sortColumn === 'contact') {
+              aVal = (a.data?.contact?.name || '').toLowerCase();
+              bVal = (b.data?.contact?.name || '').toLowerCase();
+            } else if (state.sortColumn === 'value') {
+              aVal = parseFloat(a.data?.monetaryValue || 0);
+              bVal = parseFloat(b.data?.monetaryValue || 0);
+            }
+            if (aVal < bVal) return state.sortDirection === 'asc' ? -1 : 1;
+            if (aVal > bVal) return state.sortDirection === 'asc' ? 1 : -1;
+            return 0;
+          });
+        }
+
+        // Pagination
+        const totalRecords = filteredOpps.length;
+        const totalPages = Math.ceil(totalRecords / state.rowsPerPage);
+        const startIdx = (state.currentPage - 1) * state.rowsPerPage;
+        const endIdx = Math.min(startIdx + state.rowsPerPage, totalRecords);
+        const paginatedOpps = filteredOpps.slice(startIdx, endIdx);
+
+        // Helper functions
+        window.sortConsultationBy = function(column) {
+          if (state.sortColumn === column) {
+            state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
+          } else {
+            state.sortColumn = column;
+            state.sortDirection = column === 'value' ? 'desc' : 'asc';
+          }
+          window.renderConsultationBookingTable(state.currentFilter);
+        };
+
+        window.goToConsultationPage = function(page) {
+          if (page >= 1 && page <= totalPages) {
+            state.currentPage = page;
+            window.renderConsultationBookingTable(state.currentFilter);
+          }
+        };
+
+        window.updateConsultationSearch = function(event) {
+          state.searchQuery = event.target.value;
+        };
+
+        window.executeConsultationSearch = function() {
+          state.currentPage = 1;
+          window.renderConsultationBookingTable(state.currentFilter);
+        };
+
+        window.handleConsultationKeypress = function(event) {
+          if (event.key === 'Enter') {
+            window.executeConsultationSearch();
+          }
+        };
+
+        const getSortIcon = (column) => {
+          if (state.sortColumn !== column) return '';
+          return state.sortDirection === 'asc'
+            ? '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>'
+            : '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>';
+        };
+
+        const tableHTML = `
+          <!-- Search Box -->
+          <div class="mb-4 flex gap-2">
+            <input
+              type="text"
+              placeholder="Search by opportunity name, contact, or email..."
+              value="${state.searchQuery}"
+              oninput="window.updateConsultationSearch(event)"
+              onkeypress="window.handleConsultationKeypress(event)"
+              class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+            <button
+              onclick="window.executeConsultationSearch()"
+              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            >
+              Search
+            </button>
+          </div>
+
+          <!-- Table -->
+          <div class="overflow-x-auto border border-gray-200 rounded-lg">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th onclick="window.sortConsultationBy('name')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Opportunity ${getSortIcon('name')}
+                  </th>
+                  <th onclick="window.sortConsultationBy('contact')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Contact ${getSortIcon('contact')}
+                  </th>
+                  <th onclick="window.sortConsultationBy('value')" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Value ${getSortIcon('value')}
+                  </th>
+                  <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Booking Status</th>
+                  <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                ${paginatedOpps.map(opp => {
+                  const value = parseFloat(opp.data?.monetaryValue || 0);
+                  const contactName = opp.data?.contact?.name || opp.data?.name || 'N/A';
+                  const contactEmail = opp.data?.contact?.email || '';
+                  const attributions = opp.data?.attributions || [];
+                  const hasBooking = Array.isArray(attributions) && attributions.some(attr => attr.medium === 'calendar');
+
+                  return `
+                    <tr class="hover:bg-gray-50">
+                      <td class="px-4 py-3 text-sm font-medium text-gray-900">${opp.data?.name || 'N/A'}</td>
+                      <td class="px-4 py-3 text-sm text-gray-600">
+                        ${contactName}
+                        ${contactEmail ? `<br><span class="text-xs text-gray-500">${contactEmail}</span>` : ''}
+                      </td>
+                      <td class="px-4 py-3 text-sm text-right font-semibold ${hasBooking ? 'text-green-600' : 'text-orange-600'}">${formatCurrency(value)}</td>
+                      <td class="px-4 py-3 text-center">
+                        ${hasBooking
+                          ? '<span class="px-2 py-1 text-xs rounded-full font-medium bg-green-100 text-green-800 flex items-center gap-1 justify-center"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Booked</span>'
+                          : '<span class="px-2 py-1 text-xs rounded-full font-medium bg-orange-100 text-orange-800">Not Booked</span>'
+                        }
+                      </td>
+                      <td class="px-4 py-3 text-center">
+                        <span class="px-2 py-1 text-xs rounded-full font-medium bg-blue-100 text-blue-800">${opp.data?.status || 'N/A'}</span>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination -->
+          <div class="mt-4 flex items-center justify-between">
+            <p class="text-sm text-gray-600">
+              Showing ${startIdx + 1}-${endIdx} of ${totalRecords} opportunities
+            </p>
+            <div class="flex gap-2">
+              <button
+                onclick="window.goToConsultationPage(${state.currentPage - 1})"
+                ${state.currentPage === 1 ? 'disabled' : ''}
+                class="px-3 py-1 border rounded ${state.currentPage === 1 ? 'bg-gray-100 text-gray-400' : 'bg-white hover:bg-gray-50'}"
+              >
+                Previous
+              </button>
+              <span class="px-3 py-1 text-sm text-gray-600">Page ${state.currentPage} of ${totalPages || 1}</span>
+              <button
+                onclick="window.goToConsultationPage(${state.currentPage + 1})"
+                ${state.currentPage >= totalPages ? 'disabled' : ''}
+                class="px-3 py-1 border rounded ${state.currentPage >= totalPages ? 'bg-gray-100 text-gray-400' : 'bg-white hover:bg-gray-50'}"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        `;
+
+        document.getElementById('consultationTableContainer').innerHTML = tableHTML;
+      };
+
+      // Render content
       content.innerHTML = `
         <div class="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-          <h4 class="font-semibold text-gray-900 mb-2">How this is calculated:</h4>
-          <p class="text-sm text-gray-700">
-            (Leads with calendar attribution ÷ Total leads) × 100<br>
-            = (${booked.length} ÷ ${response.data.length}) × 100 = ${((booked.length / response.data.length) * 100).toFixed(1)}%
+          <h4 class="font-semibold text-gray-900 mb-2">📅 How Lead → Consultation Booking is Calculated</h4>
+          <p class="text-sm text-gray-700 mb-3">
+            This metric shows what percentage of your <strong>open opportunities</strong> have booked a consultation (calendar appointment).
           </p>
+          <div class="bg-white rounded p-3 mb-3 border-l-4 border-green-500">
+            <p class="text-sm text-gray-800 mb-2"><strong>Calculation Formula:</strong></p>
+            <p class="text-sm text-gray-700">
+              Booking Rate = (Opportunities with Calendar Booking ÷ Total Open Opportunities) × 100
+            </p>
+            <p class="text-sm text-gray-600 mt-2">
+              = (${booked.length} ÷ ${openOpportunities.length}) × 100 = <strong class="text-green-600">${bookingRate}%</strong>
+            </p>
+          </div>
+          <div class="text-sm text-gray-700 space-y-2">
+            <p><strong>🎯 What we detect:</strong> Opportunities with <code>attributions</code> containing <code>{"medium": "calendar"}</code></p>
+            <p><strong>📊 What we count:</strong> Only "open" status opportunities (active pipeline, not won/lost)</p>
+            <p><strong>💡 Why this matters:</strong> Booked consultations indicate lead engagement. Leads that haven't booked represent
+            an opportunity to improve your booking process or follow-up strategy.</p>
+          </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-4 mb-6">
-          <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-            <p class="text-sm text-gray-600">Booked Consultation</p>
-            <p class="text-2xl font-bold text-green-700">${booked.length}</p>
-          </div>
-          <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
-            <p class="text-sm text-gray-600">Did Not Book</p>
-            <p class="text-2xl font-bold text-gray-700">${notBooked.length}</p>
-          </div>
+        <!-- Summary Cards -->
+        <div id="consultationSummaryCards" class="grid grid-cols-3 gap-4 mb-6">
+          <!-- Cards will be rendered by renderConsultationBookingTable to show active state -->
         </div>
 
-        <div class="space-y-4">
-          <div>
-            <h4 class="font-semibold text-green-700 mb-2">Booked Consultation (${booked.length})</h4>
-            <div class="max-h-64 overflow-y-auto border rounded">
-              ${booked.map(opp => `
-                <div class="p-3 border-b hover:bg-gray-50">
-                  <p class="font-medium">${opp.data?.name || 'N/A'}</p>
-                  <p class="text-sm text-gray-600">Status: ${opp.data?.status || 'N/A'}</p>
-                </div>
-              `).join('')}
-            </div>
+        ${notBooked.length > 0 ? `
+          <div class="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+            <h4 class="font-semibold text-orange-900 mb-2 flex items-center gap-2">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              Opportunity Alert
+            </h4>
+            <p class="text-sm text-orange-800">
+              You have <strong>${notBooked.length} opportunities (${formatCurrency(notBookedValue)} in potential revenue)</strong>
+              that haven't booked a consultation yet. Consider:
+            </p>
+            <ul class="text-sm text-orange-700 mt-2 ml-6 space-y-1">
+              <li>• Sending automated calendar booking reminders</li>
+              <li>• Following up with personalized outreach</li>
+              <li>• Reviewing your booking funnel for friction points</li>
+            </ul>
           </div>
+        ` : ''}
 
-          <div>
-            <h4 class="font-semibold text-gray-700 mb-2">Did Not Book (${notBooked.length})</h4>
-            <div class="max-h-64 overflow-y-auto border rounded">
-              ${notBooked.slice(0, 20).map(opp => `
-                <div class="p-3 border-b hover:bg-gray-50">
-                  <p class="font-medium">${opp.data?.name || 'N/A'}</p>
-                  <p class="text-sm text-gray-600">Status: ${opp.data?.status || 'N/A'}</p>
-                </div>
-              `).join('')}
-              ${notBooked.length > 20 ? `<div class="p-3 text-center text-gray-500">...and ${notBooked.length - 20} more</div>` : ''}
-            </div>
-          </div>
+        <div id="consultationTableContainer">
+          <!-- Table will be rendered here -->
         </div>
       `;
+
+      // Initial render
+      window.renderConsultationBookingTable('all');
     }
 
     // Drill-down: Lead Response Time
     async function showResponseTimeDrilldown(content, periodStart, periodEnd) {
+      // Fetch contacts, opportunities, and conversations
+      const [contactsResponse, opportunitiesResponse, conversationsResponse] = await Promise.all([
+        api.get(`/api/v1/integrations/connector-data?entity_type=contact&start_date=${periodStart}&end_date=${periodEnd}&limit=500`),
+        api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=500`),
+        api.get(`/api/v1/integrations/connector-data?entity_type=conversation&start_date=${periodStart}&end_date=${periodEnd}&limit=2000`)
+      ]);
+
+      const contacts = contactsResponse?.data || [];
+      const opportunities = opportunitiesResponse?.data || [];
+      const conversations = conversationsResponse?.data || [];
+
+      // Build a comprehensive list of ALL qualified leads (contacts + unique contacts from opportunities)
+      const allQualifiedLeads = [];
+      const processedContactIds = new Set();
+
+      // 1. Add standalone contact records
+      contacts.forEach(contact => {
+        const contactId = contact.data?.id;
+        if (contactId && !processedContactIds.has(contactId)) {
+          processedContactIds.add(contactId);
+          allQualifiedLeads.push({
+            id: contactId,
+            name: contact.data?.contactName || contact.data?.name ||
+                  (contact.data?.firstName && contact.data?.lastName
+                    ? `${contact.data.firstName} ${contact.data.lastName}`
+                    : 'N/A'),
+            email: contact.data?.email || 'N/A',
+            phone: contact.data?.phone || 'N/A',
+            createdAt: new Date(contact.source_created_at),
+            source: 'contact'
+          });
+        }
+      });
+
+      // 2. Add contacts from opportunities (if not already added)
+      opportunities.forEach(opp => {
+        const contactId = opp.data?.contactId;
+        const contactData = opp.data?.contact || {};
+
+        if (contactId && !processedContactIds.has(contactId)) {
+          processedContactIds.add(contactId);
+          allQualifiedLeads.push({
+            id: contactId,
+            name: contactData.name || opp.data?.name || 'N/A',
+            email: contactData.email || 'N/A',
+            phone: contactData.phone || 'N/A',
+            createdAt: new Date(opp.source_created_at), // Use opportunity creation as proxy
+            source: 'opportunity'
+          });
+        }
+      });
+
+      // Group conversations by contactId and get the earliest OUTBOUND message
+      // OUTBOUND = firm reaching out to the contact (what we want to measure)
+      // INBOUND = contact reaching out to firm (not a response from firm)
+      const firstConversationByContact = new Map();
+      conversations.forEach(conv => {
+        const contactId = conv.data?.contactId;
+        if (!contactId) return;
+
+        // Only count OUTBOUND messages (firm → contact)
+        const isOutbound = conv.data?.lastMessageDirection === 'outbound';
+        if (!isOutbound) return;
+
+        const convTime = new Date(conv.source_created_at);
+        if (!firstConversationByContact.has(contactId) ||
+            convTime < firstConversationByContact.get(contactId).time) {
+          firstConversationByContact.set(contactId, {
+            time: convTime,
+            data: conv
+          });
+        }
+      });
+
+      // Calculate response time for each qualified lead
+      const contactsWithResponseTime = allQualifiedLeads.map(lead => {
+        const contactId = lead.id;
+        const contactCreatedAt = lead.createdAt;
+        const firstConv = firstConversationByContact.get(contactId);
+
+        let responseTimeHours = null;
+        let responseStatus = 'Awaiting Response';
+        let firstConversationTime = null;
+        let contactMethod = 'N/A';
+
+        if (firstConv) {
+          const diffMs = firstConv.time - contactCreatedAt;
+          responseTimeHours = diffMs / (1000 * 60 * 60); // Convert to hours
+          responseStatus = 'Responded';
+          firstConversationTime = firstConv.time;
+
+          // Extract contact method from conversation data
+          const messageType = firstConv.data.data?.lastMessageType || firstConv.data.data?.type || 'Unknown';
+          contactMethod = messageType;
+        }
+
+        return {
+          id: contactId,
+          name: lead.name,
+          email: lead.email,
+          phone: lead.phone,
+          contactCreatedAt: contactCreatedAt,
+          firstConversationTime: firstConversationTime,
+          responseTimeHours: responseTimeHours,
+          responseStatus: responseStatus,
+          contactMethod: contactMethod,
+          leadSource: lead.source // 'contact' or 'opportunity'
+        };
+      });
+
+      // Calculate summary statistics
+      const respondedContacts = contactsWithResponseTime.filter(c => c.responseStatus === 'Responded');
+      const awaitingResponseContacts = contactsWithResponseTime.filter(c => c.responseStatus === 'Awaiting Response');
+      const avgResponseTime = respondedContacts.length > 0
+        ? (respondedContacts.reduce((sum, c) => sum + c.responseTimeHours, 0) / respondedContacts.length)
+        : 0;
+      const responseRate = allQualifiedLeads.length > 0
+        ? ((respondedContacts.length / allQualifiedLeads.length) * 100)
+        : 0;
+
+      // Store data in window for table rendering
+      window.leadResponseTimeData = {
+        contacts: contactsWithResponseTime,
+        currentPage: 1,
+        rowsPerPage: 25,
+        sortColumn: 'responseTimeHours',
+        sortDirection: 'asc',
+        searchQuery: '',
+        currentFilter: 'all' // 'all', 'responded', 'awaiting_response'
+      };
+
+      // Render table function
+      window.renderResponseTimeTable = function(filter = 'all') {
+        const state = window.leadResponseTimeData;
+        state.currentFilter = filter;
+        state.currentPage = 1; // Reset to page 1 when changing filter
+
+        // Apply filter
+        let filteredContacts = state.contacts;
+        if (filter === 'responded') {
+          filteredContacts = state.contacts.filter(c => c.responseStatus === 'Responded');
+        } else if (filter === 'awaiting_response') {
+          filteredContacts = state.contacts.filter(c => c.responseStatus === 'Awaiting Response');
+        }
+
+        // Apply search filter
+        if (state.searchQuery) {
+          const query = state.searchQuery.toLowerCase();
+          filteredContacts = filteredContacts.filter(contact =>
+            (contact.name && contact.name.toLowerCase().includes(query)) ||
+            (contact.email && contact.email.toLowerCase().includes(query)) ||
+            (contact.phone && contact.phone.toLowerCase().includes(query))
+          );
+        }
+
+        // Apply sorting
+        if (state.sortColumn) {
+          filteredContacts.sort((a, b) => {
+            let aVal = a[state.sortColumn];
+            let bVal = b[state.sortColumn];
+
+            // Handle null values for response time (no response = Infinity for sorting purposes)
+            if (state.sortColumn === 'responseTimeHours') {
+              aVal = aVal === null ? Infinity : aVal;
+              bVal = bVal === null ? Infinity : bVal;
+            }
+
+            // Handle date sorting
+            if (state.sortColumn === 'contactCreatedAt' || state.sortColumn === 'firstConversationTime') {
+              aVal = aVal ? aVal.getTime() : 0;
+              bVal = bVal ? bVal.getTime() : 0;
+            }
+
+            // String comparison
+            if (typeof aVal === 'string') {
+              aVal = aVal.toLowerCase();
+              bVal = bVal ? bVal.toLowerCase() : '';
+            }
+
+            if (aVal < bVal) return state.sortDirection === 'asc' ? -1 : 1;
+            if (aVal > bVal) return state.sortDirection === 'asc' ? 1 : -1;
+            return 0;
+          });
+        }
+
+        // Pagination
+        const totalRecords = filteredContacts.length;
+        const totalPages = Math.ceil(totalRecords / state.rowsPerPage);
+        const startIdx = (state.currentPage - 1) * state.rowsPerPage;
+        const endIdx = Math.min(startIdx + state.rowsPerPage, totalRecords);
+        const paginatedContacts = filteredContacts.slice(startIdx, endIdx);
+
+        // Helper functions
+        window.sortResponseTimeBy = function(column) {
+          if (state.sortColumn === column) {
+            state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
+          } else {
+            state.sortColumn = column;
+            state.sortDirection = 'asc';
+          }
+          window.renderResponseTimeTable(state.currentFilter);
+        };
+
+        window.goToResponseTimePage = function(page) {
+          if (page >= 1 && page <= totalPages) {
+            state.currentPage = page;
+            window.renderResponseTimeTable(state.currentFilter);
+          }
+        };
+
+        window.updateResponseTimeSearch = function(event) {
+          state.searchQuery = event.target.value;
+        };
+
+        window.executeResponseTimeSearch = function() {
+          state.currentPage = 1;
+          window.renderResponseTimeTable(state.currentFilter);
+        };
+
+        window.handleResponseTimeKeypress = function(event) {
+          if (event.key === 'Enter') {
+            window.executeResponseTimeSearch();
+          }
+        };
+
+        const getSortIcon = (column) => {
+          if (state.sortColumn !== column) return '';
+          return state.sortDirection === 'asc'
+            ? '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>'
+            : '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>';
+        };
+
+        const formatDate = (date) => {
+          if (!date) return 'N/A';
+          return date.toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          });
+        };
+
+        const formatResponseTime = (hours) => {
+          if (hours === null) return 'N/A';
+          if (hours < 1) {
+            const minutes = Math.round(hours * 60);
+            return `${minutes} min${minutes !== 1 ? 's' : ''}`;
+          }
+          return `${hours.toFixed(1)} hrs`;
+        };
+
+        const formatContactMethod = (method) => {
+          if (!method || method === 'N/A') return 'N/A';
+
+          // Map GoHighLevel types to friendly names with icons
+          const methodMap = {
+            'TYPE_EMAIL': '📧 Email',
+            'TYPE_CALL': '📞 Phone Call',
+            'TYPE_SMS': '💬 Text/SMS',
+            'TYPE_INSTAGRAM': '📷 Instagram',
+            'TYPE_PHONE': '📞 Phone',
+            'TYPE_FACEBOOK': '👥 Facebook',
+            'TYPE_WHATSAPP': '💚 WhatsApp',
+            'TYPE_WEBCHAT': '💻 Web Chat'
+          };
+
+          return methodMap[method] || method;
+        };
+
+        const tableHTML = `
+          <!-- Search Box -->
+          <div class="mb-4 flex gap-2">
+            <input
+              type="text"
+              placeholder="Search by name, email, or phone..."
+              value="${state.searchQuery}"
+              oninput="window.updateResponseTimeSearch(event)"
+              onkeypress="window.handleResponseTimeKeypress(event)"
+              class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+            <button
+              onclick="window.executeResponseTimeSearch()"
+              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            >
+              Search
+            </button>
+          </div>
+
+          <div class="overflow-x-auto" style="max-height: 500px;">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50 sticky top-0">
+                <tr>
+                  <th onclick="window.sortResponseTimeBy('name')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Contact Name ${getSortIcon('name')}
+                  </th>
+                  <th onclick="window.sortResponseTimeBy('email')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Email ${getSortIcon('email')}
+                  </th>
+                  <th onclick="window.sortResponseTimeBy('contactCreatedAt')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Contact Created ${getSortIcon('contactCreatedAt')}
+                  </th>
+                  <th onclick="window.sortResponseTimeBy('firstConversationTime')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    First Response ${getSortIcon('firstConversationTime')}
+                  </th>
+                  <th onclick="window.sortResponseTimeBy('contactMethod')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Contact Method ${getSortIcon('contactMethod')}
+                  </th>
+                  <th onclick="window.sortResponseTimeBy('responseTimeHours')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Response Time ${getSortIcon('responseTimeHours')}
+                  </th>
+                  <th onclick="window.sortResponseTimeBy('responseStatus')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Status ${getSortIcon('responseStatus')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                ${paginatedContacts.map(contact => {
+                  const statusColor = contact.responseStatus === 'Responded' ? 'text-green-600' : 'text-amber-600';
+                  const responseTimeColor =
+                    contact.responseTimeHours === null ? 'text-gray-400' :
+                    contact.responseTimeHours <= 24 ? 'text-green-600' :
+                    contact.responseTimeHours <= 48 ? 'text-yellow-600' : 'text-red-600';
+
+                  return `
+                    <tr class="hover:bg-gray-50">
+                      <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">${contact.name}</td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">${contact.email}</td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">${formatDate(contact.contactCreatedAt)}</td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">${formatDate(contact.firstConversationTime)}</td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">${formatContactMethod(contact.contactMethod)}</td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold ${responseTimeColor}">${formatResponseTime(contact.responseTimeHours)}</td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold ${statusColor}">${contact.responseStatus}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="mt-4 flex items-center justify-between">
+            <div class="text-sm text-gray-600">
+              Showing ${startIdx + 1} to ${endIdx} of ${totalRecords} ${state.currentFilter === 'all' ? 'leads' : state.currentFilter === 'responded' ? 'responded leads' : 'leads awaiting response'}
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                onclick="window.goToResponseTimePage(${state.currentPage - 1})"
+                ${state.currentPage === 1 ? 'disabled' : ''}
+                class="px-3 py-1 text-sm border rounded ${state.currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+              >
+                Previous
+              </button>
+              <div class="flex items-center gap-1">
+                ${Array.from({length: Math.min(totalPages, 7)}, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 7) {
+                    pageNum = i + 1;
+                  } else if (state.currentPage <= 4) {
+                    pageNum = i + 1;
+                  } else if (state.currentPage >= totalPages - 3) {
+                    pageNum = totalPages - 6 + i;
+                  } else {
+                    pageNum = state.currentPage - 3 + i;
+                  }
+                  const isActive = pageNum === state.currentPage;
+                  return `
+                    <button
+                      onclick="window.goToResponseTimePage(${pageNum})"
+                      class="px-3 py-1 text-sm border rounded ${isActive ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+                    >
+                      ${pageNum}
+                    </button>
+                  `;
+                }).join('')}
+              </div>
+              <button
+                onclick="window.goToResponseTimePage(${state.currentPage + 1})"
+                ${state.currentPage === totalPages ? 'disabled' : ''}
+                class="px-3 py-1 text-sm border rounded ${state.currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        `;
+
+        document.getElementById('responseTimeTableContainer').innerHTML = tableHTML;
+      };
+
+      // Render the content
       content.innerHTML = `
         <div class="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-          <h4 class="font-semibold text-gray-900 mb-2">How this is calculated:</h4>
-          <p class="text-sm text-gray-700">
-            Average time (in hours) from when a lead was created to when they received their first conversation/response.<br><br>
-            Formula: AVG(first_conversation_time - lead_created_time)
+          <h4 class="font-semibold text-gray-900 mb-2">📊 How Lead Response Time is Calculated</h4>
+          <p class="text-sm text-gray-700 mb-3">
+            This metric measures how quickly <strong>your firm reaches out</strong> to new leads after they enter your system.
           </p>
+          <div class="bg-white rounded p-3 mb-3 border-l-4 border-indigo-500">
+            <p class="text-sm text-gray-800 mb-2"><strong>What we measure:</strong></p>
+            <p class="text-sm text-gray-700">
+              ⏱️ Time from <strong>Lead Created</strong> → <strong>First Outbound Message</strong> from your firm
+            </p>
+          </div>
+          <div class="text-sm text-gray-700 space-y-2">
+            <p><strong>✅ "Responded"</strong> = Your firm sent an outbound message to this lead (email, call, SMS, etc.)</p>
+            <p><strong>⏳ "Awaiting Response"</strong> = Lead is waiting for your firm to reach out (actionable follow-up needed!)</p>
+            <p class="pt-2 border-t border-gray-200 mt-2">
+              <strong>Why outbound only?</strong> We only count messages <em>from your firm to the lead</em>, not messages from the lead to you.
+              This measures your team's responsiveness and follow-up speed.
+            </p>
+            <p class="text-xs text-gray-600 mt-2">
+              📈 <strong>Industry Benchmark:</strong> &lt; 24 hours for optimal conversion |
+              🎯 <strong>Best Practice:</strong> Respond within 5 minutes for maximum engagement
+            </p>
+          </div>
         </div>
-        <div class="text-center py-8 text-gray-500">
-          <p>This metric shows aggregate response time.</p>
-          <p class="mt-2 text-sm">To see individual lead response times, we need to fetch conversation data for each lead.</p>
+
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div onclick="window.renderResponseTimeTable('all')" class="bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow">
+            <p class="text-sm text-gray-600">Total Qualified Leads</p>
+            <p class="text-2xl font-bold text-gray-900">${allQualifiedLeads.length}</p>
+            <p class="text-xs text-gray-500">${contacts.length} contacts + ${opportunities.filter(o => o.data?.contactId && !contacts.find(c => c.data?.id === o.data.contactId)).length} from opps</p>
+          </div>
+          <div onclick="window.renderResponseTimeTable('responded')" class="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow">
+            <p class="text-sm text-gray-600">✅ Responded</p>
+            <p class="text-2xl font-bold text-green-700">${respondedContacts.length}</p>
+            <p class="text-xs text-gray-500">${responseRate.toFixed(1)}% response rate</p>
+          </div>
+          <div onclick="window.renderResponseTimeTable('awaiting_response')" class="bg-amber-50 border border-amber-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow">
+            <p class="text-sm text-gray-600">⏳ Awaiting Response</p>
+            <p class="text-2xl font-bold text-amber-700">${awaitingResponseContacts.length}</p>
+            <p class="text-xs text-amber-600">Action needed!</p>
+          </div>
+          <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+            <p class="text-sm text-gray-600">Avg Response Time</p>
+            <p class="text-2xl font-bold ${avgResponseTime <= 24 ? 'text-green-600' : avgResponseTime <= 48 ? 'text-yellow-600' : 'text-red-600'}">
+              ${avgResponseTime < 1 ? `${Math.round(avgResponseTime * 60)} min` : `${avgResponseTime.toFixed(1)} hrs`}
+            </p>
+            <p class="text-xs text-gray-500">Target: &lt; 24 hours</p>
+          </div>
+        </div>
+
+        <div id="responseTimeTableContainer">
+          <!-- Table will be rendered here -->
         </div>
       `;
+
+      // Initial render
+      window.renderResponseTimeTable('all');
     }
 
     // Drill-down: Lead Quality Score (Estate Planning - NO company field)
@@ -2034,12 +2736,246 @@
           });
         });
 
-      // Sort by score (highest first)
-      leadsWithScores.sort((a, b) => b.qualityScore - a.qualityScore);
-
       const avgScore = leadsWithScores.length > 0
         ? (leadsWithScores.reduce((sum, l) => sum + l.qualityScore, 0) / leadsWithScores.length).toFixed(1)
         : 0;
+
+      // Store data in window scope for table rendering
+      window.leadQualityData = {
+        leads: leadsWithScores,
+        currentPage: 1,
+        rowsPerPage: 25,
+        sortColumn: 'qualityScore',
+        sortDirection: 'desc',
+        searchQuery: ''
+      };
+
+      // Render table function
+      window.renderLeadQualityTable = function() {
+        const state = window.leadQualityData;
+        let filteredLeads = [...state.leads];
+
+        // Apply search filter
+        if (state.searchQuery) {
+          const query = state.searchQuery.toLowerCase();
+          filteredLeads = filteredLeads.filter(lead => {
+            const name = lead.name.toLowerCase();
+            const email = lead.email.toLowerCase();
+            const phone = lead.phone.toLowerCase();
+            const tags = (lead.tags || []).join(' ').toLowerCase();
+            return name.includes(query) || email.includes(query) || phone.includes(query) || tags.includes(query);
+          });
+        }
+
+        // Apply sorting
+        if (state.sortColumn) {
+          filteredLeads.sort((a, b) => {
+            let aVal, bVal;
+            switch(state.sortColumn) {
+              case 'name':
+                aVal = a.name.toLowerCase();
+                bVal = b.name.toLowerCase();
+                break;
+              case 'qualityScore':
+                aVal = a.qualityScore;
+                bVal = b.qualityScore;
+                break;
+              case 'email':
+                aVal = a.email !== 'N/A' ? 1 : 0;
+                bVal = b.email !== 'N/A' ? 1 : 0;
+                break;
+              case 'phone':
+                aVal = a.phone !== 'N/A' ? 1 : 0;
+                bVal = b.phone !== 'N/A' ? 1 : 0;
+                break;
+              case 'tags':
+                aVal = a.tags ? a.tags.length : 0;
+                bVal = b.tags ? b.tags.length : 0;
+                break;
+              case 'source':
+                aVal = (a.attributions && a.attributions.length > 0) ? 1 : 0;
+                bVal = (b.attributions && b.attributions.length > 0) ? 1 : 0;
+                break;
+              default:
+                return 0;
+            }
+
+            if (aVal < bVal) return state.sortDirection === 'asc' ? -1 : 1;
+            if (aVal > bVal) return state.sortDirection === 'asc' ? 1 : -1;
+            return 0;
+          });
+        }
+
+        // Pagination
+        const totalRecords = filteredLeads.length;
+        const totalPages = Math.ceil(totalRecords / state.rowsPerPage);
+        const startIdx = (state.currentPage - 1) * state.rowsPerPage;
+        const endIdx = Math.min(startIdx + state.rowsPerPage, totalRecords);
+        const paginatedLeads = filteredLeads.slice(startIdx, endIdx);
+
+        // Helper functions
+        window.sortLeadQualityBy = function(column) {
+          if (state.sortColumn === column) {
+            state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
+          } else {
+            state.sortColumn = column;
+            state.sortDirection = 'desc';
+          }
+          window.renderLeadQualityTable();
+        };
+
+        window.goToLeadQualityPage = function(page) {
+          if (page >= 1 && page <= totalPages) {
+            state.currentPage = page;
+            window.renderLeadQualityTable();
+          }
+        };
+
+        window.updateLeadQualitySearch = function(event) {
+          state.searchQuery = event.target.value;
+        };
+
+        window.executeLeadQualitySearch = function() {
+          state.currentPage = 1;
+          window.renderLeadQualityTable();
+        };
+
+        window.handleLeadQualityKeypress = function(event) {
+          if (event.key === 'Enter') {
+            window.executeLeadQualitySearch();
+          }
+        };
+
+        const getSortIcon = (column) => {
+          if (state.sortColumn !== column) {
+            return '<svg class="w-4 h-4 text-gray-400 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path></svg>';
+          }
+          return state.sortDirection === 'asc'
+            ? '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>'
+            : '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>';
+        };
+
+        const tableHTML = `
+          <!-- Search Box -->
+          <div class="mb-4 flex gap-2">
+            <input
+              type="text"
+              placeholder="Search by name, email, phone, or tags..."
+              value="${state.searchQuery}"
+              oninput="window.updateLeadQualitySearch(event)"
+              onkeypress="window.handleLeadQualityKeypress(event)"
+              class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+            <button
+              onclick="window.executeLeadQualitySearch()"
+              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            >
+              Search
+            </button>
+          </div>
+
+          <div class="overflow-x-auto" style="max-height: 500px;">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50 sticky top-0">
+                <tr>
+                  <th onclick="window.sortLeadQualityBy('name')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Name ${getSortIcon('name')}
+                  </th>
+                  <th onclick="window.sortLeadQualityBy('email')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Email ${getSortIcon('email')}
+                  </th>
+                  <th onclick="window.sortLeadQualityBy('phone')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Phone ${getSortIcon('phone')}
+                  </th>
+                  <th onclick="window.sortLeadQualityBy('tags')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Tags ${getSortIcon('tags')}
+                  </th>
+                  <th onclick="window.sortLeadQualityBy('source')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Source ${getSortIcon('source')}
+                  </th>
+                  <th onclick="window.sortLeadQualityBy('qualityScore')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Score ${getSortIcon('qualityScore')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                ${paginatedLeads.map(lead => {
+                  const scoreColor = lead.qualityScore >= 75 ? 'text-green-600' : lead.qualityScore >= 50 ? 'text-yellow-600' : 'text-red-600';
+                  const hasAttribution = lead.attributions && lead.attributions.length > 0;
+                  const attributionSource = hasAttribution
+                    ? lead.attributions[0].medium || lead.attributions[0].source || 'Unknown'
+                    : 'None';
+                  const tagsDisplay = lead.tags && lead.tags.length > 0
+                    ? `${lead.tags.length} tag${lead.tags.length > 1 ? 's' : ''}`
+                    : 'None';
+
+                  return `
+                    <tr class="hover:bg-gray-50">
+                      <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">${lead.name}</td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm">${lead.email !== 'N/A' ? '✓' : '✗'}</td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm">${lead.phone !== 'N/A' ? '✓' : '✗'}</td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500" title="${(lead.tags || []).join(', ')}">${tagsDisplay}</td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${hasAttribution ? '✓ ' + attributionSource : '✗'}</td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm font-bold ${scoreColor}">${lead.qualityScore}/100</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="mt-4 flex items-center justify-between">
+            <div class="text-sm text-gray-600">
+              Showing ${startIdx + 1} to ${endIdx} of ${totalRecords} total leads
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                onclick="window.goToLeadQualityPage(${state.currentPage - 1})"
+                ${state.currentPage === 1 ? 'disabled' : ''}
+                class="px-3 py-1 text-sm border rounded ${state.currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+              >
+                Previous
+              </button>
+              <div class="flex items-center gap-1">
+                ${Array.from({length: Math.min(totalPages, 7)}, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 7) {
+                    pageNum = i + 1;
+                  } else if (state.currentPage <= 4) {
+                    pageNum = i + 1;
+                  } else if (state.currentPage >= totalPages - 3) {
+                    pageNum = totalPages - 6 + i;
+                  } else {
+                    pageNum = state.currentPage - 3 + i;
+                  }
+                  const isActive = pageNum === state.currentPage;
+                  return `
+                    <button
+                      onclick="window.goToLeadQualityPage(${pageNum})"
+                      class="px-3 py-1 text-sm border rounded ${isActive ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+                    >
+                      ${pageNum}
+                    </button>
+                  `;
+                }).join('')}
+              </div>
+              <button
+                onclick="window.goToLeadQualityPage(${state.currentPage + 1})"
+                ${state.currentPage === totalPages ? 'disabled' : ''}
+                class="px-3 py-1 text-sm border rounded ${state.currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        `;
+
+        document.getElementById('leadQualityTableContainer').innerHTML = tableHTML;
+      };
+
+      // Log for debugging the count discrepancy
+      console.log('[Lead Quality Score Debug] Total leads with scores:', leadsWithScores.length);
+      console.log('[Lead Quality Score Debug] Should match qualified leads count (307)');
 
       content.innerHTML = `
         <div class="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
@@ -2055,47 +2991,13 @@
           </p>
         </div>
 
-        <div class="overflow-x-auto max-h-96">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50 sticky top-0">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Score</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tags</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-              ${leadsWithScores.slice(0, 100).map(lead => {
-                const scoreColor = lead.qualityScore >= 75 ? 'text-green-600' : lead.qualityScore >= 50 ? 'text-yellow-600' : 'text-red-600';
-                const hasAttribution = lead.attributions && lead.attributions.length > 0;
-                const attributionSource = hasAttribution
-                  ? lead.attributions[0].medium || lead.attributions[0].source || 'Unknown'
-                  : 'None';
-                const tagsDisplay = lead.tags && lead.tags.length > 0
-                  ? `${lead.tags.length} tag${lead.tags.length > 1 ? 's' : ''}`
-                  : 'None';
-
-                return `
-                  <tr class="hover:bg-gray-50">
-                    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">${lead.name}</td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm font-bold ${scoreColor}">${lead.qualityScore}/100</td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm">${lead.email !== 'N/A' ? '✓' : '✗'}</td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm">${lead.phone !== 'N/A' ? '✓' : '✗'}</td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500" title="${lead.tags.join(', ')}">${tagsDisplay}</td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${hasAttribution ? '✓ ' + attributionSource : '✗'}</td>
-                  </tr>
-                `;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
-        <div class="mt-4 text-sm text-gray-600 text-center">
-          Showing ${Math.min(100, leadsWithScores.length)} of ${leadsWithScores.length} total lead${leadsWithScores.length !== 1 ? 's' : ''}
+        <div id="leadQualityTableContainer">
+          <!-- Table will be rendered here -->
         </div>
       `;
+
+      // Initial render of the interactive table
+      window.renderLeadQualityTable();
     }
 
     // Drill-down: Consultation Show-up Rate
@@ -2143,6 +3045,888 @@
           ${scheduled.length === 0 ? '<p>No consultations scheduled in this period.</p>' : ''}
         </div>
       `;
+    }
+
+    // Drill-down: Average Case Value
+    async function showAverageCaseValueDrilldown(content, periodStart, periodEnd) {
+      //Fetch both opportunities and contacts
+      const [oppResponse, contactsResponse] = await Promise.all([
+        api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=500`),
+        api.get(`/api/v1/integrations/connector-data?entity_type=contact&start_date=${periodStart}&end_date=${periodEnd}&limit=1000`)
+      ]);
+
+      const opportunities = oppResponse?.data || [];
+      const contacts = contactsResponse?.data || [];
+
+      // Filter opportunities with monetary value > 0
+      const opportunitiesWithValue = opportunities.filter(opp => {
+        const value = parseFloat(opp.data?.monetaryValue || 0);
+        return value > 0;
+      });
+
+      // Calculate statistics
+      const totalOpportunities = opportunitiesWithValue.length;
+      const totalValue = opportunitiesWithValue.reduce((sum, opp) => sum + parseFloat(opp.data?.monetaryValue || 0), 0);
+      const avgValue = totalOpportunities > 0 ? totalValue / totalOpportunities : 0;
+      const minValue = totalOpportunities > 0 ? Math.min(...opportunitiesWithValue.map(o => parseFloat(o.data?.monetaryValue || 0))) : 0;
+      const maxValue = totalOpportunities > 0 ? Math.max(...opportunitiesWithValue.map(o => parseFloat(o.data?.monetaryValue || 0))) : 0;
+
+      // Group by status
+      const byStatus = {
+        open: opportunitiesWithValue.filter(o => o.data?.status === 'open'),
+        won: opportunitiesWithValue.filter(o => o.data?.status === 'won'),
+        lost: opportunitiesWithValue.filter(o => o.data?.status === 'lost'),
+        other: opportunitiesWithValue.filter(o => !['open', 'won', 'lost'].includes(o.data?.status))
+      };
+
+      // Find contacts without opportunities (potential future opportunities)
+      const contactIdsWithOpportunities = new Set(
+        opportunities.map(opp => opp.data?.contactId).filter(Boolean)
+      );
+      const contactsWithoutOpportunities = contacts.filter(c =>
+        c.data?.id && !contactIdsWithOpportunities.has(c.data.id)
+      );
+
+      // Calculate potential revenue from contacts without opportunities
+      const potentialLeadsCount = contactsWithoutOpportunities.length;
+      const potentialLeadsValue = potentialLeadsCount * avgValue;
+
+      // Store data for table rendering
+      window.caseValueData = {
+        opportunities: opportunitiesWithValue,
+        currentPage: 1,
+        rowsPerPage: 25,
+        sortColumn: 'monetaryValue',
+        sortDirection: 'desc',
+        searchQuery: '',
+        currentFilter: 'all' // 'all', 'open', 'won', 'lost'
+      };
+
+      // Currency formatter
+      const formatCurrency = (value) => {
+        return new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: 'USD',
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        }).format(value);
+      };
+
+      // Render table function
+      window.renderCaseValueTable = function(filter = 'all') {
+        const state = window.caseValueData;
+        state.currentFilter = filter;
+        state.currentPage = 1;
+
+        // Calculate revenue breakdown
+        const openRevenue = byStatus.open.reduce((s, o) => s + parseFloat(o.data?.monetaryValue || 0), 0);
+        const wonRevenue = byStatus.won.reduce((s, o) => s + parseFloat(o.data?.monetaryValue || 0), 0);
+        const lostRevenue = byStatus.lost.reduce((s, o) => s + parseFloat(o.data?.monetaryValue || 0), 0);
+        const abandonedRevenue = byStatus.other.reduce((s, o) => s + parseFloat(o.data?.monetaryValue || 0), 0);
+
+        // Reclamation opportunity (lost + abandoned)
+        const reclamationRevenue = lostRevenue + abandonedRevenue;
+        const reclamationCount = byStatus.lost.length + byStatus.other.length;
+
+        // Total potential revenue = open opportunities + estimated value from unqualified contacts
+        const totalPotentialRevenue = openRevenue + potentialLeadsValue;
+
+        // Render summary cards with active state
+        const isActive = (cardFilter) => cardFilter === filter ? 'ring-2 ring-indigo-600 shadow-lg' : '';
+        const summaryCardsHTML = `
+          <!-- Total Potential Revenue - Highlighted Card -->
+          <div class="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg p-4 shadow-lg col-span-2">
+            <div class="flex items-center gap-2 mb-2">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <p class="text-sm font-semibold opacity-90">Total Potential Revenue</p>
+            </div>
+            <p class="text-3xl font-bold mb-1">${formatCurrency(totalPotentialRevenue)}</p>
+
+            <div class="bg-white bg-opacity-20 rounded px-3 py-2 mb-2">
+              <div class="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <div class="opacity-75">From ${byStatus.open.length} Open Opportunities</div>
+                  <div class="font-semibold text-base">${formatCurrency(openRevenue)}</div>
+                </div>
+                <div>
+                  <div class="opacity-75">+ ${potentialLeadsCount} Unqualified Contacts</div>
+                  <div class="font-semibold text-base">${formatCurrency(potentialLeadsValue)}</div>
+                  <div class="opacity-60 text-xs mt-1">(est. @ ${formatCurrency(avgValue)} avg)</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2 text-xs border-t border-white border-opacity-20 pt-2">
+              <div>
+                <div class="opacity-75">Won</div>
+                <div class="font-semibold">${formatCurrency(wonRevenue)}</div>
+              </div>
+              <div>
+                <div class="opacity-75">Lost</div>
+                <div class="font-semibold">${formatCurrency(lostRevenue)}</div>
+              </div>
+              <div>
+                <div class="opacity-75">Abandoned</div>
+                <div class="font-semibold">${formatCurrency(abandonedRevenue)}</div>
+              </div>
+            </div>
+            ${reclamationCount > 0 ? `
+              <div class="mt-2 pt-2 border-t border-white border-opacity-20">
+                <div class="flex items-center gap-1 text-xs">
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                  </svg>
+                  <span class="opacity-90 font-medium">Reclamation Opportunity: ${formatCurrency(reclamationRevenue)}</span>
+                </div>
+                <p class="text-xs opacity-75 mt-1">Re-engage ${reclamationCount} lost/abandoned leads</p>
+              </div>
+            ` : ''}
+          </div>
+
+          <div onclick="window.renderCaseValueTable('all')" class="bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('all')}">
+            <p class="text-sm text-gray-600">Total Opportunities</p>
+            <p class="text-2xl font-bold text-gray-900">${totalOpportunities}</p>
+            <p class="text-xs text-gray-500">${formatCurrency(totalValue)} total</p>
+          </div>
+          <div onclick="window.renderCaseValueTable('open')" class="bg-blue-50 border border-blue-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('open')}">
+            <p class="text-sm text-gray-600">Open</p>
+            <p class="text-2xl font-bold text-blue-700">${byStatus.open.length}</p>
+            <p class="text-xs text-gray-500">${formatCurrency(byStatus.open.reduce((s, o) => s + parseFloat(o.data?.monetaryValue || 0), 0))}</p>
+          </div>
+          <div onclick="window.renderCaseValueTable('won')" class="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('won')}">
+            <p class="text-sm text-gray-600">Won</p>
+            <p class="text-2xl font-bold text-green-700">${byStatus.won.length}</p>
+            <p class="text-xs text-gray-500">${formatCurrency(byStatus.won.reduce((s, o) => s + parseFloat(o.data?.monetaryValue || 0), 0))}</p>
+          </div>
+          <div onclick="window.renderCaseValueTable('lost')" class="bg-red-50 border border-red-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('lost')}">
+            <p class="text-sm text-gray-600 flex items-center gap-1">
+              Lost
+              ${byStatus.lost.length > 0 ? '<svg class="w-3 h-3 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>' : ''}
+            </p>
+            <p class="text-2xl font-bold text-red-700">${byStatus.lost.length}</p>
+            <p class="text-xs text-gray-500">${formatCurrency(byStatus.lost.reduce((s, o) => s + parseFloat(o.data?.monetaryValue || 0), 0))}</p>
+            ${byStatus.lost.length > 0 ? '<p class="text-xs text-orange-600 mt-1">Re-engage?</p>' : ''}
+          </div>
+          <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+            <p class="text-sm text-gray-600">Value Range</p>
+            <p class="text-lg font-bold text-indigo-700">${formatCurrency(minValue)} - ${formatCurrency(maxValue)}</p>
+            <p class="text-xs text-gray-500">Min to Max</p>
+          </div>
+        `;
+        document.getElementById('caseValueSummaryCards').innerHTML = summaryCardsHTML;
+
+        // Apply filter
+        let filteredOpps = state.opportunities;
+        if (filter !== 'all') {
+          filteredOpps = state.opportunities.filter(o => o.data?.status === filter);
+        }
+
+        // Apply search
+        if (state.searchQuery) {
+          const query = state.searchQuery.toLowerCase();
+          filteredOpps = filteredOpps.filter(opp =>
+            (opp.data?.name && opp.data.name.toLowerCase().includes(query)) ||
+            (opp.data?.contact?.name && opp.data.contact.name.toLowerCase().includes(query)) ||
+            (opp.data?.contact?.email && opp.data.contact.email.toLowerCase().includes(query)) ||
+            (opp.data?.source && opp.data.source.toLowerCase().includes(query))
+          );
+        }
+
+        // Apply sorting
+        if (state.sortColumn) {
+          filteredOpps.sort((a, b) => {
+            let aVal, bVal;
+
+            if (state.sortColumn === 'monetaryValue') {
+              aVal = parseFloat(a.data?.monetaryValue || 0);
+              bVal = parseFloat(b.data?.monetaryValue || 0);
+            } else if (state.sortColumn === 'name') {
+              aVal = (a.data?.name || '').toLowerCase();
+              bVal = (b.data?.name || '').toLowerCase();
+            } else if (state.sortColumn === 'contactName') {
+              aVal = (a.data?.contact?.name || '').toLowerCase();
+              bVal = (b.data?.contact?.name || '').toLowerCase();
+            } else if (state.sortColumn === 'source') {
+              aVal = (a.data?.source || '').toLowerCase();
+              bVal = (b.data?.source || '').toLowerCase();
+            } else if (state.sortColumn === 'status') {
+              aVal = (a.data?.status || '').toLowerCase();
+              bVal = (b.data?.status || '').toLowerCase();
+            } else if (state.sortColumn === 'createdAt') {
+              aVal = new Date(a.data?.createdAt || 0).getTime();
+              bVal = new Date(b.data?.createdAt || 0).getTime();
+            }
+
+            if (aVal < bVal) return state.sortDirection === 'asc' ? -1 : 1;
+            if (aVal > bVal) return state.sortDirection === 'asc' ? 1 : -1;
+            return 0;
+          });
+        }
+
+        // Pagination
+        const totalRecords = filteredOpps.length;
+        const totalPages = Math.ceil(totalRecords / state.rowsPerPage);
+        const startIdx = (state.currentPage - 1) * state.rowsPerPage;
+        const endIdx = Math.min(startIdx + state.rowsPerPage, totalRecords);
+        const paginatedOpps = filteredOpps.slice(startIdx, endIdx);
+
+        // Helper functions
+        window.sortCaseValueBy = function(column) {
+          if (state.sortColumn === column) {
+            state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
+          } else {
+            state.sortColumn = column;
+            state.sortDirection = column === 'monetaryValue' ? 'desc' : 'asc';
+          }
+          window.renderCaseValueTable(state.currentFilter);
+        };
+
+        window.goToCaseValuePage = function(page) {
+          if (page >= 1 && page <= totalPages) {
+            state.currentPage = page;
+            window.renderCaseValueTable(state.currentFilter);
+          }
+        };
+
+        window.updateCaseValueSearch = function(event) {
+          state.searchQuery = event.target.value;
+        };
+
+        window.executeCaseValueSearch = function() {
+          state.currentPage = 1;
+          window.renderCaseValueTable(state.currentFilter);
+        };
+
+        window.handleCaseValueKeypress = function(event) {
+          if (event.key === 'Enter') {
+            window.executeCaseValueSearch();
+          }
+        };
+
+        const getSortIcon = (column) => {
+          if (state.sortColumn !== column) return '';
+          return state.sortDirection === 'asc'
+            ? '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>'
+            : '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>';
+        };
+
+        const formatDate = (dateStr) => {
+          if (!dateStr) return 'N/A';
+          const date = new Date(dateStr);
+          return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        };
+
+        const getStatusColor = (status) => {
+          const colors = {
+            'open': 'text-blue-600 bg-blue-50',
+            'won': 'text-green-600 bg-green-50',
+            'lost': 'text-red-600 bg-red-50'
+          };
+          return colors[status] || 'text-gray-600 bg-gray-50';
+        };
+
+        const tableHTML = `
+          <!-- Search Box -->
+          <div class="mb-4 flex gap-2">
+            <input
+              type="text"
+              placeholder="Search by opportunity name, contact, email, or source..."
+              value="${state.searchQuery}"
+              oninput="window.updateCaseValueSearch(event)"
+              onkeypress="window.handleCaseValueKeypress(event)"
+              class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+            <button
+              onclick="window.executeCaseValueSearch()"
+              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            >
+              Search
+            </button>
+          </div>
+
+          <!-- Scrollable Table with Visual Indicator -->
+          <div class="relative">
+            ${totalRecords > 7 ? '<div class="absolute top-0 right-4 z-10 bg-indigo-100 text-indigo-700 text-xs px-3 py-1 rounded-b-lg shadow-md flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>Scroll to see all ${totalRecords}</div>' : ''}
+            <div class="overflow-x-auto overflow-y-auto border border-gray-200 rounded-lg shadow-inner" style="max-height: 500px;">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50 sticky top-0 z-10">
+                  <tr>
+                    <th onclick="window.sortCaseValueBy('name')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                      Opportunity ${getSortIcon('name')}
+                    </th>
+                    <th onclick="window.sortCaseValueBy('contactName')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                      Contact ${getSortIcon('contactName')}
+                    </th>
+                    <th onclick="window.sortCaseValueBy('monetaryValue')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                      Value ${getSortIcon('monetaryValue')}
+                    </th>
+                    <th onclick="window.sortCaseValueBy('status')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                      Status ${getSortIcon('status')}
+                    </th>
+                    <th onclick="window.sortCaseValueBy('source')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                      Source ${getSortIcon('source')}
+                    </th>
+                    <th onclick="window.sortCaseValueBy('createdAt')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                      Created ${getSortIcon('createdAt')}
+                    </th>
+                  </tr>
+                </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                ${paginatedOpps.map(opp => {
+                  const value = parseFloat(opp.data?.monetaryValue || 0);
+                  const status = opp.data?.status || 'unknown';
+                  const contactName = opp.data?.contact?.name || opp.data?.name || 'N/A';
+                  const contactEmail = opp.data?.contact?.email || '';
+
+                  return `
+                    <tr class="hover:bg-gray-50">
+                      <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">${opp.data?.name || 'N/A'}</td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                        ${contactName}
+                        ${contactEmail ? `<br><span class="text-xs text-gray-500">${contactEmail}</span>` : ''}
+                      </td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-green-600">${formatCurrency(value)}</td>
+                      <td class="px-4 py-3 whitespace-nowrap text-xs">
+                        <span class="px-2 py-1 rounded-full font-medium ${getStatusColor(status)}">${status.toUpperCase()}</span>
+                      </td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">${opp.data?.source || 'N/A'}</td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${formatDate(opp.data?.createdAt)}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+            </div>
+          </div>
+
+          <div class="mt-4 flex items-center justify-between">
+            <div class="text-sm text-gray-600">
+              Showing ${startIdx + 1} to ${endIdx} of ${totalRecords} ${state.currentFilter === 'all' ? 'opportunities' : state.currentFilter + ' opportunities'}
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                onclick="window.goToCaseValuePage(${state.currentPage - 1})"
+                ${state.currentPage === 1 ? 'disabled' : ''}
+                class="px-3 py-1 text-sm border rounded ${state.currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+              >
+                Previous
+              </button>
+              <div class="flex items-center gap-1">
+                ${Array.from({length: Math.min(totalPages, 7)}, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 7) {
+                    pageNum = i + 1;
+                  } else if (state.currentPage <= 4) {
+                    pageNum = i + 1;
+                  } else if (state.currentPage >= totalPages - 3) {
+                    pageNum = totalPages - 6 + i;
+                  } else {
+                    pageNum = state.currentPage - 3 + i;
+                  }
+                  const isActive = pageNum === state.currentPage;
+                  return `
+                    <button
+                      onclick="window.goToCaseValuePage(${pageNum})"
+                      class="px-3 py-1 text-sm border rounded ${isActive ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+                    >
+                      ${pageNum}
+                    </button>
+                  `;
+                }).join('')}
+              </div>
+              <button
+                onclick="window.goToCaseValuePage(${state.currentPage + 1})"
+                ${state.currentPage === totalPages ? 'disabled' : ''}
+                class="px-3 py-1 text-sm border rounded ${state.currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        `;
+
+        document.getElementById('caseValueTableContainer').innerHTML = tableHTML;
+      };
+
+      // Render content
+      content.innerHTML = `
+        <div class="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <h4 class="font-semibold text-gray-900 mb-2">💰 How Average Case Value is Calculated</h4>
+          <p class="text-sm text-gray-700 mb-3">
+            This metric shows the <strong>average monetary value</strong> of all opportunities created during this period,
+            along with the total potential revenue from open opportunities.
+          </p>
+          <div class="bg-white rounded p-3 mb-3 border-l-4 border-green-500">
+            <p class="text-sm text-gray-800 mb-2"><strong>Calculation Formula:</strong></p>
+            <p class="text-sm text-gray-700">
+              Average Case Value = <strong>Total Value of All Opportunities</strong> ÷ <strong>Number of Opportunities</strong>
+            </p>
+            <p class="text-sm text-gray-600 mt-2">
+              = ${formatCurrency(totalValue)} ÷ ${totalOpportunities} = <strong class="text-green-600">${formatCurrency(avgValue)}</strong>
+            </p>
+          </div>
+          <div class="text-sm text-gray-700 space-y-2">
+            <p><strong>📊 What we count:</strong> Opportunities with monetary value > $0 AND contacts without opportunities (estimated value)</p>
+            <p><strong>📅 Time period:</strong> All opportunities and contacts created between the selected dates</p>
+            <p><strong>💵 Total Potential Revenue = Two Components:</strong></p>
+            <ul class="ml-6 text-xs space-y-1">
+              <li><strong>Open Opportunities:</strong> Actual monetary value from opportunities with status="open"</li>
+              <li><strong>Unqualified Contacts:</strong> Estimated value from contacts without opportunities (count × average case value)</li>
+            </ul>
+            <p><strong>🔄 Reclamation Opportunity:</strong> Lost and abandoned opportunities can be re-engaged to recover potential revenue</p>
+            <p><strong>🎯 Status Breakdown:</strong></p>
+            <ul class="ml-6 text-xs space-y-1">
+              <li><strong>Open:</strong> Active opportunities in the pipeline (actual value)</li>
+              <li><strong>Won:</strong> Closed and won (realized revenue)</li>
+              <li><strong>Lost:</strong> Closed without winning (reclamation candidate)</li>
+              <li><strong>Abandoned:</strong> Closed without pursuing (reclamation candidate)</li>
+              <li><strong>Unqualified Contacts:</strong> Leads that haven't been converted to opportunities yet (estimated value)</li>
+            </ul>
+            <p class="pt-2 border-t border-gray-200 mt-2 text-xs text-gray-600">
+              💡 <strong>Why this matters:</strong> This view shows your COMPLETE revenue potential - not just from active opportunities,
+              but also from contacts that haven't been qualified yet. Multiply unqualified contacts by your average case value to see
+              the potential revenue if you convert them to opportunities. The "Reclamation Opportunity" shows additional value from
+              re-engaging lost/abandoned leads.
+            </p>
+          </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div id="caseValueSummaryCards" class="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+          <!-- Cards will be rendered by renderCaseValueTable to show active state -->
+        </div>
+
+        <div id="caseValueTableContainer">
+          <!-- Table will be rendered here -->
+        </div>
+      `;
+
+      // Initial render
+      window.renderCaseValueTable('all');
+    }
+
+    // Drill-down: Consultations Held
+    async function showConsultationsHeldDrilldown(content, periodStart, periodEnd) {
+      // Fetch all opportunities
+      const oppResponse = await api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=500`);
+      const opportunities = oppResponse?.data || [];
+
+      // Categorize opportunities by consultation status
+      const withCalendarBooking = [];
+      const notBooked = [];
+      const confirmedShowed = [];
+      const progressed = [];
+      const stillOpen = [];
+
+      opportunities.forEach(opp => {
+        const attributions = opp.data?.attributions || [];
+        const hasCalendarBooking = Array.isArray(attributions) && attributions.some(attr => attr.medium === 'calendar');
+        const appointmentStatus = opp.data?.appointmentStatus;
+        const oppStatus = opp.data?.status;
+
+        if (hasCalendarBooking) {
+          withCalendarBooking.push(opp);
+        } else {
+          notBooked.push(opp);
+        }
+
+        if (appointmentStatus === 'showed') {
+          confirmedShowed.push(opp);
+        }
+
+        if (oppStatus === 'won' || oppStatus === 'active') {
+          progressed.push(opp);
+        }
+
+        if (oppStatus === 'open') {
+          stillOpen.push(opp);
+        }
+      });
+
+      // Calculate summary stats
+      const totalOpps = opportunities.length;
+      const totalValue = opportunities.reduce((sum, opp) => sum + parseFloat(opp.data?.monetaryValue || 0), 0);
+      const avgValue = totalOpps > 0 ? totalValue / totalOpps : 0;
+      const calendarBookingRate = totalOpps > 0 ? Math.round((withCalendarBooking.length / totalOpps) * 100) : 0;
+      const notBookedValue = notBooked.reduce((sum, opp) => sum + parseFloat(opp.data?.monetaryValue || 0), 0);
+
+      const formatCurrency = (value) => {
+        return new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: 'USD',
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0
+        }).format(value);
+      };
+
+      // Store data for table rendering
+      window.consultationsHeldData = {
+        allOpportunities: opportunities,
+        withCalendarBooking: withCalendarBooking,
+        notBooked: notBooked,
+        confirmedShowed: confirmedShowed,
+        progressed: progressed,
+        stillOpen: stillOpen,
+        currentPage: 1,
+        rowsPerPage: 25,
+        sortColumn: 'created_date',
+        sortDirection: 'desc',
+        searchQuery: '',
+        currentFilter: 'all' // 'all', 'booked', 'not_booked', 'confirmed', 'progressed', 'open'
+      };
+
+      // Helper functions
+      window.updateConsultationsHeldSearch = (event) => {
+        window.consultationsHeldData.searchQuery = event.target.value;
+      };
+
+      window.executeConsultationsHeldSearch = () => {
+        window.consultationsHeldData.currentPage = 1;
+        window.renderConsultationsHeldTable(window.consultationsHeldData.currentFilter);
+      };
+
+      window.handleConsultationsHeldKeypress = (event) => {
+        if (event.key === 'Enter') {
+          window.executeConsultationsHeldSearch();
+        }
+      };
+
+      window.sortConsultationsHeldBy = (column) => {
+        const state = window.consultationsHeldData;
+        if (state.sortColumn === column) {
+          state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+          state.sortColumn = column;
+          state.sortDirection = 'asc';
+        }
+        window.renderConsultationsHeldTable(state.currentFilter);
+      };
+
+      window.goToConsultationsHeldPage = (page) => {
+        const state = window.consultationsHeldData;
+        const totalPages = Math.ceil(state.filteredOpportunities.length / state.rowsPerPage);
+        if (page >= 1 && page <= totalPages) {
+          state.currentPage = page;
+          window.renderConsultationsHeldTable(state.currentFilter);
+        }
+      };
+
+      // Main render function
+      window.renderConsultationsHeldTable = function(filter = 'all') {
+        const state = window.consultationsHeldData;
+        state.currentFilter = filter;
+
+        // Filter data based on selected filter
+        let displayOpps = [];
+        switch (filter) {
+          case 'booked':
+            displayOpps = state.withCalendarBooking;
+            break;
+          case 'not_booked':
+            displayOpps = state.notBooked;
+            break;
+          case 'confirmed':
+            displayOpps = state.confirmedShowed;
+            break;
+          case 'progressed':
+            displayOpps = state.progressed;
+            break;
+          case 'open':
+            displayOpps = state.stillOpen;
+            break;
+          case 'all':
+          default:
+            displayOpps = state.allOpportunities;
+            break;
+        }
+
+        // Apply search filter
+        if (state.searchQuery.trim()) {
+          const query = state.searchQuery.toLowerCase();
+          displayOpps = displayOpps.filter(opp => {
+            const oppName = (opp.data?.name || '').toLowerCase();
+            const contactName = (opp.data?.contact?.name || opp.data?.contact?.firstName || '').toLowerCase();
+            const contactEmail = (opp.data?.contact?.email || '').toLowerCase();
+            return oppName.includes(query) || contactName.includes(query) || contactEmail.includes(query);
+          });
+        }
+
+        state.filteredOpportunities = displayOpps;
+
+        // Apply sorting
+        displayOpps.sort((a, b) => {
+          let aVal, bVal;
+          switch (state.sortColumn) {
+            case 'name':
+              aVal = (a.data?.name || '').toLowerCase();
+              bVal = (b.data?.name || '').toLowerCase();
+              break;
+            case 'contact':
+              aVal = (a.data?.contact?.name || '').toLowerCase();
+              bVal = (b.data?.contact?.name || '').toLowerCase();
+              break;
+            case 'value':
+              aVal = parseFloat(a.data?.monetaryValue || 0);
+              bVal = parseFloat(b.data?.monetaryValue || 0);
+              break;
+            case 'status':
+              aVal = (a.data?.status || '').toLowerCase();
+              bVal = (b.data?.status || '').toLowerCase();
+              break;
+            case 'created_date':
+              aVal = new Date(a.source_created_at);
+              bVal = new Date(b.source_created_at);
+              break;
+            default:
+              return 0;
+          }
+          if (aVal < bVal) return state.sortDirection === 'asc' ? -1 : 1;
+          if (aVal > bVal) return state.sortDirection === 'asc' ? 1 : -1;
+          return 0;
+        });
+
+        // Pagination
+        const totalRecords = displayOpps.length;
+        const totalPages = Math.ceil(totalRecords / state.rowsPerPage) || 1;
+        if (state.currentPage > totalPages) state.currentPage = totalPages;
+
+        const startIdx = (state.currentPage - 1) * state.rowsPerPage;
+        const endIdx = Math.min(startIdx + state.rowsPerPage, totalRecords);
+        const paginatedOpps = displayOpps.slice(startIdx, endIdx);
+
+        // Render summary cards with active state
+        const isActive = (cardFilter) => cardFilter === filter ? 'ring-2 ring-indigo-600 shadow-lg' : '';
+        const summaryCardsHTML = `
+          <div onclick="window.renderConsultationsHeldTable('all')" class="bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('all')}">
+            <p class="text-sm text-gray-600">Total Opportunities</p>
+            <p class="text-2xl font-bold text-gray-900">${state.allOpportunities.length}</p>
+            <p class="text-xs text-gray-500">${formatCurrency(totalValue)} total value</p>
+          </div>
+          <div onclick="window.renderConsultationsHeldTable('booked')" class="bg-blue-50 border border-blue-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('booked')}">
+            <p class="text-sm text-blue-600 font-medium">📅 Calendar Bookings</p>
+            <p class="text-2xl font-bold text-blue-700">${state.withCalendarBooking.length}</p>
+            <p class="text-xs text-gray-500">${calendarBookingRate}% of all opps</p>
+          </div>
+          <div onclick="window.renderConsultationsHeldTable('not_booked')" class="bg-red-50 border border-red-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('not_booked')}">
+            <p class="text-sm text-red-600 font-medium">❌ Not Booked</p>
+            <p class="text-2xl font-bold text-red-700">${state.notBooked.length}</p>
+            <p class="text-xs text-gray-500">${formatCurrency(notBookedValue)} at risk</p>
+          </div>
+          <div onclick="window.renderConsultationsHeldTable('confirmed')" class="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('confirmed')}">
+            <p class="text-sm text-green-600 font-medium">✅ Confirmed Showed</p>
+            <p class="text-2xl font-bold text-green-700">${state.confirmedShowed.length}</p>
+            <p class="text-xs text-gray-500">Explicitly marked</p>
+          </div>
+          <div onclick="window.renderConsultationsHeldTable('progressed')" class="bg-purple-50 border border-purple-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('progressed')}">
+            <p class="text-sm text-purple-600 font-medium">🚀 Progressed</p>
+            <p class="text-2xl font-bold text-purple-700">${state.progressed.length}</p>
+            <p class="text-xs text-gray-500">Won or Active</p>
+          </div>
+          <div onclick="window.renderConsultationsHeldTable('open')" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all ${isActive('open')}">
+            <p class="text-sm text-yellow-600 font-medium">⏳ Still Open</p>
+            <p class="text-2xl font-bold text-yellow-700">${state.stillOpen.length}</p>
+            <p class="text-xs text-gray-500">Pending outcome</p>
+          </div>
+        `;
+
+        document.getElementById('consultationsHeldSummaryCards').innerHTML = summaryCardsHTML;
+
+        // Helper functions for table rendering
+        const getSortIcon = (column) => {
+          if (state.sortColumn !== column) return '';
+          return state.sortDirection === 'asc'
+            ? '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>'
+            : '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>';
+        };
+
+        const formatDate = (dateStr) => {
+          if (!dateStr) return 'N/A';
+          const date = new Date(dateStr);
+          return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        };
+
+        const getAttendanceStatus = (opp) => {
+          const attributions = opp.data?.attributions || [];
+          const hasCalendarBooking = Array.isArray(attributions) && attributions.some(attr => attr.medium === 'calendar');
+          const appointmentStatus = opp.data?.appointmentStatus;
+          const oppStatus = opp.data?.status;
+
+          if (appointmentStatus === 'showed') {
+            return { label: 'Confirmed Showed', color: 'bg-green-100 text-green-700' };
+          } else if (oppStatus === 'won' || oppStatus === 'active') {
+            return { label: 'Progressed', color: 'bg-purple-100 text-purple-700' };
+          } else if (hasCalendarBooking) {
+            return { label: 'Booked', color: 'bg-blue-100 text-blue-700' };
+          } else {
+            return { label: 'No Booking', color: 'bg-gray-100 text-gray-600' };
+          }
+        };
+
+        const tableHTML = `
+          <!-- Search Box -->
+          <div class="mb-4 flex gap-2">
+            <input
+              type="text"
+              placeholder="Search by opportunity name, contact, or email..."
+              value="${state.searchQuery}"
+              oninput="window.updateConsultationsHeldSearch(event)"
+              onkeypress="window.handleConsultationsHeldKeypress(event)"
+              class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+            <button
+              onclick="window.executeConsultationsHeldSearch()"
+              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            >
+              Search
+            </button>
+          </div>
+
+          <!-- Table -->
+          <div class="overflow-x-auto border border-gray-200 rounded-lg">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th onclick="window.sortConsultationsHeldBy('name')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Opportunity ${getSortIcon('name')}
+                  </th>
+                  <th onclick="window.sortConsultationsHeldBy('contact')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Contact ${getSortIcon('contact')}
+                  </th>
+                  <th onclick="window.sortConsultationsHeldBy('value')" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Value ${getSortIcon('value')}
+                  </th>
+                  <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                    Calendar Booking
+                  </th>
+                  <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                    Attendance Status
+                  </th>
+                  <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                    Opp Status
+                  </th>
+                  <th onclick="window.sortConsultationsHeldBy('created_date')" class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Created ${getSortIcon('created_date')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                ${paginatedOpps.map(opp => {
+                  const value = parseFloat(opp.data?.monetaryValue || 0);
+                  const contactName = opp.data?.contact?.name ||
+                                     (opp.data?.contact?.firstName && opp.data?.contact?.lastName
+                                       ? `${opp.data.contact.firstName} ${opp.data.contact.lastName}`
+                                       : 'Unknown');
+                  const contactEmail = opp.data?.contact?.email || '';
+                  const contactPhone = opp.data?.contact?.phone || '';
+                  const attributions = opp.data?.attributions || [];
+                  const hasCalendarBooking = Array.isArray(attributions) && attributions.some(attr => attr.medium === 'calendar');
+                  const attendanceStatus = getAttendanceStatus(opp);
+                  const oppStatus = opp.data?.status || 'unknown';
+
+                  return `
+                    <tr class="hover:bg-gray-50">
+                      <td class="px-4 py-3 text-sm font-medium text-gray-900">${opp.data?.name || 'N/A'}</td>
+                      <td class="px-4 py-3 text-sm text-gray-600">
+                        ${contactName}
+                        ${contactEmail ? `<br><span class="text-xs text-gray-500">${contactEmail}</span>` : ''}
+                        ${contactPhone ? `<br><span class="text-xs text-gray-500">${contactPhone}</span>` : ''}
+                      </td>
+                      <td class="px-4 py-3 text-right text-sm font-semibold text-green-600">${formatCurrency(value)}</td>
+                      <td class="px-4 py-3 text-center text-sm">
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${hasCalendarBooking ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}">
+                          ${hasCalendarBooking ? '✅ Yes' : '❌ No'}
+                        </span>
+                      </td>
+                      <td class="px-4 py-3 text-center text-sm">
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${attendanceStatus.color}">
+                          ${attendanceStatus.label}
+                        </span>
+                      </td>
+                      <td class="px-4 py-3 text-center text-sm">
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          oppStatus === 'won' ? 'bg-green-100 text-green-700' :
+                          oppStatus === 'active' ? 'bg-purple-100 text-purple-700' :
+                          oppStatus === 'open' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-gray-100 text-gray-600'
+                        }">
+                          ${oppStatus.toUpperCase()}
+                        </span>
+                      </td>
+                      <td class="px-4 py-3 text-center text-sm text-gray-500">${formatDate(opp.source_created_at)}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination -->
+          <div class="mt-4 flex items-center justify-between text-sm text-gray-700">
+            <p>Showing ${startIdx + 1}-${endIdx} of ${totalRecords} opportunities</p>
+            <div class="flex gap-2">
+              <button
+                onclick="window.goToConsultationsHeldPage(${state.currentPage - 1})"
+                ${state.currentPage === 1 ? 'disabled' : ''}
+                class="px-3 py-1 border rounded ${state.currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+              >
+                Previous
+              </button>
+              <span class="px-3 py-1">Page ${state.currentPage} of ${totalPages}</span>
+              <button
+                onclick="window.goToConsultationsHeldPage(${state.currentPage + 1})"
+                ${state.currentPage === totalPages ? 'disabled' : ''}
+                class="px-3 py-1 border rounded ${state.currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        `;
+
+        document.getElementById('consultationsHeldTableContainer').innerHTML = tableHTML;
+      };
+
+      // Render content
+      content.innerHTML = `
+        <div class="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <h4 class="font-semibold text-gray-900 mb-2">📅 How Consultations Held is Calculated</h4>
+          <p class="text-sm text-gray-700 mb-3">
+            This metric counts opportunities where a consultation was scheduled and/or held. We determine this through multiple signals:
+          </p>
+          <div class="bg-white rounded p-3 mb-3 border-l-4 border-blue-500">
+            <p class="text-sm text-gray-800 mb-2"><strong>What We Count:</strong></p>
+            <ul class="text-sm text-gray-700 space-y-1 list-disc list-inside">
+              <li><strong>Calendar Bookings:</strong> Opportunities with calendar attribution (medium: "calendar")</li>
+              <li><strong>Confirmed Shows:</strong> Opportunities explicitly marked as appointmentStatus = "showed"</li>
+              <li><strong>Progressed Opportunities:</strong> Won or Active status (implies consultation happened)</li>
+            </ul>
+          </div>
+          <div class="text-sm text-gray-700 space-y-2">
+            <p><strong>💡 Current Data:</strong></p>
+            <ul class="list-disc list-inside space-y-1 ml-2">
+              <li><strong>${withCalendarBooking.length}</strong> opportunities have calendar bookings (${calendarBookingRate}% of all)</li>
+              <li><strong>${notBooked.length}</strong> opportunities NOT booked yet (${formatCurrency(notBookedValue)} at risk)</li>
+              <li><strong>${confirmedShowed.length}</strong> explicitly confirmed as showed</li>
+              <li><strong>${progressed.length}</strong> progressed to Won or Active status</li>
+              <li><strong>${stillOpen.length}</strong> still in Open status</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div id="consultationsHeldSummaryCards" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+          <!-- Cards will be rendered by renderConsultationsHeldTable to show active state -->
+        </div>
+
+        <div id="consultationsHeldTableContainer">
+          <!-- Table will be rendered here -->
+        </div>
+      `;
+
+      // Initial render
+      window.renderConsultationsHeldTable('all');
     }
 
     // Create distribution metric card (for array results like horizontal bar charts)
@@ -2194,10 +3978,34 @@
         return createDistributionMetricCard(metric);
       }
 
-      // Use API-provided formatted values if available
-      const currentValue = metric.formattedCurrent || formatNumber(metric.current, 0);
-      const priorValue = metric.formattedPrior || (metric.prior !== null ? formatNumber(metric.prior, 0) : 'N/A');
-      const targetValue = metric.formattedTarget || formatNumber(metric.target, 0);
+      // Currency formatter with commas
+      const formatCurrency = (value) => {
+        if (value === null || value === undefined || isNaN(value)) return 'N/A';
+        return new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: 'USD',
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        }).format(value);
+      };
+
+      // Determine if this is a currency metric
+      const isCurrency = metric.type === 'currency' || metric.unit === 'dollars';
+
+      // Use API-provided formatted values if available, but apply currency formatting if needed
+      let currentValue, priorValue, targetValue;
+
+      if (isCurrency) {
+        // For currency metrics, always apply proper formatting with commas
+        currentValue = formatCurrency(metric.current);
+        priorValue = metric.prior !== null ? formatCurrency(metric.prior) : 'N/A';
+        targetValue = formatCurrency(metric.target);
+      } else {
+        // For non-currency metrics, use API formatting or fallback
+        currentValue = metric.formattedCurrent || formatNumber(metric.current, 0);
+        priorValue = metric.formattedPrior || (metric.prior !== null ? formatNumber(metric.prior, 0) : 'N/A');
+        targetValue = metric.formattedTarget || formatNumber(metric.target, 0);
+      }
 
       // Use API-provided status or calculate
       const statusColor = metric.status === 'error' ? 'gray' : (metric.status || 'gray');
@@ -2213,7 +4021,15 @@
         ? '<svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>'
         : '<svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14"></path></svg>';
 
-      const changeText = metric.formattedChange || (change !== null ? formatNumber(Math.abs(change), 1) : 'N/A');
+      // Format change text with proper currency formatting if applicable
+      let changeText;
+      if (isCurrency && change !== null) {
+        // For currency, format with commas (e.g., "$402.03")
+        changeText = formatCurrency(Math.abs(change)).replace('$', '');  // Remove $ since we'll add it in context
+        changeText = '$' + changeText.replace('$', '');  // Ensure single $
+      } else {
+        changeText = metric.formattedChange || (change !== null ? formatNumber(Math.abs(change), 1) : 'N/A');
+      }
 
       // Determine if override button should be shown (for N/A or 0 values, or always show)
       const showOverrideButton = true; // Show for all metrics - user can override any value
