@@ -113,7 +113,7 @@
     <!-- Data Override Slide-out Panel -->
     <div id="dataOverridePanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
       <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
-        <h2 class="text-lg font-semibold text-gray-900">Override Metric Data</h2>
+        <h2 class="text-lg font-semibold text-gray-900">Override Target Value</h2>
         <button id="closeDataOverridePanel" class="text-gray-400 hover:text-gray-600">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -133,10 +133,10 @@
 
         <!-- Current Value Display -->
         <div class="mb-6">
-          <label class="block text-sm font-medium text-gray-700 mb-2">Current Value</label>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Current Target</label>
           <div class="p-3 bg-gray-50 rounded-lg border border-gray-200">
             <p id="overrideCurrentValue" class="text-2xl font-bold text-gray-900">-</p>
-            <p class="text-xs text-gray-500 mt-1">Calculated from data sources</p>
+            <p class="text-xs text-gray-500 mt-1">Default target value</p>
           </div>
         </div>
 
@@ -144,7 +144,7 @@
         <form id="overrideForm" class="space-y-4">
           <div>
             <label for="overrideValue" class="block text-sm font-medium text-gray-700 mb-2">
-              Override Value <span class="text-red-500">*</span>
+              New Target Value <span class="text-red-500">*</span>
             </label>
             <input
               type="number"
@@ -152,9 +152,9 @@
               step="0.01"
               required
               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder="Enter value to override"
+              placeholder="Enter new target value"
             >
-            <p class="text-xs text-gray-500 mt-1">This value will replace the calculated value for this period.</p>
+            <p class="text-xs text-gray-500 mt-1">This target will replace the default target for this period.</p>
           </div>
 
           <div>
@@ -1643,18 +1643,6 @@
           <div class="mb-4">
             <div class="flex items-center justify-between mb-1">
               <p class="text-xs text-gray-500">Current Period</p>
-              ${showOverrideButton ? `
-                <button
-                  onclick="openDataOverridePanel('${metric.key}', '${metric.name}', '${metric.description || ''}', ${metric.current})"
-                  class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1"
-                  title="Override this value"
-                >
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                  </svg>
-                  Override
-                </button>
-              ` : ''}
             </div>
             <p class="text-3xl font-bold text-gray-900">${currentValue}</p>
           </div>
@@ -1674,7 +1662,21 @@
               <p class="font-semibold text-gray-700">${priorValue}</p>
             </div>
             <div>
-              <p class="text-xs text-gray-500 mb-1">Target</p>
+              <div class="flex items-center justify-between mb-1">
+                <p class="text-xs text-gray-500">Target</p>
+                ${showOverrideButton ? `
+                  <button
+                    onclick="openDataOverridePanel('${metric.key}', '${metric.name}', '${metric.description || ''}', ${metric.target}, 'target')"
+                    class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1"
+                    title="Override target value"
+                  >
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                    </svg>
+                    Override
+                  </button>
+                ` : ''}
+              </div>
               <p class="font-semibold text-gray-700">${targetValue}</p>
             </div>
           </div>
@@ -2909,7 +2911,7 @@
     let currentOverrideData = null;
 
     // Open data override panel
-    function openDataOverridePanel(metricKey, metricName, metricDescription, currentValue) {
+    function openDataOverridePanel(metricKey, metricName, metricDescription, currentValue, overrideType = 'target') {
       const moduleKey = document.getElementById('moduleSelect').value;
       const periodStart = document.getElementById('periodStart').value;
       const periodEnd = document.getElementById('periodEnd').value;
@@ -2924,7 +2926,8 @@
         key: metricKey,
         name: metricName,
         description: metricDescription,
-        currentValue: currentValue
+        currentValue: currentValue,
+        overrideType: overrideType
       };
 
       // Populate panel
@@ -2934,12 +2937,17 @@
         new Date(periodStart + 'T00:00:00Z'),
         new Date(periodEnd + 'T23:59:59Z')
       );
+
+      // Update labels based on override type
+      const valueLabel = overrideType === 'target' ? 'Current Target' : 'Current Value';
+      document.getElementById('overrideCurrentValue').parentElement.querySelector('p.text-xs').textContent = valueLabel;
       document.getElementById('overrideCurrentValue').textContent = formatNumber(currentValue, 2);
 
       // Reset form
       document.getElementById('overrideForm').reset();
       document.getElementById('overrideValue').value = '';
       document.getElementById('overrideNotes').value = '';
+      document.getElementById('overrideType').value = overrideType;
 
       // Load existing overrides for this metric
       loadExistingOverrides(moduleKey, metricKey, periodStart, periodEnd);
