@@ -1569,12 +1569,12 @@
           <h4 class="font-semibold text-gray-900 mb-4">Data Quality Insights</h4>
           <div class="grid grid-cols-3 gap-4">
             <!-- Unique Contact IDs in Opportunities -->
-            <div onclick="window.renderContactTable('qualified', 'contacts')" class="bg-purple-50 border border-purple-200 rounded-lg p-4 cursor-pointer hover:bg-purple-100 hover:shadow-md transition-all duration-200">
+            <div onclick="window.renderContactTable('all', 'opportunities')" class="bg-purple-50 border border-purple-200 rounded-lg p-4 cursor-pointer hover:bg-purple-100 hover:shadow-md transition-all duration-200">
               <div class="flex items-center justify-between mb-2">
                 <p class="text-sm font-medium text-gray-900">📋 Unique Contact IDs</p>
               </div>
               <p class="text-3xl font-bold text-purple-700">${uniqueContactIdsInOpportunities}</p>
-              <p class="text-xs text-gray-500 mt-1">Distinct contacts referenced in opportunities · Click to view</p>
+              <p class="text-xs text-gray-500 mt-1">Distinct contacts referenced in opportunities · Click to view opportunities</p>
             </div>
 
             <!-- Missing Contacts -->
