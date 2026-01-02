@@ -919,8 +919,7 @@
         sortDirection: 'asc',
         searchQuery: '',
         currentFilter: 'all',
-        viewType: 'contacts', // 'contacts', 'opportunities', or 'contact_opportunities'
-        searchDebounceTimer: null // Store debounce timer in state
+        viewType: 'contacts' // 'contacts', 'opportunities', or 'contact_opportunities'
       };
 
       // Function to render filtered table with sorting, filtering, and pagination
@@ -1046,22 +1045,24 @@
           }
         };
 
-        // Helper function to handle search
-        window.handleSearch = function(event) {
+        // Helper function to update search query (no render)
+        window.updateSearchQuery = function(event) {
           const state = window.qualifiedLeadsData;
-          const value = event.target.value;
-          state.searchQuery = value;
+          state.searchQuery = event.target.value;
+        };
+
+        // Helper function to execute search
+        window.executeSearch = function() {
+          const state = window.qualifiedLeadsData;
           state.currentPage = 1; // Reset to page 1 when searching
+          window.renderContactTable();
+        };
 
-          // Clear existing timer
-          if (state.searchDebounceTimer) {
-            clearTimeout(state.searchDebounceTimer);
+        // Allow Enter key to trigger search
+        window.handleSearchKeypress = function(event) {
+          if (event.key === 'Enter') {
+            window.executeSearch();
           }
-
-          // Debounce the render by 300ms
-          state.searchDebounceTimer = setTimeout(() => {
-            window.renderContactTable();
-          }, 300);
         };
 
         // Sort indicator
@@ -1082,14 +1083,21 @@
           </div>
 
           <!-- Search Box -->
-          <div class="mb-4">
+          <div class="mb-4 flex gap-2">
             <input
               type="text"
               placeholder="Search by name, email, or phone..."
               value="${state.searchQuery}"
-              oninput="window.handleSearch(event)"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              oninput="window.updateSearchQuery(event)"
+              onkeypress="window.handleSearchKeypress(event)"
+              class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
+            <button
+              onclick="window.executeSearch()"
+              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            >
+              Search
+            </button>
           </div>
 
           <div class="overflow-x-auto" style="max-height: 500px;">
@@ -1285,14 +1293,21 @@
             <button onclick="window.renderContactTable('all', 'contacts')" class="text-sm text-indigo-600 hover:text-indigo-800">Back to Contacts</button>
           </div>
 
-          <div class="mb-4">
+          <div class="mb-4 flex gap-2">
             <input
               type="text"
               placeholder="Search by name, contact, or status..."
               value="${state.searchQuery}"
-              oninput="window.handleSearch(event)"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              oninput="window.updateSearchQuery(event)"
+              onkeypress="window.handleSearchKeypress(event)"
+              class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
+            <button
+              onclick="window.executeSearch()"
+              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            >
+              Search
+            </button>
           </div>
 
           <div class="overflow-x-auto" style="max-height: 500px;">
@@ -1435,14 +1450,21 @@
             <button onclick="window.renderContactTable('all', 'contacts')" class="text-sm text-indigo-600 hover:text-indigo-800">Back to Contacts</button>
           </div>
 
-          <div class="mb-4">
+          <div class="mb-4 flex gap-2">
             <input
               type="text"
               placeholder="Search by contact name or email..."
               value="${state.searchQuery}"
-              oninput="window.handleSearch(event)"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              oninput="window.updateSearchQuery(event)"
+              onkeypress="window.handleSearchKeypress(event)"
+              class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
+            <button
+              onclick="window.executeSearch()"
+              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            >
+              Search
+            </button>
           </div>
 
           <div class="space-y-4" style="max-height: 500px; overflow-y: auto;">
@@ -1611,14 +1633,21 @@
             <button onclick="window.renderContactTable('all', 'contacts')" class="text-sm text-indigo-600 hover:text-indigo-800">Back to Contacts</button>
           </div>
 
-          <div class="mb-4">
+          <div class="mb-4 flex gap-2">
             <input
               type="text"
               placeholder="Search by name, email, or contact ID..."
               value="${state.searchQuery}"
-              oninput="window.handleSearch(event)"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              oninput="window.updateSearchQuery(event)"
+              onkeypress="window.handleSearchKeypress(event)"
+              class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
+            <button
+              onclick="window.executeSearch()"
+              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            >
+              Search
+            </button>
           </div>
 
           <div class="space-y-4" style="max-height: 500px; overflow-y: auto;">
