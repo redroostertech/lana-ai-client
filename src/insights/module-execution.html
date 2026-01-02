@@ -919,7 +919,8 @@
         sortDirection: 'asc',
         searchQuery: '',
         currentFilter: 'all',
-        viewType: 'contacts' // 'contacts', 'opportunities', or 'contact_opportunities'
+        viewType: 'contacts', // 'contacts', 'opportunities', or 'contact_opportunities'
+        searchDebounceTimer: null // Store debounce timer in state
       };
 
       // Function to render filtered table with sorting, filtering, and pagination
@@ -1045,22 +1046,20 @@
           }
         };
 
-        // Debounce timer for search
-        let searchDebounceTimer = null;
-
         // Helper function to handle search
         window.handleSearch = function(event) {
+          const state = window.qualifiedLeadsData;
           const value = event.target.value;
           state.searchQuery = value;
           state.currentPage = 1; // Reset to page 1 when searching
 
           // Clear existing timer
-          if (searchDebounceTimer) {
-            clearTimeout(searchDebounceTimer);
+          if (state.searchDebounceTimer) {
+            clearTimeout(state.searchDebounceTimer);
           }
 
           // Debounce the render by 300ms
-          searchDebounceTimer = setTimeout(() => {
+          state.searchDebounceTimer = setTimeout(() => {
             window.renderContactTable();
           }, 300);
         };
