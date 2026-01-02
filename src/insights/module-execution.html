@@ -912,6 +912,7 @@
         contacts,
         contactIdsFromOpportunities,
         opportunities,
+        allContactIds, // Add this for missing contact detection
         currentPage: 1,
         rowsPerPage: 25,
         sortColumn: null,
@@ -947,7 +948,7 @@
         // Render based on view type
         if (state.viewType === 'opportunities') {
           console.log('[renderContactTable] Rendering opportunities view');
-          return window.renderOpportunitiesTable();
+          return window.renderOpportunitiesTable(state.currentFilter);
         } else if (state.viewType === 'contact_opportunities') {
           console.log('[renderContactTable] Rendering contact-opportunities view');
           return window.renderContactOpportunitiesTable();
@@ -1174,16 +1175,32 @@
       };
 
       // Render opportunities table
-      window.renderOpportunitiesTable = function() {
-        console.log('[renderOpportunitiesTable] Called');
+      window.renderOpportunitiesTable = function(filter) {
+        console.log('[renderOpportunitiesTable] Called with filter:', filter);
 
         const state = window.qualifiedLeadsData;
-        const { opportunities } = state;
+        const { opportunities, allContactIds } = state;
 
         console.log('[renderOpportunitiesTable] Total opportunities:', opportunities.length);
 
+        // Update filter if provided
+        if (filter !== undefined) {
+          state.currentFilter = filter;
+          state.currentPage = 1; // Reset to page 1 when changing filter
+        }
+
         let filteredOpportunities = opportunities;
         let filterTitle = 'All Opportunities';
+
+        // Apply filter based on currentFilter
+        if (state.currentFilter === 'missing_contacts') {
+          // Show only opportunities where contactId exists but is not in allContactIds
+          filteredOpportunities = opportunities.filter(opp => {
+            const contactId = opp.data?.contactId;
+            return contactId && !allContactIds.has(contactId);
+          });
+          filterTitle = 'Opportunities with Missing Contacts';
+        }
 
         // Apply search filter
         if (state.searchQuery) {
@@ -1548,7 +1565,7 @@
           <h4 class="font-semibold text-gray-900 mb-4">Lead Relationship Breakdown</h4>
           <div class="grid grid-cols-2 gap-4 mb-4">
             <!-- Qualified (Have Opportunities) -->
-            <div onclick="window.renderContactTable('qualified')" class="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer hover:bg-green-100 hover:shadow-md transition-all duration-200">
+            <div onclick="window.renderContactTable('qualified', 'contacts')" class="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer hover:bg-green-100 hover:shadow-md transition-all duration-200">
               <div class="flex items-center justify-between mb-2">
                 <p class="text-sm font-medium text-gray-900">✅ Qualified (Have Opportunities)</p>
               </div>
@@ -1557,7 +1574,7 @@
             </div>
 
             <!-- Not Yet Qualified (No Opportunities) -->
-            <div onclick="window.renderContactTable('not_qualified')" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 cursor-pointer hover:bg-yellow-100 hover:shadow-md transition-all duration-200">
+            <div onclick="window.renderContactTable('not_qualified', 'contacts')" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 cursor-pointer hover:bg-yellow-100 hover:shadow-md transition-all duration-200">
               <div class="flex items-center justify-between mb-2">
                 <p class="text-sm font-medium text-gray-900">⚠️ Not Yet Qualified (No Opportunities)</p>
               </div>
@@ -1568,7 +1585,7 @@
 
           <!-- Reference Information -->
           <div class="grid grid-cols-2 gap-4">
-            <div onclick="window.renderContactTable('all')" class="bg-blue-50 border border-blue-200 rounded-lg p-4 cursor-pointer hover:bg-blue-100 hover:shadow-md transition-all duration-200">
+            <div onclick="window.renderContactTable('all', 'contacts')" class="bg-blue-50 border border-blue-200 rounded-lg p-4 cursor-pointer hover:bg-blue-100 hover:shadow-md transition-all duration-200">
               <div class="flex items-center justify-between mb-2">
                 <p class="text-sm font-medium text-gray-900">ℹ️ Total Contacts</p>
               </div>
@@ -1600,12 +1617,12 @@
 
             <!-- Missing Contacts -->
             ${contactsOnlyInOpportunities > 0 ? `
-            <div onclick="window.renderContactTable('all', 'contacts')" class="bg-red-50 border border-red-200 rounded-lg p-4 cursor-pointer hover:bg-red-100 hover:shadow-md transition-all duration-200">
+            <div onclick="window.renderContactTable('missing_contacts', 'opportunities')" class="bg-red-50 border border-red-200 rounded-lg p-4 cursor-pointer hover:bg-red-100 hover:shadow-md transition-all duration-200">
               <div class="flex items-center justify-between mb-2">
                 <p class="text-sm font-medium text-gray-900">🔴 Missing Contacts</p>
               </div>
               <p class="text-3xl font-bold text-red-700">${contactsOnlyInOpportunities}</p>
-              <p class="text-xs text-gray-500 mt-1">Contact IDs in opportunities but no contact record · Click to view all contacts</p>
+              <p class="text-xs text-gray-500 mt-1">Contact IDs in opportunities but no contact record · Click to view opportunities</p>
             </div>
             ` : `
             <div onclick="window.renderContactTable('qualified', 'contacts')" class="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer hover:bg-green-100 hover:shadow-md transition-all duration-200">
