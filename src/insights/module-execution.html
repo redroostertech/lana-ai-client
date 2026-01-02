@@ -911,25 +911,39 @@
       window.qualifiedLeadsData = {
         contacts,
         contactIdsFromOpportunities,
+        opportunities,
         currentPage: 1,
         rowsPerPage: 25,
         sortColumn: null,
         sortDirection: 'asc',
         searchQuery: '',
-        currentFilter: 'all'
+        currentFilter: 'all',
+        viewType: 'contacts' // 'contacts', 'opportunities', or 'contact_opportunities'
       };
 
       // Function to render filtered table with sorting, filtering, and pagination
-      window.renderContactTable = function(filter) {
+      window.renderContactTable = function(filter, viewType) {
         const state = window.qualifiedLeadsData;
-        const { contacts, contactIdsFromOpportunities } = state;
+        const { contacts, contactIdsFromOpportunities, opportunities } = state;
 
-        // Update filter if provided
+        // Update filter and view type if provided
         if (filter !== undefined) {
           state.currentFilter = filter;
           state.currentPage = 1; // Reset to page 1 when changing filter
         }
+        if (viewType !== undefined) {
+          state.viewType = viewType;
+          state.currentPage = 1;
+        }
 
+        // Render based on view type
+        if (state.viewType === 'opportunities') {
+          return renderOpportunitiesTable();
+        } else if (state.viewType === 'contact_opportunities') {
+          return renderContactOpportunitiesTable();
+        }
+
+        // Default: Contacts view
         let filteredContacts = contacts;
         let filterTitle = 'All Contacts';
 
@@ -1147,6 +1161,331 @@
         }
       };
 
+      // Render opportunities table
+      function renderOpportunitiesTable() {
+        const state = window.qualifiedLeadsData;
+        const { opportunities } = state;
+
+        let filteredOpportunities = opportunities;
+        let filterTitle = 'All Opportunities';
+
+        // Apply search filter
+        if (state.searchQuery) {
+          const query = state.searchQuery.toLowerCase();
+          filteredOpportunities = filteredOpportunities.filter(opp => {
+            const name = opp.data?.name || '';
+            const contactName = opp.data?.contact?.name || '';
+            const status = opp.data?.status || '';
+            return name.toLowerCase().includes(query) || contactName.toLowerCase().includes(query) || status.toLowerCase().includes(query);
+          });
+        }
+
+        // Apply sorting
+        if (state.sortColumn) {
+          filteredOpportunities.sort((a, b) => {
+            let aVal, bVal;
+            switch(state.sortColumn) {
+              case 'name':
+                aVal = a.data?.name || '';
+                bVal = b.data?.name || '';
+                break;
+              case 'contact':
+                aVal = a.data?.contact?.name || '';
+                bVal = b.data?.contact?.name || '';
+                break;
+              case 'value':
+                aVal = parseFloat(a.data?.monetaryValue || 0);
+                bVal = parseFloat(b.data?.monetaryValue || 0);
+                break;
+              case 'status':
+                aVal = a.data?.status || '';
+                bVal = b.data?.status || '';
+                break;
+              case 'created':
+                aVal = new Date(a.source_created_at).getTime();
+                bVal = new Date(b.source_created_at).getTime();
+                break;
+              default:
+                return 0;
+            }
+            if (aVal < bVal) return state.sortDirection === 'asc' ? -1 : 1;
+            if (aVal > bVal) return state.sortDirection === 'asc' ? 1 : -1;
+            return 0;
+          });
+        }
+
+        // Calculate pagination
+        const totalRecords = filteredOpportunities.length;
+        const totalPages = Math.ceil(totalRecords / state.rowsPerPage);
+        const startIdx = (state.currentPage - 1) * state.rowsPerPage;
+        const endIdx = Math.min(startIdx + state.rowsPerPage, totalRecords);
+        const paginatedOpportunities = filteredOpportunities.slice(startIdx, endIdx);
+
+        const getSortIcon = (column) => {
+          if (state.sortColumn !== column) {
+            return '<svg class="w-4 h-4 text-gray-400 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path></svg>';
+          }
+          if (state.sortDirection === 'asc') {
+            return '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>';
+          }
+          return '<svg class="w-4 h-4 text-indigo-600 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>';
+        };
+
+        const tableHTML = `
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="font-semibold text-gray-900">${filterTitle}</h4>
+            <button onclick="window.renderContactTable('all', 'contacts')" class="text-sm text-indigo-600 hover:text-indigo-800">Back to Contacts</button>
+          </div>
+
+          <div class="mb-4">
+            <input
+              type="text"
+              placeholder="Search by name, contact, or status..."
+              value="${state.searchQuery}"
+              oninput="window.handleSearch(event)"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+          </div>
+
+          <div class="overflow-x-auto" style="max-height: 500px;">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50 sticky top-0">
+                <tr>
+                  <th onclick="window.sortTableBy('name')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Opportunity ${getSortIcon('name')}
+                  </th>
+                  <th onclick="window.sortTableBy('contact')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Contact ${getSortIcon('contact')}
+                  </th>
+                  <th onclick="window.sortTableBy('value')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Value ${getSortIcon('value')}
+                  </th>
+                  <th onclick="window.sortTableBy('status')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Status ${getSortIcon('status')}
+                  </th>
+                  <th onclick="window.sortTableBy('created')" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                    Created ${getSortIcon('created')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                ${paginatedOpportunities.map(opp => `
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">${opp.data?.name || 'N/A'}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${opp.data?.contact?.name || 'N/A'}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">$${parseFloat(opp.data?.monetaryValue || 0).toLocaleString()}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm">
+                      <span class="px-2 py-1 text-xs font-medium rounded-full ${
+                        opp.data?.status === 'won' ? 'bg-green-100 text-green-800' :
+                        opp.data?.status === 'lost' ? 'bg-red-100 text-red-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }">${opp.data?.status || 'N/A'}</span>
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${new Date(opp.source_created_at).toLocaleDateString()}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="mt-4 flex items-center justify-between">
+            <div class="text-sm text-gray-600">
+              Showing ${startIdx + 1} to ${endIdx} of ${totalRecords} opportunities
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                onclick="window.goToPage(${state.currentPage - 1})"
+                ${state.currentPage === 1 ? 'disabled' : ''}
+                class="px-3 py-1 text-sm border rounded ${state.currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+              >
+                Previous
+              </button>
+              <div class="flex items-center gap-1">
+                ${Array.from({length: Math.min(totalPages, 7)}, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 7) {
+                    pageNum = i + 1;
+                  } else if (state.currentPage <= 4) {
+                    pageNum = i + 1;
+                  } else if (state.currentPage >= totalPages - 3) {
+                    pageNum = totalPages - 6 + i;
+                  } else {
+                    pageNum = state.currentPage - 3 + i;
+                  }
+                  return `
+                    <button
+                      onclick="window.goToPage(${pageNum})"
+                      class="px-3 py-1 text-sm border rounded ${state.currentPage === pageNum ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+                    >
+                      ${pageNum}
+                    </button>
+                  `;
+                }).join('')}
+              </div>
+              <button
+                onclick="window.goToPage(${state.currentPage + 1})"
+                ${state.currentPage === totalPages ? 'disabled' : ''}
+                class="px-3 py-1 text-sm border rounded ${state.currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        `;
+
+        const container = document.getElementById('contactTableContainer');
+        if (container) {
+          container.innerHTML = tableHTML;
+        }
+      }
+
+      // Render contact-opportunities grouped table
+      function renderContactOpportunitiesTable() {
+        const state = window.qualifiedLeadsData;
+        const { contacts, opportunities, contactIdsFromOpportunities } = state;
+
+        // Group opportunities by contact ID
+        const oppsByContact = {};
+        opportunities.forEach(opp => {
+          const contactId = opp.data?.contactId;
+          if (contactId) {
+            if (!oppsByContact[contactId]) {
+              oppsByContact[contactId] = [];
+            }
+            oppsByContact[contactId].push(opp);
+          }
+        });
+
+        // Get contacts that have opportunities
+        let contactsWithOpps = contacts.filter(c => contactIdsFromOpportunities.has(c.data?.id));
+
+        // Apply search filter
+        if (state.searchQuery) {
+          const query = state.searchQuery.toLowerCase();
+          contactsWithOpps = contactsWithOpps.filter(contact => {
+            const name = contact.data?.contactName || contact.data?.name || '';
+            const email = contact.data?.email || '';
+            return name.toLowerCase().includes(query) || email.toLowerCase().includes(query);
+          });
+        }
+
+        // Pagination
+        const totalRecords = contactsWithOpps.length;
+        const totalPages = Math.ceil(totalRecords / state.rowsPerPage);
+        const startIdx = (state.currentPage - 1) * state.rowsPerPage;
+        const endIdx = Math.min(startIdx + state.rowsPerPage, totalRecords);
+        const paginatedContacts = contactsWithOpps.slice(startIdx, endIdx);
+
+        const tableHTML = `
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="font-semibold text-gray-900">Contacts with Opportunities</h4>
+            <button onclick="window.renderContactTable('all', 'contacts')" class="text-sm text-indigo-600 hover:text-indigo-800">Back to Contacts</button>
+          </div>
+
+          <div class="mb-4">
+            <input
+              type="text"
+              placeholder="Search by contact name or email..."
+              value="${state.searchQuery}"
+              oninput="window.handleSearch(event)"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+          </div>
+
+          <div class="space-y-4" style="max-height: 500px; overflow-y: auto;">
+            ${paginatedContacts.map(contact => {
+              const contactName = contact.data?.contactName || contact.data?.name || 'N/A';
+              const contactEmail = contact.data?.email || 'N/A';
+              const contactOpps = oppsByContact[contact.data?.id] || [];
+
+              return `
+                <div class="border border-gray-200 rounded-lg p-4 bg-white">
+                  <div class="flex items-start justify-between mb-3">
+                    <div>
+                      <h5 class="font-semibold text-gray-900">${contactName}</h5>
+                      <p class="text-sm text-gray-500">${contactEmail}</p>
+                    </div>
+                    <span class="px-2 py-1 text-xs font-medium rounded-full bg-indigo-100 text-indigo-800">
+                      ${contactOpps.length} ${contactOpps.length === 1 ? 'Opportunity' : 'Opportunities'}
+                    </span>
+                  </div>
+
+                  <div class="space-y-2">
+                    ${contactOpps.map(opp => `
+                      <div class="pl-4 border-l-2 border-gray-200 py-2">
+                        <div class="flex items-start justify-between">
+                          <div class="flex-1">
+                            <p class="text-sm font-medium text-gray-900">${opp.data?.name || 'Unnamed Opportunity'}</p>
+                            <div class="flex items-center gap-4 mt-1">
+                              <span class="text-xs text-gray-500">Value: $${parseFloat(opp.data?.monetaryValue || 0).toLocaleString()}</span>
+                              <span class="px-2 py-0.5 text-xs rounded-full ${
+                                opp.data?.status === 'won' ? 'bg-green-100 text-green-800' :
+                                opp.data?.status === 'lost' ? 'bg-red-100 text-red-800' :
+                                'bg-yellow-100 text-yellow-800'
+                              }">${opp.data?.status || 'N/A'}</span>
+                            </div>
+                          </div>
+                          <span class="text-xs text-gray-400">${new Date(opp.source_created_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+
+          <div class="mt-4 flex items-center justify-between">
+            <div class="text-sm text-gray-600">
+              Showing ${startIdx + 1} to ${endIdx} of ${totalRecords} contacts with opportunities
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                onclick="window.goToPage(${state.currentPage - 1})"
+                ${state.currentPage === 1 ? 'disabled' : ''}
+                class="px-3 py-1 text-sm border rounded ${state.currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+              >
+                Previous
+              </button>
+              <div class="flex items-center gap-1">
+                ${Array.from({length: Math.min(totalPages, 7)}, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 7) {
+                    pageNum = i + 1;
+                  } else if (state.currentPage <= 4) {
+                    pageNum = i + 1;
+                  } else if (state.currentPage >= totalPages - 3) {
+                    pageNum = totalPages - 6 + i;
+                  } else {
+                    pageNum = state.currentPage - 3 + i;
+                  }
+                  return `
+                    <button
+                      onclick="window.goToPage(${pageNum})"
+                      class="px-3 py-1 text-sm border rounded ${state.currentPage === pageNum ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+                    >
+                      ${pageNum}
+                    </button>
+                  `;
+                }).join('')}
+              </div>
+              <button
+                onclick="window.goToPage(${state.currentPage + 1})"
+                ${state.currentPage === totalPages ? 'disabled' : ''}
+                class="px-3 py-1 text-sm border rounded ${state.currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        `;
+
+        const container = document.getElementById('contactTableContainer');
+        if (container) {
+          container.innerHTML = tableHTML;
+        }
+      }
+
       content.innerHTML = `
         <!-- Calculation Explanation -->
         <div class="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
@@ -1215,7 +1554,7 @@
               <p class="text-2xl font-bold text-blue-700">${totalContacts}</p>
               <p class="text-xs text-gray-500 mt-1">Total contact records in system for this period · Click to view</p>
             </div>
-            <div onclick="window.renderContactTable('all')" class="bg-blue-50 border border-blue-200 rounded-lg p-4 cursor-pointer hover:bg-blue-100 hover:shadow-md transition-all duration-200">
+            <div onclick="window.renderContactTable('all', 'opportunities')" class="bg-blue-50 border border-blue-200 rounded-lg p-4 cursor-pointer hover:bg-blue-100 hover:shadow-md transition-all duration-200">
               <div class="flex items-center justify-between mb-2">
                 <p class="text-sm font-medium text-gray-900">ℹ️ Total Opportunities</p>
               </div>
@@ -1230,7 +1569,7 @@
           <h4 class="font-semibold text-gray-900 mb-4">Data Quality Insights</h4>
           <div class="grid grid-cols-3 gap-4">
             <!-- Unique Contact IDs in Opportunities -->
-            <div onclick="window.renderContactTable('qualified')" class="bg-purple-50 border border-purple-200 rounded-lg p-4 cursor-pointer hover:bg-purple-100 hover:shadow-md transition-all duration-200">
+            <div onclick="window.renderContactTable('qualified', 'contacts')" class="bg-purple-50 border border-purple-200 rounded-lg p-4 cursor-pointer hover:bg-purple-100 hover:shadow-md transition-all duration-200">
               <div class="flex items-center justify-between mb-2">
                 <p class="text-sm font-medium text-gray-900">📋 Unique Contact IDs</p>
               </div>
@@ -1240,15 +1579,15 @@
 
             <!-- Missing Contacts -->
             ${contactsOnlyInOpportunities > 0 ? `
-            <div onclick="window.renderContactTable('all')" class="bg-red-50 border border-red-200 rounded-lg p-4 cursor-pointer hover:bg-red-100 hover:shadow-md transition-all duration-200">
+            <div onclick="window.renderContactTable('all', 'contacts')" class="bg-red-50 border border-red-200 rounded-lg p-4 cursor-pointer hover:bg-red-100 hover:shadow-md transition-all duration-200">
               <div class="flex items-center justify-between mb-2">
                 <p class="text-sm font-medium text-gray-900">🔴 Missing Contacts</p>
               </div>
               <p class="text-3xl font-bold text-red-700">${contactsOnlyInOpportunities}</p>
-              <p class="text-xs text-gray-500 mt-1">Contact IDs in opportunities but no contact record · Click to view all</p>
+              <p class="text-xs text-gray-500 mt-1">Contact IDs in opportunities but no contact record · Click to view all contacts</p>
             </div>
             ` : `
-            <div onclick="window.renderContactTable('qualified')" class="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer hover:bg-green-100 hover:shadow-md transition-all duration-200">
+            <div onclick="window.renderContactTable('qualified', 'contacts')" class="bg-green-50 border border-green-200 rounded-lg p-4 cursor-pointer hover:bg-green-100 hover:shadow-md transition-all duration-200">
               <div class="flex items-center justify-between mb-2">
                 <p class="text-sm font-medium text-gray-900">✅ No Missing Contacts</p>
               </div>
@@ -1257,8 +1596,8 @@
             </div>
             `}
 
-            <!-- Duplicate Opportunities per Contact -->
-            <div onclick="window.renderContactTable('qualified')" class="bg-orange-50 border border-orange-200 rounded-lg p-4 cursor-pointer hover:bg-orange-100 hover:shadow-md transition-all duration-200">
+            <!-- Opportunities per Contact -->
+            <div onclick="window.renderContactTable('qualified', 'contact_opportunities')" class="bg-orange-50 border border-orange-200 rounded-lg p-4 cursor-pointer hover:bg-orange-100 hover:shadow-md transition-all duration-200">
               <div class="flex items-center justify-between mb-2">
                 <p class="text-sm font-medium text-gray-900">🔄 Opportunities/Contact</p>
               </div>
