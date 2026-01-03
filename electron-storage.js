@@ -125,6 +125,11 @@ function saveServerConnection(server) {
       orgName: server.orgName,
       version: server.version,
       apiVersion: server.apiVersion,
+      // Burst API configuration for direct calls to burst service
+      burstApiKey: server.burstApiKey || null,
+      burstUrl: server.burstUrl || null,
+      tier: server.tier || 'standard',
+      rateLimit: server.rateLimit || 100,
       connectedAt: new Date().toISOString(),
       lastVerified: new Date().toISOString()
     };
