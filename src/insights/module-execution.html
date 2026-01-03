@@ -14,6 +14,7 @@
   <script src="../js/components.js"></script>
   <script src="../js/menu.js"></script>
   <script src="../js/notifications.js"></script>
+  <script src="../js/drilldown-renderer.js"></script>
 </head>
 <body class="bg-gray-50 min-h-screen">
   <!-- Sidebar -->
@@ -243,9 +244,7 @@
           <div>
             <label for="moduleSelect" class="block text-sm font-medium text-gray-700 mb-2">Module</label>
             <select id="moduleSelect" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-              <option value="growth-intake-performance">Growth: Intake Performance</option>
-              <option value="growth-lead-quality" disabled>Growth: Lead Quality (Coming Soon)</option>
-              <option value="operations-matter-velocity" disabled>Operations: Matter Velocity (Coming Soon)</option>
+              <option value="">Loading modules...</option>
             </select>
           </div>
 
@@ -527,6 +526,79 @@
       }
     }
     loadUserInfo();
+
+    // Load available modules from backend
+    async function loadModules() {
+      const moduleSelect = document.getElementById('moduleSelect');
+
+      try {
+        const response = await api.get('/api/v1/modules');
+
+        // Clear loading option
+        moduleSelect.innerHTML = '';
+
+        if (!response.modules || response.modules.length === 0) {
+          const option = document.createElement('option');
+          option.value = '';
+          option.textContent = 'No modules available';
+          option.disabled = true;
+          moduleSelect.appendChild(option);
+          return;
+        }
+
+        // Group modules by category
+        const modulesByCategory = {};
+        response.modules.forEach(module => {
+          const category = module.category || 'other';
+          if (!modulesByCategory[category]) {
+            modulesByCategory[category] = [];
+          }
+          modulesByCategory[category].push(module);
+        });
+
+        // Render modules grouped by category
+        Object.keys(modulesByCategory).sort().forEach(category => {
+          const modules = modulesByCategory[category];
+
+          modules.forEach(module => {
+            const option = document.createElement('option');
+            option.value = module.moduleKey;
+
+            // Format display name: "Category: Module Name"
+            const categoryName = category.charAt(0).toUpperCase() + category.slice(1);
+            option.textContent = `${categoryName}: ${module.name}`;
+
+            // Disable if required connectors are not connected
+            if (!module.available) {
+              option.disabled = true;
+              option.textContent += ' (Requires additional connectors)';
+            }
+
+            moduleSelect.appendChild(option);
+          });
+        });
+
+        // Auto-select first available module
+        const firstAvailable = response.modules.find(m => m.available);
+        if (firstAvailable) {
+          moduleSelect.value = firstAvailable.moduleKey;
+        }
+
+      } catch (error) {
+        console.error('Failed to load modules:', error);
+        moduleSelect.innerHTML = '';
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'Failed to load modules';
+        option.disabled = true;
+        moduleSelect.appendChild(option);
+
+        showError('Failed to load available modules. Please refresh the page.');
+      }
+    }
+
+    // Load modules on page load
+    loadModules();
 
     // User menu toggle
     const userMenu = document.getElementById('userMenu');
@@ -826,12 +898,37 @@
       }
     }
 
+    // =======================================================================
+    // Generic Drilldown Renderer Integration
+    // =======================================================================
+
+    // Initialize drilldown renderer (global instance)
+    let drilldownRenderer;
+
+    // Open generic drilldown using new drilldown renderer
+    async function openGenericDrilldown(metricKey, metricName) {
+      try {
+        const periodStart = document.getElementById('periodStart').value + 'T00:00:00Z';
+        const periodEnd = document.getElementById('periodEnd').value + 'T23:59:59Z';
+        const moduleKey = document.getElementById('moduleSelect')?.value || 'growth-intake-performance';
+
+        if (!drilldownRenderer) {
+          drilldownRenderer = new DrilldownRenderer();
+        }
+
+        await drilldownRenderer.open(moduleKey, metricKey, periodStart, periodEnd);
+      } catch (error) {
+        console.error('Failed to open drilldown:', error);
+        alert(`Failed to load drilldown: ${error.message || 'Unknown error'}`);
+      }
+    }
+
     // Close drilldown modal
     function closeDrilldownModal() {
       document.getElementById('drilldownModal').classList.add('hidden');
     }
 
-    // Show drill-down for any metric
+    // Show drill-down for any metric (Legacy fallback)
     async function showMetricDrilldown(metricKey, metricName) {
       const modal = document.getElementById('drilldownModal');
       const title = document.getElementById('drilldownTitle');
@@ -4647,6 +4744,18 @@
             </div>
             <div class="flex items-center gap-2">
               ${getStatusBadge(statusColor)}
+              ${metric.hasDrilldown ? `
+              <button
+                onclick="openGenericDrilldown('${metric.key}', '${metric.name}')"
+                class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 transition-colors"
+                title="View detailed data breakdown"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                </svg>
+                View Data
+              </button>
+              ` : `
               <button
                 onclick="showMetricDrilldown('${metric.key}', '${metric.name}')"
                 class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 transition-colors"
@@ -4658,6 +4767,7 @@
                 </svg>
                 Details
               </button>
+              `}
             </div>
           </div>
 
