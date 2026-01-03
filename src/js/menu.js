@@ -114,7 +114,7 @@ const MenuConfig = {
         items: [
           { id: 'connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
           { id: 'sync-status', label: 'Sync Status', href: '/integrations/sync-status.html', icon: 'sync' },
-          { id: 'insights', label: 'AI Insights', href: '/insights/dashboard.html', icon: 'insights' },
+          { id: 'module-execution', label: 'Module Execution', href: '/insights/module-execution.html', icon: 'dashboard' },
           { id: 'workflows', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
         ]
       },
@@ -217,7 +217,7 @@ const MenuConfig = {
         items: [
           { id: 'workflows-connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
           { id: 'workflows-sync', label: 'Sync Status', href: '/integrations/sync-status.html', icon: 'sync' },
-          { id: 'workflows-insights', label: 'AI Insights', href: '/insights/dashboard.html', icon: 'insights' },
+          { id: 'workflows-module-execution', label: 'Module Execution', href: '/insights/module-execution.html', icon: 'dashboard' },
           { id: 'workflows-list', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
         ]
       },
@@ -309,7 +309,6 @@ const MenuConfig = {
         items: [
           { id: 'insights-connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
           { id: 'insights-sync', label: 'Sync Status', href: '/integrations/sync-status.html', icon: 'sync' },
-          { id: 'insights-dashboard', label: 'AI Insights', href: '/insights/dashboard.html', icon: 'insights' },
           { id: 'insights-modules', label: 'Module Execution', href: '/insights/module-execution.html', icon: 'dashboard' },
           { id: 'insights-workflows', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
         ]
@@ -383,7 +382,7 @@ const MenuConfig = {
         items: [
           { id: 'integrations-connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
           { id: 'integrations-sync', label: 'Sync Status', href: '/integrations/sync-status.html', icon: 'sync' },
-          { id: 'integrations-insights', label: 'AI Insights', href: '/insights/dashboard.html', icon: 'insights' },
+          { id: 'integrations-module-execution', label: 'Module Execution', href: '/insights/module-execution.html', icon: 'dashboard' },
           { id: 'integrations-workflows', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
         ]
       },
