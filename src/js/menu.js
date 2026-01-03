@@ -113,7 +113,6 @@ const MenuConfig = {
         requiredRoles: [],
         items: [
           { id: 'connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
-          { id: 'sync-status', label: 'Sync Status', href: '/integrations/sync-status.html', icon: 'sync' },
           { id: 'module-execution', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
           { id: 'workflows', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
         ]
@@ -216,7 +215,6 @@ const MenuConfig = {
         requiredRoles: [],
         items: [
           { id: 'workflows-connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
-          { id: 'workflows-sync', label: 'Sync Status', href: '/integrations/sync-status.html', icon: 'sync' },
           { id: 'workflows-module-execution', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
           { id: 'workflows-list', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
         ]
@@ -308,7 +306,6 @@ const MenuConfig = {
         requiredRoles: [],
         items: [
           { id: 'insights-connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
-          { id: 'insights-sync', label: 'Sync Status', href: '/integrations/sync-status.html', icon: 'sync' },
           { id: 'insights-modules', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
           { id: 'insights-workflows', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
         ]
@@ -381,7 +378,6 @@ const MenuConfig = {
         requiredRoles: [],
         items: [
           { id: 'integrations-connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
-          { id: 'integrations-sync', label: 'Sync Status', href: '/integrations/sync-status.html', icon: 'sync' },
           { id: 'integrations-module-execution', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
           { id: 'integrations-workflows', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
         ]
