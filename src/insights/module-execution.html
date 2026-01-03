@@ -350,7 +350,7 @@
 
           <!-- Period Info -->
           <div class="mt-4 pt-4 border-t border-gray-100">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <p class="text-xs text-gray-500 uppercase tracking-wide">Period Type</p>
                 <p id="resultPeriodType" class="text-sm font-medium text-gray-900 mt-1"></p>
@@ -362,6 +362,15 @@
               <div>
                 <p class="text-xs text-gray-500 uppercase tracking-wide">Prior Period</p>
                 <p id="resultPriorPeriod" class="text-sm font-medium text-gray-900 mt-1"></p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 uppercase tracking-wide">Connector Source(s)</p>
+                <button id="dataSourcesBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 transition-colors mt-1">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
+                  </svg>
+                  <span id="dataSourcesCount">0 Connectors</span>
+                </button>
               </div>
             </div>
           </div>
@@ -712,6 +721,84 @@
       document.getElementById('executionInfo').classList.remove('hidden');
       document.getElementById('executionError').classList.add('hidden');
     }
+
+    // =======================================================================
+    // Data Sources Modal
+    // =======================================================================
+
+    // Store data sources globally
+    let currentDataSources = [];
+
+    // Update data sources from module execution response
+    function updateDataSources(dataSources) {
+      currentDataSources = dataSources || [];
+      const count = currentDataSources.length;
+
+      // Update button text
+      const countText = document.getElementById('dataSourcesCount');
+      if (countText) {
+        countText.textContent = `${count} Connector${count !== 1 ? 's' : ''}`;
+      }
+    }
+
+    // Open data sources modal
+    function openDataSourcesModal() {
+      const modal = document.getElementById('dataSourcesModal');
+      const list = document.getElementById('dataSourcesList');
+
+      // Clear existing list
+      list.innerHTML = '';
+
+      if (currentDataSources.length === 0) {
+        list.innerHTML = '<p class="text-sm text-gray-500 text-center py-4">No data sources found</p>';
+      } else {
+        // Render connector cards
+        currentDataSources.forEach(connector => {
+          const connectorCard = document.createElement('div');
+          connectorCard.className = 'flex items-center gap-3 p-3 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 transition-colors';
+
+          connectorCard.innerHTML = `
+            <div class="flex-shrink-0">
+              <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
+              </svg>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium text-gray-900 truncate">${connector.name || connector.connectorType}</p>
+              <p class="text-xs text-gray-500">${connector.connectorType}</p>
+            </div>
+            <div class="flex-shrink-0">
+              <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                Active
+              </span>
+            </div>
+          `;
+
+          list.appendChild(connectorCard);
+        });
+      }
+
+      // Show modal
+      modal.classList.remove('hidden');
+    }
+
+    // Close data sources modal
+    function closeDataSourcesModal() {
+      const modal = document.getElementById('dataSourcesModal');
+      modal.classList.add('hidden');
+    }
+
+    // Add event listener to data sources button (after DOM loads)
+    document.addEventListener('DOMContentLoaded', () => {
+      const dataSourcesBtn = document.getElementById('dataSourcesBtn');
+      if (dataSourcesBtn) {
+        dataSourcesBtn.addEventListener('click', openDataSourcesModal);
+      }
+    });
+
+    // =======================================================================
+    // Chart Rendering
+    // =======================================================================
 
     // Render metric chart (for array results - horizontal bar chart)
     function renderMetricChart(metric, canvasId) {
@@ -5819,6 +5906,9 @@
           document.getElementById('resultPriorPeriod').textContent = 'N/A';
         }
 
+        // Update data sources
+        updateDataSources(data.dataSources || []);
+
         // Render visualizations based on backend response (section-driven)
         renderVisualizations(data);
 
@@ -6387,6 +6477,49 @@
     // Initialize dynamic menu
     renderMenu('#mainNav');
   </script>
+
+  <!-- Data Sources Modal -->
+  <div id="dataSourcesModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-6 w-full max-w-md">
+      <div class="bg-white rounded-lg shadow-xl">
+        <!-- Modal Header -->
+        <div class="flex items-start justify-between p-5 border-b border-gray-200">
+          <h3 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
+            <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
+            </svg>
+            Data Sources
+          </h3>
+          <button
+            onclick="closeDataSourcesModal()"
+            class="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Modal Content -->
+        <div class="p-5">
+          <p class="text-sm text-gray-600 mb-4">This report pulls data from the following connectors:</p>
+          <div id="dataSourcesList" class="space-y-3">
+            <!-- Connectors will be dynamically inserted here -->
+          </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="flex justify-end p-5 border-t border-gray-200">
+          <button
+            onclick="closeDataSourcesModal()"
+            class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Drill-down Modal -->
   <div id="drilldownModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full z-50">

@@ -128,8 +128,6 @@ const MenuConfig = {
           { id: 'sessions', label: 'Sessions', href: '/admin/sessions.html', icon: 'sessions' },
           { id: 'audit', label: 'Audit Logs', href: '/admin/audit.html', icon: 'audit' },
           { id: 'health', label: 'System Health', href: '/admin/health.html', icon: 'health' },
-          { id: 'search-analytics', label: 'Search Analytics', href: '/admin/search-analytics.html', icon: 'analytics' },
-          { id: 'relevance-labeling', label: 'Relevance Labeling', href: '/admin/relevance-labeling.html', icon: 'label' },
           // { id: 'integrations', label: 'Integrations', href: '/admin/integrations.html', icon: 'integrations' },
           // { id: 'plugins', label: 'Plugins', href: '/admin/plugins.html', icon: 'plugins' },
           // { id: 'reporting', label: 'Reporting', href: '/admin/reporting.html', icon: 'reporting' },
