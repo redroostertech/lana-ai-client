@@ -105,6 +105,7 @@ const MenuConfig = {
           { id: 'dashboard', label: 'Dashboard', href: '/index.html', icon: 'home' },
           { id: 'chat', label: 'Chat', href: '/chat.html', icon: 'chat' },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
+          { id: 'workflows', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
         ]
       },
       {
@@ -114,7 +115,6 @@ const MenuConfig = {
         items: [
           { id: 'connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
           { id: 'module-execution', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
-          { id: 'workflows', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
         ]
       },
       {
@@ -207,6 +207,7 @@ const MenuConfig = {
           { id: 'workflows-home', label: 'Dashboard', href: '/index.html', icon: 'home' },
           { id: 'workflows-chat', label: 'Chat', href: '/chat.html', icon: 'chat' },
           { id: 'workflows-matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
+          { id: 'workflows-list', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
         ]
       },
       {
@@ -216,7 +217,6 @@ const MenuConfig = {
         items: [
           { id: 'workflows-connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
           { id: 'workflows-module-execution', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
-          { id: 'workflows-list', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
         ]
       },
       {
@@ -298,6 +298,7 @@ const MenuConfig = {
           { id: 'insights-home', label: 'Dashboard', href: '/index.html', icon: 'home' },
           { id: 'insights-chat', label: 'Chat', href: '/chat.html', icon: 'chat' },
           { id: 'insights-matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
+          { id: 'insights-workflows', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
         ]
       },
       {
@@ -307,7 +308,6 @@ const MenuConfig = {
         items: [
           { id: 'insights-connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
           { id: 'insights-modules', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
-          { id: 'insights-workflows', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
         ]
       },
       {
@@ -370,6 +370,7 @@ const MenuConfig = {
           { id: 'integrations-home', label: 'Dashboard', href: '/index.html', icon: 'home' },
           { id: 'integrations-chat', label: 'Chat', href: '/chat.html', icon: 'chat' },
           { id: 'integrations-matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
+          { id: 'integrations-workflows', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
         ]
       },
       {
@@ -379,7 +380,6 @@ const MenuConfig = {
         items: [
           { id: 'integrations-connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
           { id: 'integrations-module-execution', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
-          { id: 'integrations-workflows', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
         ]
       },
       {
