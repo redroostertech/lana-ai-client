@@ -1236,7 +1236,6 @@
       document.getElementById('modalModuleVersion').textContent = currentModuleMetadata.version;
       document.getElementById('modalModuleMetrics').textContent = currentModuleMetadata.metricCount;
       document.getElementById('modalModuleCategory').textContent = currentModuleMetadata.category;
-      document.getElementById('modalModuleTier').textContent = currentModuleMetadata.tier;
 
       // Set status badge with appropriate styling
       const statusBadge = document.getElementById('modalModuleStatus');
@@ -6148,7 +6147,6 @@
           version: data.moduleVersion || data.version || '1.0.0',
           metricCount: data.metrics ? data.metrics.length : 0,
           category: data.moduleCategory || data.category || 'analytics',
-          tier: data.moduleTier || data.tier || 'professional',
           status: data.moduleStatus || data.status || 'stable'
         };
 
@@ -6963,19 +6961,6 @@
               <div>
                 <p class="text-xs font-medium text-gray-500">Category</p>
                 <p class="text-sm font-semibold text-gray-900 capitalize" id="modalModuleCategory"></p>
-              </div>
-            </div>
-
-            <!-- Tier -->
-            <div class="flex items-start gap-3">
-              <div class="flex-shrink-0 w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
-                <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
-                </svg>
-              </div>
-              <div>
-                <p class="text-xs font-medium text-gray-500">Tier</p>
-                <p class="text-sm font-semibold text-gray-900 capitalize" id="modalModuleTier"></p>
               </div>
             </div>
           </div>
