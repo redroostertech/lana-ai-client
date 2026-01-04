@@ -115,6 +115,7 @@ const MenuConfig = {
         items: [
           { id: 'connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
           { id: 'module-execution', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
+          { id: 'predictions', label: 'Predictions', href: '/insights/predictions.html', icon: 'performance' },
         ]
       },
       {
@@ -215,6 +216,7 @@ const MenuConfig = {
         items: [
           { id: 'workflows-connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
           { id: 'workflows-module-execution', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
+          { id: 'workflows-predictions', label: 'Predictions', href: '/insights/predictions.html', icon: 'performance' },
         ]
       },
       {
@@ -306,19 +308,7 @@ const MenuConfig = {
         items: [
           { id: 'insights-connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
           { id: 'insights-modules', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
-        ]
-      },
-      {
-        id: 'insights-reports',
-        title: 'Insights Reports',
-        requiredRoles: [],
-        items: [
-          { id: 'insights-aging', label: 'Aging Analysis', href: '/insights/aging-analysis.html', icon: 'timeline' },
-          { id: 'insights-followups', label: 'Missed Follow-ups', href: '/insights/missed-followups.html', icon: 'audit' },
-          { id: 'insights-attribution', label: 'Attribution', href: '/insights/attribution.html', icon: 'trends' },
           { id: 'insights-predictions', label: 'Predictions', href: '/insights/predictions.html', icon: 'performance' },
-          { id: 'insights-funnel', label: 'Funnel Analysis', href: '/insights/funnel-analysis.html', icon: 'connectors' },
-          { id: 'insights-staff', label: 'Staff Productivity', href: '/insights/staff-productivity.html', icon: 'entities' },
         ]
       },
       {
@@ -378,6 +368,7 @@ const MenuConfig = {
         items: [
           { id: 'integrations-connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
           { id: 'integrations-module-execution', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
+          { id: 'integrations-predictions', label: 'Predictions', href: '/insights/predictions.html', icon: 'performance' },
         ]
       },
       {
