@@ -26,7 +26,7 @@
 
     .notion-editor .ProseMirror {
       outline: none;
-      padding: 0;
+      padding: 0 0 0 80px; /* Left padding for + button and drag handle */
       min-height: 500px;
       font-size: 16px;
       line-height: 1.75;
@@ -105,13 +105,178 @@
     /* Notion-style lists */
     .notion-editor .ProseMirror ul,
     .notion-editor .ProseMirror ol {
-      padding-left: 1.5em;
+      padding-left: 2em;
       margin: 0.5em 0;
+    }
+
+    .notion-editor .ProseMirror ul {
+      list-style-type: disc;
+    }
+
+    .notion-editor .ProseMirror ol {
+      list-style-type: decimal;
     }
 
     .notion-editor .ProseMirror li {
       margin: 0.25em 0;
       padding-left: 0.3em;
+      display: list-item;
+    }
+
+    /* Links */
+    .notion-editor .ProseMirror a,
+    .notion-editor .ProseMirror .editor-link {
+      color: #2563eb;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    .notion-editor .ProseMirror a:hover,
+    .notion-editor .ProseMirror .editor-link:hover {
+      color: #1d4ed8;
+    }
+
+    /* Tables */
+    .notion-editor .ProseMirror table,
+    .notion-editor .ProseMirror .editor-table {
+      border-collapse: collapse;
+      table-layout: fixed;
+      width: 100%;
+      margin: 1em 0;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .notion-editor .ProseMirror table td,
+    .notion-editor .ProseMirror table th {
+      min-width: 1em;
+      border: 1px solid #e5e7eb;
+      padding: 8px 12px;
+      vertical-align: top;
+      box-sizing: border-box;
+      position: relative;
+    }
+
+    .notion-editor .ProseMirror table th {
+      font-weight: 600;
+      text-align: left;
+      background-color: #f9fafb;
+    }
+
+    .notion-editor .ProseMirror table .selectedCell {
+      background-color: #e0e7ff;
+    }
+
+    .notion-editor .ProseMirror table .column-resize-handle {
+      position: absolute;
+      right: -2px;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      background-color: #3b82f6;
+      pointer-events: none;
+    }
+
+    .notion-editor .ProseMirror table p {
+      margin: 0;
+    }
+
+    /* Table wrapper for controls */
+    .table-wrapper {
+      position: relative;
+      margin: 1em 0;
+    }
+
+    .table-wrapper table {
+      margin: 0;
+    }
+
+    /* Table row controls (left side) */
+    .table-row-controls {
+      position: absolute;
+      left: -32px;
+      top: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .table-row-control {
+      width: 28px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+
+    .table-wrapper:hover .table-row-control {
+      opacity: 1;
+    }
+
+    .table-row-control button {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: white;
+      border: 1px solid #e5e7eb;
+      color: #6b7280;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .table-row-control button:hover {
+      background: #f3f4f6;
+      border-color: #d1d5db;
+      color: #374151;
+    }
+
+    /* Table column controls (top) */
+    .table-column-controls {
+      position: absolute;
+      top: -32px;
+      left: 0;
+      right: 0;
+      display: flex;
+      gap: 0;
+    }
+
+    .table-column-control {
+      flex: 1;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+
+    .table-wrapper:hover .table-column-control {
+      opacity: 1;
+    }
+
+    .table-column-control button {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: white;
+      border: 1px solid #e5e7eb;
+      color: #6b7280;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .table-column-control button:hover {
+      background: #f3f4f6;
+      border-color: #d1d5db;
+      color: #374151;
     }
 
     /* Block controls - Drag handle and Plus button */
@@ -605,9 +770,9 @@
 
     <!-- Main Editor Area - Notion-style centered column -->
     <div class="flex-1 overflow-y-auto bg-white">
-      <div class="max-w-4xl mx-auto px-24 py-16">
+      <div class="max-w-4xl mx-auto py-16">
         <!-- Notion-style title (editable) -->
-        <div class="mb-8">
+        <div class="mb-8" style="padding-left: 80px;">
           <input
             type="text"
             id="notionTitle"
@@ -705,6 +870,24 @@
             </div>
           </div>
           <div class="slash-command-section">
+            <div class="slash-command-section-title">Inline</div>
+            <div class="slash-command-item" data-command="link">
+              <div class="slash-command-icon">@</div>
+              <div class="slash-command-content">
+                <div class="slash-command-title">Link</div>
+                <div class="slash-command-description">Add a hyperlink</div>
+              </div>
+              <div class="slash-command-shortcut">⌘K</div>
+            </div>
+            <div class="slash-command-item" data-command="table">
+              <div class="slash-command-icon">⊞</div>
+              <div class="slash-command-content">
+                <div class="slash-command-title">Table</div>
+                <div class="slash-command-description">Insert a table</div>
+              </div>
+            </div>
+          </div>
+          <div class="slash-command-section">
             <div class="slash-command-section-title">Merge Fields</div>
             <div class="slash-command-item" data-command="merge" data-field="{{client.name}}">
               <div class="slash-command-icon">{{}}</div>
@@ -727,6 +910,132 @@
                 <div class="slash-command-description">Insert {{date.today}}</div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- Link Editor Modal -->
+        <div id="linkModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="z-index: 10000;">
+          <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div class="p-6">
+              <h3 class="text-lg font-semibold text-gray-900 mb-4">Add Link</h3>
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Link Text</label>
+                  <input type="text" id="linkText" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Link text">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">URL</label>
+                  <input type="url" id="linkUrl" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="https://example.com">
+                </div>
+              </div>
+              <div class="mt-6 flex justify-between">
+                <button onclick="removeLinkFromEditor()" class="px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors">
+                  Remove Link
+                </button>
+                <div class="flex gap-2">
+                  <button onclick="closeLinkModal()" class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md transition-colors">
+                    Cancel
+                  </button>
+                  <button onclick="saveLinkToEditor()" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors">
+                    Save
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Table Configuration Modal -->
+        <div id="tableModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="z-index: 10000;">
+          <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div class="p-6">
+              <h3 class="text-lg font-semibold text-gray-900 mb-4">Insert Table</h3>
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Rows</label>
+                  <input type="number" id="tableRows" min="1" max="20" value="3" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Columns</label>
+                  <input type="number" id="tableCols" min="1" max="10" value="3" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div class="flex items-center">
+                  <input type="checkbox" id="tableWithHeader" checked class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+                  <label for="tableWithHeader" class="ml-2 text-sm text-gray-700">Include header row</label>
+                </div>
+              </div>
+              <div class="mt-6 flex justify-end gap-2">
+                <button onclick="closeTableModal()" class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md transition-colors">
+                  Cancel
+                </button>
+                <button onclick="insertTableToEditor()" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors">
+                  Insert Table
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Table Controls Toolbar (appears when row/column button is clicked) -->
+        <div id="tableToolbar" class="hidden fixed bg-white rounded-lg shadow-xl border border-gray-200 py-1" style="z-index: 9999; min-width: 200px;">
+          <!-- Row-specific menu -->
+          <div id="rowMenu" class="hidden">
+            <button onclick="addTableRowBefore(); hideTableToolbar();" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+              Insert Row Above
+            </button>
+            <button onclick="addTableRowAfter(); hideTableToolbar();" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+              Insert Row Below
+            </button>
+            <div class="border-t border-gray-200 my-1"></div>
+            <button onclick="moveTableRowUp(); hideTableToolbar();" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+              Move Row Up
+            </button>
+            <button onclick="moveTableRowDown(); hideTableToolbar();" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+              Move Row Down
+            </button>
+            <div class="border-t border-gray-200 my-1"></div>
+            <button onclick="deleteTableRow(); hideTableToolbar();" class="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors">
+              Delete Row
+            </button>
+          </div>
+
+          <!-- Column-specific menu -->
+          <div id="columnMenu" class="hidden">
+            <button onclick="addTableColumnBefore(); hideTableToolbar();" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+              Insert Column Left
+            </button>
+            <button onclick="addTableColumnAfter(); hideTableToolbar();" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+              Insert Column Right
+            </button>
+            <div class="border-t border-gray-200 my-1"></div>
+            <button onclick="moveTableColumnLeft(); hideTableToolbar();" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+              Move Column Left
+            </button>
+            <button onclick="moveTableColumnRight(); hideTableToolbar();" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+              Move Column Right
+            </button>
+            <div class="border-t border-gray-200 my-1"></div>
+            <button onclick="toggleTableHeaderRow(); hideTableToolbar();" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+              Toggle Header Row
+            </button>
+            <div class="border-t border-gray-200 my-1"></div>
+            <button onclick="deleteTableColumn(); hideTableToolbar();" class="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors">
+              Delete Column
+            </button>
+          </div>
+
+          <!-- General table menu -->
+          <div id="tableGeneralMenu" class="hidden">
+            <button onclick="mergeCells(); hideTableToolbar();" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+              Merge Cells
+            </button>
+            <button onclick="splitCell(); hideTableToolbar();" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+              Split Cell
+            </button>
+            <div class="border-t border-gray-200 my-1"></div>
+            <button onclick="deleteTable(); hideTableToolbar();" class="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors">
+              Delete Table
+            </button>
           </div>
         </div>
       </div>
@@ -1131,7 +1440,11 @@
         Typography: !!window.TiptapTypography,
         Link: !!window.TiptapLink,
         Underline: !!window.TiptapUnderline,
-        TextAlign: !!window.TiptapTextAlign
+        TextAlign: !!window.TiptapTextAlign,
+        Table: !!window.TiptapTable,
+        TableRow: !!window.TiptapTableRow,
+        TableHeader: !!window.TiptapTableHeader,
+        TableCell: !!window.TiptapTableCell
       });
 
       tiptapEditor = new window.TiptapEditor({
@@ -1156,6 +1469,15 @@
           window.TiptapTextAlign.configure({
             types: ['heading', 'paragraph'],
           }),
+          window.TiptapTable.configure({
+            resizable: true,
+            HTMLAttributes: {
+              class: 'editor-table',
+            },
+          }),
+          window.TiptapTableRow,
+          window.TiptapTableHeader,
+          window.TiptapTableCell,
         ],
         content: '<p></p>',
         editorProps: {
@@ -1177,6 +1499,27 @@
         console.log('[Tiptap] Update - isEmpty:', editor.isEmpty, 'classes:', editor.view.dom.className);
       });
 
+      // Track the last table structure to avoid unnecessary updates
+      let lastTableStructure = null;
+
+      function getTableStructure() {
+        const tables = tiptapEditor.view.dom.querySelectorAll('table');
+        return Array.from(tables).map(table => {
+          const rows = table.querySelectorAll('tr');
+          const cols = rows[0]?.querySelectorAll('td, th').length || 0;
+          return { rows: rows.length, cols };
+        });
+      }
+
+      // Only update table controls when table structure changes
+      tiptapEditor.on('update', ({ editor }) => {
+        const currentStructure = JSON.stringify(getTableStructure());
+        if (currentStructure !== lastTableStructure) {
+          lastTableStructure = currentStructure;
+          updateTableControls();
+        }
+      });
+
       // Setup slash commands
       setupSlashCommands();
 
@@ -1188,54 +1531,44 @@
     }
 
     function setupPlusButtonHandlers() {
-      const editorContainer = document.getElementById('editor');
-      const editorContent = editorContainer.querySelector('.ProseMirror');
-      
+      const editorContent = document.getElementById('editor').querySelector('.ProseMirror');
       if (!editorContent) return;
-      
-      // Handle clicks on the editor container (not just content) to catch left margin clicks
-      editorContainer.addEventListener('click', (e) => {
+
+      // Keyboard shortcut: Ctrl+/ or Cmd+/ to open slash menu
+      editorContent.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+          e.preventDefault();
+          const { from } = tiptapEditor.state.selection;
+          slashCommandPosition = from;
+          showSlashCommandMenu();
+        }
+      });
+
+      // Click handler for + button in left margin (80px padding area)
+      editorContent.addEventListener('click', (e) => {
         const editorRect = editorContent.getBoundingClientRect();
         const clickX = e.clientX - editorRect.left;
-        
-        // Plus button is at left: -36px, width 22px, so area is roughly -36px to -14px
-        // But since clicks outside the editor won't register, we check for clicks near the left edge
-        // Account for padding/margin - check if click is in left 60px area
-        if (clickX < 60 && clickX >= 0) {
-          // Find the block element under the cursor
-          const clickY = e.clientY - editorRect.top;
-          const elementAtPoint = document.elementFromPoint(e.clientX, e.clientY);
-          
-          // Walk up the DOM tree to find a block element
-          let blockElement = elementAtPoint;
-          while (blockElement && blockElement !== editorContent && blockElement !== document.body) {
-            const tagName = blockElement.tagName?.toLowerCase();
-            if (tagName === 'p' || tagName === 'h1' || tagName === 'h2' || tagName === 'h3' || tagName === 'div') {
-              // Check if this is actually a block element in the editor
-              if (blockElement.closest('.ProseMirror')) {
-                try {
-                  // Get the position of this block in the editor
-                  const pos = tiptapEditor.view.posAtDOM(blockElement, 0);
 
-                  // Set cursor position at the start of this block (DON'T insert "/")
-                  tiptapEditor.chain().focus().setTextSelection(pos).run();
+        // Check if click is in the left margin (0-80px)
+        if (clickX >= 0 && clickX < 80) {
+          const blockElement = e.target.closest('p, h1, h2, h3');
 
-                  // Show slash command menu immediately
-                  setTimeout(() => {
-                    const { from } = tiptapEditor.state.selection;
-                    slashCommandPosition = from;
-                    showSlashCommandMenu();
-                  }, 10);
-                  
-                  e.preventDefault();
-                  e.stopPropagation();
-                  return;
-                } catch (err) {
-                  console.warn('[PlusButton] Error handling click:', err);
-                }
-              }
+          if (blockElement && blockElement.closest('.ProseMirror')) {
+            try {
+              const pos = tiptapEditor.view.posAtDOM(blockElement, 0);
+              tiptapEditor.chain().focus().setTextSelection(pos).run();
+
+              setTimeout(() => {
+                const { from } = tiptapEditor.state.selection;
+                slashCommandPosition = from;
+                showSlashCommandMenu();
+              }, 10);
+
+              e.preventDefault();
+              e.stopPropagation();
+            } catch (err) {
+              console.warn('[PlusButton] Error:', err);
             }
-            blockElement = blockElement.parentElement;
           }
         }
       });
@@ -1351,6 +1684,13 @@
 
       // Handle keyboard navigation
       tiptapEditor.view.dom.addEventListener('keydown', function(e) {
+        // Cmd+K / Ctrl+K to open link modal
+        if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+          e.preventDefault();
+          openLinkModal();
+          return;
+        }
+
         if (slashCommandMenu.classList.contains('active')) {
           const items = Array.from(slashCommandMenu.querySelectorAll('.slash-command-item:not([style*="display: none"])'));
 
@@ -1377,6 +1717,16 @@
       const commandItems = slashCommandMenu.querySelectorAll('.slash-command-item');
       commandItems.forEach(item => {
         item.addEventListener('click', () => executeSlashCommand(item));
+      });
+
+      // Click handler for links - Ctrl/Cmd+Click to edit
+      tiptapEditor.view.dom.addEventListener('click', (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.target.tagName === 'A') {
+          e.preventDefault();
+          const pos = tiptapEditor.view.posAtDOM(e.target, 0);
+          tiptapEditor.commands.setTextSelection(pos);
+          openLinkModal();
+        }
       });
     }
 
@@ -1455,7 +1805,7 @@
 
       switch(command) {
         case 'text':
-          // Just plain text, do nothing
+          tiptapEditor.chain().focus().setParagraph().run();
           break;
         case 'h1':
           tiptapEditor.chain().focus().setHeading({ level: 1 }).run();
@@ -1481,6 +1831,12 @@
         case 'divider':
           tiptapEditor.chain().focus().setHorizontalRule().run();
           break;
+        case 'link':
+          openLinkModal();
+          break;
+        case 'table':
+          openTableModal();
+          break;
         case 'merge':
           tiptapEditor.chain().focus().insertContent(field + ' ').run();
           break;
@@ -1488,6 +1844,551 @@
 
       hideSlashCommandMenu();
     }
+
+    // Link Modal Functions
+    function openLinkModal() {
+      const { from, to } = tiptapEditor.state.selection;
+      const selectedText = tiptapEditor.state.doc.textBetween(from, to, ' ');
+      const linkAttrs = tiptapEditor.getAttributes('link');
+
+      document.getElementById('linkText').value = selectedText || '';
+      document.getElementById('linkUrl').value = linkAttrs.href || '';
+
+      const modal = document.getElementById('linkModal');
+      const modalTitle = modal.querySelector('h3');
+      const removeButton = modal.querySelector('button[onclick="removeLinkFromEditor()"]');
+
+      if (linkAttrs.href) {
+        modalTitle.textContent = 'Edit Link';
+        removeButton.style.display = '';
+      } else {
+        modalTitle.textContent = 'Add Link';
+        removeButton.style.display = 'none';
+      }
+
+      modal.classList.remove('hidden');
+
+      // Focus URL input
+      setTimeout(() => {
+        const urlInput = document.getElementById('linkUrl');
+        urlInput.focus();
+        urlInput.select();
+      }, 100);
+    }
+
+    function closeLinkModal() {
+      document.getElementById('linkModal').classList.add('hidden');
+      document.getElementById('linkText').value = '';
+      document.getElementById('linkUrl').value = '';
+      tiptapEditor.commands.focus();
+    }
+
+    function saveLinkToEditor() {
+      const linkText = document.getElementById('linkText').value.trim();
+      const linkUrl = document.getElementById('linkUrl').value.trim();
+
+      if (!linkUrl) {
+        alert('Please enter a URL');
+        return;
+      }
+
+      const { from, to } = tiptapEditor.state.selection;
+      const selectedText = tiptapEditor.state.doc.textBetween(from, to, ' ');
+
+      if (selectedText) {
+        // Update existing selection with link
+        tiptapEditor
+          .chain()
+          .focus()
+          .extendMarkRange('link')
+          .setLink({ href: linkUrl })
+          .run();
+      } else if (linkText) {
+        // Insert new link with text
+        tiptapEditor
+          .chain()
+          .focus()
+          .insertContent(`<a href="${linkUrl}">${linkText}</a> `)
+          .run();
+      } else {
+        // Insert URL as both text and link
+        tiptapEditor
+          .chain()
+          .focus()
+          .insertContent(`<a href="${linkUrl}">${linkUrl}</a> `)
+          .run();
+      }
+
+      closeLinkModal();
+    }
+
+    function removeLinkFromEditor() {
+      tiptapEditor.chain().focus().unsetLink().run();
+      closeLinkModal();
+    }
+
+    // Table Modal Functions
+    function openTableModal() {
+      document.getElementById('tableModal').classList.remove('hidden');
+      setTimeout(() => {
+        document.getElementById('tableRows').focus();
+      }, 100);
+    }
+
+    function closeTableModal() {
+      document.getElementById('tableModal').classList.add('hidden');
+      tiptapEditor.commands.focus();
+    }
+
+    function insertTableToEditor() {
+      const rows = parseInt(document.getElementById('tableRows').value) || 3;
+      const cols = parseInt(document.getElementById('tableCols').value) || 3;
+      const withHeader = document.getElementById('tableWithHeader').checked;
+
+      tiptapEditor
+        .chain()
+        .focus()
+        .insertTable({ rows, cols, withHeaderRow: withHeader })
+        .run();
+
+      closeTableModal();
+    }
+
+    // Table Editing Functions
+    function addTableRowBefore() {
+      tiptapEditor.chain().focus().addRowBefore().run();
+    }
+
+    function addTableRowAfter() {
+      tiptapEditor.chain().focus().addRowAfter().run();
+    }
+
+    function deleteTableRow() {
+      tiptapEditor.chain().focus().deleteRow().run();
+    }
+
+    function addTableColumnBefore() {
+      tiptapEditor.chain().focus().addColumnBefore().run();
+    }
+
+    function addTableColumnAfter() {
+      tiptapEditor.chain().focus().addColumnAfter().run();
+    }
+
+    function deleteTableColumn() {
+      tiptapEditor.chain().focus().deleteColumn().run();
+    }
+
+    function deleteTable() {
+      tiptapEditor.chain().focus().deleteTable().run();
+      hideTableToolbar();
+    }
+
+    // Move row/column functions
+    function moveTableRowUp() {
+      const { state, view } = tiptapEditor;
+      const { $from } = state.selection;
+      const { tr } = state;
+
+      // Find the table and current row
+      let tableDepth = null;
+      let rowDepth = null;
+      let rowIndex = null;
+
+      for (let d = $from.depth; d > 0; d--) {
+        if ($from.node(d).type.name === 'table') {
+          tableDepth = d;
+        }
+        if ($from.node(d).type.name === 'tableRow') {
+          rowDepth = d;
+          rowIndex = $from.index(d);
+          break;
+        }
+      }
+
+      if (!tableDepth || !rowDepth || rowIndex <= 0) return;
+
+      const table = $from.node(tableDepth);
+      const currentRow = table.child(rowIndex);
+      const prevRow = table.child(rowIndex - 1);
+
+      // Get positions
+      const tableStart = $from.start(tableDepth);
+      let currentRowPos = tableStart;
+      for (let i = 0; i < rowIndex; i++) {
+        currentRowPos += table.child(i).nodeSize;
+      }
+      const prevRowPos = currentRowPos - prevRow.nodeSize;
+
+      // Create transaction to swap rows
+      const transaction = state.tr
+        .replaceWith(prevRowPos, prevRowPos + prevRow.nodeSize, currentRow)
+        .replaceWith(currentRowPos + currentRow.nodeSize - prevRow.nodeSize, currentRowPos + currentRow.nodeSize, prevRow);
+
+      view.dispatch(transaction);
+    }
+
+    function moveTableRowDown() {
+      const { state, view } = tiptapEditor;
+      const { $from } = state.selection;
+
+      // Find the table and current row
+      let tableDepth = null;
+      let rowDepth = null;
+      let rowIndex = null;
+
+      for (let d = $from.depth; d > 0; d--) {
+        if ($from.node(d).type.name === 'table') {
+          tableDepth = d;
+        }
+        if ($from.node(d).type.name === 'tableRow') {
+          rowDepth = d;
+          rowIndex = $from.index(d);
+          break;
+        }
+      }
+
+      if (!tableDepth || !rowDepth) return;
+
+      const table = $from.node(tableDepth);
+      if (rowIndex >= table.childCount - 1) return;
+
+      const currentRow = table.child(rowIndex);
+      const nextRow = table.child(rowIndex + 1);
+
+      // Get positions
+      const tableStart = $from.start(tableDepth);
+      let currentRowPos = tableStart;
+      for (let i = 0; i < rowIndex; i++) {
+        currentRowPos += table.child(i).nodeSize;
+      }
+      const nextRowPos = currentRowPos + currentRow.nodeSize;
+
+      // Create transaction to swap rows
+      const transaction = state.tr
+        .replaceWith(currentRowPos, currentRowPos + currentRow.nodeSize, nextRow)
+        .replaceWith(nextRowPos + nextRow.nodeSize - currentRow.nodeSize, nextRowPos + nextRow.nodeSize, currentRow);
+
+      view.dispatch(transaction);
+    }
+
+    function moveTableColumnLeft() {
+      const { state, view } = tiptapEditor;
+      const { $from } = state.selection;
+
+      // Find table, row, and column info
+      let tableDepth = null;
+      let colIndex = null;
+
+      for (let d = $from.depth; d > 0; d--) {
+        if ($from.node(d).type.name === 'table') {
+          tableDepth = d;
+        }
+        if ($from.node(d).type.name === 'tableCell' || $from.node(d).type.name === 'tableHeader') {
+          colIndex = $from.index(d);
+          break;
+        }
+      }
+
+      if (!tableDepth || colIndex <= 0) return;
+
+      const table = $from.node(tableDepth);
+      const { tr } = state;
+
+      // Swap cells in each row
+      table.forEach((row, rowOffset, rowIndex) => {
+        const currentCell = row.child(colIndex);
+        const prevCell = row.child(colIndex - 1);
+
+        const tableStart = $from.start(tableDepth);
+        let rowPos = tableStart;
+        for (let i = 0; i < rowIndex; i++) {
+          rowPos += table.child(i).nodeSize;
+        }
+
+        let currentCellPos = rowPos + 1; // +1 for row start
+        for (let i = 0; i < colIndex; i++) {
+          currentCellPos += row.child(i).nodeSize;
+        }
+        const prevCellPos = currentCellPos - prevCell.nodeSize;
+
+        tr.replaceWith(prevCellPos, prevCellPos + prevCell.nodeSize, currentCell)
+          .replaceWith(currentCellPos + currentCell.nodeSize - prevCell.nodeSize, currentCellPos + currentCell.nodeSize, prevCell);
+      });
+
+      view.dispatch(tr);
+    }
+
+    function moveTableColumnRight() {
+      const { state, view } = tiptapEditor;
+      const { $from } = state.selection;
+
+      // Find table, row, and column info
+      let tableDepth = null;
+      let colIndex = null;
+      let totalCols = 0;
+
+      for (let d = $from.depth; d > 0; d--) {
+        if ($from.node(d).type.name === 'table') {
+          tableDepth = d;
+        }
+        if ($from.node(d).type.name === 'tableCell' || $from.node(d).type.name === 'tableHeader') {
+          colIndex = $from.index(d);
+          totalCols = $from.node(d - 1).childCount;
+          break;
+        }
+      }
+
+      if (!tableDepth || colIndex >= totalCols - 1) return;
+
+      const table = $from.node(tableDepth);
+      const { tr } = state;
+
+      // Swap cells in each row
+      table.forEach((row, rowOffset, rowIndex) => {
+        const currentCell = row.child(colIndex);
+        const nextCell = row.child(colIndex + 1);
+
+        const tableStart = $from.start(tableDepth);
+        let rowPos = tableStart;
+        for (let i = 0; i < rowIndex; i++) {
+          rowPos += table.child(i).nodeSize;
+        }
+
+        let currentCellPos = rowPos + 1; // +1 for row start
+        for (let i = 0; i < colIndex; i++) {
+          currentCellPos += row.child(i).nodeSize;
+        }
+        const nextCellPos = currentCellPos + currentCell.nodeSize;
+
+        tr.replaceWith(currentCellPos, currentCellPos + currentCell.nodeSize, nextCell)
+          .replaceWith(nextCellPos + nextCell.nodeSize - currentCell.nodeSize, nextCellPos + nextCell.nodeSize, currentCell);
+      });
+
+      view.dispatch(tr);
+    }
+
+    function toggleTableHeaderRow() {
+      tiptapEditor.chain().focus().toggleHeaderRow().run();
+    }
+
+    function mergeCells() {
+      tiptapEditor.chain().focus().mergeCells().run();
+    }
+
+    function splitCell() {
+      tiptapEditor.chain().focus().splitCell().run();
+    }
+
+    function updateTableControls() {
+      // Remove existing wrappers
+      const existingWrappers = document.querySelectorAll('.table-wrapper');
+      existingWrappers.forEach(wrapper => {
+        const table = wrapper.querySelector('table');
+        if (table) {
+          wrapper.parentNode.insertBefore(table, wrapper);
+        }
+        wrapper.remove();
+      });
+
+      // Find all tables in the editor
+      const tables = tiptapEditor.view.dom.querySelectorAll('table');
+
+      tables.forEach((table, tableIndex) => {
+        // Create wrapper
+        const wrapper = document.createElement('div');
+        wrapper.className = 'table-wrapper';
+
+        // Wrap the table
+        table.parentNode.insertBefore(wrapper, table);
+        wrapper.appendChild(table);
+
+        // Get table dimensions
+        const rows = table.querySelectorAll('tr');
+        const cols = rows[0]?.querySelectorAll('td, th').length || 0;
+
+        // Add column controls at top
+        const colControls = document.createElement('div');
+        colControls.className = 'table-column-controls';
+
+        for (let i = 0; i < cols; i++) {
+          const colControl = document.createElement('div');
+          colControl.className = 'table-column-control';
+          const btn = document.createElement('button');
+          btn.textContent = '+';
+          btn.title = 'Column ' + (i + 1) + ' options';
+          btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleColumnClick(tableIndex, i, e);
+          });
+          colControl.appendChild(btn);
+          colControls.appendChild(colControl);
+        }
+        wrapper.insertBefore(colControls, table);
+
+        // Add row controls on left
+        const rowControls = document.createElement('div');
+        rowControls.className = 'table-row-controls';
+
+        rows.forEach((row, i) => {
+          const rowControl = document.createElement('div');
+          rowControl.className = 'table-row-control';
+          rowControl.style.height = row.offsetHeight + 'px';
+          const btn = document.createElement('button');
+          btn.textContent = '+';
+          btn.title = 'Row ' + (i + 1) + ' options';
+          btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleRowClick(tableIndex, i, e);
+          });
+          rowControl.appendChild(btn);
+          rowControls.appendChild(rowControl);
+        });
+        wrapper.insertBefore(rowControls, table);
+      });
+    }
+
+    function handleRowClick(tableIndex, rowIndex, event) {
+      // Focus the table first
+      const tables = tiptapEditor.view.dom.querySelectorAll('table');
+      const table = tables[tableIndex];
+      if (!table) return;
+
+      const row = table.querySelectorAll('tr')[rowIndex];
+      if (!row) return;
+
+      const firstCell = row.querySelector('td, th');
+      if (!firstCell) return;
+
+      // Set selection to this row - use position INSIDE the cell
+      const pos = tiptapEditor.view.posAtDOM(firstCell, 0);
+      tiptapEditor.commands.setTextSelection(pos);
+
+      // Debug: verify which row we actually selected
+      const { $from } = tiptapEditor.state.selection;
+      let actualRowIndex = null;
+      for (let d = $from.depth; d > 0; d--) {
+        if ($from.node(d).type.name === 'tableRow') {
+          actualRowIndex = $from.index(d);
+          break;
+        }
+      }
+
+      console.log('Clicked row button:', rowIndex, 'Actual selected row:', actualRowIndex);
+
+      // Show context menu - use the ACTUAL row index from ProseMirror, not the DOM index
+      showRowContextMenu(event, actualRowIndex !== null ? actualRowIndex : rowIndex);
+    }
+
+    function handleColumnClick(tableIndex, colIndex, event) {
+      // Focus the table first
+      const tables = tiptapEditor.view.dom.querySelectorAll('table');
+      const table = tables[tableIndex];
+      if (!table) return;
+
+      const firstRow = table.querySelector('tr');
+      if (!firstRow) return;
+
+      const cells = firstRow.querySelectorAll('td, th');
+      const cell = cells[colIndex];
+      if (!cell) return;
+
+      // Set selection to this column
+      const pos = tiptapEditor.view.posAtDOM(cell, 0);
+      tiptapEditor.commands.setTextSelection(pos);
+
+      // Debug: verify which column we actually selected
+      const { $from } = tiptapEditor.state.selection;
+      let actualColIndex = null;
+      let rowDepth = null;
+
+      // Find the tableRow in the node hierarchy
+      for (let d = $from.depth; d > 0; d--) {
+        const node = $from.node(d);
+        if (node.type.name === 'tableRow') {
+          rowDepth = d;
+          // The index at this depth gives us which cell we're in within this row
+          actualColIndex = $from.index(d);
+          break;
+        }
+      }
+
+      console.log('Clicked column button:', colIndex, 'Actual selected column:', actualColIndex, 'Row depth:', rowDepth);
+
+      // Show context menu - use the ACTUAL column index from ProseMirror, not the DOM index
+      showColumnContextMenu(event, actualColIndex !== null ? actualColIndex : colIndex);
+    }
+
+    function showRowContextMenu(event, rowIndex) {
+      const menu = document.getElementById('tableToolbar');
+      const rowMenu = document.getElementById('rowMenu');
+      const colMenu = document.getElementById('columnMenu');
+      const generalMenu = document.getElementById('tableGeneralMenu');
+
+      // Hide all menus
+      rowMenu.classList.add('hidden');
+      colMenu.classList.add('hidden');
+      generalMenu.classList.add('hidden');
+
+      // Show row menu
+      rowMenu.classList.remove('hidden');
+
+      // Position menu
+      menu.style.left = (event.pageX - 10) + 'px';
+      menu.style.top = event.pageY + 'px';
+      menu.classList.remove('hidden');
+
+      // Store current row for operations
+      menu.dataset.contextType = 'row';
+      menu.dataset.contextIndex = rowIndex;
+    }
+
+    function showColumnContextMenu(event, colIndex) {
+      const menu = document.getElementById('tableToolbar');
+      const rowMenu = document.getElementById('rowMenu');
+      const colMenu = document.getElementById('columnMenu');
+      const generalMenu = document.getElementById('tableGeneralMenu');
+
+      // Hide all menus
+      rowMenu.classList.add('hidden');
+      colMenu.classList.add('hidden');
+      generalMenu.classList.add('hidden');
+
+      // Show column menu
+      colMenu.classList.remove('hidden');
+
+      // Position menu
+      menu.style.left = event.pageX + 'px';
+      menu.style.top = (event.pageY + 10) + 'px';
+      menu.classList.remove('hidden');
+
+      // Store current column for operations
+      menu.dataset.contextType = 'column';
+      menu.dataset.contextIndex = colIndex;
+    }
+
+    function hideTableToolbar() {
+      const toolbar = document.getElementById('tableToolbar');
+      toolbar.classList.add('hidden');
+    }
+
+    // Add click-away listener to dismiss table menu when clicking outside
+    document.addEventListener('click', (e) => {
+      const menu = document.getElementById('tableToolbar');
+      if (!menu) return;
+
+      // Check if menu is visible and click was outside menu and outside table control buttons
+      if (!menu.classList.contains('hidden')) {
+        const clickedInsideMenu = menu.contains(e.target);
+        const clickedControlButton = e.target.closest('.table-row-control button') || e.target.closest('.table-column-control button');
+
+        if (!clickedInsideMenu && !clickedControlButton) {
+          hideTableToolbar();
+        }
+      }
+    });
 
     function closeTemplateEditor() {
       document.getElementById('editorModal').classList.add('hidden');

@@ -106,6 +106,7 @@ const MenuConfig = {
           { id: 'chat', label: 'Chat', href: '/chat.html', icon: 'chat' },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
           { id: 'workflows', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
+          { id: 'docgen', label: 'Document Templates', href: '/workflows/document-generation.html', icon: 'document' },
         ]
       },
       {
@@ -207,6 +208,7 @@ const MenuConfig = {
           { id: 'workflows-chat', label: 'Chat', href: '/chat.html', icon: 'chat' },
           { id: 'workflows-matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
           { id: 'workflows-list', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
+          { id: 'workflows-docgen', label: 'Document Templates', href: '/workflows/document-generation.html', icon: 'document' },
         ]
       },
       {
@@ -217,38 +219,6 @@ const MenuConfig = {
           { id: 'workflows-connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
           { id: 'workflows-module-execution', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
           { id: 'workflows-predictions', label: 'Predictions', href: '/insights/predictions.html', icon: 'performance' },
-        ]
-      },
-      {
-        id: 'workflows-automation',
-        title: 'Workflow Tools',
-        requiredRoles: [],
-        items: [
-          { 
-            id: 'workflows-templates', 
-            label: 'Templates', 
-            href: '/workflows/templates.html', 
-            icon: 'templates',
-            customVisibility: () => window.LanaConfig?.WORKFLOWS_TEMPLATES_ENABLED !== false
-          },
-          { 
-            id: 'workflows-builder', 
-            label: 'Visual Builder', 
-            href: '/workflows/builder.html', 
-            icon: 'builder',
-            customVisibility: () => window.LanaConfig?.WORKFLOWS_VISUAL_BUILDER_ENABLED !== false
-          },
-          { 
-            id: 'workflows-active', 
-            label: 'Active Workflows', 
-            href: '/workflows/active.html', 
-            icon: 'active',
-            customVisibility: () => window.LanaConfig?.WORKFLOWS_ACTIVE_ENABLED !== false
-          },
-          { id: 'workflows-logs', label: 'Execution Logs', href: '/workflows/execution-logs.html', icon: 'logs' },
-          { id: 'workflows-cadences', label: 'Follow-up Cadences', href: '/workflows/follow-up-cadences.html', icon: 'cadences' },
-          // { id: 'workflows-retargeting', label: 'Retargeting', href: '/workflows/retargeting.html', icon: 'retargeting' },
-          { id: 'workflows-docgen', label: 'Document Generation', href: '/workflows/document-generation.html', icon: 'document' },
         ]
       },
       {
@@ -299,6 +269,7 @@ const MenuConfig = {
           { id: 'insights-chat', label: 'Chat', href: '/chat.html', icon: 'chat' },
           { id: 'insights-matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
           { id: 'insights-workflows', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
+          { id: 'insights-docgen', label: 'Document Templates', href: '/workflows/document-generation.html', icon: 'document' },
         ]
       },
       {
@@ -359,6 +330,7 @@ const MenuConfig = {
           { id: 'integrations-chat', label: 'Chat', href: '/chat.html', icon: 'chat' },
           { id: 'integrations-matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
           { id: 'integrations-workflows', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
+          { id: 'integrations-docgen', label: 'Document Templates', href: '/workflows/document-generation.html', icon: 'document' },
         ]
       },
       {

@@ -4287,6 +4287,66 @@
           `;
         }
 
+        // Build generated document card HTML if present
+        let generatedDocCardHtml = '';
+        if (metadata && metadata.generated_document_id) {
+          const docId = metadata.generated_document_id;
+          generatedDocCardHtml = `
+            <div class="generated-document-card mt-3 bg-white border border-gray-200 rounded-lg p-4 shadow-sm" data-doc-id="${docId}">
+              <div class="flex items-start justify-between mb-2">
+                <div class="flex items-center gap-2">
+                  <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                  </svg>
+                  <span class="font-medium text-gray-900 text-sm doc-title">Loading...</span>
+                </div>
+                <span class="text-xs text-gray-500 doc-timestamp">Just now</span>
+              </div>
+              <div class="doc-preview text-sm text-gray-600 mb-3 line-clamp-3" style="display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;">
+                Loading document...
+              </div>
+              <div class="flex gap-2">
+                <button class="doc-action-btn px-3 py-1.5 text-xs bg-indigo-50 text-indigo-700 rounded hover:bg-indigo-100 transition-colors" onclick="viewGeneratedDocument('${docId}')">
+                  View Full
+                </button>
+                <button class="doc-action-btn px-3 py-1.5 text-xs bg-white border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors" onclick="editGeneratedDocument('${docId}')">
+                  Edit
+                </button>
+                <button class="doc-action-btn px-3 py-1.5 text-xs bg-white border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors" onclick="downloadGeneratedDocument('${docId}')">
+                  Download
+                </button>
+                <button class="doc-action-btn px-3 py-1.5 text-xs bg-white border border-red-300 text-red-700 rounded hover:bg-red-50 transition-colors ml-auto" onclick="deleteGeneratedDocument('${docId}')">
+                  Delete
+                </button>
+              </div>
+            </div>
+          `;
+        }
+
+        // Build follow-up actions HTML if present
+        let followUpActionsHtml = '';
+        if (metadata && metadata.follow_up_actions && metadata.follow_up_actions.length > 0) {
+          followUpActionsHtml = `
+            <div class="follow-up-actions mt-3 flex gap-2 flex-wrap">
+              ${metadata.follow_up_actions.map(action => `
+                <button
+                  class="action-btn px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-colors flex items-center gap-2 text-sm"
+                  data-action="${action.action}"
+                  data-action-id="${action.id}"
+                  data-action-data='${JSON.stringify(action.data).replace(/'/g, "&#39;")}'
+                  title="${action.description || ''}">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    ${action.icon === 'pencil' ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>' : ''}
+                    ${action.icon === 'refresh' ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>' : ''}
+                    ${action.icon === 'save' ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>' : ''}
+                  </svg>
+                  ${action.label}
+                </button>
+              `).join('')}
+            </div>
+          `;
+        }
+
         messageEl.className = 'ai-message-container';
         messageEl.innerHTML = `
           <div class="flex items-start space-x-3">
@@ -4302,9 +4362,16 @@
               </div>
               ${reasoningPanelHtml}
               ${citationsHtml}
+              ${generatedDocCardHtml}
+              ${followUpActionsHtml}
             </div>
           </div>
         `;
+
+        // If generated document card was added, fetch and populate the document details
+        if (metadata && metadata.generated_document_id) {
+          fetchAndPopulateGeneratedDocument(metadata.generated_document_id);
+        }
       }
 
       // Hide welcome message if present
@@ -6484,6 +6551,410 @@
         closeDocumentPicker();
       }
     });
+
+    // =========================================================================
+    // Generated Document Functions
+    // =========================================================================
+
+    /**
+     * Fetch and populate a generated document card with actual data
+     */
+    async function fetchAndPopulateGeneratedDocument(documentId) {
+      try {
+        const response = await apiRequest(`/generated-documents/${documentId}`);
+
+        if (!response.success) {
+          console.error('[GeneratedDoc] Failed to fetch document:', response);
+          return;
+        }
+
+        const doc = response.document;
+
+        // Find the document card in the DOM
+        const card = document.querySelector(`.generated-document-card[data-doc-id="${documentId}"]`);
+        if (!card) {
+          console.warn('[GeneratedDoc] Card not found in DOM:', documentId);
+          return;
+        }
+
+        // Update title
+        const titleEl = card.querySelector('.doc-title');
+        if (titleEl) {
+          titleEl.textContent = doc.title;
+        }
+
+        // Update timestamp
+        const timestampEl = card.querySelector('.doc-timestamp');
+        if (timestampEl) {
+          const timeAgo = formatTimeAgo(new Date(doc.created_at));
+          timestampEl.textContent = timeAgo;
+        }
+
+        // Update preview (first 200 chars)
+        const previewEl = card.querySelector('.doc-preview');
+        if (previewEl) {
+          const preview = doc.content.substring(0, 200) + (doc.content.length > 200 ? '...' : '');
+          previewEl.textContent = preview;
+        }
+
+        console.log('[GeneratedDoc] Document populated:', { documentId, title: doc.title });
+
+      } catch (error) {
+        console.error('[GeneratedDoc] Failed to fetch document:', error);
+      }
+    }
+
+    /**
+     * View full generated document in a modal
+     */
+    async function viewGeneratedDocument(documentId) {
+      try {
+        const response = await apiRequest(`/generated-documents/${documentId}`);
+
+        if (!response.success) {
+          Toast.error('Failed to load document');
+          return;
+        }
+
+        const doc = response.document;
+
+        // Create modal
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50';
+        modal.innerHTML = `
+          <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h2 class="text-lg font-semibold text-gray-900">${doc.title}</h2>
+              <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+            <div class="px-6 py-4 overflow-y-auto flex-1">
+              <div class="whitespace-pre-wrap text-gray-800">${doc.content}</div>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-200 flex gap-2">
+              <button onclick="editGeneratedDocument('${documentId}')" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                Edit Document
+              </button>
+              <button onclick="downloadGeneratedDocument('${documentId}')" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                Download
+              </button>
+              <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 ml-auto">
+                Close
+              </button>
+            </div>
+          </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Close on backdrop click
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) {
+            modal.remove();
+          }
+        });
+
+      } catch (error) {
+        console.error('[GeneratedDoc] Failed to view document:', error);
+        Toast.error('Failed to load document');
+      }
+    }
+
+    /**
+     * Edit generated document (opens in workflow editor)
+     */
+    async function editGeneratedDocument(documentId) {
+      try {
+        const response = await apiRequest(`/generated-documents/${documentId}`);
+
+        if (!response.success) {
+          Toast.error('Failed to load document');
+          return;
+        }
+
+        const doc = response.document;
+
+        // Save to localStorage
+        const tempDocId = `temp_doc_${Date.now()}`;
+        const tempDoc = {
+          content: doc.content,
+          template_type: 'ai_generated',
+          matter_id: doc.matter_id,
+          suggested_name: doc.title,
+          created_at: Date.now()
+        };
+
+        localStorage.setItem(tempDocId, JSON.stringify(tempDoc));
+
+        // Redirect to workflow editor
+        window.location.href = `workflows/document-generation.html?temp_doc=${tempDocId}`;
+
+      } catch (error) {
+        console.error('[GeneratedDoc] Failed to edit document:', error);
+        Toast.error('Failed to load document for editing');
+      }
+    }
+
+    /**
+     * Download generated document as PDF
+     */
+    async function downloadGeneratedDocument(documentId) {
+      try {
+        const response = await apiRequest(`/generated-documents/${documentId}`);
+
+        if (!response.success) {
+          Toast.error('Failed to load document');
+          return;
+        }
+
+        const doc = response.document;
+
+        // Check if jsPDF is available
+        if (typeof window.jspdf === 'undefined') {
+          // Fallback: Load jsPDF dynamically
+          const script = document.createElement('script');
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+          script.onload = () => generatePDF(doc);
+          document.head.appendChild(script);
+        } else {
+          generatePDF(doc);
+        }
+
+        function generatePDF(doc) {
+          const { jsPDF } = window.jspdf;
+          const pdf = new jsPDF();
+
+          // Set font and formatting
+          pdf.setFontSize(12);
+
+          // Split content into lines (handle long lines)
+          const pageWidth = pdf.internal.pageSize.getWidth();
+          const margins = 20;
+          const maxLineWidth = pageWidth - (margins * 2);
+
+          const lines = pdf.splitTextToSize(doc.content, maxLineWidth);
+
+          // Add content with pagination
+          let y = 20; // Starting Y position
+          const lineHeight = 7;
+          const pageHeight = pdf.internal.pageSize.getHeight();
+
+          lines.forEach((line, index) => {
+            // Check if we need a new page
+            if (y + lineHeight > pageHeight - 20) {
+              pdf.addPage();
+              y = 20; // Reset Y position for new page
+            }
+
+            pdf.text(line, margins, y);
+            y += lineHeight;
+          });
+
+          // Download the PDF
+          pdf.save(`${doc.title}.pdf`);
+          Toast.success('Document downloaded as PDF');
+        }
+
+      } catch (error) {
+        console.error('[GeneratedDoc] Failed to download document:', error);
+        Toast.error('Failed to download document');
+      }
+    }
+
+    /**
+     * Delete generated document (permanent delete with confirmation modal)
+     */
+    async function deleteGeneratedDocument(documentId) {
+      // Create confirmation modal
+      const modal = document.createElement('div');
+      modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50';
+      modal.innerHTML = `
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+              <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900">Delete Document?</h3>
+              <p class="text-sm text-gray-600">This action cannot be undone.</p>
+            </div>
+          </div>
+          <p class="text-sm text-gray-700 mb-6">
+            Are you sure you want to permanently delete this document? This will remove it from your conversation history.
+          </p>
+          <div class="flex gap-3 justify-end">
+            <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 text-sm bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+              Cancel
+            </button>
+            <button id="confirmDelete" class="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">
+              Delete Permanently
+            </button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+
+      // Handle confirmation
+      modal.querySelector('#confirmDelete').addEventListener('click', async () => {
+        modal.remove();
+
+        try {
+          const response = await apiRequest(`/generated-documents/${documentId}`, {
+            method: 'DELETE'
+          });
+
+          if (!response.success) {
+            Toast.error('Failed to delete document');
+            return;
+          }
+
+          // Remove card from DOM with animation
+          const card = document.querySelector(`.generated-document-card[data-doc-id="${documentId}"]`);
+          if (card) {
+            card.style.opacity = '0';
+            card.style.transform = 'scale(0.95)';
+            card.style.transition = 'all 0.3s ease';
+            setTimeout(() => card.remove(), 300);
+          }
+
+          Toast.success('Document deleted');
+
+        } catch (error) {
+          console.error('[GeneratedDoc] Failed to delete document:', error);
+          Toast.error('Failed to delete document');
+        }
+      });
+
+      // Close on backdrop click
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          modal.remove();
+        }
+      });
+    }
+
+    // Handle follow-up action button clicks (delegated event listener)
+    document.addEventListener('click', async (e) => {
+      const actionBtn = e.target.closest('.action-btn');
+      if (!actionBtn) return;
+
+      const action = actionBtn.dataset.action;
+      const actionId = actionBtn.dataset.actionId;
+      const actionData = JSON.parse(actionBtn.dataset.actionData || '{}');
+
+      console.log('[FollowUpAction] Button clicked:', { action, actionId, actionData });
+
+      try {
+        switch (action) {
+          case 'open_workflow_editor':
+            await handleEditDocument(actionData);
+            break;
+
+          case 'attach_for_revision':
+            await handleRequestChanges(actionData);
+            break;
+
+          case 'save_workflow_template':
+            await handleSaveTemplate(actionData);
+            break;
+
+          default:
+            console.warn('[FollowUpAction] Unknown action:', action);
+            Toast.warning('This action is not yet implemented');
+        }
+      } catch (error) {
+        console.error('[FollowUpAction] Action failed:', error);
+        Toast.error(`Failed to execute action: ${error.message}`);
+      }
+    });
+
+    /**
+     * Handle "Edit Document" action
+     * Saves generated content to localStorage and redirects to workflow editor
+     */
+    async function handleEditDocument(actionData) {
+      const { content, template_type, matter_id } = actionData;
+
+      // Generate unique temp ID
+      const tempDocId = `temp_doc_${Date.now()}`;
+
+      // Store in localStorage
+      const tempDoc = {
+        content,
+        template_type,
+        matter_id,
+        created_at: Date.now()
+      };
+
+      localStorage.setItem(tempDocId, JSON.stringify(tempDoc));
+
+      console.log('[EditDocument] Saved to localStorage:', { tempDocId, matter_id });
+
+      // Redirect to workflow editor with temp doc ID
+      window.location.href = `workflows/document-generation.html?temp_doc=${tempDocId}`;
+    }
+
+    /**
+     * Handle "Request Changes" action
+     * Creates a temporary text file with the generated content and adds it to pending files
+     */
+    async function handleRequestChanges(actionData) {
+      const { original_content, attachment_type } = actionData;
+
+      // Create a Blob from the content (text/plain)
+      const blob = new Blob([original_content], { type: 'text/plain' });
+
+      // Create a File object (like from file input)
+      const file = new File([blob], 'generated_document.txt', {
+        type: 'text/plain',
+        lastModified: Date.now()
+      });
+
+      // Add to pendingFiles array (same as file upload)
+      pendingFiles.push(file);
+
+      // Update UI to show pending file
+      updatePendingFilesUI();
+
+      // Focus message input
+      messageInput.focus();
+
+      console.log('[RequestChanges] Added generated document to pending files');
+      Toast.success('Document attached for revision. Ask the AI to make changes!');
+    }
+
+    /**
+     * Handle "Save as Template" action
+     * Opens save template modal with suggested name
+     */
+    async function handleSaveTemplate(actionData) {
+      const { content, suggested_name } = actionData;
+
+      // For now, redirect to workflow editor with save intent
+      const tempDocId = `temp_doc_${Date.now()}`;
+
+      const tempDoc = {
+        content,
+        template_type: 'ai_generated',
+        matter_id: currentMatter?.matter_id || null,
+        suggested_name,
+        save_intent: true,
+        created_at: Date.now()
+      };
+
+      localStorage.setItem(tempDocId, JSON.stringify(tempDoc));
+
+      console.log('[SaveTemplate] Saved to localStorage with save intent:', { tempDocId, suggested_name });
+
+      // Redirect to workflow editor
+      window.location.href = `workflows/document-generation.html?temp_doc=${tempDocId}&save=true`;
+    }
 
     // Initialize
       loadUserInfo();
