@@ -666,6 +666,112 @@
     .notion-editor .ProseMirror a:hover {
       color: #4338ca;
     }
+
+    /* Preview Content Styling */
+    #previewContent h1 {
+      font-size: 32px;
+      font-weight: bold;
+      margin: 24px 0 16px 0;
+      line-height: 1.2;
+    }
+
+    #previewContent h2 {
+      font-size: 24px;
+      font-weight: bold;
+      margin: 20px 0 12px 0;
+      line-height: 1.3;
+    }
+
+    #previewContent h3 {
+      font-size: 20px;
+      font-weight: bold;
+      margin: 16px 0 8px 0;
+      line-height: 1.4;
+    }
+
+    #previewContent p {
+      margin: 8px 0;
+    }
+
+    #previewContent strong,
+    #previewContent b {
+      font-weight: bold;
+    }
+
+    #previewContent em,
+    #previewContent i {
+      font-style: italic;
+    }
+
+    #previewContent u {
+      text-decoration: underline;
+    }
+
+    #previewContent s,
+    #previewContent strike,
+    #previewContent del {
+      text-decoration: line-through;
+    }
+
+    #previewContent a {
+      color: #2563eb;
+      text-decoration: underline;
+    }
+
+    #previewContent a:hover {
+      color: #1d4ed8;
+    }
+
+    #previewContent ul {
+      list-style-type: disc;
+      margin: 12px 0;
+      padding-left: 32px;
+    }
+
+    #previewContent ol {
+      list-style-type: decimal;
+      margin: 12px 0;
+      padding-left: 32px;
+    }
+
+    #previewContent li {
+      margin: 4px 0;
+    }
+
+    #previewContent table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 16px 0;
+      border: 1px solid #e5e7eb;
+    }
+
+    #previewContent th,
+    #previewContent td {
+      border: 1px solid #e5e7eb;
+      padding: 8px 12px;
+      text-align: left;
+    }
+
+    #previewContent th {
+      background-color: #f9fafb;
+      font-weight: bold;
+    }
+
+    #previewContent [style*="text-align: left"] {
+      text-align: left;
+    }
+
+    #previewContent [style*="text-align: center"] {
+      text-align: center;
+    }
+
+    #previewContent [style*="text-align: right"] {
+      text-align: right;
+    }
+
+    #previewContent [style*="text-align: justify"] {
+      text-align: justify;
+    }
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
@@ -2795,9 +2901,14 @@
           // Create new template
           response = await DocumentTemplatesAPI.createTemplate(backendData);
           Toast.success('Template created successfully');
+
+          // Update editingTemplateId so subsequent saves update instead of creating duplicates
+          if (response && response.template && response.template.id) {
+            editingTemplateId = response.template.id;
+          }
         }
 
-        closeTemplateEditor();
+        // Don't close editor - stay in edit mode
         await loadTemplates(); // Reload templates from backend
       } catch (error) {
         console.error('[DocumentGeneration] Failed to save template:', error);
