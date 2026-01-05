@@ -2658,7 +2658,7 @@
           <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
             <p class="text-sm text-gray-600">Avg Response Time</p>
             <p class="text-2xl font-bold ${avgResponseTime <= 24 ? 'text-green-600' : avgResponseTime <= 48 ? 'text-yellow-600' : 'text-red-600'}">
-              ${avgResponseTime < 1 ? `${Math.round(avgResponseTime * 60)} min` : `${avgResponseTime.toFixed(1)} hrs`}
+              ${avgResponseTime < 1 ? `${(avgResponseTime * 60).toFixed(1)} min` : `${avgResponseTime.toFixed(1)} hrs`}
             </p>
             <p class="text-xs text-gray-500">Target: &lt; 24 hours</p>
           </div>
