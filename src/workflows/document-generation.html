@@ -1287,7 +1287,17 @@
           <!-- Preview content here -->
         </div>
       </div>
-      <div class="p-4 border-t border-gray-100 flex justify-end flex-shrink-0">
+      <div class="p-4 border-t border-gray-100 flex justify-between items-center flex-shrink-0">
+        <div class="flex gap-2">
+          <button onclick="downloadDocument('pdf')" class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg flex items-center gap-2 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            Download PDF
+          </button>
+          <button onclick="downloadDocument('docx')" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center gap-2 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            Download Word
+          </button>
+        </div>
         <button onclick="closePreviewModal()" class="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
           Close Preview
         </button>
@@ -1363,6 +1373,11 @@
     let automationRules = [];
     let isLoadingTemplates = false;
     let isLoadingRules = false;
+
+    // Track current preview state for downloads
+    let currentPreviewContent = '';
+    let currentPreviewTemplateId = null;
+    let currentPreviewTemplateName = '';
 
     // ============================================================
     // DATA TRANSFORMATION FUNCTIONS
@@ -2938,12 +2953,17 @@
     function previewTemplateById(id) {
       const template = documentTemplates.find(t => t.id === id);
       if (template) {
+        currentPreviewTemplateId = id;
+        currentPreviewTemplateName = template.name;
         showPreview(template.content);
       }
     }
 
     function previewTemplate() {
       if (tiptapEditor) {
+        currentPreviewTemplateId = editingTemplateId;
+        const name = document.getElementById('templateName').value || document.getElementById('notionTitle').value;
+        currentPreviewTemplateName = name || 'Untitled Document';
         showPreview(tiptapEditor.getHTML());
       }
     }
@@ -2956,12 +2976,73 @@
         preview = preview.replace(regex, value);
       });
 
+      currentPreviewContent = preview;
       document.getElementById('previewContent').innerHTML = preview;
       document.getElementById('previewModal').classList.remove('hidden');
     }
 
     function closePreviewModal() {
       document.getElementById('previewModal').classList.add('hidden');
+    }
+
+    async function downloadDocument(format) {
+      if (!currentPreviewContent) {
+        Toast.error('No document to download');
+        return;
+      }
+
+      const button = event.target.closest('button');
+      const originalText = button.innerHTML;
+      button.disabled = true;
+      button.innerHTML = '<svg class="animate-spin h-4 w-4 inline mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Generating...';
+
+      try {
+        // If we have a saved template ID, use the backend API to generate
+        if (currentPreviewTemplateId) {
+          // Extract merge field values from the preview content
+          const variables = {};
+          Object.keys(sampleData).forEach(key => {
+            variables[key] = sampleData[key];
+          });
+
+          const response = await DocumentTemplatesAPI.generateDocument(
+            currentPreviewTemplateId,
+            variables,
+            format
+          );
+
+          // Backend returns a URL or blob - trigger download
+          if (response.document && response.document.url) {
+            // If backend returns a download URL
+            window.open(response.document.url, '_blank');
+          } else if (response.content) {
+            // If backend returns content directly, create blob
+            const blob = new Blob([response.content], {
+              type: format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${currentPreviewTemplateName}.${format}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          }
+
+          Toast.success(`Document downloaded as ${format.toUpperCase()}`);
+        } else {
+          // For unsaved templates, we need to implement client-side conversion
+          // For now, show a message to save first
+          Toast.error('Please save the template before downloading');
+        }
+      } catch (error) {
+        console.error('[DocumentGeneration] Download failed:', error);
+        Toast.error(`Failed to download ${format.toUpperCase()}: ` + (error.message || 'Unknown error'));
+      } finally {
+        button.disabled = false;
+        button.innerHTML = originalText;
+      }
     }
 
     function addAutomationRule() {
