@@ -3274,8 +3274,8 @@
     async function showQualityScoreDrilldown(content, periodStart, periodEnd) {
       // Fetch opportunities (enriched contact data) and standalone contacts
       const [opportunitiesResponse, contactsResponse] = await Promise.all([
-        api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=500`),
-        api.get(`/api/v1/integrations/connector-data?entity_type=contact&start_date=${periodStart}&end_date=${periodEnd}&limit=500`)
+        api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=10000`),
+        api.get(`/api/v1/integrations/connector-data?entity_type=contact&start_date=${periodStart}&end_date=${periodEnd}&limit=10000`)
       ]);
 
       const opportunities = opportunitiesResponse?.data || [];
