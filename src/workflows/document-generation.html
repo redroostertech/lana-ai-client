@@ -898,12 +898,12 @@
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
           Preview
         </button>
-        <button onclick="downloadDocumentFromEditor('pdf')" class="px-3 py-1.5 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md flex items-center gap-1.5 transition-colors">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+        <button onclick="openPrintPreviewFromEditor()" class="px-3 py-1.5 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md flex items-center gap-1.5 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
           PDF
         </button>
         <button onclick="downloadDocumentFromEditor('docx')" class="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md flex items-center gap-1.5 transition-colors">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
           Word
         </button>
         <button onclick="saveTemplate()" class="px-4 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors">
@@ -1297,13 +1297,13 @@
       </div>
       <div class="p-4 border-t border-gray-100 flex justify-between items-center flex-shrink-0">
         <div class="flex gap-2">
-          <button onclick="downloadDocument('pdf')" class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg flex items-center gap-2 transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-            Download PDF
+          <button onclick="openPrintPreview()" class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg flex items-center gap-2 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+            View PDF
           </button>
           <button onclick="downloadDocument('docx')" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center gap-2 transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-            Download Word
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+            View Word
           </button>
         </div>
         <button onclick="closePreviewModal()" class="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
@@ -3101,11 +3101,13 @@
               const content = result.document.content;
               console.log('[DocumentGeneration] Content type:', typeof content, 'Length:', content.length);
 
-              // Check if content looks like HTML (backend might be returning HTML instead of PDF/DOCX)
+              // Check if content looks like HTML (this is expected for print-to-PDF workflow)
               if (content.trim().startsWith('<')) {
-                console.error('[DocumentGeneration] Backend returned HTML content instead of binary document');
-                Toast.error(`Backend returned HTML instead of ${format.toUpperCase()} file. Check server configuration.`);
-                throw new Error('Backend is not configured to generate binary documents');
+                console.log('[DocumentGeneration] Received HTML content for print preview');
+                // This should not happen with downloadDocument(), only with openPrintPreview()
+                // But if it does, handle it gracefully
+                Toast.error(`Received HTML instead of ${format.toUpperCase()}. Use "Print to PDF" button instead.`);
+                throw new Error('Use Print to PDF button for PDF generation');
               }
 
               // Try to decode base64 if it looks like base64
@@ -3190,6 +3192,154 @@
       } catch (error) {
         console.error('[DocumentGeneration] Download failed:', error);
         Toast.error(`Failed to download ${format.toUpperCase()}: ` + (error.message || 'Unknown error'));
+      } finally {
+        button.disabled = false;
+        button.innerHTML = originalText;
+      }
+    }
+
+    /**
+     * Open print preview in a new window
+     * Generates HTML with built-in print button
+     */
+    async function openPrintPreview() {
+      const button = event.target.closest('button');
+      const originalText = button.innerHTML;
+      button.disabled = true;
+      button.innerHTML = '<svg class="animate-spin h-4 w-4 inline mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Generating...';
+
+      try {
+        if (!currentPreviewTemplateId) {
+          throw new Error('No template selected');
+        }
+
+        // Extract merge field values from the preview content
+        const variables = {};
+        Object.keys(sampleData).forEach(key => {
+          variables[key] = sampleData[key];
+        });
+
+        const token = localStorage.getItem('token');
+        const baseUrl = api.baseUrl || window.location.origin;
+
+        console.log('[DocumentGeneration] Generating print preview for template:', currentPreviewTemplateId);
+
+        const url = `${baseUrl}/api/v1/document-templates/${currentPreviewTemplateId}/generate`;
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            variables,
+            output_format: 'html' // Request HTML for print preview
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error?.message || 'Failed to generate print preview');
+        }
+
+        const result = await response.json();
+        console.log('[DocumentGeneration] Print preview response:', result);
+
+        if (result.document && result.document.content) {
+          const htmlContent = result.document.content;
+
+          // Open in a new window - use about:blank explicitly for Electron compatibility
+          const printWindow = window.open('about:blank', '_blank', 'width=900,height=800');
+
+          if (!printWindow) {
+            throw new Error('Failed to open print window. Please check your browser settings.');
+          }
+
+          printWindow.document.write(htmlContent);
+          printWindow.document.close();
+
+          Toast.success('PDF preview opened in new window');
+        } else {
+          throw new Error('Invalid response format from server');
+        }
+      } catch (error) {
+        console.error('[DocumentGeneration] Print preview failed:', error);
+        Toast.error('Failed to open print preview: ' + (error.message || 'Unknown error'));
+      } finally {
+        button.disabled = false;
+        button.innerHTML = originalText;
+      }
+    }
+
+    /**
+     * Open print preview from the editor toolbar
+     * Uses the current template being edited
+     */
+    async function openPrintPreviewFromEditor() {
+      const button = event.target.closest('button');
+      const originalText = button.innerHTML;
+      button.disabled = true;
+      button.innerHTML = '<svg class="animate-spin h-4 w-4 inline mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Generating...';
+
+      try {
+        if (!currentTemplateId) {
+          throw new Error('No template being edited');
+        }
+
+        // Extract merge field values from the editor content
+        const variables = {};
+        Object.keys(sampleData).forEach(key => {
+          variables[key] = sampleData[key];
+        });
+
+        const token = localStorage.getItem('token');
+        const baseUrl = api.baseUrl || window.location.origin;
+
+        console.log('[DocumentGeneration] Generating print preview from editor for template:', currentTemplateId);
+
+        const url = `${baseUrl}/api/v1/document-templates/${currentTemplateId}/generate`;
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            variables,
+            output_format: 'html' // Request HTML for print preview
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error?.message || 'Failed to generate print preview');
+        }
+
+        const result = await response.json();
+        console.log('[DocumentGeneration] Print preview response:', result);
+
+        if (result.document && result.document.content) {
+          const htmlContent = result.document.content;
+
+          // Open in a new window - use about:blank explicitly for Electron compatibility
+          const printWindow = window.open('about:blank', '_blank', 'width=900,height=800');
+
+          if (!printWindow) {
+            throw new Error('Failed to open print window. Please check your browser settings.');
+          }
+
+          printWindow.document.write(htmlContent);
+          printWindow.document.close();
+
+          Toast.success('PDF preview opened in new window');
+        } else {
+          throw new Error('Invalid response format from server');
+        }
+      } catch (error) {
+        console.error('[DocumentGeneration] Print preview from editor failed:', error);
+        Toast.error('Failed to open print preview: ' + (error.message || 'Unknown error'));
       } finally {
         button.disabled = false;
         button.innerHTML = originalText;

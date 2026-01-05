@@ -146,10 +146,21 @@ function createWindow(serverUrl = null) {
     mainWindow = null;
   });
 
-  // Handle external links (open in default browser)
+  // Handle window open requests
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    require('electron').shell.openExternal(url);
-    return { action: 'deny' };
+    // Allow about:blank, blob:, data:, and empty URLs (for print preview and dynamic content)
+    if (!url || url === '' || url === 'about:blank' || url.startsWith('blob:') || url.startsWith('data:')) {
+      return { action: 'allow' };
+    }
+
+    // Open external http/https links in system browser
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      require('electron').shell.openExternal(url);
+      return { action: 'deny' };
+    }
+
+    // Allow all other URLs
+    return { action: 'allow' };
   });
 }
 
@@ -195,10 +206,21 @@ function createLoginWindow() {
   // Create application menu
   createApplicationMenu();
 
-  // Handle external links (open in default browser)
+  // Handle window open requests
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    require('electron').shell.openExternal(url);
-    return { action: 'deny' };
+    // Allow about:blank, blob:, data:, and empty URLs (for print preview and dynamic content)
+    if (!url || url === '' || url === 'about:blank' || url.startsWith('blob:') || url.startsWith('data:')) {
+      return { action: 'allow' };
+    }
+
+    // Open external http/https links in system browser
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      require('electron').shell.openExternal(url);
+      return { action: 'deny' };
+    }
+
+    // Allow all other URLs
+    return { action: 'allow' };
   });
 }
 
