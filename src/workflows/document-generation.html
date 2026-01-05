@@ -3072,6 +3072,19 @@
             // JSON response - log it to see structure
             const result = await response.json();
             console.log('[DocumentGeneration] Backend JSON Response:', result);
+            console.log('[DocumentGeneration] Response keys:', Object.keys(result));
+
+            // Log first 100 chars of content if present to see encoding
+            if (result.content) {
+              console.log('[DocumentGeneration] result.content type:', typeof result.content);
+              console.log('[DocumentGeneration] result.content length:', result.content.length);
+              console.log('[DocumentGeneration] result.content preview (first 100 chars):', result.content.substring(0, 100));
+            }
+            if (result.document && result.document.content) {
+              console.log('[DocumentGeneration] result.document.content type:', typeof result.document.content);
+              console.log('[DocumentGeneration] result.document.content length:', result.document.content.length);
+              console.log('[DocumentGeneration] result.document.content preview (first 100 chars):', result.document.content.substring(0, 100));
+            }
 
             // Handle different response formats
             if (result.document && result.document.url) {
