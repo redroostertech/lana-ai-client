@@ -11,6 +11,8 @@ class DrilldownRenderer {
     this.modal = null;
     this.currentConfig = null;
     this.currentData = null;
+    this.allRows = []; // Store all fetched rows for client-side filtering
+    this.filteredRows = []; // Filtered rows after search/filter
     this.currentPage = 1;
     this.pageSize = 25;
     this.sortBy = null;
@@ -18,6 +20,7 @@ class DrilldownRenderer {
     this.filters = {};
     this.searchQuery = '';
     this.initialized = false;
+    this.currentTableView = null; // Stores current table view filter state
 
     // Don't call init() here - defer until first use
   }
@@ -47,9 +50,9 @@ class DrilldownRenderer {
         <!-- Background overlay -->
         <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" id="drilldown-backdrop"></div>
 
-        <!-- Modal panel -->
-        <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-          <div class="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-7xl">
+        <!-- Modal panel (full-screen) -->
+        <div class="fixed inset-0 flex">
+          <div class="relative w-full h-full bg-white overflow-y-auto">
             <!-- Header -->
             <div class="bg-white px-4 py-5 sm:px-6 border-b border-gray-200">
               <div class="flex items-center justify-between">
@@ -76,61 +79,17 @@ class DrilldownRenderer {
                 </div>
               </div>
 
-              <!-- How We Match Data (if configured) -->
-              <div id="drilldown-how-we-match" class="hidden mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 class="text-sm font-semibold text-blue-900 mb-2" id="drilldown-match-title">How We Match This Data</h4>
-                <p class="text-sm text-blue-800 mb-2" id="drilldown-match-method"></p>
-                <div id="drilldown-match-content"></div>
-              </div>
-
               <!-- Insights/Alerts (if any) -->
               <div id="drilldown-insights" class="hidden mt-4 space-y-2">
                 <!-- Insights will be rendered here -->
               </div>
 
-              <!-- Search, filters, and controls -->
+              <!-- Filters and controls -->
               <div class="mt-4 flex flex-wrap items-center gap-4">
-                <div class="flex-1 min-w-[200px]">
-                  <label for="drilldown-search" class="sr-only">Search</label>
-                  <input type="text" id="drilldown-search" placeholder="Search..."
-                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
-                </div>
-
-                <!-- Sort dropdown -->
-                <div id="drilldown-sort-container" class="hidden">
-                  <label for="drilldown-sort-select" class="sr-only">Sort by</label>
-                  <select id="drilldown-sort-select" class="block rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
-                    <!-- Sort options will be rendered here -->
-                  </select>
-                </div>
-
                 <!-- Filter toggles -->
                 <div id="drilldown-filter-container" class="hidden flex items-center space-x-2">
                   <!-- Filter buttons will be rendered here -->
                 </div>
-
-                <!-- Export buttons -->
-                <div id="drilldown-export-container" class="hidden flex items-center space-x-2">
-                  <button type="button" id="drilldown-export-csv" class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                    <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    CSV
-                  </button>
-                  <button type="button" id="drilldown-export-excel" class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                    <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    Excel
-                  </button>
-                </div>
-
-                <button type="button" id="drilldown-refresh" class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                  <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Refresh
-                </button>
               </div>
             </div>
 
@@ -141,11 +100,39 @@ class DrilldownRenderer {
               </div>
             </div>
 
+            <!-- Search bar with sort dropdown (positioned after filters, before table) -->
+            <div class="bg-white px-4 sm:px-6 pt-4">
+              <div class="flex items-center gap-3">
+                <!-- Search input -->
+                <div class="flex-1">
+                  <label for="drilldown-search" class="sr-only">Search</label>
+                  <input type="text" id="drilldown-search" placeholder="Search..." autocomplete="off"
+                    class="block w-full rounded-md border border-gray-300 shadow-sm px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                </div>
+
+                <!-- Search button -->
+                <button type="button" id="drilldown-search-btn" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                  <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  Search
+                </button>
+
+                <!-- Sort dropdown -->
+                <div id="drilldown-sort-container" class="hidden">
+                  <label for="drilldown-sort-select" class="sr-only">Sort by</label>
+                  <select id="drilldown-sort-select" class="block rounded-md border border-gray-300 shadow-sm px-3 py-2 pr-10 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                    <!-- Sort options will be rendered here -->
+                  </select>
+                </div>
+              </div>
+            </div>
+
             <!-- Table container -->
-            <div class="bg-white px-4 sm:px-6">
+            <div class="bg-white px-4 sm:px-6 pb-4">
               <div class="mt-4 flex flex-col">
-                <div class="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
-                  <div class="inline-block min-w-full py-2 align-middle">
+                <div class="overflow-x-auto">
+                  <div class="inline-block min-w-full align-middle">
                     <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
                       <!-- Loading state -->
                       <div id="drilldown-loading" class="flex items-center justify-center py-12">
@@ -260,16 +247,24 @@ class DrilldownRenderer {
     document.getElementById('drilldown-help-close')?.addEventListener('click', () => this.closeHelp());
     document.getElementById('drilldown-help-backdrop')?.addEventListener('click', () => this.closeHelp());
 
-    // Search
+    // Get search input element
     const searchInput = document.getElementById('drilldown-search');
-    let searchTimeout;
-    searchInput?.addEventListener('input', (e) => {
-      clearTimeout(searchTimeout);
-      searchTimeout = setTimeout(() => {
+
+    // Search button (click to search)
+    document.getElementById('drilldown-search-btn')?.addEventListener('click', () => {
+      const searchInput = document.getElementById('drilldown-search');
+      this.searchQuery = searchInput?.value || '';
+      this.currentPage = 1;
+      this.fetchData();
+    });
+
+    // Search on Enter key
+    searchInput?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
         this.searchQuery = e.target.value;
         this.currentPage = 1;
         this.fetchData();
-      }, 300);
+      }
     });
 
     // Sort dropdown
@@ -319,9 +314,17 @@ class DrilldownRenderer {
    * @param {string} periodStart - Start date (ISO 8601)
    * @param {string} periodEnd - End date (ISO 8601)
    */
-  async open(moduleKey, metricKey, periodStart, periodEnd) {
+  async open(moduleKey, metricKey, options = {}) {
     // Initialize if not already done (lazy initialization)
     this.init();
+
+    // Extract options (support both object and legacy separate params)
+    const { periodStart, periodEnd, organizationId } = options;
+
+    if (!periodStart || !periodEnd) {
+      console.error('[DrilldownRenderer] Missing periodStart or periodEnd in options');
+      return;
+    }
 
     // Show modal
     this.modal.classList.remove('hidden');
@@ -345,6 +348,7 @@ class DrilldownRenderer {
         metricKey,
         periodStart,
         periodEnd,
+        organizationId,
         ...config.drilldown
       };
 
@@ -358,12 +362,58 @@ class DrilldownRenderer {
         this.sortDirection = config.drilldown.defaultSort.direction || 'asc';
       }
 
+      // Inject custom CSS to override browser autofill styling
+      this.injectCustomCSS();
+
       // Fetch and render data
       await this.fetchData();
     } catch (error) {
       console.error('[DrilldownRenderer] Error opening drilldown:', error);
       this.showError(error.message || 'Failed to load drilldown configuration');
     }
+  }
+
+  /**
+   * Inject custom CSS to override browser autofill and focus styling
+   */
+  injectCustomCSS() {
+    // Check if custom styles already exist
+    if (document.getElementById('drilldown-custom-styles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'drilldown-custom-styles';
+    style.textContent = `
+      /* Override browser autofill yellow background */
+      #drilldown-search:-webkit-autofill,
+      #drilldown-search:-webkit-autofill:hover,
+      #drilldown-search:-webkit-autofill:focus,
+      #drilldown-search:-webkit-autofill:active {
+        -webkit-box-shadow: 0 0 0 30px white inset !important;
+        -webkit-text-fill-color: #111827 !important;
+        transition: background-color 5000s ease-in-out 0s;
+      }
+
+      /* Remove yellow border from all inputs and selects */
+      #drilldown-search:focus,
+      #drilldown-sort-select:focus {
+        outline: none !important;
+        box-shadow: 0 0 0 2px #3b82f6 !important;
+        border-color: transparent !important;
+      }
+
+      /* Ensure select dropdown arrow is visible */
+      #drilldown-sort-select {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+        background-position: right 0.5rem center;
+        background-repeat: no-repeat;
+        background-size: 1.5em 1.5em;
+        padding-right: 2.5rem;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+      }
+    `;
+    document.head.appendChild(style);
   }
 
   /**
@@ -380,6 +430,17 @@ class DrilldownRenderer {
    * Fetch drilldown configuration from API
    */
   async fetchDrilldownConfig(moduleKey, metricKey) {
+    // Use global api helper instead of fetch to support Electron backend URLs
+    // Check both window.api and global api (defined in api.js)
+    const apiClient = window.api || (typeof api !== 'undefined' ? api : null);
+
+    if (apiClient) {
+      const response = await apiClient.get(`/api/v1/modules/${moduleKey}/metrics/${metricKey}/drilldown`);
+      // api helper returns response.data, which contains {success: true, drilldown: {...}}
+      return response.data || response;
+    }
+
+    // Fallback to fetch for non-Electron environments
     const response = await fetch(`/api/v1/modules/${moduleKey}/metrics/${metricKey}/drilldown`, {
       headers: {
         'Authorization': `Bearer ${this.getAuthToken()}`
@@ -402,32 +463,79 @@ class DrilldownRenderer {
     this.showLoading();
 
     try {
-      const response = await fetch(
-        `/api/v1/modules/${this.currentConfig.moduleKey}/metrics/${this.currentConfig.metricKey}/drilldown/execute`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.getAuthToken()}`
-          },
-          body: JSON.stringify({
-            periodStart: this.currentConfig.periodStart,
-            periodEnd: this.currentConfig.periodEnd,
-            page: this.currentPage,
-            pageSize: this.pageSize,
-            sortBy: this.sortBy,
-            sortDirection: this.sortDirection,
-            filters: this.filters,
-            search: this.searchQuery
-          })
-        }
-      );
+      let result;
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch drilldown data: ${response.statusText}`);
+      // Use global api helper instead of fetch to support Electron backend URLs
+      // Check both window.api and global api (defined in api.js)
+      const apiClient = window.api || (typeof api !== 'undefined' ? api : null);
+
+      if (apiClient) {
+        const requestBody = {
+          periodStart: this.currentConfig.periodStart,
+          periodEnd: this.currentConfig.periodEnd,
+          organizationId: this.currentConfig.organizationId,
+          page: this.currentPage,
+          pageSize: this.pageSize,
+          sortBy: this.sortBy,
+          sortDirection: this.sortDirection,
+          filters: this.filters,
+          search: this.searchQuery
+        };
+
+        // Add view filter if set (from clicking summary cards)
+        if (this.currentViewFilter) {
+          requestBody.viewFilter = this.currentViewFilter;
+        }
+        if (this.currentViewType) {
+          requestBody.viewType = this.currentViewType;
+        }
+
+        const response = await apiClient.post(
+          `/api/v1/modules/${this.currentConfig.moduleKey}/metrics/${this.currentConfig.metricKey}/drilldown/execute`,
+          requestBody
+        );
+        result = response;
+      } else {
+        // Fallback to fetch for non-Electron environments
+        const requestBody = {
+          periodStart: this.currentConfig.periodStart,
+          periodEnd: this.currentConfig.periodEnd,
+          organizationId: this.currentConfig.organizationId,
+          page: this.currentPage,
+          pageSize: this.pageSize,
+          sortBy: this.sortBy,
+          sortDirection: this.sortDirection,
+          filters: this.filters,
+          search: this.searchQuery
+        };
+
+        // Add view filter if set (from clicking summary cards)
+        if (this.currentViewFilter) {
+          requestBody.viewFilter = this.currentViewFilter;
+        }
+        if (this.currentViewType) {
+          requestBody.viewType = this.currentViewType;
+        }
+
+        const response = await fetch(
+          `/api/v1/modules/${this.currentConfig.moduleKey}/metrics/${this.currentConfig.metricKey}/drilldown/execute`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${this.getAuthToken()}`
+            },
+            body: JSON.stringify(requestBody)
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch drilldown data: ${response.statusText}`);
+        }
+
+        result = await response.json();
       }
 
-      const result = await response.json();
       this.currentData = result.data;
 
       // Render the data
@@ -449,7 +557,6 @@ class DrilldownRenderer {
     document.getElementById('drilldown-error').classList.add('hidden');
 
     // Render advanced features
-    this.renderHowWeMatch();
     this.renderSortOptions();
     this.renderExportButtons();
 
@@ -477,9 +584,26 @@ class DrilldownRenderer {
   }
 
   /**
-   * Render summary statistics
+   * Render summary statistics (detects structure and delegates)
    */
   renderSummary() {
+    // Check if summary.sections exists (new structure)
+    if (this.currentConfig.summary?.sections) {
+      this.renderSectionedSummary();
+    } else if (this.currentConfig.summary?.fields) {
+      // Render flat layout (backwards compatibility)
+      this.renderFlatSummary();
+    } else {
+      // No summary configured
+      const container = document.getElementById('drilldown-summary-container');
+      container.classList.add('hidden');
+    }
+  }
+
+  /**
+   * Render flat summary (legacy/backwards compatible)
+   */
+  renderFlatSummary() {
     const container = document.getElementById('drilldown-summary-container');
     const summaryEl = document.getElementById('drilldown-summary');
 
@@ -490,20 +614,285 @@ class DrilldownRenderer {
 
     container.classList.remove('hidden');
 
+    // Restore grid classes for flat layout (backwards compatibility)
+    summaryEl.className = 'grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4';
+
     const summaryHTML = this.currentConfig.summary.fields.map(field => {
       const value = this.currentData.summary[field.field];
       const formattedValue = this.formatValue(value, field.format);
       const highlightClass = field.highlight ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200';
+      const clickableClass = field.clickable ? 'cursor-pointer hover:bg-blue-100 hover:border-blue-300' : '';
+      const badgeHTML = field.badge ? this.renderBadge(field.badge) : '';
 
       return `
-        <div class="border ${highlightClass} rounded-lg px-3 py-2">
-          <dt class="text-xs font-medium text-gray-500 truncate">${field.label}</dt>
+        <div class="border ${highlightClass} ${clickableClass} rounded-lg px-3 py-2 relative group"
+             ${field.clickable ? `data-clickable="true" data-filter-field="${field.filterBy?.field}" data-filter-value='${JSON.stringify(field.filterBy?.value)}'` : ''}>
+          <dt class="text-xs font-medium text-gray-500 truncate flex items-center justify-between">
+            <span>${field.label}</span>
+            ${badgeHTML}
+          </dt>
           <dd class="mt-1 text-lg font-semibold text-gray-900">${formattedValue}</dd>
+          ${field.description ? `<p class="text-xs text-gray-500 mt-1">${field.description}</p>` : ''}
+          ${field.helpText ? `
+            <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none w-64 z-10">
+              ${field.helpText}
+              <div class="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
+            </div>
+          ` : ''}
         </div>
       `;
     }).join('');
 
     summaryEl.innerHTML = summaryHTML;
+
+    // Attach click handlers to clickable summary items
+    const clickableItems = summaryEl.querySelectorAll('[data-clickable="true"]');
+    clickableItems.forEach(item => {
+      item.addEventListener('click', () => {
+        const filterField = item.getAttribute('data-filter-field');
+        const filterValue = JSON.parse(item.getAttribute('data-filter-value'));
+        this.applySummaryFilter(filterField, filterValue);
+      });
+    });
+  }
+
+  /**
+   * Render sectioned summary (new structure)
+   */
+  renderSectionedSummary() {
+    const container = document.getElementById('drilldown-summary-container');
+    const summaryEl = document.getElementById('drilldown-summary');
+
+    if (!this.currentData.summary || !this.currentConfig.summary?.sections) {
+      container.classList.add('hidden');
+      return;
+    }
+
+    container.classList.remove('hidden');
+
+    // Remove grid classes from summary element for sectioned layout
+    summaryEl.className = ''; // Clear all classes
+
+    // Render each section
+    const sectionsHTML = this.currentConfig.summary.sections.map(section => {
+      if (section.type === 'hero') {
+        return this.renderHeroSection(section);
+      } else if (section.type === 'metrics_grid') {
+        return this.renderMetricsGridSection(section);
+      }
+      return '';
+    }).join('');
+
+    summaryEl.innerHTML = sectionsHTML;
+
+    // Attach click handlers to clickable summary items
+    const clickableItems = summaryEl.querySelectorAll('[data-clickable="true"]');
+    clickableItems.forEach(item => {
+      item.addEventListener('click', () => {
+        const filterRaw = item.getAttribute('data-table-view-filter');
+        const viewType = item.getAttribute('data-table-view-type');
+
+        if (filterRaw) {
+          try {
+            const filter = JSON.parse(filterRaw);
+            this.currentTableView = { filter, viewType };
+            console.log('[DrilldownRenderer] Summary field clicked - Table view:', this.currentTableView);
+
+            // Apply the table view filter
+            this.applyTableViewFilter(filter, viewType);
+          } catch (e) {
+            console.error('[DrilldownRenderer] Failed to parse table view filter:', e);
+          }
+        }
+      });
+    });
+  }
+
+  /**
+   * Apply table view filter when a summary card is clicked
+   * @param {Object|String} filter - Filter criteria (can be string like "all", "qualified", or object with criteria)
+   * @param {String} viewType - Type of view ("contacts", "opportunities", etc.)
+   */
+  applyTableViewFilter(filter, viewType) {
+    console.log('[DrilldownRenderer] Applying table view filter:', { filter, viewType });
+
+    // Reset to page 1 when applying new filter
+    this.currentPage = 1;
+
+    // Clear existing filters and search
+    this.filters = {};
+    this.searchQuery = '';
+
+    // Update UI to reflect cleared filters
+    const searchInput = document.getElementById('drilldown-search');
+    if (searchInput) searchInput.value = '';
+
+    // Store the filter type for the API request
+    this.currentViewFilter = filter;
+    this.currentViewType = viewType;
+
+    // Re-fetch data with the new filter
+    this.fetchData();
+  }
+
+  /**
+   * Render hero section (large highlighted metric)
+   */
+  renderHeroSection(section) {
+    if (!section.fields || section.fields.length === 0) return '';
+
+    const field = section.fields[0]; // Hero sections typically have one field
+    const value = this.currentData.summary[field.field];
+    const formattedValue = this.formatValue(value, field.format);
+
+    // Support dynamic description templates
+    let description = field.description;
+    if (field.descriptionTemplate) {
+      description = this.substituteTemplate(field.descriptionTemplate, this.currentData.summary);
+    }
+
+    // Check if hero card is clickable
+    const clickable = field.clickable && field.tableView;
+    const clickableClass = clickable ? 'cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200' : '';
+
+    const dataAttrs = clickable
+      ? `data-clickable="true" data-table-view-filter='${JSON.stringify(field.tableView?.filter || 'all')}' data-table-view-type="${field.tableView?.viewType || 'all'}"`
+      : '';
+
+    // Icon mapping
+    const iconMap = {
+      'percentage': `<svg class="h-8 w-8 text-indigo-400 absolute top-6 right-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      </svg>`,
+      'default': ''
+    };
+
+    const icon = iconMap[field.icon] || iconMap.default;
+
+    return `
+      <div class="mb-6 p-6 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-200 relative ${clickableClass}" ${dataAttrs}>
+        <p class="text-sm text-gray-600 mb-1">${this.escapeHtml(field.label)}</p>
+        <p class="text-4xl font-bold text-indigo-600">${formattedValue}</p>
+        ${description ? `<p class="text-xs text-gray-500 mt-1">${this.escapeHtml(description)}${clickable ? ' · <span class="text-indigo-600 font-medium">Click to view all leads</span>' : ''}</p>` : ''}
+        ${icon}
+      </div>
+    `;
+  }
+
+  /**
+   * Render metrics grid section (grid of metric cards)
+   */
+  renderMetricsGridSection(section) {
+    if (!section.fields || section.fields.length === 0) return '';
+
+    const fieldsHTML = section.fields.map(field => {
+      const value = this.currentData.summary[field.field];
+      const formattedValue = this.formatValue(value, field.format);
+
+      // Extract color from emoji/badge
+      const color = this.extractColorFromField(field, value);
+
+      const clickable = field.tableView ? true : false;
+      const clickableClass = clickable ? 'cursor-pointer hover:shadow-md hover:scale-105 transition-transform' : '';
+
+      const dataAttrs = clickable
+        ? `data-clickable="true" data-table-view-filter='${JSON.stringify(field.tableView?.filter || {})}' data-table-view-type="${field.tableView?.viewType || 'all'}"`
+        : '';
+
+      return `
+        <div class="bg-${color}-50 border border-${color}-200 rounded-lg px-3 py-2 ${clickableClass}" ${dataAttrs}>
+          <p class="text-sm font-medium text-${color}-900">${this.escapeHtml(field.label)}</p>
+          <p class="text-3xl font-bold text-${color}-700 mt-1">${formattedValue}</p>
+          ${field.description ? `<p class="text-xs text-${color}-600 mt-1">${this.escapeHtml(field.description)}${clickable ? ' · Click to view' : ''}</p>` : ''}
+        </div>
+      `;
+    }).join('');
+
+    // Support configurable columns (default: 2)
+    const columns = section.columns || 2;
+    const gridColsClass = `grid-cols-${columns}`;
+
+    return `
+      <div class="mb-6">
+        ${section.title ? `<h4 class="font-semibold text-gray-900 mb-4">${this.escapeHtml(section.title)}</h4>` : ''}
+        ${section.description ? `<p class="text-sm text-gray-600 mb-4">${this.escapeHtml(section.description)}</p>` : ''}
+
+        <div class="grid ${gridColsClass} gap-4">
+          ${fieldsHTML}
+        </div>
+
+        ${section.footer ? `<div class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">${this.escapeHtml(section.footer)}</div>` : ''}
+      </div>
+    `;
+  }
+
+  /**
+   * Extract color from field based on emoji/badge/value
+   */
+  extractColorFromField(field, value) {
+    // Check for explicit badge emoji
+    const label = field.label || '';
+    const description = field.description || '';
+
+    // Color mapping based on emoji/semantic meaning
+    if (label.includes('✅') || description.includes('✅')) return 'green';
+    if (label.includes('⚠️') || description.includes('⚠️')) return 'yellow';
+    if (label.includes('ℹ️') || description.includes('ℹ️')) return 'blue';
+    if (label.includes('📋') || description.includes('📋')) return 'purple';
+    if (label.includes('🔴') || description.includes('🔴')) return 'red';
+    if (label.includes('🔄') || description.includes('🔄')) return 'orange';
+
+    // Check for orphaned opportunities (red if > 0)
+    if (field.field === 'orphaned_opportunities' && value > 0) return 'red';
+    if (field.field === 'orphaned_opportunities') return 'yellow';
+
+    // Semantic field mapping
+    if (field.field.includes('without') || field.field.includes('missing')) return 'yellow';
+    if (field.field.includes('with') || field.field.includes('success')) return 'green';
+    if (field.field.includes('total') || field.field.includes('count')) return 'blue';
+    if (field.field.includes('avg') || field.field.includes('average')) return 'orange';
+
+    // Default
+    return 'gray';
+  }
+
+  /**
+   * Render badge for summary field
+   */
+  renderBadge(badgeType) {
+    const badges = {
+      warning: '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">⚠️</span>',
+      info: '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">ℹ️</span>',
+      success: '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">✓</span>',
+      error: '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">✕</span>'
+    };
+    return badges[badgeType] || '';
+  }
+
+  /**
+   * Apply filter from summary item click
+   */
+  applySummaryFilter(filterField, filterValue) {
+    // Set the filter
+    this.filters[filterField] = filterValue;
+
+    // Update the filter UI if exists
+    const filterSelect = document.querySelector(`select[name="${filterField}"], input[name="${filterField}"]`);
+    if (filterSelect) {
+      if (filterSelect.tagName === 'SELECT' && filterSelect.multiple) {
+        // Multi-select
+        Array.from(filterSelect.options).forEach(option => {
+          option.selected = filterValue.includes(option.value);
+        });
+      } else if (filterSelect.tagName === 'SELECT') {
+        filterSelect.value = filterValue[0] || filterValue;
+      }
+    }
+
+    // Reset to page 1 and re-render
+    this.currentPage = 1;
+    this.renderTable();
+    this.renderPagination();
   }
 
   /**
@@ -675,6 +1064,7 @@ class DrilldownRenderer {
         return `${parseFloat(value).toLocaleString('en-US', { minimumFractionDigits: numDecimals, maximumFractionDigits: numDecimals })}${suffix}`;
 
       case 'percent':
+      case 'percentage':
         return `${parseFloat(value).toFixed(format.decimals || 1)}%`;
 
       case 'date':
@@ -692,6 +1082,10 @@ class DrilldownRenderer {
    * Escape HTML to prevent XSS
    */
   escapeHtml(text) {
+    // Handle non-string values
+    if (text === null || text === undefined) return '';
+    if (typeof text !== 'string') text = String(text);
+
     const map = {
       '&': '&amp;',
       '<': '&lt;',
@@ -700,6 +1094,65 @@ class DrilldownRenderer {
       "'": '&#039;'
     };
     return text.replace(/[&<>"']/g, m => map[m]);
+  }
+
+  /**
+   * Format entity names as tag-style badges
+   * Looks for capitalized entity names (Contact, Opportunity, Contact ID, etc.) and wraps them in badge styles
+   */
+  formatEntityNames(text) {
+    // Entity names to format as tags
+    const entities = [
+      'Contact ID',
+      'Contact',
+      'Opportunity',
+      'Opportunities',
+      'Lead',
+      'Leads',
+      'Case',
+      'Cases',
+      'Matter',
+      'Matters'
+    ];
+
+    // Sort by length (longest first) to avoid partial replacements
+    entities.sort((a, b) => b.length - a.length);
+
+    let formattedText = text;
+    entities.forEach(entity => {
+      // Use word boundaries to match whole words only
+      const regex = new RegExp(`\\b(${entity})\\b`, 'g');
+      formattedText = formattedText.replace(
+        regex,
+        '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 mx-0.5">$1</span>'
+      );
+    });
+
+    return formattedText;
+  }
+
+  /**
+   * Substitute template variables with values from data object
+   * Example: "{{contacts_with_opportunities}} of {{total_contacts}} contacts" → "7 of 32 contacts"
+   */
+  substituteTemplate(template, data) {
+    if (!template) return '';
+
+    let result = template;
+    // Match {{variable_name}} patterns
+    const matches = template.match(/\{\{([^}]+)\}\}/g);
+
+    if (matches) {
+      matches.forEach(match => {
+        const fieldName = match.replace(/\{\{|\}\}/g, '').trim();
+        const value = data[fieldName];
+        // Format numbers nicely
+        const formattedValue = typeof value === 'number' ? Math.round(value) : (value || '');
+        result = result.replace(match, formattedValue);
+      });
+    }
+
+    return result;
   }
 
   /**
@@ -820,34 +1273,12 @@ class DrilldownRenderer {
   }
 
   /**
-   * Render export buttons
+   * Render export buttons (deprecated - export buttons removed from UI)
    */
   renderExportButtons() {
-    const container = document.getElementById('drilldown-export-container');
-    const exportConfig = this.currentConfig.export;
-
-    if (!exportConfig || !exportConfig.enabled) {
-      container.classList.add('hidden');
-      return;
-    }
-
-    container.classList.remove('hidden');
-
-    // Show/hide individual export buttons based on formats
-    const csvBtn = document.getElementById('drilldown-export-csv');
-    const excelBtn = document.getElementById('drilldown-export-excel');
-
-    if (exportConfig.formats && exportConfig.formats.includes('csv')) {
-      csvBtn.classList.remove('hidden');
-    } else {
-      csvBtn.classList.add('hidden');
-    }
-
-    if (exportConfig.formats && exportConfig.formats.includes('excel')) {
-      excelBtn.classList.remove('hidden');
-    } else {
-      excelBtn.classList.add('hidden');
-    }
+    // Export buttons have been removed from the UI
+    // This method is kept for backwards compatibility but does nothing
+    return;
   }
 
   /**
@@ -900,6 +1331,7 @@ class DrilldownRenderer {
    */
   showHelp() {
     const helpModal = document.getElementById('drilldown-help-modal');
+    const helpModalTitle = document.getElementById('help-modal-title');
     const helpContent = document.getElementById('drilldown-help-content');
     const helpText = this.currentConfig?.helpText;
 
@@ -910,12 +1342,12 @@ class DrilldownRenderer {
 
     helpModal.classList.remove('hidden');
 
+    // Set modal title to drilldown title (from helpText.title or current config title)
+    const modalTitle = helpText?.title || this.currentConfig?.title || 'Help & Documentation';
+    helpModalTitle.textContent = modalTitle;
+
     // Render help content
     let html = '';
-
-    if (helpText.title) {
-      html += `<h2 class="text-xl font-bold text-gray-900 mb-4">${this.escapeHtml(helpText.title)}</h2>`;
-    }
 
     if (helpText.sections && helpText.sections.length > 0) {
       helpText.sections.forEach(section => {
@@ -924,12 +1356,12 @@ class DrilldownRenderer {
           html += `<h3 class="text-lg font-semibold text-gray-900 mb-2">${this.escapeHtml(section.heading)}</h3>`;
         }
         if (section.content) {
-          html += `<p class="text-sm text-gray-700 mb-2">${this.escapeHtml(section.content)}</p>`;
+          html += `<p class="text-sm text-gray-700 mb-2">${this.formatEntityNames(this.escapeHtml(section.content))}</p>`;
         }
         if (section.bullets && section.bullets.length > 0) {
           html += '<ul class="list-disc list-inside text-sm text-gray-700 space-y-1 ml-4">';
           section.bullets.forEach(bullet => {
-            html += `<li>${this.escapeHtml(bullet)}</li>`;
+            html += `<li>${this.formatEntityNames(this.escapeHtml(bullet))}</li>`;
           });
           html += '</ul>';
         }
@@ -956,8 +1388,26 @@ class DrilldownRenderer {
       return this.formatValue(value, column.format);
     }
 
+    // For numeric values (like quality scores), map to the appropriate legend range
+    let displayValue = value;
+    let legendKey = value;
+
+    if (typeof value === 'number') {
+      // Map numeric quality scores to legend ranges
+      if (value >= 80) {
+        legendKey = '80-100';
+      } else if (value >= 60) {
+        legendKey = '60-79';
+      } else if (value >= 40) {
+        legendKey = '40-59';
+      } else {
+        legendKey = '0-39';
+      }
+      displayValue = value; // Show the actual score
+    }
+
     // Get legend text for this value
-    const legendText = column.legend[value];
+    const legendText = column.legend[legendKey];
     const colorMap = {
       'Showed': 'bg-green-100 text-green-800',
       'No-Show': 'bg-red-100 text-red-800',
@@ -970,13 +1420,18 @@ class DrilldownRenderer {
       'Lost/Abandoned': 'bg-red-100 text-red-800',
       'Contact + Opportunity': 'bg-green-100 text-green-800',
       'Contact Only': 'bg-gray-100 text-gray-800',
-      'Opportunity Only': 'bg-blue-100 text-blue-800'
+      'Opportunity Only': 'bg-blue-100 text-blue-800',
+      // Quality score ranges
+      '80-100': 'bg-green-100 text-green-800',
+      '60-79': 'bg-yellow-100 text-yellow-800',
+      '40-59': 'bg-orange-100 text-orange-800',
+      '0-39': 'bg-blue-100 text-blue-800'
     };
 
-    const colorClass = colorMap[value] || 'bg-gray-100 text-gray-800';
+    const colorClass = colorMap[legendKey] || 'bg-gray-100 text-gray-800';
     const title = legendText ? this.escapeHtml(legendText) : '';
 
-    return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colorClass}" title="${title}">${this.escapeHtml(value)}</span>`;
+    return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colorClass}" title="${title}">${this.escapeHtml(displayValue)}</span>`;
   }
 }
 
