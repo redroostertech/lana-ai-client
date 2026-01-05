@@ -1411,7 +1411,12 @@ class DrilldownRenderer {
     // If we have legend text, show that instead of the raw value
     // Keep the raw value as a tooltip for context
     if (legendText) {
-      displayValue = legendText;
+      // If showValueWithLegend is true, display both the number and the legend text
+      if (column.showValueWithLegend && typeof value === 'number') {
+        displayValue = `${value} - ${legendText}`;
+      } else {
+        displayValue = legendText;
+      }
     }
 
     // Color mapping based on score value and type
