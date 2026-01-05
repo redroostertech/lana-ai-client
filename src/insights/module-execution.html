@@ -14,7 +14,7 @@
   <script src="../js/components.js"></script>
   <script src="../js/menu.js"></script>
   <script src="../js/notifications.js"></script>
-  <script src="../js/drilldown-renderer.js"></script>
+  <script src="../js/drilldown-renderer.js?v=1736099999&bust=1"></script>
 </head>
 <body class="bg-gray-50 min-h-screen">
   <!-- Sidebar -->
@@ -1265,45 +1265,21 @@
       document.getElementById('moduleInfoModal').classList.add('hidden');
     }
 
-    // Generic drilldown handler (uses module definition config)
+    // Generic drilldown handler (uses DrilldownRenderer class)
     async function tryGenericDrilldown(content, moduleKey, metricKey, periodStart, periodEnd) {
       try {
-        // Check if generic drilldown endpoint exists for this metric
-        const drilldownConfigResponse = await api.get(
-          `/api/v1/modules/${moduleKey}/metrics/${metricKey}/drilldown`
-        );
-
-        if (!drilldownConfigResponse?.drilldown?.enabled) {
-          console.log(`[Drilldown] Not enabled for ${metricKey}`);
-          return false;
-        }
-
-        const drilldownConfig = drilldownConfigResponse.drilldown;
-        console.log(`[Drilldown] Config loaded for ${metricKey}:`, drilldownConfig);
-
-        // Fetch drilldown data from the execute endpoint
-        const drilldownDataResponse = await api.post(
-          `/api/v1/modules/${moduleKey}/metrics/${metricKey}/drilldown/execute`,
-          {
+        // Use the DrilldownRenderer class instead of custom rendering
+        if (window.drilldownRenderer) {
+          await window.drilldownRenderer.open(moduleKey, metricKey, {
             periodStart,
             periodEnd,
-            page: 1,
-            pageSize: 100,
-          }
-        );
-
-        if (!drilldownDataResponse?.data) {
-          console.error('[Drilldown] No data returned from execute endpoint');
-          return false;
+            organizationId: api.user.organization_id
+          });
+          return true;
         }
 
-        const { rows, pagination, summary } = drilldownDataResponse.data;
-        console.log(`[Drilldown] Data loaded: ${rows.length} rows`);
-
-        // Render the generic drilldown table
-        renderGenericDrilldown(content, drilldownConfig, rows, pagination, summary);
-
-        return true; // Successfully rendered
+        console.error('[Drilldown] DrilldownRenderer not available');
+        return false;
       } catch (error) {
         // If drilldown not found (404), return false to fall back to legacy
         if (error.response?.status === 404 || error.status === 404) {
@@ -1423,10 +1399,6 @@
       const title = document.getElementById('drilldownTitle');
       const content = document.getElementById('drilldownContent');
 
-      title.textContent = `${metricName} - Details`;
-      content.innerHTML = '<div class="text-center py-8"><div class="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto"></div><p class="text-gray-600 mt-4">Loading data...</p></div>';
-      modal.classList.remove('hidden');
-
       try {
         const periodStart = document.getElementById('periodStart').value + 'T00:00:00Z';
         const periodEnd = document.getElementById('periodEnd').value + 'T23:59:59Z';
@@ -1437,16 +1409,19 @@
 
         if (hasGenericDrilldown) {
           console.log(`[Drilldown] Using generic drilldown for ${metricKey}`);
+          // Generic drilldown opens its own modal, so don't open the outer modal
           return; // Successfully rendered generic drilldown
         }
+
+        // If generic drilldown not available, open the legacy modal
+        title.textContent = `${metricName} - Details`;
+        content.innerHTML = '<div class="text-center py-8"><div class="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto"></div><p class="text-gray-600 mt-4">Loading data...</p></div>';
+        modal.classList.remove('hidden');
 
         console.log(`[Drilldown] Falling back to legacy drilldown for ${metricKey}`);
 
         // Fall back to legacy hardcoded drill-down logic
         switch(metricKey) {
-          case 'qualified_leads':
-            await showQualifiedLeadsDrilldown(content, periodStart, periodEnd);
-            break;
           case 'lead_to_consultation_booking_rate':
             await showConsultationBookingDrilldown(content, periodStart, periodEnd);
             break;
@@ -1479,16 +1454,28 @@
 
     // Drill-down: Qualified Leads (with Contact → Opportunity relationship)
     async function showQualifiedLeadsDrilldown(content, periodStart, periodEnd) {
-      // Fetch both contacts and opportunities to calculate relationship
-      const [contactsResponse, opportunitiesResponse] = await Promise.all([
+      // NEW APPROACH: Fetch data from JSON-configured drill-down API
+      const [drilldownDataResponse, contactsResponse, opportunitiesResponse] = await Promise.all([
+        api.post(`/api/v1/modules/growth-intake-performance/metrics/qualified_leads/drilldown/execute`, {
+          periodStart,
+          periodEnd,
+          organizationId: api.user.organization_id,
+          page: 1,
+          pageSize: 1000 // Get all for client-side filtering
+        }),
         api.get(`/api/v1/integrations/connector-data?entity_type=contact&start_date=${periodStart}&end_date=${periodEnd}`),
         api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}`)
       ]);
 
+      // Extract summary data from API response
+      const summary = drilldownDataResponse?.data?.summary || {};
+      const drilldownRows = drilldownDataResponse?.data?.rows || [];
+
+      // Also fetch raw contacts and opportunities for table views
       const contacts = contactsResponse?.data || [];
       const opportunities = opportunitiesResponse?.data || [];
 
-      // Build contact ID sets for relationship mapping
+      // Build contact ID sets for relationship mapping (still needed for table filtering)
       const contactIdsFromOpportunities = new Set(
         opportunities
           .filter(opp => opp.data?.contactId)
@@ -1497,25 +1484,19 @@
 
       const allContactIds = new Set(contacts.map(c => c.data?.id).filter(Boolean));
 
-      // Calculate breakdown
-      const contactsWithOpportunities = Array.from(contactIdsFromOpportunities).filter(id => allContactIds.has(id)).length;
-      const contactsWithoutOpportunities = contacts.filter(c => !contactIdsFromOpportunities.has(c.data?.id)).length;
-      const opportunitiesWithoutContacts = opportunities.filter(opp => !opp.data?.contactId || opp.data.contactId === '').length;
-      const totalContacts = contacts.length;
-      const totalOpportunities = opportunities.length;
-      const conversionRate = totalContacts > 0 ? ((contactsWithOpportunities / totalContacts) * 100).toFixed(1) : 0;
+      // Use values from API summary response (JSON config query)
+      const contactsWithOpportunities = summary.contacts_with_opportunities || 0;
+      const contactsWithoutOpportunities = summary.contacts_without_opportunities || 0;
+      const opportunitiesWithoutContacts = summary.orphaned_opportunities || 0;
+      const totalContacts = summary.total_contacts || 0;
+      const totalOpportunities = summary.total_opportunities || 0;
+      const conversionRate = summary.conversion_rate || 0;
+      const uniqueContactIdsInOpportunities = summary.unique_contact_ids_in_opportunities || 0;
+      const contactsOnlyInOpportunities = opportunitiesWithoutContacts;
 
-      // Calculate unique contact IDs referenced in opportunities (including those not in contact records)
-      const uniqueContactIdsInOpportunities = contactIdsFromOpportunities.size;
-      const contactsOnlyInOpportunities = uniqueContactIdsInOpportunities - contactsWithOpportunities;
-
-      // Total Qualified Leads = ALL DISTINCT contact IDs (from contacts.id AND opportunities.contactId)
-      // This matches the backend metric query: COUNT(DISTINCT COALESCE(data->>'contact_id', data->>'id'))
-      const allUniqueContactIds = new Set([
-        ...allContactIds, // All contact IDs from contact records
-        ...contactIdsFromOpportunities // All contact IDs referenced in opportunities
-      ]);
-      const totalQualifiedLeads = allUniqueContactIds.size;
+      // Use total qualified leads from API summary
+      const totalQualifiedLeads = summary.total_qualified_leads || 0;
+      const avgOpportunitiesPerContact = summary.avg_opportunities_per_contact || 0;
       const gapExplanation = totalQualifiedLeads !== totalContacts ? `(${totalQualifiedLeads} qualified leads vs ${totalContacts} total contacts)` : '';
 
       // Store data in window scope for onclick handlers
@@ -2474,7 +2455,7 @@
               <div class="flex items-center justify-between mb-2">
                 <p class="text-sm font-medium text-gray-900">🔄 Opportunities/Contact</p>
               </div>
-              <p class="text-3xl font-bold text-orange-700">${(totalOpportunities / Math.max(uniqueContactIdsInOpportunities, 1)).toFixed(1)}</p>
+              <p class="text-3xl font-bold text-orange-700">${avgOpportunitiesPerContact.toFixed(1)}</p>
               <p class="text-xs text-gray-500 mt-1">Average opportunities per unique contact · Click to view</p>
             </div>
           </div>
