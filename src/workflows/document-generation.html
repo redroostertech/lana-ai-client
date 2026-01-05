@@ -3080,10 +3080,15 @@
               console.log('[DocumentGeneration] result.content length:', result.content.length);
               console.log('[DocumentGeneration] result.content preview (first 100 chars):', result.content.substring(0, 100));
             }
-            if (result.document && result.document.content) {
-              console.log('[DocumentGeneration] result.document.content type:', typeof result.document.content);
-              console.log('[DocumentGeneration] result.document.content length:', result.document.content.length);
-              console.log('[DocumentGeneration] result.document.content preview (first 100 chars):', result.document.content.substring(0, 100));
+            if (result.document) {
+              console.log('[DocumentGeneration] result.document keys:', Object.keys(result.document));
+              console.log('[DocumentGeneration] result.document:', result.document);
+
+              if (result.document.content) {
+                console.log('[DocumentGeneration] result.document.content type:', typeof result.document.content);
+                console.log('[DocumentGeneration] result.document.content length:', result.document.content.length);
+                console.log('[DocumentGeneration] result.document.content preview (first 200 chars):', result.document.content.substring(0, 200));
+              }
             }
 
             // Handle different response formats
@@ -3092,9 +3097,16 @@
               window.open(result.document.url, '_blank');
               Toast.success(`Document downloaded as ${format.toUpperCase()}`);
             } else if (result.document && result.document.content) {
-              // Format 2: { document: { content: "..." } } - likely base64
+              // Format 2: { document: { content: "..." } }
               const content = result.document.content;
               console.log('[DocumentGeneration] Content type:', typeof content, 'Length:', content.length);
+
+              // Check if content looks like HTML (backend might be returning HTML instead of PDF/DOCX)
+              if (content.trim().startsWith('<')) {
+                console.error('[DocumentGeneration] Backend returned HTML content instead of binary document');
+                Toast.error(`Backend returned HTML instead of ${format.toUpperCase()} file. Check server configuration.`);
+                throw new Error('Backend is not configured to generate binary documents');
+              }
 
               // Try to decode base64 if it looks like base64
               let binaryData;
@@ -3103,8 +3115,10 @@
                 const base64Data = content.replace(/^data:[^;]+;base64,/, '');
                 binaryData = atob(base64Data);
               } catch (e) {
-                console.warn('[DocumentGeneration] Not base64, using raw content:', e);
-                binaryData = content;
+                console.error('[DocumentGeneration] Failed to decode base64:', e);
+                console.error('[DocumentGeneration] Content preview:', content.substring(0, 200));
+                Toast.error('Failed to decode document content. Backend may not be configured correctly.');
+                throw e;
               }
 
               // Convert to Uint8Array for proper binary handling
