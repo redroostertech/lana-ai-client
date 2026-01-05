@@ -12,32 +12,464 @@
   <script src="../js/components.js"></script>
   <script src="../js/menu.js"></script>
   <script src="../js/workflows.js"></script>
-  <!-- Quill Editor -->
-  <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
-  <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+  <!-- Tiptap Editor Bundle -->
+  <script src="../js/tiptap-bundle-built.js"></script>
   <style>
-    .ql-editor {
-      min-height: 300px;
-      font-family: 'Times New Roman', serif;
+    /* Tiptap Notion-style editor styling */
+    .notion-editor {
+      border: none !important;
+    }
+
+    .notion-editor {
+      min-height: 500px;
+    }
+
+    .notion-editor .ProseMirror {
+      outline: none;
+      padding: 0;
+      min-height: 500px;
+      font-size: 16px;
+      line-height: 1.75;
+      color: #37352f;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, 'Apple Color Emoji', Arial, sans-serif;
+    }
+
+    /* Make sure empty paragraphs have height */
+    .notion-editor .ProseMirror p {
+      min-height: 1em;
+    }
+
+    .notion-editor .ProseMirror:focus {
+      outline: none;
+    }
+
+    /* Tiptap Placeholder - Using Tiptap's built-in placeholder extension */
+    /* Tiptap adds .is-empty class to empty paragraph nodes */
+    /* We show placeholder on first empty paragraph when it's the only content */
+
+    /* Show placeholder on the first and only empty paragraph */
+    .notion-editor .ProseMirror > p.is-empty:first-child:last-child::before {
+      content: "Type '/' for commands, or just start writing..." !important;
+      color: #9ca3af !important;
+      pointer-events: none !important;
+      float: left !important;
+      height: 0 !important;
+      /* Override + button styles completely */
+      position: static !important;
+      width: auto !important;
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      display: inline !important;
+      left: auto !important;
+      top: auto !important;
+      cursor: text !important;
+      font-size: inherit !important;
+      font-weight: normal !important;
+      line-height: inherit !important;
+      opacity: 1 !important;
+    }
+
+    /* Hide drag handle on placeholder paragraph */
+    .notion-editor .ProseMirror > p.is-empty:first-child:last-child::after {
+      display: none !important;
+    }
+
+    /* Notion-style headings */
+    .notion-editor .ProseMirror h1 {
+      font-size: 2.5em;
+      font-weight: 700;
+      margin: 0.67em 0;
+      line-height: 1.2;
+    }
+
+    .notion-editor .ProseMirror h2 {
+      font-size: 1.875em;
+      font-weight: 600;
+      margin: 0.83em 0;
+      line-height: 1.3;
+    }
+
+    .notion-editor .ProseMirror h3 {
+      font-size: 1.5em;
+      font-weight: 600;
+      margin: 1em 0;
+      line-height: 1.4;
+    }
+
+    /* Notion-style paragraphs */
+    .notion-editor .ProseMirror p {
+      margin: 0.5em 0;
+    }
+
+    /* Notion-style lists */
+    .notion-editor .ProseMirror ul,
+    .notion-editor .ProseMirror ol {
+      padding-left: 1.5em;
+      margin: 0.5em 0;
+    }
+
+    .notion-editor .ProseMirror li {
+      margin: 0.25em 0;
+      padding-left: 0.3em;
+    }
+
+    /* Block controls - Drag handle and Plus button */
+    .notion-editor .ProseMirror > * {
+      position: relative;
+    }
+
+    /* Drag handle (⋮⋮) - default hidden state */
+    .notion-editor .ProseMirror > p::after,
+    .notion-editor .ProseMirror > h1::after,
+    .notion-editor .ProseMirror > h2::after,
+    .notion-editor .ProseMirror > h3::after {
+      content: '⋮⋮';
+      position: absolute;
+      left: -60px;
+      top: 2px;
+      width: 18px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border-radius: 3px;
+      cursor: grab;
+      color: #d1d5db;
+      font-size: 12px;
+      line-height: 1;
+      letter-spacing: -2px;
+      opacity: 0;
+      transition: opacity 0.15s ease, background 0.15s ease;
+    }
+
+    /* Plus button (+) - default hidden state */
+    .notion-editor .ProseMirror > p::before,
+    .notion-editor .ProseMirror > h1::before,
+    .notion-editor .ProseMirror > h2::before,
+    .notion-editor .ProseMirror > h3::before {
+      content: '+';
+      position: absolute;
+      left: -36px;
+      top: 2px;
+      width: 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 4px;
+      cursor: pointer;
+      color: #9ca3af;
+      font-size: 16px;
+      font-weight: 500;
+      line-height: 1;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      opacity: 0;
+      transition: opacity 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    }
+
+    /* CRITICAL: Show buttons when hovering - must come AFTER default state */
+    /* Hover over the paragraph/heading shows both buttons */
+    .notion-editor .ProseMirror > p:hover::before,
+    .notion-editor .ProseMirror > p:hover::after,
+    .notion-editor .ProseMirror > h1:hover::before,
+    .notion-editor .ProseMirror > h1:hover::after,
+    .notion-editor .ProseMirror > h2:hover::before,
+    .notion-editor .ProseMirror > h2:hover::after,
+    .notion-editor .ProseMirror > h3:hover::before,
+    .notion-editor .ProseMirror > h3:hover::after {
+      opacity: 1;
+    }
+
+    /* Keep buttons visible when hovering directly over them */
+    .notion-editor .ProseMirror > p::before:hover,
+    .notion-editor .ProseMirror > p::after:hover,
+    .notion-editor .ProseMirror > h1::before:hover,
+    .notion-editor .ProseMirror > h1::after:hover,
+    .notion-editor .ProseMirror > h2::before:hover,
+    .notion-editor .ProseMirror > h2::after:hover,
+    .notion-editor .ProseMirror > h3::before:hover,
+    .notion-editor .ProseMirror > h3::after:hover {
+      opacity: 1;
+    }
+
+    /* Visual feedback when hovering over drag handle */
+    .notion-editor .ProseMirror > p::after:hover,
+    .notion-editor .ProseMirror > h1::after:hover,
+    .notion-editor .ProseMirror > h2::after:hover,
+    .notion-editor .ProseMirror > h3::after:hover {
+      background: #f3f4f6;
+      color: #9ca3af;
+    }
+
+    /* Visual feedback when hovering over plus button */
+    .notion-editor .ProseMirror > p::before:hover,
+    .notion-editor .ProseMirror > h1::before:hover,
+    .notion-editor .ProseMirror > h2::before:hover,
+    .notion-editor .ProseMirror > h3::before:hover {
+      background: #f9fafb;
+      border-color: #d1d5db;
+    }
+
+    /* Merge field styling - Notion-style badges */
+    .merge-field {
+      display: inline-block;
+      background: #f1f3f9;
+      color: #4f46e5;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+      font-size: 0.875em;
+      font-weight: 500;
+      border: 1px solid #e0e7ff;
+      margin: 0 2px;
+      cursor: default;
+    }
+
+    /* Notion-style title input */
+    #notionTitle:focus {
+      outline: none;
+    }
+
+    #notionTitle::placeholder {
+      color: #d1d5db;
+    }
+
+    /* Smooth scrolling */
+    .overflow-y-auto {
+      scroll-behavior: smooth;
+    }
+
+    /* Hide Quill default tooltip */
+    .ql-tooltip {
+      left: 0 !important;
+      top: 0 !important;
+    }
+
+    /* AI Chat Panel */
+    #aiChatPanel {
+      position: fixed;
+      right: 0;
+      top: 48px;
+      bottom: 0;
+      width: 400px;
+      background: white;
+      border-left: 1px solid #e5e7eb;
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #aiChatPanel.open {
+      transform: translateX(0);
+    }
+
+    .chat-message {
+      padding: 12px 16px;
+      margin-bottom: 8px;
+      border-radius: 8px;
+      max-width: 85%;
+    }
+
+    .chat-message.user {
+      background: #4f46e5;
+      color: white;
+      margin-left: auto;
+    }
+
+    .chat-message.assistant {
+      background: #f3f4f6;
+      color: #1f2937;
+      margin-right: auto;
+    }
+
+    /* Floating AI button animation */
+    #toggleAIChatBtn {
+      box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.4);
+    }
+
+    /* Palette slide animation */
+    #mergeFieldsPalette.open {
+      transform: translateX(0) !important;
+    }
+
+    /* Block actions (+ button) - Notion style */
+    .block-actions {
+      position: absolute;
+      left: -40px;
+      width: 32px;
+      height: 32px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+
+    .notion-editor .ql-editor:hover .block-actions,
+    .block-actions.active {
+      display: flex;
+      opacity: 1;
+    }
+
+    .block-action-button {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      cursor: pointer;
+      color: #9ca3af;
+      transition: all 0.15s ease;
+    }
+
+    .block-action-button:hover {
+      background: #f3f4f6;
+      color: #374151;
+    }
+
+    /* Slash command menu */
+    #slashCommandMenu,
+    #blockActionMenu {
+      position: absolute;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+      min-width: 280px;
+      max-height: 400px;
+      overflow-y: auto;
+      z-index: 1000;
+      display: none;
+    }
+
+    #slashCommandMenu.active {
+      display: block;
+    }
+
+    .slash-command-section {
+      padding: 6px 0;
+    }
+
+    .slash-command-section-title {
+      padding: 6px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .slash-command-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: background 0.1s ease;
+    }
+
+    .slash-command-item:hover,
+    .slash-command-item.selected {
+      background: #f3f4f6;
+    }
+
+    .slash-command-icon {
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f9fafb;
+      border-radius: 4px;
+      flex-shrink: 0;
+      font-size: 18px;
+    }
+
+    .slash-command-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .slash-command-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: #1f2937;
+      margin-bottom: 2px;
+    }
+
+    .slash-command-description {
+      font-size: 12px;
+      color: #6b7280;
+      line-height: 1.4;
+    }
+
+    .slash-command-shortcut {
+      font-size: 11px;
+      color: #9ca3af;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+
+
+    /* Code block styling */
+    .notion-editor .ProseMirror pre {
+      background: #f3f4f6;
+      border-radius: 6px;
+      padding: 16px;
+      margin: 0.5em 0;
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
       font-size: 14px;
       line-height: 1.6;
+      overflow-x: auto;
     }
-    .ql-toolbar {
-      border-top-left-radius: 8px;
-      border-top-right-radius: 8px;
-      background: #f9fafb;
-    }
-    .ql-container {
-      border-bottom-left-radius: 8px;
-      border-bottom-right-radius: 8px;
-    }
-    .merge-field {
-      background: #e0e7ff;
-      color: #3730a3;
+
+    .notion-editor .ProseMirror code {
+      background: #f3f4f6;
       padding: 2px 6px;
-      border-radius: 4px;
-      font-family: monospace;
-      font-size: 12px;
+      border-radius: 3px;
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+      font-size: 0.9em;
+    }
+
+    .notion-editor .ProseMirror pre code {
+      background: transparent;
+      padding: 0;
+    }
+
+    /* Blockquote styling */
+    .notion-editor .ProseMirror blockquote {
+      border-left: 3px solid #e5e7eb;
+      padding-left: 16px;
+      margin: 0.5em 0;
+      color: #6b7280;
+      font-style: italic;
+    }
+
+    /* Horizontal rule styling */
+    .notion-editor .ProseMirror hr {
+      border: none;
+      border-top: 1px solid #e5e7eb;
+      margin: 1em 0;
+    }
+
+    /* Link styling */
+    .notion-editor .ProseMirror a {
+      color: #4f46e5;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    .notion-editor .ProseMirror a:hover {
+      color: #4338ca;
     }
   </style>
 </head>
@@ -138,99 +570,229 @@
     </main>
   </div>
 
-  <!-- Template Editor Modal -->
-  <div id="editorModal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
-      <!-- Modal Header -->
-      <div class="p-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
-        <div class="flex items-center gap-4">
-          <h3 class="text-lg font-semibold text-gray-900" id="editorTitle">New Template</h3>
-        </div>
-        <button onclick="closeTemplateEditor()" class="text-gray-400 hover:text-gray-600">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+  <!-- Template Editor Modal - Full Screen Notion-style -->
+  <div id="editorModal" class="fixed inset-0 bg-white hidden z-50 flex flex-col">
+    <!-- Top Bar - Notion-style minimal header -->
+    <div class="flex-shrink-0 h-12 border-b border-gray-200 flex items-center justify-between px-6">
+      <div class="flex items-center gap-4">
+        <!-- Close button -->
+        <button onclick="closeTemplateEditor()" class="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
-      </div>
-
-      <!-- Modal Body -->
-      <div class="flex-1 overflow-y-auto p-6">
-        <div class="grid grid-cols-3 gap-6">
-          <!-- Left: Template Details -->
-          <div class="col-span-1 space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Template Name</label>
-              <input type="text" id="templateName" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="e.g., Engagement Letter">
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-              <textarea id="templateDescription" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Brief description of this template"></textarea>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
-              <select id="templateCategory" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                <option value="Client Intake">Client Intake</option>
-                <option value="Billing">Billing</option>
-                <option value="Case Documents">Case Documents</option>
-                <option value="Correspondence">Correspondence</option>
-              </select>
-            </div>
-
-            <!-- Insert Merge Field -->
-            <div class="pt-4 border-t border-gray-200">
-              <label class="block text-sm font-medium text-gray-700 mb-2">Insert Merge Field</label>
-              <select id="mergeFieldSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-2">
-                <option value="">Select field...</option>
-                <optgroup label="Client">
-                  <option value="{{client.name}}">Client Name</option>
-                  <option value="{{client.email}}">Client Email</option>
-                  <option value="{{client.phone}}">Client Phone</option>
-                  <option value="{{client.address}}">Client Address</option>
-                </optgroup>
-                <optgroup label="Matter">
-                  <option value="{{matter.name}}">Matter Name</option>
-                  <option value="{{matter.type}}">Matter Type</option>
-                  <option value="{{matter.number}}">Matter Number</option>
-                </optgroup>
-                <optgroup label="Dates & Amounts">
-                  <option value="{{date.today}}">Today's Date</option>
-                  <option value="{{fee.amount}}">Fee Amount</option>
-                  <option value="{{fee.retainer}}">Retainer Amount</option>
-                </optgroup>
-                <optgroup label="Firm">
-                  <option value="{{attorney.name}}">Attorney Name</option>
-                  <option value="{{firm.name}}">Firm Name</option>
-                  <option value="{{firm.address}}">Firm Address</option>
-                </optgroup>
-              </select>
-              <button onclick="insertMergeField()" class="w-full px-3 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg">
-                Insert at Cursor
-              </button>
-            </div>
-          </div>
-
-          <!-- Right: Editor -->
-          <div class="col-span-2">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Template Content</label>
-            <div id="editor" class="bg-white"></div>
-          </div>
+        <!-- Template metadata -->
+        <div class="flex items-center gap-3">
+          <input type="text" id="templateName" class="text-sm font-medium text-gray-900 bg-transparent border-none focus:outline-none focus:ring-0 px-2 py-1 hover:bg-gray-100 rounded" placeholder="Untitled Template" style="min-width: 200px;">
+          <select id="templateCategory" class="text-xs text-gray-600 bg-transparent border-none focus:outline-none focus:ring-0 px-2 py-1 hover:bg-gray-100 rounded cursor-pointer">
+            <option value="Client Intake">Client Intake</option>
+            <option value="Billing">Billing</option>
+            <option value="Case Documents">Case Documents</option>
+            <option value="Correspondence">Correspondence</option>
+          </select>
         </div>
       </div>
 
-      <!-- Modal Footer -->
-      <div class="p-4 border-t border-gray-100 flex items-center justify-between flex-shrink-0">
-        <button onclick="previewTemplate()" class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg flex items-center gap-2">
+      <!-- Right side actions -->
+      <div class="flex items-center gap-2">
+        <button onclick="previewTemplate()" class="px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 rounded-md flex items-center gap-1.5 transition-colors">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-          Preview with Sample Data
+          Preview
         </button>
-        <div class="flex gap-3">
-          <button onclick="closeTemplateEditor()" class="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
-            Cancel
-          </button>
-          <button onclick="saveTemplate()" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg">
-            Save Template
+        <button onclick="saveTemplate()" class="px-4 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors">
+          Save
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Editor Area - Notion-style centered column -->
+    <div class="flex-1 overflow-y-auto bg-white">
+      <div class="max-w-4xl mx-auto px-24 py-16">
+        <!-- Notion-style title (editable) -->
+        <div class="mb-8">
+          <input
+            type="text"
+            id="notionTitle"
+            class="w-full text-4xl font-bold text-gray-900 bg-transparent border-none focus:outline-none placeholder-gray-300"
+            placeholder="Untitled"
+            style="padding: 0; margin: 0;"
+          >
+          <textarea
+            id="templateDescription"
+            rows="1"
+            class="w-full mt-4 text-base text-gray-600 bg-transparent border-none focus:outline-none resize-none placeholder-gray-400 overflow-hidden"
+            placeholder="Add a description..."
+            oninput="autoExpandTextarea(this)"
+            style="padding: 0; margin-top: 8px;"
+          ></textarea>
+        </div>
+
+        <!-- Notion-style editor -->
+        <div id="editor" class="notion-editor" style="min-height: 400px; border: 1px dashed #e5e7eb; border-radius: 8px;"></div>
+
+        <!-- Slash Command Menu -->
+        <div id="slashCommandMenu">
+          <div class="slash-command-section">
+            <div class="slash-command-section-title">Basic blocks</div>
+            <div class="slash-command-item" data-command="text">
+              <div class="slash-command-icon">T</div>
+              <div class="slash-command-content">
+                <div class="slash-command-title">Text</div>
+                <div class="slash-command-description">Just start writing with plain text</div>
+              </div>
+            </div>
+            <div class="slash-command-item" data-command="h1">
+              <div class="slash-command-icon">H1</div>
+              <div class="slash-command-content">
+                <div class="slash-command-title">Heading 1</div>
+                <div class="slash-command-description">Big section heading</div>
+              </div>
+              <div class="slash-command-shortcut">#</div>
+            </div>
+            <div class="slash-command-item" data-command="h2">
+              <div class="slash-command-icon">H2</div>
+              <div class="slash-command-content">
+                <div class="slash-command-title">Heading 2</div>
+                <div class="slash-command-description">Medium section heading</div>
+              </div>
+              <div class="slash-command-shortcut">##</div>
+            </div>
+            <div class="slash-command-item" data-command="h3">
+              <div class="slash-command-icon">H3</div>
+              <div class="slash-command-content">
+                <div class="slash-command-title">Heading 3</div>
+                <div class="slash-command-description">Small section heading</div>
+              </div>
+              <div class="slash-command-shortcut">###</div>
+            </div>
+            <div class="slash-command-item" data-command="bullet">
+              <div class="slash-command-icon">•</div>
+              <div class="slash-command-content">
+                <div class="slash-command-title">Bulleted list</div>
+                <div class="slash-command-description">Create a simple bulleted list</div>
+              </div>
+              <div class="slash-command-shortcut">-</div>
+            </div>
+            <div class="slash-command-item" data-command="numbered">
+              <div class="slash-command-icon">1.</div>
+              <div class="slash-command-content">
+                <div class="slash-command-title">Numbered list</div>
+                <div class="slash-command-description">Create a list with numbering</div>
+              </div>
+              <div class="slash-command-shortcut">1.</div>
+            </div>
+            <div class="slash-command-item" data-command="quote">
+              <div class="slash-command-icon">"</div>
+              <div class="slash-command-content">
+                <div class="slash-command-title">Quote</div>
+                <div class="slash-command-description">Capture a quote</div>
+              </div>
+              <div class="slash-command-shortcut">&gt;</div>
+            </div>
+            <div class="slash-command-item" data-command="codeblock">
+              <div class="slash-command-icon">&lt;/&gt;</div>
+              <div class="slash-command-content">
+                <div class="slash-command-title">Code block</div>
+                <div class="slash-command-description">Capture a code snippet</div>
+              </div>
+              <div class="slash-command-shortcut">```</div>
+            </div>
+            <div class="slash-command-item" data-command="divider">
+              <div class="slash-command-icon">—</div>
+              <div class="slash-command-content">
+                <div class="slash-command-title">Divider</div>
+                <div class="slash-command-description">Visually divide blocks</div>
+              </div>
+              <div class="slash-command-shortcut">---</div>
+            </div>
+          </div>
+          <div class="slash-command-section">
+            <div class="slash-command-section-title">Merge Fields</div>
+            <div class="slash-command-item" data-command="merge" data-field="{{client.name}}">
+              <div class="slash-command-icon">{{}}</div>
+              <div class="slash-command-content">
+                <div class="slash-command-title">Client Name</div>
+                <div class="slash-command-description">Insert {{client.name}}</div>
+              </div>
+            </div>
+            <div class="slash-command-item" data-command="merge" data-field="{{matter.name}}">
+              <div class="slash-command-icon">{{}}</div>
+              <div class="slash-command-content">
+                <div class="slash-command-title">Matter Name</div>
+                <div class="slash-command-description">Insert {{matter.name}}</div>
+              </div>
+            </div>
+            <div class="slash-command-item" data-command="merge" data-field="{{date.today}}">
+              <div class="slash-command-icon">{{}}</div>
+              <div class="slash-command-content">
+                <div class="slash-command-title">Today's Date</div>
+                <div class="slash-command-description">Insert {{date.today}}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Chat Assistant Panel -->
+    <div id="aiChatPanel">
+      <div class="flex-shrink-0 p-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-indigo-600 to-purple-600">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center">
+            <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-sm font-semibold text-white">Lana AI Assistant</h3>
+            <p class="text-xs text-indigo-100">Help me edit this document</p>
+          </div>
+        </div>
+        <button onclick="toggleAIChat()" class="text-white hover:bg-white/20 p-1.5 rounded-lg transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+
+      <div id="chatMessages" class="flex-1 overflow-y-auto p-4 space-y-3">
+        <div class="chat-message assistant">
+          <div class="text-sm">👋 Hi! I'm Lana. I can help you edit this document. Try asking me to:</div>
+          <ul class="text-sm mt-2 space-y-1 ml-4 list-disc">
+            <li>Add a section about payment terms</li>
+            <li>Rewrite the introduction to be more formal</li>
+            <li>Insert a confidentiality clause</li>
+            <li>Fix grammar and spelling</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="flex-shrink-0 p-4 border-t border-gray-200 bg-gray-50">
+        <div class="flex gap-2">
+          <input
+            type="text"
+            id="aiChatInput"
+            placeholder="Ask Lana to edit your document..."
+            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            onkeypress="if(event.key === 'Enter') sendAIMessage()"
+          >
+          <button
+            onclick="sendAIMessage()"
+            class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+            </svg>
           </button>
         </div>
       </div>
     </div>
+
+    <!-- Floating AI Chat Button -->
+    <button
+      id="toggleAIChatBtn"
+      onclick="toggleAIChat()"
+      class="fixed bottom-8 right-8 p-4 bg-indigo-600 text-white rounded-full shadow-lg hover:bg-indigo-700 transition-all hover:scale-110 z-20"
+      title="Chat with Lana AI">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
+      </svg>
+    </button>
   </div>
 
   <!-- Preview Modal -->
@@ -314,8 +876,8 @@
     document.getElementById('openSidebar').addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
     document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
 
-    // Quill editor instance
-    let quillEditor = null;
+    // Tiptap editor instance
+    let tiptapEditor = null;
     let editingTemplateId = null;
 
     // Mock data for document templates
@@ -462,73 +1024,478 @@
       if (templateId) {
         const template = documentTemplates.find(t => t.id === templateId);
         if (template) {
-          document.getElementById('editorTitle').textContent = 'Edit Template';
           document.getElementById('templateName').value = template.name;
+          document.getElementById('notionTitle').value = template.name;
           document.getElementById('templateDescription').value = template.description;
           document.getElementById('templateCategory').value = template.category;
 
-          // Initialize Quill and set content
-          initQuillEditor();
-          quillEditor.root.innerHTML = template.content;
+          // Initialize Tiptap and set content
+          initTiptapEditor();
+          tiptapEditor.commands.setContent(template.content);
         }
       } else {
-        document.getElementById('editorTitle').textContent = 'New Template';
         document.getElementById('templateName').value = '';
+        document.getElementById('notionTitle').value = '';
         document.getElementById('templateDescription').value = '';
         document.getElementById('templateCategory').value = 'Client Intake';
 
-        initQuillEditor();
-        quillEditor.root.innerHTML = '<p>Start writing your document template here...</p>';
+        initTiptapEditor();
+        tiptapEditor.commands.setContent('<p></p>');
       }
 
       document.getElementById('editorModal').classList.remove('hidden');
     }
 
-    function initQuillEditor() {
-      // Properly destroy existing Quill instance
+    // Toggle AI chat panel
+    function toggleAIChat() {
+      const panel = document.getElementById('aiChatPanel');
+      panel.classList.toggle('open');
+    }
+
+    // Send message to AI
+    function sendAIMessage() {
+      const input = document.getElementById('aiChatInput');
+      const message = input.value.trim();
+
+      if (!message) return;
+
+      // Add user message to chat
+      const chatMessages = document.getElementById('chatMessages');
+      const userMsg = document.createElement('div');
+      userMsg.className = 'chat-message user';
+      userMsg.innerHTML = `<div class="text-sm">${message}</div>`;
+      chatMessages.appendChild(userMsg);
+
+      // Clear input
+      input.value = '';
+
+      // Scroll to bottom
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+
+      // Simulate AI response (replace with actual API call)
+      setTimeout(() => {
+        const assistantMsg = document.createElement('div');
+        assistantMsg.className = 'chat-message assistant';
+        assistantMsg.innerHTML = `<div class="text-sm">I'll help you with that! Let me make those changes to your document...</div>`;
+        chatMessages.appendChild(assistantMsg);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }, 1000);
+    }
+
+    // Auto-expand textarea as user types
+    function autoExpandTextarea(textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = textarea.scrollHeight + 'px';
+    }
+
+    // Sync title fields
+    document.addEventListener('DOMContentLoaded', () => {
+      const notionTitle = document.getElementById('notionTitle');
+      const templateName = document.getElementById('templateName');
+
+      if (notionTitle && templateName) {
+        notionTitle.addEventListener('input', (e) => {
+          templateName.value = e.target.value;
+        });
+
+        templateName.addEventListener('input', (e) => {
+          notionTitle.value = e.target.value;
+        });
+      }
+    });
+
+    // Slash command variables
+    let slashCommandMenu = null;
+    let slashCommandIndex = -1;
+    let slashCommandPosition = null;
+
+    function initTiptapEditor() {
+      // Destroy existing editor if present
+      if (tiptapEditor) {
+        tiptapEditor.destroy();
+        tiptapEditor = null;
+      }
+
+      // Clear the editor container
       const editorContainer = document.getElementById('editor');
-      if (quillEditor) {
-        quillEditor = null;
-      }
-
-      // Remove any existing Quill elements (toolbar and container)
-      const existingToolbar = editorContainer.previousElementSibling;
-      if (existingToolbar && existingToolbar.classList.contains('ql-toolbar')) {
-        existingToolbar.remove();
-      }
-
-      // Clear and reset the editor container
       editorContainer.innerHTML = '';
-      editorContainer.className = 'bg-white'; // Reset classes added by Quill
+      editorContainer.className = 'notion-editor';
 
-      quillEditor = new Quill('#editor', {
-        theme: 'snow',
-        modules: {
-          toolbar: [
-            [{ 'header': [1, 2, 3, false] }],
-            ['bold', 'italic', 'underline'],
-            [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-            [{ 'align': [] }],
-            ['clean']
-          ]
+      // Create new Tiptap editor using global variables
+      console.log('[Tiptap] Initializing editor...');
+      console.log('[Tiptap] Editor container:', editorContainer);
+      console.log('[Tiptap] Extensions available:', {
+        Editor: !!window.TiptapEditor,
+        StarterKit: !!window.TiptapStarterKit,
+        Placeholder: !!window.TiptapPlaceholder,
+        Typography: !!window.TiptapTypography,
+        Link: !!window.TiptapLink,
+        Underline: !!window.TiptapUnderline,
+        TextAlign: !!window.TiptapTextAlign
+      });
+
+      tiptapEditor = new window.TiptapEditor({
+        element: editorContainer,
+        extensions: [
+          window.TiptapStarterKit,
+          window.TiptapPlaceholder.configure({
+            placeholder: "Type '/' for commands, or just start writing...",
+            emptyEditorClass: 'is-editor-empty',
+            emptyNodeClass: 'is-empty',
+            showOnlyWhenEditable: true,
+            showOnlyCurrent: false,
+          }),
+          window.TiptapTypography,
+          window.TiptapLink.configure({
+            openOnClick: false,
+            HTMLAttributes: {
+              class: 'editor-link',
+            },
+          }),
+          window.TiptapUnderline,
+          window.TiptapTextAlign.configure({
+            types: ['heading', 'paragraph'],
+          }),
+        ],
+        content: '<p></p>',
+        editorProps: {
+          attributes: {
+            class: 'tiptap ProseMirror',
+            'data-placeholder': "Type '/' for commands, or just start writing...",
+          },
+        },
+      });
+
+      console.log('[Tiptap] Editor created:', tiptapEditor);
+      console.log('[Tiptap] Editor HTML:', tiptapEditor.getHTML());
+      console.log('[Tiptap] Editor DOM classes:', tiptapEditor.view.dom.className);
+      console.log('[Tiptap] Editor is empty:', tiptapEditor.isEmpty);
+      console.log('[Tiptap] data-placeholder:', tiptapEditor.view.dom.getAttribute('data-placeholder'));
+
+      // Debug: Monitor when classes change
+      tiptapEditor.on('update', ({ editor }) => {
+        console.log('[Tiptap] Update - isEmpty:', editor.isEmpty, 'classes:', editor.view.dom.className);
+      });
+
+      // Setup slash commands
+      setupSlashCommands();
+
+      // Setup plus button click handlers
+      setupPlusButtonHandlers();
+
+      // Setup drag and drop for reordering blocks
+      setupDragAndDrop();
+    }
+
+    function setupPlusButtonHandlers() {
+      const editorContainer = document.getElementById('editor');
+      const editorContent = editorContainer.querySelector('.ProseMirror');
+      
+      if (!editorContent) return;
+      
+      // Handle clicks on the editor container (not just content) to catch left margin clicks
+      editorContainer.addEventListener('click', (e) => {
+        const editorRect = editorContent.getBoundingClientRect();
+        const clickX = e.clientX - editorRect.left;
+        
+        // Plus button is at left: -36px, width 22px, so area is roughly -36px to -14px
+        // But since clicks outside the editor won't register, we check for clicks near the left edge
+        // Account for padding/margin - check if click is in left 60px area
+        if (clickX < 60 && clickX >= 0) {
+          // Find the block element under the cursor
+          const clickY = e.clientY - editorRect.top;
+          const elementAtPoint = document.elementFromPoint(e.clientX, e.clientY);
+          
+          // Walk up the DOM tree to find a block element
+          let blockElement = elementAtPoint;
+          while (blockElement && blockElement !== editorContent && blockElement !== document.body) {
+            const tagName = blockElement.tagName?.toLowerCase();
+            if (tagName === 'p' || tagName === 'h1' || tagName === 'h2' || tagName === 'h3' || tagName === 'div') {
+              // Check if this is actually a block element in the editor
+              if (blockElement.closest('.ProseMirror')) {
+                try {
+                  // Get the position of this block in the editor
+                  const pos = tiptapEditor.view.posAtDOM(blockElement, 0);
+
+                  // Set cursor position at the start of this block (DON'T insert "/")
+                  tiptapEditor.chain().focus().setTextSelection(pos).run();
+
+                  // Show slash command menu immediately
+                  setTimeout(() => {
+                    const { from } = tiptapEditor.state.selection;
+                    slashCommandPosition = from;
+                    showSlashCommandMenu();
+                  }, 10);
+                  
+                  e.preventDefault();
+                  e.stopPropagation();
+                  return;
+                } catch (err) {
+                  console.warn('[PlusButton] Error handling click:', err);
+                }
+              }
+            }
+            blockElement = blockElement.parentElement;
+          }
         }
       });
     }
 
-    function closeTemplateEditor() {
-      document.getElementById('editorModal').classList.add('hidden');
-      editingTemplateId = null;
+    function setupDragAndDrop() {
+      const editorContent = document.getElementById('editor').querySelector('.ProseMirror');
+      if (!editorContent) return;
+
+      let draggedElement = null;
+      let draggedPos = null;
+
+      // Use event delegation for drag handles
+      editorContent.addEventListener('mousedown', (e) => {
+        // Check if click is near where drag handle would be (::after pseudo-element)
+        const target = e.target;
+        if (!target.matches || (!target.matches('p') && !target.matches('h1') && !target.matches('h2') && !target.matches('h3'))) {
+          return;
+        }
+
+        const rect = target.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+
+        // Drag handle is at left: -60px, so check if click is in that area
+        // Since we have no padding, we need to check relative to the element
+        if (clickX < -40 && clickX > -70) {
+          e.preventDefault();
+          draggedElement = target;
+          draggedElement.style.opacity = '0.5';
+          draggedElement.setAttribute('draggable', 'true');
+
+          try {
+            draggedPos = tiptapEditor.view.posAtDOM(draggedElement, 0);
+          } catch (err) {
+            console.warn('[Drag] Error getting position:', err);
+          }
+        }
+      });
+
+      editorContent.addEventListener('dragstart', (e) => {
+        if (!draggedElement) return;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/html', draggedElement.outerHTML);
+      });
+
+      editorContent.addEventListener('dragover', (e) => {
+        if (!draggedElement) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+
+        const target = e.target.closest('p, h1, h2, h3');
+        if (target && target !== draggedElement && target.parentNode === editorContent) {
+          const rect = target.getBoundingClientRect();
+          const midpoint = rect.top + rect.height / 2;
+
+          if (e.clientY < midpoint) {
+            target.parentNode.insertBefore(draggedElement, target);
+          } else {
+            target.parentNode.insertBefore(draggedElement, target.nextSibling);
+          }
+        }
+      });
+
+      editorContent.addEventListener('dragend', (e) => {
+        if (draggedElement) {
+          draggedElement.style.opacity = '';
+          draggedElement.removeAttribute('draggable');
+
+          // Sync with Tiptap's internal state
+          try {
+            const newHTML = editorContent.innerHTML;
+            tiptapEditor.commands.setContent(newHTML);
+          } catch (err) {
+            console.warn('[Drag] Error syncing content:', err);
+          }
+
+          draggedElement = null;
+          draggedPos = null;
+        }
+      });
+
+      editorContent.addEventListener('drop', (e) => {
+        e.preventDefault();
+      });
     }
 
-    function insertMergeField() {
-      const select = document.getElementById('mergeFieldSelect');
-      const field = select.value;
-      if (field && quillEditor) {
-        const range = quillEditor.getSelection(true);
-        quillEditor.insertText(range.index, field, 'user');
-        quillEditor.setSelection(range.index + field.length);
-        select.value = '';
+    function setupSlashCommands() {
+      slashCommandMenu = document.getElementById('slashCommandMenu');
+
+      // Listen for updates in the editor
+      tiptapEditor.on('update', ({ editor }) => {
+        const { from } = editor.state.selection;
+        const textBefore = editor.state.doc.textBetween(Math.max(0, from - 20), from, '\n');
+
+        // Check if user typed "/"
+        if (textBefore.endsWith('/')) {
+          slashCommandPosition = from - 1;
+          showSlashCommandMenu();
+        } else if (slashCommandMenu.classList.contains('active')) {
+          const slashIndex = textBefore.lastIndexOf('/');
+          if (slashIndex === -1) {
+            hideSlashCommandMenu();
+          } else {
+            const query = textBefore.substring(slashIndex + 1);
+            if (query.includes(' ') || query.includes('\n')) {
+              hideSlashCommandMenu();
+            } else {
+              filterSlashCommands(query);
+            }
+          }
+        }
+      });
+
+      // Handle keyboard navigation
+      tiptapEditor.view.dom.addEventListener('keydown', function(e) {
+        if (slashCommandMenu.classList.contains('active')) {
+          const items = Array.from(slashCommandMenu.querySelectorAll('.slash-command-item:not([style*="display: none"])'));
+
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            slashCommandIndex = Math.min(slashCommandIndex + 1, items.length - 1);
+            highlightCommand(items);
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            slashCommandIndex = Math.max(slashCommandIndex - 1, 0);
+            highlightCommand(items);
+          } else if (e.key === 'Enter' && items.length > 0) {
+            e.preventDefault();
+            if (slashCommandIndex >= 0 && items[slashCommandIndex]) {
+              executeSlashCommand(items[slashCommandIndex]);
+            }
+          } else if (e.key === 'Escape') {
+            hideSlashCommandMenu();
+          }
+        }
+      });
+
+      // Click handlers for slash commands
+      const commandItems = slashCommandMenu.querySelectorAll('.slash-command-item');
+      commandItems.forEach(item => {
+        item.addEventListener('click', () => executeSlashCommand(item));
+      });
+    }
+
+    function showSlashCommandMenu() {
+      const { from } = tiptapEditor.state.selection;
+      const coords = tiptapEditor.view.coordsAtPos(slashCommandPosition || from);
+
+      slashCommandMenu.style.left = coords.left + 'px';
+      slashCommandMenu.style.top = (coords.bottom + 8) + 'px';
+      slashCommandMenu.classList.add('active');
+      slashCommandIndex = 0;
+
+      // Reset filter
+      const items = slashCommandMenu.querySelectorAll('.slash-command-item');
+      items.forEach(item => item.style.display = '');
+      highlightCommand(Array.from(items));
+    }
+
+    function hideSlashCommandMenu() {
+      slashCommandMenu.classList.remove('active');
+      slashCommandIndex = -1;
+      slashCommandPosition = null;
+    }
+
+    function filterSlashCommands(query) {
+      const items = slashCommandMenu.querySelectorAll('.slash-command-item');
+      const lowerQuery = query.toLowerCase();
+      let visibleItems = [];
+
+      items.forEach(item => {
+        const title = item.querySelector('.slash-command-title').textContent.toLowerCase();
+        if (title.includes(lowerQuery)) {
+          item.style.display = '';
+          visibleItems.push(item);
+        } else {
+          item.style.display = 'none';
+        }
+      });
+
+      slashCommandIndex = visibleItems.length > 0 ? 0 : -1;
+      highlightCommand(visibleItems);
+    }
+
+    function highlightCommand(items) {
+      items.forEach((item, index) => {
+        if (index === slashCommandIndex) {
+          item.classList.add('selected');
+          item.scrollIntoView({ block: 'nearest' });
+        } else {
+          item.classList.remove('selected');
+        }
+      });
+    }
+
+    function executeSlashCommand(item) {
+      const command = item.dataset.command;
+      const field = item.dataset.field;
+      const { from } = tiptapEditor.state.selection;
+
+      // Delete the "/" and any query text if it exists
+      const textBefore = tiptapEditor.state.doc.textBetween(Math.max(0, from - 20), from, '\n');
+      const slashIndex = textBefore.lastIndexOf('/');
+
+      if (slashIndex !== -1) {
+        // There's a slash to delete (user typed "/")
+        const deleteFrom = from - (textBefore.length - slashIndex);
+        tiptapEditor
+          .chain()
+          .focus()
+          .deleteRange({ from: deleteFrom, to: from })
+          .run();
+      } else {
+        // No slash (triggered by "+" button), just focus
+        tiptapEditor.chain().focus().run();
       }
+
+      switch(command) {
+        case 'text':
+          // Just plain text, do nothing
+          break;
+        case 'h1':
+          tiptapEditor.chain().focus().setHeading({ level: 1 }).run();
+          break;
+        case 'h2':
+          tiptapEditor.chain().focus().setHeading({ level: 2 }).run();
+          break;
+        case 'h3':
+          tiptapEditor.chain().focus().setHeading({ level: 3 }).run();
+          break;
+        case 'bullet':
+          tiptapEditor.chain().focus().toggleBulletList().run();
+          break;
+        case 'numbered':
+          tiptapEditor.chain().focus().toggleOrderedList().run();
+          break;
+        case 'quote':
+          tiptapEditor.chain().focus().toggleBlockquote().run();
+          break;
+        case 'codeblock':
+          tiptapEditor.chain().focus().toggleCodeBlock().run();
+          break;
+        case 'divider':
+          tiptapEditor.chain().focus().setHorizontalRule().run();
+          break;
+        case 'merge':
+          tiptapEditor.chain().focus().insertContent(field + ' ').run();
+          break;
+      }
+
+      hideSlashCommandMenu();
+    }
+
+    function closeTemplateEditor() {
+      document.getElementById('editorModal').classList.add('hidden');
+      if (tiptapEditor) {
+        tiptapEditor.destroy();
+        tiptapEditor = null;
+      }
+      editingTemplateId = null;
     }
 
     function editTemplate(id) {
@@ -536,10 +1503,11 @@
     }
 
     function saveTemplate() {
-      const name = document.getElementById('templateName').value.trim();
+      // Get name from either field (they're synced)
+      const name = (document.getElementById('templateName').value || document.getElementById('notionTitle').value).trim();
       const description = document.getElementById('templateDescription').value.trim();
       const category = document.getElementById('templateCategory').value;
-      const content = quillEditor.root.innerHTML;
+      const content = tiptapEditor ? tiptapEditor.getHTML() : '';
 
       if (!name) {
         Toast.error('Please enter a template name');
@@ -609,8 +1577,8 @@
     }
 
     function previewTemplate() {
-      if (quillEditor) {
-        showPreview(quillEditor.root.innerHTML);
+      if (tiptapEditor) {
+        showPreview(tiptapEditor.getHTML());
       }
     }
 
@@ -698,9 +1666,77 @@
       if (e.target.id === 'ruleModal') closeRuleModal();
     });
 
+    /**
+     * Load AI-generated document from localStorage (if temp_doc parameter present)
+     * Called when user clicks "Edit Document" from chat interface
+     */
+    function loadTempDocumentFromStorage() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tempDocId = urlParams.get('temp_doc');
+      const saveIntent = urlParams.get('save') === 'true';
+
+      if (!tempDocId) {
+        return; // No temp doc to load
+      }
+
+      // Retrieve from localStorage
+      const tempDocJson = localStorage.getItem(tempDocId);
+      if (!tempDocJson) {
+        console.warn('[TempDoc] Not found in localStorage:', tempDocId);
+        Toast.warning('The generated document was not found.');
+        return;
+      }
+
+      try {
+        const tempDoc = JSON.parse(tempDocJson);
+
+        console.log('[TempDoc] Loaded from localStorage:', {
+          tempDocId,
+          matter_id: tempDoc.matter_id,
+          content_length: tempDoc.content?.length,
+          save_intent: saveIntent
+        });
+
+        // Open template editor with AI-generated content
+        editingTemplateId = null; // New template, not editing existing
+
+        // Pre-fill suggested name if available
+        const suggestedName = tempDoc.suggested_name || '';
+        document.getElementById('templateName').value = suggestedName;
+        document.getElementById('notionTitle').value = suggestedName;
+
+        document.getElementById('templateDescription').value = 'AI-generated document';
+        document.getElementById('templateCategory').value = 'Client Intake';
+
+        // Initialize Tiptap and set AI-generated content
+        initTiptapEditor();
+        tiptapEditor.commands.setContent(tempDoc.content || '<p>No content available</p>');
+
+        // Open the editor modal
+        document.getElementById('editorModal').classList.remove('hidden');
+
+        // Clean up localStorage after loading (prevent reuse)
+        localStorage.removeItem(tempDocId);
+
+        Toast.success(saveIntent ? 'Document loaded. Fill in details and save as template.' : 'Document loaded for editing.');
+
+        // Remove URL parameters (clean URL)
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+
+      } catch (error) {
+        console.error('[TempDoc] Failed to parse:', error);
+        Toast.error('Failed to load generated document');
+        localStorage.removeItem(tempDocId);
+      }
+    }
+
     // Initialize
     renderTemplates();
     renderAutomationRules();
+
+    // Check if opening from chat interface (AI-generated document)
+    loadTempDocumentFromStorage();
   </script>
 </body>
 </html>
