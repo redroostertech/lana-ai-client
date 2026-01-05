@@ -9,6 +9,7 @@
   <script src="../js/config.js"></script>
   <script src="../js/mock-data.js"></script>
   <script src="../js/api.js"></script>
+  <script src="../js/document-templates-api.js"></script>
   <script src="../js/components.js"></script>
   <script src="../js/menu.js"></script>
   <script src="../js/workflows.js"></script>
@@ -501,6 +502,35 @@
       color: #374151;
     }
 
+    /* Bubble Menu */
+    #bubbleMenu {
+      transition: opacity 0.15s ease;
+    }
+
+    .bubble-btn {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      border: none;
+      background: white;
+      color: #374151;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .bubble-btn:hover {
+      background: #f3f4f6;
+    }
+
+    .bubble-btn.is-active {
+      background: #e0e7ff;
+      color: #4f46e5;
+    }
+
     /* Slash command menu */
     #slashCommandMenu,
     #blockActionMenu {
@@ -945,6 +975,35 @@
           </div>
         </div>
 
+        <!-- Bubble Menu for Text Formatting -->
+        <div id="bubbleMenu" class="hidden fixed bg-white rounded-lg shadow-xl border border-gray-200 flex items-center gap-1 p-1" style="z-index: 10000;">
+          <button id="bubbleBold" class="bubble-btn" title="Bold (⌘B)">
+            <span style="font-weight: bold;">B</span>
+          </button>
+          <button id="bubbleItalic" class="bubble-btn" title="Italic (⌘I)">
+            <span style="font-style: italic;">I</span>
+          </button>
+          <button id="bubbleUnderline" class="bubble-btn" title="Underline (⌘U)">
+            <span style="text-decoration: underline;">U</span>
+          </button>
+          <button id="bubbleStrike" class="bubble-btn" title="Strikethrough">
+            <span style="text-decoration: line-through;">S</span>
+          </button>
+          <div class="w-px h-6 bg-gray-300 mx-1"></div>
+          <button id="bubbleAlignLeft" class="bubble-btn" title="Align Left">
+            <span>⫤</span>
+          </button>
+          <button id="bubbleAlignCenter" class="bubble-btn" title="Align Center">
+            <span>⫶</span>
+          </button>
+          <button id="bubbleAlignRight" class="bubble-btn" title="Align Right">
+            <span>⫥</span>
+          </button>
+          <button id="bubbleAlignJustify" class="bubble-btn" title="Justify">
+            <span>⫼</span>
+          </button>
+        </div>
+
         <!-- Table Configuration Modal -->
         <div id="tableModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="z-index: 10000;">
           <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
@@ -1189,61 +1248,175 @@
     let tiptapEditor = null;
     let editingTemplateId = null;
 
-    // Mock data for document templates
-    let documentTemplates = [
-      {
-        id: 'doc-001',
-        name: 'Engagement Letter',
-        description: 'Standard client engagement letter for new matters',
-        category: 'Client Intake',
-        content: `<p>{{date.today}}</p><p><br></p><p>{{client.name}}<br>{{client.address}}</p><p><br></p><p>RE: {{matter.name}}</p><p><br></p><p>Dear {{client.name}},</p><p><br></p><p>Thank you for choosing {{firm.name}} to represent you in the above-referenced matter. This letter confirms the terms of our engagement.</p><p><br></p><p><strong>Scope of Representation:</strong></p><p>We have agreed to represent you in connection with {{matter.type}} matters.</p><p><br></p><p><strong>Fee Arrangement:</strong></p><p>Our fee for this representation will be {{fee.amount}}. A retainer of {{fee.retainer}} is due upon signing this agreement.</p><p><br></p><p>Please sign below to indicate your agreement to these terms.</p><p><br></p><p>Sincerely,</p><p><br></p><p>{{attorney.name}}<br>{{firm.name}}</p>`,
-        mergeFields: ['client.name', 'client.address', 'matter.name', 'matter.type', 'fee.amount', 'fee.retainer', 'attorney.name', 'firm.name', 'date.today'],
-        lastModified: '2024-11-15T10:00:00Z'
-      },
-      {
-        id: 'doc-002',
-        name: 'Fee Agreement',
-        description: 'Detailed fee agreement with payment terms',
-        category: 'Billing',
-        content: `<p><strong>FEE AGREEMENT</strong></p><p><br></p><p>This Fee Agreement is entered into between {{firm.name}} ("Firm") and {{client.name}} ("Client").</p><p><br></p><p><strong>1. Services</strong></p><p>The Firm agrees to provide legal services in connection with: {{matter.type}}</p><p><br></p><p><strong>2. Fees</strong></p><p>The Client agrees to pay the following:</p><ul><li>Initial retainer: {{fee.retainer}}</li><li>Hourly rate: {{fee.amount}}/hour</li></ul><p><br></p><p>Date: {{date.today}}</p>`,
-        mergeFields: ['client.name', 'firm.name', 'matter.type', 'fee.retainer', 'fee.amount', 'date.today'],
-        lastModified: '2024-11-10T14:30:00Z'
-      },
-      {
-        id: 'doc-003',
-        name: 'Welcome Packet',
-        description: 'Welcome information for new clients',
-        category: 'Client Intake',
-        content: `<p><strong>Welcome to {{firm.name}}</strong></p><p><br></p><p>Dear {{client.name}},</p><p><br></p><p>Welcome! We are pleased to have you as a client. Your matter number is {{matter.number}}.</p><p><br></p><p>Your primary attorney will be {{attorney.name}}.</p><p><br></p><p>If you have any questions, please don't hesitate to contact us.</p>`,
-        mergeFields: ['client.name', 'firm.name', 'matter.number', 'attorney.name'],
-        lastModified: '2024-11-05T09:15:00Z'
-      }
-    ];
+    // Data arrays (populated from backend API)
+    let documentTemplates = [];
+    let automationRules = [];
+    let isLoadingTemplates = false;
+    let isLoadingRules = false;
 
-    let automationRules = [
-      {
-        id: 'rule-001',
-        trigger: 'verbal_yes',
-        triggerLabel: 'Client gives verbal yes',
-        templateId: 'doc-001',
-        templateName: 'Engagement Letter',
-        outputPath: '/matters/{{matter.number}}/documents/',
-        namingPattern: '{{client.name}}_Engagement_{{date.today}}',
-        autoSend: true,
-        enabled: true
-      },
-      {
-        id: 'rule-002',
-        trigger: 'engagement_signed',
-        triggerLabel: 'Engagement letter signed',
-        templateId: 'doc-003',
-        templateName: 'Welcome Packet',
-        outputPath: '/matters/{{matter.number}}/documents/',
-        namingPattern: '{{client.name}}_Welcome_{{date.today}}',
-        autoSend: true,
-        enabled: true
+    // ============================================================
+    // DATA TRANSFORMATION FUNCTIONS
+    // Map between backend schema and frontend schema
+    // ============================================================
+
+    /**
+     * Transform backend template to frontend format
+     * Backend: { id, name, description, category, template_content, variables: [{name, type}], created_at, updated_at }
+     * Frontend: { id, name, description, category, content, mergeFields: [string], lastModified }
+     */
+    function transformTemplateFromBackend(backendTemplate) {
+      return {
+        id: backendTemplate.id,
+        name: backendTemplate.name,
+        description: backendTemplate.description || '',
+        category: backendTemplate.category || 'Uncategorized',
+        content: backendTemplate.template_content || '',
+        mergeFields: (backendTemplate.variables || []).map(v => v.name),
+        lastModified: backendTemplate.updated_at || backendTemplate.created_at
+      };
+    }
+
+    /**
+     * Transform frontend template to backend format
+     * Frontend: { id, name, description, category, content, mergeFields: [string] }
+     * Backend: { name, description, category, template_content, variables: [{name, type, required}] }
+     */
+    function transformTemplateToBackend(frontendTemplate) {
+      return {
+        name: frontendTemplate.name,
+        description: frontendTemplate.description,
+        category: frontendTemplate.category,
+        template_content: frontendTemplate.content,
+        variables: (frontendTemplate.mergeFields || []).map(field => ({
+          name: field,
+          type: 'string',
+          required: false
+        }))
+      };
+    }
+
+    /**
+     * Transform backend automation rule to frontend format
+     * Backend: { id, trigger, template_id, actions: [{type, config}], enabled, created_at, updated_at }
+     * Frontend: { id, trigger, triggerLabel, templateId, templateName, outputPath, namingPattern, autoSend, enabled }
+     */
+    function transformRuleFromBackend(backendRule) {
+      const action = backendRule.actions && backendRule.actions[0] ? backendRule.actions[0] : {};
+      const config = action.config || {};
+
+      return {
+        id: backendRule.id,
+        trigger: backendRule.trigger,
+        triggerLabel: getTriggerLabel(backendRule.trigger),
+        templateId: backendRule.template_id,
+        templateName: getTemplateName(backendRule.template_id),
+        outputPath: config.output_path || '/matters/{{matter.number}}/documents/',
+        namingPattern: config.naming_pattern || '{{client.name}}_Document_{{date.today}}',
+        autoSend: config.auto_send || false,
+        enabled: backendRule.enabled !== false
+      };
+    }
+
+    /**
+     * Transform frontend automation rule to backend format
+     * Frontend: { trigger, templateId, outputPath, namingPattern, autoSend, enabled }
+     * Backend: { trigger, template_id, actions: [{type: 'generate_document', config}], enabled }
+     */
+    function transformRuleToBackend(frontendRule) {
+      return {
+        trigger: frontendRule.trigger,
+        template_id: frontendRule.templateId,
+        actions: [
+          {
+            type: 'generate_document',
+            config: {
+              output_path: frontendRule.outputPath,
+              naming_pattern: frontendRule.namingPattern,
+              auto_send: frontendRule.autoSend
+            }
+          }
+        ],
+        enabled: frontendRule.enabled !== false
+      };
+    }
+
+    /**
+     * Get human-readable trigger label
+     */
+    function getTriggerLabel(trigger) {
+      const labels = {
+        'verbal_yes': 'Client gives verbal yes',
+        'engagement_signed': 'Engagement letter signed',
+        'matter_created': 'Matter created',
+        'document_uploaded': 'Document uploaded',
+        'status_changed': 'Status changed'
+      };
+      return labels[trigger] || trigger;
+    }
+
+    /**
+     * Get template name by ID
+     */
+    function getTemplateName(templateId) {
+      const template = documentTemplates.find(t => t.id === templateId);
+      return template ? template.name : 'Unknown Template';
+    }
+
+    // ============================================================
+    // API DATA LOADING FUNCTIONS
+    // ============================================================
+
+    /**
+     * Load templates from backend API
+     */
+    async function loadTemplates() {
+      if (isLoadingTemplates) return;
+      isLoadingTemplates = true;
+      renderTemplates(); // Show loading state
+
+      try {
+        const response = await DocumentTemplatesAPI.listTemplates();
+        documentTemplates = (response.templates || []).map(transformTemplateFromBackend);
+      } catch (error) {
+        console.error('[DocumentGeneration] Failed to load templates:', error);
+        Toast.error('Failed to load templates: ' + (error.message || 'Unknown error'));
+        documentTemplates = [];
+      } finally {
+        isLoadingTemplates = false;
+        renderTemplates(); // Show loaded templates
       }
-    ];
+    }
+
+    /**
+     * Load automation rules from backend API
+     */
+    async function loadAutomationRules() {
+      if (isLoadingRules) return;
+      isLoadingRules = true;
+      renderAutomationRules(); // Show loading state
+
+      try {
+        const response = await DocumentTemplatesAPI.listRules();
+        automationRules = (response.rules || []).map(transformRuleFromBackend);
+      } catch (error) {
+        console.error('[DocumentGeneration] Failed to load automation rules:', error);
+        Toast.error('Failed to load automation rules: ' + (error.message || 'Unknown error'));
+        automationRules = [];
+      } finally {
+        isLoadingRules = false;
+        renderAutomationRules(); // Show loaded rules
+      }
+    }
+
+    /**
+     * Initialize page data - load templates and rules
+     */
+    async function initializePageData() {
+      await Promise.all([
+        loadTemplates(),
+        loadAutomationRules()
+      ]);
+    }
 
     // Sample data for preview
     const sampleData = {
@@ -1265,6 +1438,35 @@
 
     function renderTemplates() {
       const container = document.getElementById('templatesGrid');
+
+      // Show loading state
+      if (isLoadingTemplates) {
+        container.innerHTML = `
+          <div class="col-span-full text-center py-12">
+            <svg class="animate-spin h-12 w-12 mx-auto text-indigo-600" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="mt-4 text-gray-500">Loading templates...</p>
+          </div>
+        `;
+        return;
+      }
+
+      // Show empty state
+      if (documentTemplates.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-full text-center py-12">
+            <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <p class="text-gray-500 mb-2">No templates yet</p>
+            <p class="text-sm text-gray-400">Create your first document template to get started</p>
+          </div>
+        `;
+        return;
+      }
+
       container.innerHTML = documentTemplates.map(t => `
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
           <div class="p-6">
@@ -1297,6 +1499,22 @@
 
     function renderAutomationRules() {
       const container = document.getElementById('automationRules');
+
+      // Show loading state
+      if (isLoadingRules) {
+        container.innerHTML = `
+          <div class="text-center py-8">
+            <svg class="animate-spin h-8 w-8 mx-auto text-indigo-600" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="mt-4 text-gray-500">Loading automation rules...</p>
+          </div>
+        `;
+        return;
+      }
+
+      // Show empty state
       if (automationRules.length === 0) {
         container.innerHTML = `
           <div class="text-center py-8 text-gray-500">
@@ -1528,6 +1746,105 @@
 
       // Setup drag and drop for reordering blocks
       setupDragAndDrop();
+
+      // Setup bubble menu for text formatting
+      setupBubbleMenu();
+    }
+
+    function setupBubbleMenu() {
+      const bubbleMenu = document.getElementById('bubbleMenu');
+      if (!bubbleMenu) return;
+
+      // Update bubble menu position and visibility on selection change
+      tiptapEditor.on('selectionUpdate', ({ editor }) => {
+        const { from, to, empty } = editor.state.selection;
+
+        // Only show bubble menu if text is selected (not empty selection)
+        if (empty || from === to) {
+          bubbleMenu.classList.add('hidden');
+          return;
+        }
+
+        // Get selection coordinates
+        const { view } = editor;
+        const start = view.coordsAtPos(from);
+        const end = view.coordsAtPos(to);
+
+        // Position bubble menu above the selection
+        const menuWidth = 300; // approximate width
+        const menuHeight = 44; // approximate height
+        const left = Math.max(10, Math.min(window.innerWidth - menuWidth - 10, (start.left + end.left) / 2 - menuWidth / 2));
+        const top = Math.max(10, start.top - menuHeight - 8);
+
+        bubbleMenu.style.left = `${left}px`;
+        bubbleMenu.style.top = `${top}px`;
+        bubbleMenu.classList.remove('hidden');
+
+        // Update active states
+        updateBubbleMenuActiveStates();
+      });
+
+      // Hide bubble menu when clicking outside
+      document.addEventListener('click', (e) => {
+        if (!bubbleMenu.contains(e.target) && !tiptapEditor.view.dom.contains(e.target)) {
+          bubbleMenu.classList.add('hidden');
+        }
+      });
+
+      // Button handlers
+      document.getElementById('bubbleBold').addEventListener('click', () => {
+        tiptapEditor.chain().focus().toggleBold().run();
+        updateBubbleMenuActiveStates();
+      });
+
+      document.getElementById('bubbleItalic').addEventListener('click', () => {
+        tiptapEditor.chain().focus().toggleItalic().run();
+        updateBubbleMenuActiveStates();
+      });
+
+      document.getElementById('bubbleUnderline').addEventListener('click', () => {
+        tiptapEditor.chain().focus().toggleUnderline().run();
+        updateBubbleMenuActiveStates();
+      });
+
+      document.getElementById('bubbleStrike').addEventListener('click', () => {
+        tiptapEditor.chain().focus().toggleStrike().run();
+        updateBubbleMenuActiveStates();
+      });
+
+      document.getElementById('bubbleAlignLeft').addEventListener('click', () => {
+        tiptapEditor.chain().focus().setTextAlign('left').run();
+        updateBubbleMenuActiveStates();
+      });
+
+      document.getElementById('bubbleAlignCenter').addEventListener('click', () => {
+        tiptapEditor.chain().focus().setTextAlign('center').run();
+        updateBubbleMenuActiveStates();
+      });
+
+      document.getElementById('bubbleAlignRight').addEventListener('click', () => {
+        tiptapEditor.chain().focus().setTextAlign('right').run();
+        updateBubbleMenuActiveStates();
+      });
+
+      document.getElementById('bubbleAlignJustify').addEventListener('click', () => {
+        tiptapEditor.chain().focus().setTextAlign('justify').run();
+        updateBubbleMenuActiveStates();
+      });
+    }
+
+    function updateBubbleMenuActiveStates() {
+      // Update bold, italic, underline, strikethrough active states
+      document.getElementById('bubbleBold').classList.toggle('is-active', tiptapEditor.isActive('bold'));
+      document.getElementById('bubbleItalic').classList.toggle('is-active', tiptapEditor.isActive('italic'));
+      document.getElementById('bubbleUnderline').classList.toggle('is-active', tiptapEditor.isActive('underline'));
+      document.getElementById('bubbleStrike').classList.toggle('is-active', tiptapEditor.isActive('strike'));
+
+      // Update alignment active states
+      document.getElementById('bubbleAlignLeft').classList.toggle('is-active', tiptapEditor.isActive({ textAlign: 'left' }));
+      document.getElementById('bubbleAlignCenter').classList.toggle('is-active', tiptapEditor.isActive({ textAlign: 'center' }));
+      document.getElementById('bubbleAlignRight').classList.toggle('is-active', tiptapEditor.isActive({ textAlign: 'right' }));
+      document.getElementById('bubbleAlignJustify').classList.toggle('is-active', tiptapEditor.isActive({ textAlign: 'justify' }));
     }
 
     function setupPlusButtonHandlers() {
@@ -1988,7 +2305,6 @@
     function moveTableRowUp() {
       const { state, view } = tiptapEditor;
       const { $from } = state.selection;
-      const { tr } = state;
 
       // Find the table and current row
       let tableDepth = null;
@@ -2001,12 +2317,18 @@
         }
         if ($from.node(d).type.name === 'tableRow') {
           rowDepth = d;
-          rowIndex = $from.index(d);
           break;
         }
       }
 
-      if (!tableDepth || !rowDepth || rowIndex <= 0) return;
+      // Get the row index within the table (not within the row itself)
+      if (tableDepth !== null && rowDepth !== null) {
+        rowIndex = $from.index(tableDepth);
+      }
+
+      console.log('moveTableRowUp - tableDepth:', tableDepth, 'rowDepth:', rowDepth, 'rowIndex:', rowIndex);
+
+      if (!tableDepth || !rowDepth || rowIndex === null || rowIndex <= 0) return;
 
       const table = $from.node(tableDepth);
       const currentRow = table.child(rowIndex);
@@ -2043,12 +2365,18 @@
         }
         if ($from.node(d).type.name === 'tableRow') {
           rowDepth = d;
-          rowIndex = $from.index(d);
           break;
         }
       }
 
-      if (!tableDepth || !rowDepth) return;
+      // Get the row index within the table (not within the row itself)
+      if (tableDepth !== null && rowDepth !== null) {
+        rowIndex = $from.index(tableDepth);
+      }
+
+      console.log('moveTableRowDown - tableDepth:', tableDepth, 'rowDepth:', rowDepth, 'rowIndex:', rowIndex);
+
+      if (!tableDepth || !rowDepth || rowIndex === null) return;
 
       const table = $from.node(tableDepth);
       if (rowIndex >= table.childCount - 1) return;
@@ -2335,9 +2663,9 @@
       // Show row menu
       rowMenu.classList.remove('hidden');
 
-      // Position menu
+      // Position menu - add offset to prevent text cutoff
       menu.style.left = (event.pageX - 10) + 'px';
-      menu.style.top = event.pageY + 'px';
+      menu.style.top = (event.pageY + 30) + 'px';
       menu.classList.remove('hidden');
 
       // Store current row for operations
@@ -2359,9 +2687,9 @@
       // Show column menu
       colMenu.classList.remove('hidden');
 
-      // Position menu
+      // Position menu - add offset to prevent text cutoff
       menu.style.left = event.pageX + 'px';
-      menu.style.top = (event.pageY + 10) + 'px';
+      menu.style.top = (event.pageY + 30) + 'px';
       menu.classList.remove('hidden');
 
       // Store current column for operations
@@ -2403,7 +2731,7 @@
       openTemplateEditor(id);
     }
 
-    function saveTemplate() {
+    async function saveTemplate() {
       // Get name from either field (they're synced)
       const name = (document.getElementById('templateName').value || document.getElementById('notionTitle').value).trim();
       const description = document.getElementById('templateDescription').value.trim();
@@ -2425,48 +2753,58 @@
         }
       }
 
-      if (editingTemplateId) {
-        // Update existing
-        const idx = documentTemplates.findIndex(t => t.id === editingTemplateId);
-        if (idx !== -1) {
-          documentTemplates[idx] = {
-            ...documentTemplates[idx],
-            name,
-            description,
-            category,
-            content,
-            mergeFields,
-            lastModified: new Date().toISOString()
-          };
-        }
-        Toast.success('Template updated successfully');
-      } else {
-        // Create new
-        const newTemplate = {
-          id: `doc-${Date.now()}`,
+      // Show loading state
+      const saveBtn = event.target;
+      const originalText = saveBtn.textContent;
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = '<svg class="animate-spin h-4 w-4 inline mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Saving...';
+
+      try {
+        const frontendTemplate = {
           name,
           description,
           category,
           content,
-          mergeFields,
-          lastModified: new Date().toISOString()
+          mergeFields
         };
-        documentTemplates.push(newTemplate);
-        Toast.success('Template created successfully');
-      }
 
-      closeTemplateEditor();
-      renderTemplates();
+        const backendData = transformTemplateToBackend(frontendTemplate);
+
+        let response;
+        if (editingTemplateId) {
+          // Update existing template
+          response = await DocumentTemplatesAPI.updateTemplate(editingTemplateId, backendData);
+          Toast.success('Template updated successfully');
+        } else {
+          // Create new template
+          response = await DocumentTemplatesAPI.createTemplate(backendData);
+          Toast.success('Template created successfully');
+        }
+
+        closeTemplateEditor();
+        await loadTemplates(); // Reload templates from backend
+      } catch (error) {
+        console.error('[DocumentGeneration] Failed to save template:', error);
+        Toast.error('Failed to save template: ' + (error.message || 'Unknown error'));
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = originalText;
+      }
     }
 
-    function deleteTemplate(id) {
-      if (confirm('Are you sure you want to delete this template?')) {
-        documentTemplates = documentTemplates.filter(t => t.id !== id);
-        // Also remove any automation rules using this template
-        automationRules = automationRules.filter(r => r.templateId !== id);
+    async function deleteTemplate(id) {
+      if (!confirm('Are you sure you want to delete this template?')) {
+        return;
+      }
+
+      try {
+        await DocumentTemplatesAPI.deleteTemplate(id);
         Toast.success('Template deleted');
-        renderTemplates();
-        renderAutomationRules();
+        await loadTemplates(); // Reload templates
+        await loadAutomationRules(); // Reload rules (backend cascades deletion)
+      } catch (error) {
+        console.error('[DocumentGeneration] Failed to delete template:', error);
+        Toast.error('Failed to delete template: ' + (error.message || 'Unknown error'));
       }
     }
 
@@ -2510,11 +2848,9 @@
       document.getElementById('ruleModal').classList.add('hidden');
     }
 
-    function saveAutomationRule() {
+    async function saveAutomationRule() {
       const trigger = document.getElementById('ruleTrigger').value;
-      const triggerLabel = document.getElementById('ruleTrigger').options[document.getElementById('ruleTrigger').selectedIndex].text;
       const templateId = document.getElementById('ruleTemplate').value;
-      const template = documentTemplates.find(t => t.id === templateId);
       const outputPath = document.getElementById('rulePath').value;
       const namingPattern = document.getElementById('ruleNaming').value;
       const autoSend = document.getElementById('ruleAutoSend').checked;
@@ -2524,36 +2860,59 @@
         return;
       }
 
-      const newRule = {
-        id: `rule-${Date.now()}`,
-        trigger,
-        triggerLabel,
-        templateId,
-        templateName: template ? template.name : 'Unknown',
-        outputPath,
-        namingPattern,
-        autoSend,
-        enabled: true
-      };
+      try {
+        const frontendRule = {
+          trigger,
+          templateId,
+          outputPath,
+          namingPattern,
+          autoSend,
+          enabled: true
+        };
 
-      automationRules.push(newRule);
-      Toast.success('Automation rule added');
-      closeRuleModal();
-      renderAutomationRules();
-    }
-
-    function toggleRule(id) {
-      const rule = automationRules.find(r => r.id === id);
-      if (rule) {
-        rule.enabled = !rule.enabled;
-        Toast.info(`Rule ${rule.enabled ? 'enabled' : 'disabled'}`);
+        const backendData = transformRuleToBackend(frontendRule);
+        await DocumentTemplatesAPI.createRule(backendData);
+        Toast.success('Automation rule added');
+        closeRuleModal();
+        await loadAutomationRules(); // Reload rules from backend
+      } catch (error) {
+        console.error('[DocumentGeneration] Failed to save automation rule:', error);
+        Toast.error('Failed to save automation rule: ' + (error.message || 'Unknown error'));
       }
     }
 
-    function deleteRule(id) {
-      automationRules = automationRules.filter(r => r.id !== id);
-      Toast.success('Rule deleted');
-      renderAutomationRules();
+    async function toggleRule(id) {
+      const rule = automationRules.find(r => r.id === id);
+      if (!rule) return;
+
+      try {
+        if (rule.enabled) {
+          await DocumentTemplatesAPI.disableRule(id);
+          Toast.info('Rule disabled');
+        } else {
+          await DocumentTemplatesAPI.enableRule(id);
+          Toast.info('Rule enabled');
+        }
+        await loadAutomationRules(); // Reload rules
+      } catch (error) {
+        console.error('[DocumentGeneration] Failed to toggle rule:', error);
+        Toast.error('Failed to toggle rule: ' + (error.message || 'Unknown error'));
+      }
+    }
+
+    async function deleteRule(id) {
+      if (!confirm('Are you sure you want to delete this automation rule?')) {
+        return;
+      }
+
+      try {
+        await DocumentTemplatesAPI.deleteRule(id);
+        Toast.success('Rule deleted');
+        await loadAutomationRules(); // Reload rules
+      } catch (error) {
+        console.error('[DocumentGeneration] Failed to delete rule:', error);
+        Toast.error('Failed to delete rule: ' + (error.message || 'Unknown error'));
+      }
     }
 
     // Close modals on backdrop click
@@ -2632,9 +2991,8 @@
       }
     }
 
-    // Initialize
-    renderTemplates();
-    renderAutomationRules();
+    // Initialize - Load data from backend API
+    initializePageData();
 
     // Check if opening from chat interface (AI-generated document)
     loadTempDocumentFromStorage();
