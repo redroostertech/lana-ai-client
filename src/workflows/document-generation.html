@@ -3005,21 +3005,34 @@
             variables[key] = sampleData[key];
           });
 
-          const response = await DocumentTemplatesAPI.generateDocument(
-            currentPreviewTemplateId,
-            variables,
-            format
-          );
+          // Make direct fetch request to get binary file response
+          const token = localStorage.getItem('token');
+          const baseUrl = api.baseUrl || window.location.origin;
+          const url = `${baseUrl}/api/v1/document-templates/${currentPreviewTemplateId}/generate`;
 
-          // Backend returns a URL or blob - trigger download
-          if (response.document && response.document.url) {
-            // If backend returns a download URL
-            window.open(response.document.url, '_blank');
-          } else if (response.content) {
-            // If backend returns content directly, create blob
-            const blob = new Blob([response.content], {
-              type: format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-            });
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              variables,
+              output_format: format
+            })
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error?.message || 'Failed to generate document');
+          }
+
+          // Check if response is a file (binary) or JSON
+          const contentType = response.headers.get('content-type');
+
+          if (contentType && (contentType.includes('application/pdf') || contentType.includes('application/vnd.openxmlformats'))) {
+            // Binary file response - download directly
+            const blob = await response.blob();
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -3028,9 +3041,33 @@
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-          }
+            Toast.success(`Document downloaded as ${format.toUpperCase()}`);
+          } else {
+            // JSON response with URL or content
+            const result = await response.json();
 
-          Toast.success(`Document downloaded as ${format.toUpperCase()}`);
+            if (result.document && result.document.url) {
+              // Backend returns a download URL
+              window.open(result.document.url, '_blank');
+              Toast.success(`Document downloaded as ${format.toUpperCase()}`);
+            } else if (result.content) {
+              // Backend returns base64 or text content
+              const blob = new Blob([result.content], {
+                type: format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+              });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `${currentPreviewTemplateName}.${format}`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+              Toast.success(`Document downloaded as ${format.toUpperCase()}`);
+            } else {
+              throw new Error('Invalid response format from server');
+            }
+          }
         } else {
           // For unsaved templates, we need to implement client-side conversion
           // For now, show a message to save first
