@@ -1136,7 +1136,7 @@
         const periodStart = document.getElementById('periodStart').value + 'T00:00:00Z';
         const periodEnd = document.getElementById('periodEnd').value + 'T23:59:59Z';
 
-        const response = await api.get(`/api/v1/integrations/connector-data?entity_type=contact&source=${encodeURIComponent(source)}&start_date=${periodStart}&end_date=${periodEnd}&limit=100`);
+        const response = await api.get(`/api/v1/integrations/connector-data?entity_type=contact&source=${encodeURIComponent(source)}&start_date=${periodStart}&end_date=${periodEnd}`);
 
         if (!response || !response.data || response.data.length === 0) {
           content.innerHTML = '<div class="text-center py-8 text-gray-500">No leads found for this source.</div>';
@@ -1481,8 +1481,8 @@
     async function showQualifiedLeadsDrilldown(content, periodStart, periodEnd) {
       // Fetch both contacts and opportunities to calculate relationship
       const [contactsResponse, opportunitiesResponse] = await Promise.all([
-        api.get(`/api/v1/integrations/connector-data?entity_type=contact&start_date=${periodStart}&end_date=${periodEnd}&limit=1000`),
-        api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=1000`)
+        api.get(`/api/v1/integrations/connector-data?entity_type=contact&start_date=${periodStart}&end_date=${periodEnd}`),
+        api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}`)
       ]);
 
       const contacts = contactsResponse?.data || [];
@@ -1509,9 +1509,13 @@
       const uniqueContactIdsInOpportunities = contactIdsFromOpportunities.size;
       const contactsOnlyInOpportunities = uniqueContactIdsInOpportunities - contactsWithOpportunities;
 
-      // Total Qualified Leads = Unique contactIds in opportunities + Standalone contacts (no opportunities)
-      // This matches the backend calculation exactly
-      const totalQualifiedLeads = uniqueContactIdsInOpportunities + contactsWithoutOpportunities;
+      // Total Qualified Leads = ALL DISTINCT contact IDs (from contacts.id AND opportunities.contactId)
+      // This matches the backend metric query: COUNT(DISTINCT COALESCE(data->>'contact_id', data->>'id'))
+      const allUniqueContactIds = new Set([
+        ...allContactIds, // All contact IDs from contact records
+        ...contactIdsFromOpportunities // All contact IDs referenced in opportunities
+      ]);
+      const totalQualifiedLeads = allUniqueContactIds.size;
       const gapExplanation = totalQualifiedLeads !== totalContacts ? `(${totalQualifiedLeads} qualified leads vs ${totalContacts} total contacts)` : '';
 
       // Store data in window scope for onclick handlers
@@ -2356,10 +2360,14 @@
         <div class="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
           <h4 class="font-semibold text-gray-900 mb-2">How this is calculated:</h4>
           <p class="text-sm text-gray-700 mb-2">
-            <strong>Qualified Leads (${totalQualifiedLeads})</strong> = Unique Contact IDs in Opportunities (${uniqueContactIdsInOpportunities}) + Standalone Contacts (${contactsWithoutOpportunities})
+            <strong>Qualified Leads (${totalQualifiedLeads})</strong> = All Distinct Contact IDs from both:
           </p>
+          <ul class="text-sm text-gray-700 ml-4 list-disc">
+            <li>Contact records (${allContactIds.size} unique IDs)</li>
+            <li>Opportunities (${uniqueContactIdsInOpportunities} unique contact IDs referenced)</li>
+          </ul>
           <p class="text-xs text-gray-600 mt-2">
-            Note: "Unique Contact IDs in Opportunities" includes all contact IDs referenced in opportunities, even if ${contactsOnlyInOpportunities} of them don't have corresponding contact records (merged or deleted contacts).
+            Note: This counts each unique person once, even if they appear in both contacts AND opportunities. ${contactsOnlyInOpportunities} contact ID(s) are referenced in opportunities but don't have contact records.
           </p>
           ${contactsOnlyInOpportunities > 0 ? `
           <div class="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
@@ -2493,7 +2501,7 @@
 
     // Drill-down: Consultation Booking Rate
     async function showConsultationBookingDrilldown(content, periodStart, periodEnd) {
-      const response = await api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=500`);
+      const response = await api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}`);
 
       if (!response || !response.data || response.data.length === 0) {
         content.innerHTML = '<div class="text-center py-8 text-gray-500">No opportunities found in this period.</div>';
@@ -2820,9 +2828,9 @@
     async function showResponseTimeDrilldown(content, periodStart, periodEnd) {
       // Fetch contacts, opportunities, and conversations
       const [contactsResponse, opportunitiesResponse, conversationsResponse] = await Promise.all([
-        api.get(`/api/v1/integrations/connector-data?entity_type=contact&start_date=${periodStart}&end_date=${periodEnd}&limit=500`),
-        api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=500`),
-        api.get(`/api/v1/integrations/connector-data?entity_type=conversation&start_date=${periodStart}&end_date=${periodEnd}&limit=2000`)
+        api.get(`/api/v1/integrations/connector-data?entity_type=contact&start_date=${periodStart}&end_date=${periodEnd}`),
+        api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}`),
+        api.get(`/api/v1/integrations/connector-data?entity_type=conversation&start_date=${periodStart}&end_date=${periodEnd}`)
       ]);
 
       const contacts = contactsResponse?.data || [];
@@ -3274,8 +3282,8 @@
     async function showQualityScoreDrilldown(content, periodStart, periodEnd) {
       // Fetch opportunities (enriched contact data) and standalone contacts
       const [opportunitiesResponse, contactsResponse] = await Promise.all([
-        api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=10000`),
-        api.get(`/api/v1/integrations/connector-data?entity_type=contact&start_date=${periodStart}&end_date=${periodEnd}&limit=10000`)
+        api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}`),
+        api.get(`/api/v1/integrations/connector-data?entity_type=contact&start_date=${periodStart}&end_date=${periodEnd}`)
       ]);
 
       const opportunities = opportunitiesResponse?.data || [];
@@ -3604,8 +3612,8 @@
     async function showConsultationShowRateDrilldown(content, periodStart, periodEnd) {
       // Fetch opportunities and pipelines
       const [oppResponse, pipelineResponse] = await Promise.all([
-        api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=500`),
-        api.get(`/api/v1/integrations/connector-data?entity_type=pipeline&limit=50`)
+        api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}`),
+        api.get(`/api/v1/integrations/connector-data?entity_type=pipeline`)
       ]);
 
       const opportunities = oppResponse?.data || [];
@@ -4021,8 +4029,8 @@
     async function showAverageCaseValueDrilldown(content, periodStart, periodEnd) {
       //Fetch both opportunities and contacts
       const [oppResponse, contactsResponse] = await Promise.all([
-        api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=500`),
-        api.get(`/api/v1/integrations/connector-data?entity_type=contact&start_date=${periodStart}&end_date=${periodEnd}&limit=1000`)
+        api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}`),
+        api.get(`/api/v1/integrations/connector-data?entity_type=contact&start_date=${periodStart}&end_date=${periodEnd}`)
       ]);
 
       const opportunities = oppResponse?.data || [];
@@ -4480,7 +4488,7 @@
     // Drill-down: Consultations Held
     async function showConsultationsHeldDrilldown(content, periodStart, periodEnd) {
       // Fetch all opportunities
-      const oppResponse = await api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=500`);
+      const oppResponse = await api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}`);
       const opportunities = oppResponse?.data || [];
 
       // Categorize opportunities by consultation status
@@ -4902,7 +4910,7 @@
     // Drill-down: Time to Engagement
     async function showTimeToEngagementDrilldown(content, periodStart, periodEnd) {
       // Fetch all engaged opportunities
-      const opportunitiesResponse = await api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}&limit=1000`);
+      const opportunitiesResponse = await api.get(`/api/v1/integrations/connector-data?entity_type=opportunity&start_date=${periodStart}&end_date=${periodEnd}`);
       const allOpps = opportunitiesResponse?.data || [];
 
       // Filter to engaged opportunities (won/open/active with createdAt and updatedAt)
