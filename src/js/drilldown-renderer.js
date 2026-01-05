@@ -1388,48 +1388,76 @@ class DrilldownRenderer {
       return this.formatValue(value, column.format);
     }
 
-    // For numeric values (like quality scores), map to the appropriate legend range
     let displayValue = value;
-    let legendKey = value;
+    let legendKey = String(value); // Convert to string for lookup
 
-    if (typeof value === 'number') {
-      // Map numeric quality scores to legend ranges
+    // First, try exact match in legend (for component scores like 0, 15, 20, 30, 50)
+    if (!column.legend[legendKey] && typeof value === 'number') {
+      // No exact match - try range mapping for quality scores (80-100, 60-79, etc.)
       if (value >= 80) {
         legendKey = '80-100';
       } else if (value >= 60) {
         legendKey = '60-79';
       } else if (value >= 40) {
         legendKey = '40-59';
-      } else {
+      } else if (value >= 0) {
         legendKey = '0-39';
       }
-      displayValue = value; // Show the actual score
     }
 
     // Get legend text for this value
     const legendText = column.legend[legendKey];
-    const colorMap = {
-      'Showed': 'bg-green-100 text-green-800',
-      'No-Show': 'bg-red-100 text-red-800',
-      'Cancelled': 'bg-gray-100 text-gray-800',
-      'Rescheduled': 'bg-yellow-100 text-yellow-800',
-      'Pending': 'bg-blue-100 text-blue-800',
-      'Converted to Case': 'bg-green-100 text-green-800',
-      'Won in CRM (No Case)': 'bg-yellow-100 text-yellow-800',
-      'In Pipeline': 'bg-blue-100 text-blue-800',
-      'Lost/Abandoned': 'bg-red-100 text-red-800',
-      'Contact + Opportunity': 'bg-green-100 text-green-800',
-      'Contact Only': 'bg-gray-100 text-gray-800',
-      'Opportunity Only': 'bg-blue-100 text-blue-800',
-      // Quality score ranges
-      '80-100': 'bg-green-100 text-green-800',
-      '60-79': 'bg-yellow-100 text-yellow-800',
-      '40-59': 'bg-orange-100 text-orange-800',
-      '0-39': 'bg-blue-100 text-blue-800'
+
+    // If we have legend text, show that instead of the raw value
+    // Keep the raw value as a tooltip for context
+    if (legendText) {
+      displayValue = legendText;
+    }
+
+    // Color mapping based on score value and type
+    const getColorClass = (key, val) => {
+      // Exact value colors (component scores)
+      const exactColors = {
+        '50': 'bg-green-100 text-green-800',
+        '30': 'bg-green-100 text-green-800',
+        '25': 'bg-blue-100 text-blue-800',
+        '20': 'bg-blue-100 text-blue-800',
+        '15': 'bg-yellow-100 text-yellow-800',
+        '10': 'bg-red-100 text-red-800',
+        '0': 'bg-gray-100 text-gray-800'
+      };
+
+      // Range colors (quality scores)
+      const rangeColors = {
+        '80-100': 'bg-green-100 text-green-800',
+        '60-79': 'bg-yellow-100 text-yellow-800',
+        '40-59': 'bg-orange-100 text-orange-800',
+        '0-39': 'bg-blue-100 text-blue-800'
+      };
+
+      // Status colors
+      const statusColors = {
+        'Showed': 'bg-green-100 text-green-800',
+        'No-Show': 'bg-red-100 text-red-800',
+        'Cancelled': 'bg-gray-100 text-gray-800',
+        'Rescheduled': 'bg-yellow-100 text-yellow-800',
+        'Pending': 'bg-blue-100 text-blue-800',
+        'Converted to Case': 'bg-green-100 text-green-800',
+        'Won in CRM (No Case)': 'bg-yellow-100 text-yellow-800',
+        'In Pipeline': 'bg-blue-100 text-blue-800',
+        'Lost/Abandoned': 'bg-red-100 text-red-800',
+        'Contact + Opportunity': 'bg-green-100 text-green-800',
+        'Contact Only': 'bg-gray-100 text-gray-800',
+        'Opportunity Only': 'bg-blue-100 text-blue-800'
+      };
+
+      return exactColors[key] || rangeColors[key] || statusColors[key] || 'bg-gray-100 text-gray-800';
     };
 
-    const colorClass = colorMap[legendKey] || 'bg-gray-100 text-gray-800';
-    const title = legendText ? this.escapeHtml(legendText) : '';
+    const colorClass = getColorClass(legendKey, value);
+
+    // Tooltip shows original value for reference (e.g., "Score: 20")
+    const title = typeof value === 'number' ? `Score: ${value}` : '';
 
     return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colorClass}" title="${title}">${this.escapeHtml(displayValue)}</span>`;
   }
