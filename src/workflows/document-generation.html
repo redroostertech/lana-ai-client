@@ -3079,8 +3079,28 @@
               window.open(result.document.url, '_blank');
               Toast.success(`Document downloaded as ${format.toUpperCase()}`);
             } else if (result.document && result.document.content) {
-              // Format 2: { document: { content: "..." } }
-              const blob = new Blob([result.document.content], {
+              // Format 2: { document: { content: "..." } } - likely base64
+              const content = result.document.content;
+              console.log('[DocumentGeneration] Content type:', typeof content, 'Length:', content.length);
+
+              // Try to decode base64 if it looks like base64
+              let binaryData;
+              try {
+                // Remove data URI prefix if present (e.g., "data:application/pdf;base64,")
+                const base64Data = content.replace(/^data:[^;]+;base64,/, '');
+                binaryData = atob(base64Data);
+              } catch (e) {
+                console.warn('[DocumentGeneration] Not base64, using raw content:', e);
+                binaryData = content;
+              }
+
+              // Convert to Uint8Array for proper binary handling
+              const bytes = new Uint8Array(binaryData.length);
+              for (let i = 0; i < binaryData.length; i++) {
+                bytes[i] = binaryData.charCodeAt(i);
+              }
+
+              const blob = new Blob([bytes], {
                 type: format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
               });
               const url = URL.createObjectURL(blob);
@@ -3093,8 +3113,28 @@
               URL.revokeObjectURL(url);
               Toast.success(`Document downloaded as ${format.toUpperCase()}`);
             } else if (result.content) {
-              // Format 3: { content: "..." }
-              const blob = new Blob([result.content], {
+              // Format 3: { content: "..." } - likely base64
+              const content = result.content;
+              console.log('[DocumentGeneration] Content type:', typeof content, 'Length:', content.length);
+
+              // Try to decode base64 if it looks like base64
+              let binaryData;
+              try {
+                // Remove data URI prefix if present (e.g., "data:application/pdf;base64,")
+                const base64Data = content.replace(/^data:[^;]+;base64,/, '');
+                binaryData = atob(base64Data);
+              } catch (e) {
+                console.warn('[DocumentGeneration] Not base64, using raw content:', e);
+                binaryData = content;
+              }
+
+              // Convert to Uint8Array for proper binary handling
+              const bytes = new Uint8Array(binaryData.length);
+              for (let i = 0; i < binaryData.length; i++) {
+                bytes[i] = binaryData.charCodeAt(i);
+              }
+
+              const blob = new Blob([bytes], {
                 type: format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
               });
               const url = URL.createObjectURL(blob);
