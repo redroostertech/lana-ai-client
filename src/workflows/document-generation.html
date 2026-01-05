@@ -1786,6 +1786,7 @@
 
       // Hide bubble menu when clicking outside
       document.addEventListener('click', (e) => {
+        if (!tiptapEditor || !tiptapEditor.view) return;
         if (!bubbleMenu.contains(e.target) && !tiptapEditor.view.dom.contains(e.target)) {
           bubbleMenu.classList.add('hidden');
         }
