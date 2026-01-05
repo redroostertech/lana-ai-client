@@ -1453,7 +1453,13 @@ class DrilldownRenderer {
         'Lost/Abandoned': 'bg-red-100 text-red-800',
         'Contact + Opportunity': 'bg-green-100 text-green-800',
         'Contact Only': 'bg-gray-100 text-gray-800',
-        'Opportunity Only': 'bg-blue-100 text-blue-800'
+        'Opportunity Only': 'bg-blue-100 text-blue-800',
+        // Response speed colors
+        'Instant': 'bg-green-100 text-green-800',
+        'Fast': 'bg-yellow-100 text-yellow-800',
+        'Slow': 'bg-orange-100 text-orange-800',
+        'Very Slow': 'bg-red-100 text-red-800',
+        'No Response': 'bg-gray-100 text-gray-800'
       };
 
       return exactColors[key] || rangeColors[key] || statusColors[key] || 'bg-gray-100 text-gray-800';
