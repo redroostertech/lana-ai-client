@@ -990,6 +990,10 @@
             <span style="text-decoration: line-through;">S</span>
           </button>
           <div class="w-px h-6 bg-gray-300 mx-1"></div>
+          <button id="bubbleLink" class="bubble-btn" title="Add/Edit Link (⌘K)">
+            <span>🔗</span>
+          </button>
+          <div class="w-px h-6 bg-gray-300 mx-1"></div>
           <button id="bubbleAlignLeft" class="bubble-btn" title="Align Left">
             <span>⫤</span>
           </button>
@@ -1668,7 +1672,11 @@
       tiptapEditor = new window.TiptapEditor({
         element: editorContainer,
         extensions: [
-          window.TiptapStarterKit,
+          window.TiptapStarterKit.configure({
+            bold: {},
+            italic: {},
+            strike: {},
+          }),
           window.TiptapPlaceholder.configure({
             placeholder: "Type '/' for commands, or just start writing...",
             emptyEditorClass: 'is-editor-empty',
@@ -1813,6 +1821,10 @@
         updateBubbleMenuActiveStates();
       });
 
+      document.getElementById('bubbleLink').addEventListener('click', () => {
+        openLinkModal();
+      });
+
       document.getElementById('bubbleAlignLeft').addEventListener('click', () => {
         tiptapEditor.chain().focus().setTextAlign('left').run();
         updateBubbleMenuActiveStates();
@@ -1835,11 +1847,14 @@
     }
 
     function updateBubbleMenuActiveStates() {
+      if (!tiptapEditor) return;
+
       // Update bold, italic, underline, strikethrough active states
       document.getElementById('bubbleBold').classList.toggle('is-active', tiptapEditor.isActive('bold'));
       document.getElementById('bubbleItalic').classList.toggle('is-active', tiptapEditor.isActive('italic'));
       document.getElementById('bubbleUnderline').classList.toggle('is-active', tiptapEditor.isActive('underline'));
       document.getElementById('bubbleStrike').classList.toggle('is-active', tiptapEditor.isActive('strike'));
+      document.getElementById('bubbleLink').classList.toggle('is-active', tiptapEditor.isActive('link'));
 
       // Update alignment active states
       document.getElementById('bubbleAlignLeft').classList.toggle('is-active', tiptapEditor.isActive({ textAlign: 'left' }));
