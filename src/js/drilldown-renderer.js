@@ -507,11 +507,19 @@ class DrilldownRenderer {
           requestBody.viewType = this.currentViewType;
         }
 
+        console.log('[DrilldownRenderer] Executing drilldown request:', {
+          moduleKey: this.currentConfig.moduleKey,
+          metricKey: this.currentConfig.metricKey,
+          requestBody
+        });
+
         const response = await apiClient.post(
           `/api/v1/modules/${this.currentConfig.moduleKey}/metrics/${this.currentConfig.metricKey}/drilldown/execute`,
           requestBody
         );
         result = response;
+
+        console.log('[DrilldownRenderer] Received response:', result);
       } else {
         // Fallback to fetch for non-Electron environments
         const requestBody = {
@@ -551,7 +559,20 @@ class DrilldownRenderer {
         }
 
         result = await response.json();
+
+        console.log('[DrilldownRenderer] Received response (fetch):', result);
       }
+
+      console.log('[DrilldownRenderer] Setting currentData:', result.data);
+      console.log('[DrilldownRenderer] Data structure check:', {
+        hasData: !!result.data,
+        hasRows: !!(result.data && result.data.rows),
+        rowsLength: result.data && result.data.rows ? result.data.rows.length : 0,
+        hasSummary: !!(result.data && result.data.summary),
+        summaryKeys: result.data && result.data.summary ? Object.keys(result.data.summary) : [],
+        hasInsights: !!(result.data && result.data.insights),
+        insightsLength: result.data && result.data.insights ? result.data.insights.length : 0
+      });
 
       this.currentData = result.data;
 
@@ -567,7 +588,18 @@ class DrilldownRenderer {
    * Render the drilldown data
    */
   render() {
-    if (!this.currentData || !this.currentConfig) return;
+    console.log('[DrilldownRenderer] render() called');
+    console.log('[DrilldownRenderer] Render checks:', {
+      hasCurrentData: !!this.currentData,
+      hasCurrentConfig: !!this.currentConfig,
+      currentDataType: typeof this.currentData,
+      currentConfigType: typeof this.currentConfig
+    });
+
+    if (!this.currentData || !this.currentConfig) {
+      console.warn('[DrilldownRenderer] Missing data or config, aborting render');
+      return;
+    }
 
     // Hide loading state
     document.getElementById('drilldown-loading').classList.add('hidden');
@@ -578,44 +610,81 @@ class DrilldownRenderer {
     this.renderExportButtons();
 
     // Check if we have data
-    if (this.currentData.rows.length === 0) {
+    console.log('[DrilldownRenderer] Checking for rows:', {
+      hasRowsProperty: 'rows' in this.currentData,
+      rowsType: typeof this.currentData.rows,
+      rowsLength: this.currentData.rows ? this.currentData.rows.length : 'N/A'
+    });
+
+    if (!this.currentData.rows || this.currentData.rows.length === 0) {
+      console.log('[DrilldownRenderer] No rows found, showing empty state');
       document.getElementById('drilldown-table').classList.add('hidden');
       document.getElementById('drilldown-empty').classList.remove('hidden');
       return;
     }
 
     // Show table
+    console.log('[DrilldownRenderer] Showing table with', this.currentData.rows.length, 'rows');
     document.getElementById('drilldown-empty').classList.add('hidden');
     document.getElementById('drilldown-table').classList.remove('hidden');
 
     // Render insights (if enabled)
+    console.log('[DrilldownRenderer] Checking insights:', {
+      insightsEnabled: this.currentConfig.insights?.enabled,
+      hasInsightsData: !!this.currentData.insights,
+      insightsLength: this.currentData.insights ? this.currentData.insights.length : 0
+    });
+
     if (this.currentConfig.insights?.enabled && this.currentData.insights) {
+      console.log('[DrilldownRenderer] Rendering insights...');
       this.renderInsights();
     }
 
     // Render summary (if enabled)
+    console.log('[DrilldownRenderer] Checking summary:', {
+      summaryEnabled: this.currentConfig.summary?.enabled,
+      hasSummaryData: !!this.currentData.summary,
+      summaryKeys: this.currentData.summary ? Object.keys(this.currentData.summary) : []
+    });
+
     if (this.currentConfig.summary?.enabled && this.currentData.summary) {
+      console.log('[DrilldownRenderer] Rendering summary...');
       this.renderSummary();
     }
 
     // Render table
+    console.log('[DrilldownRenderer] Rendering table...');
     this.renderTable();
 
     // Render pagination
+    console.log('[DrilldownRenderer] Rendering pagination...');
     this.renderPagination();
+
+    console.log('[DrilldownRenderer] render() complete');
   }
 
   /**
    * Render insights/alerts based on data patterns
    */
   renderInsights() {
+    console.log('[DrilldownRenderer] renderInsights() called');
     const container = document.getElementById('drilldown-insights');
+
+    console.log('[DrilldownRenderer] Insights data check:', {
+      hasInsights: !!this.currentData.insights,
+      isArray: Array.isArray(this.currentData.insights),
+      length: this.currentData.insights ? this.currentData.insights.length : 0,
+      insights: this.currentData.insights
+    });
 
     // Check if insights data exists
     if (!this.currentData.insights || !Array.isArray(this.currentData.insights) || this.currentData.insights.length === 0) {
+      console.log('[DrilldownRenderer] No insights to render, hiding container');
       container.classList.add('hidden');
       return;
     }
+
+    console.log('[DrilldownRenderer] Rendering', this.currentData.insights.length, 'insights');
 
     // Show container
     container.classList.remove('hidden');
@@ -742,13 +811,24 @@ class DrilldownRenderer {
    * Render summary statistics (detects structure and delegates)
    */
   renderSummary() {
+    console.log('[DrilldownRenderer] renderSummary() called');
+    console.log('[DrilldownRenderer] Summary config check:', {
+      hasSections: !!(this.currentConfig.summary?.sections),
+      hasFields: !!(this.currentConfig.summary?.fields),
+      summaryConfig: this.currentConfig.summary
+    });
+    console.log('[DrilldownRenderer] Summary data:', this.currentData.summary);
+
     // Check if summary.sections exists (new structure)
     if (this.currentConfig.summary?.sections) {
+      console.log('[DrilldownRenderer] Using sectioned summary layout');
       this.renderSectionedSummary();
     } else if (this.currentConfig.summary?.fields) {
+      console.log('[DrilldownRenderer] Using flat summary layout (legacy)');
       // Render flat layout (backwards compatibility)
       this.renderFlatSummary();
     } else {
+      console.log('[DrilldownRenderer] No summary configured, hiding container');
       // No summary configured
       const container = document.getElementById('drilldown-summary-container');
       container.classList.add('hidden');
