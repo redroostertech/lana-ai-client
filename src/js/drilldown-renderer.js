@@ -588,6 +588,11 @@ class DrilldownRenderer {
     document.getElementById('drilldown-empty').classList.add('hidden');
     document.getElementById('drilldown-table').classList.remove('hidden');
 
+    // Render insights (if enabled)
+    if (this.currentConfig.insights?.enabled && this.currentData.insights) {
+      this.renderInsights();
+    }
+
     // Render summary (if enabled)
     if (this.currentConfig.summary?.enabled && this.currentData.summary) {
       this.renderSummary();
@@ -598,6 +603,139 @@ class DrilldownRenderer {
 
     // Render pagination
     this.renderPagination();
+  }
+
+  /**
+   * Render insights/alerts based on data patterns
+   */
+  renderInsights() {
+    const container = document.getElementById('drilldown-insights');
+
+    // Check if insights data exists
+    if (!this.currentData.insights || !Array.isArray(this.currentData.insights) || this.currentData.insights.length === 0) {
+      container.classList.add('hidden');
+      return;
+    }
+
+    // Show container
+    container.classList.remove('hidden');
+
+    // Render each insight as a card
+    const insightsHTML = this.currentData.insights.map(insight => {
+      // Determine background and border colors based on insight type
+      const colorClasses = this.getInsightColorClasses(insight.type);
+
+      // Substitute template variables in message
+      const message = this.substituteInsightTemplate(insight.message, insight.data);
+
+      // Render action if provided
+      const actionHTML = insight.action
+        ? `<div class="mt-2">
+             <p class="${colorClasses.text}"><strong>What to do:</strong> ${this.escapeHtml(insight.action)}</p>
+           </div>`
+        : '';
+
+      return `
+        <div class="rounded-md ${colorClasses.bg} p-4 border-l-4 ${colorClasses.border}">
+          <div class="flex">
+            <div class="flex-shrink-0">
+              <span class="text-2xl">${insight.icon}</span>
+            </div>
+            <div class="ml-3">
+              <h3 class="text-sm font-medium ${colorClasses.title}">${this.escapeHtml(insight.title)}</h3>
+              <div class="mt-2 text-sm ${colorClasses.text}">
+                <p>${this.escapeHtml(message)}</p>
+              </div>
+              ${actionHTML}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    container.innerHTML = insightsHTML;
+  }
+
+  /**
+   * Get Tailwind CSS color classes for insight type
+   * @param {string} type - Insight type (alert, warning, success, info)
+   * @returns {Object} - Object with bg, border, title, and text color classes
+   */
+  getInsightColorClasses(type) {
+    const colorMap = {
+      alert: {
+        bg: 'bg-red-50',
+        border: 'border-red-400',
+        title: 'text-red-800',
+        text: 'text-red-700'
+      },
+      warning: {
+        bg: 'bg-yellow-50',
+        border: 'border-yellow-400',
+        title: 'text-yellow-800',
+        text: 'text-yellow-700'
+      },
+      success: {
+        bg: 'bg-green-50',
+        border: 'border-green-400',
+        title: 'text-green-800',
+        text: 'text-green-700'
+      },
+      info: {
+        bg: 'bg-blue-50',
+        border: 'border-blue-400',
+        title: 'text-blue-800',
+        text: 'text-blue-700'
+      }
+    };
+
+    return colorMap[type] || colorMap.info;
+  }
+
+  /**
+   * Substitute template variables in insight message
+   * Supports {{field}} and {{field | currency}} and {{field | number}}
+   * @param {string} template - Message template with {{variables}}
+   * @param {Object} data - Data object containing field values
+   * @returns {string} - Message with substituted values
+   */
+  substituteInsightTemplate(template, data) {
+    if (!template || !data) return template || '';
+
+    let result = template;
+
+    // Match {{variable}} or {{variable | format}} patterns
+    const matches = template.match(/\{\{([^}]+)\}\}/g);
+
+    if (matches) {
+      matches.forEach(match => {
+        // Extract field name and optional format filter
+        const content = match.replace(/\{\{|\}\}/g, '').trim();
+        const parts = content.split('|').map(p => p.trim());
+        const fieldName = parts[0];
+        const formatFilter = parts[1]; // 'currency', 'number', or undefined
+
+        const value = data[fieldName];
+
+        // Format the value based on filter
+        let formattedValue;
+        if (formatFilter === 'currency') {
+          formattedValue = this.formatValue(value, { type: 'currency', prefix: '$', decimals: 0 });
+        } else if (formatFilter === 'number') {
+          formattedValue = this.formatValue(value, { type: 'number', decimals: 1 });
+        } else {
+          // No format filter - use raw value or format as number if numeric
+          formattedValue = typeof value === 'number'
+            ? this.formatValue(value, { type: 'number', decimals: 1 })
+            : (value || '');
+        }
+
+        // Replace the match with formatted value
+        result = result.replace(match, formattedValue);
+      });
+    }
+
+    return result;
   }
 
   /**
