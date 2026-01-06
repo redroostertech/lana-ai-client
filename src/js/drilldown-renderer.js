@@ -6,6 +6,23 @@
  * @description Data-driven component that fetches and renders drilldown data based on metric configuration
  */
 
+// Marked library is loaded globally via script tag (see module-execution.html)
+// The UMD build creates a global 'marked' object
+// Configure marked if available
+if (typeof marked !== 'undefined' && marked) {
+  try {
+    marked.use({
+      breaks: true,
+      gfm: true
+    });
+    console.log('[DrilldownRenderer] Marked library loaded successfully');
+  } catch (e) {
+    console.warn('[DrilldownRenderer] Error configuring marked:', e);
+  }
+} else {
+  console.warn('[DrilldownRenderer] Marked library not available, markdown will not be rendered');
+}
+
 class DrilldownRenderer {
   constructor() {
     this.modal = null;
@@ -1097,6 +1114,63 @@ class DrilldownRenderer {
   }
 
   /**
+   * Render inline markdown text to HTML (for single lines, headings, etc.)
+   * Falls back to escapeHtml if marked library is not available
+   */
+  renderMarkdownInline(text) {
+    // Handle non-string values
+    if (text === null || text === undefined) return '';
+    if (typeof text !== 'string') text = String(text);
+
+    // If marked is available, use it to render markdown
+    if (marked && typeof marked.parseInline === 'function') {
+      try {
+        // Use parseInline for inline markdown (no <p> tags)
+        return marked.parseInline(text);
+      } catch (e) {
+        console.warn('[DrilldownRenderer] Error rendering inline markdown:', e);
+        return this.escapeHtml(text);
+      }
+    }
+
+    // Fallback: escape HTML if marked is not available
+    return this.escapeHtml(text);
+  }
+
+  /**
+   * Render block-level markdown text to HTML (for paragraphs, lists, multi-line content)
+   * Falls back to escapeHtml if marked library is not available
+   */
+  renderMarkdownBlock(text) {
+    // Handle non-string values
+    if (text === null || text === undefined) return '';
+    if (typeof text !== 'string') text = String(text);
+
+    // If marked is available, use it to render markdown
+    if (marked && typeof marked.parse === 'function') {
+      try {
+        // Use parse for block-level markdown (with <p> tags, line breaks, etc.)
+        let html = marked.parse(text);
+
+        // Remove outer <p> tags if present (for cleaner rendering in our context)
+        // But keep inner structure like lists, line breaks, bold, etc.
+        html = html.trim();
+        if (html.startsWith('<p>') && html.endsWith('</p>') && html.split('<p>').length === 2) {
+          html = html.slice(3, -4); // Remove outer <p></p> only
+        }
+
+        return html;
+      } catch (e) {
+        console.warn('[DrilldownRenderer] Error rendering block markdown:', e);
+        return this.escapeHtml(text);
+      }
+    }
+
+    // Fallback: escape HTML and preserve line breaks if marked is not available
+    return this.escapeHtml(text).replace(/\n/g, '<br>');
+  }
+
+  /**
    * Format entity names as tag-style badges
    * Looks for capitalized entity names (Contact, Opportunity, Contact ID, etc.) and wraps them in badge styles
    */
@@ -1353,15 +1427,19 @@ class DrilldownRenderer {
       helpText.sections.forEach(section => {
         html += `<div class="mb-6">`;
         if (section.heading) {
-          html += `<h3 class="text-lg font-semibold text-gray-900 mb-2">${this.escapeHtml(section.heading)}</h3>`;
+          // Headings are inline content
+          html += `<h3 class="text-lg font-semibold text-gray-900 mb-2">${this.renderMarkdownInline(section.heading)}</h3>`;
         }
         if (section.content) {
-          html += `<p class="text-sm text-gray-700 mb-2">${this.formatEntityNames(this.escapeHtml(section.content))}</p>`;
+          // Content may contain line breaks, lists, etc. - use block rendering
+          // Don't wrap in <p> tags since renderMarkdownBlock may return multiple elements
+          html += `<div class="text-sm text-gray-700 mb-2">${this.formatEntityNames(this.renderMarkdownBlock(section.content))}</div>`;
         }
         if (section.bullets && section.bullets.length > 0) {
           html += '<ul class="list-disc list-inside text-sm text-gray-700 space-y-1 ml-4">';
           section.bullets.forEach(bullet => {
-            html += `<li>${this.formatEntityNames(this.escapeHtml(bullet))}</li>`;
+            // Bullets may contain inline markdown (bold, etc.)
+            html += `<li>${this.formatEntityNames(this.renderMarkdownInline(bullet))}</li>`;
           });
           html += '</ul>';
         }
