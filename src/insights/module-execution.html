@@ -5242,38 +5242,40 @@
       return `
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
           <!-- Metric Header -->
-          <div class="flex items-start justify-between mb-4">
-            <div class="flex-1">
+          <div class="mb-4">
+            <!-- Row 1: Metric Name, Status Badge, Details Button -->
+            <div class="flex items-center justify-between gap-2 mb-2">
               <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide">${metric.name}</h3>
-              <p class="text-xs text-gray-400 mt-1">${metric.description || ''}</p>
+              <div class="flex items-center gap-2">
+                ${getStatusBadge(statusColor)}
+                ${metric.hasDrilldown ? `
+                <button
+                  onclick="openGenericDrilldown('${metric.key}', '${metric.name}')"
+                  class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 transition-colors whitespace-nowrap"
+                  title="View detailed data breakdown"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                  </svg>
+                  Details
+                </button>
+                ` : `
+                <button
+                  onclick="showMetricDrilldown('${metric.key}', '${metric.name}')"
+                  class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 transition-colors whitespace-nowrap"
+                  title="View details and see how this is calculated"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                  </svg>
+                  Details
+                </button>
+                `}
+              </div>
             </div>
-            <div class="flex items-center gap-2">
-              ${getStatusBadge(statusColor)}
-              ${metric.hasDrilldown ? `
-              <button
-                onclick="openGenericDrilldown('${metric.key}', '${metric.name}')"
-                class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 transition-colors"
-                title="View detailed data breakdown"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                </svg>
-                View Data
-              </button>
-              ` : `
-              <button
-                onclick="showMetricDrilldown('${metric.key}', '${metric.name}')"
-                class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 transition-colors"
-                title="View details and see how this is calculated"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                </svg>
-                Details
-              </button>
-              `}
-            </div>
+            <!-- Row 2: Description -->
+            <p class="text-xs text-gray-400">${metric.description || ''}</p>
           </div>
 
           <!-- Current Value -->
@@ -5452,10 +5454,14 @@
           return renderComparisonChart(viz, data, uniqueId);
         case 'pie_chart':
           return renderPieChart(viz, data, uniqueId);
+        case 'funnel_chart':
+          return renderFunnelChart(viz, data, uniqueId);
         case 'bubble_chart':
           return renderBubbleChart(viz, data, uniqueId);
         case 'grouped_bar_chart':
           return renderGroupedBarChart(viz, data, uniqueId);
+        case 'horizontal_bar_chart':
+          return renderHorizontalBarChart(viz, data, uniqueId);
         case 'table':
           return renderTable(viz, data, uniqueId);
         default:
@@ -5959,6 +5965,297 @@
       }, 100);
 
       return div;
+    }
+
+    /**
+     * Render funnel_chart visualization
+     */
+    function renderFunnelChart(viz, data, uniqueId) {
+      console.log('[renderFunnelChart] START', { viz, data, uniqueId });
+
+      const div = document.createElement('div');
+      div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
+
+      const canvasId = `chart-${uniqueId}`;
+      const helpTextHTML = renderHelpTextModal(viz.helpText, uniqueId);
+
+      console.log('[renderFunnelChart] Creating container HTML', { canvasId });
+
+      div.innerHTML = `
+        <div class="flex items-center mb-4">
+          <h3 class="text-lg font-semibold text-gray-900">${viz.title || 'Funnel Chart'}</h3>
+          ${helpTextHTML}
+        </div>
+        ${viz.description ? `<p class="text-sm text-gray-500 mb-4">${viz.description}</p>` : ''}
+        <div class="h-96">
+          <canvas id="${canvasId}"></canvas>
+        </div>
+      `;
+
+      setTimeout(() => {
+        console.log('[renderFunnelChart] setTimeout executing');
+
+        const ctx = document.getElementById(canvasId);
+        console.log('[renderFunnelChart] Canvas element:', ctx);
+
+        if (!ctx) {
+          console.error('[renderFunnelChart] Canvas element not found!', { canvasId });
+          return;
+        }
+
+        console.log('[renderFunnelChart] viz.metrics:', viz.metrics);
+        console.log('[renderFunnelChart] data.metrics:', data.metrics);
+
+        // Find the metric with funnel progression data
+        const metric = data.metrics.find(m => viz.metrics.includes(m.key));
+        console.log('[renderFunnelChart] Found metric:', metric);
+
+        if (!metric) {
+          console.error('[renderFunnelChart] Metric not found!', {
+            vizMetrics: viz.metrics,
+            availableMetrics: data.metrics.map(m => m.key)
+          });
+          return;
+        }
+
+        if (!Array.isArray(metric.current)) {
+          console.error('[renderFunnelChart] metric.current is not an array!', {
+            metricKey: metric.key,
+            current: metric.current,
+            currentType: typeof metric.current
+          });
+          return;
+        }
+
+        const funnelData = metric.current;
+        console.log('[renderFunnelChart] Funnel data:', funnelData);
+
+        // Extract data from metric result
+        const labels = funnelData.map(d => d.label || 'Unknown');
+        const values = funnelData.map(d => d.value || 0);
+        const percentages = funnelData.map(d => d.percentage || 0);
+        const dropoffRates = funnelData.map(d => d.dropoff_rate || 0);
+
+        console.log('[renderFunnelChart] Extracted data:', {
+          labels,
+          values,
+          percentages,
+          dropoffRates
+        });
+
+        // Map colors from config or use defaults
+        const colorScheme = viz.config?.colorScheme || {};
+        const colors = labels.map(label => {
+          const normalizedLabel = label.toLowerCase();
+          return colorScheme[normalizedLabel] || '#6b7280';
+        });
+
+        console.log('[renderFunnelChart] Colors:', colors);
+        console.log('[renderFunnelChart] Creating Chart.js instance...');
+
+        const chart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Leads',
+              data: values,
+              backgroundColor: colors,
+              borderColor: colors,
+              borderWidth: 1
+            }]
+          },
+          options: {
+            indexAxis: 'y', // Horizontal bars for funnel effect
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: false
+              },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    const index = context.dataIndex;
+                    const value = context.parsed.x;
+                    const percentage = percentages[index];
+                    const dropoff = dropoffRates[index];
+
+                    let label = `${value} leads (${percentage}%)`;
+                    if (dropoff > 0) {
+                      label += ` | ${dropoff}% drop-off from previous stage`;
+                    }
+                    return label;
+                  }
+                }
+              }
+            },
+            scales: {
+              x: {
+                beginAtZero: true,
+                title: {
+                  display: true,
+                  text: 'Number of Leads'
+                }
+              }
+            },
+            onClick: (event, elements) => {
+              if (elements.length > 0) {
+                const index = elements[0].index;
+                const stage = labels[index];
+                // Trigger drilldown with stage parameter
+                openDrilldown(metric.key, { drill_stage: stage });
+              }
+            }
+          }
+        });
+
+        console.log('[renderFunnelChart] Chart.js instance created successfully:', chart);
+        chartInstances[canvasId] = chart;
+      }, 100);
+
+      return div;
+    }
+
+    /**
+     * Render horizontal_bar_chart visualization
+     */
+    function renderHorizontalBarChart(viz, data, uniqueId) {
+      const div = document.createElement('div');
+      div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
+
+      // Title and description
+      const header = document.createElement('div');
+      header.className = 'mb-4';
+      header.innerHTML = `
+        <h3 class="text-lg font-semibold text-gray-900 mb-1">${viz.title || 'Chart'}</h3>
+        ${viz.description ? `<p class="text-sm text-gray-600">${viz.description}</p>` : ''}
+      `;
+      div.appendChild(header);
+
+      // Chart container
+      const chartContainer = document.createElement('div');
+      chartContainer.className = 'h-96';
+      div.appendChild(chartContainer);
+
+      // Render chart after DOM insertion
+      setTimeout(() => {
+        renderHorizontalBarChartCanvas(chartContainer, viz, data, uniqueId);
+      }, 100);
+
+      return div;
+    }
+
+    /**
+     * Render horizontal bar chart on canvas using Chart.js
+     */
+    function renderHorizontalBarChartCanvas(container, viz, data, uniqueId) {
+      // Find the metric data
+      const metricKey = viz.metrics?.[0];
+      if (!metricKey) {
+        console.error('[renderHorizontalBarChart] No metric specified');
+        container.innerHTML = '<p class="text-gray-500 text-center py-8">No metric configured</p>';
+        return;
+      }
+
+      const metric = data.metrics?.find(m => m.key === metricKey);
+      if (!metric) {
+        console.error('[renderHorizontalBarChart] Metric not found', { metricKey });
+        container.innerHTML = '<p class="text-gray-500 text-center py-8">Metric not found</p>';
+        return;
+      }
+
+      // Extract data (distribution metrics use 'current' field which is an array)
+      const chartData = Array.isArray(metric.current) ? metric.current : (Array.isArray(metric.result) ? metric.result : []);
+
+      if (chartData.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-center py-8">No data for this period</p>';
+        return;
+      }
+
+      // Extract labels and values
+      const labels = chartData.map(d => d.label || 'Unknown');
+      const values = chartData.map(d => d.value || 0);
+
+      // Determine if this is a percentage metric (check suffix or format)
+      const isPercentage = metric.format?.suffix === '%' || metric.unit === 'percent';
+
+      // Create canvas
+      const canvas = document.createElement('canvas');
+      container.appendChild(canvas);
+
+      // Create chart
+      const chart = new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: metric.name,
+            data: values,
+            backgroundColor: 'rgba(99, 102, 241, 0.8)', // Indigo
+            borderColor: 'rgba(99, 102, 241, 1)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          indexAxis: 'y', // Horizontal bars
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const value = context.parsed.x;
+                  if (isPercentage) {
+                    return `${value}%`;
+                  } else {
+                    return `${value} ${metric.unit || ''}`.trim();
+                  }
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: isPercentage ? 'Percentage (%)' : (metric.unit || 'Value')
+              },
+              ticks: {
+                callback: function(value) {
+                  return isPercentage ? `${value}%` : value;
+                }
+              }
+            },
+            y: {
+              title: {
+                display: false
+              }
+            }
+          },
+          onClick: (event, elements) => {
+            if (elements.length > 0) {
+              const index = elements[0].index;
+              const label = labels[index];
+              // Trigger drilldown if available
+              if (metric.drilldown?.enabled && window.openDrilldown) {
+                // Pass the label as drill_source parameter
+                window.openDrilldown(metricKey, { drill_source: label });
+              }
+            }
+          }
+        }
+      });
+
+      // Store chart instance for cleanup
+      if (!window.chartInstances) {
+        window.chartInstances = {};
+      }
+      window.chartInstances[`${uniqueId}_horizontal_bar`] = chart;
     }
 
     /**
