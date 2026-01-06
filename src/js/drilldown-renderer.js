@@ -609,26 +609,7 @@ class DrilldownRenderer {
     this.renderSortOptions();
     this.renderExportButtons();
 
-    // Check if we have data
-    console.log('[DrilldownRenderer] Checking for rows:', {
-      hasRowsProperty: 'rows' in this.currentData,
-      rowsType: typeof this.currentData.rows,
-      rowsLength: this.currentData.rows ? this.currentData.rows.length : 'N/A'
-    });
-
-    if (!this.currentData.rows || this.currentData.rows.length === 0) {
-      console.log('[DrilldownRenderer] No rows found, showing empty state');
-      document.getElementById('drilldown-table').classList.add('hidden');
-      document.getElementById('drilldown-empty').classList.remove('hidden');
-      return;
-    }
-
-    // Show table
-    console.log('[DrilldownRenderer] Showing table with', this.currentData.rows.length, 'rows');
-    document.getElementById('drilldown-empty').classList.add('hidden');
-    document.getElementById('drilldown-table').classList.remove('hidden');
-
-    // Render insights (if enabled)
+    // Render insights first (even if no rows)
     console.log('[DrilldownRenderer] Checking insights:', {
       insightsEnabled: this.currentConfig.insights?.enabled,
       hasInsightsData: !!this.currentData.insights,
@@ -640,7 +621,7 @@ class DrilldownRenderer {
       this.renderInsights();
     }
 
-    // Render summary (if enabled)
+    // Render summary (even if no rows)
     console.log('[DrilldownRenderer] Checking summary:', {
       summaryEnabled: this.currentConfig.summary?.enabled,
       hasSummaryData: !!this.currentData.summary,
@@ -651,6 +632,26 @@ class DrilldownRenderer {
       console.log('[DrilldownRenderer] Rendering summary...');
       this.renderSummary();
     }
+
+    // Check if we have data rows
+    console.log('[DrilldownRenderer] Checking for rows:', {
+      hasRowsProperty: 'rows' in this.currentData,
+      rowsType: typeof this.currentData.rows,
+      rowsLength: this.currentData.rows ? this.currentData.rows.length : 'N/A'
+    });
+
+    if (!this.currentData.rows || this.currentData.rows.length === 0) {
+      console.log('[DrilldownRenderer] No rows found, showing empty state');
+      document.getElementById('drilldown-table').classList.add('hidden');
+      document.getElementById('drilldown-empty').classList.remove('hidden');
+      // Don't return early - summary and insights are already rendered above
+      return;
+    }
+
+    // Show table (only if we have rows)
+    console.log('[DrilldownRenderer] Showing table with', this.currentData.rows.length, 'rows');
+    document.getElementById('drilldown-empty').classList.add('hidden');
+    document.getElementById('drilldown-table').classList.remove('hidden');
 
     // Render table
     console.log('[DrilldownRenderer] Rendering table...');
