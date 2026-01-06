@@ -645,6 +645,10 @@ class DrilldownRenderer {
       document.getElementById('drilldown-loading').classList.add('hidden');
       document.getElementById('drilldown-table').classList.add('hidden');
       document.getElementById('drilldown-empty').classList.remove('hidden');
+
+      // Render pagination even with 0 rows to show "Showing 0 to 0 of 0 results"
+      this.renderPagination();
+
       // Don't return early - summary and insights are already rendered above
       return;
     }
