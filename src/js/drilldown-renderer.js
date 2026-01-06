@@ -1642,7 +1642,64 @@ class DrilldownRenderer {
     // Render help content
     let html = '';
 
-    if (helpText.sections && helpText.sections.length > 0) {
+    // Support new structure: paragraphs, columnGuide, tips, interpretation
+    if (helpText.paragraphs || helpText.columnGuide || helpText.tips || helpText.interpretation) {
+      console.log('[DrilldownRenderer] Rendering help text with new structure');
+
+      // Render paragraphs
+      if (helpText.paragraphs && helpText.paragraphs.length > 0) {
+        helpText.paragraphs.forEach(para => {
+          html += `<p class="text-sm text-gray-700 mb-4">${this.escapeHtml(para)}</p>`;
+        });
+      }
+
+      // Render column guide
+      if (helpText.columnGuide) {
+        html += '<div class="mb-6">';
+        if (helpText.columnGuide.title) {
+          html += `<h3 class="text-lg font-semibold text-gray-900 mb-2">${this.escapeHtml(helpText.columnGuide.title)}</h3>`;
+        }
+        if (helpText.columnGuide.bullets && helpText.columnGuide.bullets.length > 0) {
+          html += '<ul class="list-disc list-inside text-sm text-gray-700 space-y-1 ml-4">';
+          helpText.columnGuide.bullets.forEach(bullet => {
+            html += `<li>${this.escapeHtml(bullet)}</li>`;
+          });
+          html += '</ul>';
+        }
+        html += '</div>';
+      }
+
+      // Render interpretation
+      if (helpText.interpretation) {
+        html += '<div class="mb-6">';
+        if (helpText.interpretation.title) {
+          html += `<h3 class="text-lg font-semibold text-gray-900 mb-2">${this.escapeHtml(helpText.interpretation.title)}</h3>`;
+        }
+        if (helpText.interpretation.bullets && helpText.interpretation.bullets.length > 0) {
+          html += '<ul class="list-disc list-inside text-sm text-gray-700 space-y-1 ml-4">';
+          helpText.interpretation.bullets.forEach(bullet => {
+            html += `<li>${this.escapeHtml(bullet)}</li>`;
+          });
+          html += '</ul>';
+        }
+        html += '</div>';
+      }
+
+      // Render tips
+      if (helpText.tips && helpText.tips.length > 0) {
+        html += '<div class="mb-6">';
+        html += '<h3 class="text-lg font-semibold text-gray-900 mb-2">💡 Tips</h3>';
+        html += '<ul class="list-disc list-inside text-sm text-gray-700 space-y-1 ml-4">';
+        helpText.tips.forEach(tip => {
+          html += `<li>${this.escapeHtml(tip)}</li>`;
+        });
+        html += '</ul>';
+        html += '</div>';
+      }
+    }
+    // Support old structure: sections array (backwards compatibility)
+    else if (helpText.sections && helpText.sections.length > 0) {
+      console.log('[DrilldownRenderer] Rendering help text with old structure (sections)');
       helpText.sections.forEach(section => {
         html += `<div class="mb-6">`;
         if (section.heading) {
@@ -1664,6 +1721,9 @@ class DrilldownRenderer {
         }
         html += '</div>';
       });
+    } else {
+      console.warn('[DrilldownRenderer] No help text content found');
+      html = '<p class="text-sm text-gray-500">No help documentation available.</p>';
     }
 
     helpContent.innerHTML = html;
