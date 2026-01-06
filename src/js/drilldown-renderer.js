@@ -642,6 +642,7 @@ class DrilldownRenderer {
 
     if (!this.currentData.rows || this.currentData.rows.length === 0) {
       console.log('[DrilldownRenderer] No rows found, showing empty state');
+      document.getElementById('drilldown-loading').classList.add('hidden');
       document.getElementById('drilldown-table').classList.add('hidden');
       document.getElementById('drilldown-empty').classList.remove('hidden');
       // Don't return early - summary and insights are already rendered above
@@ -650,6 +651,7 @@ class DrilldownRenderer {
 
     // Show table (only if we have rows)
     console.log('[DrilldownRenderer] Showing table with', this.currentData.rows.length, 'rows');
+    document.getElementById('drilldown-loading').classList.add('hidden');
     document.getElementById('drilldown-empty').classList.add('hidden');
     document.getElementById('drilldown-table').classList.remove('hidden');
 
@@ -1456,6 +1458,18 @@ class DrilldownRenderer {
     document.getElementById('drilldown-table').classList.add('hidden');
     document.getElementById('drilldown-empty').classList.add('hidden');
     document.getElementById('drilldown-error').classList.add('hidden');
+
+    // Reset pagination display to avoid showing stale counts
+    const paginationInfo = document.getElementById('drilldown-pagination-info');
+    if (paginationInfo) {
+      paginationInfo.textContent = 'Loading...';
+    }
+
+    // Hide summary and insights containers during loading
+    const summaryContainer = document.getElementById('drilldown-summary-container');
+    const insightsContainer = document.getElementById('drilldown-insights');
+    if (summaryContainer) summaryContainer.classList.add('hidden');
+    if (insightsContainer) insightsContainer.classList.add('hidden');
   }
 
   /**
