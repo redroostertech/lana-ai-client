@@ -1333,9 +1333,9 @@ class DrilldownRenderer {
     const helpModal = document.getElementById('drilldown-help-modal');
     const helpModalTitle = document.getElementById('help-modal-title');
     const helpContent = document.getElementById('drilldown-help-content');
-    const helpText = this.currentConfig?.helpText;
+    const helpText = this.currentConfig?.help;
 
-    if (!helpText) {
+    if (!helpText || !helpText.enabled) {
       alert('No help documentation available for this drilldown.');
       return;
     }
