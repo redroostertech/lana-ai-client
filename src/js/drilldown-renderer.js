@@ -1204,7 +1204,7 @@ class DrilldownRenderer {
     const { page, totalRecords, totalPages, hasNextPage, hasPreviousPage } = this.currentData.pagination;
 
     // Update pagination info
-    const start = (page - 1) * this.pageSize + 1;
+    const start = totalRecords === 0 ? 0 : (page - 1) * this.pageSize + 1;
     const end = Math.min(page * this.pageSize, totalRecords);
     document.getElementById('drilldown-pagination-info').textContent =
       `Showing ${start} to ${end} of ${totalRecords} results`;
