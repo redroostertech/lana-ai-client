@@ -210,7 +210,7 @@
     <main class="p-4 lg:p-8">
       <!-- Module Execution Controls -->
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">Run Report</h2>
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Reporting</h2>
 
         <!-- Period Presets (Quick Selection) -->
         <div class="mb-4">
@@ -405,6 +405,21 @@
 
   <script>
     if (!api.requireAuth()) throw new Error('Not authenticated');
+
+    // Configure marked library for markdown rendering (loaded globally via script tag)
+    if (typeof marked !== 'undefined' && marked) {
+      try {
+        marked.use({
+          breaks: true,
+          gfm: true
+        });
+        console.log('[ModuleExecution] Marked library configured successfully');
+      } catch (e) {
+        console.warn('[ModuleExecution] Error configuring marked:', e);
+      }
+    } else {
+      console.warn('[ModuleExecution] Marked library not available, markdown will not be rendered');
+    }
 
     // Load full user profile with roles before rendering menu
     (async () => {
@@ -5480,6 +5495,59 @@
     }
 
     /**
+     * Render inline markdown text to HTML (for single lines, headings, etc.)
+     * Falls back to plain text if marked library is not available
+     */
+    function renderMarkdownInline(text) {
+      if (text === null || text === undefined) return '';
+      if (typeof text !== 'string') text = String(text);
+
+      // If marked is available, use it to render markdown
+      if (typeof marked !== 'undefined' && marked && typeof marked.parseInline === 'function') {
+        try {
+          return marked.parseInline(text);
+        } catch (e) {
+          console.warn('[HelpModal] Error rendering inline markdown:', e);
+          return text;
+        }
+      }
+
+      // Fallback: return plain text
+      return text;
+    }
+
+    /**
+     * Render block-level markdown text to HTML (for paragraphs, lists, multi-line content)
+     * Falls back to plain text with line breaks if marked library is not available
+     */
+    function renderMarkdownBlock(text) {
+      if (text === null || text === undefined) return '';
+      if (typeof text !== 'string') text = String(text);
+
+      // If marked is available, use it to render markdown
+      if (typeof marked !== 'undefined' && marked && typeof marked.parse === 'function') {
+        try {
+          let html = marked.parse(text);
+
+          // Remove outer <p> tags if present (for cleaner rendering in our context)
+          // But keep inner structure like lists, line breaks, bold, etc.
+          html = html.trim();
+          if (html.startsWith('<p>') && html.endsWith('</p>') && html.split('<p>').length === 2) {
+            html = html.slice(3, -4); // Remove outer <p></p> only
+          }
+
+          return html;
+        } catch (e) {
+          console.warn('[HelpModal] Error rendering block markdown:', e);
+          return text.replace(/\n/g, '<br>');
+        }
+      }
+
+      // Fallback: preserve line breaks
+      return text.replace(/\n/g, '<br>');
+    }
+
+    /**
      * Render help text modal for visualizations
      * Creates a help icon button and modal overlay for displaying helpText
      * @param {Object} helpText - Help text configuration with title and sections
@@ -5493,24 +5561,26 @@
 
       const modalId = `help-modal-${uniqueId}`;
 
-      // Generate sections HTML
+      // Generate sections HTML with markdown support
       const sectionsHTML = helpText.sections.map(section => {
         let contentHTML = '';
 
         if (section.content) {
-          contentHTML = `<p class="text-sm text-gray-700 leading-relaxed">${section.content}</p>`;
+          // Content may contain line breaks, lists, etc. - use block rendering
+          contentHTML = `<div class="text-sm text-gray-700 leading-relaxed">${renderMarkdownBlock(section.content)}</div>`;
         }
 
         if (section.bullets && section.bullets.length > 0) {
           const bulletsHTML = section.bullets.map(bullet =>
-            `<li class="text-sm text-gray-700 leading-relaxed">${bullet}</li>`
+            // Bullets may contain inline markdown (bold, etc.)
+            `<li class="text-sm text-gray-700 leading-relaxed">${renderMarkdownInline(bullet)}</li>`
           ).join('');
           contentHTML = `<ul class="list-disc pl-5 space-y-2">${bulletsHTML}</ul>`;
         }
 
         return `
           <div class="mb-6">
-            <h4 class="text-md font-semibold text-gray-900 mb-3">${section.heading}</h4>
+            <h4 class="text-md font-semibold text-gray-900 mb-3">${renderMarkdownInline(section.heading)}</h4>
             ${contentHTML}
           </div>
         `;
