@@ -210,7 +210,7 @@
     <main class="p-4 lg:p-8">
       <!-- Module Execution Controls -->
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">Execute Module</h2>
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Run Report</h2>
 
         <!-- Period Presets (Quick Selection) -->
         <div class="mb-4">
@@ -279,7 +279,7 @@
           <!-- Execute Button -->
           <div class="flex items-end">
             <button id="executeBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-6 py-2 rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
-              <span id="executeBtnText">Execute Module</span>
+              <span id="executeBtnText">Run Report</span>
               <svg id="executeBtnSpinner" class="hidden animate-spin inline-block w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -5480,6 +5480,90 @@
     }
 
     /**
+     * Render help text modal for visualizations
+     * Creates a help icon button and modal overlay for displaying helpText
+     * @param {Object} helpText - Help text configuration with title and sections
+     * @param {string} uniqueId - Unique identifier for the modal
+     * @returns {string} HTML string for help icon and modal
+     */
+    function renderHelpTextModal(helpText, uniqueId) {
+      if (!helpText || !helpText.sections || helpText.sections.length === 0) {
+        return '';
+      }
+
+      const modalId = `help-modal-${uniqueId}`;
+
+      // Generate sections HTML
+      const sectionsHTML = helpText.sections.map(section => {
+        let contentHTML = '';
+
+        if (section.content) {
+          contentHTML = `<p class="text-sm text-gray-700 leading-relaxed">${section.content}</p>`;
+        }
+
+        if (section.bullets && section.bullets.length > 0) {
+          const bulletsHTML = section.bullets.map(bullet =>
+            `<li class="text-sm text-gray-700 leading-relaxed">${bullet}</li>`
+          ).join('');
+          contentHTML = `<ul class="list-disc pl-5 space-y-2">${bulletsHTML}</ul>`;
+        }
+
+        return `
+          <div class="mb-6">
+            <h4 class="text-md font-semibold text-gray-900 mb-3">${section.heading}</h4>
+            ${contentHTML}
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <!-- Help Icon Button -->
+        <button
+          onclick="document.getElementById('${modalId}').classList.remove('hidden')"
+          class="ml-2 inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
+          title="Click for help understanding this chart"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+        </button>
+
+        <!-- Help Modal -->
+        <div id="${modalId}" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <!-- Modal Header -->
+            <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h3 class="text-xl font-bold text-gray-900">${helpText.title || 'Help'}</h3>
+              <button
+                onclick="document.getElementById('${modalId}').classList.add('hidden')"
+                class="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+
+            <!-- Modal Content -->
+            <div class="px-6 py-6">
+              ${sectionsHTML}
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4">
+              <button
+                onclick="document.getElementById('${modalId}').classList.add('hidden')"
+                class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                Got it!
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    /**
      * Render trend_chart visualization (time series)
      */
     function renderTrendChart(viz, data, uniqueId) {
@@ -5491,8 +5575,13 @@
       div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
 
       const canvasId = `chart-${uniqueId}`;
+      const helpTextHTML = renderHelpTextModal(viz.helpText, uniqueId);
+
       div.innerHTML = `
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">${viz.title || 'Metrics Over Time'}</h3>
+        <div class="flex items-center mb-4">
+          <h3 class="text-lg font-semibold text-gray-900">${viz.title || 'Metrics Over Time'}</h3>
+          ${helpTextHTML}
+        </div>
         <div class="h-96">
           <canvas id="${canvasId}"></canvas>
         </div>
@@ -5581,14 +5670,18 @@
       div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
 
       const canvasId = `chart-${uniqueId}`;
+      const helpTextHTML = renderHelpTextModal(viz.helpText, uniqueId);
 
       // Add helpful description for the chart
       const description = viz.description || 'Compare how your metrics changed from the previous period to now.';
 
       div.innerHTML = `
         <div class="mb-4">
-          <div class="flex items-start justify-between mb-2">
-            <h3 class="text-lg font-semibold text-gray-900">${viz.title || 'Current vs Prior Period'}</h3>
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center">
+              <h3 class="text-lg font-semibold text-gray-900">${viz.title || 'Current vs Prior Period'}</h3>
+              ${helpTextHTML}
+            </div>
             ${viz.infoTooltip ? `<div class="tooltip" title="${viz.infoTooltip}">ℹ️</div>` : ''}
           </div>
           <p class="text-sm text-gray-600 leading-relaxed">${description}</p>
@@ -5743,8 +5836,13 @@
       div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
 
       const canvasId = `chart-${uniqueId}`;
+      const helpTextHTML = renderHelpTextModal(viz.helpText, uniqueId);
+
       div.innerHTML = `
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">${viz.title || 'Distribution'}</h3>
+        <div class="flex items-center mb-4">
+          <h3 class="text-lg font-semibold text-gray-900">${viz.title || 'Distribution'}</h3>
+          ${helpTextHTML}
+        </div>
         <div class="h-64">
           <canvas id="${canvasId}"></canvas>
         </div>
@@ -5801,8 +5899,13 @@
       div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
 
       const canvasId = `chart-${uniqueId}`;
+      const helpTextHTML = renderHelpTextModal(viz.helpText, uniqueId);
+
       div.innerHTML = `
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">${viz.title || 'Bubble Chart'}</h3>
+        <div class="flex items-center mb-4">
+          <h3 class="text-lg font-semibold text-gray-900">${viz.title || 'Bubble Chart'}</h3>
+          ${helpTextHTML}
+        </div>
         ${viz.description ? `<p class="text-sm text-gray-500 mb-4">${viz.description}</p>` : ''}
         <div class="h-96">
           <canvas id="${canvasId}"></canvas>
@@ -5899,8 +6002,13 @@
       div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
 
       const canvasId = `chart-${uniqueId}`;
+      const helpTextHTML = renderHelpTextModal(viz.helpText, uniqueId);
+
       div.innerHTML = `
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">${viz.title || 'Grouped Bar Chart'}</h3>
+        <div class="flex items-center mb-4">
+          <h3 class="text-lg font-semibold text-gray-900">${viz.title || 'Grouped Bar Chart'}</h3>
+          ${helpTextHTML}
+        </div>
         ${viz.description ? `<p class="text-sm text-gray-500 mb-4">${viz.description}</p>` : ''}
         <div class="h-96">
           <canvas id="${canvasId}"></canvas>
@@ -6338,7 +6446,7 @@
       } finally {
         // Reset button state
         executeBtn.disabled = false;
-        executeBtnText.textContent = 'Execute Module';
+        executeBtnText.textContent = 'Run Report';
         executeBtnSpinner.classList.add('hidden');
       }
     }
