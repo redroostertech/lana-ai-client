@@ -1184,8 +1184,11 @@ class DrilldownRenderer {
         const value = row[col.field];
         // Use badge renderer for badge columns, otherwise use standard formatter
         const formattedValue = col.type === 'badge' ? this.renderBadgeColumn(value, col) : this.formatValue(value, col.format || {type: col.type});
+        // Add tooltip support for cells
+        const tooltipAttr = col.tooltip ? `title="${this.escapeHtml(col.tooltip)}"` : '';
+        const cursorClass = col.tooltip ? ' cursor-help' : '';
         return `
-          <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900 text-${col.align || 'left'}">
+          <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900 text-${col.align || 'left'}${cursorClass}" ${tooltipAttr}>
             ${formattedValue}
           </td>
         `;
