@@ -6118,6 +6118,21 @@
     }
 
     /**
+     * Helper: Convert hex color to rgba
+     */
+    function hexToRgba(hex, alpha = 1) {
+      // Remove # if present
+      hex = hex.replace('#', '');
+
+      // Parse hex values
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    /**
      * Render horizontal_bar_chart visualization
      */
     function renderHorizontalBarChart(viz, data, uniqueId) {
@@ -6180,6 +6195,33 @@
       // Determine if this is a percentage metric (check suffix or format)
       const isPercentage = metric.format?.suffix === '%' || metric.unit === 'percent';
 
+      // Determine bar colors (conditional coloring based on value)
+      let backgroundColors;
+      let borderColors;
+
+      if (viz.barColors && viz.colorRule) {
+        // Conditional coloring: evaluate colorRule for each value
+        backgroundColors = values.map(value => {
+          // Evaluate the colorRule expression
+          // colorRule example: "value < 0 ? 'negative' : value > 0 ? 'positive' : 'neutral'"
+          const colorKey = eval(viz.colorRule);
+          const colorHex = viz.barColors[colorKey] || viz.barColors.neutral || '#6b7280';
+
+          // Convert hex to rgba with 0.8 opacity
+          return hexToRgba(colorHex, 0.8);
+        });
+
+        borderColors = values.map(value => {
+          const colorKey = eval(viz.colorRule);
+          const colorHex = viz.barColors[colorKey] || viz.barColors.neutral || '#6b7280';
+          return colorHex;
+        });
+      } else {
+        // Default single color (indigo)
+        backgroundColors = 'rgba(99, 102, 241, 0.8)';
+        borderColors = 'rgba(99, 102, 241, 1)';
+      }
+
       // Create canvas
       const canvas = document.createElement('canvas');
       container.appendChild(canvas);
@@ -6192,8 +6234,8 @@
           datasets: [{
             label: metric.name,
             data: values,
-            backgroundColor: 'rgba(99, 102, 241, 0.8)', // Indigo
-            borderColor: 'rgba(99, 102, 241, 1)',
+            backgroundColor: backgroundColors,
+            borderColor: borderColors,
             borderWidth: 1
           }]
         },
@@ -6209,11 +6251,20 @@
               callbacks: {
                 label: function(context) {
                   const value = context.parsed.x;
+
+                  // Handle growth/change percentages (percent_change unit)
+                  if (metric.unit === 'percent_change') {
+                    const sign = value > 0 ? '+' : ''; // Negative already has minus
+                    return `${sign}${value}%`;
+                  }
+
+                  // Handle regular percentages
                   if (isPercentage) {
                     return `${value}%`;
-                  } else {
-                    return `${value} ${metric.unit || ''}`.trim();
                   }
+
+                  // Handle other units
+                  return `${value} ${metric.unit || ''}`.trim();
                 }
               }
             }
