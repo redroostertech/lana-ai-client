@@ -6142,11 +6142,15 @@
       const div = document.createElement('div');
       div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
 
-      // Title and description
+      // Title, help button, and description
+      const helpTextHTML = renderHelpTextModal(viz.helpText, uniqueId);
       const header = document.createElement('div');
       header.className = 'mb-4';
       header.innerHTML = `
-        <h3 class="text-lg font-semibold text-gray-900 mb-1">${viz.title || 'Chart'}</h3>
+        <div class="flex items-center mb-1">
+          <h3 class="text-lg font-semibold text-gray-900">${viz.title || 'Chart'}</h3>
+          ${helpTextHTML}
+        </div>
         ${viz.description ? `<p class="text-sm text-gray-600">${viz.description}</p>` : ''}
       `;
       div.appendChild(header);
