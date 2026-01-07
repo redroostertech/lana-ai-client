@@ -1224,7 +1224,10 @@
           drilldownRenderer = new DrilldownRenderer();
         }
 
-        await drilldownRenderer.open(moduleKey, metricKey, periodStart, periodEnd);
+        await drilldownRenderer.open(moduleKey, metricKey, {
+          periodStart,
+          periodEnd
+        });
       } catch (error) {
         console.error('Failed to open drilldown:', error);
         alert(`Failed to load drilldown: ${error.message || 'Unknown error'}`);
@@ -5324,7 +5327,7 @@
               <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide">${metric.name}</h3>
               <div class="flex items-center gap-2">
                 ${getStatusBadge(statusColor)}
-                ${metric.hasDrilldown ? `
+                ${metric.hasDrilldown === true ? `
                 <button
                   onclick="openGenericDrilldown('${metric.key}', '${metric.name}')"
                   class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 transition-colors whitespace-nowrap"
@@ -5335,7 +5338,7 @@
                   </svg>
                   Details
                 </button>
-                ` : `
+                ` : metric.hasDrilldown === false ? '' : `
                 <button
                   onclick="showMetricDrilldown('${metric.key}', '${metric.name}')"
                   class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 transition-colors whitespace-nowrap"
@@ -6049,7 +6052,7 @@
     }
 
     /**
-     * Render funnel_chart visualization
+     * Render funnel_chart visualization - Custom flow chart with visual funnel
      */
     function renderFunnelChart(viz, data, uniqueId) {
       console.log('[renderFunnelChart] START', { viz, data, uniqueId });
@@ -6057,143 +6060,123 @@
       const div = document.createElement('div');
       div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
 
-      const canvasId = `chart-${uniqueId}`;
       const helpTextHTML = renderHelpTextModal(viz.helpText, uniqueId);
 
-      console.log('[renderFunnelChart] Creating container HTML', { canvasId });
+      // Find the metric with funnel progression data
+      const metric = data.metrics.find(m => viz.metrics && viz.metrics.includes(m.key));
+
+      if (!metric || !Array.isArray(metric.current)) {
+        div.innerHTML = `
+          <div class="flex items-center mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">${viz.title || 'Funnel Chart'}</h3>
+          </div>
+          <p class="text-gray-500 text-center py-8">No funnel data available</p>
+        `;
+        return div;
+      }
+
+      const funnelData = metric.current;
+      console.log('[renderFunnelChart] Funnel data:', funnelData);
+
+      // Build funnel stages HTML
+      let funnelHTML = '';
+      funnelData.forEach((stage, index) => {
+        const value = stage.value || 0;
+        const percentage = stage.percentage || 0;
+        const dropoffRate = stage.dropoff_rate || 0;
+        const previousCount = stage.previous_stage_count || 0;
+        const dropped = previousCount - value;
+
+        // Color scheme based on stage type
+        let bgColor = 'bg-blue-500';
+        let textColor = 'text-blue-700';
+
+        if (stage.label.includes('Initial Contact')) {
+          bgColor = 'bg-indigo-500';
+          textColor = 'text-indigo-700';
+        } else if (stage.label.includes('Became Opportunity')) {
+          bgColor = 'bg-purple-500';
+          textColor = 'text-purple-700';
+        } else if (stage.label.includes('Won') || stage.label.includes('Matter')) {
+          bgColor = 'bg-green-500';
+          textColor = 'text-green-700';
+        } else if (stage.label.includes('Stage')) {
+          bgColor = 'bg-blue-500';
+          textColor = 'text-blue-700';
+        }
+
+        // Calculate bar width based on percentage of initial
+        const barWidth = Math.max(percentage, 5); // Minimum 5% width for visibility
+
+        funnelHTML += `
+          <div class="mb-4">
+            <!-- Stage Bar -->
+            <div class="relative">
+              <div class="flex items-center gap-3 mb-1">
+                <div class="flex-1">
+                  <div class="bg-gray-100 rounded-lg overflow-hidden" style="height: 60px;">
+                    <div class="${bgColor} h-full flex items-center px-4 transition-all duration-300 hover:opacity-90 cursor-pointer"
+                         style="width: ${barWidth}%"
+                         onclick="openGenericDrilldown('${metric.key}', '${stage.label.replace(/'/g, "\\'")}')">
+                      <div class="flex items-center justify-between w-full text-white">
+                        <div class="flex-1">
+                          <div class="font-semibold text-sm">${stage.label}</div>
+                          <div class="text-xs opacity-90">${value.toLocaleString()} leads</div>
+                        </div>
+                        <div class="text-right">
+                          <div class="font-bold text-lg">${percentage.toFixed(1)}%</div>
+                          <div class="text-xs opacity-90">of initial</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            ${index < funnelData.length - 1 && dropoffRate > 0 ? `
+              <!-- Dropoff Arrow -->
+              <div class="flex items-center gap-2 my-2 ml-4">
+                <svg class="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clip-rule="evenodd"></path>
+                </svg>
+                <span class="text-sm text-red-600 font-medium">
+                  ${dropped.toLocaleString()} dropped (${dropoffRate.toFixed(1)}% loss)
+                </span>
+              </div>
+            ` : index < funnelData.length - 1 ? `
+              <!-- Flow Arrow -->
+              <div class="flex items-center gap-2 my-2 ml-4">
+                <svg class="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clip-rule="evenodd"></path>
+                </svg>
+                <span class="text-sm text-gray-500">Continues to next stage</span>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      });
 
       div.innerHTML = `
-        <div class="flex items-center mb-4">
+        <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold text-gray-900">${viz.title || 'Funnel Chart'}</h3>
           ${helpTextHTML}
         </div>
-        ${viz.description ? `<p class="text-sm text-gray-500 mb-4">${viz.description}</p>` : ''}
-        <div class="h-96">
-          <canvas id="${canvasId}"></canvas>
+        ${viz.description ? `<p class="text-sm text-gray-500 mb-6">${viz.description}</p>` : ''}
+
+        <div class="space-y-2">
+          ${funnelHTML}
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-gray-200">
+          <div class="flex items-center gap-2 text-xs text-gray-500">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+            </svg>
+            <span>Click any stage to see detailed leads at that step</span>
+          </div>
         </div>
       `;
-
-      setTimeout(() => {
-        console.log('[renderFunnelChart] setTimeout executing');
-
-        const ctx = document.getElementById(canvasId);
-        console.log('[renderFunnelChart] Canvas element:', ctx);
-
-        if (!ctx) {
-          console.error('[renderFunnelChart] Canvas element not found!', { canvasId });
-          return;
-        }
-
-        console.log('[renderFunnelChart] viz.metrics:', viz.metrics);
-        console.log('[renderFunnelChart] data.metrics:', data.metrics);
-
-        // Find the metric with funnel progression data
-        const metric = data.metrics.find(m => viz.metrics.includes(m.key));
-        console.log('[renderFunnelChart] Found metric:', metric);
-
-        if (!metric) {
-          console.error('[renderFunnelChart] Metric not found!', {
-            vizMetrics: viz.metrics,
-            availableMetrics: data.metrics.map(m => m.key)
-          });
-          return;
-        }
-
-        if (!Array.isArray(metric.current)) {
-          console.error('[renderFunnelChart] metric.current is not an array!', {
-            metricKey: metric.key,
-            current: metric.current,
-            currentType: typeof metric.current
-          });
-          return;
-        }
-
-        const funnelData = metric.current;
-        console.log('[renderFunnelChart] Funnel data:', funnelData);
-
-        // Extract data from metric result
-        const labels = funnelData.map(d => d.label || 'Unknown');
-        const values = funnelData.map(d => d.value || 0);
-        const percentages = funnelData.map(d => d.percentage || 0);
-        const dropoffRates = funnelData.map(d => d.dropoff_rate || 0);
-
-        console.log('[renderFunnelChart] Extracted data:', {
-          labels,
-          values,
-          percentages,
-          dropoffRates
-        });
-
-        // Map colors from config or use defaults
-        const colorScheme = viz.config?.colorScheme || {};
-        const colors = labels.map(label => {
-          const normalizedLabel = label.toLowerCase();
-          return colorScheme[normalizedLabel] || '#6b7280';
-        });
-
-        console.log('[renderFunnelChart] Colors:', colors);
-        console.log('[renderFunnelChart] Creating Chart.js instance...');
-
-        const chart = new Chart(ctx, {
-          type: 'bar',
-          data: {
-            labels: labels,
-            datasets: [{
-              label: 'Leads',
-              data: values,
-              backgroundColor: colors,
-              borderColor: colors,
-              borderWidth: 1
-            }]
-          },
-          options: {
-            indexAxis: 'y', // Horizontal bars for funnel effect
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: {
-                display: false
-              },
-              tooltip: {
-                callbacks: {
-                  label: function(context) {
-                    const index = context.dataIndex;
-                    const value = context.parsed.x;
-                    const percentage = percentages[index];
-                    const dropoff = dropoffRates[index];
-
-                    let label = `${value} leads (${percentage}%)`;
-                    if (dropoff > 0) {
-                      label += ` | ${dropoff}% drop-off from previous stage`;
-                    }
-                    return label;
-                  }
-                }
-              }
-            },
-            scales: {
-              x: {
-                beginAtZero: true,
-                title: {
-                  display: true,
-                  text: 'Number of Leads'
-                }
-              }
-            },
-            onClick: (event, elements) => {
-              if (elements.length > 0) {
-                const index = elements[0].index;
-                const stage = labels[index];
-                // Trigger drilldown with stage parameter
-                openDrilldown(metric.key, { drill_stage: stage });
-              }
-            }
-          }
-        });
-
-        console.log('[renderFunnelChart] Chart.js instance created successfully:', chart);
-        chartInstances[canvasId] = chart;
-      }, 100);
 
       return div;
     }
