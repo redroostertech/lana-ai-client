@@ -15,6 +15,10 @@
   <script src="../js/workflows.js"></script>
   <!-- Tiptap Editor Bundle -->
   <script src="../js/tiptap-bundle-built.js"></script>
+  <!-- Document Chat Components -->
+  <script src="../js/chat.js"></script>
+  <script src="../js/document-chat.js"></script>
+  <script src="../js/document-actions.js"></script>
   <style>
     /* Tiptap Notion-style editor styling */
     .notion-editor {
@@ -424,15 +428,61 @@
       width: 400px;
       background: white;
       border-left: 1px solid #e5e7eb;
-      transform: translateX(100%);
+      transform: translateX(100%) !important;
       transition: transform 0.3s ease;
       z-index: 50;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
     }
 
     #aiChatPanel.open {
-      transform: translateX(0);
+      transform: translateX(0) !important;
+    }
+
+    /* Selection chip styling */
+    .selection-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+
+    .selection-chip:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+
+    .selection-chip .chip-icon {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+
+    .selection-chip .chip-text {
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .selection-chip .chip-close {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      cursor: pointer;
+      opacity: 0.8;
+      transition: opacity 0.2s ease;
+    }
+
+    .selection-chip .chip-close:hover {
+      opacity: 1;
     }
 
     .chat-message {
@@ -614,6 +664,58 @@
       flex-shrink: 0;
     }
 
+    /* AI Option Styling (NEW - Week 1) */
+    .slash-command-item.ai-option {
+      background: linear-gradient(90deg, #eef2ff 0%, #faf5ff 100%);
+      border-left: 3px solid #6366f1;
+    }
+
+    .slash-command-item.ai-option:hover {
+      background: linear-gradient(90deg, #e0e7ff 0%, #f3e8ff 100%);
+    }
+
+    /* Bubble menu AI button */
+    .bubble-btn.ai-button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    /* Drag handle context menu */
+    #dragHandleMenu {
+      position: fixed;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+      border: 1px solid #e5e7eb;
+      z-index: 10000;
+      min-width: 200px;
+    }
+
+    #dragHandleMenu.hidden {
+      display: none;
+    }
+
+    .context-menu-item {
+      width: 100%;
+      padding: 8px 16px;
+      text-align: left;
+      background: none;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 14px;
+    }
+
+    .context-menu-item:hover {
+      background-color: #f9fafb;
+    }
+
+    .context-menu-item:first-child:hover {
+      background-color: #eef2ff; /* Indigo highlight for AI option */
+    }
 
     /* Code block styling */
     .notion-editor .ProseMirror pre {
@@ -935,6 +1037,20 @@
 
         <!-- Slash Command Menu -->
         <div id="slashCommandMenu">
+          <!-- AI Option (NEW - Week 1) -->
+          <div class="slash-command-section">
+            <div class="slash-command-item ai-option" data-command="ai">
+              <div class="slash-command-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z" />
+                </svg>
+              </div>
+              <div class="slash-command-content">
+                <div class="slash-command-title" style="color: #6366f1; font-weight: 600;">Ask AI</div>
+                <div class="slash-command-description">Get AI help with your document</div>
+              </div>
+            </div>
+          </div>
           <div class="slash-command-section">
             <div class="slash-command-section-title">Basic blocks</div>
             <div class="slash-command-item" data-command="text">
@@ -1087,6 +1203,13 @@
 
         <!-- Bubble Menu for Text Formatting -->
         <div id="bubbleMenu" class="hidden fixed bg-white rounded-lg shadow-xl border border-gray-200 flex items-center gap-1 p-1" style="z-index: 10000;">
+          <!-- AI Button (NEW - Week 1) -->
+          <button id="bubbleAI" class="bubble-btn ai-button" title="Ask AI" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-weight: 600; padding: 8px; border-radius: 6px; display: flex; align-items: center; justify-content: center;">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z" />
+            </svg>
+          </button>
+          <div class="w-px h-6 bg-gray-300 mx-1"></div>
           <button id="bubbleBold" class="bubble-btn" title="Bold (⌘B)">
             <span style="font-weight: bold;">B</span>
           </button>
@@ -1115,6 +1238,33 @@
           </button>
           <button id="bubbleAlignJustify" class="bubble-btn" title="Justify">
             <span>⫼</span>
+          </button>
+        </div>
+
+        <!-- Drag Handle Context Menu (NEW - Week 1) -->
+        <div id="dragHandleMenu" class="hidden fixed bg-white rounded-lg shadow-xl border border-gray-200 z-50 py-1 min-w-[200px]" style="z-index: 10000;">
+          <!-- AI Option (NEW) -->
+          <button class="context-menu-item w-full px-4 py-2 text-left hover:bg-indigo-50 flex items-center gap-3 transition-colors text-sm border-0 bg-transparent cursor-pointer" onclick="openAIChatFromDragHandle()">
+            <svg class="w-5 h-5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z" />
+            </svg>
+            <div>
+              <div class="font-medium text-gray-900">Ask AI</div>
+              <div class="text-xs text-gray-500">Get help with this block</div>
+            </div>
+          </button>
+
+          <div class="border-t border-gray-200 my-1"></div>
+
+          <!-- Existing options (placeholder for future functionality) -->
+          <button class="context-menu-item w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm border-0 bg-transparent cursor-pointer" onclick="deleteBlock()">
+            <span class="text-gray-400">🗑️</span>
+            <span class="text-gray-700">Delete block</span>
+          </button>
+
+          <button class="context-menu-item w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-sm border-0 bg-transparent cursor-pointer" onclick="duplicateBlock()">
+            <span class="text-gray-400">📋</span>
+            <span class="text-gray-700">Duplicate block</span>
           </button>
         </div>
 
@@ -1219,8 +1369,8 @@
       <div class="flex-shrink-0 p-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-indigo-600 to-purple-600">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center">
-            <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+            <svg class="w-6 h-6 text-indigo-600" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z" />
             </svg>
           </div>
           <div>
@@ -1246,22 +1396,45 @@
       </div>
 
       <div class="flex-shrink-0 p-4 border-t border-gray-200 bg-gray-50">
-        <div class="flex gap-2">
-          <input
-            type="text"
-            id="aiChatInput"
-            placeholder="Ask Lana to edit your document..."
-            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            onkeypress="if(event.key === 'Enter') sendAIMessage()"
-          >
-          <button
-            onclick="sendAIMessage()"
-            class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
-            </svg>
-          </button>
-        </div>
+        <form id="aiChatForm" onsubmit="event.preventDefault(); sendAIMessage();">
+          <!-- Message input -->
+          <div class="w-full relative mb-2">
+            <!-- Selection chips container (appears above input) -->
+            <div id="selectionChipsContainer" class="flex flex-wrap gap-2 mb-2 hidden">
+              <!-- Chips will be inserted here dynamically -->
+            </div>
+
+            <div
+              id="aiChatInput"
+              contenteditable="true"
+              data-placeholder="Ask Lana to edit your document..."
+              class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm max-h-32 overflow-y-auto empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400"
+              style="min-height: 44px;"
+            ></div>
+          </div>
+
+          <!-- Controls row: hint on left, send button on right -->
+          <div class="flex items-center justify-between">
+            <!-- Left side: hint text -->
+            <div class="flex items-center gap-3">
+              <p class="text-xs text-gray-400">Press Enter to send, Shift+Enter for new line</p>
+            </div>
+
+            <!-- Right side: send button -->
+            <div class="flex items-center gap-2">
+              <button
+                type="submit"
+                id="sendBtn"
+                class="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                title="Send message"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19V5m0 0l-7 7m7-7l7 7"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </form>
       </div>
     </div>
 
@@ -1700,31 +1873,142 @@
 
     // Toggle AI chat panel
     function toggleAIChat() {
+      console.log('[DocumentChat] Toggle AI chat panel');
       const panel = document.getElementById('aiChatPanel');
-      panel.classList.toggle('open');
+      if (!panel) {
+        console.error('[DocumentChat] Panel element not found');
+        return;
+      }
+
+      const isCurrentlyOpen = panel.classList.contains('open');
+      console.log('[DocumentChat] Current state before toggle:', isCurrentlyOpen ? 'open' : 'closed');
+
+      if (isCurrentlyOpen) {
+        // Explicitly close the panel
+        panel.classList.remove('open');
+        console.log('[DocumentChat] Panel closed - removed "open" class');
+      } else {
+        // Explicitly open the panel
+        panel.classList.add('open');
+        console.log('[DocumentChat] Panel opened - added "open" class');
+
+        // Initialize DocumentChat on first open
+        if (!documentChat) {
+          initializeDocumentChat();
+        }
+      }
+
+      // Verify final state
+      console.log('[DocumentChat] Final state after toggle:', panel.classList.contains('open') ? 'open' : 'closed');
+      console.log('[DocumentChat] Panel classes:', panel.className);
+    }
+
+    // Initialize DocumentChat and DocumentActionHandler
+    function initializeDocumentChat() {
+      console.log('[DocumentChat] Initializing document chat...');
+
+      try {
+        // Get required elements
+        const chatContainer = document.getElementById('aiChatPanel');
+        const chatMessagesContainer = document.getElementById('chatMessages');
+        const chatInputElement = document.getElementById('aiChatInput');
+
+        if (!chatContainer || !chatMessagesContainer || !chatInputElement) {
+          console.error('[DocumentChat] Required chat elements not found');
+          return;
+        }
+
+        // Get current matter ID from URL or session
+        const urlParams = new URLSearchParams(window.location.search);
+        const matterId = urlParams.get('matterId') || null;
+
+        // Initialize action handler
+        documentActionHandler = new DocumentActionHandler({
+          editor: window.editor, // Global editor instance
+          chatContainer: chatMessagesContainer,
+          onApprovalRequired: null // Use default approval dialog
+        });
+
+        // Initialize document chat
+        documentChat = new DocumentChat({
+          container: chatContainer,
+          demoMode: false,
+          api: window.api, // ApiClient instance
+          editor: window.editor, // Tiptap editor instance
+          matterId: matterId,
+          actionHandler: documentActionHandler,
+          onDocumentChange: (content) => {
+            console.log('[DocumentChat] Document changed significantly');
+          }
+        });
+
+        // Replace chat container HTML with LanaChat structure
+        // This ensures DocumentChat (which extends LanaChat) has proper DOM structure
+        documentChat.render();
+
+        // Re-wire send button to use DocumentChat
+        const sendBtn = chatContainer.querySelector('#chatSendBtn');
+        const chatForm = chatContainer.querySelector('#chatForm');
+
+        if (chatForm) {
+          chatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const input = chatContainer.querySelector('#chatInput');
+            if (input && input.value.trim()) {
+              documentChat.sendMessage();
+            }
+          });
+        }
+
+        console.log('[DocumentChat] Document chat initialized successfully', {
+          matterId,
+          hasEditor: !!window.editor,
+          hasActionHandler: !!documentActionHandler
+        });
+
+      } catch (error) {
+        console.error('[DocumentChat] Initialization failed:', error);
+      }
     }
 
     // Send message to AI
+    // Global variables for document chat
+    let documentChat = null;
+    let documentActionHandler = null;
+
     function sendAIMessage() {
+      // Delegate to DocumentChat instance if available
+      if (documentChat) {
+        const input = document.getElementById('aiChatInput');
+        const message = input.textContent.trim() || input.innerText.trim();
+        if (message) {
+          documentChat.sendMessage();
+        }
+        return;
+      }
+
+      // Fallback for when chat not initialized
       const input = document.getElementById('aiChatInput');
-      const message = input.value.trim();
+      const message = input.textContent.trim() || input.innerText.trim();
 
       if (!message) return;
+
+      console.warn('[DocumentChat] Chat not initialized, using fallback');
 
       // Add user message to chat
       const chatMessages = document.getElementById('chatMessages');
       const userMsg = document.createElement('div');
       userMsg.className = 'chat-message user';
-      userMsg.innerHTML = `<div class="text-sm">${message}</div>`;
+      userMsg.innerHTML = `<div class="text-sm">${escapeHtml(message)}</div>`;
       chatMessages.appendChild(userMsg);
 
       // Clear input
-      input.value = '';
+      input.textContent = '';
 
       // Scroll to bottom
       chatMessages.scrollTop = chatMessages.scrollHeight;
 
-      // Simulate AI response (replace with actual API call)
+      // Simulate AI response
       setTimeout(() => {
         const assistantMsg = document.createElement('div');
         assistantMsg.className = 'chat-message assistant';
@@ -1732,6 +2016,27 @@
         chatMessages.appendChild(assistantMsg);
         chatMessages.scrollTop = chatMessages.scrollHeight;
       }, 1000);
+    }
+
+    // Helper function to escape HTML
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Setup keyboard handler for chat input (Enter/Shift+Enter)
+    function setupChatKeyboardHandler() {
+      const input = document.getElementById('aiChatInput');
+      if (!input) return;
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendAIMessage();
+        }
+        // Shift+Enter allows new line (default behavior)
+      });
     }
 
     // Auto-expand textarea as user types
@@ -1754,6 +2059,9 @@
           notionTitle.value = e.target.value;
         });
       }
+
+      // Setup chat keyboard handler
+      setupChatKeyboardHandler();
     });
 
     // Slash command variables
@@ -1766,6 +2074,8 @@
       if (tiptapEditor) {
         tiptapEditor.destroy();
         tiptapEditor = null;
+        window.tiptapEditor = null;
+        window.editor = null;
       }
 
       // Clear the editor container
@@ -1834,6 +2144,10 @@
           },
         },
       });
+
+      // Make editor globally accessible for AI functions
+      window.tiptapEditor = tiptapEditor;
+      window.editor = tiptapEditor;
 
       console.log('[Tiptap] Editor created:', tiptapEditor);
       console.log('[Tiptap] Editor HTML:', tiptapEditor.getHTML());
@@ -1922,6 +2236,11 @@
       });
 
       // Button handlers
+      // AI Button (NEW - Week 1)
+      document.getElementById('bubbleAI').addEventListener('click', () => {
+        openAIChatFromBubbleMenu();
+      });
+
       document.getElementById('bubbleBold').addEventListener('click', () => {
         tiptapEditor.chain().focus().toggleBold().run();
         updateBubbleMenuActiveStates();
@@ -1984,6 +2303,360 @@
       document.getElementById('bubbleAlignJustify').classList.toggle('is-active', tiptapEditor.isActive({ textAlign: 'justify' }));
     }
 
+    /**
+     * Week 1 AI Button Click Handlers
+     * Three functions for opening AI chat from different editor contexts
+     */
+
+    /**
+     * Week 2 Selection Helper Functions
+     * Extract selection metadata for position-aware editing
+     */
+
+    /**
+     * Get HTML content from ProseMirror selection
+     * @param {Object} editor - Tiptap editor instance
+     * @param {number} from - Start position
+     * @param {number} to - End position
+     * @returns {string} HTML string
+     */
+    function getSelectionHTML(editor, from, to) {
+      try {
+        const { state } = editor;
+        const slice = state.doc.slice(from, to);
+        const fragment = slice.content;
+
+        // Use DOMSerializer to convert to HTML
+        const { schema } = state;
+        const serializer = DOMSerializer.fromSchema(schema);
+        const div = document.createElement('div');
+        const dom = serializer.serializeFragment(fragment);
+        div.appendChild(dom);
+
+        return div.innerHTML;
+      } catch (error) {
+        console.warn('[SelectionHelper] Failed to extract HTML:', error);
+        return '';
+      }
+    }
+
+    /**
+     * Get context around selection (±100 characters)
+     * @param {Object} editor - Tiptap editor instance
+     * @param {number} from - Start position
+     * @param {number} to - End position
+     * @returns {Object} Context before, selected, and after
+     */
+    function getSelectionContext(editor, from, to) {
+      const { state } = editor;
+      const contextStart = Math.max(0, from - 100);
+      const contextEnd = Math.min(state.doc.content.size, to + 100);
+
+      return {
+        before: state.doc.textBetween(contextStart, from, '\n'),
+        selected: state.doc.textBetween(from, to, '\n'),
+        after: state.doc.textBetween(to, contextEnd, '\n')
+      };
+    }
+
+    /**
+     * Get context around cursor (±100 characters)
+     * @param {Object} editor - Tiptap editor instance
+     * @param {number} position - Cursor position
+     * @returns {Object} Context before and after
+     */
+    function getCursorContext(editor, position) {
+      const { state } = editor;
+      const start = Math.max(0, position - 100);
+      const end = Math.min(state.doc.content.size, position + 100);
+
+      return {
+        before: state.doc.textBetween(start, position, '\n'),
+        after: state.doc.textBetween(position, end, '\n')
+      };
+    }
+
+    /**
+     * Open AI chat from slash command menu
+     */
+    function openAIChatFromSlashMenu() {
+      console.log('[DocumentChat] AI invoked from slash menu');
+
+      // Close slash menu
+      hideSlashCommandMenu();
+
+      // Extract selection metadata
+      const editor = window.editor || tiptapEditor;
+      let selectionMetadata = null;
+
+      if (editor && editor.state && editor.state.selection) {
+        const { from } = editor.state.selection;
+
+        // No selection - cursor position only
+        selectionMetadata = {
+          hasSelection: false,
+          cursorPosition: from,
+          context: getCursorContext(editor, from)
+        };
+      } else {
+        console.warn('[DocumentChat] Editor not initialized, selection metadata unavailable');
+      }
+
+      // Store in documentChat instance
+      if (window.documentChat) {
+        window.documentChat.setSelectionMetadata(selectionMetadata);
+      }
+
+      // Open AI chat panel
+      const panel = document.getElementById('aiChatPanel');
+      if (!panel.classList.contains('open')) {
+        toggleAIChat();
+      }
+
+      // Focus input and set placeholder
+      setTimeout(() => {
+        const input = document.getElementById('aiChatInput');
+        if (input) {
+          input.focus();
+          input.setAttribute('data-placeholder', 'Ask AI to generate content (e.g., "Add a confidentiality clause")');
+
+          // Clear any existing text
+          input.textContent = '';
+        }
+      }, 300);
+    }
+
+    /**
+     * Display selection chip in chat input
+     * Shows a visual chip like file attachments
+     */
+    function displaySelectionChip(selectionMetadata) {
+      console.log('[DocumentChat] Displaying selection chip', selectionMetadata);
+
+      const container = document.getElementById('selectionChipsContainer');
+      if (!container) {
+        console.error('[DocumentChat] Selection chips container not found');
+        return;
+      }
+
+      // Clear any existing chips
+      container.innerHTML = '';
+
+      // Determine chip label and icon
+      const isBlockLevel = selectionMetadata.blockLevel || false;
+      const textPreview = selectionMetadata.text?.substring(0, 50) || 'Selected text';
+      const chipLabel = isBlockLevel ? `📝 Block: ${textPreview}...` : `✏️ ${textPreview}...`;
+
+      // Create chip HTML
+      const chipHTML = `
+        <div class="selection-chip" data-selection-id="current">
+          <svg class="chip-icon" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+            <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path>
+            <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"></path>
+          </svg>
+          <span class="chip-text" title="${selectionMetadata.text}">${chipLabel}</span>
+          <svg class="chip-close" onclick="removeSelectionChip()" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+          </svg>
+        </div>
+      `;
+
+      container.innerHTML = chipHTML;
+      container.classList.remove('hidden');
+    }
+
+    /**
+     * Remove selection chip
+     * Clears both the visual chip and the stored metadata
+     */
+    function removeSelectionChip() {
+      console.log('[DocumentChat] Removing selection chip');
+
+      const container = document.getElementById('selectionChipsContainer');
+      if (container) {
+        container.innerHTML = '';
+        container.classList.add('hidden');
+      }
+
+      // Clear selection metadata from documentChat
+      if (window.documentChat) {
+        window.documentChat.setSelectionMetadata(null);
+      }
+    }
+
+    /**
+     * Open AI chat from bubble menu (text selection)
+     */
+    function openAIChatFromBubbleMenu() {
+      console.log('[DocumentChat] AI invoked from bubble menu');
+
+      // Extract selection metadata
+      const editor = window.editor || tiptapEditor;
+      let selectionMetadata = null;
+
+      if (editor && editor.state && editor.state.selection) {
+        const { from, to, empty } = editor.state.selection;
+
+        if (!empty) {
+          // User has selected text
+          const selectedText = editor.state.doc.textBetween(from, to, '\n');
+          const selectedHTML = getSelectionHTML(editor, from, to);
+
+          selectionMetadata = {
+            hasSelection: true,
+            from: from,
+            to: to,
+            text: selectedText,
+            html: selectedHTML,
+            length: to - from,
+            context: getSelectionContext(editor, from, to)
+          };
+        } else {
+          // No selection - cursor position only
+          selectionMetadata = {
+            hasSelection: false,
+            cursorPosition: from,
+            context: getCursorContext(editor, from)
+          };
+        }
+      } else {
+        console.warn('[DocumentChat] Editor not initialized, selection metadata unavailable');
+      }
+
+      // Store in documentChat instance
+      if (window.documentChat) {
+        window.documentChat.setSelectionMetadata(selectionMetadata);
+      }
+
+      // Open AI chat panel
+      const panel = document.getElementById('aiChatPanel');
+      if (!panel.classList.contains('open')) {
+        toggleAIChat();
+      }
+
+      // Display selection chip if there's a selection
+      if (selectionMetadata && selectionMetadata.hasSelection) {
+        displaySelectionChip(selectionMetadata);
+      }
+
+      // Focus input and set contextual placeholder
+      setTimeout(() => {
+        const input = document.getElementById('aiChatInput');
+        if (input) {
+          input.focus();
+
+          if (selectionMetadata && selectionMetadata.hasSelection) {
+            // Selection exists - suggest editing actions
+            input.setAttribute('data-placeholder', 'Fix grammar in selected text, make it more formal, or describe what you want...');
+          } else {
+            input.setAttribute('data-placeholder', 'Ask AI about your document...');
+          }
+
+          input.textContent = '';
+        }
+      }, 300);
+    }
+
+    /**
+     * Open AI chat from drag handle menu
+     */
+    function openAIChatFromDragHandle() {
+      console.log('[DocumentChat] AI invoked from drag handle menu');
+
+      // Close drag handle menu
+      closeDragHandleMenu();
+
+      // Extract selection metadata (block-level)
+      const editor = window.editor || tiptapEditor;
+      let selectionMetadata = null;
+
+      if (editor && editor.state && editor.state.selection) {
+        const { from, to } = editor.state.selection;
+
+        // Get the block's content
+        const selectedText = editor.state.doc.textBetween(from, to, '\n');
+        const selectedHTML = getSelectionHTML(editor, from, to);
+
+        selectionMetadata = {
+          hasSelection: true,
+          from: from,
+          to: to,
+          text: selectedText,
+          html: selectedHTML,
+          length: to - from,
+          context: getSelectionContext(editor, from, to),
+          blockLevel: true // Indicate this is block-level selection
+        };
+      } else {
+        console.warn('[DocumentChat] Editor not initialized, selection metadata unavailable');
+      }
+
+      // Store in documentChat instance
+      if (window.documentChat) {
+        window.documentChat.setSelectionMetadata(selectionMetadata);
+      }
+
+      // Open AI chat panel
+      const panel = document.getElementById('aiChatPanel');
+      if (!panel.classList.contains('open')) {
+        toggleAIChat();
+      }
+
+      // Display selection chip for block-level selection
+      if (selectionMetadata && selectionMetadata.hasSelection) {
+        displaySelectionChip(selectionMetadata);
+      }
+
+      // Focus input and set placeholder
+      setTimeout(() => {
+        const input = document.getElementById('aiChatInput');
+        if (input) {
+          input.focus();
+          input.setAttribute('data-placeholder', 'Ask AI about this block (e.g., "Rewrite this paragraph", "Make this more concise")');
+          input.textContent = '';
+        }
+      }, 300);
+    }
+
+    /**
+     * Drag Handle Context Menu Functions
+     */
+    function showDragHandleMenu(x, y) {
+      const menu = document.getElementById('dragHandleMenu');
+      if (!menu) return;
+
+      menu.style.left = `${x}px`;
+      menu.style.top = `${y}px`;
+      menu.classList.remove('hidden');
+
+      // Close menu on outside click
+      setTimeout(() => {
+        document.addEventListener('click', closeDragHandleMenu, { once: true });
+      }, 100);
+    }
+
+    function closeDragHandleMenu() {
+      const menu = document.getElementById('dragHandleMenu');
+      if (menu) {
+        menu.classList.add('hidden');
+      }
+    }
+
+    /**
+     * Placeholder functions for drag handle menu options
+     */
+    function deleteBlock() {
+      console.log('[Editor] Delete block requested (not yet implemented)');
+      closeDragHandleMenu();
+      // TODO: Week 2 - Implement block deletion
+    }
+
+    function duplicateBlock() {
+      console.log('[Editor] Duplicate block requested (not yet implemented)');
+      closeDragHandleMenu();
+      // TODO: Week 2 - Implement block duplication
+    }
+
     function setupPlusButtonHandlers() {
       const editorContent = document.getElementById('editor').querySelector('.ProseMirror');
       if (!editorContent) return;
@@ -2034,6 +2707,23 @@
 
       let draggedElement = null;
       let draggedPos = null;
+
+      // Right-click on drag handle to show context menu (NEW - Week 1)
+      editorContent.addEventListener('contextmenu', (e) => {
+        const target = e.target;
+        if (!target.matches || (!target.matches('p') && !target.matches('h1') && !target.matches('h2') && !target.matches('h3'))) {
+          return;
+        }
+
+        const rect = target.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+
+        // Check if right-click is on drag handle area (left: -60px)
+        if (clickX < -40 && clickX > -70) {
+          e.preventDefault();
+          showDragHandleMenu(e.clientX, e.clientY);
+        }
+      });
 
       // Use event delegation for drag handles
       editorContent.addEventListener('mousedown', (e) => {
@@ -2258,6 +2948,9 @@
       }
 
       switch(command) {
+        case 'ai':
+          openAIChatFromSlashMenu();
+          break;
         case 'text':
           tiptapEditor.chain().focus().setParagraph().run();
           break;
@@ -2860,6 +3553,8 @@
       if (tiptapEditor) {
         tiptapEditor.destroy();
         tiptapEditor = null;
+        window.tiptapEditor = null;
+        window.editor = null;
       }
       editingTemplateId = null;
     }

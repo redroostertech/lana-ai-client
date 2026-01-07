@@ -105,8 +105,8 @@ const MenuConfig = {
           { id: 'dashboard', label: 'Dashboard', href: '/index.html', icon: 'home' },
           { id: 'chat', label: 'Chat', href: '/chat.html', icon: 'chat' },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
-          { id: 'workflows', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
-          { id: 'docgen', label: 'Document Templates', href: '/workflows/document-generation.html', icon: 'document' },
+          // { id: 'workflows', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
+          // { id: 'docgen', label: 'Document Templates', href: '/workflows/document-generation.html', icon: 'document' },
         ]
       },
       {
@@ -116,7 +116,7 @@ const MenuConfig = {
         items: [
           { id: 'connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
           { id: 'module-execution', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
-          { id: 'predictions', label: 'Predictions', href: '/insights/predictions.html', icon: 'performance' },
+          // { id: 'predictions', label: 'Predictions', href: '/insights/predictions.html', icon: 'performance' },
         ]
       },
       {
@@ -207,8 +207,8 @@ const MenuConfig = {
           { id: 'workflows-home', label: 'Dashboard', href: '/index.html', icon: 'home' },
           { id: 'workflows-chat', label: 'Chat', href: '/chat.html', icon: 'chat' },
           { id: 'workflows-matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
-          { id: 'workflows-list', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
-          { id: 'workflows-docgen', label: 'Document Templates', href: '/workflows/document-generation.html', icon: 'document' },
+          // { id: 'workflows-list', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
+          // { id: 'workflows-docgen', label: 'Document Templates', href: '/workflows/document-generation.html', icon: 'document' },
         ]
       },
       {
@@ -218,7 +218,7 @@ const MenuConfig = {
         items: [
           { id: 'workflows-connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
           { id: 'workflows-module-execution', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
-          { id: 'workflows-predictions', label: 'Predictions', href: '/insights/predictions.html', icon: 'performance' },
+          // { id: 'workflows-predictions', label: 'Predictions', href: '/insights/predictions.html', icon: 'performance' },
         ]
       },
       {
@@ -268,8 +268,8 @@ const MenuConfig = {
           { id: 'insights-home', label: 'Dashboard', href: '/index.html', icon: 'home' },
           { id: 'insights-chat', label: 'Chat', href: '/chat.html', icon: 'chat' },
           { id: 'insights-matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
-          { id: 'insights-workflows', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
-          { id: 'insights-docgen', label: 'Document Templates', href: '/workflows/document-generation.html', icon: 'document' },
+          // { id: 'insights-workflows', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
+          // { id: 'insights-docgen', label: 'Document Templates', href: '/workflows/document-generation.html', icon: 'document' },
         ]
       },
       {
@@ -279,7 +279,7 @@ const MenuConfig = {
         items: [
           { id: 'insights-connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
           { id: 'insights-modules', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
-          { id: 'insights-predictions', label: 'Predictions', href: '/insights/predictions.html', icon: 'performance' },
+          // { id: 'insights-predictions', label: 'Predictions', href: '/insights/predictions.html', icon: 'performance' },
         ]
       },
       {
@@ -329,8 +329,8 @@ const MenuConfig = {
           { id: 'integrations-home', label: 'Dashboard', href: '/index.html', icon: 'home' },
           { id: 'integrations-chat', label: 'Chat', href: '/chat.html', icon: 'chat' },
           { id: 'integrations-matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
-          { id: 'integrations-workflows', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
-          { id: 'integrations-docgen', label: 'Document Templates', href: '/workflows/document-generation.html', icon: 'document' },
+          // { id: 'integrations-workflows', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
+          // { id: 'integrations-docgen', label: 'Document Templates', href: '/workflows/document-generation.html', icon: 'document' },
         ]
       },
       {
@@ -340,7 +340,7 @@ const MenuConfig = {
         items: [
           { id: 'integrations-connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
           { id: 'integrations-module-execution', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
-          { id: 'integrations-predictions', label: 'Predictions', href: '/insights/predictions.html', icon: 'performance' },
+          // { id: 'integrations-predictions', label: 'Predictions', href: '/insights/predictions.html', icon: 'performance' },
         ]
       },
       {
