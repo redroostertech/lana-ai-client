@@ -1184,12 +1184,11 @@ class DrilldownRenderer {
         const value = row[col.field];
         // Use badge renderer for badge columns, otherwise use standard formatter
         const formattedValue = col.type === 'badge' ? this.renderBadgeColumn(value, col) : this.formatValue(value, col.format || {type: col.type});
-        // Add tooltip support for cells
-        const tooltipAttr = col.tooltip ? `title="${this.escapeHtml(col.tooltip)}"` : '';
-        const cursorClass = col.tooltip ? ' cursor-help' : '';
+        // Add tooltip support for cells - render help icon next to value if tooltip exists
+        const tooltipIcon = col.tooltip ? `<svg class="inline-block ml-1 h-4 w-4 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor" title="${this.escapeHtml(col.tooltip)}"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>` : '';
         return `
-          <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900 text-${col.align || 'left'}${cursorClass}" ${tooltipAttr}>
-            ${formattedValue}
+          <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900 text-${col.align || 'left'}">
+            ${formattedValue}${tooltipIcon}
           </td>
         `;
       }).join('');
