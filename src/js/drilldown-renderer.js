@@ -1185,7 +1185,7 @@ class DrilldownRenderer {
         // Use badge renderer for badge columns, otherwise use standard formatter
         const formattedValue = col.type === 'badge' ? this.renderBadgeColumn(value, col) : this.formatValue(value, col.format || {type: col.type});
         // Add tooltip support for cells - render help icon next to value if tooltip exists
-        const tooltipIcon = col.tooltip ? `<svg class="inline-block ml-1 h-4 w-4 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor" title="${this.escapeHtml(col.tooltip)}"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>` : '';
+        const tooltipIcon = col.tooltip ? `<svg class="inline-block ml-1 h-4 w-4 text-gray-400 cursor-pointer hover:text-gray-600 cell-tooltip-trigger" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-tooltip="${this.escapeHtml(col.tooltip)}"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>` : '';
         return `
           <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900 text-${col.align || 'left'}">
             ${formattedValue}${tooltipIcon}
@@ -1197,6 +1197,77 @@ class DrilldownRenderer {
     }).join('');
 
     document.getElementById('drilldown-table-body').innerHTML = rowsHTML;
+
+    // Attach click handlers for tooltips
+    this.attachTooltipHandlers();
+  }
+
+  /**
+   * Attach click handlers for cell tooltips
+   */
+  attachTooltipHandlers() {
+    // Remove any existing tooltip
+    const existingTooltip = document.getElementById('cell-tooltip-popover');
+    if (existingTooltip) {
+      existingTooltip.remove();
+    }
+
+    // Attach click handlers to all tooltip triggers
+    document.querySelectorAll('.cell-tooltip-trigger').forEach(trigger => {
+      trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.showTooltip(trigger);
+      });
+    });
+
+    // Close tooltip when clicking outside
+    document.addEventListener('click', () => {
+      const tooltip = document.getElementById('cell-tooltip-popover');
+      if (tooltip) {
+        tooltip.remove();
+      }
+    });
+  }
+
+  /**
+   * Show tooltip popover near the clicked help icon
+   */
+  showTooltip(trigger) {
+    // Remove any existing tooltip
+    const existingTooltip = document.getElementById('cell-tooltip-popover');
+    if (existingTooltip) {
+      existingTooltip.remove();
+      return; // Toggle behavior - click again to close
+    }
+
+    const tooltipText = trigger.getAttribute('data-tooltip');
+    if (!tooltipText) return;
+
+    // Create tooltip element
+    const tooltip = document.createElement('div');
+    tooltip.id = 'cell-tooltip-popover';
+    tooltip.className = 'absolute z-50 bg-gray-900 text-white text-sm rounded-lg shadow-lg p-3 max-w-xs';
+    tooltip.innerHTML = tooltipText;
+    tooltip.style.pointerEvents = 'none'; // Don't interfere with clicks
+
+    // Position tooltip near the trigger
+    const rect = trigger.getBoundingClientRect();
+    tooltip.style.left = `${rect.left + window.scrollX}px`;
+    tooltip.style.top = `${rect.bottom + window.scrollY + 5}px`;
+
+    // Add to DOM
+    document.body.appendChild(tooltip);
+
+    // Adjust position if it goes off-screen
+    setTimeout(() => {
+      const tooltipRect = tooltip.getBoundingClientRect();
+      if (tooltipRect.right > window.innerWidth) {
+        tooltip.style.left = `${window.innerWidth - tooltipRect.width - 10}px`;
+      }
+      if (tooltipRect.bottom > window.innerHeight) {
+        tooltip.style.top = `${rect.top + window.scrollY - tooltipRect.height - 5}px`;
+      }
+    }, 0);
   }
 
   /**
