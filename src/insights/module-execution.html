@@ -5292,10 +5292,14 @@
       const percentChange = metric.changePercent !== null && metric.changePercent !== undefined ? metric.changePercent : null;
       const changeDirection = metric.changeDirection || 'flat';
 
+      // Determine arrow color based on invertTrend
+      const upColor = metric.invertTrend ? 'text-red-600' : 'text-green-600';
+      const downColor = metric.invertTrend ? 'text-green-600' : 'text-red-600';
+
       const changeArrow = changeDirection === 'up'
-        ? '<svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>'
+        ? `<svg class="w-4 h-4 ${upColor}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>`
         : changeDirection === 'down'
-        ? '<svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>'
+        ? `<svg class="w-4 h-4 ${downColor}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>`
         : '<svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14"></path></svg>';
 
       // Format change text with proper currency formatting if applicable
@@ -5359,12 +5363,14 @@
           </div>
 
           <!-- Change Indicator -->
+          ${currentModuleConfig && currentModuleConfig.ui && currentModuleConfig.ui.showComparison !== false ? `
           <div class="flex items-center gap-2 mb-4 pb-4 border-b border-gray-100">
             ${changeArrow}
-            <span class="text-sm font-medium ${change > 0 ? 'text-green-600' : change < 0 ? 'text-red-600' : 'text-gray-600'}">
+            <span class="text-sm font-medium ${metric.invertTrend ? (change > 0 ? 'text-red-600' : change < 0 ? 'text-green-600' : 'text-gray-600') : (change > 0 ? 'text-green-600' : change < 0 ? 'text-red-600' : 'text-gray-600')}">
               ${changeText} ${change !== null && change !== 0 ? (change > 0 ? 'increase' : 'decrease') : 'no change'}
             </span>
           </div>
+          ` : ''}
 
           <!-- Prior Period & Target -->
           <div class="grid grid-cols-2 gap-4 text-sm">
@@ -6908,6 +6914,9 @@
           status: data.moduleStatus || data.status || 'stable'
         };
 
+        // Store full module configuration (for accessing ui.showComparison, etc.)
+        currentModuleConfig = data;
+
         // Update module header
         document.getElementById('moduleTitle').textContent = data.moduleName || 'Module Results';
         document.getElementById('executionTime').textContent = `${executionTimeMs}ms`;
@@ -6953,6 +6962,7 @@
     let statusChart = null;
     let currentModuleData = null;
     let currentModuleMetadata = null; // Stores module config (name, description, version, etc.)
+    let currentModuleConfig = null; // Stores full module configuration (ui settings, metrics, etc.)
 
     // Render charts
     function renderCharts(metrics) {
