@@ -5915,9 +5915,12 @@
       const helpTextHTML = renderHelpTextModal(viz.helpText, uniqueId);
 
       div.innerHTML = `
-        <div class="flex items-center mb-4">
-          <h3 class="text-lg font-semibold text-gray-900">${viz.title || 'Distribution'}</h3>
-          ${helpTextHTML}
+        <div class="mb-4">
+          <div class="flex items-center mb-1">
+            <h3 class="text-lg font-semibold text-gray-900">${viz.title || 'Distribution'}</h3>
+            ${helpTextHTML}
+          </div>
+          ${viz.description ? `<p class="text-sm text-gray-600">${viz.description}</p>` : ''}
         </div>
         <div class="h-64">
           <canvas id="${canvasId}"></canvas>
