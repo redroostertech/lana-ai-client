@@ -667,7 +667,7 @@ class MenuSystem {
           </div>
           <div class="flex-shrink-0 border-t border-gray-800 pt-4 pb-4">
             ${footerHtml}
-            <p id="app-version" class="px-4 mt-3 text-xs text-gray-500">v${version}</p>
+            <p id="app-version" class="px-4 mt-3 text-xs text-gray-500">${version}</p>
           </div>
         </div>
       `;

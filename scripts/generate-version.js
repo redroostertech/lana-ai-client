@@ -24,7 +24,7 @@ const releaseType = packageJson.releaseType || 'stable';
 
 // Generate display version
 // Examples: v3.0.0, v3.0.0b1, v3.0.0-rc1, v3.0.0-dev
-let displayVersion = `v${version}`;
+let displayVersion = `${version}`;
 
 if (releaseType && releaseType !== 'stable') {
   const suffix = {

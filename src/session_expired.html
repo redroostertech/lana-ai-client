@@ -6,6 +6,7 @@
     <title>Session Expired - Lana AI</title>
     <script src="js/tailwind-loader.js"></script>
     <script src="js/config.js"></script>
+    <script src="js/version.js"></script>
     <script src="js/error-reporter.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -51,7 +52,7 @@
 
     <script>
         // Set app version from config
-        document.getElementById('app-version').textContent = 'v' + (window.LanaConfig?.APP_VERSION || '2.0.0');
+        document.getElementById('app-version').textContent = window.APP_VERSION?.getVersion() || 'v0.0.0';
 
         document.addEventListener('DOMContentLoaded', function() {
             // Clear any stored tokens
