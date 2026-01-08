@@ -551,7 +551,34 @@
         <pre id="viewerText" class="hidden w-full h-full bg-white rounded-lg shadow-sm p-6 overflow-auto text-sm font-mono whitespace-pre-wrap"></pre>
         <div id="viewerTable" class="hidden w-full h-full bg-white rounded-lg shadow-sm overflow-auto"></div>
         <img id="viewerImage" class="hidden max-w-full max-h-full mx-auto rounded-lg shadow-sm object-contain">
-        <div id="viewerDocx" class="hidden w-full h-full bg-white rounded-lg shadow-sm p-6 overflow-auto prose prose-sm max-w-none"></div>
+        <div id="viewerDocx" class="hidden w-full h-full bg-white rounded-lg shadow-sm p-6 overflow-auto prose prose-sm max-w-none">
+          <style>
+            #viewerDocx table.docx-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin: 1em 0;
+              border: 1px solid #e5e7eb;
+            }
+            #viewerDocx table.docx-table td,
+            #viewerDocx table.docx-table th {
+              border: 1px solid #e5e7eb;
+              padding: 0.5em;
+              text-align: left;
+            }
+            #viewerDocx table.docx-table th {
+              background-color: #f3f4f6;
+              font-weight: 600;
+            }
+            #viewerDocx table.docx-table tr:nth-child(even) {
+              background-color: #f9fafb;
+            }
+            #viewerDocx img {
+              max-width: 100%;
+              height: auto;
+              margin: 1em 0;
+            }
+          </style>
+        </div>
       </div>
     </div>
   </div>
@@ -2324,9 +2351,32 @@
           // .docx files - convert to HTML using Mammoth.js
           try {
             const arrayBuffer = await blob.arrayBuffer();
-            const result = await mammoth.convertToHtml({arrayBuffer: arrayBuffer});
+            const result = await mammoth.convertToHtml({
+              arrayBuffer: arrayBuffer,
+              convertImage: mammoth.images.imgElement(function(image) {
+                return image.read("base64").then(function(imageBuffer) {
+                  return {
+                    src: "data:" + image.contentType + ";base64," + imageBuffer
+                  };
+                });
+              }),
+              styleMap: [
+                "p[style-name='Heading 1'] => h1:fresh",
+                "p[style-name='Heading 2'] => h2:fresh",
+                "p[style-name='Heading 3'] => h3:fresh",
+                "p[style-name='Title'] => h1.document-title:fresh",
+                "r[style-name='Strong'] => strong",
+                "r[style-name='Emphasis'] => em",
+                "table => table.docx-table"
+              ]
+            });
             viewerDocx.innerHTML = result.value;
             viewerDocx.classList.remove('hidden');
+
+            // Log any messages/warnings from Mammoth
+            if (result.messages.length > 0) {
+              console.log('Mammoth conversion messages:', result.messages);
+            }
           } catch (mammothError) {
             console.error('Failed to convert .docx:', mammothError);
             viewerError.classList.remove('hidden');
@@ -2735,9 +2785,32 @@
           // .docx files - convert to HTML using Mammoth.js
           try {
             const arrayBuffer = await blob.arrayBuffer();
-            const result = await mammoth.convertToHtml({arrayBuffer: arrayBuffer});
+            const result = await mammoth.convertToHtml({
+              arrayBuffer: arrayBuffer,
+              convertImage: mammoth.images.imgElement(function(image) {
+                return image.read("base64").then(function(imageBuffer) {
+                  return {
+                    src: "data:" + image.contentType + ";base64," + imageBuffer
+                  };
+                });
+              }),
+              styleMap: [
+                "p[style-name='Heading 1'] => h1:fresh",
+                "p[style-name='Heading 2'] => h2:fresh",
+                "p[style-name='Heading 3'] => h3:fresh",
+                "p[style-name='Title'] => h1.document-title:fresh",
+                "r[style-name='Strong'] => strong",
+                "r[style-name='Emphasis'] => em",
+                "table => table.docx-table"
+              ]
+            });
             viewerDocx.innerHTML = result.value;
             viewerDocx.classList.remove('hidden');
+
+            // Log any messages/warnings from Mammoth
+            if (result.messages.length > 0) {
+              console.log('Mammoth conversion messages:', result.messages);
+            }
           } catch (mammothError) {
             console.error('Failed to convert .docx:', mammothError);
             viewerError.classList.remove('hidden');
