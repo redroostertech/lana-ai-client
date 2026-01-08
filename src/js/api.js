@@ -724,6 +724,7 @@ class ApiClient {
   get(endpoint) { return this.request('GET', endpoint); }
   post(endpoint, data) { return this.request('POST', endpoint, data); }
   put(endpoint, data) { return this.request('PUT', endpoint, data); }
+  patch(endpoint, data) { return this.request('PATCH', endpoint, data); }
   delete(endpoint, data) { return this.request('DELETE', endpoint, data); }
 
   // ============================================================
@@ -1141,7 +1142,7 @@ class ApiClient {
    * @returns {Promise<Object>} Documents list
    */
   async getMatterDocuments(matterId, page = 1, limit = 50) {
-    return this.get(`/api/v1/documents?matter_id=${matterId}&page=${page}&limit=${limit}`);
+    return this.get(`/api/v1/documents?client_matter=${matterId}&page=${page}&limit=${limit}`);
   }
 
   /**
@@ -1162,6 +1163,201 @@ class ApiClient {
     if (status) params.append('status', status);
     if (search) params.append('search', search);
     return this.get(`/api/v1/storage/files?${params}`);
+  }
+
+  /**
+   * Get orphaned files for a matter (files in MinIO but not in documents table)
+   * @param {string} matterId - The matter ID
+   * @returns {Promise<Object>} Orphaned files list
+   */
+  async getOrphanedFiles(matterId) {
+    return this.get(`/api/v1/files/orphaned/${matterId}`);
+  }
+
+  /**
+   * Get tasks for a matter
+   * @param {string} matterId - The matter ID
+   * @returns {Promise<Object>} Tasks list
+   */
+  async getMatterTasks(matterId) {
+    return this.get(`/api/v1/matters/${matterId}/tasks`);
+  }
+
+  /**
+   * Create a LANA-native task for a matter
+   * @param {string} matterId - The matter ID
+   * @param {Object} taskData - Task data (title, description, notes, priority, due_date, assigned_to_user_id)
+   * @returns {Promise<Object>} Created task
+   */
+  async createTask(matterId, taskData) {
+    return this.post(`/api/v1/matters/${matterId}/tasks`, taskData);
+  }
+
+  /**
+   * Update a LANA-native task
+   * @param {string} taskId - The task ID
+   * @param {Object} updates - Task updates (title, description, notes, status, priority, due_date, assigned_to_user_id)
+   * @returns {Promise<Object>} Updated task
+   */
+  async updateTask(taskId, updates) {
+    return this.patch(`/api/v1/matters/tasks/${taskId}`, updates);
+  }
+
+  /**
+   * Quick complete a LANA-native task
+   * @param {string} taskId - The task ID
+   * @returns {Promise<Object>} Completed task
+   */
+  async completeTask(taskId) {
+    return this.patch(`/api/v1/matters/tasks/${taskId}/complete`, {});
+  }
+
+  /**
+   * Delete a LANA-native task (soft delete)
+   * @param {string} taskId - The task ID
+   * @returns {Promise<Object>} Deletion response
+   */
+  async deleteTask(taskId) {
+    return this.delete(`/api/v1/matters/tasks/${taskId}`);
+  }
+
+  // ============================================================================
+  // Matter Comments API (Collaboration Feed)
+  // ============================================================================
+
+  /**
+   * Get comments for a matter
+   * @param {string} matterId - The matter ID
+   * @param {Object} options - Query options (limit, sort, filter)
+   * @returns {Promise<Object>} Comments response
+   */
+  async getComments(matterId, options = {}) {
+    const params = new URLSearchParams();
+    if (options.limit) params.append('limit', options.limit);
+    if (options.sort) params.append('sort', options.sort);
+    if (options.filter) params.append('filter', options.filter);
+
+    const queryString = params.toString();
+    const endpoint = `/api/v1/matters/${matterId}/comments${queryString ? '?' + queryString : ''}`;
+
+    return this.get(endpoint);
+  }
+
+  /**
+   * Get users who can be mentioned in a matter
+   * @param {string} matterId - The matter ID
+   * @returns {Promise<Object>} Mentionable users response
+   */
+  async getMentionableUsers(matterId) {
+    return this.get(`/api/v1/matters/${matterId}/mentionable-users`);
+  }
+
+  /**
+   * Create a comment on a matter
+   * @param {string} matterId - The matter ID
+   * @param {Object} data - Comment data (content, mentions, referenced_document_ids)
+   * @returns {Promise<Object>} Created comment
+   */
+  async createComment(matterId, data) {
+    return this.post(`/api/v1/matters/${matterId}/comments`, data);
+  }
+
+  /**
+   * Reply to a comment
+   * @param {string} commentId - The parent comment ID
+   * @param {Object} data - Reply data (content, mentions)
+   * @returns {Promise<Object>} Created reply
+   */
+  async replyToComment(commentId, data) {
+    return this.post(`/api/v1/comments/${commentId}/reply`, data);
+  }
+
+  /**
+   * Update a comment
+   * @param {string} commentId - The comment ID
+   * @param {Object} data - Updated data (content)
+   * @returns {Promise<Object>} Updated comment
+   */
+  async updateComment(commentId, data) {
+    return this.put(`/api/v1/comments/${commentId}`, data);
+  }
+
+  /**
+   * Delete a comment (soft delete)
+   * @param {string} commentId - The comment ID
+   * @returns {Promise<Object>} Deletion result
+   */
+  async deleteComment(commentId) {
+    return this.delete(`/api/v1/comments/${commentId}`);
+  }
+
+  /**
+   * Pin a comment to the top of the matter feed
+   * @param {string} commentId - The comment ID
+   * @returns {Promise<Object>} Pin result
+   */
+  async pinComment(commentId) {
+    return this.post(`/api/v1/matters/comments/${commentId}/pin`);
+  }
+
+  /**
+   * Unpin a comment
+   * @param {string} commentId - The comment ID
+   * @returns {Promise<Object>} Unpin result
+   */
+  async unpinComment(commentId) {
+    return this.delete(`/api/v1/matters/comments/${commentId}/pin`);
+  }
+
+  /**
+   * Get notifications for the current user
+   * @param {Object} options - Query options (read, limit, sort)
+   * @returns {Promise<Object>} Notifications response
+   */
+  async getNotifications(options = {}) {
+    const params = new URLSearchParams();
+    if (options.read !== undefined) params.append('read', options.read);
+    if (options.limit) params.append('limit', options.limit);
+    if (options.sort) params.append('sort', options.sort);
+
+    const queryString = params.toString();
+    const endpoint = `/api/v1/notifications${queryString ? '?' + queryString : ''}`;
+
+    return this.get(endpoint);
+  }
+
+  /**
+   * Get unread notification count
+   * @returns {Promise<Object>} Notification count
+   */
+  async getNotificationCount() {
+    return this.get('/api/v1/notifications/count');
+  }
+
+  /**
+   * Mark a notification as read
+   * @param {string} notificationId - The notification ID
+   * @returns {Promise<Object>} Update result
+   */
+  async markNotificationRead(notificationId) {
+    return this.put(`/api/v1/notifications/${notificationId}/read`);
+  }
+
+  /**
+   * Mark all notifications as read
+   * @returns {Promise<Object>} Update result
+   */
+  async markAllNotificationsRead() {
+    return this.put('/api/v1/notifications/read-all');
+  }
+
+  /**
+   * Assign an orphaned file to a matter (create documents table entry)
+   * @param {Object} fileData - File assignment data
+   * @returns {Promise<Object>} Assignment result
+   */
+  async assignOrphanedFile(fileData) {
+    return this.post('/api/v1/files/orphaned/assign', fileData);
   }
 
   /**
@@ -1572,6 +1768,60 @@ class ApiClient {
 
   async terminateSession(sessionId) {
     return this.delete(`/api/v1/admin/sessions/${sessionId}`);
+  }
+
+  // ============================================================
+  // Document Processing (JIT - Just-In-Time)
+  // ============================================================
+
+  /**
+   * Trigger on-demand processing for a document
+   * @param {string} documentId - Document ID
+   * @param {string} triggeredBy - 'view' | 'chat_reference' | 'file_drawer'
+   * @returns {Promise<Object>}
+   */
+  async triggerDocumentProcessing(documentId, triggeredBy) {
+    return this.post(`/api/v1/storage/${documentId}/trigger-processing`, {
+      triggered_by: triggeredBy
+    });
+  }
+
+  /**
+   * Get document processing status
+   * @param {string} documentId - Document ID
+   * @returns {Promise<Object>}
+   */
+  async getDocumentProcessingStatus(documentId) {
+    return this.get(`/api/v1/storage/${documentId}/processing-status`);
+  }
+
+  /**
+   * Poll for document processing completion
+   * @param {string} documentId - Document ID
+   * @param {number} maxAttempts - Maximum polling attempts (default: 60)
+   * @param {number} intervalMs - Polling interval in ms (default: 2000)
+   * @returns {Promise<Object>}
+   */
+  async pollDocumentProcessing(documentId, maxAttempts = 60, intervalMs = 2000) {
+    let attempts = 0;
+
+    while (attempts < maxAttempts) {
+      const status = await this.getDocumentProcessingStatus(documentId);
+
+      if (status.stage === 'completed') {
+        return status;
+      }
+
+      if (status.stage === 'failed') {
+        throw new Error(`Document processing failed: ${status.status}`);
+      }
+
+      // Wait before next poll
+      await new Promise(resolve => setTimeout(resolve, intervalMs));
+      attempts++;
+    }
+
+    throw new Error('Document processing timeout');
   }
 
   // ============================================================
