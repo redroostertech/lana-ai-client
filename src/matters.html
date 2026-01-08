@@ -14,6 +14,7 @@
   <script src="js/menu.js"></script>
   <script src="js/notifications.js"></script>
   <script src="js/activity.js"></script>
+  <script src="js/vendor/mammoth.min.js"></script>
 </head>
 <body class="bg-gray-50 min-h-screen">
   <!-- Sidebar -->
@@ -550,6 +551,7 @@
         <pre id="viewerText" class="hidden w-full h-full bg-white rounded-lg shadow-sm p-6 overflow-auto text-sm font-mono whitespace-pre-wrap"></pre>
         <div id="viewerTable" class="hidden w-full h-full bg-white rounded-lg shadow-sm overflow-auto"></div>
         <img id="viewerImage" class="hidden max-w-full max-h-full mx-auto rounded-lg shadow-sm object-contain">
+        <div id="viewerDocx" class="hidden w-full h-full bg-white rounded-lg shadow-sm p-6 overflow-auto prose prose-sm max-w-none"></div>
       </div>
     </div>
   </div>
@@ -2258,6 +2260,7 @@
       viewerText.classList.add('hidden');
       viewerTable.classList.add('hidden');
       viewerImage.classList.add('hidden');
+      viewerDocx.classList.add('hidden');
 
       // Set file info
       document.getElementById('viewerFileName').textContent = filename;
@@ -2317,8 +2320,20 @@
           const text = await blob.text();
           viewerText.textContent = text;
           viewerText.classList.remove('hidden');
+        } else if (filename.match(/\.docx$/i) || type.includes('wordprocessingml')) {
+          // .docx files - convert to HTML using Mammoth.js
+          try {
+            const arrayBuffer = await blob.arrayBuffer();
+            const result = await mammoth.convertToHtml({arrayBuffer: arrayBuffer});
+            viewerDocx.innerHTML = result.value;
+            viewerDocx.classList.remove('hidden');
+          } catch (mammothError) {
+            console.error('Failed to convert .docx:', mammothError);
+            viewerError.classList.remove('hidden');
+            document.getElementById('viewerErrorMsg').textContent = 'Failed to preview .docx file';
+          }
         } else {
-          // Unsupported file type (e.g., .docx, .xlsx) - show error with download option
+          // Unsupported file type (e.g., .xlsx) - show error with download option
           viewerError.classList.remove('hidden');
           document.getElementById('viewerErrorMsg').textContent = `Preview not available for ${contentType || 'this file type'}`;
         }
@@ -2656,6 +2671,7 @@
       viewerText.classList.add('hidden');
       viewerTable.classList.add('hidden');
       viewerImage.classList.add('hidden');
+      viewerDocx.classList.add('hidden');
 
       // Set file info
       document.getElementById('viewerFileName').textContent = filename;
@@ -2715,6 +2731,18 @@
           const text = await blob.text();
           viewerText.textContent = text;
           viewerText.classList.remove('hidden');
+        } else if (filename.match(/\.docx$/i) || type.includes('wordprocessingml')) {
+          // .docx files - convert to HTML using Mammoth.js
+          try {
+            const arrayBuffer = await blob.arrayBuffer();
+            const result = await mammoth.convertToHtml({arrayBuffer: arrayBuffer});
+            viewerDocx.innerHTML = result.value;
+            viewerDocx.classList.remove('hidden');
+          } catch (mammothError) {
+            console.error('Failed to convert .docx:', mammothError);
+            viewerError.classList.remove('hidden');
+            document.getElementById('viewerErrorMsg').textContent = 'Failed to preview .docx file';
+          }
         } else {
           // Unsupported file type - show error with download option
           viewerError.classList.remove('hidden');
