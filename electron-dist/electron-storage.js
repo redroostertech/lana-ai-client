@@ -1,54 +1,145 @@
-/**
- * Electron Storage Module
- * 
- * Handles secure persistent storage of server connection configuration
- * Uses electron-store with encryption
- */
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __commonJS = (cb, mod) => function __require() {
+  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+};
 
-const Store = require('electron-store');
-const { app } = require('electron');
-const crypto = require('crypto');
-const os = require('os');
-const { logInfo, logError } = require('./electron-logger');
+// electron-logger.js
+var require_electron_logger = __commonJS({
+  "electron-logger.js"(exports2, module2) {
+    var fs = require("fs");
+    var path = require("path");
+    var { app: app2 } = require("electron");
+    var LOG_LEVELS = {
+      DEBUG: 0,
+      INFO: 1,
+      WARN: 2,
+      ERROR: 3
+    };
+    var logBuffer = [];
+    var MAX_LOG_ENTRIES = 1e3;
+    var currentLogLevel = process.env.NODE_ENV === "development" ? LOG_LEVELS.DEBUG : LOG_LEVELS.INFO;
+    function getTimestamp() {
+      return (/* @__PURE__ */ new Date()).toISOString();
+    }
+    function addToBuffer(level, message, args) {
+      const entry = {
+        timestamp: getTimestamp(),
+        level,
+        message,
+        args: args.length > 0 ? JSON.stringify(args, null, 2) : void 0
+      };
+      logBuffer.push(entry);
+      if (logBuffer.length > MAX_LOG_ENTRIES) {
+        logBuffer.shift();
+      }
+    }
+    function logDebug(message, ...args) {
+      addToBuffer("DEBUG", message, args);
+      if (currentLogLevel <= LOG_LEVELS.DEBUG) {
+        console.log(`[DEBUG] ${message}`, ...args);
+      }
+    }
+    function logInfo2(message, ...args) {
+      addToBuffer("INFO", message, args);
+      if (currentLogLevel <= LOG_LEVELS.INFO) {
+        console.log(`[INFO] ${message}`, ...args);
+      }
+    }
+    function logWarn(message, ...args) {
+      addToBuffer("WARN", message, args);
+      if (currentLogLevel <= LOG_LEVELS.WARN) {
+        console.warn(`[WARN] ${message}`, ...args);
+      }
+    }
+    function logError2(message, error) {
+      const errorDetails = error ? { message: error.message, stack: error.stack } : void 0;
+      addToBuffer("ERROR", message, errorDetails ? [errorDetails] : []);
+      if (currentLogLevel <= LOG_LEVELS.ERROR) {
+        if (error) {
+          console.error(`[ERROR] ${message}`, error);
+        } else {
+          console.error(`[ERROR] ${message}`);
+        }
+      }
+    }
+    function getLogFilePath() {
+      const userDataPath = app2?.getPath?.("userData") || ".";
+      return path.join(userDataPath, "lana-debug.log");
+    }
+    function exportLogs() {
+      const logPath = getLogFilePath();
+      const systemInfo = {
+        timestamp: getTimestamp(),
+        platform: process.platform,
+        arch: process.arch,
+        nodeVersion: process.versions.node,
+        electronVersion: process.versions.electron,
+        chromeVersion: process.versions.chrome,
+        appVersion: app2?.getVersion?.() || "unknown"
+      };
+      let logContent = "=== LANA AI DEBUG LOG ===\n\n";
+      logContent += "--- System Info ---\n";
+      logContent += JSON.stringify(systemInfo, null, 2) + "\n\n";
+      logContent += "--- Application Logs ---\n";
+      for (const entry of logBuffer) {
+        logContent += `[${entry.timestamp}] [${entry.level}] ${entry.message}`;
+        if (entry.args) {
+          logContent += `
+  ${entry.args}`;
+        }
+        logContent += "\n";
+      }
+      fs.writeFileSync(logPath, logContent, "utf8");
+      return logPath;
+    }
+    function getLogsAsString() {
+      return logBuffer.map((entry) => {
+        let line = `[${entry.timestamp}] [${entry.level}] ${entry.message}`;
+        if (entry.args) {
+          line += ` ${entry.args}`;
+        }
+        return line;
+      }).join("\n");
+    }
+    function clearLogs() {
+      logBuffer.length = 0;
+    }
+    module2.exports = {
+      logDebug,
+      logInfo: logInfo2,
+      logWarn,
+      logError: logError2,
+      exportLogs,
+      getLogsAsString,
+      getLogFilePath,
+      clearLogs
+    };
+  }
+});
 
-// Config version - increment this when making breaking changes to storage format
-const CONFIG_VERSION = 2;
-
-/**
- * Generate a device-specific encryption key
- * Uses machine ID and home directory to create a unique key per user
- *
- * IMPORTANT: This key MUST remain stable across app updates and reinstalls.
- * If this formula ever changes, existing users will lose their saved config.
- */
+// electron-storage.js
+var Store = require("electron-store");
+var { app } = require("electron");
+var crypto = require("crypto");
+var os = require("os");
+var { logInfo, logError } = require_electron_logger();
 function generateEncryptionKey() {
   try {
-    // Use only stable system identifiers that won't change:
-    // - hostname: stable unless user renames their computer
-    // - homedir: stable for the user account
-    // DO NOT use app.getPath() - it can vary due to App Translocation
     const machineId = os.hostname();
     const userHome = os.homedir();
-
-    // NEVER change this key material string - it would break existing installs
     const keyMaterial = `${machineId}-${userHome}-lana-ai-client-stable`;
-
-    const hash = crypto.createHash('sha256');
+    const hash = crypto.createHash("sha256");
     hash.update(keyMaterial);
-    return hash.digest('hex');
+    return hash.digest("hex");
   } catch (error) {
-    logError('Failed to generate encryption key, using fallback', error);
-    return crypto.createHash('sha256').update('lana-ai-fallback-key').digest('hex');
+    logError("Failed to generate encryption key, using fallback", error);
+    return crypto.createHash("sha256").update("lana-ai-fallback-key").digest("hex");
   }
 }
-
-// Initialize encrypted store with device-specific key
-// Wrap in function to handle corrupted config files gracefully
-let store;
-
+var store;
 function initializeStore() {
   const storeOptions = {
-    name: 'server-config',
+    name: "server-config",
     encryptionKey: generateEncryptionKey(),
     defaults: {
       server: null,
@@ -59,35 +150,27 @@ function initializeStore() {
       }
     }
   };
-
   try {
     store = new Store(storeOptions);
   } catch (error) {
-    // Config file is corrupted (common after uninstall/reinstall or version mismatch)
-    logError('Config file corrupted, resetting to defaults', error);
-
+    logError("Config file corrupted, resetting to defaults", error);
     try {
-      // Get the config file path and delete it
-      const fs = require('fs');
-      const path = require('path');
-      const configDir = app.getPath('userData');
-      const configPath = path.join(configDir, 'server-config.json');
-
+      const fs = require("fs");
+      const path = require("path");
+      const configDir = app.getPath("userData");
+      const configPath = path.join(configDir, "server-config.json");
       if (fs.existsSync(configPath)) {
         fs.unlinkSync(configPath);
         logInfo(`Deleted corrupted config file: ${configPath}`);
       }
-
-      // Try again with fresh config
       store = new Store(storeOptions);
-      logInfo('Successfully initialized fresh config store');
+      logInfo("Successfully initialized fresh config store");
     } catch (retryError) {
-      logError('Failed to recover from corrupted config', retryError);
-      // Last resort: create an in-memory store-like object
+      logError("Failed to recover from corrupted config", retryError);
       store = {
         _data: storeOptions.defaults,
         get: function(key, defaultValue) {
-          return this._data[key] !== undefined ? this._data[key] : defaultValue;
+          return this._data[key] !== void 0 ? this._data[key] : defaultValue;
         },
         set: function(key, value) {
           this._data[key] = value;
@@ -102,19 +185,11 @@ function initializeStore() {
           return this._data;
         }
       };
-      logInfo('Using in-memory fallback store');
+      logInfo("Using in-memory fallback store");
     }
   }
 }
-
-// Initialize store on module load
 initializeStore();
-
-/**
- * Save server connection details
- * @param {Object} server - Server details
- * @returns {boolean} Success status
- */
 function saveServerConnection(server) {
   try {
     const connectionData = {
@@ -125,195 +200,130 @@ function saveServerConnection(server) {
       orgName: server.orgName,
       version: server.version,
       apiVersion: server.apiVersion,
-      connectedAt: new Date().toISOString(),
-      lastVerified: new Date().toISOString()
+      connectedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      lastVerified: (/* @__PURE__ */ new Date()).toISOString()
     };
-
-    store.set('server', connectionData);
-    store.set('lastConnected', new Date().toISOString());
-
+    store.set("server", connectionData);
+    store.set("lastConnected", (/* @__PURE__ */ new Date()).toISOString());
     logInfo(`Server connection saved: ${server.orgName} (${server.orgId})`);
     return true;
   } catch (error) {
-    logError('Failed to save server connection', error);
+    logError("Failed to save server connection", error);
     return false;
   }
 }
-
-/**
- * Get saved server connection
- * @returns {Object|null} Saved server details or null
- */
 function getSavedServer() {
   try {
-    const server = store.get('server');
-    
+    const server = store.get("server");
     if (!server) {
-      logInfo('No saved server found');
+      logInfo("No saved server found");
       return null;
     }
-
     logInfo(`Retrieved saved server: ${server.orgName} (${server.orgId})`);
     return server;
   } catch (error) {
-    logError('Failed to get saved server', error);
+    logError("Failed to get saved server", error);
     return null;
   }
 }
-
-/**
- * Update last verified timestamp for saved server
- * @returns {boolean} Success status
- */
 function updateLastVerified() {
   try {
-    const server = store.get('server');
-    
+    const server = store.get("server");
     if (!server) {
       return false;
     }
-
-    server.lastVerified = new Date().toISOString();
-    store.set('server', server);
-    
+    server.lastVerified = (/* @__PURE__ */ new Date()).toISOString();
+    store.set("server", server);
     return true;
   } catch (error) {
-    logError('Failed to update last verified timestamp', error);
+    logError("Failed to update last verified timestamp", error);
     return false;
   }
 }
-
-/**
- * Clear saved server connection (logout/disconnect)
- * @returns {boolean} Success status
- */
 function clearSavedServer() {
   try {
-    const server = store.get('server');
-    
+    const server = store.get("server");
     if (server) {
       logInfo(`Clearing saved server: ${server.orgName}`);
     }
-
-    store.delete('server');
+    store.delete("server");
     return true;
   } catch (error) {
-    logError('Failed to clear saved server', error);
+    logError("Failed to clear saved server", error);
     return false;
   }
 }
-
-/**
- * Get user preferences
- * @returns {Object} User preferences
- */
 function getPreferences() {
   try {
-    return store.get('preferences', {
+    return store.get("preferences", {
       autoConnect: true,
       rememberServer: true
     });
   } catch (error) {
-    logError('Failed to get preferences', error);
+    logError("Failed to get preferences", error);
     return {
       autoConnect: true,
       rememberServer: true
     };
   }
 }
-
-/**
- * Update user preferences
- * @param {Object} preferences - Preferences to update
- * @returns {boolean} Success status
- */
 function updatePreferences(preferences) {
   try {
     const current = getPreferences();
     const updated = { ...current, ...preferences };
-    
-    store.set('preferences', updated);
-    logInfo('Preferences updated');
+    store.set("preferences", updated);
+    logInfo("Preferences updated");
     return true;
   } catch (error) {
-    logError('Failed to update preferences', error);
+    logError("Failed to update preferences", error);
     return false;
   }
 }
-
-/**
- * Get all stored data (for debugging)
- * @returns {Object} All stored data
- */
 function getAllData() {
   try {
     return store.store;
   } catch (error) {
-    logError('Failed to get all data', error);
+    logError("Failed to get all data", error);
     return {};
   }
 }
-
-/**
- * Clear all stored data (reset)
- * @returns {boolean} Success status
- */
 function clearAllData() {
   try {
     store.clear();
-    logInfo('All stored data cleared');
+    logInfo("All stored data cleared");
     return true;
   } catch (error) {
-    logError('Failed to clear all data', error);
+    logError("Failed to clear all data", error);
     return false;
   }
 }
-
-/**
- * Save connection history
- * @param {Object} server - Server connection info
- * @returns {boolean} Success status
- */
 function addToConnectionHistory(server) {
   try {
-    const history = store.get('connectionHistory', []);
-    
-    // Add to history (limit to last 10)
+    const history = store.get("connectionHistory", []);
     const entry = {
       orgId: server.orgId,
       orgName: server.orgName,
       url: server.url,
-      connectedAt: new Date().toISOString()
+      connectedAt: (/* @__PURE__ */ new Date()).toISOString()
     };
-
-    // Remove duplicates
-    const filtered = history.filter(h => h.orgId !== server.orgId);
+    const filtered = history.filter((h) => h.orgId !== server.orgId);
     filtered.unshift(entry);
-
-    // Keep only last 10
     const trimmed = filtered.slice(0, 10);
-    
-    store.set('connectionHistory', trimmed);
+    store.set("connectionHistory", trimmed);
     return true;
   } catch (error) {
-    logError('Failed to add to connection history', error);
+    logError("Failed to add to connection history", error);
     return false;
   }
 }
-
-/**
- * Get connection history
- * @returns {Array} Connection history
- */
 function getConnectionHistory() {
   try {
-    return store.get('connectionHistory', []);
+    return store.get("connectionHistory", []);
   } catch (error) {
-    logError('Failed to get connection history', error);
+    logError("Failed to get connection history", error);
     return [];
   }
 }
-
 module.exports = {
   saveServerConnection,
   getSavedServer,
