@@ -2248,17 +2248,85 @@
       );
     }
 
-    // View orphaned document (download from MinIO directly using storage key)
+    // View orphaned document in file viewer modal (using storage key)
     window.viewOrphanedDocument = async function(storageKey, matterId, filename, contentType, fileSize) {
+      // Show modal with loading state
+      viewerModal.classList.remove('hidden');
+      viewerLoading.classList.remove('hidden');
+      viewerError.classList.add('hidden');
+      viewerIframe.classList.add('hidden');
+      viewerText.classList.add('hidden');
+      viewerTable.classList.add('hidden');
+      viewerImage.classList.add('hidden');
+
+      // Set file info
+      document.getElementById('viewerFileName').textContent = filename;
+      document.getElementById('viewerFileInfo').textContent = `${contentType || 'Unknown type'} • ${formatFileSize(fileSize)}`;
+
+      // Set download button URL
+      document.getElementById('viewerDownloadBtn').onclick = () => downloadOrphanedDocument(storageKey, matterId, filename);
+      document.getElementById('viewerErrorDownload').onclick = () => downloadOrphanedDocument(storageKey, matterId, filename);
+
       try {
-        Toast.info('Opening document...');
-        // Use the download endpoint with storage_key instead of file_id
-        // We'll need to create a new endpoint or use the existing one with storage_key
-        // For now, let's just download it
+        // Fetch file using download-by-key endpoint
         const url = `${api.baseUrl}/api/v1/storage/download-by-key?storage_key=${encodeURIComponent(storageKey)}&matter_id=${matterId}`;
-        window.open(url, '_blank');
+        const response = await fetch(url, {
+          headers: {
+            'Authorization': `Bearer ${api.token}`
+          }
+        });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            if (window.api && typeof window.api.showSessionExpiredModal === 'function') {
+              window.api.showSessionExpiredModal();
+            } else {
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              Toast.error('Session expired. Redirecting to login...');
+              setTimeout(() => { window.location.href = 'login.html'; }, 1500);
+            }
+            throw new Error('Session expired');
+          }
+          throw new Error(`Failed to load document: ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+
+        viewerLoading.classList.add('hidden');
+
+        // Display based on content type
+        const type = contentType?.toLowerCase() || '';
+
+        if (type.startsWith('image/')) {
+          // Image files
+          viewerImage.src = objectUrl;
+          viewerImage.classList.remove('hidden');
+        } else if (type === 'application/pdf') {
+          // PDF files - use iframe
+          viewerIframe.src = objectUrl;
+          viewerIframe.classList.remove('hidden');
+        } else if (filename.match(/\.csv$/i) || type.includes('csv')) {
+          // CSV files - render as spreadsheet table
+          const text = await blob.text();
+          renderCSVTable(text);
+          viewerTable.classList.remove('hidden');
+        } else if (type.startsWith('text/') || type === 'application/json' || type === 'application/xml' || filename.match(/\.(txt|md|json|xml|log|js|ts|py|html|css|yaml|yml)$/i)) {
+          // Text-based files
+          const text = await blob.text();
+          viewerText.textContent = text;
+          viewerText.classList.remove('hidden');
+        } else {
+          // Unsupported file type (e.g., .docx, .xlsx) - show error with download option
+          viewerError.classList.remove('hidden');
+          document.getElementById('viewerErrorMsg').textContent = `Preview not available for ${contentType || 'this file type'}`;
+        }
       } catch (error) {
-        Toast.error(error.message || 'Failed to open document');
+        console.error('Failed to load document:', error);
+        viewerLoading.classList.add('hidden');
+        viewerError.classList.remove('hidden');
+        document.getElementById('viewerErrorMsg').textContent = error.message || 'Failed to load document';
       }
     }
 
@@ -2704,6 +2772,50 @@
       }
     }
 
+    // Download orphaned document with authentication (using storage key)
+    window.downloadOrphanedDocument = async function(storageKey, matterId, filename) {
+      try {
+        const url = `${api.baseUrl}/api/v1/storage/download-by-key?storage_key=${encodeURIComponent(storageKey)}&matter_id=${matterId}`;
+        const response = await fetch(url, {
+          headers: {
+            'Authorization': `Bearer ${api.token}`
+          }
+        });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            if (window.api && typeof window.api.showSessionExpiredModal === 'function') {
+              window.api.showSessionExpiredModal();
+            } else {
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              Toast.error('Session expired. Redirecting to login...');
+              setTimeout(() => { window.location.href = 'login.html'; }, 1500);
+            }
+            throw new Error('Session expired');
+          }
+          throw new Error(`Failed to download: ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+
+        // Create download link
+        const a = document.createElement('a');
+        a.href = objectUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(objectUrl);
+
+        Toast.success('Download started');
+      } catch (error) {
+        console.error('Download failed:', error);
+        Toast.error(error.message || 'Failed to download file');
+      }
+    }
+
     // Render Conversations Tab
     function renderConversationsTab(matter, chats) {
       const content = document.getElementById('tabContentConversations');
@@ -2939,7 +3051,7 @@
     async function loadMentionableUsers(matterId) {
       try {
         const response = await api.getMentionableUsers(matterId);
-        mentionableUsers = response.users || [];
+        mentionableUsers = response.data || [];
       } catch (error) {
         console.error('Failed to load mentionable users:', error);
         mentionableUsers = [];
@@ -2949,7 +3061,7 @@
     async function loadComments(matterId) {
       try {
         const response = await api.getComments(matterId, { limit: 100, sort: 'created_at:desc' });
-        const comments = response.comments || [];
+        const comments = response.data || [];
 
         renderCommentsList(comments, matterId);
 
@@ -3221,7 +3333,7 @@
       try {
         await api.createComment(matterId, {
           content,
-          mentions: mentions.length > 0 ? mentions : undefined
+          mentioned_user_ids: mentions.length > 0 ? mentions : []
         });
 
         input.value = '';
