@@ -826,7 +826,7 @@
     function renderMatterCard(matter) {
       // Escape all user-controlled data to prevent XSS
       const escapedMatterId = escapeHtml(matter.matter_id);
-      const escapedMatterName = escapeHtml(matter.matter_name || 'Untitled');
+      const escapedMatterName = escapeHtml(matter.name || matter.matter_name || 'Untitled');
       const escapedClientName = escapeHtml(matter.client_name || '');
       const escapedDescription = escapeHtml(matter.description || 'No description');
       const escapedMatterNumber = escapeHtml(matter.matter_number || '');
