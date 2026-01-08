@@ -390,8 +390,8 @@ window.NotificationPanel = (function() {
       const iconHtml = getNotificationIcon(notification.type);
       
       return `
-        <div class="notification-item p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors ${isUnread ? 'bg-indigo-50/50' : ''}" 
-             data-id="${notification.id}" 
+        <div class="notification-item p-4 border-b border-gray-100 ${isUnread ? 'bg-indigo-50/50' : ''}"
+             data-id="${notification.id}"
              data-read="${!isUnread}">
           <div class="flex gap-3">
             <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${getNotificationBgColor(notification.type)}">
@@ -402,7 +402,7 @@ window.NotificationPanel = (function() {
                 <p class="text-sm font-medium text-gray-900 ${isUnread ? 'font-semibold' : ''}">${escapeHtml(notification.title)}</p>
                 ${isUnread ? '<span class="w-2 h-2 bg-indigo-600 rounded-full flex-shrink-0 mt-1.5"></span>' : ''}
               </div>
-              <p class="text-sm text-gray-600 mt-0.5 line-clamp-2">${escapeHtml(notification.body || notification.message || '')}</p>
+              <p class="text-sm text-gray-600 mt-0.5">${escapeHtml(notification.body || notification.message || '')}</p>
               <p class="text-xs text-gray-400 mt-1">${timeAgo(notification.created_at)}</p>
             </div>
           </div>
@@ -421,22 +421,26 @@ window.NotificationPanel = (function() {
 
     elements.list.innerHTML = html;
 
-    // Add click handlers
-    document.querySelectorAll('.notification-item').forEach(item => {
-      item.addEventListener('click', async () => {
-        const notificationId = item.dataset.id;
-        const notification = state.notifications.find(n => n.id === notificationId);
-        
-        // Mark as read (even if already read, to ensure sync with server)
-        await markAsRead(notificationId);
+    // TODO: Implement proper click handling for notifications
+    // For now, click handlers are disabled to prevent navigation while we work on proper UX
+    // The notification items will show full text without truncation
 
-        // Navigate to action URL if available
-        if (notification && notification.action_url) {
-          close();
-          window.location.href = notification.action_url;
-        }
-      });
-    });
+    // Add click handlers
+    // document.querySelectorAll('.notification-item').forEach(item => {
+    //   item.addEventListener('click', async () => {
+    //     const notificationId = item.dataset.id;
+    //     const notification = state.notifications.find(n => n.id === notificationId);
+    //
+    //     // Mark as read (even if already read, to ensure sync with server)
+    //     await markAsRead(notificationId);
+    //
+    //     // Navigate to action URL if available
+    //     if (notification && notification.action_url) {
+    //       close();
+    //       window.location.href = notification.action_url;
+    //     }
+    //   });
+    // });
   }
 
   /**

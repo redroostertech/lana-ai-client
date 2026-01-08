@@ -609,6 +609,16 @@
             return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
         }
 
+        /**
+         * Format number with thousand separators
+         * @param {number} num - Number to format
+         * @returns {string} Formatted number (e.g., 8833 -> "8,833")
+         */
+        function formatNumber(num) {
+            if (num == null || isNaN(num)) return '0';
+            return Number(num).toLocaleString('en-US');
+        }
+
         async function uploadFiles() {
             if (selectedFiles.length === 0) {
                 Toast.error('Please select files to upload');

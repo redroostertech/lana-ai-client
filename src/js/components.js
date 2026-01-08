@@ -64,7 +64,12 @@ const Modal = {
         </div>
         <div class="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
           <button class="btn-cancel px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">${cancelText}</button>
-          <button class="btn-confirm px-4 py-2 text-white ${type === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'} rounded-lg transition-colors">${confirmText}</button>
+          <button class="btn-confirm px-4 py-2 text-white ${
+            type === 'danger' ? 'bg-red-600 hover:bg-red-700' :
+            type === 'success' ? 'bg-green-600 hover:bg-green-700' :
+            type === 'primary' ? 'bg-blue-600 hover:bg-blue-700' :
+            'bg-blue-600 hover:bg-blue-700'
+          } rounded-lg transition-colors">${confirmText}</button>
         </div>
       </div>
     `;
@@ -96,8 +101,8 @@ const Modal = {
     return overlay;
   },
 
-  confirm(title, message, onConfirm) {
-    return this.show({ title, content: message, onConfirm, type: 'danger', confirmText: 'Delete' });
+  confirm(title, message, onConfirm, confirmText = 'Delete', type = 'danger') {
+    return this.show({ title, content: message, onConfirm, type, confirmText });
   },
 
   alert(title, message) {

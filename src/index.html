@@ -589,9 +589,29 @@
           if (orgId) {
             const result = await api.getOrganizationStats(orgId);
             const stats = result.statistics || result;
-            document.getElementById('statMatters').textContent = stats.total_matters || 0;
-            document.getElementById('statMattersLabel').textContent = 'Total Matters';
-            document.getElementById('statUsers').textContent = stats.total_users || 0;
+
+            // Display total unified matters count
+            const totalMatters = stats.total_matters || 0;
+            document.getElementById('statMatters').textContent = totalMatters.toLocaleString();
+
+            // Show breakdown if available (LANA + connector matters)
+            const lanaMatters = stats.lana_matters;
+            const connectorMatters = stats.connector_matters;
+
+            if (lanaMatters !== undefined && connectorMatters !== undefined && connectorMatters > 0) {
+              // Show breakdown when we have connector matters
+              document.getElementById('statMattersLabel').innerHTML = `
+                Total Matters
+                <span class="block text-xs font-normal text-gray-400 mt-1">
+                  ${lanaMatters.toLocaleString()} LANA, ${connectorMatters.toLocaleString()} Connector
+                </span>
+              `;
+            } else {
+              // Simple label when no connector matters
+              document.getElementById('statMattersLabel').textContent = 'Total Matters';
+            }
+
+            document.getElementById('statUsers').textContent = (stats.total_users || 0).toLocaleString();
             document.getElementById('statUsersCard').classList.remove('hidden');
 
             // Show user breakdown if available
@@ -626,7 +646,7 @@
             } catch (storageError) {
               // Fallback to basic stats if enhanced endpoint fails
               console.error('Failed to load enhanced storage stats:', storageError);
-              document.getElementById('statDocuments').textContent = stats.total_documents || 0;
+              document.getElementById('statDocuments').textContent = (stats.total_documents || 0).toLocaleString();
               document.getElementById('statStorage').textContent = formatBytes(stats.total_storage_bytes || stats.storage_used || 0);
             }
 
@@ -731,7 +751,7 @@
           const paginationTotal = mattersResult.pagination?.total || 0;
           // If pagination says there are matters but none returned, trust the returned count
           const myMattersCount = returnedCount === 0 ? 0 : paginationTotal;
-          document.getElementById('statMatters').textContent = myMattersCount;
+          document.getElementById('statMatters').textContent = myMattersCount.toLocaleString();
           document.getElementById('statMattersLabel').textContent = 'My Matters';
           // Hide users card for non-admins
           document.getElementById('statUsersCard').classList.add('hidden');

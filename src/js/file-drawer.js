@@ -351,6 +351,43 @@ const FileDrawer = {
         throw new Error('API client not available');
       }
 
+      // TRIGGER #3: File Drawer Activation - Check if processing needed before activating
+      if (activate) {
+        try {
+          const status = await api.getDocumentProcessingStatus(documentId);
+
+          if (status.stage === 'pending' || !status.hasExtractedText) {
+            console.log('[FileDrawer] Document needs processing, triggering JIT processing');
+
+            // Show processing indicator in file drawer
+            this.showFileProcessingIndicator(documentId);
+
+            // Trigger processing (don't wait for completion before activating)
+            api.triggerDocumentProcessing(documentId, 'file_drawer')
+              .then(() => {
+                console.log('[FileDrawer] Processing triggered successfully');
+                // Poll for completion in background
+                return api.pollDocumentProcessing(documentId);
+              })
+              .then(() => {
+                console.log('[FileDrawer] Processing completed');
+                this.hideFileProcessingIndicator(documentId);
+                if (Toast) Toast.success('Document processed and ready for AI');
+                // Refresh documents to show updated status
+                this.loadDocuments(this.currentSessionId);
+              })
+              .catch(error => {
+                console.error('[FileDrawer] Processing failed:', error);
+                this.hideFileProcessingIndicator(documentId);
+                if (Toast) Toast.warning('Document activated but processing failed');
+              });
+          }
+        } catch (statusError) {
+          console.error('[FileDrawer] Failed to check processing status:', statusError);
+          // Don't fail activation if status check fails
+        }
+      }
+
       const endpoint = activate ? 'activate' : 'deactivate';
       const data = await api.post(
         `/api/v1/chat/sessions/${this.currentSessionId}/drawer/${endpoint}`,
@@ -482,6 +519,53 @@ const FileDrawer = {
           availableChevron.classList.add('rotate-180');
         }
       }
+    }
+  },
+
+  /**
+   * Show processing indicator for a specific file in the drawer
+   */
+  showFileProcessingIndicator(documentId) {
+    const docElement = document.querySelector(`[data-doc-id="${documentId}"]`);
+    if (!docElement) return;
+
+    // Add processing class
+    docElement.classList.add('file-status-processing');
+
+    // Find or create processing indicator
+    let indicator = docElement.querySelector('.processing-indicator');
+    if (!indicator) {
+      indicator = document.createElement('div');
+      indicator.className = 'processing-indicator text-xs text-blue-600 mt-1 flex items-center gap-1';
+      indicator.innerHTML = `
+        <svg class="animate-spin h-3 w-3" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span>Processing for AI...</span>
+      `;
+
+      const infoSection = docElement.querySelector('.flex-1.min-w-0');
+      if (infoSection) {
+        infoSection.appendChild(indicator);
+      }
+    }
+  },
+
+  /**
+   * Hide processing indicator for a specific file in the drawer
+   */
+  hideFileProcessingIndicator(documentId) {
+    const docElement = document.querySelector(`[data-doc-id="${documentId}"]`);
+    if (!docElement) return;
+
+    // Remove processing class
+    docElement.classList.remove('file-status-processing');
+
+    // Remove indicator
+    const indicator = docElement.querySelector('.processing-indicator');
+    if (indicator) {
+      indicator.remove();
     }
   }
 };

@@ -260,6 +260,11 @@ class LanaChat {
       return;
     }
 
+    // TRIGGER #2: Chat # Mention - Detect and trigger processing for mentioned documents
+    if (!this.demoMode) {
+      await this.handleDocumentMentions(content);
+    }
+
     // Clear citations when starting a NEW message (prevents race condition)
     this.currentMessageCitations = {};
 
@@ -1014,6 +1019,105 @@ class LanaChat {
 
     messagesContainer.appendChild(messageEl);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }
+
+  /**
+   * TRIGGER #2: Handle document mentions in chat messages
+   * Detect # mentions and trigger processing for unprocessed documents
+   */
+  async handleDocumentMentions(message) {
+    // Detect #mentions in message (filenames after #)
+    const mentions = message.match(/#([a-zA-Z0-9_\-\.]+)/g);
+
+    if (!mentions || mentions.length === 0) {
+      return; // No mentions found
+    }
+
+    console.log('[Chat] Detected document mentions:', mentions);
+
+    // Get file drawer documents (if available)
+    if (!window.FileDrawer || !window.FileDrawer.currentSessionId) {
+      console.log('[Chat] File drawer not initialized, skipping mention processing');
+      return;
+    }
+
+    const processingPromises = [];
+
+    for (const mention of mentions) {
+      const filename = mention.substring(1); // Remove # prefix
+
+      // Find document by filename in active or available documents
+      const doc = this.findDocumentByFilename(filename);
+
+      if (doc) {
+        console.log(`[Chat] Found document for mention: ${filename}`, doc);
+
+        try {
+          // Check if processing needed
+          const status = await this.api.getDocumentProcessingStatus(doc.id);
+
+          if (status.stage === 'pending' || !status.hasExtractedText) {
+            console.log(`[Chat] Document ${filename} needs processing, triggering JIT`);
+
+            // Trigger processing (don't wait)
+            const promise = this.api.triggerDocumentProcessing(doc.id, 'chat_reference')
+              .then(() => {
+                console.log(`[Chat] Processing triggered for ${filename}`);
+                // Poll for completion in background
+                return this.api.pollDocumentProcessing(doc.id);
+              })
+              .then(() => {
+                console.log(`[Chat] Processing completed for ${filename}`);
+                this.addSystemMessage(`Document "${filename}" processed and ready`);
+              })
+              .catch(error => {
+                console.error(`[Chat] Failed to process ${filename}:`, error);
+                this.addSystemMessage(`Failed to process "${filename}"`);
+              });
+
+            processingPromises.push(promise);
+          }
+        } catch (error) {
+          console.error(`[Chat] Error checking status for ${filename}:`, error);
+        }
+      } else {
+        console.log(`[Chat] Document not found for mention: ${filename}`);
+      }
+    }
+
+    // Optional: Wait for all processing to complete before sending message
+    // For now, we process in background and send message immediately
+    if (processingPromises.length > 0) {
+      console.log(`[Chat] Processing ${processingPromises.length} mentioned documents in background`);
+    }
+  }
+
+  /**
+   * Find document by filename in conversation context
+   * Search in both active and available documents from FileDrawer
+   */
+  findDocumentByFilename(filename) {
+    if (!window.FileDrawer) return null;
+
+    const allDocs = [
+      ...(window.FileDrawer.documents.active || []),
+      ...(window.FileDrawer.documents.available || [])
+    ];
+
+    // Try exact match first
+    let doc = allDocs.find(d => d.filename === filename);
+
+    // Try case-insensitive match
+    if (!doc) {
+      doc = allDocs.find(d => d.filename.toLowerCase() === filename.toLowerCase());
+    }
+
+    // Try partial match (filename contains the mention)
+    if (!doc) {
+      doc = allDocs.find(d => d.filename.toLowerCase().includes(filename.toLowerCase()));
+    }
+
+    return doc;
   }
 
   toggle() {
