@@ -810,6 +810,80 @@
     let currentMatters = []; // Track currently displayed matters for "Select All"
     let matters = [];
 
+    // Security: HTML escaping to prevent XSS attacks
+    // Using explicit string replacement for better performance and security
+    function escapeHtml(unsafe) {
+      if (unsafe === null || unsafe === undefined) return '';
+      return String(unsafe)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    // Helper function to render a single matter card
+    function renderMatterCard(matter) {
+      // Escape all user-controlled data to prevent XSS
+      const escapedMatterId = escapeHtml(matter.matter_id);
+      const escapedMatterName = escapeHtml(matter.matter_name || 'Untitled');
+      const escapedClientName = escapeHtml(matter.client_name || '');
+      const escapedDescription = escapeHtml(matter.description || 'No description');
+      const escapedMatterNumber = escapeHtml(matter.matter_number || '');
+      const escapedSource = escapeHtml(matter.source || 'lana');  // Use 'source' not 'source_type' for pin API
+
+      return `
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow relative matter-card ${selectedMatters.has(matter.matter_id) ? 'ring-2 ring-indigo-500' : ''}" data-matter-id="${escapedMatterId}">
+          <!-- Selection Checkbox -->
+          <div class="absolute top-4 left-4 z-10">
+            <input type="checkbox"
+                   class="matter-checkbox w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                   data-matter-id="${escapedMatterId}"
+                   ${selectedMatters.has(matter.matter_id) ? 'checked' : ''}
+                   onclick="event.stopPropagation(); toggleMatterSelection('${escapedMatterId}')">
+          </div>
+
+          <div class="cursor-pointer pl-8" onclick="viewMatter('${escapedMatterId}')">
+            <div class="flex items-start justify-between mb-4">
+              <div class="flex-1">
+                <span class="text-xs text-gray-400 font-mono">${escapedMatterId}</span>
+                <h3 class="text-lg font-semibold text-gray-900 mt-1">${escapedMatterName}</h3>
+                <p class="text-sm text-gray-500">${escapedClientName}</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <!-- Pin Button -->
+                <button
+                  onclick="event.stopPropagation(); togglePin('${escapedMatterId}', '${escapedSource}', ${matter.is_pinned || false})"
+                  class="pin-button ${matter.is_pinned ? 'text-yellow-500' : 'text-gray-400'} hover:text-yellow-600 transition-colors"
+                  title="${matter.is_pinned ? 'Unpin matter' : 'Pin matter'}"
+                  data-matter-id="${escapedMatterId}"
+                  aria-label="${matter.is_pinned ? 'Unpin matter' : 'Pin matter'}">
+                  ${matter.is_pinned ? `
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/>
+                    </svg>
+                  ` : `
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
+                    </svg>
+                  `}
+                </button>
+                ${statusBadge(matter.status || 'active')}
+              </div>
+            </div>
+            <p class="text-sm text-gray-600 line-clamp-2 mb-4">${escapedDescription}</p>
+            <div class="flex items-center justify-between text-xs text-gray-400">
+              <span>Created ${formatDate(matter.created_at)}</span>
+              <div class="flex gap-2">
+                <button onclick="event.stopPropagation(); editMatter('${escapedMatterId}')" class="text-indigo-600 hover:text-indigo-800">Edit</button>
+                <button onclick="event.stopPropagation(); deleteMatter('${escapedMatterId}')" class="text-red-600 hover:text-red-800">Delete</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     // Load matters
     async function loadMatters() {
       const grid = document.getElementById('mattersGrid');
@@ -857,37 +931,54 @@
           return;
         }
 
-        grid.innerHTML = matters.map(matter => `
-          <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow relative matter-card ${selectedMatters.has(matter.matter_id) ? 'ring-2 ring-indigo-500' : ''}" data-matter-id="${matter.matter_id}">
-            <!-- Selection Checkbox -->
-            <div class="absolute top-4 left-4 z-10">
-              <input type="checkbox"
-                     class="matter-checkbox w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                     data-matter-id="${matter.matter_id}"
-                     ${selectedMatters.has(matter.matter_id) ? 'checked' : ''}
-                     onclick="event.stopPropagation(); toggleMatterSelection('${matter.matter_id}')">
-            </div>
+        // Separate pinned and unpinned matters
+        const pinnedMatters = matters.filter(m => m.is_pinned);
+        const unpinnedMatters = matters.filter(m => !m.is_pinned);
 
-            <div class="cursor-pointer pl-8" onclick="viewMatter('${matter.matter_id}')">
-              <div class="flex items-start justify-between mb-4">
-                <div class="flex-1">
-                  <span class="text-xs text-gray-400 font-mono">${matter.matter_id}</span>
-                  <h3 class="text-lg font-semibold text-gray-900 mt-1">${matter.matter_name || 'Untitled'}</h3>
-                  <p class="text-sm text-gray-500">${matter.client_name || ''}</p>
-                </div>
-                ${statusBadge(matter.status || 'active')}
-              </div>
-              <p class="text-sm text-gray-600 line-clamp-2 mb-4">${matter.description || 'No description'}</p>
-              <div class="flex items-center justify-between text-xs text-gray-400">
-                <span>Created ${formatDate(matter.created_at)}</span>
-                <div class="flex gap-2">
-                  <button onclick="event.stopPropagation(); editMatter('${matter.matter_id}')" class="text-indigo-600 hover:text-indigo-800">Edit</button>
-                  <button onclick="event.stopPropagation(); deleteMatter('${matter.matter_id}')" class="text-red-600 hover:text-red-800">Delete</button>
-                </div>
+        // Sort pinned matters by pinned_at (most recent first)
+        // Security: Handle null/undefined pinned_at to prevent crashes
+        pinnedMatters.sort((a, b) => {
+          const aTime = a.pinned_at ? new Date(a.pinned_at).getTime() : 0;
+          const bTime = b.pinned_at ? new Date(b.pinned_at).getTime() : 0;
+          return bTime - aTime; // Most recent first
+        });
+
+        // Render matters with grouping
+        let html = '';
+
+        // Pinned Matters Section
+        if (pinnedMatters.length > 0) {
+          html += `
+            <div class="col-span-full">
+              <div class="flex items-center gap-2 mb-4">
+                <svg class="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/>
+                </svg>
+                <h2 class="text-lg font-semibold text-gray-900">Pinned Matters</h2>
+                <span class="text-sm text-gray-500">(${pinnedMatters.length})</span>
               </div>
             </div>
-          </div>
-        `).join('');
+          `;
+          html += pinnedMatters.map(matter => renderMatterCard(matter)).join('');
+        }
+
+        // All Matters Section
+        if (unpinnedMatters.length > 0) {
+          html += `
+            <div class="col-span-full ${pinnedMatters.length > 0 ? 'mt-8' : ''}">
+              <div class="flex items-center gap-2 mb-4">
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
+                </svg>
+                <h2 class="text-lg font-semibold text-gray-900">All Matters</h2>
+                <span class="text-sm text-gray-500">(${unpinnedMatters.length})</span>
+              </div>
+            </div>
+          `;
+          html += unpinnedMatters.map(matter => renderMatterCard(matter)).join('');
+        }
+
+        grid.innerHTML = html;
 
         // Update pagination
         const total = result.total || matters.length;
@@ -2561,6 +2652,80 @@
     }
     if (drawerOverlay) {
       drawerOverlay.addEventListener('click', closeDrawer);
+    }
+
+    // Security: Prevent concurrent pin/unpin requests (race condition fix)
+    const pinningInProgress = new Set();
+
+    // Pin/Unpin matter
+    window.togglePin = async function(matterId, source = 'lana', isPinned) {
+      const button = document.querySelector(`.pin-button[data-matter-id="${matterId}"]`);
+      if (!button) return;
+
+      // Prevent concurrent requests for same matter (race condition fix)
+      const key = `${matterId}-${source}`;
+      if (pinningInProgress.has(key)) {
+        console.warn('Pin operation already in progress for this matter');
+        return;
+      }
+
+      // Mark operation as in progress
+      pinningInProgress.add(key);
+
+      // Store original state for rollback on error
+      const originalHTML = button.innerHTML;
+      const originalClass = button.className;
+      const originalTitle = button.title;
+
+      try {
+        // Optimistic UI update
+        if (isPinned) {
+          button.innerHTML = `
+            <svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+          `;
+          button.className = 'pin-button text-gray-400';
+          button.title = 'Unpinning...';
+        } else {
+          button.innerHTML = `
+            <svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+          `;
+          button.className = 'pin-button text-yellow-500';
+          button.title = 'Pinning...';
+        }
+
+        // Call API
+        if (isPinned) {
+          await api.unpinMatter(matterId, source);
+          Toast.success('Matter unpinned');
+        } else {
+          await api.pinMatter(matterId, source);
+          Toast.success('Matter pinned');
+        }
+
+        // Reload matters to reflect new order
+        await loadMatters();
+      } catch (error) {
+        // Rollback on error
+        button.innerHTML = originalHTML;
+        button.className = originalClass;
+        button.title = originalTitle;
+
+        // Show error message
+        if (error.message?.includes('404') || error.message?.includes('not found')) {
+          Toast.error('Matter not found or you do not have access');
+        } else if (error.message?.includes('429') || error.message?.includes('rate limit')) {
+          Toast.error('Too many requests. Please wait a moment and try again.');
+        } else {
+          Toast.error(error.message || 'Failed to update pin status');
+        }
+      } finally {
+        // Always remove from in-progress set (race condition fix)
+        pinningInProgress.delete(key);
+      }
     }
 
     // Delete matter

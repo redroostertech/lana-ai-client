@@ -975,6 +975,14 @@ class ApiClient {
     return this.post('/api/v1/matters/bulk-delete', { matter_ids: matterIds });
   }
 
+  async pinMatter(matterId, source = 'lana') {
+    return this.post(`/api/v1/matters/${matterId}/pin`, { source });
+  }
+
+  async unpinMatter(matterId, source = 'lana') {
+    return this.delete(`/api/v1/matters/${matterId}/pin?source=${source}`);
+  }
+
   async getMatterPermissions(matterId) {
     return this.get(`/api/v1/matters/${matterId}/permissions`);
   }

@@ -260,6 +260,17 @@ const Form = {
   }
 };
 
+// Security: HTML escaping helper
+function escapeHtml(unsafe) {
+  if (unsafe === null || unsafe === undefined) return '';
+  return String(unsafe)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 // Status Badge Helper
 function statusBadge(status) {
   const styles = {
@@ -274,7 +285,9 @@ function statusBadge(status) {
     running: 'bg-green-100 text-green-800',
     stopped: 'bg-gray-100 text-gray-800'
   };
-  return `<span class="px-2 py-1 text-xs font-medium rounded-full ${styles[status] || 'bg-gray-100 text-gray-800'}">${status}</span>`;
+  // Security: Escape status value to prevent XSS
+  const escapedStatus = escapeHtml(status);
+  return `<span class="px-2 py-1 text-xs font-medium rounded-full ${styles[status] || 'bg-gray-100 text-gray-800'}">${escapedStatus}</span>`;
 }
 
 // Date Formatter
