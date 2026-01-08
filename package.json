@@ -3,7 +3,7 @@
   "productName": "Lana AI",
   "version": "3.0.0",
   "buildNumber": "1",
-  "releaseType": "beta",
+  "releaseType": "stable",
   "description": "Lana AI - Enterprise AI Platform",
   "main": "src/index.js",
   "author": {
