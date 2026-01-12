@@ -102,22 +102,22 @@
         const pathWithoutFile = afterBase.substring(0, afterBase.lastIndexOf('/'));
         // Count directory depth
         const depth = pathWithoutFile ? pathWithoutFile.split('/').length : 0;
-        // Build relative path
-        return (depth > 0 ? '../'.repeat(depth) : '') + LOCAL_URL;
+        // Build relative path (add ./ prefix for Electron to ensure relative resolution)
+        return (depth > 0 ? '../'.repeat(depth) : './') + LOCAL_URL;
       }
 
       // Fallback: assume we're in root
-      return LOCAL_URL;
+      return './' + LOCAL_URL;
     }
 
     // For web browser, count directories from root (excluding filename)
     // Example: /admin/users.html -> depth 1 -> ../css/tailwind.js
-    // Example: /index.html -> depth 0 -> css/tailwind.js
+    // Example: /index.html -> depth 0 -> ./css/tailwind.js
     const pathParts = currentPath.split('/').filter(p => p); // Remove empty strings
     const depth = Math.max(0, pathParts.length - 1); // Subtract 1 for the filename
 
-    // Build relative path
-    return (depth > 0 ? '../'.repeat(depth) : '') + LOCAL_URL;
+    // Build relative path (add ./ prefix to ensure relative resolution)
+    return (depth > 0 ? '../'.repeat(depth) : './') + LOCAL_URL;
   }
 
   function loadLocal() {
