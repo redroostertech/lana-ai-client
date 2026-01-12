@@ -77,35 +77,47 @@
     const isElectron = window.location.protocol === 'file:';
 
     if (isElectron) {
-      // For Electron with file://, find public_html root and calculate relative path
+      // For Electron with file://, find public_html or src root
       // Example: /Users/.../public_html/admin/users.html -> ../css/tailwind.js
       // Example: /Users/.../public_html/index.html -> css/tailwind.js
 
-      // Count directory depth from public_html
-      const publicHtmlIndex = currentPath.indexOf('public_html');
-      if (publicHtmlIndex === -1) {
-        // Fallback: just use relative path based on slashes after filename
-        const pathParts = currentPath.split('/').filter(p => p && !p.endsWith('.html'));
-        const depth = pathParts.length;
+      const publicHtmlIndex = currentPath.indexOf('public_html/');
+      const srcIndex = currentPath.indexOf('/src/');
+
+      let baseIndex = -1;
+      let baseLength = 0;
+
+      if (publicHtmlIndex !== -1) {
+        baseIndex = publicHtmlIndex;
+        baseLength = 'public_html/'.length;
+      } else if (srcIndex !== -1) {
+        baseIndex = srcIndex;
+        baseLength = '/src/'.length;
+      }
+
+      if (baseIndex !== -1) {
+        // Get path after base directory
+        const afterBase = currentPath.substring(baseIndex + baseLength);
+        // Remove the filename (last segment)
+        const pathWithoutFile = afterBase.substring(0, afterBase.lastIndexOf('/'));
+        // Count directory depth
+        const depth = pathWithoutFile ? pathWithoutFile.split('/').length : 0;
+        // Build relative path
         return (depth > 0 ? '../'.repeat(depth) : '') + LOCAL_URL;
       }
 
-      // Get path after public_html/
-      const afterPublicHtml = currentPath.substring(publicHtmlIndex + 'public_html/'.length);
-      const segments = afterPublicHtml.split('/').filter(p => p && !p.endsWith('.html'));
-      const depth = segments.length;
-
-      // Build relative path
-      return (depth > 0 ? '../'.repeat(depth) : '') + LOCAL_URL;
+      // Fallback: assume we're in root
+      return LOCAL_URL;
     }
 
-    // For web browser, use relative path
-    const pathParts = currentPath.split('/').filter(p => p && !p.endsWith('.html'));
-    const depth = pathParts.length;
+    // For web browser, count directories from root (excluding filename)
+    // Example: /admin/users.html -> depth 1 -> ../css/tailwind.js
+    // Example: /index.html -> depth 0 -> css/tailwind.js
+    const pathParts = currentPath.split('/').filter(p => p); // Remove empty strings
+    const depth = Math.max(0, pathParts.length - 1); // Subtract 1 for the filename
 
-    // Build relative path to css/tailwind.js from current page
-    let basePath = depth > 0 ? '../'.repeat(depth) : '';
-    return basePath + LOCAL_URL;
+    // Build relative path
+    return (depth > 0 ? '../'.repeat(depth) : '') + LOCAL_URL;
   }
 
   function loadLocal() {
