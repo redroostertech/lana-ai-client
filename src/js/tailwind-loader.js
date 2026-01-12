@@ -73,8 +73,33 @@
   }
 
   function determineLocalPath() {
-    // Determine the correct path based on current page location
     const currentPath = window.location.pathname;
+    const isElectron = window.location.protocol === 'file:';
+
+    if (isElectron) {
+      // For Electron with file://, find public_html root and calculate relative path
+      // Example: /Users/.../public_html/admin/users.html -> ../css/tailwind.js
+      // Example: /Users/.../public_html/index.html -> css/tailwind.js
+
+      // Count directory depth from public_html
+      const publicHtmlIndex = currentPath.indexOf('public_html');
+      if (publicHtmlIndex === -1) {
+        // Fallback: just use relative path based on slashes after filename
+        const pathParts = currentPath.split('/').filter(p => p && !p.endsWith('.html'));
+        const depth = pathParts.length;
+        return (depth > 0 ? '../'.repeat(depth) : '') + LOCAL_URL;
+      }
+
+      // Get path after public_html/
+      const afterPublicHtml = currentPath.substring(publicHtmlIndex + 'public_html/'.length);
+      const segments = afterPublicHtml.split('/').filter(p => p && !p.endsWith('.html'));
+      const depth = segments.length;
+
+      // Build relative path
+      return (depth > 0 ? '../'.repeat(depth) : '') + LOCAL_URL;
+    }
+
+    // For web browser, use relative path
     const pathParts = currentPath.split('/').filter(p => p && !p.endsWith('.html'));
     const depth = pathParts.length;
 
