@@ -117,14 +117,8 @@ function createWindow(serverUrl = null) {
     show: false // Don't show until ready (prevents flash of white screen)
   });
 
-  // Load the index.html from public_html directory or backend server
-  // For development with backend server running, use SERVER_URL env var
-  const backendServerUrl = process.env.SERVER_URL || process.env.BACKEND_URL;
-  const startUrl = backendServerUrl
-    ? `${backendServerUrl}/index.html`
-    : createFileUrl(path.join(__dirname, 'public_html/index.html'));
-
-  console.log('[Electron] Loading app from:', startUrl);
+  // Load the index.html from public_html directory
+  const startUrl = createFileUrl(path.join(__dirname, 'public_html/index.html'));
   mainWindow.loadURL(startUrl);
 
   // Show window when ready to prevent visual flash
@@ -197,13 +191,8 @@ function createLoginWindow() {
     titleBarStyle: 'default'
   });
 
-  // Load login page directly or from backend server
-  const backendServerUrl = process.env.SERVER_URL || process.env.BACKEND_URL;
-  const loginUrl = backendServerUrl
-    ? `${backendServerUrl}/login.html`
-    : createFileUrl(path.join(__dirname, 'public_html/login.html'));
-
-  console.log('[Electron] Loading login from:', loginUrl);
+  // Load login page directly
+  const loginUrl = createFileUrl(path.join(__dirname, 'public_html/login.html'));
   mainWindow.loadURL(loginUrl);
 
   mainWindow.once('ready-to-show', () => {
