@@ -15,6 +15,10 @@
   <script src="js/notifications.js"></script>
   <script src="js/chat-demo-responses.js"></script>
   <script src="js/file-drawer.js"></script>
+  <script src="js/navigation-helpers.js"></script>
+    <script src="js/new-project-modal.js"></script>
+    <script src="js/conversation-menu.js"></script>
+  <script src="js/conversation-search-modal.js"></script>
   <script src="js/chat.js"></script>
   <style>
     .chat-container {
@@ -330,83 +334,8 @@
       </div>
     </header>
 
-    <!-- Chat Layout with Conversations Panel -->
+    <!-- Chat Area -->
     <div class="flex flex-1 overflow-hidden">
-      <!-- Conversations Panel -->
-      <div class="w-64 bg-white border-r border-gray-200 flex-shrink-0 flex flex-col">
-        <div class="p-4 flex flex-col flex-1 overflow-hidden">
-          <!-- Search -->
-          <div class="relative mb-4">
-            <input 
-              type="text" 
-              id="conversationSearch" 
-              placeholder="Search conversations..."
-              class="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            >
-            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-            </svg>
-          </div>
-
-          <!-- New Chat Button (hidden) -->
-          <button id="newConversationBtn" class="hidden w-full mb-4 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-            </svg>
-            New Conversation
-          </button>
-
-          <!-- Projects Section (full height) -->
-          <div class="flex-1 flex flex-col min-h-0">
-            <button onclick="toggleSection('projects')" class="w-full flex items-center justify-between text-left py-2 hover:bg-gray-50 rounded-lg px-2 transition-colors">
-              <span class="text-xs font-semibold text-gray-700 uppercase tracking-wider">Projects</span>
-              <svg id="projectsChevron" class="w-4 h-4 text-gray-500 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-              </svg>
-            </button>
-            <div id="projectsContent" class="mt-2 flex-1 overflow-y-auto">
-              <!-- New Project Button -->
-              <button onclick="openNewProjectModal()" class="w-full mb-3 px-3 py-2 bg-white border-2 border-indigo-600 text-indigo-600 text-sm font-medium rounded-lg hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                </svg>
-                New Project
-              </button>
-
-              <div id="groupedConversations">
-                <!-- Populated by JS -->
-              </div>
-            </div>
-          </div>
-
-          <!-- Your Chats Section (hidden) -->
-          <div class="hidden flex-1 flex flex-col min-h-0">
-            <button onclick="toggleSection('yourChats')" class="w-full flex items-center justify-between text-left py-2 hover:bg-gray-50 rounded-lg px-2 transition-colors flex-shrink-0">
-              <span class="text-xs font-semibold text-gray-700 uppercase tracking-wider">Your Chats</span>
-              <svg id="yourChatsChevron" class="w-4 h-4 text-gray-500 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-              </svg>
-            </button>
-            <div id="yourChatsContent" class="mt-2 space-y-1 flex-1 overflow-y-auto">
-              <div id="ungroupedConversations" class="space-y-1">
-                <!-- Populated by JS -->
-              </div>
-            </div>
-          </div>
-
-          <!-- Conversations Panel Footer -->
-          <div class="p-3 border-t border-gray-200 flex-shrink-0">
-            <button onclick="openHelpMenu()" class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 font-medium rounded-lg transition-colors">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-              <span>Show Help</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Chat Area -->
       <div class="flex-1 flex flex-col bg-white overflow-hidden">
         <!-- Active Generation Banner (shown when AI is still generating after page refresh) -->
         <div id="generationBanner" class="hidden bg-yellow-50 border-b border-yellow-200 px-6 py-3">
@@ -1352,19 +1281,201 @@
         console.error('Failed to load user profile:', error);
       }
       
-      // Render dynamic menu (will now have access to roles)
-      renderMenu('#mainNav');
-      
-      // Continue with page initialization
-      initializePage();
+      // Render dynamic chat menu (will now have access to roles)
+      renderMenu('#mainNav', { menuType: 'chat' });
+
+      // Continue with page initialization (now async)
+      await initializePage();
     })();
 
-    function initializePage() {
+    /**
+     * Initialize from URL parameters (session, matter, openModal)
+     * This function is called AFTER conversations are loaded to avoid race conditions
+     */
+    async function initializeFromURL() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const sessionId = urlParams.get('session');
+      const matterId = urlParams.get('matter');
 
-      // Initialize notifications panel
-      NotificationPanel.init();
+      if (sessionId) {
+        // Validate session ID format
+        if (!NavigationHelpers.validateSessionId(sessionId)) {
+          console.error('Invalid session ID format:', sessionId);
+          Toast.error('Invalid conversation link');
+          startNewChat();
+          return;
+        }
 
-    // UI Elements
+        currentConversationId = sessionId;
+        try {
+          await loadConversationMessages(sessionId);
+          // Enable input now that conversation is loaded
+          enableMessageInput();
+
+          // Update conversation menu to highlight active conversation
+          // Conversation menu has already loaded, so this is safe
+          if (typeof ConversationMenu !== 'undefined') {
+            const success = ConversationMenu.setActive(sessionId);
+            if (!success) {
+              console.warn('[Chat] Conversation not found in sidebar menu, but messages loaded successfully');
+            }
+          }
+
+          // Check if there's an active generation for this conversation
+          await checkForActiveGeneration();
+        } catch (error) {
+          console.error('Failed to load conversation from URL:', error);
+          // Conversation might have been deleted - clear URL params and start fresh
+          Toast.warning('The conversation you were viewing no longer exists');
+          startNewChat();
+        }
+      } else if (matterId) {
+        // Validate matter ID format
+        if (!NavigationHelpers.validateMatterId(matterId)) {
+          console.error('Invalid matter ID format:', matterId);
+          Toast.error('Invalid matter link');
+          // Open matter selection modal as fallback
+          if (typeof window.openNewProjectModal === 'function') {
+            window.openNewProjectModal();
+          }
+          return;
+        }
+
+        // Validate matter exists and user has access, then create conversation session
+        try {
+          const matterResponse = await api.get(`/api/v1/matters/${matterId}`);
+          const matter = matterResponse.matter || matterResponse;
+
+          if (!matter || !matter.matter_id) {
+            throw new Error('Matter not found');
+          }
+
+          const matterName = matter.matter_name || matter.name || matterId;
+
+          // Set matter context
+          window.currentMatterId = matterId;
+
+          console.log('[Chat] Creating conversation for matter:', {
+            matter_id: matter.matter_id,
+            matter_name: matterName,
+            client_name: matter.client_name
+          });
+
+          // Reset message pagination state
+          messagesPage = 1;
+          messagesHasMore = false;
+          isLoadingMoreMessages = false;
+          isLoadingConversation = false;
+          messages = [];
+
+          // Clear chat UI (keep indicator elements)
+          const preservedElements = ['loadMoreIndicator', 'messagesLoading', 'welcomeMessage'];
+          Array.from(chatMessages.children).forEach(child => {
+            if (!preservedElements.includes(child.id)) {
+              child.remove();
+            }
+          });
+
+          // Hide welcome message
+          const welcomeMessage = document.getElementById('welcomeMessage');
+          if (welcomeMessage) welcomeMessage.classList.add('hidden');
+
+          const suggestionsEl = document.getElementById('suggestions');
+          if (suggestionsEl) suggestionsEl.classList.add('hidden');
+
+          // Create a new conversation session with matter context
+          const response = await api.post('/api/v1/chat/sessions', {
+            matter_id: matterId,
+            title: matterName,
+            context: {
+              matter_name: matterName,
+              matter_id: matterId
+            }
+          });
+
+          const newThreadId = response.session?.thread_id || response.session?.id || response.thread_id;
+
+          if (newThreadId) {
+            currentConversationId = newThreadId;
+
+            // Enable message input now that conversation is created
+            enableMessageInput();
+
+            // Update URL with session ID
+            const urlParams = new URLSearchParams(window.location.search);
+            urlParams.set('matter', matterId);
+            urlParams.set('session', newThreadId);
+            window.history.pushState({}, '', `${window.location.pathname}?${urlParams}`);
+
+            // Clear messages array
+            messages = [];
+
+            // Reload conversations to show the new project (reset pagination)
+            yourChatsPage = 1;
+            if (typeof ConversationMenu !== 'undefined') {
+              await ConversationMenu.loadConversations(true);
+              ConversationMenu.setActive(newThreadId);
+            }
+
+            Toast.success(`Started chat for ${matterName}`);
+            console.log('[Chat] Conversation created with ID:', newThreadId);
+          } else {
+            throw new Error('No thread ID returned from API');
+          }
+
+        } catch (error) {
+          console.error('Failed to create matter conversation:', error);
+
+          // Check if the error is due to matter not found
+          if (error.response?.data?.error?.code === 'MATTER_NOT_FOUND') {
+            const errorMatterId = error.response.data.error.matter_id;
+            Toast.error(`Matter "${errorMatterId}" not found. Please sync your matters from integrations first.`);
+
+            // Clear URL parameters
+            window.history.pushState({}, '', window.location.pathname);
+
+            // Redirect to integrations page after a moment
+            setTimeout(() => {
+              const confirmed = confirm(`Matter "${errorMatterId}" doesn't exist in LANA yet.\n\nWould you like to go to the integrations page to sync your matters?`);
+              if (confirmed) {
+                window.location.href = NavigationHelpers.resolvePath('integrations/connectors.html');
+              } else {
+                // Open matter selection modal to choose a different matter
+                if (typeof window.openNewProjectModal === 'function') {
+                  window.openNewProjectModal();
+                }
+              }
+            }, 500);
+          } else {
+            // Generic error handling
+            Toast.error(`Failed to start chat for matter. Please try again.`);
+
+            // Clear invalid matter context
+            window.currentMatterId = null;
+
+            // Open matter selection modal as fallback
+            if (typeof window.openNewProjectModal === 'function') {
+              setTimeout(() => {
+                window.openNewProjectModal();
+              }, 1500);
+            }
+          }
+        }
+      }
+
+      // Check if we should auto-open the new project modal
+      const openModal = urlParams.get('openModal');
+      if (openModal === 'newProject') {
+        // Wait a bit for page to fully initialize, then open modal
+        setTimeout(() => {
+          if (typeof window.openNewProjectModal === 'function') {
+            window.openNewProjectModal();
+          }
+        }, 300);
+      }
+    }
+
+    // UI Elements - Define these FIRST before any initialization
     const sidebar = document.getElementById('sidebar');
     const sidebarOverlay = document.getElementById('sidebarOverlay');
     const openSidebar = document.getElementById('openSidebar');
@@ -1383,7 +1494,7 @@
     const activityDetail = document.getElementById('activityDetail');
     const suggestions = document.getElementById('suggestions');
 
-    // Chat state
+    // Chat state - MUST be declared BEFORE initializePage() calls initializeFromURL()
     let messages = [];
     let currentConversationId = null;      // Thread ID - groups messages in a conversation
     let currentSessionId = null;            // Session ID - unique ID for current message/request
@@ -1400,7 +1511,7 @@
     let reasoningStartTime = null;  // When reasoning started
     let reasoningDurationInterval = null;  // Interval for updating duration
     let currentModelName = null;  // Current model being used
-    
+
     // Pagination state for conversations list
     let yourChatsPage = 1;
     let yourChatsLimit = 20;
@@ -1414,6 +1525,27 @@
     let messagesHasMore = false;
     let isLoadingMoreMessages = false;
     let isLoadingConversation = false;
+    let loadingConversationId = null;  // Track which specific conversation is being loaded
+
+    async function initializePage() {
+
+      // Initialize notifications panel
+      NotificationPanel.init();
+
+      // Initialize conversation menu in sidebar and AWAIT loading
+      if (typeof ConversationMenu !== 'undefined' && ConversationMenu.init()) {
+        // Load conversations into the menu - MUST AWAIT before handling URL params
+        await ConversationMenu.loadConversations(true);
+      }
+
+      // Initialize conversation search modal
+      if (typeof ConversationSearchModal !== 'undefined') {
+        ConversationSearchModal.init();
+      }
+
+      // Now that conversations are loaded, handle URL parameters
+      await initializeFromURL();
+    }
 
     // Toggle section visibility
     window.toggleSection = function(sectionName) {
@@ -1820,21 +1952,49 @@
       renderMatters(filtered);
     }
 
+    /**
+     * Validate matter ID format
+     * Accepts: MATT-XXXXX (native), AS-XXXXX (ActionStep), numeric (legacy)
+     *
+     * TODO: In future, dynamically load prefixes from connector registry
+     * When adding new connectors, update the validPatterns array below
+     */
+    function validateMatterId(matterId) {
+      if (!matterId) return false;
+
+      const matterIdString = String(matterId);
+
+      // TODO: Replace this static list with dynamic loading from connector registry
+      // Each connector should define its matter_id prefix format
+      const validPatterns = [
+        /^MATT-/i,      // Native LANA matters
+        /^AS-/i,        // ActionStep imported matters
+        /^matter_/i,    // Legacy matter_ prefix
+        /^\d+$/         // Legacy numeric IDs
+        // ADD NEW CONNECTOR PREFIXES HERE (e.g., /^CLIO-/i, /^MY-/i, etc.)
+      ];
+
+      return validPatterns.some(pattern => pattern.test(matterIdString));
+    }
+
     window.createProjectChat = async function(matterId, matterName) {
       try {
         // Close the modal
         closeNewProjectModal();
 
-        // Validate matter_id format - should be MATT-XXXXX, not a UUID
-        if (!matterId || !matterId.startsWith('MATT-')) {
-          console.error('Invalid matter_id format:', matterId, '- Expected MATT-XXXXX format');
+        // Validate matter_id format
+        if (!validateMatterId(matterId)) {
+          console.error('Invalid matter_id format:', matterId);
           Toast.error('Invalid matter ID. Please try again.');
           return;
         }
 
+        // Convert to string if numeric (legacy matters)
+        const matterIdString = String(matterId);
+
         // Store matter ID for context in all messages
-        window.currentMatterId = matterId;
-        console.log('Creating project chat with matter:', { matterId, matterName, format: 'MATT-XXXXX' });
+        window.currentMatterId = matterIdString;
+        console.log('Creating project chat with matter:', { matterId: matterIdString, matterName });
 
         // Reset message pagination state
         messagesPage = 1;
@@ -1860,11 +2020,11 @@
 
         // Create a new conversation with matter_id (but don't send any initial messages)
         const response = await api.post('/api/v1/chat/sessions', {
-          matter_id: matterId,
+          matter_id: matterIdString,
           title: matterName,
           context: {
             matter_name: matterName,
-            matter_id: matterId
+            matter_id: matterIdString
           }
         });
 
@@ -1878,7 +2038,7 @@
 
           // Update URL
           const urlParams = new URLSearchParams(window.location.search);
-          urlParams.set('matter', matterId);
+          urlParams.set('matter', matterIdString);
           urlParams.set('session', newThreadId);
           window.history.pushState({}, '', `${window.location.pathname}?${urlParams}`);
 
@@ -1893,7 +2053,34 @@
         }
       } catch (error) {
         console.error('Failed to create project chat:', error);
-        Toast.error('Failed to create project chat. Please try again.');
+
+        // Check if the error is due to matter not found
+        if (error.response?.data?.error?.code === 'MATTER_NOT_FOUND') {
+          const errorMatterId = error.response.data.error.matter_id;
+          Toast.error(`Matter "${errorMatterId}" not found. Please sync your matters from integrations first.`);
+
+          // Clear URL parameters
+          window.history.pushState({}, '', window.location.pathname);
+
+          // Clear invalid matter context
+          window.currentMatterId = null;
+
+          // Redirect to integrations page after a moment
+          setTimeout(() => {
+            const confirmed = confirm(`Matter "${errorMatterId}" doesn't exist in LANA yet.\n\nWould you like to go to the integrations page to sync your matters?`);
+            if (confirmed) {
+              window.location.href = NavigationHelpers.resolvePath('integrations/connectors.html');
+            } else {
+              // Open matter selection modal to choose a different matter
+              if (typeof window.openNewProjectModal === 'function') {
+                window.openNewProjectModal();
+              }
+            }
+          }, 500);
+        } else {
+          // Generic error handling
+          Toast.error('Failed to create project chat. Please try again.');
+        }
       }
     }
 
@@ -2030,6 +2217,15 @@
         }
         
         renderConversations(allConversations);
+
+        // Also update the conversation menu in sidebar
+        if (typeof ConversationMenu !== 'undefined') {
+          ConversationMenu.conversations = allConversations;
+          ConversationMenu.currentConversationId = currentConversationId;
+          ConversationMenu.hasMore = yourChatsHasMore;
+          ConversationMenu.page = yourChatsPage;
+          ConversationMenu.render();
+        }
       } catch (error) {
         console.error('Failed to load conversations:', error);
         // Show empty state instead of error
@@ -2075,41 +2271,45 @@
       // Store all project groups for modal
       allProjectGroups = grouped;
 
-      // Render ungrouped conversations (Your Chats)
+      // Render ungrouped conversations (Your Chats) - old panel (may not exist)
       const ungroupedContainer = document.getElementById('ungroupedConversations');
-      if (ungrouped.length === 0 && !isLoadingMoreChats) {
-        ungroupedContainer.innerHTML = '<p class="text-sm text-gray-400 italic px-3 py-2">No recent conversations</p>';
-      } else {
-        const chatsHTML = ungrouped.map(conv => createConversationItem(conv)).join('');
-        ungroupedContainer.innerHTML = chatsHTML;
-        
-        // Show loading indicator at the bottom if loading more
-        if (isLoadingMoreChats && yourChatsHasMore) {
-          ungroupedContainer.innerHTML += '<div class="flex items-center justify-center py-3"><div class="animate-spin rounded-full h-5 w-5 border-2 border-indigo-200 border-t-indigo-600"></div></div>';
+      if (ungroupedContainer) {
+        if (ungrouped.length === 0 && !isLoadingMoreChats) {
+          ungroupedContainer.innerHTML = '<p class="text-sm text-gray-400 italic px-3 py-2">No recent conversations</p>';
+        } else {
+          const chatsHTML = ungrouped.map(conv => createConversationItem(conv)).join('');
+          ungroupedContainer.innerHTML = chatsHTML;
+
+          // Show loading indicator at the bottom if loading more
+          if (isLoadingMoreChats && yourChatsHasMore) {
+            ungroupedContainer.innerHTML += '<div class="flex items-center justify-center py-3"><div class="animate-spin rounded-full h-5 w-5 border-2 border-indigo-200 border-t-indigo-600"></div></div>';
+          }
         }
       }
 
-      // Render grouped conversations (Projects) - limit to 6
+      // Render grouped conversations (Projects) - limit to 6 - old panel (may not exist)
       const groupedContainer = document.getElementById('groupedConversations');
-      const matterGroups = Object.entries(grouped);
-      
-      if (matterGroups.length === 0) {
-        groupedContainer.innerHTML = '<p class="text-sm text-gray-400 italic px-3 py-2">No project conversations</p>';
-      } else {
-        const limitedGroups = matterGroups.slice(0, 6);
-        const projectsHTML = limitedGroups.map(([matterId, group]) => `
-          <div class="space-y-1 mb-4">
-            ${group.conversations.map(conv => createConversationItem(conv, group.matterName)).join('')}
-          </div>
-        `).join('');
-        
-        const showMoreBtn = matterGroups.length > 6 ? `
-          <button onclick="openProjectsModal()" class="w-full mt-2 px-3 py-2 text-sm text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors font-medium">
-            Show More (${matterGroups.length - 6} more)
-          </button>
-        ` : '';
-        
-        groupedContainer.innerHTML = projectsHTML + showMoreBtn;
+      if (groupedContainer) {
+        const matterGroups = Object.entries(grouped);
+
+        if (matterGroups.length === 0) {
+          groupedContainer.innerHTML = '<p class="text-sm text-gray-400 italic px-3 py-2">No project conversations</p>';
+        } else {
+          const limitedGroups = matterGroups.slice(0, 6);
+          const projectsHTML = limitedGroups.map(([matterId, group]) => `
+            <div class="space-y-1 mb-4">
+              ${group.conversations.map(conv => createConversationItem(conv, group.matterName)).join('')}
+            </div>
+          `).join('');
+
+          const showMoreBtn = matterGroups.length > 6 ? `
+            <button onclick="openProjectsModal()" class="w-full mt-2 px-3 py-2 text-sm text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors font-medium">
+              Show More (${matterGroups.length - 6} more)
+            </button>
+          ` : '';
+
+          groupedContainer.innerHTML = projectsHTML + showMoreBtn;
+        }
       }
     }
 
@@ -2230,7 +2430,7 @@
 
       return `
         <div class="conversation-item ${isActive} p-2 rounded-lg border border-gray-200 cursor-pointer transition-colors w-full max-w-full overflow-hidden group relative"
-             onclick="selectConversation('${conv.thread_id}')">
+             onclick="selectConversation('${conv.thread_id}', '${conv.matter_id || ''}')">
           <div class="flex items-start gap-2 min-w-0 w-full">
             <div class="w-7 h-7 bg-gradient-to-br from-indigo-500 to-purple-600 rounded flex items-center justify-center flex-shrink-0">
               <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2387,6 +2587,11 @@
         // Reload conversations list
         yourChatsPage = 1;
         await loadConversations(false);
+
+        // Also refresh the conversation menu sidebar if available
+        if (typeof ConversationMenu !== 'undefined') {
+          await ConversationMenu.loadConversations(true);
+        }
       } catch (error) {
         console.error('Failed to rename conversation:', error);
         Toast.error('Failed to rename conversation');
@@ -2438,11 +2643,16 @@
         if (isDeletingCurrentConversation) {
           startNewChat();
         }
-        
+
         // Reload conversations list
         yourChatsPage = 1;
         await loadConversations(false);
-        
+
+        // Also refresh the conversation menu sidebar if available
+        if (typeof ConversationMenu !== 'undefined') {
+          await ConversationMenu.loadConversations(true);
+        }
+
         // Show success message
         Toast.success(isProject ? 'Project conversation deleted (matter preserved)' : 'Conversation deleted');
       } catch (error) {
@@ -2452,12 +2662,16 @@
     }
 
     // Select conversation
-    window.selectConversation = async function(threadId) {
+    window.selectConversation = async function(threadId, matterId = null) {
       currentConversationId = threadId;
 
-      // Find the matter_id from the conversation data
-      const conv = allConversations.find(c => c.thread_id === threadId || c.id === threadId);
-      window.currentMatterId = conv?.matter_id || null;
+      // Use provided matterId, or try to find it from conversation data as fallback
+      if (matterId) {
+        window.currentMatterId = matterId;
+      } else {
+        const conv = allConversations.find(c => c.thread_id === threadId || c.id === threadId);
+        window.currentMatterId = conv?.matter_id || null;
+      }
 
       console.log('Selected conversation:', { threadId, matterId: window.currentMatterId });
 
@@ -2482,6 +2696,11 @@
         event.currentTarget.classList.add('active');
       }
 
+      // Update active state in conversation menu
+      if (typeof ConversationMenu !== 'undefined') {
+        ConversationMenu.setActive(threadId);
+      }
+
       // Load conversation messages (will update context meter from response)
       try {
         await loadConversationMessages(threadId);
@@ -2497,9 +2716,13 @@
 
     // Load conversation messages with pagination support
     async function loadConversationMessages(threadId, loadMore = false) {
-      // Prevent duplicate loading
-      if (isLoadingConversation && !loadMore) return;
+      // Prevent duplicate loading of the SAME conversation
+      // Allow switching to a different conversation even if one is loading
+      if (isLoadingConversation && !loadMore && loadingConversationId === threadId) return;
       if (isLoadingMoreMessages && loadMore) return;
+
+      // Track which conversation we're loading
+      loadingConversationId = threadId;
 
       const loadMoreIndicator = document.getElementById('loadMoreIndicator');
       const messagesLoadingIndicator = document.getElementById('messagesLoading');
@@ -2628,6 +2851,12 @@
 
         isLoadingConversation = false;
         isLoadingMoreMessages = false;
+
+        // Only clear loadingConversationId if we finished loading the conversation we started
+        // (another conversation might have started loading while this one was finishing)
+        if (loadingConversationId === threadId) {
+          loadingConversationId = null;
+        }
 
         // Load file drawer documents for this session (only on initial load, not when loading more messages)
         if (!loadMore && currentConversationId && window.FileDrawer) {
@@ -4068,6 +4297,15 @@
         isGenerating = false;
         generatingConversationId = null;  // Clear generating conversation ID
 
+        // Update conversation menu to reflect new message
+        if (typeof ConversationMenu !== 'undefined' && currentConversationId) {
+          // Update conversation with latest message timestamp and preview
+          ConversationMenu.updateConversation(currentConversationId, {
+            last_message: content,
+            updated_at: new Date().toISOString()
+          });
+        }
+
         // Hide generation banner (in case it was showing)
         hideGenerationBanner();
 
@@ -5445,10 +5683,12 @@
       return div.innerHTML;
     }
 
-    // New chat button
-    newChatBtn.addEventListener('click', () => {
-      startNewChat();
-    });
+    // New chat button (only if it exists - may not exist with dynamic menu)
+    if (newChatBtn) {
+      newChatBtn.addEventListener('click', () => {
+        startNewChat();
+      });
+    }
 
     // Stop generation button
     stopBtn.addEventListener('click', async () => {
@@ -7032,38 +7272,6 @@
 
       // Add event listener to close help menu when clicking overlay
       document.getElementById('helpMenuOverlay')?.addEventListener('click', closeHelpMenu);
-
-      // Check URL for session parameter and load that conversation
-      (async function initializeFromURL() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const sessionId = urlParams.get('session');
-        const matterId = urlParams.get('matter');
-
-        if (sessionId) {
-          currentConversationId = sessionId;
-          try {
-            await loadConversationMessages(sessionId);
-            // Enable input now that conversation is loaded
-            enableMessageInput();
-
-            // Check if there's an active generation for this conversation
-            await checkForActiveGeneration();
-          } catch (error) {
-            console.error('Failed to load conversation from URL:', error);
-            // Conversation might have been deleted - clear URL params and start fresh
-            Toast.warning('The conversation you were viewing no longer exists');
-            startNewChat();
-          }
-        } else if (matterId) {
-          // Starting a new conversation for a specific matter
-          currentConversationId = null;
-          window.currentMatterId = matterId;
-          // Enable input for new conversation with matter context
-          enableMessageInput();
-          // Show empty chat - wait for user to type first message
-          console.log('Ready to start new chat for matter:', matterId);
-        }
-      })();
     }
   </script>
   </div>
