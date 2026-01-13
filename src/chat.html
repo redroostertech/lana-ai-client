@@ -1315,6 +1315,12 @@
 
         console.log('[initializeFromURL] Valid session ID, loading conversation:', sessionId);
         currentConversationId = sessionId;
+
+        // Set matter context if provided
+        if (matterId) {
+          window.currentMatterId = matterId;
+        }
+
         try {
           console.log('[initializeFromURL] Calling loadConversationMessages...');
           await loadConversationMessages(sessionId);
@@ -1322,12 +1328,17 @@
           // Enable input now that conversation is loaded
           enableMessageInput();
 
-          // Update conversation menu to highlight active conversation
-          // Conversation menu has already loaded, so this is safe
+          // Reload conversation menu to ensure newly created conversations are visible
           if (typeof ConversationMenu !== 'undefined') {
+            console.log('[initializeFromURL] Reloading conversation menu to include newly created conversation...');
+            await ConversationMenu.loadConversations(true);
+
+            // Now set it as active
             const success = ConversationMenu.setActive(sessionId);
+            console.log('[initializeFromURL] Set conversation as active in sidebar:', success);
+
             if (!success) {
-              console.warn('[Chat] Conversation not found in sidebar menu, but messages loaded successfully');
+              console.warn('[initializeFromURL] Conversation not found in sidebar menu after reload');
             }
           }
 
@@ -1394,6 +1405,8 @@
           if (suggestionsEl) suggestionsEl.classList.add('hidden');
 
           // Create a new conversation session with matter context
+          console.log('[initializeFromURL] Creating conversation for matter:', { matterId, matterName });
+
           const response = await api.post('/api/v1/chat/sessions', {
             matter_id: matterId,
             title: matterName,
@@ -1403,7 +1416,15 @@
             }
           });
 
+          console.log('[initializeFromURL] API response:', response);
+
           const newThreadId = response.session?.thread_id || response.session?.id || response.thread_id;
+
+          console.log('[initializeFromURL] ✅ Conversation created successfully!', {
+            threadId: newThreadId,
+            matterId: matterId,
+            title: matterName
+          });
 
           if (newThreadId) {
             currentConversationId = newThreadId;
@@ -1415,7 +1436,10 @@
             const urlParams = new URLSearchParams(window.location.search);
             urlParams.set('matter', matterId);
             urlParams.set('session', newThreadId);
-            window.history.pushState({}, '', `${window.location.pathname}?${urlParams}`);
+            const newUrl = `${window.location.pathname}?${urlParams}`;
+
+            console.log('[initializeFromURL] Updating URL to:', newUrl);
+            window.history.pushState({}, '', newUrl);
 
             // Clear messages array
             messages = [];
@@ -2054,6 +2078,8 @@
         if (suggestionsEl) suggestionsEl.classList.add('hidden');
 
         // Create a new conversation with matter_id (but don't send any initial messages)
+        console.log('[createProjectChat] Creating conversation for matter:', { matterId: matterIdString, matterName });
+
         const response = await api.post('/api/v1/chat/sessions', {
           matter_id: matterIdString,
           title: matterName,
@@ -2063,7 +2089,15 @@
           }
         });
 
+        console.log('[createProjectChat] API response:', response);
+
         const newThreadId = response.session?.thread_id || response.session?.id || response.thread_id;
+
+        console.log('[createProjectChat] ✅ Conversation created successfully!', {
+          threadId: newThreadId,
+          matterId: matterIdString,
+          title: matterName
+        });
 
         if (newThreadId) {
           currentConversationId = newThreadId;
@@ -2075,7 +2109,10 @@
           const urlParams = new URLSearchParams(window.location.search);
           urlParams.set('matter', matterIdString);
           urlParams.set('session', newThreadId);
-          window.history.pushState({}, '', `${window.location.pathname}?${urlParams}`);
+          const newUrl = `${window.location.pathname}?${urlParams}`;
+
+          console.log('[createProjectChat] Updating URL to:', newUrl);
+          window.history.pushState({}, '', newUrl);
 
           // Clear chat and messages
           messages = [];

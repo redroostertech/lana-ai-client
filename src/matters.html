@@ -13,6 +13,10 @@
   <script src="js/components.js"></script>
   <script src="js/version.js"></script>
   <script src="js/menu.js"></script>
+  <script src="js/navigation-helpers.js"></script>
+    <script src="js/new-project-modal.js"></script>
+    <script src="js/conversation-menu.js"></script>
+  <script src="js/conversation-search-modal.js"></script>
   <script src="js/notifications.js"></script>
   <script src="js/activity.js"></script>
   <script src="js/vendor/mammoth.min.js"></script>
@@ -932,7 +936,7 @@
       
       // Render dynamic menu (will now have access to roles)
       renderMenu('#mainNav');
-      
+
       // Continue with page initialization
       initializePage();
     })();
@@ -941,6 +945,18 @@
 
       // Initialize notifications panel
       NotificationPanel.init();
+
+      // Initialize conversation menu in sidebar
+      if (typeof ConversationMenu !== 'undefined' && ConversationMenu.init()) {
+        // Load conversations into the menu
+        ConversationMenu.loadConversations(true);
+      }
+
+      // Initialize conversation search modal
+      if (typeof ConversationSearchModal !== 'undefined') {
+        ConversationSearchModal.init();
+      }
+
 
     // Load user info
     function loadUserInfo() {
@@ -1530,6 +1546,79 @@
 
     document.getElementById('closeMatterModal').addEventListener('click', () => modal.classList.add('hidden'));
     document.getElementById('cancelMatterBtn').addEventListener('click', () => modal.classList.add('hidden'));
+
+    // Create conversation for a matter and navigate to chat
+    window.createMatterConversation = async function(matterId, matterName) {
+      console.log('[matters.html.createMatterConversation] Creating conversation for matter:', { matterId, matterName });
+
+      try {
+        // Show loading indicator (could add a toast or button spinner here)
+        console.log('[matters.html.createMatterConversation] Calling API to create conversation...');
+
+        // Create conversation via API
+        const response = await api.post('/api/v1/chat/sessions', {
+          matter_id: matterId,
+          title: matterName || matterId,
+          context: {
+            matter_name: matterName,
+            matter_id: matterId
+          }
+        });
+
+        console.log('[matters.html.createMatterConversation] API response:', response);
+
+        const threadId = response.session?.thread_id || response.session?.id || response.thread_id;
+
+        if (!threadId) {
+          throw new Error('No thread ID returned from API');
+        }
+
+        console.log('[matters.html.createMatterConversation] ✅ Conversation created successfully!', {
+          threadId,
+          matterId,
+          matterName
+        });
+
+        // Navigate to chat.html with session and matter parameters
+        const params = new URLSearchParams();
+        params.set('session', threadId);
+        params.set('matter', matterId);
+
+        const chatPath = NavigationHelpers.resolveChatPath();
+        const fullUrl = `${chatPath}?${params.toString()}`;
+
+        console.log('[matters.html.createMatterConversation] ========================================');
+        console.log('[matters.html.createMatterConversation] READY TO NAVIGATE');
+        console.log('[matters.html.createMatterConversation] ========================================');
+        console.log('[matters.html.createMatterConversation] Thread ID:', threadId);
+        console.log('[matters.html.createMatterConversation] Matter ID:', matterId);
+        console.log('[matters.html.createMatterConversation] Matter Name:', matterName);
+        console.log('[matters.html.createMatterConversation] Chat Path:', chatPath);
+        console.log('[matters.html.createMatterConversation] URL Params:', params.toString());
+        console.log('[matters.html.createMatterConversation] Full URL:', fullUrl);
+        console.log('[matters.html.createMatterConversation] Current window.location.href:', window.location.href);
+        console.log('[matters.html.createMatterConversation] ========================================');
+        console.log('[matters.html.createMatterConversation] 🚀 WILL NAVIGATE TO:', fullUrl);
+        console.log('[matters.html.createMatterConversation] ⏱️  Waiting 2 seconds for log capture...');
+        console.log('[matters.html.createMatterConversation] ========================================');
+
+        // Wait 2 seconds before navigating so user can copy logs
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        console.log('[matters.html.createMatterConversation] 🚀 NAVIGATING NOW to:', fullUrl);
+        window.location.href = fullUrl;
+
+      } catch (error) {
+        console.error('[matters.html.createMatterConversation] Failed to create conversation:', error);
+
+        // Show user-friendly error message
+        if (error.response?.data?.error?.code === 'MATTER_NOT_FOUND') {
+          Toast.error(`Matter not found. Please refresh the page and try again.`);
+        } else {
+          Toast.error(`Failed to create conversation: ${error.message || 'Unknown error'}`);
+        }
+      }
+    };
 
     // Edit matter
     window.editMatter = async function(matterId) {
@@ -2997,12 +3086,12 @@
             </div>
             <h4 class="text-lg font-semibold text-gray-900 mb-2">No conversations yet</h4>
             <p class="text-gray-500 mb-6">Start a conversation in this matter to organize all related chats</p>
-            <a href="chat.html?matter=${matter.matter_id}" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium">
+            <button onclick="createMatterConversation('${matter.matter_id}', '${(matter.name || matter.matter_name || '').replace(/'/g, "\\'")}')" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
               </svg>
               Start First Conversation
-            </a>
+            </button>
           </div>
         `;
         return;
@@ -3012,17 +3101,17 @@
         <div class="space-y-4">
           <div class="flex items-center justify-between">
             <p class="text-sm text-gray-500">${chats.length} conversation${chats.length !== 1 ? 's' : ''}</p>
-            <a href="chat.html?matter=${matter.matter_id}" class="inline-flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium">
+            <button onclick="createMatterConversation('${matter.matter_id}', '${(matter.name || matter.matter_name || '').replace(/'/g, "\\'")}')" class="inline-flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
               </svg>
               New Chat
-            </a>
+            </button>
           </div>
 
           <div class="space-y-2">
             ${chats.map(chat => `
-              <a href="chat.html?session=${chat.thread_id}" class="block bg-white border border-gray-200 hover:border-indigo-300 hover:shadow-sm rounded-lg p-4 transition-all group">
+              <div onclick="NavigationHelpers.navigateToConversation('${chat.thread_id}', '${matter.matter_id}')" class="block bg-white border border-gray-200 hover:border-indigo-300 hover:shadow-sm rounded-lg p-4 transition-all group cursor-pointer">
                 <div class="flex items-start gap-3">
                   <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
                     <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3040,7 +3129,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                   </svg>
                 </div>
-              </a>
+              </div>
             `).join('')}
           </div>
         </div>

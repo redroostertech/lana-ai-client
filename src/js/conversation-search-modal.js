@@ -154,6 +154,19 @@ const ConversationSearchModal = {
       const response = await api.get(`/api/v1/chat/sessions?page=1&limit=10&sort=updated_at&order=desc`);
       const conversations = response.sessions || [];
 
+      // DEBUG: Log the full API response
+      console.log('[ConversationSearchModal.loadRecentConversations] API Response:', response);
+      console.log('[ConversationSearchModal.loadRecentConversations] Conversations count:', conversations.length);
+      if (conversations.length > 0) {
+        console.log('[ConversationSearchModal.loadRecentConversations] First conversation ALL fields:', conversations[0]);
+        console.log('[ConversationSearchModal.loadRecentConversations] ID fields check:', {
+          id: conversations[0].id,
+          thread_id: conversations[0].thread_id,
+          session_id: conversations[0].session_id,
+          _id: conversations[0]._id
+        });
+      }
+
       if (conversations.length === 0) {
         this.renderEmpty('No recent conversations');
       } else {
@@ -213,12 +226,29 @@ const ConversationSearchModal = {
    * Render a single result item
    */
   renderResultItem(conv, query) {
+    // DEBUG: Show first conversation's structure
+    if (!this._debugShown) {
+      this._debugShown = true;
+      console.log('[ConversationSearchModal.renderResultItem] First conversation - All Keys:', Object.keys(conv));
+      console.log('[ConversationSearchModal.renderResultItem] First conversation - Full Object:', JSON.stringify(conv, null, 2));
+    }
+
     const threadId = conv.thread_id || conv.id;
     const matterId = conv.matter_id || '';
     const title = conv.title || conv.metadata?.title || 'Untitled Chat';
     const lastMessage = conv.last_message || conv.lastMessage || '';
     const preview = lastMessage.substring(0, 100) + (lastMessage.length > 100 ? '...' : '');
     const matterName = conv.matter_name || conv.metadata?.matter_name || '';
+
+    console.log('[ConversationSearchModal.renderResultItem] Extracting from conversation:', {
+      availableKeys: Object.keys(conv),
+      idFields: {
+        'conv.id': conv.id,
+        'conv.thread_id': conv.thread_id,
+        'conv.session_id': conv.session_id
+      },
+      extracted: { threadId, matterId, title, matterName }
+    });
 
     // Highlight search term
     const highlightedTitle = this.highlightText(title, query);
@@ -236,9 +266,19 @@ const ConversationSearchModal = {
 
     const timestamp = this.formatTimestamp(conv.updated_at || conv.created_at);
 
+    // Safety check: ensure threadId is valid
+    if (!threadId) {
+      console.error('[ConversationSearchModal.renderResultItem] Invalid threadId:', conv);
+      return '';
+    }
+
+    // Escape special characters in IDs to prevent breaking onclick handler
+    const escapedThreadId = String(threadId).replace(/'/g, "\\'");
+    const escapedMatterId = String(matterId).replace(/'/g, "\\'");
+
     return `
       <div class="p-4 hover:bg-gray-50 rounded-lg cursor-pointer border border-gray-200 mb-3 transition-colors"
-           onclick="ConversationSearchModal.selectConversation('${threadId}', '${matterId}')">
+           onclick="ConversationSearchModal.selectConversation('${escapedThreadId}', '${escapedMatterId}')">
         <div class="flex items-start justify-between gap-2">
           <div class="flex-1 min-w-0">
             <p class="text-sm font-medium text-gray-900">${highlightedTitle}</p>
@@ -255,17 +295,32 @@ const ConversationSearchModal = {
    * Select a conversation and close modal
    */
   selectConversation(threadId, matterId = '') {
-    this.close();
+    console.log('[ConversationSearchModal.selectConversation] Called with:', { threadId, matterId });
+    console.log('[ConversationSearchModal.selectConversation] Current location:', window.location.href);
+    console.log('[ConversationSearchModal.selectConversation] Current pathname:', window.location.pathname);
 
     // Check if we're on the chat page
     const isOnChatPage = NavigationHelpers.isOnChatPage();
+    console.log('[ConversationSearchModal.selectConversation] isOnChatPage:', isOnChatPage);
+    console.log('[ConversationSearchModal.selectConversation] window.selectConversation exists?', typeof window.selectConversation);
 
-    if (isOnChatPage && typeof window.selectConversation === 'function') {
-      // We're on chat page, call the local function with matterId
-      window.selectConversation(threadId, matterId);
-    } else {
-      // Navigate to chat page with conversation - use centralized navigation
-      NavigationHelpers.navigateToConversation(threadId, matterId);
+    // Close modal first
+    this.close();
+
+    try {
+      if (isOnChatPage && typeof window.selectConversation === 'function') {
+        // We're on chat page, call the local function with matterId
+        console.log('[ConversationSearchModal.selectConversation] ✅ On chat page, calling window.selectConversation');
+        console.log('[ConversationSearchModal.selectConversation] Passing:', { threadId, matterId });
+        window.selectConversation(threadId, matterId);
+      } else {
+        // Navigate to chat page with conversation - use centralized navigation
+        console.log('[ConversationSearchModal.selectConversation] ❌ Not on chat page, navigating to:', { threadId, matterId });
+        NavigationHelpers.navigateToConversation(threadId, matterId);
+      }
+    } catch (error) {
+      console.error('[ConversationSearchModal.selectConversation] ERROR:', error);
+      alert(`Error selecting conversation: ${error.message}`);
     }
   },
 
