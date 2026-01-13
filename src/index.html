@@ -63,6 +63,10 @@
   <script src="js/components.js"></script>
   <script src="js/version.js"></script>
   <script src="js/menu.js"></script>
+  <script src="js/navigation-helpers.js"></script>
+    <script src="js/new-project-modal.js"></script>
+    <script src="js/conversation-menu.js"></script>
+  <script src="js/conversation-search-modal.js"></script>
   <script src="js/notifications.js"></script>
   <script src="js/activity.js"></script>
 </head>
@@ -476,6 +480,107 @@
   <!-- Overlay for mobile sidebar -->
   <div id="sidebarOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden lg:hidden"></div>
 
+  <!-- Conversation Actions Modal -->
+  <div id="conversationActionsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 9999;" onclick="if(event.target === this) closeConversationActionsModal()">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md" onclick="event.stopPropagation()">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between p-6 border-b border-gray-200">
+        <h2 class="text-xl font-semibold text-gray-900">Conversation Options</h2>
+        <button onclick="closeConversationActionsModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6">
+        <div class="mb-4 p-4 bg-gray-50 rounded-lg">
+          <p class="text-sm font-medium text-gray-700 mb-1">Current Name:</p>
+          <p id="modalConversationTitle" class="text-base text-gray-900"></p>
+        </div>
+
+        <div class="space-y-3">
+          <!-- Rename Button -->
+          <button onclick="editConversationFromModal()" class="w-full flex items-center gap-3 px-4 py-3 bg-white border-2 border-gray-200 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-all group">
+            <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
+              <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+              </svg>
+            </div>
+            <div class="flex-1 text-left">
+              <p class="font-medium text-gray-900 group-hover:text-indigo-600 transition-colors">Rename Conversation</p>
+              <p class="text-sm text-gray-500">Change the conversation title</p>
+            </div>
+          </button>
+
+          <!-- View Matter Details Button (only shown if conversation has a matter) -->
+          <button id="viewMatterDetailsBtn" onclick="viewMatterDetailsFromModal()" class="w-full hidden flex items-center gap-3 px-4 py-3 bg-white border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all group">
+            <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
+              <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+            </div>
+            <div class="flex-1 text-left">
+              <p class="font-medium text-gray-900 group-hover:text-blue-600 transition-colors">View Matter Details</p>
+              <p class="text-sm text-gray-500">Open the full matter information</p>
+            </div>
+          </button>
+
+          <!-- Delete Button -->
+          <button onclick="deleteConversationFromModal()" class="w-full flex items-center gap-3 px-4 py-3 bg-white border-2 border-gray-200 rounded-lg hover:border-red-500 hover:bg-red-50 transition-all group">
+            <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center group-hover:bg-red-200 transition-colors">
+              <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+              </svg>
+            </div>
+            <div class="flex-1 text-left">
+              <p class="font-medium text-gray-900 group-hover:text-red-600 transition-colors">Delete Conversation</p>
+              <p class="text-sm text-gray-500">Permanently remove this conversation</p>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rename Conversation Modal -->
+  <div id="renameConversationModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 10000;" onclick="if(event.target === this) closeRenameModal()">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md" onclick="event.stopPropagation()">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between p-6 border-b border-gray-200">
+        <h2 class="text-xl font-semibold text-gray-900">Rename Conversation</h2>
+        <button onclick="closeRenameModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6">
+        <div class="mb-4">
+          <label for="renameInput" class="block text-sm font-medium text-gray-700 mb-2">New conversation name</label>
+          <input
+            type="text"
+            id="renameInput"
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+            placeholder="Enter new name..."
+            onkeypress="if(event.key === 'Enter') confirmRename()"
+          />
+        </div>
+        <div class="flex gap-3">
+          <button onclick="closeRenameModal()" class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+          <button onclick="confirmRename()" class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+            Rename
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     // Feature flags
     const isSearchEnabled = false;
@@ -525,7 +630,18 @@
     
     // Render dynamic menu (will now have access to roles)
     renderMenu('#mainNav');
-    
+
+    // Initialize conversation menu in sidebar
+    if (typeof ConversationMenu !== 'undefined' && ConversationMenu.init()) {
+      // Load conversations into the menu
+      ConversationMenu.loadConversations(true);
+    }
+
+    // Initialize conversation search modal
+    if (typeof ConversationSearchModal !== 'undefined') {
+      ConversationSearchModal.init();
+    }
+
     // UI Elements
     const sidebar = document.getElementById('sidebar');
     const sidebarOverlay = document.getElementById('sidebarOverlay');
@@ -953,7 +1069,266 @@
         console.error('[Search] Form element not found - DOM might not be ready');
       }
     }
+
+    // =================================================================
+    // CONVERSATION ACTIONS MODAL
+    // =================================================================
+
+    // Conversation actions modal state
+    let selectedConversationId = null;
+    let selectedConversationTitle = null;
+    let selectedConversationIsProject = false;
+    let selectedConversationMatterId = null;
+
+    // Open conversation actions modal
+    window.openConversationActionsModal = function(threadId, title, matterId) {
+      selectedConversationId = threadId;
+      selectedConversationTitle = title;
+      selectedConversationMatterId = matterId;
+      selectedConversationIsProject = matterId !== null;
+
+      // Update modal content
+      document.getElementById('modalConversationTitle').textContent = title.replace(/&apos;/g, "'").replace(/&quot;/g, '"').replace(/&#96;/g, '`');
+
+      // Show/hide matter details button
+      const matterBtn = document.getElementById('viewMatterDetailsBtn');
+      if (matterId && matterId !== 'null') {
+        matterBtn.classList.remove('hidden');
+      } else {
+        matterBtn.classList.add('hidden');
+      }
+
+      // Show modal
+      const modal = document.getElementById('conversationActionsModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    // Close conversation actions modal
+    window.closeConversationActionsModal = function() {
+      const modal = document.getElementById('conversationActionsModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+
+      selectedConversationId = null;
+      selectedConversationTitle = null;
+      selectedConversationIsProject = false;
+    }
+
+    // Edit conversation from modal - opens rename modal
+    window.editConversationFromModal = function() {
+      // Validate we have a conversation selected
+      if (!selectedConversationId || !selectedConversationTitle) {
+        Toast.error('No conversation selected');
+        console.error('[Rename] No conversation selected', {
+          selectedConversationId,
+          selectedConversationTitle
+        });
+        return;
+      }
+
+      // Save values BEFORE closing modal (closeConversationActionsModal clears these)
+      const conversationId = selectedConversationId;
+      const conversationTitle = selectedConversationTitle;
+
+      // Close the actions modal
+      closeConversationActionsModal();
+
+      // Restore the values we need for rename
+      selectedConversationId = conversationId;
+      selectedConversationTitle = conversationTitle;
+
+      // Open rename modal
+      const renameModal = document.getElementById('renameConversationModal');
+      const renameInput = document.getElementById('renameInput');
+
+      // Set current title as default value (decode HTML entities)
+      const currentTitle = conversationTitle
+        .replace(/&apos;/g, "'")
+        .replace(/&quot;/g, '"')
+        .replace(/&#96;/g, '`')
+        .replace(/&amp;/g, '&');
+
+      renameInput.value = currentTitle;
+      renameModal.classList.remove('hidden');
+      renameModal.classList.add('flex');
+
+      // Focus input and select all text
+      setTimeout(() => {
+        renameInput.focus();
+        renameInput.select();
+      }, 100);
+    }
+
+    // Close rename modal
+    window.closeRenameModal = function() {
+      const renameModal = document.getElementById('renameConversationModal');
+      renameModal.classList.add('hidden');
+      renameModal.classList.remove('flex');
+    }
+
+    // Confirm rename
+    window.confirmRename = async function() {
+      // Validate conversation is still selected
+      if (!selectedConversationId) {
+        Toast.error('No conversation selected');
+        closeRenameModal();
+        return;
+      }
+
+      const renameInput = document.getElementById('renameInput');
+      const newTitle = renameInput.value.trim();
+
+      if (!newTitle) {
+        Toast.error('Conversation name cannot be empty');
+        return;
+      }
+
+      // Only compare if we have a current title
+      if (selectedConversationTitle) {
+        const currentTitle = selectedConversationTitle
+          .replace(/&apos;/g, "'")
+          .replace(/&quot;/g, '"')
+          .replace(/&#96;/g, '`')
+          .replace(/&amp;/g, '&');
+
+        if (newTitle === currentTitle) {
+          closeRenameModal();
+          return;
+        }
+      }
+
+      try {
+        await api.put(`/api/v1/chat/sessions/${selectedConversationId}`, { title: newTitle });
+        Toast.success('Conversation renamed');
+        closeRenameModal();
+
+        // Refresh the conversation menu sidebar if available
+        if (typeof ConversationMenu !== 'undefined') {
+          await ConversationMenu.loadConversations(true);
+        }
+      } catch (error) {
+        console.error('Failed to rename conversation:', error);
+        Toast.error('Failed to rename conversation');
+      }
+    }
+
+    // View matter details from modal
+    window.viewMatterDetailsFromModal = function() {
+      if (!selectedConversationMatterId) {
+        Toast.error('No matter associated with this conversation');
+        return;
+      }
+
+      // Navigate to matters.html
+      window.location.href = `matters.html?matter_id=${selectedConversationMatterId}`;
+    }
+
+    // Delete conversation from modal
+    window.deleteConversationFromModal = function() {
+      // Show custom confirmation modal
+      const confirmTitle = selectedConversationIsProject
+        ? 'Delete Project Conversation?'
+        : 'Delete Conversation?';
+
+      const confirmMessage = selectedConversationIsProject
+        ? 'This will only delete the chat messages. The matter/project itself will NOT be deleted and you can create new conversations for it later.'
+        : 'This action cannot be undone. All messages in this conversation will be permanently deleted.';
+
+      openDeleteConfirmModal(confirmTitle, confirmMessage);
+    }
+
+    // Open custom delete confirmation modal
+    window.openDeleteConfirmModal = function(title, message) {
+      document.getElementById('deleteConfirmTitle').textContent = title;
+      document.getElementById('deleteConfirmMessage').textContent = message;
+
+      const modal = document.getElementById('deleteConfirmModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    // Close custom delete confirmation modal
+    window.closeDeleteConfirmModal = function() {
+      const modal = document.getElementById('deleteConfirmModal');
+      modal.classList.remove('flex');
+      modal.classList.add('hidden');
+    }
+
+    // Confirm delete action
+    window.confirmDeleteConversation = async function() {
+      // Store values BEFORE closing modal
+      const conversationIdToDelete = selectedConversationId;
+
+      // Validate we have an ID to delete
+      if (!conversationIdToDelete) {
+        Toast.error('No conversation selected');
+        closeDeleteConfirmModal();
+        closeConversationActionsModal();
+        return;
+      }
+
+      try {
+        // Close both modals
+        closeDeleteConfirmModal();
+        closeConversationActionsModal();
+
+        // Delete from backend
+        await api.delete(`/api/v1/chat/sessions/${conversationIdToDelete}`);
+
+        Toast.success('Conversation deleted');
+
+        // Refresh the conversation menu sidebar if available
+        if (typeof ConversationMenu !== 'undefined') {
+          await ConversationMenu.loadConversations(true);
+        }
+      } catch (error) {
+        console.error('Failed to delete conversation:', error);
+        Toast.error('Failed to delete conversation');
+      }
+    }
   </script>
+
+  <!-- Delete Confirmation Modal -->
+  <div id="deleteConfirmModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 10001;" onclick="if(event.target === this) closeDeleteConfirmModal()">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md" onclick="event.stopPropagation()">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between p-6 border-b border-gray-200">
+        <div class="flex items-center gap-3">
+          <div class="flex-shrink-0 w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+            <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+          </div>
+          <h2 id="deleteConfirmTitle" class="text-xl font-semibold text-gray-900">Delete Conversation?</h2>
+        </div>
+        <button onclick="closeDeleteConfirmModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6">
+        <p id="deleteConfirmMessage" class="text-gray-600 leading-relaxed"></p>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+        <button onclick="closeDeleteConfirmModal()" class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          Cancel
+        </button>
+        <button onclick="confirmDeleteConversation()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+          </svg>
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+
   </div> <!-- End #app-content -->
 </body>
 </html>
