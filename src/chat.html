@@ -1297,18 +1297,28 @@
       const sessionId = urlParams.get('session');
       const matterId = urlParams.get('matter');
 
+      console.log('[initializeFromURL] Starting initialization', {
+        sessionId,
+        matterId,
+        fullURL: window.location.href,
+        searchParams: window.location.search
+      });
+
       if (sessionId) {
         // Validate session ID format
         if (!NavigationHelpers.validateSessionId(sessionId)) {
-          console.error('Invalid session ID format:', sessionId);
+          console.error('[initializeFromURL] Invalid session ID format:', sessionId);
           Toast.error('Invalid conversation link');
           startNewChat();
           return;
         }
 
+        console.log('[initializeFromURL] Valid session ID, loading conversation:', sessionId);
         currentConversationId = sessionId;
         try {
+          console.log('[initializeFromURL] Calling loadConversationMessages...');
           await loadConversationMessages(sessionId);
+          console.log('[initializeFromURL] Messages loaded successfully, enabling input');
           // Enable input now that conversation is loaded
           enableMessageInput();
 
@@ -1528,6 +1538,7 @@
     let loadingConversationId = null;  // Track which specific conversation is being loaded
 
     async function initializePage() {
+      console.log('[initializePage] Starting page initialization');
 
       // Load user profile
       loadUserInfo();
@@ -1566,7 +1577,9 @@
       document.getElementById('helpMenuOverlay')?.addEventListener('click', closeHelpMenu);
 
       // Now that conversations are loaded, handle URL parameters
+      console.log('[initializePage] About to call initializeFromURL()');
       await initializeFromURL();
+      console.log('[initializePage] Completed initializeFromURL()');
     }
 
     // Toggle section visibility
@@ -7276,9 +7289,6 @@
       // Redirect to workflow editor
       window.location.href = `workflows/document-generation.html?temp_doc=${tempDocId}&save=true`;
     }
-
-    // Call initialization after all functions are defined
-    initializePage();
   </script>
   </div>
 </body>
