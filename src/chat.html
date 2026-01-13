@@ -2698,6 +2698,8 @@
 
     // Select conversation
     window.selectConversation = async function(threadId, matterId = null) {
+      console.log('[selectConversation] Called with:', { threadId, matterId });
+
       currentConversationId = threadId;
 
       // Use provided matterId, or try to find it from conversation data as fallback
@@ -2708,7 +2710,7 @@
         window.currentMatterId = conv?.matter_id || null;
       }
 
-      console.log('Selected conversation:', { threadId, matterId: window.currentMatterId });
+      console.log('[selectConversation] Set currentConversationId:', { currentConversationId, matterId: window.currentMatterId });
 
       // Enable message input now that a conversation is selected
       enableMessageInput();
