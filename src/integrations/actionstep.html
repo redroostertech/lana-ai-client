@@ -786,8 +786,18 @@
         document.getElementById('statTasksOverdue').textContent = overdue > 0 ? `${formatNumber(overdue)} overdue` : 'No overdue tasks';
 
         document.getElementById('statDocuments').textContent = formatNumber(stats.documents?.total || 0);
+        const ready = stats.documents?.ready || 0;
         const processing = stats.documents?.processing || 0;
-        document.getElementById('statDocsProcessing').textContent = processing > 0 ? `${formatNumber(processing)} processing` : 'All processed';
+
+        // Show ready (lazy embedded) + processing counts
+        if (ready > 0 || processing > 0) {
+          const parts = [];
+          if (ready > 0) parts.push(`${formatNumber(ready)} ready`);
+          if (processing > 0) parts.push(`${formatNumber(processing)} processing`);
+          document.getElementById('statDocsProcessing').textContent = parts.join(', ');
+        } else {
+          document.getElementById('statDocsProcessing').textContent = 'All processed';
+        }
 
         // Update last sync time
         if (result.last_sync) {
