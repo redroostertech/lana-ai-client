@@ -1529,6 +1529,9 @@
 
     async function initializePage() {
 
+      // Load user profile
+      loadUserInfo();
+
       // Initialize notifications panel
       NotificationPanel.init();
 
@@ -1542,6 +1545,25 @@
       if (typeof ConversationSearchModal !== 'undefined') {
         ConversationSearchModal.init();
       }
+
+      // Load conversations list (for legacy support)
+      await loadConversations();
+
+      // Initialize SSE for real-time updates (if not demo mode)
+      if (!isDemoMode) {
+        initSSE();
+      }
+
+      // Disable input by default until a conversation is selected
+      disableMessageInput();
+
+      // Show document tip banner on first load (if not previously dismissed)
+      setTimeout(() => {
+        showDocumentTip();
+      }, 1000);
+
+      // Add event listener to close help menu when clicking overlay
+      document.getElementById('helpMenuOverlay')?.addEventListener('click', closeHelpMenu);
 
       // Now that conversations are loaded, handle URL parameters
       await initializeFromURL();
@@ -7255,24 +7277,8 @@
       window.location.href = `workflows/document-generation.html?temp_doc=${tempDocId}&save=true`;
     }
 
-    // Initialize
-      loadUserInfo();
-      loadConversations(); // Load conversations list
-      if (!isDemoMode) {
-        initSSE();
-      }
-
-      // Disable input by default until a conversation is selected
-      disableMessageInput();
-
-      // Show document tip banner on first load (if not previously dismissed)
-      setTimeout(() => {
-        showDocumentTip();
-      }, 1000);
-
-      // Add event listener to close help menu when clicking overlay
-      document.getElementById('helpMenuOverlay')?.addEventListener('click', closeHelpMenu);
-    }
+    // Call initialization after all functions are defined
+    initializePage();
   </script>
   </div>
 </body>
