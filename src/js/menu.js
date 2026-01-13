@@ -94,60 +94,57 @@ const UserRoles = {
  * - external: boolean - if true, opens in new tab
  */
 const MenuConfig = {
-  // Default menu for main portal pages
+  // Default menu for main portal pages - now with conversation list
   portal: {
     sections: [
       {
         id: 'main',
-        title: null, // No header for main nav
+        title: null,
         requiredRoles: [],
         items: [
           { id: 'dashboard', label: 'Dashboard', href: '/index.html', icon: 'home' },
-          { id: 'chat', label: 'Chat', href: '/chat.html', icon: 'chat' },
+          {
+            id: 'search-conversations',
+            label: 'Search Conversations',
+            href: '#',
+            icon: 'search',
+            isButton: true,
+            onClick: 'openConversationSearchModal'
+          },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
-          // { id: 'workflows', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
-          // { id: 'docgen', label: 'Document Templates', href: '/workflows/document-generation.html', icon: 'document' },
-        ]
-      },
-      {
-        id: 'data-insights',
-        title: 'Data & Insights',
-        requiredRoles: [],
-        items: [
           { id: 'connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
-          { id: 'module-execution', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
-          // { id: 'predictions', label: 'Predictions', href: '/insights/predictions.html', icon: 'performance' },
+          { id: 'insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
         ]
       },
       {
-        id: 'administration',
-        title: 'Administration',
-        requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN, UserRoles.ADMIN],
+        id: 'projects',
+        title: 'Projects',
+        requiredRoles: [],
+        isConversationList: true,
         items: [
-          { id: 'users', label: 'Users', href: '/admin/users.html', icon: 'users' },
-          { id: 'roles', label: 'Roles & Permissions', href: '/admin/roles.html', icon: 'roles' },
-          { id: 'organizations', label: 'Organizations', href: '/admin/organizations.html', icon: 'organizations' },
-          { id: 'sessions', label: 'Sessions', href: '/admin/sessions.html', icon: 'sessions' },
-          { id: 'audit', label: 'Audit Logs', href: '/admin/audit.html', icon: 'audit' },
-          { id: 'health', label: 'System Health', href: '/admin/health.html', icon: 'health' },
-          // { id: 'integrations', label: 'Integrations', href: '/admin/integrations.html', icon: 'integrations' },
-          // { id: 'plugins', label: 'Plugins', href: '/admin/plugins.html', icon: 'plugins' },
-          // { id: 'reporting', label: 'Reporting', href: '/admin/reporting.html', icon: 'reporting' },
-          // { 
-          //   id: 'onboarding', 
-          //   label: 'Onboarding', 
-          //   href: '/admin/onboarding_management.html', 
-          //   icon: 'onboarding',
-          //   requiredRoles: [UserRoles.SYSTEM_ADMIN] // Only system admins
-          // },
+          {
+            id: 'new-matter-chat',
+            label: 'New Matters Chat',
+            href: '#',
+            icon: 'document',
+            isButton: true,
+            onClick: 'openNewProjectModal'
+          }
         ]
       },
       {
         id: 'account',
-        title: 'Account',
+        title: null,
         requiredRoles: [],
-        isFooter: true, // Push to bottom of sidebar
+        isFooter: true,
         items: [
+          {
+            id: 'administration',
+            label: 'Administration',
+            href: '/admin/index.html',
+            icon: 'users',
+            requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN, UserRoles.ADMIN]
+          },
           { id: 'settings', label: 'Settings', href: '/settings.html', icon: 'settings' },
           { id: 'help', label: 'Help & Support', href: '/help.html', icon: 'help' },
         ]
@@ -200,58 +197,55 @@ const MenuConfig = {
   workflows: {
     sections: [
       {
-        id: 'workflows-main',
+        id: 'main',
         title: null,
         requiredRoles: [],
         items: [
-          { id: 'workflows-home', label: 'Dashboard', href: '/index.html', icon: 'home' },
-          { id: 'workflows-chat', label: 'Chat', href: '/chat.html', icon: 'chat' },
-          { id: 'workflows-matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
-          // { id: 'workflows-list', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
-          // { id: 'workflows-docgen', label: 'Document Templates', href: '/workflows/document-generation.html', icon: 'document' },
+          { id: 'dashboard', label: 'Dashboard', href: '/index.html', icon: 'home' },
+          {
+            id: 'search-conversations',
+            label: 'Search Conversations',
+            href: '#',
+            icon: 'search',
+            isButton: true,
+            onClick: 'openConversationSearchModal'
+          },
+          { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
+          { id: 'connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
+          { id: 'insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
         ]
       },
       {
-        id: 'workflows-data',
-        title: 'Data & Insights',
+        id: 'projects',
+        title: 'Projects',
         requiredRoles: [],
+        isConversationList: true,
         items: [
-          { id: 'workflows-connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
-          { id: 'workflows-module-execution', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
-          // { id: 'workflows-predictions', label: 'Predictions', href: '/insights/predictions.html', icon: 'performance' },
+          {
+            id: 'new-matter-chat',
+            label: 'New Matters Chat',
+            href: '#',
+            icon: 'document',
+            isButton: true,
+            onClick: 'openNewProjectModal'
+          }
         ]
       },
       {
-        id: 'workflows-admin',
-        title: 'Administration',
-        requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN, UserRoles.ADMIN],
-        items: [
-          { id: 'workflows-users', label: 'Users', href: '/admin/users.html', icon: 'users' },
-          { id: 'workflows-roles', label: 'Roles & Permissions', href: '/admin/roles.html', icon: 'roles' },
-          { id: 'workflows-organizations', label: 'Organizations', href: '/admin/organizations.html', icon: 'organizations' },
-          { id: 'workflows-sessions', label: 'Sessions', href: '/admin/sessions.html', icon: 'sessions' },
-          { id: 'workflows-audit', label: 'Audit Logs', href: '/admin/audit.html', icon: 'audit' },
-          { id: 'workflows-health', label: 'System Health', href: '/admin/health.html', icon: 'health' },
-          // { id: 'workflows-integrations', label: 'Integrations', href: '/admin/integrations.html', icon: 'integrations' },
-          // { id: 'workflows-plugins', label: 'Plugins', href: '/admin/plugins.html', icon: 'plugins' },
-          // { id: 'workflows-reporting', label: 'Reporting', href: '/admin/reporting.html', icon: 'reporting' },
-          // {
-          //   id: 'workflows-onboarding',
-          //   label: 'Onboarding',
-          //   href: '/admin/onboarding_management.html',
-          //   icon: 'onboarding',
-          //   requiredRoles: [UserRoles.SYSTEM_ADMIN]
-          // },
-        ]
-      },
-      {
-        id: 'workflows-account',
-        title: 'Account',
+        id: 'account',
+        title: null,
         requiredRoles: [],
         isFooter: true,
         items: [
-          { id: 'workflows-settings', label: 'Settings', href: '/settings.html', icon: 'settings' },
-          { id: 'workflows-help', label: 'Help & Support', href: '/help.html', icon: 'help' },
+          {
+            id: 'administration',
+            label: 'Administration',
+            href: '/admin/index.html',
+            icon: 'users',
+            requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN, UserRoles.ADMIN]
+          },
+          { id: 'settings', label: 'Settings', href: '/settings.html', icon: 'settings' },
+          { id: 'help', label: 'Help & Support', href: '/help.html', icon: 'help' },
         ]
       }
     ]
@@ -261,58 +255,55 @@ const MenuConfig = {
   insights: {
     sections: [
       {
-        id: 'insights-main',
+        id: 'main',
         title: null,
         requiredRoles: [],
         items: [
-          { id: 'insights-home', label: 'Dashboard', href: '/index.html', icon: 'home' },
-          { id: 'insights-chat', label: 'Chat', href: '/chat.html', icon: 'chat' },
-          { id: 'insights-matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
-          // { id: 'insights-workflows', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
-          // { id: 'insights-docgen', label: 'Document Templates', href: '/workflows/document-generation.html', icon: 'document' },
+          { id: 'dashboard', label: 'Dashboard', href: '/index.html', icon: 'home' },
+          {
+            id: 'search-conversations',
+            label: 'Search Conversations',
+            href: '#',
+            icon: 'search',
+            isButton: true,
+            onClick: 'openConversationSearchModal'
+          },
+          { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
+          { id: 'connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
+          { id: 'insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
         ]
       },
       {
-        id: 'insights-data',
-        title: 'Data & Insights',
+        id: 'projects',
+        title: 'Projects',
         requiredRoles: [],
+        isConversationList: true,
         items: [
-          { id: 'insights-connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
-          { id: 'insights-modules', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
-          // { id: 'insights-predictions', label: 'Predictions', href: '/insights/predictions.html', icon: 'performance' },
+          {
+            id: 'new-matter-chat',
+            label: 'New Matters Chat',
+            href: '#',
+            icon: 'document',
+            isButton: true,
+            onClick: 'openNewProjectModal'
+          }
         ]
       },
       {
-        id: 'insights-admin',
-        title: 'Administration',
-        requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN, UserRoles.ADMIN],
-        items: [
-          { id: 'insights-users', label: 'Users', href: '/admin/users.html', icon: 'users' },
-          { id: 'insights-roles', label: 'Roles & Permissions', href: '/admin/roles.html', icon: 'roles' },
-          { id: 'insights-organizations', label: 'Organizations', href: '/admin/organizations.html', icon: 'organizations' },
-          { id: 'insights-sessions', label: 'Sessions', href: '/admin/sessions.html', icon: 'sessions' },
-          { id: 'insights-audit', label: 'Audit Logs', href: '/admin/audit.html', icon: 'audit' },
-          { id: 'insights-health', label: 'System Health', href: '/admin/health.html', icon: 'health' },
-          // { id: 'insights-integrations', label: 'Integrations', href: '/admin/integrations.html', icon: 'integrations' },
-          // { id: 'insights-plugins', label: 'Plugins', href: '/admin/plugins.html', icon: 'plugins' },
-          // { id: 'insights-reporting', label: 'Reporting', href: '/admin/reporting.html', icon: 'reporting' },
-          // {
-          //   id: 'insights-onboarding',
-          //   label: 'Onboarding',
-          //   href: '/admin/onboarding_management.html',
-          //   icon: 'onboarding',
-          //   requiredRoles: [UserRoles.SYSTEM_ADMIN]
-          // },
-        ]
-      },
-      {
-        id: 'insights-account',
-        title: 'Account',
+        id: 'account',
+        title: null,
         requiredRoles: [],
         isFooter: true,
         items: [
-          { id: 'insights-settings', label: 'Settings', href: '/settings.html', icon: 'settings' },
-          { id: 'insights-help', label: 'Help & Support', href: '/help.html', icon: 'help' },
+          {
+            id: 'administration',
+            label: 'Administration',
+            href: '/admin/index.html',
+            icon: 'users',
+            requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN, UserRoles.ADMIN]
+          },
+          { id: 'settings', label: 'Settings', href: '/settings.html', icon: 'settings' },
+          { id: 'help', label: 'Help & Support', href: '/help.html', icon: 'help' },
         ]
       }
     ]
@@ -322,58 +313,113 @@ const MenuConfig = {
   integrations: {
     sections: [
       {
-        id: 'integrations-main',
+        id: 'main',
         title: null,
         requiredRoles: [],
         items: [
-          { id: 'integrations-home', label: 'Dashboard', href: '/index.html', icon: 'home' },
-          { id: 'integrations-chat', label: 'Chat', href: '/chat.html', icon: 'chat' },
-          { id: 'integrations-matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
-          // { id: 'integrations-workflows', label: 'Workflows', href: '/workflows/dashboard.html', icon: 'workflows' },
-          // { id: 'integrations-docgen', label: 'Document Templates', href: '/workflows/document-generation.html', icon: 'document' },
+          { id: 'dashboard', label: 'Dashboard', href: '/index.html', icon: 'home' },
+          {
+            id: 'search-conversations',
+            label: 'Search Conversations',
+            href: '#',
+            icon: 'search',
+            isButton: true,
+            onClick: 'openConversationSearchModal'
+          },
+          { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
+          { id: 'connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
+          { id: 'insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
         ]
       },
       {
-        id: 'integrations-data',
-        title: 'Data & Insights',
+        id: 'projects',
+        title: 'Projects',
         requiredRoles: [],
+        isConversationList: true,
         items: [
-          { id: 'integrations-connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
-          { id: 'integrations-module-execution', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
-          // { id: 'integrations-predictions', label: 'Predictions', href: '/insights/predictions.html', icon: 'performance' },
+          {
+            id: 'new-matter-chat',
+            label: 'New Matters Chat',
+            href: '#',
+            icon: 'document',
+            isButton: true,
+            onClick: 'openNewProjectModal'
+          }
         ]
       },
       {
-        id: 'integrations-admin',
-        title: 'Administration',
-        requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN, UserRoles.ADMIN],
-        items: [
-          { id: 'integrations-users', label: 'Users', href: '/admin/users.html', icon: 'users' },
-          { id: 'integrations-roles', label: 'Roles & Permissions', href: '/admin/roles.html', icon: 'roles' },
-          { id: 'integrations-organizations', label: 'Organizations', href: '/admin/organizations.html', icon: 'organizations' },
-          { id: 'integrations-sessions', label: 'Sessions', href: '/admin/sessions.html', icon: 'sessions' },
-          { id: 'integrations-audit', label: 'Audit Logs', href: '/admin/audit.html', icon: 'audit' },
-          { id: 'integrations-health', label: 'System Health', href: '/admin/health.html', icon: 'health' },
-          // { id: 'integrations-integrations', label: 'Integrations', href: '/admin/integrations.html', icon: 'integrations' },
-          // { id: 'integrations-plugins', label: 'Plugins', href: '/admin/plugins.html', icon: 'plugins' },
-          // { id: 'integrations-reporting', label: 'Reporting', href: '/admin/reporting.html', icon: 'reporting' },
-          // {
-          //   id: 'integrations-onboarding',
-          //   label: 'Onboarding',
-          //   href: '/admin/onboarding_management.html',
-          //   icon: 'onboarding',
-          //   requiredRoles: [UserRoles.SYSTEM_ADMIN]
-          // },
-        ]
-      },
-      {
-        id: 'integrations-account',
-        title: 'Account',
+        id: 'account',
+        title: null,
         requiredRoles: [],
         isFooter: true,
         items: [
-          { id: 'integrations-settings', label: 'Settings', href: '/settings.html', icon: 'settings' },
-          { id: 'integrations-help', label: 'Help & Support', href: '/help.html', icon: 'help' },
+          {
+            id: 'administration',
+            label: 'Administration',
+            href: '/admin/index.html',
+            icon: 'users',
+            requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN, UserRoles.ADMIN]
+          },
+          { id: 'settings', label: 'Settings', href: '/settings.html', icon: 'settings' },
+          { id: 'help', label: 'Help & Support', href: '/help.html', icon: 'help' },
+        ]
+      }
+    ]
+  },
+
+  // Chat page specific menu with conversation list
+  chat: {
+    sections: [
+      {
+        id: 'chat-main',
+        title: null,
+        requiredRoles: [],
+        items: [
+          { id: 'chat-dashboard', label: 'Dashboard', href: '/index.html', icon: 'home' },
+          {
+            id: 'chat-search',
+            label: 'Search Conversations',
+            href: '#',
+            icon: 'search',
+            isButton: true,
+            onClick: 'openConversationSearchModal'
+          },
+          { id: 'chat-matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
+          { id: 'chat-connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
+          { id: 'chat-insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
+        ]
+      },
+      {
+        id: 'chat-projects',
+        title: 'Projects',
+        requiredRoles: [],
+        isConversationList: true, // Special flag for conversation list rendering
+        items: [
+          {
+            id: 'chat-new-matter',
+            label: 'New Matters Chat',
+            href: '#',
+            icon: 'document',
+            isButton: true,
+            onClick: 'openNewProjectModal'
+          }
+        ]
+      },
+      {
+        id: 'chat-footer',
+        title: null,
+        requiredRoles: [],
+        isFooter: true,
+        items: [
+          {
+            id: 'chat-administration',
+            label: 'Administration',
+            href: '/admin/index.html',
+            icon: 'users',
+            requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN, UserRoles.ADMIN]
+          },
+          { id: 'chat-settings', label: 'Settings', href: '/settings.html', icon: 'settings' },
+          { id: 'chat-help', label: 'Help & Support', href: '/help.html', icon: 'help' },
         ]
       }
     ]
@@ -452,15 +498,16 @@ class MenuSystem {
    */
   _detectMenuType() {
     const path = this.currentPath.toLowerCase();
-    
+
     // All pages use 'portal' menu for consistency
     // Admin pages now show the same menu with role-based Administration section
     // Removed special admin path detection - use portal menu everywhere
-    
+
+    if (path.includes('chat.html')) return 'chat';
     if (path.includes('/insights/')) return 'insights';
     if (path.includes('/workflows/')) return 'workflows';
     if (path.includes('/integrations/')) return 'integrations';
-    
+
     return 'portal';
   }
 
@@ -579,10 +626,23 @@ class MenuSystem {
     const activeClass = isActive ? this.activeItemClass : this.inactiveItemClass;
     const icon = MenuIcons[item.icon] || '';
     const target = item.external ? 'target="_blank" rel="noopener"' : '';
-    
+
     let badgeHtml = '';
     if (item.badge) {
       badgeHtml = `<span class="ml-auto px-2 py-0.5 text-xs rounded-full ${item.badge.class || 'bg-indigo-100 text-indigo-800'}">${item.badge.text}</span>`;
+    }
+
+    // Handle button items with onclick handlers
+    if (item.isButton && item.onClick) {
+      return `
+        <button onclick="${item.onClick}()"
+           class="w-full flex items-center gap-3 px-4 py-3 ${activeClass} rounded-lg transition-colors"
+           data-menu-id="${item.id}">
+          ${icon}
+          ${item.label}
+          ${badgeHtml}
+        </button>
+      `;
     }
 
     // Resolve href for file:// protocol compatibility (Electron on Windows)
@@ -607,10 +667,27 @@ class MenuSystem {
     if (!this.isVisible(section)) return '';
 
     const visibleItems = section.items.filter(item => this.isVisible(item));
-    if (visibleItems.length === 0) return '';
+    if (visibleItems.length === 0 && !section.isConversationList) return '';
 
     let html = '';
-    
+
+    // Handle conversation list section specially
+    if (section.isConversationList) {
+      html += `
+        <div class="mt-8 flex-1 flex flex-col min-h-0">
+          <p class="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">${section.title || ''}</p>
+          <div class="mt-3 space-y-1">
+            ${visibleItems.map(item => this.renderItem(item)).join('')}
+          </div>
+          <div class="mt-3 flex-1 overflow-y-auto space-y-1" id="conversationListContainer">
+            <!-- Conversations will be dynamically loaded here -->
+            <p class="text-sm text-gray-400 italic px-3 py-2">Loading conversations...</p>
+          </div>
+        </div>
+      `;
+      return html;
+    }
+
     if (section.title) {
       html += `
         <div class="mt-8">
@@ -662,7 +739,7 @@ class MenuSystem {
 
       return `
         <div class="flex flex-col h-full">
-          <div class="flex-1 overflow-y-auto pb-4">
+          <div class="flex-1 flex flex-col min-h-0 pb-4">
             ${regularHtml}
           </div>
           <div class="flex-shrink-0 border-t border-gray-800 pt-4 pb-4">
@@ -673,9 +750,9 @@ class MenuSystem {
       `;
     }
 
-    // Even without footer, make the menu scrollable
+    // Even without footer, use flex layout for conversation list scrolling
     return `
-      <div class="overflow-y-auto h-full pb-4">
+      <div class="flex flex-col h-full pb-4">
         ${regularHtml}
       </div>
     `;
