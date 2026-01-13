@@ -482,8 +482,10 @@ const ConnectorRegistry = {
       }
 
       const data = await response.json();
+      // Filter to only show active connectors
+      const activeConnectors = (data.connectors || []).filter(c => c.is_active === true);
       return {
-        connectors: data.connectors || [],
+        connectors: activeConnectors,
         registry_version: data.version,
         updated_at: data.last_updated
       };
