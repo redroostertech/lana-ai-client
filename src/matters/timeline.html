@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Matter Timeline - LanaAI</title>
   <script src="../js/tailwind-loader.js"></script>
+  <link rel="stylesheet" href="../css/components.css">
   <script src="../js/error-reporter.js"></script>
   <script src="../js/config.js"></script>
   <script src="../js/mock-data.js"></script>
@@ -53,7 +54,7 @@
           <p class="text-sm text-gray-500">Unified view of all matter activities</p>
         </div>
         <div class="flex items-center gap-3">
-          <select id="matterSelect" onchange="loadTimeline()" class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+          <select id="matterSelect" onchange="loadTimeline()" class="select-standard inline-block w-auto pl-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
             <option value="">Select a Matter</option>
           </select>
         </div>

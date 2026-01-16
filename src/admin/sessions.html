@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Active Sessions - Lana AI</title>
     <script src="../js/tailwind-loader.js"></script>
+  <link rel="stylesheet" href="../css/components.css">
   <script src="../js/error-reporter.js"></script>
     <script src="../js/config.js"></script>
     <script src="../js/mock-data.js"></script>
@@ -192,13 +193,13 @@
                             </svg>
                             <input type="text" id="searchInput" placeholder="Search by user, IP, or device..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
                         </div>
-                        <select id="deviceFilter" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        <select id="deviceFilter" class="select-standard inline-block w-auto pl-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
                             <option value="">All Devices</option>
                             <option value="desktop">Desktop</option>
                             <option value="mobile">Mobile</option>
                             <option value="tablet">Tablet</option>
                         </select>
-                        <select id="activityFilter" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        <select id="activityFilter" class="select-standard inline-block w-auto pl-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
                             <option value="">All Activity</option>
                             <option value="active">Active Now</option>
                             <option value="idle">Idle</option>
