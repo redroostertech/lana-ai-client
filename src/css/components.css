@@ -1,0 +1,58 @@
+/**
+ * LANA AI - Standard UI Components
+ *
+ * This file contains reusable CSS components for the LANA AI platform.
+ * Components defined here ensure consistency across all customer deployments.
+ *
+ * Reusability: 95%+ - Works identically across all environments
+ */
+
+/* ============================================================================
+   Standard Dropdown Component
+   ============================================================================
+
+   Usage: Apply .select-standard to ALL <select> elements
+
+   Features:
+   - Prevents caret/arrow from overlapping with text
+   - Browser-normalized appearance
+   - Consistent spacing (pl-4 pr-10 = 40px right padding)
+   - Custom SVG caret icon
+
+   Example:
+   <select class="select-standard block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+     <option>Select...</option>
+   </select>
+
+   See: .claude/DROPDOWN-STANDARDS.md for full documentation
+   ============================================================================ */
+
+.select-standard {
+  /* Remove browser default styling */
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+
+  /* Custom caret icon (chevron-down) - gray-600 color */
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+
+  /* Position caret 12px from right edge, vertically centered */
+  background-position: right 0.75rem center;
+  background-size: 1.25em 1.25em;  /* 20px icon */
+
+  /* Ensure adequate spacing for caret (40px right padding) */
+  padding-right: 2.5rem;
+}
+
+/* Dark mode variant (for chat interface and dark-themed pages) */
+.dark .select-standard,
+.select-standard-dark {
+  /* Lighter caret color for dark backgrounds - gray-400 */
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+}
+
+/* Disabled state - lighter caret color */
+.select-standard:disabled {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23d1d5db' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+}
