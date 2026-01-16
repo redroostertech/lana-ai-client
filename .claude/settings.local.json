@@ -26,7 +26,8 @@
       "Bash(gh auth:*)",
       "Bash(export GH_TOKEN=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)",
       "Bash(gh release:*)",
-      "Bash(node /tmp/test_navigation.js:*)"
+      "Bash(node /tmp/test_navigation.js:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

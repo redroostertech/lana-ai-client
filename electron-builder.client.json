@@ -9,7 +9,7 @@
   "extraMetadata": {
     "main": "electron-main.js"
   },
-  "artifactName": "LanaAI--genesis--02.0.0.${ext}",
+  "artifactName": "LanaAI--genesis--${version}.${ext}",
   "publish": {
     "provider": "github",
     "owner": "redroostertech",
@@ -47,7 +47,7 @@
   "npmRebuild": true,
   "mac": {
     "category": "public.app-category.business",
-    "artifactName": "LanaAI--genesis--02.0.0-${arch}.${ext}",
+    "artifactName": "LanaAI--genesis--${version}-${arch}.${ext}",
     "target": ["dmg", "zip"],
     "icon": "build/icon.icns",
     "hardenedRuntime": true,
@@ -57,7 +57,7 @@
     "notarize": true
   },
   "win": {
-    "artifactName": "LanaAI--genesis--02.0.0.${ext}",
+    "artifactName": "LanaAI--genesis--${version}.${ext}",
     "target": [
       {
         "target": "nsis",
@@ -71,7 +71,7 @@
     "icon": "build/icon.ico"
   },
   "linux": {
-    "artifactName": "LanaAI--genesis--02.0.0.${ext}",
+    "artifactName": "LanaAI--genesis--${version}.${ext}",
     "target": [
       "AppImage",
       "deb"
@@ -85,10 +85,10 @@
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
     "shortcutName": "Lana AI Client",
-    "artifactName": "LanaAI--genesis--02.0.0-setup.${ext}"
+    "artifactName": "LanaAI--genesis--${version}-setup.${ext}"
   },
   "dmg": {
-    "artifactName": "LanaAI--genesis--02.0.0-${arch}.${ext}",
+    "artifactName": "LanaAI--genesis--${version}-${arch}.${ext}",
     "contents": [
       {
         "x": 130,
@@ -108,4 +108,3 @@
     "title": "Lana AI Client ${version}"
   }
 }
-

@@ -67,11 +67,15 @@ DEV_MODE=false
 DEMO_MODE=false
 AUTO_DISCOVERY_MODE=true  # Default to auto-discovery mode
 PORT="8080"  # Default port
+PUBLISH_RELEASE=false  # Whether to create GitHub release
 
 # Config file path (in public_html directory)
 CONFIG_FILE="$PROJECT_ROOT/public_html/js/config.js"
 CONFIG_BACKUP="$PROJECT_ROOT/public_html/js/config.js.backup"
 ENV_FILE="$PROJECT_ROOT/.env"
+
+# Get version from package.json
+VERSION=$(node -p "require('$PROJECT_ROOT/package.json').version")
 
 ###############################################################################
 # Load IP from .env (set by setup-thin-client.sh)
@@ -139,6 +143,7 @@ OPTIONS:
     --clean                              Clean build directories before building
     --dev                                Build in development mode
     --demo                               Enable demo mode (no server connection)
+    --publish                            Create GitHub release and upload artifacts
     --help                               Show this help message
 
 EXAMPLES:
@@ -217,6 +222,10 @@ parse_args() {
             --auto-discovery)
                 AUTO_DISCOVERY_MODE=true
                 DEMO_MODE=false
+                shift
+                ;;
+            --publish)
+                PUBLISH_RELEASE=true
                 shift
                 ;;
             --help)
@@ -555,31 +564,119 @@ show_summary() {
     echo -e "  ${CYAN}Output:${NC}      $PROJECT_ROOT/dist/"
     echo ""
     
-    print_success "Lana AI Client build process completed!"
+    print_success "Lana AI Client v${VERSION} build process completed!"
     echo ""
     echo -e "${BLUE}Distribution Instructions:${NC}"
     echo ""
     echo "  Each platform folder contains the files to send to users:"
     echo ""
     echo "  📁 dist/macos-arm64/  → For Apple Silicon Macs (M1/M2/M3)"
-    echo "       Send: LanaAI--genesis--01-arm64.dmg"
+    echo "       Send: LanaAI--genesis--${VERSION}-arm64.dmg"
     echo ""
     echo "  📁 dist/macos-x64/    → For Intel Macs"
-    echo "       Send: LanaAI--genesis--01-x64.dmg"
+    echo "       Send: LanaAI--genesis--${VERSION}-x64.dmg"
     echo ""
     echo "  📁 dist/windows/      → For Windows PCs"
-    echo "       Send: LanaAI--genesis--01-setup.exe"
+    echo "       Send: LanaAI--genesis--${VERSION}-setup.exe"
     echo ""
     echo "  📁 dist/linux/        → For Linux PCs"
-    echo "       Send: LanaAI--genesis--01.AppImage (universal)"
-    echo "       Or:   LanaAI--genesis--01.deb (Debian/Ubuntu)"
-    echo "       Or:   LanaAI--genesis--01.rpm (Fedora/RHEL)"
+    echo "       Send: LanaAI--genesis--${VERSION}.AppImage (universal)"
+    echo "       Or:   LanaAI--genesis--${VERSION}.deb (Debian/Ubuntu)"
+    echo "       Or:   LanaAI--genesis--${VERSION}.rpm (Fedora/RHEL)"
     echo ""
     if [ "$DEMO_MODE" = false ] && [ "$AUTO_DISCOVERY_MODE" = false ]; then
         echo -e "  ${YELLOW}Important:${NC} Users need network access to http://$BACKEND_IP/"
     elif [ "$AUTO_DISCOVERY_MODE" = true ]; then
         echo -e "  ${YELLOW}Important:${NC} Server must be configured with setup-thin-client.sh for auto-discovery"
     fi
+    echo ""
+}
+
+###############################################################################
+# GitHub Release
+###############################################################################
+
+create_github_release() {
+    if [ "$PUBLISH_RELEASE" = false ]; then
+        return
+    fi
+
+    print_step "Creating GitHub release v${VERSION}..."
+
+    # Check if gh CLI is installed
+    if ! command -v gh &> /dev/null; then
+        print_error "GitHub CLI (gh) is not installed. Please install it first."
+        print_info "Install with: brew install gh"
+        return 1
+    fi
+
+    # Check if authenticated
+    if ! gh auth status &> /dev/null; then
+        print_error "GitHub CLI is not authenticated. Please run: gh auth login"
+        return 1
+    fi
+
+    DIST_DIR="$PROJECT_ROOT/dist"
+    RELEASE_TAG="v${VERSION}"
+
+    # Create release (or skip if exists)
+    print_info "Creating release ${RELEASE_TAG}..."
+    gh release create "${RELEASE_TAG}" \
+        --title "${RELEASE_TAG}" \
+        --notes "Release ${RELEASE_TAG}" \
+        --draft 2>/dev/null || print_warning "Release may already exist, continuing with upload..."
+
+    # Upload macOS ARM64 files
+    if [ -d "$DIST_DIR/macos-arm64" ]; then
+        for file in "$DIST_DIR/macos-arm64/"*.dmg "$DIST_DIR/macos-arm64/"*.zip; do
+            [ -f "$file" ] && {
+                print_info "Uploading $(basename "$file")..."
+                gh release upload "${RELEASE_TAG}" "$file" --clobber
+            }
+        done
+    fi
+
+    # Upload macOS x64 files
+    if [ -d "$DIST_DIR/macos-x64" ]; then
+        for file in "$DIST_DIR/macos-x64/"*.dmg "$DIST_DIR/macos-x64/"*.zip; do
+            [ -f "$file" ] && {
+                print_info "Uploading $(basename "$file")..."
+                gh release upload "${RELEASE_TAG}" "$file" --clobber
+            }
+        done
+    fi
+
+    # Upload Windows files
+    if [ -d "$DIST_DIR/windows" ]; then
+        for file in "$DIST_DIR/windows/"*.exe; do
+            [ -f "$file" ] && {
+                print_info "Uploading $(basename "$file")..."
+                gh release upload "${RELEASE_TAG}" "$file" --clobber
+            }
+        done
+    fi
+
+    # Upload Linux files
+    if [ -d "$DIST_DIR/linux" ]; then
+        for file in "$DIST_DIR/linux/"*.AppImage "$DIST_DIR/linux/"*.deb "$DIST_DIR/linux/"*.rpm; do
+            [ -f "$file" ] && {
+                print_info "Uploading $(basename "$file")..."
+                gh release upload "${RELEASE_TAG}" "$file" --clobber
+            }
+        done
+    fi
+
+    # Upload update manifests
+    for file in "$DIST_DIR/"latest*.yml; do
+        [ -f "$file" ] && {
+            print_info "Uploading $(basename "$file")..."
+            gh release upload "${RELEASE_TAG}" "$file" --clobber
+        }
+    done
+
+    print_success "GitHub release ${RELEASE_TAG} created and artifacts uploaded!"
+    echo ""
+    echo -e "  ${GREEN}Release URL:${NC} https://github.com/redroostertech/lana-ai-client/releases/tag/${RELEASE_TAG}"
     echo ""
 }
 
@@ -637,12 +734,13 @@ main() {
     install_dependencies
     build_app
     organize_output
-    
+
     # Don't restore config automatically - let trap handle it
     # restore_config
-    
+
     show_output
     show_summary
+    create_github_release
 }
 
 # Run main function

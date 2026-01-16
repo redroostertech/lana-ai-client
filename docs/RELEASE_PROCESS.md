@@ -68,57 +68,61 @@ node -p "require('./package.json').version"
 ./scripts/build-client.sh --platform linux    # Linux only
 ```
 
-**Build Output:**
+**Build Output:** (where `X.Y.Z` is the version from package.json)
 ```
 dist/
-├── macos-arm64/LanaAI--genesis--01-arm64.dmg   # macOS Apple Silicon
-├── macos-x64/LanaAI--genesis--01-x64.dmg       # macOS Intel
-├── windows/LanaAI--genesis--01-setup.exe       # Windows
-├── linux/LanaAI--genesis--01.AppImage          # Linux AppImage
-├── linux/LanaAI--genesis--01.deb               # Linux Debian
-├── LanaAI--genesis--01.zip                     # macOS auto-update
-├── latest.yml                                   # Windows update manifest
-├── latest-mac.yml                               # macOS update manifest
-└── latest-linux.yml                             # Linux update manifest
+├── macos-arm64/LanaAI--genesis--X.Y.Z-arm64.dmg   # macOS Apple Silicon
+├── macos-x64/LanaAI--genesis--X.Y.Z-x64.dmg       # macOS Intel
+├── windows/LanaAI--genesis--X.Y.Z-setup.exe       # Windows
+├── linux/LanaAI--genesis--X.Y.Z.AppImage          # Linux AppImage
+├── linux/LanaAI--genesis--X.Y.Z.deb               # Linux Debian
+├── LanaAI--genesis--X.Y.Z.zip                     # macOS auto-update
+├── latest.yml                                      # Windows update manifest
+├── latest-mac.yml                                  # macOS update manifest
+└── latest-linux.yml                                # Linux update manifest
 ```
 
-### Step 3: Copy Release Files
+### Step 3: Build and Publish (Recommended)
+
+The build script can automatically create the GitHub release and upload all artifacts:
 
 ```bash
-# Copy to lana-ai-client repo
-cp dist/macos-arm64/*.dmg /Users/michaelwestbrooksii/Documents/LanaAI/lana-ai-client/
-cp dist/macos-x64/*.dmg /Users/michaelwestbrooksii/Documents/LanaAI/lana-ai-client/
-cp dist/windows/*.exe /Users/michaelwestbrooksii/Documents/LanaAI/lana-ai-client/
-cp dist/linux/*.AppImage /Users/michaelwestbrooksii/Documents/LanaAI/lana-ai-client/
-cp dist/linux/*.deb /Users/michaelwestbrooksii/Documents/LanaAI/lana-ai-client/
-cp dist/latest*.yml /Users/michaelwestbrooksii/Documents/LanaAI/lana-ai-client/
-cp dist/*.zip /Users/michaelwestbrooksii/Documents/LanaAI/lana-ai-client/
+# Build and publish to GitHub in one step
+./scripts/build-client.sh --publish
+
+# Or build for specific platform and publish
+./scripts/build-client.sh --platform mac --publish
 ```
 
-### Step 4: Create GitHub Release
+This will:
+1. Build the client for the specified platform(s)
+2. Create a GitHub release tagged `vX.Y.Z`
+3. Upload all artifacts with proper naming: `LanaAI--genesis--X.Y.Z-{arch}.{ext}`
+4. Display the release URL when complete
+
+### Step 3 (Alternative): Manual Release
+
+If you prefer to create the release manually:
 
 ```bash
 cd /Users/michaelwestbrooksii/Documents/LanaAI/lana-ai-client
 
-# Get version from main repo
-VERSION=$(node -p "require('../LANA-AI/package.json').version")
+# Get version from package.json
+VERSION=$(node -p "require('./package.json').version")
 
-# Create release (empty first)
+# Create release
 gh release create v${VERSION} --title "v${VERSION}" --notes "Release v${VERSION}"
 
-# Upload files one by one (handles large files better)
-gh release upload v${VERSION} LanaAI--genesis--01-arm64.dmg
-gh release upload v${VERSION} LanaAI--genesis--01-x64.dmg
-gh release upload v${VERSION} LanaAI--genesis--01-setup.exe
-gh release upload v${VERSION} LanaAI--genesis--01.AppImage
-gh release upload v${VERSION} LanaAI--genesis--01.deb
-gh release upload v${VERSION} LanaAI--genesis--01.zip
-gh release upload v${VERSION} latest.yml
-gh release upload v${VERSION} latest-mac.yml
-gh release upload v${VERSION} latest-linux.yml
+# Upload files (filenames include version automatically)
+gh release upload v${VERSION} dist/macos-arm64/LanaAI--genesis--${VERSION}-arm64.dmg
+gh release upload v${VERSION} dist/macos-x64/LanaAI--genesis--${VERSION}-x64.dmg
+gh release upload v${VERSION} dist/windows/LanaAI--genesis--${VERSION}-setup.exe
+gh release upload v${VERSION} dist/linux/LanaAI--genesis--${VERSION}.AppImage
+gh release upload v${VERSION} dist/linux/LanaAI--genesis--${VERSION}.deb
+gh release upload v${VERSION} dist/latest*.yml
 ```
 
-### Step 5: Update Server Policy
+### Step 4: Update Server Policy
 
 After release is published, update the hosted discovery service to allow the new version:
 
@@ -142,47 +146,29 @@ curl -X POST https://www.redroostertec.com/lana-ai/v1/client/version-check \
 
 ---
 
-## Quick Release Script
+## Quick Release Command
 
-Save this as `scripts/release-client.sh`:
+The build script now supports automatic GitHub release with the `--publish` flag:
 
 ```bash
-#!/bin/bash
-set -e
+# Full release for all platforms
+./scripts/build-client.sh --publish
 
-VERSION=$(node -p "require('./package.json').version")
-CLIENT_REPO="/Users/michaelwestbrooksii/Documents/LanaAI/lana-ai-client"
+# macOS only release
+./scripts/build-client.sh --platform mac --publish
 
-echo "=== Releasing Lana AI Client v${VERSION} ==="
+# Windows only release
+./scripts/build-client.sh --platform win --publish
 
-# Check environment
-if [ -z "$APPLE_TEAM_ID" ]; then
-    echo "Error: APPLE_TEAM_ID not set"
-    exit 1
-fi
-
-# Build
-echo "Building..."
-./scripts/build-client.sh --platform mac
-
-# Copy files
-echo "Copying release files..."
-cp dist/macos-arm64/*.dmg "$CLIENT_REPO/"
-cp dist/macos-x64/*.dmg "$CLIENT_REPO/"
-cp dist/latest-mac.yml "$CLIENT_REPO/"
-cp dist/*.zip "$CLIENT_REPO/"
-
-# Create GitHub release
-echo "Creating GitHub release..."
-cd "$CLIENT_REPO"
-gh release create "v${VERSION}" --title "v${VERSION}" --notes "Release v${VERSION}" || true
-gh release upload "v${VERSION}" LanaAI--genesis--01-arm64.dmg --clobber
-gh release upload "v${VERSION}" LanaAI--genesis--01-x64.dmg --clobber
-gh release upload "v${VERSION}" latest-mac.yml --clobber
-
-echo "=== Release v${VERSION} complete! ==="
-echo "GitHub: https://github.com/redroostertech/lana-ai-client/releases/tag/v${VERSION}"
+# Linux only release
+./scripts/build-client.sh --platform linux --publish
 ```
+
+The `--publish` flag will:
+- Create a draft GitHub release tagged with the version from `package.json`
+- Upload all built artifacts with versioned filenames (e.g., `LanaAI--genesis--3.0.0-arm64.dmg`)
+- Upload update manifests (`latest.yml`, `latest-mac.yml`, `latest-linux.yml`)
+- Display the release URL when complete
 
 ---
 
@@ -217,9 +203,13 @@ rm -rf dist/win-unpacked
 
 ### GitHub upload fails (file too large)
 
-Don't commit binaries to git. Use `gh release upload` instead:
+Don't commit binaries to git. Use `gh release upload` or the `--publish` flag:
 ```bash
-gh release upload v1.0.0 LanaAI--genesis--01-arm64.dmg
+# Automatic (recommended)
+./scripts/build-client.sh --platform mac --publish
+
+# Manual
+gh release upload v3.0.0 dist/macos-arm64/LanaAI--genesis--3.0.0-arm64.dmg
 ```
 
 ---
@@ -228,11 +218,11 @@ gh release upload v1.0.0 LanaAI--genesis--01-arm64.dmg
 
 | File | Typical Size |
 |------|-------------|
-| macOS DMG (arm64) | ~95 MB |
-| macOS DMG (x64) | ~100 MB |
-| Windows Setup | ~82 MB |
-| Linux AppImage | ~105 MB |
-| Linux Deb | ~72 MB |
+| `LanaAI--genesis--X.Y.Z-arm64.dmg` (macOS ARM64) | ~95 MB |
+| `LanaAI--genesis--X.Y.Z-x64.dmg` (macOS Intel) | ~100 MB |
+| `LanaAI--genesis--X.Y.Z-setup.exe` (Windows) | ~82 MB |
+| `LanaAI--genesis--X.Y.Z.AppImage` (Linux) | ~105 MB |
+| `LanaAI--genesis--X.Y.Z.deb` (Linux Debian) | ~72 MB |
 
 ---
 
@@ -240,9 +230,9 @@ gh release upload v1.0.0 LanaAI--genesis--01-arm64.dmg
 
 - [ ] Version bumped in `package.json`
 - [ ] Environment variables set (APPLE_TEAM_ID, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD)
-- [ ] Build completed successfully
+- [ ] Build completed with `--publish` flag
 - [ ] App is properly signed and notarized
-- [ ] Files copied to `lana-ai-client` repo
-- [ ] GitHub release created with all assets
+- [ ] GitHub release created with versioned artifacts
+- [ ] Release URL displayed in build output
 - [ ] Server update policy updated
 - [ ] Tested OTA update from previous version
