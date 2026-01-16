@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Module Execution Dashboard - LanaAI</title>
+  <title>Reports - LanaAI</title>
   <script src="../js/tailwind-loader.js"></script>
   <script src="../js/error-reporter.js"></script>
   <script src="../js/vendor/chart.js"></script>
@@ -108,8 +108,8 @@
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
         </button>
         <div class="flex-1 px-4 lg:px-0">
-          <h1 class="text-xl font-semibold text-gray-900">Module Execution Dashboard</h1>
-          <p class="text-sm text-gray-500">Execute and analyze business intelligence modules</p>
+          <h1 class="text-xl font-semibold text-gray-900">Reports</h1>
+          <p class="text-sm text-gray-500">Execute and analyze business intelligence reports</p>
         </div>
 
         <div class="flex items-center gap-4">
@@ -276,7 +276,39 @@
       </div>
     </div>
 
-    <main class="p-4 lg:p-8">
+    <!-- Module Side Menu -->
+    <aside id="moduleSidebar" class="fixed left-64 top-16 bottom-0 w-64 bg-white border-r border-gray-200 z-10 hidden lg:block flex flex-col">
+      <div class="p-4 border-b border-gray-200 flex-shrink-0">
+        <h3 class="text-sm font-semibold text-gray-900 mb-3 uppercase tracking-wide">Report Modules</h3>
+        <!-- Search Input -->
+        <div class="relative">
+          <input
+            type="text"
+            id="moduleSearch"
+            placeholder="Search modules..."
+            class="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          />
+          <svg class="absolute left-3 top-2.5 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+          </svg>
+        </div>
+      </div>
+      <div class="flex-1 overflow-y-auto p-4">
+        <div id="moduleMenu" class="space-y-1">
+          <!-- Module menu will be populated by JavaScript -->
+          <div class="text-sm text-gray-500 py-4 text-center">Loading modules...</div>
+        </div>
+        <div id="moduleSearchEmpty" class="hidden text-sm text-gray-500 py-8 px-4 text-center">
+          <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M12 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <p class="font-medium text-gray-700 mb-1">No modules found</p>
+          <p class="text-xs text-gray-500">Try a different search term</p>
+        </div>
+      </div>
+    </aside>
+
+    <main class="p-4 lg:p-8 lg:ml-64">
       <!-- Module Execution Controls -->
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
         <h2 class="text-lg font-semibold text-gray-900 mb-4">Reporting</h2>
@@ -309,18 +341,13 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
-          <!-- Module Selection -->
-          <div>
-            <div class="flex items-center justify-between mb-2">
-              <label for="moduleSelect" class="block text-sm font-medium text-gray-700">Module</label>
-              <span id="moduleCategoryBadge" class="hidden px-2 py-0.5 text-xs font-medium rounded-full"></span>
-            </div>
-            <select id="moduleSelect" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-              <option value="">Loading modules...</option>
-            </select>
-          </div>
+        <!-- Module Selection - Now handled by sidebar menu, keeping select hidden for backward compatibility -->
+        <select id="moduleSelect" class="hidden">
+          <option value="">Loading modules...</option>
+        </select>
 
+        <!-- Date Range Inputs -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <!-- Start Date -->
           <div>
             <label for="periodStart" class="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
@@ -344,17 +371,17 @@
               <option value="yearly">Yearly</option>
             </select>
           </div>
+        </div>
 
-          <!-- Execute Button -->
-          <div class="flex items-end">
-            <button id="executeBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-6 py-2 rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
-              <span id="executeBtnText">Run Report</span>
-              <svg id="executeBtnSpinner" class="hidden animate-spin inline-block w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-            </button>
-          </div>
+        <!-- Execute Button Row -->
+        <div class="mb-4">
+          <button id="executeBtn" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-8 py-2.5 rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
+            <span id="executeBtnText">Run Report</span>
+            <svg id="executeBtnSpinner" class="hidden animate-spin inline-block w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          </button>
         </div>
 
         <!-- TODO: Re-enable caching once cache invalidation logic is fixed -->
@@ -652,6 +679,7 @@
     // Load available modules from backend
     // Store modules globally for accessing missing entities
     let allModules = [];
+    let moduleCategories = {};
 
     async function loadModules() {
       const moduleSelect = document.getElementById('moduleSelect');
@@ -665,11 +693,19 @@
           firstModule: response.modules?.[0]
         });
 
-        // Store modules globally
+        // Store modules and categories globally
         allModules = response.modules || [];
 
-        console.log('[DEBUG] Stored modules', {
-          count: allModules.length,
+        // Build category map from response (category key -> display name)
+        if (response.categories && Array.isArray(response.categories)) {
+          response.categories.forEach(cat => {
+            moduleCategories[cat.key] = cat.name;
+          });
+        }
+
+        console.log('[DEBUG] Stored modules and categories', {
+          moduleCount: allModules.length,
+          categories: moduleCategories,
           modules: allModules.map(m => ({
             key: m.moduleKey,
             name: m.name,
@@ -686,6 +722,10 @@
           option.textContent = 'No modules available';
           option.disabled = true;
           moduleSelect.appendChild(option);
+
+          // Update module menu
+          const moduleMenu = document.getElementById('moduleMenu');
+          moduleMenu.innerHTML = '<div class="text-sm text-gray-500 py-4 px-3">No modules available</div>';
           return;
         }
 
@@ -699,52 +739,158 @@
           modulesByCategory[category].push(module);
         });
 
-        // Render modules grouped by category
+        // Populate hidden select dropdown (for backward compatibility)
         Object.keys(modulesByCategory).sort().forEach(category => {
           const modules = modulesByCategory[category];
 
           modules.forEach(module => {
             const option = document.createElement('option');
             option.value = module.moduleKey;
-            option.dataset.category = category; // Store category in data attribute
-
-            // Use module name only (no category prefix)
+            option.dataset.category = category;
             option.textContent = module.name;
-
-            // Disable if required connectors are not connected
             if (!module.available) {
               option.disabled = true;
               option.textContent += ' (Requires additional connectors)';
             }
-
             moduleSelect.appendChild(option);
           });
+        });
+
+        // Populate module side menu with collapsible sections
+        const moduleMenu = document.getElementById('moduleMenu');
+        moduleMenu.innerHTML = '';
+
+        const categoryKeys = Object.keys(modulesByCategory).sort();
+
+        categoryKeys.forEach((category, index) => {
+          const modules = modulesByCategory[category];
+
+          // Category Section Container
+          const categorySection = document.createElement('div');
+          categorySection.className = 'mb-1';
+          categorySection.dataset.categorySection = category;
+
+          // Add separator (top border) for all sections except the first
+          if (index > 0) {
+            categorySection.classList.add('border-t', 'border-gray-200', 'pt-3', 'mt-3');
+          }
+
+          // Category Header (clickable to expand/collapse)
+          const categoryHeader = document.createElement('button');
+          categoryHeader.className = 'w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-700 uppercase tracking-wide hover:bg-gray-50 rounded transition-colors';
+          categoryHeader.dataset.category = category;
+
+          // Category name
+          const categoryName = document.createElement('span');
+          categoryName.textContent = moduleCategories[category] || category;
+          categoryHeader.appendChild(categoryName);
+
+          // Chevron icon
+          const chevronIcon = document.createElement('svg');
+          chevronIcon.className = 'w-4 h-4 transition-transform';
+          chevronIcon.setAttribute('fill', 'none');
+          chevronIcon.setAttribute('stroke', 'currentColor');
+          chevronIcon.setAttribute('viewBox', '0 0 24 24');
+          chevronIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>';
+          categoryHeader.appendChild(chevronIcon);
+
+          categorySection.appendChild(categoryHeader);
+
+          // Module items container (collapsible)
+          const moduleContainer = document.createElement('div');
+          moduleContainer.className = 'space-y-1 mt-1';
+          moduleContainer.dataset.categoryModules = category;
+
+          // Module items
+          modules.forEach(module => {
+            const moduleItem = document.createElement('button');
+            moduleItem.className = `w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
+              module.available
+                ? 'text-gray-700 hover:bg-indigo-50 hover:text-indigo-700'
+                : 'text-gray-400 cursor-not-allowed'
+            }`;
+            moduleItem.dataset.moduleKey = module.moduleKey;
+            moduleItem.dataset.category = category;
+            moduleItem.dataset.moduleName = module.name.toLowerCase();
+            moduleItem.dataset.moduleDescription = (module.description || '').toLowerCase();
+
+            const moduleText = document.createElement('div');
+            moduleText.textContent = module.name;
+            moduleItem.appendChild(moduleText);
+
+            if (!module.available) {
+              const unavailableNote = document.createElement('div');
+              unavailableNote.className = 'text-xs text-gray-400 mt-1';
+              unavailableNote.textContent = 'Requires connectors';
+              moduleItem.appendChild(unavailableNote);
+              moduleItem.disabled = true;
+            } else {
+              // Add click handler for available modules
+              moduleItem.addEventListener('click', () => {
+                // Update hidden select
+                moduleSelect.value = module.moduleKey;
+
+                // Update visual selection
+                document.querySelectorAll('#moduleMenu button[data-module-key]').forEach(btn => {
+                  btn.classList.remove('bg-indigo-100', 'text-indigo-700', 'font-medium');
+                  btn.classList.add('text-gray-700');
+                });
+                moduleItem.classList.remove('text-gray-700');
+                moduleItem.classList.add('bg-indigo-100', 'text-indigo-700', 'font-medium');
+
+                // Trigger change event
+                updateMissingEntitiesForModule(module.moduleKey);
+              });
+            }
+
+            moduleContainer.appendChild(moduleItem);
+          });
+
+          categorySection.appendChild(moduleContainer);
+
+          // Add collapse/expand functionality
+          categoryHeader.addEventListener('click', () => {
+            const isCollapsed = moduleContainer.classList.contains('hidden');
+
+            if (isCollapsed) {
+              // Expand
+              moduleContainer.classList.remove('hidden');
+              chevronIcon.classList.remove('rotate-[-90deg]');
+            } else {
+              // Collapse
+              moduleContainer.classList.add('hidden');
+              chevronIcon.classList.add('rotate-[-90deg]');
+            }
+          });
+
+          moduleMenu.appendChild(categorySection);
         });
 
         // Auto-select first available module
         const firstAvailable = response.modules.find(m => m.available);
         if (firstAvailable) {
           moduleSelect.value = firstAvailable.moduleKey;
+
+          // Highlight in side menu
+          const firstModuleBtn = moduleMenu.querySelector(`button[data-module-key="${firstAvailable.moduleKey}"]`);
+          if (firstModuleBtn) {
+            firstModuleBtn.classList.add('bg-indigo-100', 'text-indigo-700', 'font-medium');
+            firstModuleBtn.classList.remove('text-gray-700');
+          }
+
           // Update missing entities for the selected module
           updateMissingEntitiesForModule(firstAvailable.moduleKey);
         }
 
-        // Add change event listener to update missing entities and category badge when module changes
+        // Add change event listener to hidden select (for backward compatibility)
         moduleSelect.addEventListener('change', (e) => {
           updateMissingEntitiesForModule(e.target.value);
-          updateCategoryBadge(e.target.selectedOptions[0]);
         });
-
-        // Update category badge on initial load
-        if (firstAvailable) {
-          const selectedOption = moduleSelect.querySelector(`option[value="${firstAvailable.moduleKey}"]`);
-          if (selectedOption) {
-            updateCategoryBadge(selectedOption);
-          }
-        }
 
       } catch (error) {
         console.error('Failed to load modules:', error);
+
+        // Update hidden select
         moduleSelect.innerHTML = '';
         const option = document.createElement('option');
         option.value = '';
@@ -752,12 +898,126 @@
         option.disabled = true;
         moduleSelect.appendChild(option);
 
+        // Update module menu
+        const moduleMenu = document.getElementById('moduleMenu');
+        moduleMenu.innerHTML = '<div class="text-sm text-red-500 py-4 px-3">Failed to load modules. Please refresh.</div>';
+
         showError('Failed to load available modules. Please refresh the page.');
       }
     }
 
     // Load modules on page load
     loadModules();
+
+    // Module search functionality
+    const moduleSearchInput = document.getElementById('moduleSearch');
+    const moduleMenu = document.getElementById('moduleMenu');
+    const moduleSearchEmpty = document.getElementById('moduleSearchEmpty');
+
+    if (moduleSearchInput) {
+      moduleSearchInput.addEventListener('input', (e) => {
+        const searchQuery = e.target.value.toLowerCase().trim();
+
+        // Get all module items and category sections
+        const moduleItems = moduleMenu.querySelectorAll('button[data-module-key]');
+        const categorySections = moduleMenu.querySelectorAll('[data-category-section]');
+
+        if (!searchQuery) {
+          // Show all items and sections when search is cleared
+          moduleItems.forEach(item => item.classList.remove('hidden'));
+          categorySections.forEach(section => section.classList.remove('hidden'));
+          moduleSearchEmpty.classList.add('hidden');
+          return;
+        }
+
+        // Track if any modules are visible
+        let visibleCount = 0;
+        const visibleCategories = new Set();
+
+        // Split search query into words for better matching
+        const searchWords = searchQuery.split(/\s+/).filter(w => w.length > 0);
+
+        // First pass: check if ANY modules match by name only
+        let hasNameMatches = false;
+        const moduleMatchResults = [];
+
+        moduleItems.forEach(item => {
+          const moduleName = item.dataset.moduleName || '';
+          const moduleDescription = item.dataset.moduleDescription || '';
+          const category = item.dataset.category || '';
+
+          // Convert module name and description into word arrays for word-boundary matching
+          const nameWords = moduleName.split(/[\s&-]+/).filter(w => w.length > 0);
+          const descWords = moduleDescription.split(/[\s&-]+/).filter(w => w.length > 0);
+
+          // Check if module name contains all search words as substrings
+          const nameContainsAll = searchWords.every(searchWord =>
+            nameWords.some(nameWord => nameWord.includes(searchWord))
+          );
+
+          // Check if module name starts with the search query
+          const nameStartsWith = moduleName.startsWith(searchQuery);
+
+          // Check if description matches (only used if no name matches found)
+          const descriptionContainsAll = searchQuery.length >= 3 && searchWords.every(searchWord =>
+            descWords.some(descWord => descWord.includes(searchWord))
+          );
+
+          const nameMatch = nameContainsAll || nameStartsWith;
+
+          if (nameMatch) {
+            hasNameMatches = true;
+          }
+
+          moduleMatchResults.push({
+            item,
+            category,
+            nameMatch,
+            descriptionMatch: descriptionContainsAll
+          });
+        });
+
+        // Second pass: show items based on whether we have name matches
+        moduleMatchResults.forEach(result => {
+          // If we have ANY name matches, only show name matches
+          // Otherwise, show both name and description matches
+          const shouldShow = hasNameMatches ? result.nameMatch : (result.nameMatch || result.descriptionMatch);
+
+          if (shouldShow) {
+            result.item.classList.remove('hidden');
+            visibleCategories.add(result.category);
+            visibleCount++;
+          } else {
+            result.item.classList.add('hidden');
+          }
+        });
+
+        // Show/hide category sections based on visible modules
+        categorySections.forEach(section => {
+          const category = section.dataset.categorySection;
+          if (visibleCategories.has(category)) {
+            section.classList.remove('hidden');
+
+            // Auto-expand sections with matches during search
+            const moduleContainer = section.querySelector('[data-category-modules]');
+            const chevronIcon = section.querySelector('svg');
+            if (moduleContainer && chevronIcon) {
+              moduleContainer.classList.remove('hidden');
+              chevronIcon.classList.remove('rotate-[-90deg]');
+            }
+          } else {
+            section.classList.add('hidden');
+          }
+        });
+
+        // Show empty state if no results
+        if (visibleCount === 0) {
+          moduleSearchEmpty.classList.remove('hidden');
+        } else {
+          moduleSearchEmpty.classList.add('hidden');
+        }
+      });
+    }
 
     // User menu toggle
     const userMenu = document.getElementById('userMenu');
@@ -957,37 +1217,6 @@
 
     // Store missing entities globally
     let currentMissingEntities = [];
-
-    // Update category badge display
-    function updateCategoryBadge(selectedOption) {
-      const categoryBadge = document.getElementById('moduleCategoryBadge');
-
-      if (!categoryBadge || !selectedOption) return;
-
-      const category = selectedOption.dataset.category;
-
-      if (!category) {
-        categoryBadge.classList.add('hidden');
-        return;
-      }
-
-      // Category color mapping
-      const categoryStyles = {
-        'growth': 'bg-green-100 text-green-800',
-        'client': 'bg-blue-100 text-blue-800',
-        'operations': 'bg-purple-100 text-purple-800',
-        'financial': 'bg-yellow-100 text-yellow-800',
-        'staff': 'bg-indigo-100 text-indigo-800'
-      };
-
-      // Get the style for this category
-      const style = categoryStyles[category] || 'bg-gray-100 text-gray-800';
-
-      // Update badge text and style
-      categoryBadge.textContent = category.charAt(0).toUpperCase() + category.slice(1);
-      categoryBadge.className = `px-2 py-0.5 text-xs font-medium rounded-full ${style}`;
-      categoryBadge.classList.remove('hidden');
-    }
 
     // Update missing entities from module definition or execution response
     function updateMissingEntities(missingEntities) {
