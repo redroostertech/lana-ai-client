@@ -2746,7 +2746,7 @@
       try {
         // Fetch both active ingestion jobs and active upload sessions
         const [ingestJobs, uploadSessions] = await Promise.all([
-          api.get('/api/v1/storage/jobs?status=pending,processing&limit=20'),
+          api.get('/api/v1/storage/jobs?status=pending,processing&integration_source=actionstep&limit=20'),
           api.get('/api/v1/storage/upload-sessions?limit=20')
         ]);
 
@@ -2902,10 +2902,12 @@
       try {
         const offset = (logsHistoryPage - 1) * logsHistoryPageSize;
 
-        // Fetch ActionStep-specific job history (sync logs, document imports, AI ingestions)
-        const [syncLogsResult, documentImportsResult] = await Promise.all([
+        // Fetch ActionStep-specific job history (sync logs, document imports, processing jobs, AI ingestions)
+        const [syncLogsResult, documentImportsResult, processingJobsResult] = await Promise.all([
           api.get(`/api/v1/actionstep/sync-logs?limit=${logsHistoryPageSize}&offset=${offset}`),
-          api.get(`/api/v1/actionstep/documents?limit=${logsHistoryPageSize}&offset=${offset}`)
+          api.get(`/api/v1/actionstep/documents?limit=${logsHistoryPageSize}&offset=${offset}`),
+          // NEW: Fetch ALL ActionStep processing jobs (completed, failed, cancelled)
+          api.get(`/api/v1/storage/jobs?integration_source=actionstep&limit=100`)
         ]);
 
         const container = document.getElementById('jobHistoryContent');
@@ -2951,8 +2953,30 @@
           };
         });
 
-        // Merge all ActionStep-specific jobs
-        let allJobs = [...syncJobs, ...documentJobs];
+        // NEW: Map storage processing jobs to job format (includes completed, failed, cancelled)
+        const processingJobs = (processingJobsResult.jobs || [])
+          .filter(job => !['pending', 'processing'].includes(job.status)) // Exclude active jobs (shown in Active Jobs section)
+          .map(job => {
+            return {
+              id: job.id,
+              filename: job.document_name,
+              job_type: 'Document Processing',
+              status: job.status,
+              created_at: job.queued_at || job.created_at,
+              completed_at: job.completed_at,
+              processed_count: job.progress_percentage,
+              error_message: job.error_message,
+              _isProcessing: true,
+              details: {
+                progress: job.progress_percentage,
+                strategy: job.processing_strategy,
+                priority: job.priority
+              }
+            };
+          });
+
+        // Merge all ActionStep-specific jobs (sync logs + document imports + processing jobs)
+        let allJobs = [...syncJobs, ...documentJobs, ...processingJobs];
 
         // Apply status filter
         if (logsHistoryFilterStatus !== 'all') {
@@ -3172,11 +3196,82 @@
       loadJobHistory();
     }
 
-    // Cancel a job
-    async function cancelJob(jobId, isUpload = false) {
-      if (!confirm('Are you sure you want to cancel this job?')) {
-        return;
+    // Cancel a job - show confirmation modal
+    function cancelJob(jobId, isUpload = false) {
+      showCancelJobModal(jobId, isUpload);
+    }
+
+    // Show cancel job confirmation modal
+    function showCancelJobModal(jobId, isUpload = false) {
+      const dialogHtml = `
+        <div id="cancelJobModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="z-index: 10000;">
+          <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4 transform transition-all scale-100 animate-fade-in">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center flex-shrink-0">
+                <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900">Cancel Job</h3>
+                <p class="text-sm text-gray-500">This action cannot be undone</p>
+              </div>
+            </div>
+
+            <div class="mb-6">
+              <p class="text-sm text-gray-700 mb-2">
+                Are you sure you want to cancel this ${isUpload ? 'upload' : 'processing job'}?
+              </p>
+              <p class="text-sm text-gray-600">
+                The job will be stopped immediately and marked as cancelled.
+              </p>
+            </div>
+
+            <div class="flex gap-3 justify-end">
+              <button
+                onclick="closeCancelJobModal()"
+                class="px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Keep Job
+              </button>
+              <button
+                onclick="confirmCancelJob('${jobId}', ${isUpload})"
+                class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors"
+              >
+                Cancel Job
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.body.insertAdjacentHTML('beforeend', dialogHtml);
+
+      // Add animation class
+      setTimeout(() => {
+        const modal = document.getElementById('cancelJobModal');
+        if (modal) {
+          modal.querySelector('.transform').classList.remove('scale-100');
+          modal.querySelector('.transform').classList.add('scale-105');
+          setTimeout(() => {
+            modal.querySelector('.transform').classList.remove('scale-105');
+            modal.querySelector('.transform').classList.add('scale-100');
+          }, 150);
+        }
+      }, 10);
+    }
+
+    // Close cancel job modal
+    function closeCancelJobModal() {
+      const modal = document.getElementById('cancelJobModal');
+      if (modal) {
+        modal.remove();
       }
+    }
+
+    // Confirm cancel job
+    async function confirmCancelJob(jobId, isUpload = false) {
+      closeCancelJobModal();
 
       try {
         if (isUpload) {
