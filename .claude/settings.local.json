@@ -27,7 +27,9 @@
       "Bash(export GH_TOKEN=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)",
       "Bash(gh release:*)",
       "Bash(node /tmp/test_navigation.js:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(git -C /Users/michaelwestbrooksii/Documents/LanaAI/lana-ai-client log --oneline --all)",
+      "Bash(npm run generate-version:*)"
     ],
     "deny": [],
     "ask": []
