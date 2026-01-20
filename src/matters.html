@@ -1781,7 +1781,7 @@
 
       try {
         // Fetch all matter data in parallel
-        const [matterResult, permissionsResult, activityResult, chatsResult, docsResult, orphanedResult, tasksResult] = await Promise.all([
+        const [matterResult, permissionsResult, activityResult, chatsResult, docsResult, orphanedResult, tasksResult, commentsResult] = await Promise.all([
           api.getMatter(matterId),
           api.getMatterPermissions(matterId).catch(() => ({ permissions: [] })),
           api.getMatterActivity(matterId, 100).catch(() => ({ activities: [] })), // Get more for activity tab
@@ -1800,7 +1800,11 @@
           api.getMatterTasks(matterId).catch((err) => {
             console.error('[viewMatter] Failed to fetch tasks:', err);
             return { tasks: [], total_count: 0 };
-          }) // Get tasks
+          }), // Get tasks
+          api.getComments(matterId, { limit: 0 }).catch((err) => {
+            console.error('[viewMatter] Failed to fetch comment count:', err);
+            return { data: [], pagination: { total: 0 } };
+          }) // Get comment count only
         ]);
 
         const matter = matterResult.matter;
@@ -1811,6 +1815,7 @@
         const documentsPagination = docsResult.pagination || { total_count: 0 };
         const orphanedFiles = orphanedResult.orphaned_files || [];
         const tasks = tasksResult.tasks || [];
+        const commentCount = commentsResult.pagination?.total || 0;
 
         // Log conversation results for debugging
         console.log('[viewMatter] Conversations loaded:', {
@@ -1842,6 +1847,13 @@
         document.getElementById('conversationCount').textContent = chats.length || '';
         document.getElementById('documentCount').textContent = documentsPagination.total_count || documents.length || '';
         document.getElementById('taskCount').textContent = tasks.length || '';
+
+        // Update comment count badge
+        const commentBadge = document.getElementById('commentCountBadge');
+        if (commentBadge) {
+          commentBadge.textContent = commentCount || '';
+          commentBadge.classList.toggle('hidden', commentCount === 0);
+        }
 
         // Set up footer actions
         document.getElementById('drawerEditBtn').onclick = () => { editMatter(matter.matter_id); closeDrawer(); };
