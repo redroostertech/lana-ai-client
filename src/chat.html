@@ -2707,23 +2707,28 @@
       try {
         // Close modal first for better UX
         closeConversationActionsModal();
-        
+
         // Delete from backend
         await api.delete(`/api/v1/chat/sessions/${conversationIdToDelete}`);
-        
+
         // If we're viewing the deleted conversation, clear immediately
         if (isDeletingCurrentConversation) {
           startNewChat();
         }
 
-        // Reload conversations list
-        yourChatsPage = 1;
-        await loadConversations(false);
+        // IMMEDIATE UI UPDATE: Remove from local array and re-render
+        allConversations = allConversations.filter(c => c.thread_id !== conversationIdToDelete);
+        renderConversations(allConversations);
 
-        // Also refresh the conversation menu sidebar if available
+        // Update sidebar menu immediately
         if (typeof ConversationMenu !== 'undefined') {
-          await ConversationMenu.loadConversations(true);
+          ConversationMenu.conversations = ConversationMenu.conversations.filter(c => c.thread_id !== conversationIdToDelete);
+          ConversationMenu.render();
         }
+
+        // Then reload from backend to ensure consistency (don't await to avoid blocking)
+        yourChatsPage = 1;
+        loadConversations(false).catch(err => console.error('Background refresh failed:', err));
 
         // Show success message
         Toast.success(isProject ? 'Project conversation deleted (matter preserved)' : 'Conversation deleted');
