@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      background: #f9fafb;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .message-content {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .message-content code {
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      font-size: 0.9em;
+    }
+    .message-content code.inline {
+      background: #e5e7eb;
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+    .code-block-wrapper {
+      margin: 12px 0;
+    }
+    .code-block-wrapper pre {
+      background: #1f2937;
+      color: #f3f4f6;
+      padding: 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+    }
+    .language-label {
+      font-size: 12px;
+      color: #6b7280;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      letter-spacing: 0.05em;
+    }
+    .json-key { color: #93c5fd; font-weight: 500; }
+    .json-string { color: #86efac; }
+    .json-number { color: #fde047; }
+    .json-boolean { color: #d8b4fe; }
+    .json-null { color: #9ca3af; font-style: italic; }
+    .json-punctuation { color: #e5e7eb; }
+  </style>
+</head>
+<body>
+  <div class="message-content" id="output"></div>
+
+  <script>
+    function escapeCode(str) {
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function formatJSON(jsonStr) {
+      try {
+        // Parse the JSON (keep original formatting for now)
+        const parsed = JSON.parse(jsonStr.trim());
+
+        // Check if JSON is empty
+        const isEmpty = (obj) => {
+          if (Array.isArray(obj)) return obj.length === 0;
+          if (typeof obj === 'object' && obj !== null) return Object.keys(obj).length === 0;
+          return false;
+        };
+
+        if (isEmpty(parsed)) {
+          return '<span style="color: #9ca3af; font-style: italic;">Empty</span>';
+        }
+
+        // Format with proper indentation (2 spaces)
+        const formatted = JSON.stringify(parsed, null, 2);
+
+        // Escape HTML characters
+        let escaped = formatted
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+
+        // Apply syntax highlighting line by line to preserve formatting
+        const lines = escaped.split('\n');
+        const highlightedLines = lines.map(line => {
+          return line
+            .replace(/"([^"]+)"(\s*):/g, '<span class="json-key">"$1"</span>$2:')
+            .replace(/:\s*"([^"]*)"/g, ': <span class="json-string">"$1"</span>')
+            .replace(/\[\s*"([^"]*)"/g, '[ <span class="json-string">"$1"</span>')
+            .replace(/,\s*"([^"]*)"/g, ', <span class="json-string">"$1"</span>')
+            .replace(/:\s*(-?\d+\.?\d*)/g, ': <span class="json-number">$1</span>')
+            .replace(/\[\s*(-?\d+\.?\d*)/g, '[ <span class="json-number">$1</span>')
+            .replace(/,\s*(-?\d+\.?\d*)/g, ', <span class="json-number">$1</span>')
+            .replace(/:\s*(true|false)/g, ': <span class="json-boolean">$1</span>')
+            .replace(/\[\s*(true|false)/g, '[ <span class="json-boolean">$1</span>')
+            .replace(/,\s*(true|false)/g, ', <span class="json-boolean">$1</span>')
+            .replace(/:\s*(null)/g, ': <span class="json-null">$1</span>')
+            .replace(/\[\s*(null)/g, '[ <span class="json-null">$1</span>')
+            .replace(/,\s*(null)/g, ', <span class="json-null">$1</span>')
+            .replace(/([{}\[\],])/g, '<span class="json-punctuation">$1</span>');
+        });
+
+        // Join lines back together with newlines preserved
+        return highlightedLines.join('\n');
+      } catch (e) {
+        return escapeCode(jsonStr);
+      }
+    }
+
+    function formatContent(content) {
+      let formatted = content
+        // Code blocks
+        .replace(/```(\w+)?\n?([\s\S]*?)```/g, (match, lang, code) => {
+          const trimmedCode = code.trim();
+          const isJSON = lang === 'json' || lang === 'JSON' ||
+                        (trimmedCode.startsWith('{') || trimmedCode.startsWith('['));
+
+          let displayCode;
+          if (isJSON) {
+            displayCode = formatJSON(trimmedCode);
+          } else {
+            displayCode = escapeCode(trimmedCode);
+          }
+
+          const languageLabel = lang ? `<div class="language-label">${lang}</div>` : '';
+          return `<div class="code-block-wrapper">${languageLabel}<pre><code>${displayCode}</code></pre></div>`;
+        })
+        // Inline code
+        .replace(/`([^`]+)`/g, (match, code) => {
+          const escapedCode = escapeCode(code);
+          return `<code class="inline">${escapedCode}</code>`;
+        });
+
+      return formatted;
+    }
+
+    // Test cases
+    const testCases = [
+      {
+        title: 'Original Example (with newlines)',
+        content: 'Call `search_documents` with the query parameters to extract relevant information from the document.\n```json\n{\n  "query": "#Investor Deck - Lana AI-compressed.pdf"\n}\n```'
+      },
+      {
+        title: 'Empty JSON Object',
+        content: 'This returns an empty result:\n```json\n{}\n```'
+      },
+      {
+        title: 'Empty JSON Array',
+        content: 'No items found:\n```json\n[]\n```'
+      },
+      {
+        title: 'Complex JSON with literal \\n',
+        content: 'Response data:\n```json\n{\n  "status": "success",\n  "data": {\n    "name": "John Doe",\n    "age": 30,\n    "active": true\n  }\n}\n```'
+      }
+    ];
+
+    let outputHTML = '<h2 style="margin-bottom: 20px; color: #1f2937;">JSON Rendering Tests</h2>';
+
+    testCases.forEach((test, index) => {
+      console.log(`Test ${index + 1}: ${test.title}`);
+      console.log('Input:', test.content);
+      const result = formatContent(test.content);
+      console.log('Output:', result);
+
+      outputHTML += `
+        <div style="margin-bottom: 30px; padding: 15px; background: #f3f4f6; border-radius: 8px;">
+          <h3 style="margin-top: 0; color: #374151; font-size: 14px; font-weight: 600;">Test ${index + 1}: ${test.title}</h3>
+          <div>${result}</div>
+        </div>
+      `;
+    });
+
+    document.getElementById('output').innerHTML = outputHTML;
+  </script>
+</body>
+</html>
