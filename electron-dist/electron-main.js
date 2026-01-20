@@ -15351,6 +15351,11 @@ var require_electron_storage = __commonJS({
           orgName: server.orgName,
           version: server.version,
           apiVersion: server.apiVersion,
+          // Burst API configuration for direct calls to burst service
+          burstApiKey: server.burstApiKey || null,
+          burstUrl: server.burstUrl || null,
+          tier: server.tier || "standard",
+          rateLimit: server.rateLimit || 100,
           connectedAt: (/* @__PURE__ */ new Date()).toISOString(),
           lastVerified: (/* @__PURE__ */ new Date()).toISOString()
         };
@@ -29759,13 +29764,50 @@ var require_electron_updater_custom = __commonJS({
   }
 });
 
+// src/version.js
+var require_version = __commonJS({
+  "src/version.js"(exports2, module2) {
+    module2.exports = {
+      version: "3.0.0",
+      buildNumber: "1",
+      releaseType: "stable",
+      displayVersion: "3.0.0",
+      buildDate: "2026-01-17T02:30:33.135Z",
+      /**
+       * Get full version string
+       * @returns {string} e.g., "v3.0.0b1"
+       */
+      getVersion() {
+        return this.displayVersion;
+      },
+      /**
+       * Get detailed version string
+       * @returns {string} e.g., "v3.0.0b1 (Build 1, Beta)"
+       */
+      getDetailedVersion() {
+        const type = this.releaseType.charAt(0).toUpperCase() + this.releaseType.slice(1);
+        return `${this.displayVersion} (Build ${this.buildNumber}, ${type})`;
+      },
+      /**
+       * Get semantic version (for comparisons)
+       * @returns {string} e.g., "3.0.0"
+       */
+      getSemanticVersion() {
+        return this.version;
+      }
+    };
+  }
+});
+
 // package.json
 var require_package = __commonJS({
   "package.json"(exports2, module2) {
     module2.exports = {
       name: "lana-ai",
       productName: "Lana AI",
-      version: "3.0.0-pre-release",
+      version: "3.0.0",
+      buildNumber: "1",
+      releaseType: "stable",
       description: "Lana AI - Enterprise AI Platform",
       main: "src/index.js",
       author: {
@@ -29774,6 +29816,9 @@ var require_package = __commonJS({
       },
       license: "Proprietary",
       scripts: {
+        "generate-version": "node scripts/generate-version.js",
+        "build:tiptap": "node scripts/build-tiptap.js",
+        prestart: "npm run generate-version",
         start: "node --max-old-space-size=2048 src/index.js",
         "start:prod": "node --max-old-space-size=16384 src/index.js",
         dev: "nodemon --max-old-space-size=2048 src/index.js",
@@ -29807,6 +29852,20 @@ var require_package = __commonJS({
         "electron"
       ],
       dependencies: {
+        "@tiptap/core": "^3.14.0",
+        "@tiptap/extension-link": "^3.14.0",
+        "@tiptap/extension-placeholder": "^3.14.0",
+        "@tiptap/extension-table": "^3.14.0",
+        "@tiptap/extension-table-cell": "^3.14.0",
+        "@tiptap/extension-table-header": "^3.14.0",
+        "@tiptap/extension-table-row": "^3.14.0",
+        "@tiptap/extension-task-item": "^3.14.0",
+        "@tiptap/extension-task-list": "^3.14.0",
+        "@tiptap/extension-text-align": "^3.14.0",
+        "@tiptap/extension-typography": "^3.14.0",
+        "@tiptap/extension-underline": "^3.14.0",
+        "@tiptap/pm": "^3.14.0",
+        "@tiptap/starter-kit": "^3.14.0",
         archiver: "^7.0.1",
         axios: "^1.13.2",
         bcrypt: "^6.0.0",
@@ -29819,6 +29878,7 @@ var require_package = __commonJS({
         "form-data": "^4.0.4",
         "gpt-3-encoder": "^1.1.4",
         jsonwebtoken: "^9.0.2",
+        marked: "^17.0.1",
         minio: "^8.0.6",
         multer: "^2.0.2",
         "node-cache": "^5.1.2",
@@ -29861,6 +29921,19 @@ var { verifyServer } = require_electron_discovery();
 var { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified } = require_electron_storage();
 var { checkForUpdates, downloadAndInstallUpdate, showOptionalUpdateDialog, showForceUpdateDialog, shouldCheckForUpdates } = require_electron_updater_custom();
 var { logInfo, logError, exportLogs, getLogFilePath } = require_electron_logger();
+function getAppVersion() {
+  try {
+    const versionModule = require_version();
+    return versionModule.displayVersion;
+  } catch (e) {
+    try {
+      const packageJson = require_package();
+      return `v${packageJson.version}`;
+    } catch (e2) {
+      return `v${app.getVersion()}`;
+    }
+  }
+}
 var mainWindow;
 function createFileUrl(filePath) {
   let normalizedPath = filePath;
@@ -29939,8 +30012,14 @@ function createWindow(serverUrl = null) {
     mainWindow = null;
   });
   mainWindow.webContents.setWindowOpenHandler(({ url: url2 }) => {
-    require("electron").shell.openExternal(url2);
-    return { action: "deny" };
+    if (!url2 || url2 === "" || url2 === "about:blank" || url2.startsWith("blob:") || url2.startsWith("data:")) {
+      return { action: "allow" };
+    }
+    if (url2.startsWith("http://") || url2.startsWith("https://")) {
+      require("electron").shell.openExternal(url2);
+      return { action: "deny" };
+    }
+    return { action: "allow" };
   });
 }
 function createLoginWindow() {
@@ -29974,8 +30053,14 @@ function createLoginWindow() {
   });
   createApplicationMenu();
   mainWindow.webContents.setWindowOpenHandler(({ url: url2 }) => {
-    require("electron").shell.openExternal(url2);
-    return { action: "deny" };
+    if (!url2 || url2 === "" || url2 === "about:blank" || url2.startsWith("blob:") || url2.startsWith("data:")) {
+      return { action: "allow" };
+    }
+    if (url2.startsWith("http://") || url2.startsWith("https://")) {
+      require("electron").shell.openExternal(url2);
+      return { action: "deny" };
+    }
+    return { action: "allow" };
   });
 }
 async function checkAndHandleUpdates(serverUrl) {
@@ -30083,7 +30168,7 @@ function createApplicationMenu() {
               type: "info",
               title: "About Lana AI",
               message: "Lana AI Desktop Client",
-              detail: `Version: ${app.getVersion()}
+              detail: `Version: ${getAppVersion()}
 Electron: ${process.versions.electron}
 Chrome: ${process.versions.chrome}
 Node: ${process.versions.node}`
@@ -30157,7 +30242,7 @@ ipcMain.handle("renderer-log-info", async (event, message) => {
 });
 ipcMain.handle("get-config", async () => {
   return {
-    appVersion: app.getVersion(),
+    appVersion: getAppVersion(),
     platform: process.platform,
     arch: process.arch,
     isDevelopment: process.env.NODE_ENV === "development"
@@ -30172,12 +30257,7 @@ ipcMain.handle("load-settings", async () => {
   return getSavedServer2();
 });
 ipcMain.handle("get-version", async () => {
-  try {
-    const packageJson = require_package();
-    return packageJson.version;
-  } catch (e) {
-    return app.getVersion();
-  }
+  return getAppVersion();
 });
 ipcMain.handle("connect-to-server", async (event, server) => {
   logInfo(`IPC: connect-to-server requested for ${server.orgName || server.orgId}`);
@@ -30353,7 +30433,13 @@ app.whenReady().then(async () => {
   const { getAllData, clearSavedServer: clearServerConfig } = require_electron_storage();
   const Store2 = require("electron-store");
   const migrationStore = new Store2({ name: "migration-state" });
-  const currentVersion = app.getVersion();
+  let currentVersion;
+  try {
+    const versionModule = require_version();
+    currentVersion = versionModule.version;
+  } catch (e) {
+    currentVersion = app.getVersion();
+  }
   const lastVersion = migrationStore.get("lastVersion", "0.0.0");
   const discoveryVersion = migrationStore.get("discoveryVersion", "0");
   const CURRENT_DISCOVERY_VERSION = "3";

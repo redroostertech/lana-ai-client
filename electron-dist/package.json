@@ -1,6 +1,6 @@
 {
   "name": "lana-ai",
-  "version": "3.0.0-pre-release",
+  "version": "3.0.0",
   "main": "electron-main.js",
   "author": {
     "name": "Red Rooster Technologies",

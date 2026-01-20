@@ -13,6 +13,7 @@
   "license": "Proprietary",
   "scripts": {
     "generate-version": "node scripts/generate-version.js",
+    "bundle-electron": "node scripts/bundle-electron.js",
     "build:tiptap": "node scripts/build-tiptap.js",
     "prestart": "npm run generate-version",
     "start": "node --max-old-space-size=2048 src/index.js",

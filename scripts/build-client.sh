@@ -375,6 +375,16 @@ install_dependencies() {
     print_success "Dependencies installed"
 }
 
+bundle_electron() {
+    print_step "Bundling Electron files with current version..."
+    cd "$PROJECT_ROOT"
+
+    # Run the bundle script to regenerate electron-dist with current version from package.json
+    node scripts/bundle-electron.js
+
+    print_success "Electron files bundled (version: $VERSION)"
+}
+
 clean_build() {
     if [ "$CLEAN" = true ]; then
         print_step "Cleaning build directories and caches..."
@@ -732,6 +742,7 @@ main() {
     update_config
     clean_build
     install_dependencies
+    bundle_electron
     build_app
     organize_output
 
