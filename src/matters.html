@@ -3477,13 +3477,23 @@
 
     function buildCommentThreads(comments) {
       // Backend already sends comments with replies nested, just sort them
-      return comments
+      const processedComments = comments
         .map(comment => ({
           ...comment,
           // Ensure replies array exists and is sorted
           replies: (comment.replies || []).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
-        }))
-        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at)); // Newest first
+        }));
+
+      // Separate pinned and unpinned comments
+      const pinnedComments = processedComments.filter(c => c.is_pinned);
+      const unpinnedComments = processedComments.filter(c => !c.is_pinned);
+
+      // Sort each group by creation date (newest first)
+      pinnedComments.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      unpinnedComments.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+      // Return pinned comments first, then unpinned
+      return [...pinnedComments, ...unpinnedComments];
     }
 
     function renderCommentThread(comment, matterId) {
