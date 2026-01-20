@@ -249,6 +249,107 @@
       0%, 100% { opacity: 1; transform: scale(1); }
       50% { opacity: 0.85; transform: scale(0.96); }
     }
+
+    /* Message Content Formatting */
+    .message-content {
+      line-height: 1.6;
+    }
+
+    /* Ensure lists render properly inside message content */
+    .message-content ol,
+    .message-content ul {
+      margin: 0.75rem 0;
+      padding-left: 1.5rem;
+    }
+
+    .message-content ol {
+      list-style-type: decimal;
+    }
+
+    .message-content ul {
+      list-style-type: disc;
+    }
+
+    .message-content li {
+      margin-bottom: 0.25rem;
+      padding-left: 0.25rem;
+      line-height: 1.6;
+    }
+
+    .message-content p {
+      margin-bottom: 0.75rem;
+    }
+
+    .message-content p:last-child {
+      margin-bottom: 0;
+    }
+
+    /* Headers within messages */
+    .message-content h1,
+    .message-content h2,
+    .message-content h3 {
+      margin-top: 1rem;
+      margin-bottom: 0.5rem;
+      line-height: 1.3;
+    }
+
+    .message-content h1:first-child,
+    .message-content h2:first-child,
+    .message-content h3:first-child {
+      margin-top: 0;
+    }
+
+    /* Code blocks */
+    .message-content pre {
+      margin: 0.75rem 0;
+      overflow-x: auto;
+      white-space: pre-wrap; /* CRITICAL: Preserve whitespace and line breaks */
+    }
+
+    .message-content code {
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      font-size: 0.9em;
+      white-space: pre-wrap; /* CRITICAL: Preserve whitespace in code */
+    }
+
+    /* Code block wrapper styling */
+    .code-block-wrapper {
+      position: relative;
+    }
+
+    .code-block-wrapper pre {
+      margin: 0;
+      white-space: pre-wrap; /* CRITICAL: Ensure formatting is preserved */
+    }
+
+    .code-block-wrapper code {
+      white-space: pre-wrap; /* CRITICAL: Ensure indentation works */
+    }
+
+    /* JSON Component Syntax Highlighting */
+    .json-view .key {
+      color: #9cdcfe;
+      font-weight: 500;
+    }
+
+    .json-view .string {
+      color: #ce9178;
+    }
+
+    .json-view .number {
+      color: #b5cea8;
+    }
+
+    .json-view .boolean {
+      color: #569cd6;
+      font-weight: 600;
+    }
+
+    .json-view .null {
+      color: #808080;
+      font-style: italic;
+    }
+
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
@@ -5675,26 +5776,179 @@
     function formatContent(content) {
       // First extract citations
       const { cleanContent, citations } = extractCitations(content);
-      
-      // Format the main content
+
+      // We'll temporarily replace full code blocks with placeholders so that
+      // the paragraph/list logic below doesn't wrap their inner HTML.
+      const codeBlocks = {};
+      let codeBlockIndex = 0;
+
+      // Helper to escape HTML
+      const escapeCode = (str) => {
+        return str
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      };
+
+      // Helper to check if a string looks like complete JSON
+      function isCompleteJSON(str) {
+        if (!str || str.trim().length === 0) return false;
+        const trimmed = str.trim();
+        // Check if it starts and ends with matching brackets/braces
+        if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+          // Count braces to ensure they're balanced
+          let depth = 0;
+          for (let i = 0; i < trimmed.length; i++) {
+            if (trimmed[i] === '{') depth++;
+            else if (trimmed[i] === '}') depth--;
+            if (depth < 0) return false;
+          }
+          return depth === 0;
+        }
+        if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+          let depth = 0;
+          for (let i = 0; i < trimmed.length; i++) {
+            if (trimmed[i] === '[') depth++;
+            else if (trimmed[i] === ']') depth--;
+            if (depth < 0) return false;
+          }
+          return depth === 0;
+        }
+        return false;
+      }
+
+      // JSON syntax highlighting
+      function syntaxHighlight(json) {
+        if (typeof json != 'string') {
+          json = JSON.stringify(json, undefined, 2);
+        }
+
+        json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+        return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+          var cls = 'number';
+          if (/^"/.test(match)) {
+            if (/:$/.test(match)) {
+              cls = 'key';
+            } else {
+              cls = 'string';
+            }
+          } else if (/true|false/.test(match)) {
+            cls = 'boolean';
+          } else if (/null/.test(match)) {
+            cls = 'null';
+          }
+          return '<span class="' + cls + '">' + match + '</span>';
+        });
+      }
+
+      // Render JSON component
+      function renderJsonComponent(jsonString) {
+        try {
+          // Only try to parse if it looks like complete JSON
+          if (!isCompleteJSON(jsonString)) {
+            return null; // Return null for incomplete JSON, will be handled as regular code block
+          }
+
+          const data = JSON.parse(jsonString);
+          const highlightedContent = syntaxHighlight(jsonString);
+          const uniqueId = 'copy-' + Math.random().toString(36).substr(2, 9);
+          const rawJson = JSON.stringify(data, null, 2);
+
+          const template = `
+          <div class="rounded-md overflow-hidden bg-[#0d0d0d] my-4 border border-white/10 shadow-sm">
+            <div class="flex items-center justify-between px-4 py-2 bg-[#2f2f2f] text-gray-300 text-[11px] font-sans uppercase tracking-tight">
+                <span>json</span>
+                <button id="copy-btn-${uniqueId}" onclick="copyJsonToClipboard('${uniqueId}')" class="flex items-center gap-1.5 hover:text-white transition-colors">
+                    <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" xmlns="http://www.w3.org/2000/svg"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+                    Copy code
+                </button>
+            </div>
+            <div class="p-4 overflow-x-auto bg-[#0d0d0d] no-scrollbar">
+              <pre class="font-mono text-[13px] leading-6 text-[#d1d5db]"><code id="code-content-${uniqueId}" data-json="${escapeCode(rawJson)}">${highlightedContent}</code></pre>
+              <button onclick="copyJsonToClipboard('${uniqueId}')" class="bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs py-1.5 px-4 rounded-md transition-all flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                </svg>Copy
+              </button>
+            </div>
+          </div>`;
+
+          return template;
+        } catch (e) {
+          // If JSON parsing fails, return as regular code block
+          return null;
+        }
+      }
+
+      // Copy JSON to clipboard
+      window.copyJsonToClipboard = function(elementId) {
+        const codeElement = document.getElementById('code-content-' + elementId);
+        if (!codeElement) return;
+
+        const jsonText = codeElement.getAttribute('data-json') || codeElement.textContent;
+        const textArea = document.createElement("textarea");
+        textArea.value = jsonText;
+        document.body.appendChild(textArea);
+        textArea.select();
+
+        try {
+          document.execCommand('copy');
+          // Optional: Show success feedback
+          console.log('JSON copied to clipboard');
+        } catch (err) {
+          console.error('Copy failed', err);
+        }
+
+        document.body.removeChild(textArea);
+      };
+
+      // First, process inline markdown (code blocks, bold, italic, etc.)
+      // Use a more careful regex that only matches complete code blocks
       let formatted = cleanContent
         // Code blocks (must come before inline code)
-        .replace(/```(\w+)?\n?([\s\S]*?)```/g, '<pre class="bg-gray-800 text-gray-100 p-4 rounded-lg overflow-x-auto my-3 text-sm font-mono"><code>$2</code></pre>')
+        // Only match complete code blocks (those that have closing ```)
+        .replace(/```(\w+)?\n?([\s\S]*?)```/g, (match, lang, code) => {
+          const trimmedCode = code.trim();
+
+          // Check if it's JSON (either explicitly marked as json or looks like JSON)
+          const isJSON = lang === 'json' || lang === 'JSON' ||
+                        (trimmedCode.startsWith('{') || trimmedCode.startsWith('['));
+
+          let htmlBlock = '';
+
+          // Only try to render as JSON component if it's complete JSON
+          if (isJSON && isCompleteJSON(trimmedCode)) {
+            const jsonComponent = renderJsonComponent(trimmedCode);
+            if (jsonComponent) {
+              htmlBlock = jsonComponent;
+            }
+          }
+
+          // Fallback to regular code block (or if JSON rendering was not possible)
+          if (!htmlBlock) {
+            const displayCode = escapeCode(trimmedCode);
+            const languageLabel = lang ? `<div class="text-xs text-gray-400 mb-2 uppercase tracking-wide">${lang}</div>` : '';
+            htmlBlock = `<div class="code-block-wrapper my-3">${languageLabel}<pre class="bg-gray-800 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm font-mono whitespace-pre-wrap"><code class="whitespace-pre-wrap">${displayCode}</code></pre></div>`;
+          }
+
+          // Store block under a placeholder so line-based processing doesn't
+          // split and wrap it into paragraphs.
+          const placeholder = `__CODE_BLOCK_${codeBlockIndex++}__`;
+          codeBlocks[placeholder] = htmlBlock;
+          return placeholder;
+        })
         // Inline code
-        .replace(/`([^`]+)`/g, '<code class="bg-gray-200 px-1.5 py-0.5 rounded text-sm font-mono text-gray-800">$1</code>')
+        .replace(/`([^`]+)`/g, (match, code) => {
+          const escapedCode = escapeCode(code);
+          return `<code class="bg-gray-200 px-1.5 py-0.5 rounded text-sm font-mono text-gray-800">${escapedCode}</code>`;
+        })
         // Bold
         .replace(/\*\*([^\*]+)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>')
         // Italic
         .replace(/\*([^\*]+)\*/g, '<em class="italic">$1</em>')
-        // Headers
-        .replace(/^### (.+)$/gm, '<h3 class="text-base font-semibold mt-4 mb-2 text-gray-900">$1</h3>')
-        .replace(/^## (.+)$/gm, '<h2 class="text-lg font-semibold mt-4 mb-2 text-gray-900">$1</h2>')
-        .replace(/^# (.+)$/gm, '<h1 class="text-xl font-bold mt-4 mb-2 text-gray-900">$1</h1>')
-        // Numbered lists
-        .replace(/^(\d+)\.\s+(.+)$/gm, '<li class="ml-4 mb-1 list-decimal">$2</li>')
-        // Unordered lists
-        .replace(/^\-\s+(.+)$/gm, '<li class="ml-4 mb-1 list-disc">$1</li>')
-        .replace(/^\*\s+(?!\*)(.+)$/gm, '<li class="ml-4 mb-1 list-disc">$1</li>')
         // Document references: "Fact extracted N" or "Quote N" -> non-clickable badges (just visual indicators)
         .replace(/\b(Fact extracted|Quote)\s+(\d+(?:-\d+)?)\b/gi, '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800">$1 $2</span>')
         // Inline document references: "filename.pdf:page" or "filename.pdf:page:time" -> clickable references
@@ -5744,15 +5998,94 @@
           console.log('[formatContent] Not a PDF citation, using regular link');
           // Regular markdown link
           return `<a href="${escapeHtml(url)}" onclick="event.preventDefault(); openCitationViewer('${escapeHtml(url)}', '${escapeHtml(text)}')" class="text-indigo-600 hover:text-indigo-800 hover:underline font-medium cursor-pointer">${escapeHtml(text)}</a>`;
-        })
-        // Line breaks
-        .replace(/\n/g, '<br>');
-      
+        });
+
+      // Now process block-level elements (headers, lists, paragraphs) line by line
+      const lines = formatted.split('\n');
+      const processedLines = [];
+      let inOrderedList = false;
+      let inUnorderedList = false;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+
+        // Skip empty lines within lists
+        if (!line && (inOrderedList || inUnorderedList)) {
+          continue;
+        }
+
+        // Headers
+        if (line.match(/^### (.+)$/)) {
+          if (inOrderedList) { processedLines.push('</ol>'); inOrderedList = false; }
+          if (inUnorderedList) { processedLines.push('</ul>'); inUnorderedList = false; }
+          processedLines.push(line.replace(/^### (.+)$/, '<h3 class="text-base font-semibold mt-4 mb-2 text-gray-900">$1</h3>'));
+        } else if (line.match(/^## (.+)$/)) {
+          if (inOrderedList) { processedLines.push('</ol>'); inOrderedList = false; }
+          if (inUnorderedList) { processedLines.push('</ul>'); inUnorderedList = false; }
+          processedLines.push(line.replace(/^## (.+)$/, '<h2 class="text-lg font-semibold mt-4 mb-2 text-gray-900">$1</h2>'));
+        } else if (line.match(/^# (.+)$/)) {
+          if (inOrderedList) { processedLines.push('</ol>'); inOrderedList = false; }
+          if (inUnorderedList) { processedLines.push('</ul>'); inUnorderedList = false; }
+          processedLines.push(line.replace(/^# (.+)$/, '<h1 class="text-xl font-bold mt-4 mb-2 text-gray-900">$1</h1>'));
+        }
+        // Numbered list items
+        else if (line.match(/^(\d+)\.\s+(.+)$/)) {
+          if (inUnorderedList) { processedLines.push('</ul>'); inUnorderedList = false; }
+          if (!inOrderedList) {
+            processedLines.push('<ol class="list-decimal list-inside space-y-1 my-3 ml-4">');
+            inOrderedList = true;
+          }
+          processedLines.push(line.replace(/^(\d+)\.\s+(.+)$/, '<li class="text-gray-800 leading-relaxed">$2</li>'));
+        }
+        // Unordered list items (- or *)
+        else if (line.match(/^[-\*]\s+(.+)$/)) {
+          if (inOrderedList) { processedLines.push('</ol>'); inOrderedList = false; }
+          if (!inUnorderedList) {
+            processedLines.push('<ul class="list-disc list-inside space-y-1 my-3 ml-4">');
+            inUnorderedList = true;
+          }
+          processedLines.push(line.replace(/^[-\*]\s+(.+)$/, '<li class="text-gray-800 leading-relaxed">$1</li>'));
+        }
+        // JSON blocks
+        else if (line.match(/^```json\s*$/)) {
+          // if (inOrderedList) { processedLines.push('</ol>'); inOrderedList = false; }
+          // if (inUnorderedList) { processedLines.push('</ul>'); inUnorderedList = false; }
+          // processedLines.push(line.replace(/^```json\s*$/, '<div class="code-block-wrapper my-3">'));
+            // Do nothing
+        }
+        // Regular paragraph or text
+        else {
+          if (inOrderedList) { processedLines.push('</ol>'); inOrderedList = false; }
+          if (inUnorderedList) { processedLines.push('</ul>'); inUnorderedList = false; }
+
+          if (line) {
+            // Add paragraph with proper spacing
+            processedLines.push(`<p class="mb-3 text-gray-800 leading-relaxed">${line}</p>`);
+          } else {
+            // Empty line - add spacing between blocks
+            processedLines.push('<div class="mb-2"></div>');
+          }
+        }
+      }
+
+      // Close any open lists
+      if (inOrderedList) processedLines.push('</ol>');
+      if (inUnorderedList) processedLines.push('</ul>');
+
+      formatted = processedLines.join('\n');
+
+      // Replace code block placeholders with their full HTML so they render
+      // as standalone blocks, not wrapped in <p> tags.
+      Object.entries(codeBlocks).forEach(([placeholder, html]) => {
+        if (!placeholder) return;
+        formatted = formatted.split(placeholder).join(html);
+      });
+
       // Add citations section if there are any
       if (citations.length > 0) {
         formatted += renderCitations(citations);
       }
-      
+
       return formatted;
     }
 
@@ -6114,6 +6447,31 @@
         e.preventDefault();
         chatForm.dispatchEvent(new Event('submit'));
       }
+    });
+
+    // Handle paste events - strip HTML and only paste plain text
+    messageInput.addEventListener('paste', (e) => {
+      e.preventDefault();
+      
+      // Get plain text from clipboard
+      const paste = (e.clipboardData || window.clipboardData).getData('text');
+      
+      // Insert plain text at cursor position
+      const selection = window.getSelection();
+      if (!selection.rangeCount) return;
+      
+      const range = selection.getRangeAt(0);
+      range.deleteContents();
+      
+      // Create text node and insert
+      const textNode = document.createTextNode(paste);
+      range.insertNode(textNode);
+      
+      // Move cursor to end of inserted text
+      range.setStartAfter(textNode);
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
     });
 
     // =========================================================================
