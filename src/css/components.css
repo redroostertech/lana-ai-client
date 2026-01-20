@@ -56,3 +56,32 @@
 .select-standard:disabled {
   background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23d1d5db' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
 }
+
+/* ============================================================================
+   Contenteditable Input Placeholder
+   ============================================================================
+
+   Provides placeholder text for contenteditable divs used as rich text inputs.
+   Similar to textarea placeholder behavior.
+
+   Usage: Add data-placeholder attribute to contenteditable element
+   Example:
+   <div contenteditable="true" data-placeholder="Type here..."></div>
+   ============================================================================ */
+
+#commentInput:empty:before {
+  content: attr(data-placeholder);
+  color: #9ca3af; /* gray-400 */
+  pointer-events: none;
+}
+
+#commentInput:focus:empty:before {
+  content: attr(data-placeholder);
+}
+
+/* Mention and document tag styles for contenteditable */
+.mention-tag,
+.doc-tag {
+  user-select: all;
+  cursor: default;
+}
