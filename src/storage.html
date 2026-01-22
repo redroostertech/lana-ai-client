@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Shared Drive - LanaAI</title>
+  <title>My Drive - LanaAI</title>
   <script src="js/tailwind-loader.js"></script>
   <link rel="stylesheet" href="css/components.css">
   <script src="js/error-reporter.js"></script>
@@ -155,7 +155,7 @@
         </button>
 
         <div class="flex-1 px-4 lg:px-0">
-          <h1 class="text-xl font-semibold text-gray-900">Shared Drive</h1>
+          <h1 class="text-xl font-semibold text-gray-900">My Drive</h1>
         </div>
 
         <div class="flex items-center gap-4">
@@ -604,9 +604,19 @@
       } catch (error) {
         console.error('Failed to load user profile:', error);
       }
-      
+
       // Render dynamic menu (will now have access to roles)
-      renderMenu('#mainNav');
+      if (typeof renderMenu === 'function') {
+        renderMenu('#mainNav');
+      } else {
+        console.warn('renderMenu function not yet loaded, waiting...');
+        // Wait for menu.js to load
+        window.addEventListener('load', () => {
+          if (typeof renderMenu === 'function') {
+            renderMenu('#mainNav');
+          }
+        });
+      }
 
       // Continue with page initialization
       initializePage();
