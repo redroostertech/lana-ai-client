@@ -1,5 +1,5 @@
 /**
- * LanaAI Shared Drive - Storage Management
+ * LanaAI My Drivetorage Management
  *
  * Google Drive-like file and folder management with:
  * - Hierarchical folder tree navigation
@@ -26,7 +26,7 @@ const storageState = {
 // INITIALIZATION
 // ============================================================
 document.addEventListener('DOMContentLoaded', async () => {
-  console.log('[Storage] Initializing Shared Drive...');
+  console.log('[Storage] Initializing My Drive');
 
   // Render the dynamic menu
   if (typeof renderMenu === 'function') {
@@ -323,19 +323,21 @@ async function loadFolderContents() {
   emptyEl?.classList.add('hidden');
 
   try {
-    // ROOT VIEW: Load all matters as folders
+    // ROOT VIEW: Load all matters as folders from /api/v1/storage/root
     if (!storageState.currentMatterId) {
-      const response = await api.get('/api/v1/matters?status=active&limit=100');
+      const response = await api.get('/api/v1/storage/root?page=1&limit=100&sort=name&order=asc');
 
-      if (response.matters) {
+      if (response.success && response.matters) {
         // Convert matters to folder-like objects
         storageState.folders = response.matters.map(matter => ({
           id: matter.id,
           name: matter.name || matter.matter_id,
           matter_id: matter.matter_id,
           isMatter: true, // Flag to identify this is a matter, not a folder
-          document_count: 0,
-          child_folder_count: 0,
+          document_count: matter.document_count || 0,
+          child_folder_count: matter.folder_count || 0,
+          source: matter.source,  // 'client_matters' or 'connector'
+          connector_id: matter.connector_id,  // null for client matters
           created_at: matter.created_at,
           updated_at: matter.updated_at
         }));
@@ -438,6 +440,18 @@ function renderGridView(folders, files) {
       ? `navigateToMatter('${folder.matter_id}', '${escapeHtml(folder.name)}')`
       : `navigateToFolder('${folder.id}', '${escapeHtml(folder.name)}')`;
 
+    // For matters at root view, show both name and matter_id
+    const displayHtml = folder.isMatter
+      ? `
+        <h3 class="text-sm font-medium text-gray-900 text-center truncate w-full">${escapeHtml(folder.name)}</h3>
+        <p class="text-xs text-gray-600 font-mono">${escapeHtml(folder.matter_id)}</p>
+        <p class="text-xs text-gray-500 mt-1">${folder.document_count || 0} files • ${folder.child_folder_count || 0} folders</p>
+      `
+      : `
+        <h3 class="text-sm font-medium text-gray-900 text-center truncate w-full">${escapeHtml(folder.name)}</h3>
+        <p class="text-xs text-gray-500 mt-1">${folder.document_count || 0} files</p>
+      `;
+
     return `
     <div
       class="grid-item bg-white rounded-lg border border-gray-200 p-4 cursor-pointer hover:shadow-md transition-shadow"
@@ -447,8 +461,7 @@ function renderGridView(folders, files) {
         <svg class="w-16 h-16 text-indigo-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
         </svg>
-        <h3 class="text-sm font-medium text-gray-900 text-center truncate w-full">${escapeHtml(folder.name)}</h3>
-        <p class="text-xs text-gray-500 mt-1">${folder.document_count || 0} files</p>
+        ${displayHtml}
       </div>
     </div>
   `;
@@ -481,22 +494,42 @@ function renderListView(folders, files) {
       ? `navigateToMatter('${folder.matter_id}', '${escapeHtml(folder.name)}')`
       : `navigateToFolder('${folder.id}', '${escapeHtml(folder.name)}')`;
 
-    return `
-    <tr class="hover:bg-gray-50 cursor-pointer" onclick="${clickHandler}">
-      <td class="px-6 py-4">
-        <input type="checkbox" class="rounded text-indigo-600" onclick="event.stopPropagation()">
-      </td>
-      <td class="px-6 py-4 whitespace-nowrap">
+    // For matters at root view, show both name and matter_id
+    const displayHtml = folder.isMatter
+      ? `
+        <div class="flex items-center">
+          <svg class="w-5 h-5 text-indigo-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+          </svg>
+          <div>
+            <div class="text-sm font-medium text-gray-900">${escapeHtml(folder.name)}</div>
+            <div class="text-xs text-gray-600 font-mono">${escapeHtml(folder.matter_id)}</div>
+          </div>
+        </div>
+      `
+      : `
         <div class="flex items-center">
           <svg class="w-5 h-5 text-indigo-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
           </svg>
           <span class="text-sm font-medium text-gray-900">${escapeHtml(folder.name)}</span>
         </div>
+      `;
+
+    // For matters, show file and folder counts
+    const sizeDisplay = folder.isMatter
+      ? `${folder.document_count || 0} files • ${folder.child_folder_count || 0} folders`
+      : `${folder.document_count || 0} items`;
+
+    return `
+    <tr class="hover:bg-gray-50 cursor-pointer" onclick="${clickHandler}">
+      <td class="px-6 py-4">
+        <input type="checkbox" class="rounded text-indigo-600" onclick="event.stopPropagation()">
       </td>
+      <td class="px-6 py-4">${displayHtml}</td>
       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">—</td>
       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatDate(folder.created_at)}</td>
-      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${folder.document_count || 0} items</td>
+      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${sizeDisplay}</td>
       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
         <button class="text-gray-400 hover:text-gray-600" onclick="event.stopPropagation(); showFolderMenu('${folder.id}')">
           <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -626,33 +659,40 @@ async function handleFileUpload(event) {
   // BUG FIX #2: Show upload progress indicator
   showNotification(`Uploading ${files.length} file(s)...`, 'info');
 
-  const formData = new FormData();
-  formData.append('matter_id', storageState.currentMatterId);
-  if (storageState.currentFolderId) {
-    formData.append('folder_id', storageState.currentFolderId);
-  }
-
-  for (let i = 0; i < files.length; i++) {
-    formData.append('files', files[i]);
-  }
-
   try {
-    // Upload files using fetch (same pattern as api.uploadDocuments)
+    // Upload files using fetch (single file upload endpoint)
     await api._readyPromise;
-    const response = await fetch(`${api.baseUrl}/api/v1/storage/files/upload`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${api.token}`
-      },
-      body: formData
+
+    // Upload each file individually to /api/v1/storage/upload
+    const uploadPromises = Array.from(files).map(async (file) => {
+      const singleFileFormData = new FormData();
+      singleFileFormData.append('file', file);
+      singleFileFormData.append('matter_id', storageState.currentMatterId);
+      if (storageState.currentFolderId) {
+        singleFileFormData.append('folder_id', storageState.currentFolderId);
+      }
+
+      return fetch(`${api.baseUrl}/api/v1/storage/upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${api.token}`
+        },
+        body: singleFileFormData
+      });
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || error.error || 'Upload failed');
+    const responses = await Promise.all(uploadPromises);
+    const failedUploads = responses.filter(r => !r.ok);
+
+    if (failedUploads.length > 0) {
+      throw new Error(`${failedUploads.length} file(s) failed to upload`);
     }
 
-    const data = await response.json();
+    // Parse all responses
+    const results = await Promise.all(responses.map(r => r.json()));
+    console.log('[Storage] Upload successful:', results);
+
+    // BUG FIX #2: Show success notification
     showSuccessNotification(`Successfully uploaded ${files.length} file(s)`);
 
     // Clear file input
