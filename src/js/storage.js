@@ -825,8 +825,8 @@ function renderListView(folders, files) {
           <span class="text-sm font-medium text-gray-900">${escapeHtml(file.filename)}</span>
         </div>
       </td>
-      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${escapeHtml(file.uploaded_by_name || 'Unknown')}</td>
-      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatDate(file.updated_at)}</td>
+      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${escapeHtml(file.created_by_username || 'Unknown')}</td>
+      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatDate(file.created_at)}</td>
       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatFileSize(file.file_size)}</td>
       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
         <button class="text-gray-400 hover:text-gray-600" onclick="event.stopPropagation(); showFileMenu('${file.id}', event)">
