@@ -20,6 +20,14 @@ const storageState = {
   files: [],
   loadingFolders: false,
   loadingContent: false,
+  // Search, sort, and filter state
+  searchQuery: '',
+  sortBy: 'name',
+  sortOrder: 'asc',
+  sourceFilter: 'all',
+  totalResults: 0,
+  currentPage: 1,
+  totalPages: 0,
 };
 
 // ============================================================
@@ -74,6 +82,71 @@ function setupEventListeners() {
   // View toggle buttons
   document.getElementById('gridViewBtn')?.addEventListener('click', () => switchView('grid'));
   document.getElementById('listViewBtn')?.addEventListener('click', () => switchView('list'));
+
+  // Search, sort, and filter controls
+  const searchInput = document.getElementById('searchInput');
+  const clearSearchBtn = document.getElementById('clearSearchBtn');
+  const sortSelect = document.getElementById('sortSelect');
+  const sortOrderBtn = document.getElementById('sortOrderBtn');
+  const sourceFilter = document.getElementById('sourceFilter');
+
+  // Search with debounce
+  let searchTimeout;
+  searchInput?.addEventListener('input', (e) => {
+    const query = e.target.value;
+    clearSearchBtn?.classList.toggle('hidden', !query);
+
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+      storageState.searchQuery = query;
+      storageState.currentPage = 1;
+      loadFolderContents();
+    }, 500); // 500ms debounce
+  });
+
+  // Clear search
+  clearSearchBtn?.addEventListener('click', () => {
+    searchInput.value = '';
+    storageState.searchQuery = '';
+    storageState.currentPage = 1;
+    clearSearchBtn.classList.add('hidden');
+    loadFolderContents();
+  });
+
+  // Sort by dropdown
+  sortSelect?.addEventListener('change', (e) => {
+    storageState.sortBy = e.target.value;
+    storageState.currentPage = 1;
+    loadFolderContents();
+  });
+
+  // Sort order toggle
+  sortOrderBtn?.addEventListener('click', () => {
+    const currentOrder = sortOrderBtn.dataset.order;
+    const newOrder = currentOrder === 'asc' ? 'desc' : 'asc';
+    sortOrderBtn.dataset.order = newOrder;
+    storageState.sortOrder = newOrder;
+    storageState.currentPage = 1;
+
+    // Update icon
+    const icon = document.getElementById('sortOrderIcon');
+    if (newOrder === 'asc') {
+      icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>';
+      sortOrderBtn.title = 'Sort ascending';
+    } else {
+      icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h6m3 0h9m-9 4h13m-5 8l-4 4m0 0l-4-4m4 4V8"></path>';
+      sortOrderBtn.title = 'Sort descending';
+    }
+
+    loadFolderContents();
+  });
+
+  // Source filter
+  sourceFilter?.addEventListener('change', (e) => {
+    storageState.sourceFilter = e.target.value;
+    storageState.currentPage = 1;
+    loadFolderContents();
+  });
 }
 
 // ============================================================
@@ -308,6 +381,45 @@ function renderBreadcrumbs() {
 // ============================================================
 // FOLDER CONTENTS (FILES + SUBFOLDERS)
 // ============================================================
+
+/**
+ * Update the results count display
+ */
+function updateResultsCount() {
+  const resultsCountEl = document.getElementById('resultsCount');
+  if (!resultsCountEl) return;
+
+  // ROOT VIEW: Show pagination results
+  if (!storageState.currentMatterId) {
+    const start = storageState.totalResults > 0 ? (storageState.currentPage - 1) * 100 + 1 : 0;
+    const end = Math.min(storageState.currentPage * 100, storageState.totalResults);
+
+    if (storageState.totalResults === 0) {
+      resultsCountEl.textContent = 'No results found';
+    } else if (storageState.searchQuery || storageState.sourceFilter !== 'all') {
+      // Show filtered results message
+      resultsCountEl.textContent = `Showing ${start}-${end} of ${storageState.totalResults} results`;
+    } else {
+      // Show total count
+      resultsCountEl.textContent = `${storageState.totalResults} matter${storageState.totalResults !== 1 ? 's' : ''}`;
+    }
+  } else {
+    // MATTER VIEW: Show folder and file counts
+    const folderCount = storageState.folders.length;
+    const fileCount = storageState.files.length;
+    const total = folderCount + fileCount;
+
+    if (total === 0) {
+      resultsCountEl.textContent = 'Empty folder';
+    } else {
+      const parts = [];
+      if (fileCount > 0) parts.push(`${fileCount} file${fileCount !== 1 ? 's' : ''}`);
+      if (folderCount > 0) parts.push(`${folderCount} folder${folderCount !== 1 ? 's' : ''}`);
+      resultsCountEl.textContent = parts.join(' • ');
+    }
+  }
+}
+
 async function loadFolderContents() {
   console.log('[Storage] Loading folder contents:', storageState.currentFolderId);
   storageState.loadingContent = true;
@@ -325,7 +437,25 @@ async function loadFolderContents() {
   try {
     // ROOT VIEW: Load all matters as folders from /api/v1/storage/root
     if (!storageState.currentMatterId) {
-      const response = await api.get('/api/v1/storage/root?page=1&limit=100&sort=name&order=asc');
+      // Build query parameters from state
+      const params = new URLSearchParams({
+        page: storageState.currentPage,
+        limit: 100,
+        sort: storageState.sortBy,
+        order: storageState.sortOrder
+      });
+
+      // Add optional search parameter
+      if (storageState.searchQuery) {
+        params.append('search', storageState.searchQuery);
+      }
+
+      // Add source filter (if not 'all')
+      if (storageState.sourceFilter !== 'all') {
+        params.append('source', storageState.sourceFilter);
+      }
+
+      const response = await api.get(`/api/v1/storage/root?${params.toString()}`);
 
       if (response.success && response.matters) {
         // Convert matters to folder-like objects
@@ -342,6 +472,16 @@ async function loadFolderContents() {
           updated_at: matter.updated_at
         }));
         storageState.files = [];
+
+        // Update pagination state from response
+        if (response.pagination) {
+          storageState.totalResults = response.pagination.total;
+          storageState.totalPages = response.pagination.total_pages;
+        }
+
+        // Update results count display
+        updateResultsCount();
+
         renderFolderContents();
       } else {
         throw new Error(response.error || 'Failed to load matters');
@@ -365,6 +505,7 @@ async function loadFolderContents() {
     if (filesResponse.success) {
       storageState.files = filesResponse.files || [];
       updateBreadcrumbs();
+      updateResultsCount();
       renderFolderContents();
     } else {
       throw new Error(filesResponse.error || 'Failed to load folder contents');
