@@ -350,7 +350,7 @@ ADD COLUMN external_url TEXT;
   "chunk_count": 15,
   "vector_count": 15,
   "metadata": {
-    "drive_folder": "/Shared Drives/Legal/Estate Planning",
+    "drive_folder": "/My Drives/Legal/Estate Planning",
     "owner": "attorney@firm.com",
     "last_modified_by": "paralegal@firm.com"
   }

@@ -858,7 +858,20 @@ app.on('web-contents-created', (event, contents) => {
         // Build the correct path to public_html using the cross-platform helper
         const publicHtmlPath = path.join(__dirname, 'public_html');
         const fullPath = path.join(publicHtmlPath, pagePath);
-        const correctPath = createFileUrl(fullPath);
+        let correctPath = createFileUrl(fullPath);
+
+        // Preserve query string and hash from original URL
+        logInfo(`[Navigation] parsedUrl.search: ${parsedUrl.search}`);
+        logInfo(`[Navigation] parsedUrl.hash: ${parsedUrl.hash}`);
+
+        if (parsedUrl.search) {
+          correctPath += parsedUrl.search;
+          logInfo(`[Navigation] Added search: ${correctPath}`);
+        }
+        if (parsedUrl.hash) {
+          correctPath += parsedUrl.hash;
+          logInfo(`[Navigation] Added hash: ${correctPath}`);
+        }
 
         logInfo(`[Navigation] Final path: ${navigationUrl} -> ${correctPath}`);
         navigationEvent.preventDefault();
