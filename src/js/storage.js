@@ -225,8 +225,8 @@ async function loadFolderTree() {
     else {
       const response = await api.get(`/api/v1/storage/folders?matter_id=${storageState.currentMatterId}`);
 
-      if (response.success) {
-        storageState.folders = response.folders || [];
+      if (response.status === 'success' || response.data) {
+        storageState.folders = response.data?.folders || response.folders || [];
         renderFolderTree();
       } else {
         throw new Error(response.error || 'Failed to load folders');
@@ -583,8 +583,8 @@ async function loadFolderContents() {
     // MATTER VIEW: Fetch folders and files from API (matter-scoped)
     const foldersResponse = await api.get(`/api/v1/storage/folders?matter_id=${storageState.currentMatterId}`);
 
-    if (foldersResponse.success) {
-      storageState.folders = foldersResponse.folders || [];
+    if (foldersResponse.status === 'success' || foldersResponse.data || foldersResponse.folders) {
+      storageState.folders = foldersResponse.data?.folders || foldersResponse.folders || [];
     } else {
       console.warn('[Storage] Failed to load folders:', foldersResponse.error);
       storageState.folders = [];
@@ -593,8 +593,8 @@ async function loadFolderContents() {
     const folderParam = storageState.currentFolderId ? `&folder_id=${storageState.currentFolderId}` : '';
     const filesResponse = await api.get(`/api/v1/storage/files?matter_id=${storageState.currentMatterId}${folderParam}`);
 
-    if (filesResponse.success) {
-      storageState.files = filesResponse.files || [];
+    if (filesResponse.files || filesResponse.data || filesResponse.status === 'success') {
+      storageState.files = filesResponse.data?.files || filesResponse.files || [];
       buildFolderPath();  // Build and render breadcrumbs
       updateResultsCount();
       renderFolderContents();
