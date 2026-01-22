@@ -363,7 +363,9 @@ function navigateToMatter(matterId, matterName) {
     matter_id: matterId,
     matter_name: matterName
   });
-  window.location.href = `/storage.html?${params.toString()}`;
+  console.log("[Storage] Would navigate to:", `/storage.html?${params.toString()}`);
+  // COMMENTED OUT FOR DEBUGGING - uncomment to enable navigation
+  // window.location.href = `/storage.html?${params.toString()}`;
 }
 
 function buildFolderPath() {
@@ -443,7 +445,9 @@ function handleFolderClick(element) {
     isMatter: element.dataset.isMatter,
     matterId: element.dataset.matterId,
     folderId: element.dataset.folderId,
-    name: element.dataset.name
+    name: element.dataset.name,
+    currentMatterId: storageState.currentMatterId,
+    currentFolderId: storageState.currentFolderId
   });
 
   const isMatter = element.dataset.isMatter === 'true';
@@ -451,10 +455,20 @@ function handleFolderClick(element) {
 
   if (isMatter) {
     const matterId = element.dataset.matterId;
+    if (!matterId) {
+      console.error('[Storage] No matter ID found in dataset');
+      showErrorNotification('Cannot navigate: missing matter ID');
+      return;
+    }
     console.log('[Storage] Navigating to matter:', matterId, name);
     navigateToMatter(matterId, name);
   } else {
     const folderId = element.dataset.folderId;
+    if (!folderId) {
+      console.error('[Storage] No folder ID found in dataset');
+      showErrorNotification('Cannot navigate: missing folder ID');
+      return;
+    }
     console.log('[Storage] Navigating to folder:', folderId, name);
     navigateToFolder(folderId, name);
   }
