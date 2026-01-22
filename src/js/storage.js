@@ -405,14 +405,24 @@ function renderBreadcrumbs() {
  * Handle folder/matter card click using data attributes
  */
 function handleFolderClick(element) {
+  console.log('[Storage] handleFolderClick called', {
+    dataset: element.dataset,
+    isMatter: element.dataset.isMatter,
+    matterId: element.dataset.matterId,
+    folderId: element.dataset.folderId,
+    name: element.dataset.name
+  });
+
   const isMatter = element.dataset.isMatter === 'true';
   const name = element.dataset.name;
 
   if (isMatter) {
     const matterId = element.dataset.matterId;
+    console.log('[Storage] Navigating to matter:', matterId, name);
     navigateToMatter(matterId, name);
   } else {
     const folderId = element.dataset.folderId;
+    console.log('[Storage] Navigating to folder:', folderId, name);
     navigateToFolder(folderId, name);
   }
 }
