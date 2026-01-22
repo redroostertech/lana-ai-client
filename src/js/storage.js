@@ -402,6 +402,22 @@ function renderBreadcrumbs() {
 // ============================================================
 
 /**
+ * Handle folder/matter card click using data attributes
+ */
+function handleFolderClick(element) {
+  const isMatter = element.dataset.isMatter === 'true';
+  const name = element.dataset.name;
+
+  if (isMatter) {
+    const matterId = element.dataset.matterId;
+    navigateToMatter(matterId, name);
+  } else {
+    const folderId = element.dataset.folderId;
+    navigateToFolder(folderId, name);
+  }
+}
+
+/**
  * Update the results count display
  */
 function updateResultsCount() {
@@ -595,11 +611,6 @@ function renderGridView(folders, files) {
   if (!gridViewEl) return;
 
   const folderCards = folders.map(folder => {
-    // Check if this is a matter (at root view) or a regular folder
-    const clickHandler = folder.isMatter
-      ? `navigateToMatter('${folder.matter_id}', '${escapeHtml(folder.name)}')`
-      : `navigateToFolder('${folder.id}', '${escapeHtml(folder.name)}')`;
-
     // For matters at root view, show both name and matter_id
     const displayHtml = folder.isMatter
       ? `
@@ -612,10 +623,16 @@ function renderGridView(folders, files) {
         <p class="text-xs text-gray-500 mt-1">${folder.document_count || 0} files</p>
       `;
 
+    // Use data attributes to avoid escaping issues
+    const dataAttrs = folder.isMatter
+      ? `data-is-matter="true" data-matter-id="${escapeHtml(folder.matter_id)}" data-name="${escapeHtml(folder.name)}"`
+      : `data-is-matter="false" data-folder-id="${folder.id}" data-name="${escapeHtml(folder.name)}"`;
+
     return `
     <div
       class="grid-item bg-white rounded-lg border border-gray-200 p-4 cursor-pointer hover:shadow-md transition-shadow relative"
-      onclick="${clickHandler}"
+      ${dataAttrs}
+      onclick="handleFolderClick(this)"
     >
       <button
         class="absolute top-2 right-2 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"
@@ -667,10 +684,10 @@ function renderListView(folders, files) {
   if (!listViewBodyEl) return;
 
   const folderRows = folders.map(folder => {
-    // Check if this is a matter (at root view) or a regular folder
-    const clickHandler = folder.isMatter
-      ? `navigateToMatter('${folder.matter_id}', '${escapeHtml(folder.name)}')`
-      : `navigateToFolder('${folder.id}', '${escapeHtml(folder.name)}')`;
+    // Use data attributes to avoid escaping issues
+    const dataAttrs = folder.isMatter
+      ? `data-is-matter="true" data-matter-id="${escapeHtml(folder.matter_id)}" data-name="${escapeHtml(folder.name)}"`
+      : `data-is-matter="false" data-folder-id="${folder.id}" data-name="${escapeHtml(folder.name)}"`;
 
     // For matters at root view, show both name and matter_id
     const displayHtml = folder.isMatter
@@ -700,7 +717,7 @@ function renderListView(folders, files) {
       : `${folder.document_count || 0} items`;
 
     return `
-    <tr class="hover:bg-gray-50 cursor-pointer" onclick="${clickHandler}">
+    <tr class="hover:bg-gray-50 cursor-pointer" ${dataAttrs} onclick="handleFolderClick(this)">
       <td class="px-6 py-4">
         <input type="checkbox" class="rounded text-indigo-600" onclick="event.stopPropagation()">
       </td>
@@ -1225,6 +1242,7 @@ function hidePreloader() {
 }
 
 // Export functions for global access
+window.handleFolderClick = handleFolderClick;
 window.navigateToFolder = navigateToFolder;
 window.navigateToMatter = navigateToMatter;
 window.toggleFolder = toggleFolder;
