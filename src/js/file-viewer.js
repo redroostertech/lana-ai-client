@@ -15,6 +15,21 @@ const viewerState = {
 };
 
 // ============================================================
+// HELPER FUNCTIONS
+// ============================================================
+function escapeHtml(text) {
+  if (!text) return '';
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return String(text).replace(/[&<>"']/g, m => map[m]);
+}
+
+// ============================================================
 // OPEN FILE VIEWER
 // ============================================================
 async function openFileViewer(fileId) {
@@ -166,7 +181,22 @@ function loadMetadata(file) {
 
   // Populate View Mode (readonly)
   document.getElementById('metaDocTypeView').textContent = formatDocumentType(metadata.document_type) || 'Not specified';
-  document.getElementById('metaTagsView').textContent = metadata.tags || 'No tags';
+
+  // Render tags as capsules
+  const tagsView = document.getElementById('metaTagsView');
+  if (metadata.tags && metadata.tags.trim()) {
+    const tags = metadata.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+    if (tags.length > 0) {
+      tagsView.innerHTML = tags.map(tag =>
+        `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 mr-1 mb-1">${escapeHtml(tag)}</span>`
+      ).join('');
+    } else {
+      tagsView.textContent = 'No tags';
+    }
+  } else {
+    tagsView.textContent = 'No tags';
+  }
+
   document.getElementById('metaNotesView').textContent = metadata.notes || 'No notes';
 
   // Populate Edit Mode (editable fields)
@@ -283,7 +313,22 @@ async function saveMetadata() {
 
       // Update view mode fields
       document.getElementById('metaDocTypeView').textContent = formatDocumentType(metadata.document_type) || 'Not specified';
-      document.getElementById('metaTagsView').textContent = metadata.tags || 'No tags';
+
+      // Render tags as capsules
+      const tagsView = document.getElementById('metaTagsView');
+      if (metadata.tags && metadata.tags.trim()) {
+        const tags = metadata.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+        if (tags.length > 0) {
+          tagsView.innerHTML = tags.map(tag =>
+            `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 mr-1 mb-1">${escapeHtml(tag)}</span>`
+          ).join('');
+        } else {
+          tagsView.textContent = 'No tags';
+        }
+      } else {
+        tagsView.textContent = 'No tags';
+      }
+
       document.getElementById('metaNotesView').textContent = metadata.notes || 'No notes';
 
       showSuccessNotification('Metadata saved successfully');
