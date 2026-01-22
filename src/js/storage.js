@@ -13,6 +13,7 @@
 // ============================================================
 const storageState = {
   currentMatterId: null,
+  currentMatterName: null,  // Store matter name for breadcrumbs
   currentFolderId: null,
   currentFolderPath: [],
   viewMode: 'grid', // 'grid' or 'list'
@@ -41,9 +42,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderMenu('#mainNav');
   }
 
-  // Get matter_id and folder_id from URL params (optional)
+  // Get matter_id, matter_name, and folder_id from URL params (optional)
   const urlParams = new URLSearchParams(window.location.search);
   storageState.currentMatterId = urlParams.get('matter_id') || null;
+  storageState.currentMatterName = urlParams.get('matter_name') || null;
   storageState.currentFolderId = urlParams.get('folder_id') || null;
 
   // If no matter_id, we're at ROOT level - show all matters as folders
@@ -57,7 +59,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
 
   // Load initial data
-  await loadFolderContents();
+  if (storageState.currentMatterId) {
+    // Inside a matter: load folder tree and contents
+    await loadFolderTree();
+    await loadFolderContents();
+    // Initialize breadcrumbs for matter view
+    buildFolderPath();
+  } else {
+    // Root view: just load all matters
+    await loadFolderContents();
+  }
 
   // Hide preloader and show content
   hidePreloader();
@@ -314,8 +325,12 @@ function navigateToFolder(folderId, folderName) {
 function navigateToMatter(matterId, matterName) {
   console.log('[Storage] Navigating to matter:', matterId, matterName);
 
-  // Navigate to storage.html with matter_id parameter
-  window.location.href = `/storage.html?matter_id=${matterId}`;
+  // Navigate to storage.html with matter_id and matter_name parameters
+  const params = new URLSearchParams({
+    matter_id: matterId,
+    matter_name: matterName
+  });
+  window.location.href = `/storage.html?${params.toString()}`;
 }
 
 function buildFolderPath() {
@@ -351,16 +366,20 @@ function renderBreadcrumbs() {
 
   // Add matter name if we're inside a matter
   if (storageState.currentMatterId) {
-    const currentMatter = storageState.folders.find(f => f.isMatter && f.matter_id === storageState.currentMatterId);
-    const matterName = currentMatter ? currentMatter.name : storageState.currentMatterId;
+    // Use stored matter name from URL params or fallback to matter_id
+    const matterName = storageState.currentMatterName || storageState.currentMatterId;
 
     html += `<span class="breadcrumb-separator">/</span>`;
     if (!storageState.currentFolderId) {
       // We're at matter root
       html += `<span class="text-gray-900 font-medium">${escapeHtml(matterName)}</span>`;
     } else {
-      // We're in a subfolder
-      html += `<a href="/storage.html?matter_id=${storageState.currentMatterId}" class="hover:text-indigo-600">${escapeHtml(matterName)}</a>`;
+      // We're in a subfolder - make matter name clickable
+      const params = new URLSearchParams({
+        matter_id: storageState.currentMatterId,
+        matter_name: matterName
+      });
+      html += `<a href="/storage.html?${params.toString()}" class="hover:text-indigo-600">${escapeHtml(matterName)}</a>`;
     }
   }
 
@@ -504,7 +523,7 @@ async function loadFolderContents() {
 
     if (filesResponse.success) {
       storageState.files = filesResponse.files || [];
-      updateBreadcrumbs();
+      buildFolderPath();  // Build and render breadcrumbs
       updateResultsCount();
       renderFolderContents();
     } else {
