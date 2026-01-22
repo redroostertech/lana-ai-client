@@ -131,27 +131,55 @@ async function loadFileContent(file) {
 // FILE TYPE LOADERS
 // ============================================================
 async function loadPDF(file) {
-  const iframe = document.getElementById('viewerIframe');
-  const url = `${api.baseUrl}/api/v1/storage/files/${file.id}/download`;
+  try {
+    const response = await fetch(`${api.baseUrl}/api/v1/storage/files/${file.id}/download`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+      }
+    });
 
-  iframe.src = url;
-  iframe.classList.remove('hidden');
+    if (!response.ok) throw new Error('Failed to fetch PDF');
 
-  hideViewerLoading();
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+
+    const iframe = document.getElementById('viewerIframe');
+    iframe.src = objectUrl;
+    iframe.classList.remove('hidden');
+
+    hideViewerLoading();
+  } catch (error) {
+    console.error('[FileViewer] PDF load error:', error);
+    showViewerError('Failed to load PDF: ' + error.message);
+  }
 }
 
 async function loadImage(file) {
-  const img = document.getElementById('viewerImage');
-  const url = `${api.baseUrl}/api/v1/storage/files/${file.id}/download`;
+  try {
+    const response = await fetch(`${api.baseUrl}/api/v1/storage/files/${file.id}/download`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+      }
+    });
 
-  img.src = url;
-  img.onload = () => {
-    img.classList.remove('hidden');
-    hideViewerLoading();
-  };
-  img.onerror = () => {
-    showViewerError('Failed to load image');
-  };
+    if (!response.ok) throw new Error('Failed to fetch image');
+
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+
+    const img = document.getElementById('viewerImage');
+    img.src = objectUrl;
+    img.onload = () => {
+      img.classList.remove('hidden');
+      hideViewerLoading();
+    };
+    img.onerror = () => {
+      showViewerError('Failed to load image');
+    };
+  } catch (error) {
+    console.error('[FileViewer] Image load error:', error);
+    showViewerError('Failed to load image: ' + error.message);
+  }
 }
 
 async function loadText(file) {
