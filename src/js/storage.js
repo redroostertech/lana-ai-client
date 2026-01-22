@@ -594,8 +594,26 @@ async function loadFolderContents() {
       storageState.folders = [];
     }
 
-    const folderParam = storageState.currentFolderId ? `&folder_id=${storageState.currentFolderId}` : '';
-    const filesResponse = await api.get(`/api/v1/storage/files?matter_id=${storageState.currentMatterId}${folderParam}`);
+    // Build query parameters for files API with search support
+    const fileParams = new URLSearchParams({
+      matter_id: storageState.currentMatterId
+    });
+
+    if (storageState.currentFolderId) {
+      fileParams.append('folder_id', storageState.currentFolderId);
+    }
+
+    // Add search query if present
+    if (storageState.searchQuery) {
+      fileParams.append('search', storageState.searchQuery);
+    }
+
+    // Add source filter if not 'all'
+    if (storageState.sourceFilter !== 'all') {
+      fileParams.append('source', storageState.sourceFilter);
+    }
+
+    const filesResponse = await api.get(`/api/v1/storage/files?${fileParams.toString()}`);
 
     if (filesResponse.files || filesResponse.data || filesResponse.status === 'success') {
       storageState.files = filesResponse.data?.files || filesResponse.files || [];
