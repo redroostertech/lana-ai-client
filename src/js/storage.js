@@ -619,7 +619,7 @@ function renderGridView(folders, files) {
     >
       <button
         class="absolute top-2 right-2 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-        onclick="showFolderMenu('${folder.id}', event)"
+        onclick="event.stopPropagation(); showFolderMenu('${folder.id}', event)"
         style="opacity: 1"
       >
         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -643,7 +643,7 @@ function renderGridView(folders, files) {
     >
       <button
         class="absolute top-2 right-2 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-        onclick="showFileMenu('${file.id}', event)"
+        onclick="event.stopPropagation(); showFileMenu('${file.id}', event)"
         style="opacity: 1"
       >
         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -709,7 +709,7 @@ function renderListView(folders, files) {
       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatDate(folder.created_at)}</td>
       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${sizeDisplay}</td>
       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-        <button class="text-gray-400 hover:text-gray-600" onclick="showFolderMenu('${folder.id}', event)">
+        <button class="text-gray-400 hover:text-gray-600" onclick="event.stopPropagation(); showFolderMenu('${folder.id}', event)">
           <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
             <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path>
           </svg>
@@ -734,7 +734,7 @@ function renderListView(folders, files) {
       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatDate(file.updated_at)}</td>
       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatFileSize(file.file_size)}</td>
       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-        <button class="text-gray-400 hover:text-gray-600" onclick="showFileMenu('${file.id}', event)">
+        <button class="text-gray-400 hover:text-gray-600" onclick="event.stopPropagation(); showFileMenu('${file.id}', event)">
           <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
             <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path>
           </svg>
