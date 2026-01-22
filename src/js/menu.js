@@ -113,7 +113,7 @@ const MenuConfig = {
             onClick: 'openConversationSearchModal'
           },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
-          { id: 'storage', label: 'Shared Drive', href: '/storage.html', icon: 'folder' },
+          { id: 'storage', label: 'My Drive', href: '/storage.html', icon: 'folder' },
           { id: 'connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
           { id: 'insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
         ]
@@ -213,7 +213,7 @@ const MenuConfig = {
             onClick: 'openConversationSearchModal'
           },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
-          { id: 'storage', label: 'Shared Drive', href: '/storage.html', icon: 'folder' },
+          { id: 'storage', label: 'My Drive', href: '/storage.html', icon: 'folder' },
           { id: 'connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
           { id: 'insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
         ]
@@ -272,7 +272,7 @@ const MenuConfig = {
             onClick: 'openConversationSearchModal'
           },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
-          { id: 'storage', label: 'Shared Drive', href: '/storage.html', icon: 'folder' },
+          { id: 'storage', label: 'My Drive', href: '/storage.html', icon: 'folder' },
           { id: 'connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
           { id: 'insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
         ]
@@ -331,7 +331,7 @@ const MenuConfig = {
             onClick: 'openConversationSearchModal'
           },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
-          { id: 'storage', label: 'Shared Drive', href: '/storage.html', icon: 'folder' },
+          { id: 'storage', label: 'My Drive', href: '/storage.html', icon: 'folder' },
           { id: 'connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
           { id: 'insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
         ]
@@ -390,7 +390,7 @@ const MenuConfig = {
             onClick: 'openConversationSearchModal'
           },
           { id: 'chat-matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
-          { id: 'chat-storage', label: 'Shared Drive', href: '/storage.html', icon: 'folder' },
+          { id: 'chat-storage', label: 'My Drive', href: '/storage.html', icon: 'folder' },
           { id: 'chat-connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
           { id: 'chat-insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
         ]

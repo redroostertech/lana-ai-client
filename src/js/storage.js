@@ -43,6 +43,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Get matter_id, matter_name, and folder_id from URL params (optional)
+  console.log('[Storage] window.location.search:', window.location.search);
+  console.log('[Storage] window.location.href:', window.location.href);
+
   const urlParams = new URLSearchParams(window.location.search);
   storageState.currentMatterId = urlParams.get('matter_id') || null;
   storageState.currentMatterName = urlParams.get('matter_name') || null;
@@ -51,6 +54,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // If no matter_id, we're at ROOT level - show all matters as folders
   console.log('[Storage] Initialization:', {
     matterId: storageState.currentMatterId,
+    matterName: storageState.currentMatterName,
     folderId: storageState.currentFolderId,
     isRootView: !storageState.currentMatterId
   });
@@ -94,9 +98,9 @@ function updateViewButtons() {
     uploadBtn?.classList.remove('hidden');
     newFolderBtn?.classList.remove('hidden');
   } else {
-    // Root view: hide upload and new folder buttons
+    // Root view: hide upload button, but show new folder button (can create root folders)
     uploadBtn?.classList.add('hidden');
-    newFolderBtn?.classList.add('hidden');
+    newFolderBtn?.classList.remove('hidden');
   }
 }
 
@@ -370,24 +374,24 @@ function navigateToMatter(matterId, matterName) {
 function buildFolderPath() {
   storageState.currentFolderPath = [];
 
-  if (!storageState.currentFolderId) {
-    return; // At root
-  }
-
-  let currentId = storageState.currentFolderId;
-  while (currentId) {
-    const folder = storageState.folders.find(f => f.id === currentId);
-    if (folder) {
-      storageState.currentFolderPath.unshift({
-        id: folder.id,
-        name: folder.name,
-      });
-      currentId = folder.parent_folder_id;
-    } else {
-      break;
+  // Build folder path if we're in a subfolder
+  if (storageState.currentFolderId) {
+    let currentId = storageState.currentFolderId;
+    while (currentId) {
+      const folder = storageState.folders.find(f => f.id === currentId);
+      if (folder) {
+        storageState.currentFolderPath.unshift({
+          id: folder.id,
+          name: folder.name,
+        });
+        currentId = folder.parent_folder_id;
+      } else {
+        break;
+      }
     }
   }
 
+  // Always render breadcrumbs (even at matter root)
   renderBreadcrumbs();
 }
 
@@ -396,7 +400,7 @@ function renderBreadcrumbs() {
   if (!breadcrumbsEl) return;
 
   // Home link goes to root view (no matter selected)
-  let html = `<a href="/storage.html" class="hover:text-indigo-600">Home</a>`;
+  let html = `<a href="storage.html" class="hover:text-indigo-600 cursor-pointer">Home</a>`;
 
   // Add matter name if we're inside a matter
   if (storageState.currentMatterId) {
@@ -413,7 +417,7 @@ function renderBreadcrumbs() {
         matter_id: storageState.currentMatterId,
         matter_name: matterName
       });
-      html += `<a href="/storage.html?${params.toString()}" class="hover:text-indigo-600">${escapeHtml(matterName)}</a>`;
+      html += `<a href="storage.html?${params.toString()}" class="hover:text-indigo-600 cursor-pointer">${escapeHtml(matterName)}</a>`;
     }
   }
 
