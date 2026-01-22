@@ -364,8 +364,7 @@ function navigateToMatter(matterId, matterName) {
     matter_name: matterName
   });
   console.log("[Storage] Would navigate to:", `/storage.html?${params.toString()}`);
-  // COMMENTED OUT FOR DEBUGGING - uncomment to enable navigation
-  // window.location.href = `/storage.html?${params.toString()}`;
+  window.location.href = `/storage.html?${params.toString()}`;
 }
 
 function buildFolderPath() {
