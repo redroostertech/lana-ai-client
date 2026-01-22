@@ -70,9 +70,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadFolderContents();
   }
 
+  // Update UI based on current view
+  updateViewButtons();
+
   // Hide preloader and show content
   hidePreloader();
 });
+
+
+// ============================================================
+// VIEW MANAGEMENT
+// ============================================================
+
+/**
+ * Update button visibility based on current view (root vs matter)
+ */
+function updateViewButtons() {
+  const uploadBtn = document.getElementById('uploadBtn');
+  const newFolderBtn = document.getElementById('newFolderBtn');
+
+  if (storageState.currentMatterId) {
+    // Inside a matter: show upload and new folder buttons
+    uploadBtn?.classList.remove('hidden');
+    newFolderBtn?.classList.remove('hidden');
+  } else {
+    // Root view: hide upload and new folder buttons
+    uploadBtn?.classList.add('hidden');
+    newFolderBtn?.classList.add('hidden');
+  }
+}
 
 // ============================================================
 // EVENT LISTENERS
@@ -302,6 +328,13 @@ function toggleFolder(folderId) {
 function navigateToFolder(folderId, folderName) {
   console.log('[Storage] Navigating to folder:', folderId, folderName);
 
+  // Ensure we have a matter_id - folders can only exist within a matter
+  if (!storageState.currentMatterId) {
+    console.error('[Storage] Cannot navigate to folder without matter_id');
+    showErrorNotification('Cannot navigate to folder. Please select a matter first.');
+    return;
+  }
+
   // Update URL params
   const urlParams = new URLSearchParams(window.location.search);
   urlParams.set('matter_id', storageState.currentMatterId);
@@ -315,10 +348,10 @@ function navigateToFolder(folderId, folderName) {
   // Update state
   storageState.currentFolderId = folderId === 'root' ? null : folderId;
 
-  // Build folder path for breadcrumbs
+  // Build folder path for breadcrumbs (needs current folder state)
   buildFolderPath();
 
-  // Reload content
+  // Reload content - this will also reload folders if needed
   loadFolderContents();
 }
 
