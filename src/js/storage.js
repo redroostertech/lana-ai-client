@@ -94,11 +94,11 @@ function updateViewButtons() {
   const newFolderBtn = document.getElementById('newFolderBtn');
 
   if (storageState.currentMatterId) {
-    // Inside a matter: show upload and new folder buttons
+    // Inside a matter: show ONLY upload button (no subfolders yet)
     uploadBtn?.classList.remove('hidden');
-    newFolderBtn?.classList.remove('hidden');
+    newFolderBtn?.classList.add('hidden');
   } else {
-    // Root view: hide upload button, but show new folder button (can create root folders)
+    // Root view: show ONLY new folder button (creates matters)
     uploadBtn?.classList.add('hidden');
     newFolderBtn?.classList.remove('hidden');
   }
