@@ -734,7 +734,7 @@ function renderGridView(folders, files) {
   const fileCards = files.map(file => `
     <div
       class="grid-item bg-white rounded-lg border border-gray-200 p-4 cursor-pointer hover:shadow-md transition-shadow relative"
-      onclick="downloadFile('${file.id}')"
+      onclick="openFileViewer('${file.id}')"
     >
       <button
         class="absolute top-2 right-2 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"
@@ -815,7 +815,7 @@ function renderListView(folders, files) {
   }).join('');
 
   const fileRows = files.map(file => `
-    <tr class="hover:bg-gray-50 cursor-pointer" onclick="downloadFile('${file.id}')">
+    <tr class="hover:bg-gray-50 cursor-pointer" onclick="openFileViewer('${file.id}')">
       <td class="px-6 py-4">
         <input type="checkbox" class="rounded text-indigo-600" onclick="event.stopPropagation()">
       </td>
