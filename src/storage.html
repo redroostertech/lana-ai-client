@@ -20,6 +20,7 @@
   <script src="js/conversation-search-modal.js"></script>
   <script src="js/notifications.js"></script>
   <script src="js/activity.js"></script>
+  <script src="js/vendor/mammoth.min.js"></script>
   <script src="js/file-viewer.js" defer></script>
   <script src="js/storage.js" defer></script>
 
@@ -442,6 +443,34 @@
             <iframe id="viewerIframe" class="hidden w-full h-full bg-white rounded-lg shadow-sm"></iframe>
             <pre id="viewerText" class="hidden w-full h-full bg-white rounded-lg shadow-sm p-6 overflow-auto text-sm font-mono whitespace-pre-wrap"></pre>
             <img id="viewerImage" class="hidden max-w-full max-h-full mx-auto rounded-lg shadow-sm object-contain">
+            <div id="viewerDocx" class="hidden w-full h-full bg-white rounded-lg shadow-sm p-6 overflow-auto prose prose-sm max-w-none">
+              <style>
+                #viewerDocx table.docx-table {
+                  width: 100%;
+                  border-collapse: collapse;
+                  margin: 1em 0;
+                  border: 1px solid #e5e7eb;
+                }
+                #viewerDocx table.docx-table td,
+                #viewerDocx table.docx-table th {
+                  border: 1px solid #e5e7eb;
+                  padding: 0.5em;
+                  text-align: left;
+                }
+                #viewerDocx table.docx-table th {
+                  background-color: #f3f4f6;
+                  font-weight: 600;
+                }
+                #viewerDocx table.docx-table tr:nth-child(even) {
+                  background-color: #f9fafb;
+                }
+                #viewerDocx img {
+                  max-width: 100%;
+                  height: auto;
+                  margin: 1em 0;
+                }
+              </style>
+            </div>
           </div>
 
           <!-- Metadata Sidebar (Right - 35%) -->

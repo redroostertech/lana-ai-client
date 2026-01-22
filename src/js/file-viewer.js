@@ -101,6 +101,14 @@ async function loadFileContent(file) {
     if (mimeType === 'application/pdf' || ext === 'pdf') {
       await loadPDF(file);
     }
+    // Word documents (DOCX, DOC)
+    else if (
+      mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      mimeType === 'application/msword' ||
+      ['docx', 'doc'].includes(ext)
+    ) {
+      await loadDOCX(file);
+    }
     // Images
     else if (mimeType.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) {
       await loadImage(file);
@@ -165,6 +173,60 @@ async function loadText(file) {
     hideViewerLoading();
   } catch (error) {
     showViewerError('Failed to load text file');
+  }
+}
+
+async function loadDOCX(file) {
+  try {
+    // Check if mammoth is available
+    if (typeof mammoth === 'undefined') {
+      throw new Error('Mammoth library not loaded');
+    }
+
+    const response = await fetch(`${api.baseUrl}/api/v1/storage/files/${file.id}/download`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+      }
+    });
+
+    if (!response.ok) throw new Error('Failed to fetch file');
+
+    const arrayBuffer = await response.arrayBuffer();
+    const container = document.getElementById('viewerDocx');
+
+    // Convert DOCX to HTML using Mammoth with style mapping
+    const result = await mammoth.convertToHtml({
+      arrayBuffer: arrayBuffer,
+      convertImage: mammoth.images.imgElement(function(image) {
+        return image.read("base64").then(function(imageBuffer) {
+          return {
+            src: "data:" + image.contentType + ";base64," + imageBuffer
+          };
+        });
+      }),
+      styleMap: [
+        "p[style-name='Heading 1'] => h1:fresh",
+        "p[style-name='Heading 2'] => h2:fresh",
+        "p[style-name='Heading 3'] => h3:fresh",
+        "p[style-name='Title'] => h1.document-title:fresh",
+        "r[style-name='Strong'] => strong",
+        "r[style-name='Emphasis'] => em",
+        "table => table.docx-table"
+      ]
+    });
+
+    container.innerHTML = result.value;
+    container.classList.remove('hidden');
+
+    // Log any warnings from mammoth
+    if (result.messages && result.messages.length > 0) {
+      console.log('[FileViewer] DOCX conversion warnings:', result.messages);
+    }
+
+    hideViewerLoading();
+  } catch (error) {
+    console.error('[FileViewer] DOCX load error:', error);
+    showViewerError('Failed to load Word document: ' + error.message);
   }
 }
 
@@ -395,6 +457,7 @@ function hideAllViewers() {
   document.getElementById('viewerIframe').classList.add('hidden');
   document.getElementById('viewerText').classList.add('hidden');
   document.getElementById('viewerImage').classList.add('hidden');
+  document.getElementById('viewerDocx').classList.add('hidden');
 }
 
 function closeFileViewer() {
