@@ -393,8 +393,8 @@
   </div>
 
     <!-- Document Viewer Modal with Metadata Sidebar -->
-    <div id="documentViewerModal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-7xl h-[90vh] flex flex-col">
+    <div id="documentViewerModal" class="hidden fixed inset-0 bg-black bg-opacity-75 z-50">
+      <div class="bg-white w-full h-full flex flex-col">
         <!-- Header -->
         <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
           <div class="flex items-center gap-3">
@@ -446,14 +446,24 @@
 
           <!-- Metadata Sidebar (Right - 35%) -->
           <div class="w-96 bg-white border-l border-gray-200 flex flex-col overflow-hidden">
-            <!-- Metadata Header -->
+            <!-- Metadata Header with View/Edit Toggle -->
             <div class="px-4 py-3 border-b border-gray-200 bg-gray-50">
-              <h4 class="text-sm font-semibold text-gray-900">Document Details</h4>
+              <div class="flex items-center justify-between">
+                <h4 class="text-sm font-semibold text-gray-900">Document Details</h4>
+                <div class="flex items-center gap-1 bg-white rounded-lg p-1 border border-gray-300">
+                  <button id="viewModeBtn" class="px-3 py-1 text-xs font-medium rounded transition-colors bg-indigo-100 text-indigo-700">
+                    View
+                  </button>
+                  <button id="editModeBtn" class="px-3 py-1 text-xs font-medium rounded transition-colors text-gray-600 hover:bg-gray-100">
+                    Edit
+                  </button>
+                </div>
+              </div>
             </div>
 
             <!-- Metadata Content (Scrollable) -->
             <div class="flex-1 overflow-y-auto p-4 space-y-4">
-              <!-- File Info (Read-only) -->
+              <!-- File Info (Always Read-only) -->
               <div class="bg-gray-50 rounded-lg p-3 border border-gray-200">
                 <div class="space-y-1 text-sm">
                   <div class="flex justify-between">
@@ -471,39 +481,58 @@
                 </div>
               </div>
 
-              <!-- Document Type (Editable) -->
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Document Type</label>
-                <select id="metaDocType" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                  <option value="">Auto-detect</option>
-                  <option value="contract">Contract</option>
-                  <option value="pleading">Pleading</option>
-                  <option value="deposition">Deposition</option>
-                  <option value="medical_record">Medical Record</option>
-                  <option value="police_report">Police Report</option>
-                  <option value="email">Email</option>
-                  <option value="correspondence">Correspondence</option>
-                  <option value="other">Other</option>
-                </select>
+              <!-- View Mode (Read-only metadata) -->
+              <div id="metaViewMode" class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Document Type</label>
+                  <div id="metaDocTypeView" class="text-sm text-gray-900">--</div>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Tags</label>
+                  <div id="metaTagsView" class="text-sm text-gray-900">--</div>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                  <div id="metaNotesView" class="text-sm text-gray-900 whitespace-pre-wrap">--</div>
+                </div>
               </div>
 
-              <!-- Tags (Editable) -->
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Tags</label>
-                <input type="text" id="metaTags" placeholder="e.g., important, draft" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                <p class="text-xs text-gray-500 mt-1">Separate with commas</p>
-              </div>
+              <!-- Edit Mode (Editable fields) -->
+              <div id="metaEditMode" class="hidden space-y-4">
+                <!-- Document Type (Editable) -->
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Document Type</label>
+                  <select id="metaDocType" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <option value="">Auto-detect</option>
+                    <option value="contract">Contract</option>
+                    <option value="pleading">Pleading</option>
+                    <option value="deposition">Deposition</option>
+                    <option value="medical_record">Medical Record</option>
+                    <option value="police_report">Police Report</option>
+                    <option value="email">Email</option>
+                    <option value="correspondence">Correspondence</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
 
-              <!-- Notes (Editable) -->
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
-                <textarea id="metaNotes" rows="4" placeholder="Add notes..." class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"></textarea>
-                <p class="text-xs text-gray-500 mt-1"><span id="metaNotesCount">0</span>/2000</p>
+                <!-- Tags (Editable) -->
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Tags</label>
+                  <input type="text" id="metaTags" placeholder="e.g., important, draft" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                  <p class="text-xs text-gray-500 mt-1">Separate with commas</p>
+                </div>
+
+                <!-- Notes (Editable) -->
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+                  <textarea id="metaNotes" rows="4" placeholder="Add notes..." class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"></textarea>
+                  <p class="text-xs text-gray-500 mt-1"><span id="metaNotesCount">0</span>/2000</p>
+                </div>
               </div>
             </div>
 
-            <!-- Metadata Actions Footer -->
-            <div class="px-4 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-end gap-2">
+            <!-- Metadata Actions Footer (Edit Mode Only) -->
+            <div id="metaActionsFooter" class="hidden px-4 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-end gap-2">
               <button id="metaCancelBtn" class="px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 rounded-lg font-medium">
                 Cancel
               </button>

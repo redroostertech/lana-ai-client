@@ -10,7 +10,8 @@
 const viewerState = {
   currentFile: null,
   originalMetadata: {},
-  metadataChanged: false
+  metadataChanged: false,
+  metadataMode: 'view' // 'view' or 'edit'
 };
 
 // ============================================================
@@ -158,11 +159,17 @@ async function loadText(file) {
 function loadMetadata(file) {
   // File info (read-only)
   document.getElementById('metaFileSize').textContent = formatFileSize(file.file_size);
-  document.getElementById('metaFileType').textContent = file.content_type || 'Unknown';
+  document.getElementById('metaFileType').textContent = formatMimeType(file.content_type);
   document.getElementById('metaUploadedAt').textContent = new Date(file.created_at).toLocaleDateString();
 
-  // Editable fields
   const metadata = file.metadata || {};
+
+  // Populate View Mode (readonly)
+  document.getElementById('metaDocTypeView').textContent = formatDocumentType(metadata.document_type) || 'Not specified';
+  document.getElementById('metaTagsView').textContent = metadata.tags || 'No tags';
+  document.getElementById('metaNotesView').textContent = metadata.notes || 'No notes';
+
+  // Populate Edit Mode (editable fields)
   document.getElementById('metaDocType').value = metadata.document_type || '';
   document.getElementById('metaTags').value = metadata.tags || '';
   document.getElementById('metaNotes').value = metadata.notes || '';
@@ -172,6 +179,60 @@ function loadMetadata(file) {
 
   // Track changes
   trackMetadataChanges();
+
+  // Initialize in view mode
+  setMetadataMode('view');
+}
+
+function formatDocumentType(type) {
+  if (!type) return null;
+
+  const typeMap = {
+    'contract': 'Contract',
+    'pleading': 'Pleading',
+    'deposition': 'Deposition',
+    'medical_record': 'Medical Record',
+    'police_report': 'Police Report',
+    'email': 'Email',
+    'correspondence': 'Correspondence',
+    'other': 'Other'
+  };
+
+  return typeMap[type] || type;
+}
+
+function setMetadataMode(mode) {
+  viewerState.metadataMode = mode;
+
+  const viewModeBtn = document.getElementById('viewModeBtn');
+  const editModeBtn = document.getElementById('editModeBtn');
+  const viewModePanel = document.getElementById('metaViewMode');
+  const editModePanel = document.getElementById('metaEditMode');
+  const actionsFooter = document.getElementById('metaActionsFooter');
+
+  if (mode === 'view') {
+    // Update button states
+    viewModeBtn.classList.add('bg-indigo-100', 'text-indigo-700');
+    viewModeBtn.classList.remove('text-gray-600', 'hover:bg-gray-100');
+    editModeBtn.classList.remove('bg-indigo-100', 'text-indigo-700');
+    editModeBtn.classList.add('text-gray-600', 'hover:bg-gray-100');
+
+    // Show view mode, hide edit mode
+    viewModePanel.classList.remove('hidden');
+    editModePanel.classList.add('hidden');
+    actionsFooter.classList.add('hidden');
+  } else {
+    // Update button states
+    editModeBtn.classList.add('bg-indigo-100', 'text-indigo-700');
+    editModeBtn.classList.remove('text-gray-600', 'hover:bg-gray-100');
+    viewModeBtn.classList.remove('bg-indigo-100', 'text-indigo-700');
+    viewModeBtn.classList.add('text-gray-600', 'hover:bg-gray-100');
+
+    // Show edit mode, hide view mode
+    viewModePanel.classList.add('hidden');
+    editModePanel.classList.remove('hidden');
+    actionsFooter.classList.remove('hidden');
+  }
 }
 
 function trackMetadataChanges() {
@@ -219,7 +280,16 @@ async function saveMetadata() {
     if (response.success || response.status === 'success') {
       viewerState.originalMetadata = metadata;
       viewerState.metadataChanged = false;
+
+      // Update view mode fields
+      document.getElementById('metaDocTypeView').textContent = formatDocumentType(metadata.document_type) || 'Not specified';
+      document.getElementById('metaTagsView').textContent = metadata.tags || 'No tags';
+      document.getElementById('metaNotesView').textContent = metadata.notes || 'No notes';
+
       showSuccessNotification('Metadata saved successfully');
+
+      // Switch back to view mode
+      setMetadataMode('view');
     } else {
       throw new Error(response.error || 'Failed to save metadata');
     }
@@ -240,6 +310,9 @@ function cancelMetadataChanges() {
 
   viewerState.metadataChanged = false;
   updateNotesCount();
+
+  // Switch back to view mode
+  setMetadataMode('view');
 }
 
 // ============================================================
@@ -307,12 +380,84 @@ function formatFileSize(bytes) {
   return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 }
 
+function formatMimeType(mimeType) {
+  if (!mimeType) return 'Unknown';
+
+  // Common MIME types map
+  const mimeTypeMap = {
+    // Documents
+    'application/pdf': 'PDF Document',
+    'application/msword': 'Word Document',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'Word Document',
+    'application/vnd.ms-excel': 'Excel Spreadsheet',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'Excel Spreadsheet',
+    'application/vnd.ms-powerpoint': 'PowerPoint Presentation',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'PowerPoint Presentation',
+
+    // Text files
+    'text/plain': 'Text File',
+    'text/html': 'HTML Document',
+    'text/css': 'CSS File',
+    'text/javascript': 'JavaScript File',
+    'application/json': 'JSON File',
+    'text/csv': 'CSV File',
+    'text/xml': 'XML File',
+    'application/xml': 'XML File',
+
+    // Images
+    'image/jpeg': 'JPEG Image',
+    'image/png': 'PNG Image',
+    'image/gif': 'GIF Image',
+    'image/svg+xml': 'SVG Image',
+    'image/webp': 'WebP Image',
+    'image/bmp': 'Bitmap Image',
+    'image/tiff': 'TIFF Image',
+
+    // Archives
+    'application/zip': 'ZIP Archive',
+    'application/x-rar-compressed': 'RAR Archive',
+    'application/x-7z-compressed': '7-Zip Archive',
+    'application/gzip': 'GZIP Archive',
+
+    // Other
+    'application/octet-stream': 'Binary File',
+    'video/mp4': 'MP4 Video',
+    'audio/mpeg': 'MP3 Audio',
+  };
+
+  // Check exact match
+  if (mimeTypeMap[mimeType]) {
+    return mimeTypeMap[mimeType];
+  }
+
+  // Try generic patterns
+  if (mimeType.startsWith('image/')) {
+    return 'Image File';
+  }
+  if (mimeType.startsWith('video/')) {
+    return 'Video File';
+  }
+  if (mimeType.startsWith('audio/')) {
+    return 'Audio File';
+  }
+  if (mimeType.startsWith('text/')) {
+    return 'Text File';
+  }
+
+  // Return original MIME type if no match found
+  return mimeType;
+}
+
 // ============================================================
 // EVENT LISTENERS
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
   // Close button
   document.getElementById('closeDocumentViewer')?.addEventListener('click', closeFileViewer);
+
+  // View/Edit mode toggle
+  document.getElementById('viewModeBtn')?.addEventListener('click', () => setMetadataMode('view'));
+  document.getElementById('editModeBtn')?.addEventListener('click', () => setMetadataMode('edit'));
 
   // Save metadata
   document.getElementById('metaSaveBtn')?.addEventListener('click', saveMetadata);
