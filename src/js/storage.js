@@ -614,9 +614,18 @@ function renderGridView(folders, files) {
 
     return `
     <div
-      class="grid-item bg-white rounded-lg border border-gray-200 p-4 cursor-pointer hover:shadow-md transition-shadow"
+      class="grid-item bg-white rounded-lg border border-gray-200 p-4 cursor-pointer hover:shadow-md transition-shadow relative"
       onclick="${clickHandler}"
     >
+      <button
+        class="absolute top-2 right-2 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+        onclick="showFolderMenu('${folder.id}', event)"
+        style="opacity: 1"
+      >
+        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path>
+        </svg>
+      </button>
       <div class="flex flex-col items-center">
         <svg class="w-16 h-16 text-indigo-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
@@ -629,9 +638,18 @@ function renderGridView(folders, files) {
 
   const fileCards = files.map(file => `
     <div
-      class="grid-item bg-white rounded-lg border border-gray-200 p-4 cursor-pointer hover:shadow-md transition-shadow"
+      class="grid-item bg-white rounded-lg border border-gray-200 p-4 cursor-pointer hover:shadow-md transition-shadow relative"
       onclick="downloadFile('${file.id}')"
     >
+      <button
+        class="absolute top-2 right-2 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+        onclick="showFileMenu('${file.id}', event)"
+        style="opacity: 1"
+      >
+        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path>
+        </svg>
+      </button>
       <div class="flex flex-col items-center">
         ${getFileIcon(file.filename)}
         <h3 class="text-sm font-medium text-gray-900 text-center truncate w-full mt-2">${escapeHtml(file.filename)}</h3>
@@ -691,7 +709,7 @@ function renderListView(folders, files) {
       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatDate(folder.created_at)}</td>
       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${sizeDisplay}</td>
       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-        <button class="text-gray-400 hover:text-gray-600" onclick="event.stopPropagation(); showFolderMenu('${folder.id}')">
+        <button class="text-gray-400 hover:text-gray-600" onclick="showFolderMenu('${folder.id}', event)">
           <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
             <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path>
           </svg>
@@ -716,7 +734,7 @@ function renderListView(folders, files) {
       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatDate(file.updated_at)}</td>
       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatFileSize(file.file_size)}</td>
       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-        <button class="text-gray-400 hover:text-gray-600" onclick="event.stopPropagation(); showFileMenu('${file.id}')">
+        <button class="text-gray-400 hover:text-gray-600" onclick="showFileMenu('${file.id}', event)">
           <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
             <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path>
           </svg>
@@ -881,14 +899,185 @@ async function downloadFile(fileId) {
   }
 }
 
-function showFileMenu(fileId) {
+/**
+ * Show context menu for file
+ */
+function showFileMenu(fileId, event) {
   console.log('[Storage] Show file menu:', fileId);
-  // TODO: Implement context menu for file actions (rename, move, delete)
+  event?.stopPropagation();
+
+  const file = storageState.files.find(f => f.id === fileId);
+  if (!file) return;
+
+  const menuItems = [
+    {
+      icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>',
+      label: 'Download',
+      action: () => downloadFile(fileId)
+    },
+    {
+      icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>',
+      label: 'Preview',
+      action: () => {
+        hideContextMenu();
+        showNotification('Preview feature coming soon!', 'info');
+      }
+    },
+    {
+      icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>',
+      label: 'Rename',
+      action: () => {
+        hideContextMenu();
+        showNotification('Rename feature coming soon!', 'info');
+      }
+    },
+    {
+      icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>',
+      label: 'Move',
+      action: () => {
+        hideContextMenu();
+        showNotification('Move feature coming soon!', 'info');
+      }
+    },
+    {
+      divider: true
+    },
+    {
+      icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>',
+      label: 'Delete',
+      className: 'text-red-600 hover:bg-red-50',
+      action: () => {
+        hideContextMenu();
+        showNotification('Delete feature coming soon!', 'info');
+      }
+    }
+  ];
+
+  showContextMenu(menuItems, event);
 }
 
-function showFolderMenu(folderId) {
+/**
+ * Show context menu for folder
+ */
+function showFolderMenu(folderId, event) {
   console.log('[Storage] Show folder menu:', folderId);
-  // TODO: Implement context menu for folder actions (rename, move, delete)
+  event?.stopPropagation();
+
+  const folder = storageState.folders.find(f => f.id === folderId);
+  if (!folder) return;
+
+  const menuItems = [
+    {
+      icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>',
+      label: 'Open',
+      action: () => {
+        hideContextMenu();
+        if (folder.isMatter) {
+          navigateToMatter(folder.matter_id, folder.name);
+        } else {
+          navigateToFolder(folder.id, folder.name);
+        }
+      }
+    },
+    {
+      icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>',
+      label: 'Rename',
+      action: () => {
+        hideContextMenu();
+        showNotification('Rename feature coming soon!', 'info');
+      }
+    },
+    {
+      icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>',
+      label: 'Move',
+      action: () => {
+        hideContextMenu();
+        showNotification('Move feature coming soon!', 'info');
+      }
+    },
+    {
+      divider: true
+    },
+    {
+      icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>',
+      label: 'Delete',
+      className: 'text-red-600 hover:bg-red-50',
+      action: () => {
+        hideContextMenu();
+        showNotification('Delete feature coming soon!', 'info');
+      }
+    }
+  ];
+
+  showContextMenu(menuItems, event);
+}
+
+/**
+ * Generic context menu display
+ */
+function showContextMenu(menuItems, event) {
+  const menu = document.getElementById('contextMenu');
+  if (!menu) return;
+
+  // Build menu HTML
+  const menuHTML = menuItems.map(item => {
+    if (item.divider) {
+      return '<div class="border-t border-gray-200 my-1"></div>';
+    }
+
+    const className = item.className || 'text-gray-700 hover:bg-gray-100';
+    return `
+      <button
+        class="w-full text-left px-4 py-2 text-sm ${className} flex items-center gap-3 transition-colors"
+        onclick="window.contextMenuAction_${menuItems.indexOf(item)}()"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          ${item.icon}
+        </svg>
+        ${item.label}
+      </button>
+    `;
+  }).join('');
+
+  menu.innerHTML = menuHTML;
+
+  // Store actions as global functions (temporary workaround for onclick)
+  menuItems.forEach((item, index) => {
+    if (!item.divider) {
+      window[`contextMenuAction_${index}`] = item.action;
+    }
+  });
+
+  // Position menu near the click position
+  const rect = event?.target?.getBoundingClientRect();
+  if (rect) {
+    // Position menu to the left of the button
+    menu.style.left = `${rect.left - menu.offsetWidth - 10}px`;
+    menu.style.top = `${rect.top}px`;
+  } else {
+    // Fallback to center
+    menu.style.left = '50%';
+    menu.style.top = '50%';
+    menu.style.transform = 'translate(-50%, -50%)';
+  }
+
+  menu.classList.remove('hidden');
+
+  // Close menu when clicking outside
+  setTimeout(() => {
+    document.addEventListener('click', hideContextMenu);
+  }, 0);
+}
+
+/**
+ * Hide context menu
+ */
+function hideContextMenu() {
+  const menu = document.getElementById('contextMenu');
+  if (menu) {
+    menu.classList.add('hidden');
+  }
+  document.removeEventListener('click', hideContextMenu);
 }
 
 // ============================================================
