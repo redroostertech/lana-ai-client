@@ -134,7 +134,7 @@ async function loadPDF(file) {
   try {
     const response = await fetch(`${api.baseUrl}/api/v1/storage/files/${file.id}/download`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        'Authorization': `Bearer ${api.token}`
       }
     });
 
@@ -158,7 +158,7 @@ async function loadImage(file) {
   try {
     const response = await fetch(`${api.baseUrl}/api/v1/storage/files/${file.id}/download`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        'Authorization': `Bearer ${api.token}`
       }
     });
 
@@ -186,7 +186,7 @@ async function loadText(file) {
   try {
     const response = await fetch(`${api.baseUrl}/api/v1/storage/files/${file.id}/download`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        'Authorization': `Bearer ${api.token}`
       }
     });
 
@@ -213,7 +213,7 @@ async function loadDOCX(file) {
 
     const response = await fetch(`${api.baseUrl}/api/v1/storage/files/${file.id}/download`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        'Authorization': `Bearer ${api.token}`
       }
     });
 
