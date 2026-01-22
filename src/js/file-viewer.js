@@ -35,32 +35,32 @@ async function openFileViewer(fileId) {
     // Fetch file details
     const response = await api.get(`/api/v1/storage/files/${fileId}`);
 
-    if (!response || !response.file) {
+    if (!response || !response.id) {
       throw new Error('File not found');
     }
 
-    viewerState.currentFile = response.file;
+    viewerState.currentFile = response;
     viewerState.originalMetadata = {
-      document_type: response.file.metadata?.document_type || '',
-      tags: response.file.metadata?.tags || '',
-      notes: response.file.metadata?.notes || ''
+      document_type: response.metadata?.document_type || '',
+      tags: response.metadata?.tags || '',
+      notes: response.metadata?.notes || ''
     };
     viewerState.metadataChanged = false;
 
     // Update header
-    document.getElementById('viewerFileName').textContent = response.file.filename;
-    document.getElementById('viewerFileInfo').textContent = `${formatFileSize(response.file.filesize)} • ${new Date(response.file.created_at).toLocaleDateString()}`;
+    document.getElementById('viewerFileName').textContent = response.filename;
+    document.getElementById('viewerFileInfo').textContent = `${formatFileSize(response.file_size)} • ${new Date(response.created_at).toLocaleDateString()}`;
 
     // Set download link
     const downloadBtn = document.getElementById('viewerDownloadBtn');
     downloadBtn.href = `/api/v1/storage/files/${fileId}/download`;
-    downloadBtn.download = response.file.filename;
+    downloadBtn.download = response.filename;
 
     // Load file content
-    await loadFileContent(response.file);
+    await loadFileContent(response);
 
     // Load metadata
-    loadMetadata(response.file);
+    loadMetadata(response);
 
   } catch (error) {
     console.error('[FileViewer] Failed to load file:', error);
@@ -75,7 +75,7 @@ async function loadFileContent(file) {
   // Hide all viewers
   hideAllViewers();
 
-  const mimeType = file.mimetype ||'';
+  const mimeType = file.content_type || '';
   const ext = file.filename.split('.').pop().toLowerCase();
 
   console.log('[FileViewer] Loading content:', { mimeType, ext });
@@ -157,8 +157,8 @@ async function loadText(file) {
 // ============================================================
 function loadMetadata(file) {
   // File info (read-only)
-  document.getElementById('metaFileSize').textContent = formatFileSize(file.filesize);
-  document.getElementById('metaFileType').textContent = file.mimetype || 'Unknown';
+  document.getElementById('metaFileSize').textContent = formatFileSize(file.file_size);
+  document.getElementById('metaFileType').textContent = file.content_type || 'Unknown';
   document.getElementById('metaUploadedAt').textContent = new Date(file.created_at).toLocaleDateString();
 
   // Editable fields
