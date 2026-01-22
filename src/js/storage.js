@@ -64,14 +64,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Load initial data
   if (storageState.currentMatterId) {
-    // Inside a matter: load folder tree and contents
-    await loadFolderTree();
+    // Inside a matter: load folder contents
+    // Note: loadFolderTree() removed as folder tree UI is not implemented in storage.html
     await loadFolderContents();
     // Initialize breadcrumbs for matter view
     buildFolderPath();
   } else {
-    // Root view: just load all matters
+    // Root view: load all matters
     await loadFolderContents();
+
+    // Load recents and pinned matters ONLY at root level (in parallel, non-blocking)
+    Promise.all([
+      loadRecentMatters(),
+      loadPinnedMatters()
+    ]).catch(err => console.error('[Storage] Failed to load recents/pinned:', err));
   }
 
   // Update UI based on current view
@@ -267,7 +273,9 @@ function renderFolderTree() {
   // Build hierarchical structure (root folders first)
   const rootFolders = storageState.folders.filter(f => !f.parent_folder_id);
 
-  treeEl.innerHTML = rootFolders.map(folder => renderFolderTreeItem(folder, 0)).join('');
+  if (treeEl) {
+    treeEl.innerHTML = rootFolders.map(folder => renderFolderTreeItem(folder, 0)).join('');
+  }
 }
 
 function renderFolderTreeItem(folder, depth) {
@@ -559,6 +567,7 @@ async function loadFolderContents() {
           name: matter.name || matter.matter_id,
           matter_id: matter.matter_id,
           isMatter: true, // Flag to identify this is a matter, not a folder
+          is_pinned: matter.is_pinned || false,
           document_count: matter.document_count || 0,
           child_folder_count: matter.folder_count || 0,
           source: matter.source,  // 'client_matters' or 'connector'
@@ -664,6 +673,7 @@ function renderFolderContents() {
     emptyEl?.classList.remove('hidden');
     gridViewEl?.classList.add('hidden');
     listViewEl?.classList.add('hidden');
+    updatePaginationUI(); // Hide pagination when empty
     return;
   }
 
@@ -682,6 +692,9 @@ function renderFolderContents() {
     listViewEl?.classList.remove('hidden');
     gridViewEl?.classList.add('hidden');
   }
+
+  // Update pagination UI
+  updatePaginationUI();
 }
 
 function renderGridView(folders, files) {
@@ -706,15 +719,20 @@ function renderGridView(folders, files) {
       ? `data-is-matter="true" data-matter-id="${escapeHtml(folder.matter_id)}" data-name="${escapeHtml(folder.name)}"`
       : `data-is-matter="false" data-folder-id="${folder.id}" data-name="${escapeHtml(folder.name)}"`;
 
+    // For matter cards, use the modal; for regular folders, use the old menu
+    const menuButtonAttrs = folder.isMatter
+      ? `data-matter-id="${escapeHtml(folder.matter_id)}" data-matter-name="${escapeHtml(folder.name)}" data-is-pinned="${folder.is_pinned || false}" data-source="${escapeHtml(folder.source || 'lana')}" onclick="event.stopPropagation(); showMatterActionsModal(event)"`
+      : `onclick="event.stopPropagation(); showFolderMenu('${folder.id}', event)"`;
+
     return `
     <div
-      class="grid-item bg-white rounded-lg border border-gray-200 p-4 cursor-pointer hover:shadow-md transition-shadow relative"
+      class="grid-item bg-white rounded-lg border border-gray-200 p-4 cursor-pointer hover:shadow-md transition-shadow relative group"
       ${dataAttrs}
       onclick="handleFolderClick(this)"
     >
       <button
         class="absolute top-2 right-2 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-        onclick="event.stopPropagation(); showFolderMenu('${folder.id}', event)"
+        ${menuButtonAttrs}
         style="opacity: 1"
       >
         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -794,6 +812,11 @@ function renderListView(folders, files) {
       ? `${folder.document_count || 0} files • ${folder.child_folder_count || 0} folders`
       : `${folder.document_count || 0} items`;
 
+    // For matter rows, use the modal; for regular folders, use the old menu
+    const menuButtonAttrs = folder.isMatter
+      ? `data-matter-id="${escapeHtml(folder.matter_id)}" data-matter-name="${escapeHtml(folder.name)}" data-is-pinned="${folder.is_pinned || false}" data-source="${escapeHtml(folder.source || 'lana')}" onclick="event.stopPropagation(); showMatterActionsModal(event)"`
+      : `onclick="event.stopPropagation(); showFolderMenu('${folder.id}', event)"`;
+
     return `
     <tr class="hover:bg-gray-50 cursor-pointer" ${dataAttrs} onclick="handleFolderClick(this)">
       <td class="px-6 py-4">
@@ -804,7 +827,7 @@ function renderListView(folders, files) {
       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatDate(folder.created_at)}</td>
       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${sizeDisplay}</td>
       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-        <button class="text-gray-400 hover:text-gray-600" onclick="event.stopPropagation(); showFolderMenu('${folder.id}', event)">
+        <button class="text-gray-400 hover:text-gray-600" ${menuButtonAttrs}>
           <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
             <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path>
           </svg>
@@ -904,18 +927,19 @@ async function handleCreateFolder(event) {
       parent_folder_id: storageState.currentFolderId || null,
     });
 
-    if (response.success) {
+    if (response.status === 'success') {
       showSuccessNotification('Folder created successfully');
       hideNewFolderModal();
 
-      // Reload folder tree and contents
-      await loadFolderTree();
+      // Reload folder contents (folder tree UI not implemented)
       await loadFolderContents();
     } else {
+      console.error('[Storage] API returned error:', response);
       throw new Error(response.error || 'Failed to create folder');
     }
   } catch (error) {
     console.error('[Storage] Failed to create folder:', error);
+    console.error('[Storage] Error details:', error.message, error.stack);
     showErrorNotification('Failed to create folder. Please try again.');
   }
 }
@@ -986,8 +1010,38 @@ async function downloadFile(fileId) {
   console.log('[Storage] Downloading file:', fileId);
 
   try {
-    // Trigger download via API
-    window.location.href = `/api/v1/storage/files/${fileId}/download?matter_id=${storageState.currentMatterId}`;
+    // First, get file metadata to retrieve the filename
+    const fileMetadata = await api.get(`/api/v1/storage/files/${fileId}`);
+    if (!fileMetadata || !fileMetadata.filename) {
+      throw new Error('Failed to retrieve file metadata');
+    }
+
+    const filename = fileMetadata.filename;
+
+    // Download file using blob approach (prevents navigation/white screen)
+    const response = await fetch(`${api.baseUrl}/api/v1/storage/files/${fileId}/download`, {
+      headers: {
+        'Authorization': `Bearer ${api.token}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Download failed: ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+
+    // Create temporary download link
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    console.log('[Storage] Download started:', filename);
   } catch (error) {
     console.error('[Storage] Failed to download file:', error);
     showErrorNotification('Failed to download file. Please try again.');
@@ -1043,14 +1097,214 @@ function showFileMenu(fileId, event) {
   showContextMenu(menuItems, event);
 }
 
+// Global state for matter actions modal
+let selectedMatter = null;
+
+/**
+ * Show matter actions modal
+ */
+function showMatterActionsModal(event) {
+  console.log('[Storage] Show matter actions modal');
+
+  // Get data from the button element
+  const button = event.currentTarget;
+  const matterId = button.dataset.matterId;
+  const matterName = button.dataset.matterName;
+  const isPinned = button.dataset.isPinned === 'true';
+  const source = button.dataset.source || 'lana';
+
+  console.log('[Storage] Matter data:', { matterId, matterName, isPinned, source });
+
+  // Store in global state
+  selectedMatter = {
+    matterId,
+    matterName,
+    isPinned,
+    source
+  };
+
+  // Update modal content
+  document.getElementById('modalMatterName').textContent = matterName;
+  document.getElementById('modalMatterId').textContent = matterId;
+
+  // Update pin button text
+  const pinLabel = document.getElementById('pinBtnLabel');
+  const pinDesc = document.getElementById('pinBtnDesc');
+  if (isPinned) {
+    pinLabel.textContent = 'Unpin Matter';
+    pinDesc.textContent = 'Remove from pinned matters';
+  } else {
+    pinLabel.textContent = 'Pin Matter';
+    pinDesc.textContent = 'Add to pinned matters';
+  }
+
+  // Show modal
+  const modal = document.getElementById('matterActionsModal');
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+}
+
+/**
+ * Close matter actions modal
+ */
+function closeMatterActionsModal() {
+  const modal = document.getElementById('matterActionsModal');
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+  selectedMatter = null;
+}
+
+/**
+ * Open matter from modal
+ */
+function openMatterFromModal() {
+  if (!selectedMatter) return;
+  
+  // Save matter data before closing modal (which sets selectedMatter to null)
+  const matterId = selectedMatter.matterId;
+  const matterName = selectedMatter.matterName;
+  
+  closeMatterActionsModal();
+  navigateToMatter(matterId, matterName);
+}
+
+/**
+ * Toggle pin from modal
+ */
+async function togglePinFromModal() {
+  if (!selectedMatter) return;
+  
+  // Save matter data before closing modal (which sets selectedMatter to null)
+  const matterId = selectedMatter.matterId;
+  const source = selectedMatter.source;
+  const isPinned = selectedMatter.isPinned;
+  
+  closeMatterActionsModal();
+  await togglePin(matterId, source, isPinned);
+}
+
+// ============================================================
+// PAGINATION FUNCTIONS
+// ============================================================
+
+/**
+ * Update pagination UI elements based on current state
+ */
+function updatePaginationUI() {
+  const paginationControls = document.getElementById('paginationControls');
+
+  // Only show pagination in root view (when currentMatterId is null)
+  if (!storageState.currentMatterId) {
+    paginationControls?.classList.remove('hidden');
+
+    // Calculate range
+    const limit = 100; // Same as the limit in loadFolderContents
+    const start = (storageState.currentPage - 1) * limit + 1;
+    const end = Math.min(storageState.currentPage * limit, storageState.totalResults);
+
+    // Update text elements
+    document.getElementById('paginationStart').textContent = start;
+    document.getElementById('paginationEnd').textContent = end;
+    document.getElementById('paginationTotal').textContent = storageState.totalResults;
+    document.getElementById('currentPageNum').textContent = storageState.currentPage;
+    document.getElementById('totalPagesNum').textContent = storageState.totalPages || 1;
+
+    // Enable/disable buttons
+    const isFirstPage = storageState.currentPage === 1;
+    const isLastPage = storageState.currentPage >= storageState.totalPages;
+
+    // Desktop buttons
+    const prevBtn = document.getElementById('prevPage');
+    const nextBtn = document.getElementById('nextPage');
+    if (prevBtn) {
+      prevBtn.disabled = isFirstPage;
+      prevBtn.classList.toggle('opacity-50', isFirstPage);
+      prevBtn.classList.toggle('cursor-not-allowed', isFirstPage);
+    }
+    if (nextBtn) {
+      nextBtn.disabled = isLastPage;
+      nextBtn.classList.toggle('opacity-50', isLastPage);
+      nextBtn.classList.toggle('cursor-not-allowed', isLastPage);
+    }
+
+    // Mobile buttons
+    const prevBtnMobile = document.getElementById('prevPageMobile');
+    const nextBtnMobile = document.getElementById('nextPageMobile');
+    if (prevBtnMobile) {
+      prevBtnMobile.disabled = isFirstPage;
+      prevBtnMobile.classList.toggle('opacity-50', isFirstPage);
+      prevBtnMobile.classList.toggle('cursor-not-allowed', isFirstPage);
+    }
+    if (nextBtnMobile) {
+      nextBtnMobile.disabled = isLastPage;
+      nextBtnMobile.classList.toggle('opacity-50', isLastPage);
+      nextBtnMobile.classList.toggle('cursor-not-allowed', isLastPage);
+    }
+  } else {
+    // Hide pagination when inside a matter
+    paginationControls?.classList.add('hidden');
+  }
+}
+
+/**
+ * Navigate to previous page
+ */
+async function goToPreviousPage() {
+  if (storageState.currentPage > 1) {
+    storageState.currentPage--;
+    await loadFolderContents();
+  }
+}
+
+/**
+ * Navigate to next page
+ */
+async function goToNextPage() {
+  if (storageState.currentPage < storageState.totalPages) {
+    storageState.currentPage++;
+    await loadFolderContents();
+  }
+}
+
+/**
+ * Refresh the page - reload all data
+ */
+async function refreshPage() {
+  console.log('[Storage] Refreshing page...');
+
+  // Show loading state
+  const loadingEl = document.getElementById('contentLoading');
+  if (loadingEl) {
+    loadingEl.classList.remove('hidden');
+  }
+
+  // Reload all sections
+  await Promise.all([
+    loadPinnedMatters(),
+    loadRecentMatters(),
+    loadFolderContents()
+  ]);
+
+  console.log('[Storage] Page refreshed successfully');
+}
+
 /**
  * Show context menu for folder
  */
-function showFolderMenu(folderId, event) {
-  console.log('[Storage] Show folder menu:', folderId);
-  event?.stopPropagation();
+function showFolderMenu(event, folderOrId) {
+  console.log('[Storage] Show folder menu:', folderOrId);
+  if (event && event.stopPropagation) {
+    event.stopPropagation();
+  }
 
-  const folder = storageState.folders.find(f => f.id === folderId);
+  // Handle both folder object and folder ID
+  let folder;
+  if (typeof folderOrId === 'object') {
+    folder = folderOrId;
+  } else {
+    folder = storageState.folders.find(f => f.id === folderOrId);
+  }
+
   if (!folder) return;
 
   const menuItems = [
@@ -1073,7 +1327,29 @@ function showFolderMenu(folderId, event) {
         hideContextMenu();
         showNotification('Rename feature coming soon!', 'info');
       }
-    },
+    }
+  ];
+
+  // Add pin/unpin option for matters (only at root level)
+  console.log('[Storage] Pin check:', {
+    isMatter: folder.isMatter,
+    currentMatterId: storageState.currentMatterId,
+    shouldShowPin: folder.isMatter && !storageState.currentMatterId,
+    folder
+  });
+
+  if (folder.isMatter && !storageState.currentMatterId) {
+    menuItems.push({
+      icon: '<path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/>',
+      label: folder.is_pinned ? 'Unpin' : 'Pin',
+      action: async () => {
+        hideContextMenu();
+        await togglePin(folder.matter_id, folder.source || 'lana', folder.is_pinned || false);
+      }
+    });
+  }
+
+  menuItems.push(
     {
       divider: true
     },
@@ -1086,7 +1362,7 @@ function showFolderMenu(folderId, event) {
         showNotification('Delete feature coming soon!', 'info');
       }
     }
-  ];
+  );
 
   showContextMenu(menuItems, event);
 }
@@ -1127,20 +1403,55 @@ function showContextMenu(menuItems, event) {
     }
   });
 
+  // Make menu visible but invisible to calculate dimensions
+  menu.style.visibility = 'hidden';
+  menu.classList.remove('hidden');
+
   // Position menu near the click position
-  const rect = event?.target?.getBoundingClientRect();
+  const target = event?.currentTarget || event?.target;
+  console.log('[Storage] Context menu - event:', event);
+  console.log('[Storage] Context menu - currentTarget:', event?.currentTarget);
+  console.log('[Storage] Context menu - target:', target);
+
+  const rect = target?.getBoundingClientRect();
+  console.log('[Storage] Context menu - rect:', rect);
+
   if (rect) {
-    // Position menu to the left of the button
-    menu.style.left = `${rect.left - menu.offsetWidth - 10}px`;
-    menu.style.top = `${rect.top}px`;
+    // Wait for next frame to get accurate dimensions
+    requestAnimationFrame(() => {
+      const menuWidth = menu.offsetWidth || 200;
+      const menuHeight = menu.offsetHeight || 100;
+      console.log('[Storage] Context menu - dimensions:', { menuWidth, menuHeight });
+
+      // Calculate position (to the left of the button)
+      let left = rect.left - menuWidth - 10;
+      let top = rect.top;
+
+      // Keep menu within viewport bounds
+      if (left < 10) {
+        // Not enough space on left, show on right instead
+        left = rect.right + 10;
+      }
+      if (top + menuHeight > window.innerHeight - 10) {
+        top = window.innerHeight - menuHeight - 10;
+      }
+
+      console.log('[Storage] Context menu - final position:', { left, top });
+      menu.style.left = `${left}px`;
+      menu.style.top = `${top}px`;
+      menu.style.transform = 'none';
+
+      // Make menu visible
+      menu.style.visibility = 'visible';
+    });
   } else {
+    console.log('[Storage] Context menu - NO RECT, using center fallback');
     // Fallback to center
     menu.style.left = '50%';
     menu.style.top = '50%';
     menu.style.transform = 'translate(-50%, -50%)';
+    menu.style.visibility = 'visible';
   }
-
-  menu.classList.remove('hidden');
 
   // Close menu when clicking outside
   setTimeout(() => {
@@ -1319,11 +1630,260 @@ function hidePreloader() {
   }
 }
 
+// ============================================================================
+// RECENTS AND PINNED MATTERS
+// ============================================================================
+
+async function loadRecentMatters() {
+  try {
+    // Get recently accessed files and matters in parallel
+    const [filesResponse, mattersResponse] = await Promise.all([
+      api.get('/api/v1/storage/recent?limit=8'),
+      api.get('/api/v1/matters?limit=20&page=1')
+    ]);
+
+    const recentItems = [];
+
+    // Add recent files from file_activity
+    if (filesResponse && filesResponse.files && filesResponse.files.length > 0) {
+      const recentFiles = filesResponse.files.map(file => ({
+        type: 'file',
+        data: file,
+        timestamp: new Date(file.last_accessed_at || file.created_at)
+      }));
+      recentItems.push(...recentFiles);
+    }
+
+    // Add recent matters (sorted by updated_at)
+    if (mattersResponse && mattersResponse.matters && mattersResponse.matters.length > 0) {
+      const recentMatters = mattersResponse.matters
+        .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+        .slice(0, 8)
+        .map(matter => ({
+          type: 'matter',
+          data: matter,
+          timestamp: new Date(matter.updated_at)
+        }));
+      recentItems.push(...recentMatters);
+    }
+
+    // Sort all items by timestamp and take top 8
+    const sortedItems = recentItems
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, 8);
+
+    if (sortedItems.length > 0) {
+      const recentsSection = document.getElementById('recentsSection');
+      const recentFiles = document.getElementById('recentFiles');
+      const recentsCount = document.getElementById('recentsCount');
+
+      recentFiles.innerHTML = sortedItems.map(item => {
+        if (item.type === 'matter') {
+          return renderMatterCard(item.data, false);
+        } else {
+          return renderFileCardInRecents(item.data);
+        }
+      }).join('');
+
+      recentsCount.textContent = `${sortedItems.length} ${sortedItems.length === 1 ? 'item' : 'items'}`;
+      recentsSection.classList.remove('hidden');
+    }
+  } catch (error) {
+    console.error('[Storage] Failed to load recent items:', error);
+    // Silently fail - recents are not critical
+  }
+}
+
+function renderFileCardInRecents(file) {
+  const fileName = escapeHtml(file.filename || file.name);
+  const fileSize = formatFileSize(file.file_size || 0);
+  const fileIcon = getFileIconSVG(file.content_type);
+  const lastAccessed = file.last_accessed_at ? new Date(file.last_accessed_at).toLocaleDateString() : '';
+
+  return `
+    <div class="file-card bg-white rounded-lg shadow-sm border border-gray-200 p-4 cursor-pointer relative group hover:shadow-md transition-shadow"
+         onclick="openRecentFile('${file.id}', '${file.client_matter || ''}')">
+      <div class="flex flex-col items-center text-center">
+        <div class="w-12 h-12 mb-3 flex items-center justify-center">
+          ${fileIcon}
+        </div>
+        <p class="text-sm font-medium text-gray-900 truncate w-full mb-1" title="${fileName}">
+          ${fileName}
+        </p>
+        <p class="text-xs text-gray-500">${fileSize}</p>
+        ${lastAccessed ? `<p class="text-xs text-gray-400 mt-1">${lastAccessed}</p>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function openRecentFile(fileId, clientMatter) {
+  // Open file viewer
+  if (window.openFileViewer) {
+    window.openFileViewer(fileId);
+  } else {
+    console.error('[Storage] openFileViewer not available');
+  }
+}
+
+async function loadPinnedMatters() {
+  try {
+    // Get all matters and filter pinned ones
+    const response = await api.get('/api/v1/matters?limit=100&page=1');
+
+    if (response && response.matters && response.matters.length > 0) {
+      const pinnedMatters = response.matters.filter(m => m.is_pinned);
+
+      if (pinnedMatters.length > 0) {
+        // Sort by pinned_at (most recent first)
+        pinnedMatters.sort((a, b) => {
+          const aTime = a.pinned_at ? new Date(a.pinned_at).getTime() : 0;
+          const bTime = b.pinned_at ? new Date(b.pinned_at).getTime() : 0;
+          return bTime - aTime;
+        });
+
+        const pinnedSection = document.getElementById('pinnedSection');
+        const pinnedFiles = document.getElementById('pinnedFiles');
+        const pinnedCount = document.getElementById('pinnedCount');
+
+        pinnedFiles.innerHTML = pinnedMatters.map(matter => renderMatterCard(matter, true)).join('');
+        pinnedCount.textContent = `${pinnedMatters.length} ${pinnedMatters.length === 1 ? 'item' : 'items'}`;
+        pinnedSection.classList.remove('hidden');
+      }
+    }
+  } catch (error) {
+    console.error('[Storage] Failed to load pinned matters:', error);
+    // Silently fail - pinned are not critical
+  }
+}
+
+function renderMatterCard(matter, isPinned = false) {
+  const matterName = escapeHtml(matter.name || matter.matter_id);
+  const matterNumber = escapeHtml(matter.matter_id || '');
+  const docCount = matter.document_count || 0;
+  const folderCount = matter.folder_count || matter.child_folder_count || 0;
+  const lastModified = matter.updated_at ? new Date(matter.updated_at).toLocaleDateString() : '';
+
+  // Create a unique data object for the context menu
+  const folderData = {
+    matter_id: matter.matter_id,
+    name: matter.name || matter.matter_id,
+    isMatter: true,
+    is_pinned: matter.is_pinned || isPinned,
+    source: matter.source || 'lana',
+    document_count: docCount,
+    child_folder_count: folderCount
+  };
+
+  return `
+    <div class="file-card bg-white rounded-lg shadow-sm border border-gray-200 p-4 cursor-pointer relative group hover:shadow-md transition-shadow"
+         onclick="navigateToMatter('${matter.matter_id}', '${matterName.replace(/'/g, "\\'")}')">
+      ${isPinned ? `
+        <div class="absolute top-2 right-8 p-1 rounded-full bg-yellow-50 border border-yellow-200" title="Pinned">
+          <svg class="w-3 h-3 text-yellow-600" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/>
+          </svg>
+        </div>
+      ` : ''}
+      <button class="matter-menu-btn absolute top-2 right-2 p-1 rounded-full hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-opacity"
+              data-matter-id="${matter.matter_id}"
+              data-matter-name="${matterName.replace(/"/g, '&quot;')}"
+              data-is-pinned="${matter.is_pinned || isPinned}"
+              data-source="${matter.source || 'lana'}"
+              onclick="event.stopPropagation(); showMatterActionsModal(event)"
+              title="More options">
+        <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
+        </svg>
+      </button>
+      <div class="flex flex-col items-center text-center">
+        <div class="w-12 h-12 mb-3 flex items-center justify-center">
+          <svg class="w-12 h-12 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+          </svg>
+        </div>
+        <p class="text-sm font-medium text-gray-900 truncate w-full mb-1" title="${matterName}">
+          ${matterName}
+        </p>
+        ${matterNumber ? `<p class="text-xs text-gray-500 mb-1">${matterNumber}</p>` : ''}
+        <div class="flex items-center gap-2 text-xs text-gray-500">
+          <span>${docCount} ${docCount === 1 ? 'file' : 'files'}</span>
+          <span>•</span>
+          <span>${folderCount} ${folderCount === 1 ? 'folder' : 'folders'}</span>
+        </div>
+        ${lastModified ? `<p class="text-xs text-gray-400 mt-1">${lastModified}</p>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+async function togglePin(matterId, matterSource, isPinned) {
+  try {
+    if (isPinned) {
+      // Unpin the matter
+      await api.unpinMatter(matterId, matterSource);
+      showSuccessNotification('Matter unpinned');
+    } else {
+      // Pin the matter
+      await api.pinMatter(matterId, matterSource);
+      showSuccessNotification('Matter pinned');
+    }
+
+    // Reload both sections and main content
+    await Promise.all([
+      loadPinnedMatters(),
+      loadRecentMatters(),
+      loadFolderContents()
+    ]);
+  } catch (error) {
+    console.error('[Storage] Failed to toggle pin:', error);
+    showErrorNotification(error.message || 'Failed to update pin status');
+  }
+}
+
+function getFileIconSVG(contentType) {
+  if (!contentType) {
+    return '<svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>';
+  }
+
+  if (contentType.includes('pdf')) {
+    return '<svg class="w-10 h-10 text-red-500" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM8.5 13.5v3h1v-1h.5a1 1 0 0 0 1-1v-1a1 1 0 0 0-1-1h-1.5zm1 1h.5v1h-.5v-1zm2.5-1v3h1.5a1 1 0 0 0 1-1v-1a1 1 0 0 0-1-1H12zm1 1h.5v1H13v-1zm2.5-1v3h1v-1.5h.5v-1h-.5v-.5h1v-1h-2z"/></svg>';
+  }
+  if (contentType.includes('word') || contentType.includes('document')) {
+    return '<svg class="w-10 h-10 text-blue-600" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM9 13l1.5 6 1.5-4 1.5 4 1.5-6h-1l-.75 3-1.25-3.5h-.5L10.25 16 9.5 13H9z"/></svg>';
+  }
+  if (contentType.includes('csv') || contentType.includes('sheet') || contentType.includes('excel')) {
+    return '<svg class="w-10 h-10 text-green-600" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM8 13h2v2H8v-2zm0 3h2v2H8v-2zm3-3h2v2h-2v-2zm0 3h2v2h-2v-2zm3-3h2v2h-2v-2zm0 3h2v2h-2v-2z"/></svg>';
+  }
+  if (contentType.includes('image')) {
+    return '<svg class="w-10 h-10 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>';
+  }
+  if (contentType.includes('presentation') || contentType.includes('powerpoint')) {
+    return '<svg class="w-10 h-10 text-orange-500" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM9 13v6h1.5v-2h1a1.5 1.5 0 0 0 1.5-1.5v-1a1.5 1.5 0 0 0-1.5-1.5H9zm1.5 1.5h1v1h-1v-1z"/></svg>';
+  }
+  if (contentType.includes('video')) {
+    return '<svg class="w-10 h-10 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>';
+  }
+  if (contentType.includes('audio')) {
+    return '<svg class="w-10 h-10 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path></svg>';
+  }
+  if (contentType.includes('zip') || contentType.includes('archive') || contentType.includes('compressed')) {
+    return '<svg class="w-10 h-10 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"></path></svg>';
+  }
+  if (contentType.includes('text')) {
+    return '<svg class="w-10 h-10 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>';
+  }
+
+  return '<svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>';
+}
+
 // Export functions for global access
 window.handleFolderClick = handleFolderClick;
-window.navigateToFolder = navigateToFolder;
+window.navigateToFolder = navigateToMatter;
 window.navigateToMatter = navigateToMatter;
 window.toggleFolder = toggleFolder;
 window.downloadFile = downloadFile;
 window.showFileMenu = showFileMenu;
 window.showFolderMenu = showFolderMenu;
+window.togglePin = togglePin;
+window.openRecentFile = openRecentFile;

@@ -21,7 +21,7 @@ window.APP_VERSION = {
    * @returns {string} e.g., "v3.0.0b1"
    */
   getVersion() {
-    return this.displayVersion;
+    return `v${this.displayVersion}`;
   },
 
   /**

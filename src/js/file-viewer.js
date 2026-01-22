@@ -55,6 +55,10 @@ async function openFileViewer(fileId) {
       throw new Error('File not found');
     }
 
+    // Log file activity for recents tracking (non-blocking)
+    api.post(`/api/v1/storage/files/${fileId}/activity`, { event_type: 'opened' })
+      .catch(err => console.log('[FileViewer] Activity tracking failed (non-critical):', err));
+
     viewerState.currentFile = response;
     viewerState.originalMetadata = {
       document_type: response.metadata?.document_type || '',
@@ -67,10 +71,9 @@ async function openFileViewer(fileId) {
     document.getElementById('viewerFileName').textContent = response.filename;
     document.getElementById('viewerFileInfo').textContent = `${formatFileSize(response.file_size)} • ${new Date(response.created_at).toLocaleDateString()}`;
 
-    // Set download link
+    // Set download button handler
     const downloadBtn = document.getElementById('viewerDownloadBtn');
-    downloadBtn.href = `${api.baseUrl}/api/v1/storage/files/${fileId}/download`;
-    downloadBtn.download = response.filename;
+    downloadBtn.onclick = () => downloadFile(fileId, response.filename);
 
     // Load file content
     await loadFileContent(response);
@@ -259,6 +262,40 @@ async function loadDOCX(file) {
 }
 
 // ============================================================
+// FILE DOWNLOAD
+// ============================================================
+async function downloadFile(fileId, filename) {
+  try {
+    const response = await fetch(`${api.baseUrl}/api/v1/storage/files/${fileId}/download`, {
+      headers: {
+        'Authorization': `Bearer ${api.token}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to download: ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+
+    // Create temporary download link
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showSuccessNotification('Download started');
+  } catch (error) {
+    console.error('[FileViewer] Download error:', error);
+    showErrorNotification(error.message || 'Failed to download file');
+  }
+}
+
+// ============================================================
 // METADATA HANDLING
 // ============================================================
 function loadMetadata(file) {
@@ -266,6 +303,7 @@ function loadMetadata(file) {
   document.getElementById('metaFileSize').textContent = formatFileSize(file.file_size);
   document.getElementById('metaFileType').textContent = formatMimeType(file.content_type);
   document.getElementById('metaUploadedAt').textContent = new Date(file.created_at).toLocaleDateString();
+  document.getElementById('metaChunkCount').textContent = file.chunk_count !== undefined ? file.chunk_count.toLocaleString() : '0';
 
   const metadata = file.metadata || {};
 
@@ -472,8 +510,7 @@ function showViewerError(message) {
   errorDiv.classList.remove('hidden');
 
   if (viewerState.currentFile) {
-    errorDownload.href = `/api/v1/storage/files/${viewerState.currentFile.id}/download`;
-    errorDownload.download = viewerState.currentFile.filename;
+    errorDownload.onclick = () => downloadFile(viewerState.currentFile.id, viewerState.currentFile.filename);
   }
 
   hideViewerLoading();

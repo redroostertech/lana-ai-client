@@ -402,10 +402,17 @@
         </button>
 
         <div class="flex-1 px-4 lg:px-0">
-          <h1 class="text-xl font-semibold text-gray-900">Chat with Lana</h1>
+          <h1 id="chatTitle" class="text-xl font-semibold text-gray-900">Chat with Lana</h1>
         </div>
 
         <div class="flex items-center gap-4">
+          <!-- Refresh Chat Button -->
+          <button id="refreshChatBtn" class="text-gray-500 hover:text-gray-700 transition-colors" title="Refresh chat" onclick="refreshCurrentChat()">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+          </button>
+
           <!-- Notifications -->
           <button id="notificationBtn" class="relative text-gray-500 hover:text-gray-700" title="Notifications">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2771,6 +2778,11 @@
         Toast.success('Conversation renamed');
         closeRenameModal();
 
+        // Update the chat title in navigation bar if this is the current conversation
+        if (currentConversationId === selectedConversationId) {
+          document.getElementById('chatTitle').textContent = newTitle;
+        }
+
         // Reload conversations list
         yourChatsPage = 1;
         await loadConversations(false);
@@ -2866,6 +2878,11 @@
         const conv = allConversations.find(c => c.thread_id === threadId || c.id === threadId);
         window.currentMatterId = conv?.matter_id || null;
       }
+
+      // Update chat title in navigation bar
+      const conv = allConversations.find(c => c.thread_id === threadId || c.id === threadId);
+      const chatTitle = conv?.title || conv?.metadata?.title || 'Chat with Lana';
+      document.getElementById('chatTitle').textContent = chatTitle;
 
       console.log('[selectConversation] Set currentConversationId:', { currentConversationId, matterId: window.currentMatterId });
 
@@ -6471,6 +6488,43 @@
 
       // Show document tip after resetting chat
       showDocumentTip();
+
+      // Reset chat title to default
+      document.getElementById('chatTitle').textContent = 'Chat with Lana';
+    }
+
+    // Refresh current chat
+    window.refreshCurrentChat = async function() {
+      if (!currentConversationId) {
+        Toast.info('No active conversation to refresh');
+        return;
+      }
+
+      try {
+        console.log('[refreshCurrentChat] Refreshing conversation:', currentConversationId);
+
+        // Show loading indicator
+        const refreshBtn = document.getElementById('refreshChatBtn');
+        if (refreshBtn) {
+          refreshBtn.classList.add('animate-spin');
+          refreshBtn.disabled = true;
+        }
+
+        // Reload the conversation messages
+        await loadConversationMessages(currentConversationId, false);
+
+        Toast.success('Chat refreshed');
+      } catch (error) {
+        console.error('[refreshCurrentChat] Failed to refresh:', error);
+        Toast.error('Failed to refresh chat');
+      } finally {
+        // Remove loading indicator
+        const refreshBtn = document.getElementById('refreshChatBtn');
+        if (refreshBtn) {
+          refreshBtn.classList.remove('animate-spin');
+          refreshBtn.disabled = false;
+        }
+      }
     }
 
     // No auto-resize needed for contenteditable (it grows naturally with max-height and overflow-y-auto)
