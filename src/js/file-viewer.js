@@ -54,7 +54,7 @@ async function openFileViewer(fileId) {
 
     // Set download link
     const downloadBtn = document.getElementById('viewerDownloadBtn');
-    downloadBtn.href = `/api/v1/storage/files/${fileId}/download`;
+    downloadBtn.href = `${api.baseUrl}/api/v1/storage/files/${fileId}/download`;
     downloadBtn.download = response.filename;
 
     // Load file content
@@ -109,7 +109,7 @@ async function loadFileContent(file) {
 // ============================================================
 async function loadPDF(file) {
   const iframe = document.getElementById('viewerIframe');
-  const url = `/api/v1/storage/files/${file.id}/download`;
+  const url = `${api.baseUrl}/api/v1/storage/files/${file.id}/download`;
 
   iframe.src = url;
   iframe.classList.remove('hidden');
@@ -119,7 +119,7 @@ async function loadPDF(file) {
 
 async function loadImage(file) {
   const img = document.getElementById('viewerImage');
-  const url = `/api/v1/storage/files/${file.id}/download`;
+  const url = `${api.baseUrl}/api/v1/storage/files/${file.id}/download`;
 
   img.src = url;
   img.onload = () => {
@@ -133,7 +133,7 @@ async function loadImage(file) {
 
 async function loadText(file) {
   try {
-    const response = await fetch(`/api/v1/storage/files/${file.id}/download`, {
+    const response = await fetch(`${api.baseUrl}/api/v1/storage/files/${file.id}/download`, {
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('authToken')}`
       }
