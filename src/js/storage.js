@@ -120,11 +120,21 @@ function setupEventListeners() {
   document.getElementById('cancelNewFolderBtn')?.addEventListener('click', hideNewFolderModal);
   document.getElementById('newFolderForm')?.addEventListener('submit', handleCreateFolder);
 
-  // Upload button
+  // Upload button - trigger file picker
   document.getElementById('uploadBtn')?.addEventListener('click', () => {
     document.getElementById('fileUploadInput')?.click();
   });
-  document.getElementById('fileUploadInput')?.addEventListener('change', handleFileUpload);
+  // When files are selected, show hints modal instead of immediately uploading
+  document.getElementById('fileUploadInput')?.addEventListener('change', handleFileSelection);
+
+  // Single file upload modal handlers
+  document.getElementById('cancelSingleUploadBtn')?.addEventListener('click', hideSingleUploadModal);
+  document.getElementById('confirmSingleUploadBtn')?.addEventListener('click', handleSingleFileUploadWithHints);
+
+  // Bulk upload modal handlers
+  document.getElementById('cancelBulkUploadBtn')?.addEventListener('click', hideBulkUploadModal);
+  document.getElementById('confirmBulkUploadBtn')?.addEventListener('click', handleBulkUploadWithHints);
+  document.getElementById('applyToAllBtn')?.addEventListener('click', applyHintsToAll);
 
   // View toggle buttons
   document.getElementById('gridViewBtn')?.addEventListener('click', () => switchView('grid'));
@@ -945,28 +955,229 @@ async function handleCreateFolder(event) {
 }
 
 // ============================================================
-// FILE UPLOAD
+// FILE UPLOAD WITH HINTS
 // ============================================================
-async function handleFileUpload(event) {
+
+// Store selected files temporarily for upload after hints are specified
+let pendingUploadFiles = null;
+
+/**
+ * Handle file selection - show appropriate modal based on file count
+ */
+function handleFileSelection(event) {
   const files = event.target.files;
   if (!files || files.length === 0) return;
 
-  console.log('[Storage] Uploading', files.length, 'file(s)');
+  pendingUploadFiles = Array.from(files);
+  console.log('[Storage] Files selected:', pendingUploadFiles.length);
 
-  // BUG FIX #2: Show upload progress indicator
-  showNotification(`Uploading ${files.length} file(s)...`, 'info');
+  if (pendingUploadFiles.length === 1) {
+    // Single file: show single upload modal
+    showSingleUploadModal(pendingUploadFiles[0]);
+  } else {
+    // Multiple files: show bulk upload grid modal
+    showBulkUploadModal(pendingUploadFiles);
+  }
+}
+
+/**
+ * Show single file upload modal with hints
+ */
+function showSingleUploadModal(file) {
+  const modal = document.getElementById('uploadSingleFileModal');
+  const fileNameEl = document.getElementById('singleFileName');
+  const fileSizeEl = document.getElementById('singleFileSize');
+  const signaturesCheckbox = document.getElementById('singleHasSignatures');
+  const formsCheckbox = document.getElementById('singleHasForms');
+
+  if (fileNameEl) fileNameEl.textContent = file.name;
+  if (fileSizeEl) fileSizeEl.textContent = formatFileSize(file.size);
+
+  // Reset checkboxes to auto-detect (unchecked)
+  if (signaturesCheckbox) signaturesCheckbox.checked = false;
+  if (formsCheckbox) formsCheckbox.checked = false;
+
+  modal?.classList.remove('hidden');
+  modal?.classList.add('flex');
+}
+
+/**
+ * Hide single file upload modal
+ */
+function hideSingleUploadModal() {
+  const modal = document.getElementById('uploadSingleFileModal');
+  modal?.classList.add('hidden');
+  modal?.classList.remove('flex');
+
+  // Clear pending files and reset file input
+  pendingUploadFiles = null;
+  const fileInput = document.getElementById('fileUploadInput');
+  if (fileInput) fileInput.value = '';
+}
+
+/**
+ * Handle single file upload with hints
+ */
+async function handleSingleFileUploadWithHints() {
+  if (!pendingUploadFiles || pendingUploadFiles.length !== 1) {
+    showErrorNotification('No file selected');
+    return;
+  }
+
+  const file = pendingUploadFiles[0];
+  const signaturesCheckbox = document.getElementById('singleHasSignatures');
+  const formsCheckbox = document.getElementById('singleHasForms');
+  const hasSignatures = signaturesCheckbox ? signaturesCheckbox.checked : false;
+  const hasForms = formsCheckbox ? formsCheckbox.checked : false;
+
+  console.log('[Storage] Uploading file with hints:', {
+    filename: file.name,
+    hasSignatures,
+    hasForms
+  });
+
+  hideSingleUploadModal();
+  showNotification('Uploading file...', 'info');
 
   try {
-    // Upload files using fetch (single file upload endpoint)
     await api._readyPromise;
 
-    // Upload each file individually to /api/v1/storage/upload
-    const uploadPromises = Array.from(files).map(async (file) => {
-      const singleFileFormData = new FormData();
-      singleFileFormData.append('file', file);
-      singleFileFormData.append('matter_id', storageState.currentMatterId);
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('matter_id', storageState.currentMatterId);
+    if (storageState.currentFolderId) {
+      formData.append('folder_id', storageState.currentFolderId);
+    }
+
+    // Add hints if specified
+    if (hasSignatures || hasForms) {
+      const hints = {};
+      if (hasSignatures) hints.hasSignatures = true;
+      if (hasForms) hints.hasForms = true;
+      formData.append('hints', JSON.stringify(hints));
+    }
+
+    const response = await fetch(`${api.baseUrl}/api/v1/storage/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${api.token}`
+      },
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error(`Upload failed: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log('[Storage] Upload successful:', result);
+
+    showSuccessNotification('File uploaded successfully');
+    await loadFolderContents();
+  } catch (error) {
+    console.error('[Storage] Failed to upload file:', error);
+    showErrorNotification('Failed to upload file. Please try again.');
+  }
+}
+
+/**
+ * Show bulk upload grid modal
+ */
+function showBulkUploadModal(files) {
+  const modal = document.getElementById('bulkUploadModal');
+  const gridBodyEl = document.getElementById('bulkUploadGridBody');
+
+  // Build grid rows
+  const rows = files.map((file, index) => `
+    <tr>
+      <td class="px-4 py-3 text-sm text-gray-700">${escapeHtml(file.name)}</td>
+      <td class="px-4 py-3 text-sm text-gray-500">${formatFileSize(file.size)}</td>
+      <td class="px-4 py-3 text-sm text-gray-500 bulk-doc-type" data-index="${index}">${getFileType(file)}</td>
+      <td class="px-4 py-3 text-center">
+        <input type="checkbox" class="bulk-signatures-checkbox rounded text-indigo-600" data-index="${index}">
+      </td>
+      <td class="px-4 py-3 text-center">
+        <input type="checkbox" class="bulk-forms-checkbox rounded text-indigo-600" data-index="${index}">
+      </td>
+    </tr>
+  `).join('');
+
+  if (gridBodyEl) gridBodyEl.innerHTML = rows;
+
+  modal?.classList.remove('hidden');
+  modal?.classList.add('flex');
+}
+
+/**
+ * Hide bulk upload modal
+ */
+function hideBulkUploadModal() {
+  const modal = document.getElementById('bulkUploadModal');
+  modal?.classList.add('hidden');
+  modal?.classList.remove('flex');
+
+  // Clear pending files and reset file input
+  pendingUploadFiles = null;
+  const fileInput = document.getElementById('fileUploadInput');
+  if (fileInput) fileInput.value = '';
+}
+
+/**
+ * Apply hints from first file to all files
+ */
+function applyHintsToAll() {
+  const firstSignatures = document.querySelector('.bulk-signatures-checkbox[data-index="0"]')?.checked || false;
+  const firstForms = document.querySelector('.bulk-forms-checkbox[data-index="0"]')?.checked || false;
+
+  // Apply to all rows
+  document.querySelectorAll('.bulk-signatures-checkbox').forEach(checkbox => {
+    checkbox.checked = firstSignatures;
+  });
+  document.querySelectorAll('.bulk-forms-checkbox').forEach(checkbox => {
+    checkbox.checked = firstForms;
+  });
+
+  showNotification('Hints applied to all files', 'success');
+}
+
+/**
+ * Handle bulk upload with hints
+ */
+async function handleBulkUploadWithHints() {
+  if (!pendingUploadFiles || pendingUploadFiles.length === 0) {
+    showErrorNotification('No files selected');
+    return;
+  }
+
+  // Collect hints for each file
+  const filesWithHints = pendingUploadFiles.map((file, index) => {
+    const hasSignatures = document.querySelector(`.bulk-signatures-checkbox[data-index="${index}"]`)?.checked || false;
+    const hasForms = document.querySelector(`.bulk-forms-checkbox[data-index="${index}"]`)?.checked || false;
+
+    const hints = {};
+    if (hasSignatures) hints.hasSignatures = true;
+    if (hasForms) hints.hasForms = true;
+
+    return { file, hints: Object.keys(hints).length > 0 ? hints : null };
+  });
+
+  console.log('[Storage] Uploading', filesWithHints.length, 'files with hints');
+
+  hideBulkUploadModal();
+  showNotification(`Uploading ${filesWithHints.length} file(s)...`, 'info');
+
+  try {
+    await api._readyPromise;
+
+    const uploadPromises = filesWithHints.map(async ({ file, hints }) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('matter_id', storageState.currentMatterId);
       if (storageState.currentFolderId) {
-        singleFileFormData.append('folder_id', storageState.currentFolderId);
+        formData.append('folder_id', storageState.currentFolderId);
+      }
+      if (hints) {
+        formData.append('hints', JSON.stringify(hints));
       }
 
       return fetch(`${api.baseUrl}/api/v1/storage/upload`, {
@@ -974,7 +1185,7 @@ async function handleFileUpload(event) {
         headers: {
           'Authorization': `Bearer ${api.token}`
         },
-        body: singleFileFormData
+        body: formData
       });
     });
 
@@ -985,17 +1196,10 @@ async function handleFileUpload(event) {
       throw new Error(`${failedUploads.length} file(s) failed to upload`);
     }
 
-    // Parse all responses
     const results = await Promise.all(responses.map(r => r.json()));
-    console.log('[Storage] Upload successful:', results);
+    console.log('[Storage] Bulk upload successful:', results);
 
-    // BUG FIX #2: Show success notification
-    showSuccessNotification(`Successfully uploaded ${files.length} file(s)`);
-
-    // Clear file input
-    event.target.value = '';
-
-    // Reload folder contents
+    showSuccessNotification(`Successfully uploaded ${filesWithHints.length} file(s)`);
     await loadFolderContents();
   } catch (error) {
     console.error('[Storage] Failed to upload files:', error);
@@ -1492,6 +1696,59 @@ function formatFileSize(bytes) {
   return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 }
 
+/**
+ * Get file type display name from file
+ */
+function getFileType(file) {
+  // Try to get from MIME type first
+  if (file.type) {
+    const mimeMap = {
+      'application/pdf': 'PDF',
+      'application/msword': 'Word',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'Word',
+      'application/vnd.ms-excel': 'Excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'Excel',
+      'application/vnd.ms-powerpoint': 'PowerPoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'PowerPoint',
+      'text/plain': 'Text',
+      'text/csv': 'CSV',
+      'image/jpeg': 'Image',
+      'image/jpg': 'Image',
+      'image/png': 'Image',
+      'image/gif': 'Image',
+      'image/svg+xml': 'Image',
+      'application/zip': 'ZIP',
+      'application/x-zip-compressed': 'ZIP'
+    };
+
+    if (mimeMap[file.type]) {
+      return mimeMap[file.type];
+    }
+  }
+
+  // Fall back to file extension
+  const ext = file.name.split('.').pop().toLowerCase();
+  const extMap = {
+    'pdf': 'PDF',
+    'doc': 'Word',
+    'docx': 'Word',
+    'xls': 'Excel',
+    'xlsx': 'Excel',
+    'ppt': 'PowerPoint',
+    'pptx': 'PowerPoint',
+    'txt': 'Text',
+    'csv': 'CSV',
+    'jpg': 'Image',
+    'jpeg': 'Image',
+    'png': 'Image',
+    'gif': 'Image',
+    'svg': 'Image',
+    'zip': 'ZIP'
+  };
+
+  return extMap[ext] || 'Unknown';
+}
+
 function formatDate(dateString) {
   if (!dateString) return '—';
   const date = new Date(dateString);
@@ -1728,11 +1985,17 @@ function openRecentFile(fileId, clientMatter) {
 
 async function loadPinnedMatters() {
   try {
+    console.log('[Storage] loadPinnedMatters() called');
+
     // Get all matters and filter pinned ones
     const response = await api.get('/api/v1/matters?limit=100&page=1');
+    console.log('[Storage] Matters API response:', response);
 
     if (response && response.matters && response.matters.length > 0) {
+      console.log('[Storage] Total matters:', response.matters.length);
+
       const pinnedMatters = response.matters.filter(m => m.is_pinned);
+      console.log('[Storage] Pinned matters found:', pinnedMatters.length, pinnedMatters);
 
       if (pinnedMatters.length > 0) {
         // Sort by pinned_at (most recent first)
@@ -1746,10 +2009,21 @@ async function loadPinnedMatters() {
         const pinnedFiles = document.getElementById('pinnedFiles');
         const pinnedCount = document.getElementById('pinnedCount');
 
-        pinnedFiles.innerHTML = pinnedMatters.map(matter => renderMatterCard(matter, true)).join('');
-        pinnedCount.textContent = `${pinnedMatters.length} ${pinnedMatters.length === 1 ? 'item' : 'items'}`;
-        pinnedSection.classList.remove('hidden');
+        console.log('[Storage] Pinned section elements:', { pinnedSection, pinnedFiles, pinnedCount });
+
+        if (pinnedSection && pinnedFiles && pinnedCount) {
+          pinnedFiles.innerHTML = pinnedMatters.map(matter => renderMatterCard(matter, true)).join('');
+          pinnedCount.textContent = `${pinnedMatters.length} ${pinnedMatters.length === 1 ? 'item' : 'items'}`;
+          pinnedSection.classList.remove('hidden');
+          console.log('[Storage] Pinned section displayed successfully');
+        } else {
+          console.error('[Storage] Pinned section DOM elements not found!');
+        }
+      } else {
+        console.log('[Storage] No pinned matters to display');
       }
+    } else {
+      console.log('[Storage] No matters in response');
     }
   } catch (error) {
     console.error('[Storage] Failed to load pinned matters:', error);

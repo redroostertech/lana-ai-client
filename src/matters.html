@@ -1246,8 +1246,14 @@
         }
 
         // Separate pinned and unpinned matters
+        console.log('[Matters] Total matters loaded:', matters.length);
+        console.log('[Matters] Sample matter for inspection:', matters[0]);
+
         const pinnedMatters = matters.filter(m => m.is_pinned);
         const unpinnedMatters = matters.filter(m => !m.is_pinned);
+
+        console.log('[Matters] Pinned matters:', pinnedMatters.length, pinnedMatters);
+        console.log('[Matters] Unpinned matters:', unpinnedMatters.length);
 
         // Sort pinned matters by pinned_at (most recent first)
         // Security: Handle null/undefined pinned_at to prevent crashes
@@ -1262,6 +1268,7 @@
 
         // Pinned Matters Section
         if (pinnedMatters.length > 0) {
+          console.log('[Matters] Rendering pinned matters section');
           html += `
             <div class="col-span-full">
               <div class="flex items-center gap-2 mb-4">
