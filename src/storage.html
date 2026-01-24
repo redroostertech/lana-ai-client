@@ -922,9 +922,6 @@
                 <p class="text-sm text-gray-500"><span id="bulkFileCount">0</span> files selected - Configure hints for each file</p>
               </div>
             </div>
-            <button id="closeBulkModal" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-            </button>
           </div>
         </div>
 
@@ -991,7 +988,7 @@
                   <th class="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider border-b border-gray-200">Forms</th>
                 </tr>
               </thead>
-              <tbody id="bulkFilesList" class="bg-white divide-y divide-gray-200">
+              <tbody id="bulkUploadGridBody" class="bg-white divide-y divide-gray-200">
                 <!-- File rows will be dynamically inserted here -->
               </tbody>
             </table>
@@ -1000,14 +997,14 @@
 
         <!-- Modal Footer -->
         <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3 bg-gray-50 rounded-b-xl flex-shrink-0">
-          <button id="cancelBulkUpload" class="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg font-medium transition-colors">
+          <button id="cancelBulkUploadBtn" class="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg font-medium transition-colors">
             Cancel
           </button>
-          <button id="confirmBulkUpload" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors">
+          <button id="confirmBulkUploadBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
             </svg>
-            Upload <span id="bulkUploadFileCount">0</span> Documents
+            Upload Documents
           </button>
         </div>
       </div>

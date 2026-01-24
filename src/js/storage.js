@@ -1085,16 +1085,14 @@ async function handleSingleFileUploadWithHints() {
  */
 function showBulkUploadModal(files) {
   const modal = document.getElementById('bulkUploadModal');
-  const fileCountEl = document.getElementById('bulkFileCount');
   const gridBodyEl = document.getElementById('bulkUploadGridBody');
-
-  if (fileCountEl) fileCountEl.textContent = files.length;
 
   // Build grid rows
   const rows = files.map((file, index) => `
     <tr>
       <td class="px-4 py-3 text-sm text-gray-700">${escapeHtml(file.name)}</td>
       <td class="px-4 py-3 text-sm text-gray-500">${formatFileSize(file.size)}</td>
+      <td class="px-4 py-3 text-sm text-gray-500 bulk-doc-type" data-index="${index}">${getFileType(file)}</td>
       <td class="px-4 py-3 text-center">
         <input type="checkbox" class="bulk-signatures-checkbox rounded text-indigo-600" data-index="${index}">
       </td>
@@ -1696,6 +1694,59 @@ function formatFileSize(bytes) {
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+}
+
+/**
+ * Get file type display name from file
+ */
+function getFileType(file) {
+  // Try to get from MIME type first
+  if (file.type) {
+    const mimeMap = {
+      'application/pdf': 'PDF',
+      'application/msword': 'Word',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'Word',
+      'application/vnd.ms-excel': 'Excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'Excel',
+      'application/vnd.ms-powerpoint': 'PowerPoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'PowerPoint',
+      'text/plain': 'Text',
+      'text/csv': 'CSV',
+      'image/jpeg': 'Image',
+      'image/jpg': 'Image',
+      'image/png': 'Image',
+      'image/gif': 'Image',
+      'image/svg+xml': 'Image',
+      'application/zip': 'ZIP',
+      'application/x-zip-compressed': 'ZIP'
+    };
+
+    if (mimeMap[file.type]) {
+      return mimeMap[file.type];
+    }
+  }
+
+  // Fall back to file extension
+  const ext = file.name.split('.').pop().toLowerCase();
+  const extMap = {
+    'pdf': 'PDF',
+    'doc': 'Word',
+    'docx': 'Word',
+    'xls': 'Excel',
+    'xlsx': 'Excel',
+    'ppt': 'PowerPoint',
+    'pptx': 'PowerPoint',
+    'txt': 'Text',
+    'csv': 'CSV',
+    'jpg': 'Image',
+    'jpeg': 'Image',
+    'png': 'Image',
+    'gif': 'Image',
+    'svg': 'Image',
+    'zip': 'ZIP'
+  };
+
+  return extMap[ext] || 'Unknown';
 }
 
 function formatDate(dateString) {
