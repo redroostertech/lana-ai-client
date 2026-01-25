@@ -83,10 +83,15 @@ class ApiClient {
       this._ready = true;
       this._readyPromise = Promise.resolve(this.baseUrl);
     }
-    
+
     this.demoMode = this.config.DEMO_MODE || false;
     this.debugMode = this.config.DEBUG_MODE || false;
     this.timeout = this.config.REQUEST_TIMEOUT || 30000;
+
+    // Token refresh management
+    this.refreshTimer = null;
+    this.lastActivityTime = Date.now();
+    this.isRefreshing = false;
 
     if (this.demoMode) {
       // In demo mode, set up fake authentication
@@ -108,6 +113,12 @@ class ApiClient {
       } else {
         this.token = storedToken;
         this.user = JSON.parse(localStorage.getItem('user') || 'null');
+
+        // Start automatic token refresh if we have a valid token
+        if (this.token) {
+          this.startTokenRefresh();
+          this.setupActivityListener();
+        }
       }
     }
   }
@@ -136,6 +147,179 @@ class ApiClient {
       return true;
     }
     return false;
+  }
+
+  /**
+   * Parse JWT token to extract payload (including expiration time)
+   * @param {string} token - JWT token
+   * @returns {Object|null} Decoded payload or null if invalid
+   */
+  parseJWT(token) {
+    if (!token) return null;
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) return null;
+      const payload = JSON.parse(atob(parts[1]));
+      return payload;
+    } catch (error) {
+      this.log('Failed to parse JWT:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get token expiration time in milliseconds
+   * @returns {number|null} Expiration timestamp or null if no token/invalid
+   */
+  getTokenExpiration() {
+    if (!this.token) return null;
+    const payload = this.parseJWT(this.token);
+    if (!payload || !payload.exp) return null;
+    return payload.exp * 1000; // Convert to milliseconds
+  }
+
+  /**
+   * Check if token is near expiration (within threshold)
+   * @param {number} thresholdMs - Time before expiration to consider "near" (default: 1 hour)
+   * @returns {boolean} True if token expires soon
+   */
+  isTokenNearExpiration(thresholdMs = 60 * 60 * 1000) {
+    const expiration = this.getTokenExpiration();
+    if (!expiration) return false;
+    const now = Date.now();
+    return (expiration - now) < thresholdMs;
+  }
+
+  /**
+   * Check if token is expired
+   * @returns {boolean} True if token is expired
+   */
+  isTokenExpired() {
+    const expiration = this.getTokenExpiration();
+    if (!expiration) return false;
+    return Date.now() >= expiration;
+  }
+
+  /**
+   * Start automatic token refresh mechanism
+   * Refreshes token periodically before it expires
+   */
+  startTokenRefresh() {
+    // Clear any existing timer
+    this.stopTokenRefresh();
+
+    // Calculate when to refresh (refresh 1 hour before expiration)
+    const expiration = this.getTokenExpiration();
+    if (!expiration) {
+      this.log('Cannot start token refresh: no expiration in token');
+      return;
+    }
+
+    const now = Date.now();
+    const timeUntilExpiration = expiration - now;
+    const refreshThreshold = 60 * 60 * 1000; // 1 hour
+
+    // If token expires in less than 1 hour, refresh immediately
+    if (timeUntilExpiration < refreshThreshold) {
+      this.log('Token expires soon, refreshing immediately');
+      this.performTokenRefresh();
+      return;
+    }
+
+    // Schedule refresh 1 hour before expiration
+    const timeUntilRefresh = timeUntilExpiration - refreshThreshold;
+    this.log(`Token refresh scheduled in ${Math.round(timeUntilRefresh / 1000 / 60)} minutes`);
+
+    this.refreshTimer = setTimeout(() => {
+      this.performTokenRefresh();
+    }, timeUntilRefresh);
+  }
+
+  /**
+   * Stop automatic token refresh
+   */
+  stopTokenRefresh() {
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = null;
+    }
+  }
+
+  /**
+   * Perform token refresh and reschedule next refresh
+   */
+  async performTokenRefresh() {
+    if (this.isRefreshing) {
+      this.log('Token refresh already in progress');
+      return;
+    }
+
+    if (this.demoMode) {
+      this.log('Demo mode - skipping token refresh');
+      return;
+    }
+
+    this.isRefreshing = true;
+
+    try {
+      this.log('Refreshing token...');
+      const result = await this.refreshToken();
+
+      if (result && result.token) {
+        this.log('Token refreshed successfully');
+        // Restart the refresh timer with the new token
+        this.startTokenRefresh();
+      } else {
+        this.log('Token refresh returned no token');
+      }
+    } catch (error) {
+      console.error('[LanaAPI] Token refresh failed:', error);
+      // If refresh fails, show session expired modal and redirect to login
+      this.showSessionExpiredModal();
+    } finally {
+      this.isRefreshing = false;
+    }
+  }
+
+  /**
+   * Setup activity listener to refresh token on user activity
+   * Refreshes token if user is active and token is near expiration
+   */
+  setupActivityListener() {
+    const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+    const refreshThreshold = 60 * 60 * 1000; // 1 hour
+    const activityCheckInterval = 5 * 60 * 1000; // Check every 5 minutes
+
+    const handleActivity = () => {
+      this.lastActivityTime = Date.now();
+    };
+
+    // Add event listeners for user activity
+    activityEvents.forEach(event => {
+      document.addEventListener(event, handleActivity, { passive: true });
+    });
+
+    // Periodically check if we should refresh based on activity
+    this.activityCheckInterval = setInterval(() => {
+      const timeSinceActivity = Date.now() - this.lastActivityTime;
+      const wasRecentlyActive = timeSinceActivity < 5 * 60 * 1000; // Active in last 5 minutes
+
+      // If user was recently active and token is near expiration, refresh it
+      if (wasRecentlyActive && this.isTokenNearExpiration(refreshThreshold)) {
+        this.log('User is active and token near expiration, refreshing...');
+        this.performTokenRefresh();
+      }
+    }, activityCheckInterval);
+  }
+
+  /**
+   * Cleanup activity listener
+   */
+  cleanupActivityListener() {
+    if (this.activityCheckInterval) {
+      clearInterval(this.activityCheckInterval);
+      this.activityCheckInterval = null;
+    }
   }
 
   showSessionExpiredModal() {
@@ -749,6 +933,11 @@ class ApiClient {
     this.user = result.user;
     localStorage.setItem('token', result.token);
     localStorage.setItem('user', JSON.stringify(result.user));
+
+    // Start automatic token refresh and activity monitoring after login
+    this.startTokenRefresh();
+    this.setupActivityListener();
+
     return result;
   }
 
@@ -758,6 +947,10 @@ class ApiClient {
         await this.post('/api/v1/auth/logout');
       }
     } finally {
+      // Clean up token refresh timers and listeners
+      this.stopTokenRefresh();
+      this.cleanupActivityListener();
+
       this.token = null;
       this.user = null;
       localStorage.removeItem('token');
