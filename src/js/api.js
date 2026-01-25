@@ -272,7 +272,8 @@ class ApiClient {
       if (!response.ok) {
         // Check for authentication/session errors - redirect to login
         const errorCode = result.error?.code;
-        const errorMessage = result.error?.message || '';
+        // Support both error formats: {error: {message: ...}} and {detail: ...}
+        const errorMessage = result.error?.message || result.detail || result.message || '';
 
         // Don't show session expired modal for login-related requests or on the login page
         const isLoginRequest = endpoint.includes('/auth/login') || endpoint.includes('/auth/register');
@@ -288,10 +289,11 @@ class ApiClient {
 
           // Show session expired modal and redirect
           this.showSessionExpiredModal();
-          throw new ApiError(result.error?.message || 'Session expired', response.status, result);
+          throw new ApiError(result.error?.message || result.detail || 'Session expired', response.status, result);
         }
 
-        throw new ApiError(result.error?.message || 'Request failed', response.status, result);
+        // Support both error formats: {error: {message: ...}} and {detail: ...}
+        throw new ApiError(result.error?.message || result.detail || result.message || 'Request failed', response.status, result);
       }
 
       this.log(`Response:`, result);
