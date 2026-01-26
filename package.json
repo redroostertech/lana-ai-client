@@ -1,10 +1,11 @@
 {
-  "name": "lana-ai",
-  "productName": "Lana AI",
+  "name": "lana-ai-community",
+  "productName": "Lana AI Community",
   "version": "3.0.0",
   "buildNumber": "1",
   "releaseType": "stable",
-  "description": "Lana AI - Enterprise AI Platform",
+  "edition": "community",
+  "description": "Lana AI Community Edition - Local AI Platform",
   "main": "src/index.js",
   "author": {
     "name": "Red Rooster Technologies",

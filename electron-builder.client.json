@@ -1,6 +1,6 @@
 {
-  "appId": "com.redroostertech.lana-ai-client",
-  "productName": "Lana AI Client",
+  "appId": "com.redroostertech.lana-ai-community",
+  "productName": "Lana AI Community",
   "copyright": "Copyright © 2025 Red Rooster Technologies",
   "directories": {
     "output": "dist",
@@ -9,11 +9,11 @@
   "extraMetadata": {
     "main": "electron-main.js"
   },
-  "artifactName": "LanaAI--genesis--${version}.${ext}",
+  "artifactName": "LanaAI-Community-${version}.${ext}",
   "publish": {
     "provider": "github",
     "owner": "redroostertech",
-    "repo": "lana-ai-client",
+    "repo": "lana-community",
     "releaseType": "release"
   },
   "files": [
@@ -47,7 +47,7 @@
   "npmRebuild": true,
   "mac": {
     "category": "public.app-category.business",
-    "artifactName": "LanaAI--genesis--${version}-${arch}.${ext}",
+    "artifactName": "LanaAI-Community-${version}-${arch}.${ext}",
     "target": ["dmg", "zip"],
     "icon": "build/icon.icns",
     "hardenedRuntime": true,
@@ -57,7 +57,7 @@
     "notarize": true
   },
   "win": {
-    "artifactName": "LanaAI--genesis--${version}.${ext}",
+    "artifactName": "LanaAI-Community-${version}.${ext}",
     "target": [
       {
         "target": "nsis",
@@ -71,7 +71,7 @@
     "icon": "build/icon.ico"
   },
   "linux": {
-    "artifactName": "LanaAI--genesis--${version}.${ext}",
+    "artifactName": "LanaAI-Community-${version}.${ext}",
     "target": [
       "AppImage",
       "deb"
@@ -84,11 +84,11 @@
     "allowToChangeInstallationDirectory": true,
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
-    "shortcutName": "Lana AI Client",
-    "artifactName": "LanaAI--genesis--${version}-setup.${ext}"
+    "shortcutName": "Lana AI Community",
+    "artifactName": "LanaAI-Community-${version}-setup.${ext}"
   },
   "dmg": {
-    "artifactName": "LanaAI--genesis--${version}-${arch}.${ext}",
+    "artifactName": "LanaAI-Community-${version}-${arch}.${ext}",
     "contents": [
       {
         "x": 130,
@@ -105,6 +105,6 @@
       "width": 540,
       "height": 400
     },
-    "title": "Lana AI Client ${version}"
+    "title": "Lana AI Community ${version}"
   }
 }
