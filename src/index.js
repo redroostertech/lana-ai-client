@@ -43,10 +43,18 @@ app.use('/api', createProxyMiddleware({
   }
 }));
 
-// Serve static files
+// Serve static files with cache control for development
 app.use(express.static(staticDir, {
   extensions: ['html', 'htm'],
-  index: ['index.html', 'login.html']
+  index: ['index.html', 'login.html'],
+  setHeaders: (res, filePath) => {
+    // Disable caching for JS files in development to ensure latest version is always loaded
+    if (filePath.endsWith('.js')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
 }));
 
 // Serve node_modules for client-side dependencies
