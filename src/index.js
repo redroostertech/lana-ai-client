@@ -27,10 +27,16 @@ console.log(`[Frontend] Serving static files from: ${staticDir}`);
 console.log(`[Frontend] Proxying /api/* to: ${BACKEND_URL}`);
 
 // Proxy API requests to backend
+// Note: Express strips the mount path (/api) before passing to middleware,
+// so we need pathRewrite to add it back for the backend
 app.use('/api', createProxyMiddleware({
   target: BACKEND_URL,
   changeOrigin: true,
   ws: true, // Enable WebSocket proxying
+  pathRewrite: (path) => '/api' + path, // Restore /api prefix for backend
+  onProxyReq: (proxyReq, req) => {
+    console.log(`[Frontend] Proxying ${req.method} /api${req.url} -> ${BACKEND_URL}/api${req.url}`);
+  },
   onError: (err, req, res) => {
     console.error(`[Frontend] Proxy error: ${err.message}`);
     res.status(502).json({ error: 'Backend unavailable', message: err.message });
