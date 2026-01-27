@@ -1,15 +1,17 @@
 /**
  * Lana AI Community Edition - Frontend Server
- * Simple Express server to serve static files
+ * Express server to serve static files and proxy API requests to backend
  */
 
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const { createProxyMiddleware } = require('http-proxy-middleware');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
+const BACKEND_URL = process.env.BACKEND_URL || 'http://127.0.0.1:8080';
 
 // Serve static files from the src directory
 const srcDir = path.join(__dirname);
@@ -22,6 +24,18 @@ if (fs.existsSync(publicDir)) {
 }
 
 console.log(`[Frontend] Serving static files from: ${staticDir}`);
+console.log(`[Frontend] Proxying /api/* to: ${BACKEND_URL}`);
+
+// Proxy API requests to backend
+app.use('/api', createProxyMiddleware({
+  target: BACKEND_URL,
+  changeOrigin: true,
+  ws: true, // Enable WebSocket proxying
+  onError: (err, req, res) => {
+    console.error(`[Frontend] Proxy error: ${err.message}`);
+    res.status(502).json({ error: 'Backend unavailable', message: err.message });
+  }
+}));
 
 // Serve static files
 app.use(express.static(staticDir, {
