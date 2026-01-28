@@ -667,26 +667,108 @@
                 </button>
               </div>
             </div>
-            <!-- Controls row: hint on left, attach + send on right -->
-            <div class="flex items-center justify-between mt-0.5">
-              <!-- Left side: hint text -->
-              <div class="flex items-center gap-3">
-                <p class="text-xs text-gray-400">Press Enter to send, Shift+Enter for new line</p>
+            <!-- Hint text row -->
+            <div class="mt-0.5 px-3 py-2">
+              <p class="text-xs text-gray-400">Press Enter to send, Shift+Enter for new line</p>
+            </div>
+            <!-- Controls row: left (+ and tools with pill), right (attach + send) -->
+            <div class="flex items-center justify-between mt-2">
+              <!-- Left side: New conversation, Tools button, and active tool pill -->
+              <div class="flex items-center gap-2">
+                <!-- Add Document Button with Dropdown -->
+                <div class="relative">
+                  <button
+                    type="button"
+                    id="documentsBtn"
+                    class="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
+                    title="Add document"
+                  >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                  </button>
+
+                  <!-- Documents Dropdown Menu (appears above) -->
+                  <div
+                    id="documentsDropdownMenu"
+                    class="hidden absolute bottom-full left-0 mb-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden z-50"
+                  >
+                    <div class="py-1">
+                      <button
+                        type="button"
+                        onclick="FileDrawer.openDrawer(); document.getElementById('documentsDropdownMenu').classList.add('hidden');"
+                        class="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-gray-50 transition"
+                      >
+                        <svg class="w-5 h-5 text-gray-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <div>
+                          <div class="text-sm font-medium text-gray-900">Manage chat documents</div>
+                          <div class="text-xs text-gray-500 mt-0.5">Upload and activate files for this conversation</div>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Tools Dropdown Button -->
+                <div class="relative">
+                  <button
+                    type="button"
+                    id="toolsDropdownBtn"
+                    class="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg transition-colors bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    title="Select a tool"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    Tools
+                  </button>
+
+                  <!-- Tools Dropdown Menu -->
+                  <div
+                    id="toolsDropdownMenu"
+                    class="hidden absolute bottom-full left-0 mb-2 w-56 bg-gray-800 rounded-lg shadow-lg overflow-hidden z-50"
+                  >
+                    <div class="py-1">
+                      <button
+                        type="button"
+                        onclick="selectTool('document_chat')"
+                        class="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-white hover:bg-gray-700 transition"
+                      >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <span>Document Chat</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Active Tool Pill -->
+                <div id="activeToolPill" class="hidden flex items-center gap-2 px-3 py-1.5 bg-purple-100 text-purple-800 rounded-lg text-sm">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                  </svg>
+                  <span id="activeToolLabel">Document Chat</span>
+                  <button
+                    type="button"
+                    onclick="removeTool()"
+                    class="ml-1 text-purple-600 hover:text-purple-900 transition"
+                    title="Remove tool"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                  </button>
+                </div>
               </div>
-              <!-- Right side: documents + send button -->
+
+              <!-- Right side: file input + send button -->
               <div class="flex items-center gap-2">
                 <input type="file" id="chatFileInput" class="hidden" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.md,.json,.png,.jpg,.jpeg,.gif,.webp">
-                <!-- Add Document Button -->
-                <button
-                  type="button"
-                  id="documentsBtn"
-                  class="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
-                  title="Add document"
-                >
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                  </svg>
-                </button>
+
                 <button
                   type="submit"
                   id="sendBtn"
@@ -720,20 +802,6 @@
   <div id="fileDrawerOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
 
   <!-- Add Menu Popup -->
-  <div id="addMenuPopup" class="hidden absolute bottom-16 right-4 bg-white rounded-lg shadow-xl border border-gray-200 z-50 w-72">
-    <div class="py-1">
-      <button id="manageDocumentsMenuItem" class="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 transition-colors">
-        <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-        </svg>
-        <div>
-          <div class="text-sm font-medium text-gray-900">Manage chat documents</div>
-          <div class="text-xs text-gray-500">Upload and activate files for this conversation</div>
-        </div>
-      </button>
-    </div>
-  </div>
-
   <!-- File Drawer Panel (Slide-out from right) -->
   <div id="fileDrawer" class="fixed top-0 bottom-0 right-0 w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 flex flex-col h-screen">
     <!-- Drawer Header -->
@@ -1748,6 +1816,108 @@
       console.log('[initializePage] About to call initializeFromURL()');
       await initializeFromURL();
       console.log('[initializePage] Completed initializeFromURL()');
+
+      // Initialize chat mode toggle
+      initChatMode();
+    }
+
+    // ===== TOOLS DROPDOWN =====
+    // Manages tool selection and activation (only 1 tool at a time)
+    let currentChatMode = localStorage.getItem('chatMode') || 'full';
+    let activeTool = null; // Current active tool ('document_chat' or null)
+
+    function initChatMode() {
+      // Initialize from localStorage
+      if (currentChatMode === 'document') {
+        activeTool = 'document_chat';
+      }
+      updateToolsUI();
+
+      // Documents dropdown toggle
+      const documentsBtn = document.getElementById('documentsBtn');
+      const documentsMenu = document.getElementById('documentsDropdownMenu');
+
+      documentsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Close tools menu if open
+        document.getElementById('toolsDropdownMenu').classList.add('hidden');
+        // Toggle documents menu
+        documentsMenu.classList.toggle('hidden');
+      });
+
+      // Tools dropdown toggle
+      const toolsBtn = document.getElementById('toolsDropdownBtn');
+      const toolsMenu = document.getElementById('toolsDropdownMenu');
+
+      toolsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Close documents menu if open
+        documentsMenu.classList.add('hidden');
+        // Toggle tools menu
+        toolsMenu.classList.toggle('hidden');
+      });
+
+      // Close dropdowns when clicking outside
+      document.addEventListener('click', (e) => {
+        if (!toolsBtn.contains(e.target) && !toolsMenu.contains(e.target)) {
+          toolsMenu.classList.add('hidden');
+        }
+        if (!documentsBtn.contains(e.target) && !documentsMenu.contains(e.target)) {
+          documentsMenu.classList.add('hidden');
+        }
+      });
+    }
+
+    // Select a tool from the dropdown
+    window.selectTool = function(toolId) {
+      // Close dropdown
+      document.getElementById('toolsDropdownMenu').classList.add('hidden');
+
+      // Only allow 1 tool at a time
+      if (activeTool) {
+        console.log('[Tools] Removing previous tool:', activeTool);
+      }
+
+      activeTool = toolId;
+
+      // Update chat mode based on tool
+      if (toolId === 'document_chat') {
+        currentChatMode = 'document';
+        localStorage.setItem('chatMode', 'document');
+        console.log('[Tools] Activated Document Chat tool');
+      }
+
+      updateToolsUI();
+    };
+
+    // Remove active tool
+    window.removeTool = function() {
+      if (!activeTool) return;
+
+      console.log('[Tools] Removing tool:', activeTool);
+
+      activeTool = null;
+      currentChatMode = 'full';
+      localStorage.setItem('chatMode', 'full');
+
+      updateToolsUI();
+    };
+
+    // Update UI based on active tool
+    function updateToolsUI() {
+      const toolPill = document.getElementById('activeToolPill');
+      const toolLabel = document.getElementById('activeToolLabel');
+
+      if (activeTool === 'document_chat') {
+        // Show pill
+        toolPill.classList.remove('hidden');
+        toolPill.classList.add('flex');
+        toolLabel.textContent = 'Document Chat';
+      } else {
+        // Hide pill
+        toolPill.classList.add('hidden');
+        toolPill.classList.remove('flex');
+      }
     }
 
     // Toggle section visibility
@@ -2847,59 +3017,69 @@
 
     // Delete conversation from modal
     window.deleteConversationFromModal = async function() {
-      // Customize the confirmation message based on type
-      const confirmMessage = selectedConversationIsProject
-        ? 'Are you sure you want to delete this project conversation?\n\nNote: This will only delete the chat messages. The matter/project itself will NOT be deleted and you can create new conversations for it later.'
-        : 'Are you sure you want to delete this conversation? This action cannot be undone.';
-      
-      if (!confirm(confirmMessage)) {
-        return;
-      }
-      
       // Store values BEFORE closing modal (close sets them to null)
       const conversationIdToDelete = selectedConversationId;
       const isProject = selectedConversationIsProject;
       const isDeletingCurrentConversation = (currentConversationId === conversationIdToDelete);
-      
+      const conversationTitle = selectedConversationTitle;
+
       // Validate we have an ID to delete
       if (!conversationIdToDelete) {
         Toast.error('No conversation selected');
         closeConversationActionsModal();
         return;
       }
-      
-      try {
-        // Close modal first for better UX
-        closeConversationActionsModal();
 
-        // Delete from backend
-        await api.delete(`/api/v1/chat/sessions/${conversationIdToDelete}`);
+      // Close the actions modal first
+      closeConversationActionsModal();
 
-        // If we're viewing the deleted conversation, clear immediately
-        if (isDeletingCurrentConversation) {
-          startNewChat();
+      // Customize the confirmation message based on type
+      const confirmMessage = isProject
+        ? `Are you sure you want to delete "${conversationTitle}"?<br><br><strong>Note:</strong> This will only delete the chat messages. The matter/project itself will NOT be deleted and you can create new conversations for it later.`
+        : `Are you sure you want to delete "${conversationTitle}"? This action cannot be undone.`;
+
+      // Show stylized confirmation modal
+      Modal.show({
+        title: 'Delete Conversation',
+        content: `<p class="text-gray-600">${confirmMessage}</p>`,
+        confirmText: 'Delete',
+        cancelText: 'Cancel',
+        type: 'danger',
+        onConfirm: async () => {
+          try {
+            // Delete from backend
+            await api.delete(`/api/v1/chat/sessions/${conversationIdToDelete}`);
+
+            // If we're viewing the deleted conversation, clear immediately
+            if (isDeletingCurrentConversation) {
+              startNewChat();
+            }
+
+            // IMMEDIATE UI UPDATE: Remove from local array and re-render
+            allConversations = allConversations.filter(c => c.thread_id !== conversationIdToDelete);
+            renderConversations(allConversations);
+
+            // Update sidebar menu immediately
+            if (typeof ConversationMenu !== 'undefined') {
+              ConversationMenu.conversations = ConversationMenu.conversations.filter(c => c.thread_id !== conversationIdToDelete);
+              ConversationMenu.render();
+            }
+
+            // Then reload from backend to ensure consistency (don't await to avoid blocking)
+            yourChatsPage = 1;
+            loadConversations(false).catch(err => console.error('Background refresh failed:', err));
+
+            // Show success message
+            Toast.success(isProject ? 'Project conversation deleted (matter preserved)' : 'Conversation deleted');
+          } catch (error) {
+            console.error('Failed to delete conversation:', error);
+            Toast.error('Failed to delete conversation');
+          }
+        },
+        onCancel: () => {
+          // User cancelled, nothing to do
         }
-
-        // IMMEDIATE UI UPDATE: Remove from local array and re-render
-        allConversations = allConversations.filter(c => c.thread_id !== conversationIdToDelete);
-        renderConversations(allConversations);
-
-        // Update sidebar menu immediately
-        if (typeof ConversationMenu !== 'undefined') {
-          ConversationMenu.conversations = ConversationMenu.conversations.filter(c => c.thread_id !== conversationIdToDelete);
-          ConversationMenu.render();
-        }
-
-        // Then reload from backend to ensure consistency (don't await to avoid blocking)
-        yourChatsPage = 1;
-        loadConversations(false).catch(err => console.error('Background refresh failed:', err));
-
-        // Show success message
-        Toast.success(isProject ? 'Project conversation deleted (matter preserved)' : 'Conversation deleted');
-      } catch (error) {
-        console.error('Failed to delete conversation:', error);
-        Toast.error('Failed to delete conversation');
-      }
+      });
     }
 
     // Select conversation
@@ -4100,29 +4280,14 @@
         // Tag elements will be removed, leaving just the plain text
         const cleanedMessage = content.trim();
 
-        // Use unified chat endpoint with intelligent RAG retrieval
-        const body = {
-          message: cleanedMessage,  // Chat endpoint uses 'message'
-          conversation_id: currentConversationId,
-          session_id: currentConversationId,  // Use conversation_id as session_id for document activation
-          context_type: 'full_chat'  // PHASE 1: Context-based tool scoping - main chat has full capabilities
-        };
+        // ===== SMART CONTEXT TYPE DETECTION =====
+        // Determine context_type based on:
+        // 1. User's manual toggle selection (if they explicitly chose document mode)
+        // 2. Auto-detect if message contains document references (mentions or uploaded files)
+        // 3. Default to full_chat otherwise
+        let contextType = 'full_chat';
 
-        // Always include matter_id when available (for project conversations)
-        // This ensures AI has matter context and enables WARM tier retrieval
-        if (window.currentMatterId) {
-          body.matter_id = window.currentMatterId;
-        } else {
-          // Check URL params for new conversations
-          const urlParams = new URLSearchParams(window.location.search);
-          const matterId = urlParams.get('matter');
-          if (matterId) {
-            body.matter_id = matterId;
-            window.currentMatterId = matterId; // Store for future messages
-          }
-        }
-
-        // Combine all attachments: uploaded files (if any) + document mentions
+        // First, gather attachment information (we'll need this for detection)
         const allAttachments = [];
 
         // Add uploaded files (from uploadInfo if files were uploaded)
@@ -4143,7 +4308,42 @@
           allAttachments.push(...documentMentions.attachedDocs);
         }
 
-        // Include attachments in request if there are any
+        // Check if user manually enabled document mode
+        if (currentChatMode === 'document') {
+          contextType = 'document_chat';
+          console.log('[Chat Mode] Using document_chat mode (user selected Document Chat)');
+        }
+        // Auto-detect: if attachments/mentions present, use document_chat
+        else if (allAttachments.length > 0) {
+          contextType = 'document_chat';
+          console.log('[Chat Mode] Auto-detected document_chat mode (attachments present)');
+        } else {
+          console.log('[Chat Mode] Using full_chat mode (default)');
+        }
+
+        // Use unified chat endpoint with intelligent RAG retrieval
+        const body = {
+          message: cleanedMessage,  // Chat endpoint uses 'message'
+          conversation_id: currentConversationId,
+          session_id: currentConversationId,  // Use conversation_id as session_id for document activation
+          context_type: contextType  // Smart context detection: document_chat or full_chat
+        };
+
+        // Always include matter_id when available (for project conversations)
+        // This ensures AI has matter context and enables WARM tier retrieval
+        if (window.currentMatterId) {
+          body.matter_id = window.currentMatterId;
+        } else {
+          // Check URL params for new conversations
+          const urlParams = new URLSearchParams(window.location.search);
+          const matterId = urlParams.get('matter');
+          if (matterId) {
+            body.matter_id = matterId;
+            window.currentMatterId = matterId; // Store for future messages
+          }
+        }
+
+        // Include attachments in request if there are any (already gathered above for context detection)
         if (allAttachments.length > 0) {
           body.attachments = {
             files: allAttachments
@@ -4154,7 +4354,10 @@
           sessionId: body.session_id,
           conversationId: body.conversation_id,
           matterId: body.matter_id,
+          contextType: body.context_type,
+          chatMode: currentChatMode,
           attachments: body.attachments,
+          attachmentCount: allAttachments.length,
           message: content.substring(0, 50) + (content.length > 50 ? '...' : '')
         });
 
@@ -4223,12 +4426,14 @@
           for (const line of lines) {
             if (line.startsWith('event:')) {
               currentEvent = line.slice(6).trim();
+              console.log('[SSE Debug] Event type:', currentEvent);
               continue;
             }
-            
+
             if (line.startsWith('data:')) {
               try {
                 const data = JSON.parse(line.slice(5).trim());
+                console.log('[SSE Debug] Data received for event:', currentEvent, data);
                 
                 // Handle connected event - capture thread_id and session_id
                 if (currentEvent === 'connected') {
@@ -4477,10 +4682,18 @@
 
                 // Handle content streaming (content event from RAG, or message event from chat)
                 if ((currentEvent === 'content' || currentEvent === 'message') && data.content) {
+                  console.log('[SSE Debug] Content event received:', {
+                    event: currentEvent,
+                    contentLength: data.content.length,
+                    contentPreview: data.content.substring(0, 50),
+                    responseStarted
+                  });
+
                   // Accumulate raw content for proper markdown parsing
                   streamingContent += data.content;
 
                   if (!responseStarted) {
+                    console.log('[SSE Debug] Starting new response, hiding typing indicator');
                     hideTyping();
                     addStreamingMessage(streamingContent);
                     responseStarted = true;
@@ -7355,6 +7568,13 @@
         tag.remove();
         // Remove from attached documents
         documentMentions.attachedDocs = documentMentions.attachedDocs.filter(d => d.file_id !== doc.id);
+
+        // Auto-disable Document Chat tool if no documents remain
+        if (documentMentions.attachedDocs.length === 0 && activeTool === 'document_chat') {
+          removeTool();
+          console.log('[Tools] Auto-removed Document Chat tool (no documents remaining)');
+        }
+
         messageInput.focus();
       });
 
@@ -7393,6 +7613,12 @@
           type: 'document',
           name: doc.filename
         });
+      }
+
+      // Auto-enable Document Chat tool when user mentions a document
+      if (activeTool !== 'document_chat') {
+        selectTool('document_chat');
+        console.log('[Tools] Auto-activated Document Chat tool (document mentioned with #)');
       }
 
       // Close picker and clear saved range

@@ -20,6 +20,24 @@ class LanaChat {
     this.maxDemoQueries = 50;
     this.currentMessageCitations = {};  // Store citations for current message
 
+    // Stateful Chat Mode - Stored in backend, synced locally
+    // NOTE: This is now managed by the backend API, not local state
+    this.chatState = {
+      mode: 'general',
+      agentPersona: 'default',
+      activeDocuments: [],
+      contextPreferences: {
+        useRAG: true,
+        useConversationHistory: true,
+        maxHistoryMessages: 10
+      },
+      activeFilters: [],
+      sessionMetadata: {}
+    };
+
+    // Document mode constants
+    this.maxDocuments = 3;
+
     this.init();
   }
 
@@ -59,6 +77,28 @@ class LanaChat {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
             </svg>
           </button>
+        </div>
+
+        <!-- Document Chat Mode Banner -->
+        <div id="documentModeBanner" class="hidden border-b border-indigo-200 bg-indigo-50 px-4 py-3">
+          <div class="flex items-center justify-between">
+            <div class="flex-1">
+              <div class="flex items-center gap-2 mb-2">
+                <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <span class="text-sm font-semibold text-indigo-900">Document Chat Mode</span>
+                <span id="docModeCount" class="text-xs text-indigo-600">(0 of 3 documents)</span>
+              </div>
+              <div id="docModeChips" class="flex flex-wrap gap-2">
+                <!-- Document chips will be inserted here -->
+              </div>
+              <p class="text-xs text-indigo-700 mt-2">All questions will be answered using these documents</p>
+            </div>
+            <button id="exitDocMode" class="ml-3 px-3 py-1 text-xs font-medium text-indigo-700 hover:text-indigo-900 hover:bg-indigo-100 rounded-md transition">
+              Exit
+            </button>
+          </div>
         </div>
 
         <!-- Messages Area -->
@@ -197,6 +237,294 @@ class LanaChat {
     document.head.appendChild(styles);
   }
 
+  // ========================================================================
+  // DOCUMENT CHAT MODE MANAGEMENT
+  // ========================================================================
+
+  /**
+   * Add a document to active document chat mode (max 3)
+   * Calls backend API to update chat state
+   * @param {string} documentId - Document UUID
+   * @param {string} filename - Document filename
+   */
+  async addDocumentToMode(documentId, filename) {
+    if (!this.currentConversationId) {
+      console.warn('[DocumentMode] No active conversation, cannot add document');
+      return false;
+    }
+
+    // Check if already at max capacity
+    if (this.chatState.activeDocuments.length >= this.maxDocuments) {
+      this.showSystemMessage(`Maximum of ${this.maxDocuments} documents reached. Remove a document to add another.`);
+      return false;
+    }
+
+    // Check if document already added
+    const existing = this.chatState.activeDocuments.find(d => d.id === documentId);
+    if (existing) {
+      this.showSystemMessage(`"${filename}" is already in document chat mode.`);
+      return false;
+    }
+
+    try {
+      // Call backend API to add document
+      const response = await fetch(`${this.api.baseUrl}/api/chat/conversations/${this.currentConversationId}/documents`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await this.api.getToken()}`
+        },
+        body: JSON.stringify({
+          documentId,
+          filename,
+          matterId: this.api.currentMatterId || null
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to add document');
+      }
+
+      const data = await response.json();
+
+      // Update local state from backend response
+      this.chatState = data.state;
+
+      // Update UI
+      this.updateDocumentModeBanner();
+
+      console.log('[DocumentMode] Document added via API:', {
+        documentId,
+        filename,
+        totalDocs: this.chatState.activeDocuments.length,
+        mode: this.chatState.mode
+      });
+
+      this.showSystemMessage(data.message || `Added "${filename}" to document chat mode`);
+      return true;
+
+    } catch (error) {
+      console.error('[DocumentMode] Failed to add document:', error);
+      this.showSystemMessage(`Failed to add document: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Remove a document from active document chat mode
+   * Calls backend API to update chat state
+   * @param {string} documentId - Document UUID to remove
+   */
+  async removeDocumentFromMode(documentId) {
+    if (!this.currentConversationId) {
+      console.warn('[DocumentMode] No active conversation');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${this.api.baseUrl}/api/chat/conversations/${this.currentConversationId}/documents/${documentId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${await this.api.getToken()}`
+        }
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to remove document');
+      }
+
+      const data = await response.json();
+
+      // Update local state from backend response
+      this.chatState = data.state;
+
+      // Update UI
+      this.updateDocumentModeBanner();
+
+      console.log('[DocumentMode] Document removed via API:', {
+        documentId,
+        remainingDocs: this.chatState.activeDocuments.length,
+        mode: this.chatState.mode
+      });
+
+      this.showSystemMessage(data.message || 'Document removed from chat mode');
+
+    } catch (error) {
+      console.error('[DocumentMode] Failed to remove document:', error);
+      this.showSystemMessage(`Failed to remove document: ${error.message}`);
+    }
+  }
+
+  /**
+   * Exit document chat mode entirely
+   * Calls backend API to clear all documents
+   */
+  async exitDocumentMode() {
+    if (!this.currentConversationId) {
+      console.warn('[DocumentMode] No active conversation');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${this.api.baseUrl}/api/chat/conversations/${this.currentConversationId}/documents/clear`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${await this.api.getToken()}`
+        }
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to exit document mode');
+      }
+
+      const data = await response.json();
+
+      // Update local state from backend response
+      this.chatState = data.state;
+
+      // Hide banner
+      const banner = this.container.querySelector('#documentModeBanner');
+      if (banner) {
+        banner.classList.add('hidden');
+      }
+
+      console.log('[DocumentMode] Exited document chat mode via API');
+      this.showSystemMessage(data.message || 'Exited document chat mode');
+
+    } catch (error) {
+      console.error('[DocumentMode] Failed to exit document mode:', error);
+      this.showSystemMessage(`Failed to exit document mode: ${error.message}`);
+    }
+  }
+
+  /**
+   * Update the document mode banner UI
+   * Uses chatState.activeDocuments from backend
+   */
+  updateDocumentModeBanner() {
+    const banner = this.container.querySelector('#documentModeBanner');
+    const countEl = this.container.querySelector('#docModeCount');
+    const chipsContainer = this.container.querySelector('#docModeChips');
+
+    if (!banner || !countEl || !chipsContainer) return;
+
+    const activeDocuments = this.chatState.activeDocuments || [];
+    const docCount = activeDocuments.length;
+    const isDocumentMode = this.chatState.mode === 'document';
+
+    // Show/hide banner
+    if (isDocumentMode && docCount > 0) {
+      banner.classList.remove('hidden');
+    } else {
+      banner.classList.add('hidden');
+      return;
+    }
+
+    // Update count
+    countEl.textContent = `(${docCount} of ${this.maxDocuments} documents)`;
+
+    // Render document chips
+    chipsContainer.innerHTML = activeDocuments.map(doc => `
+      <div class="flex items-center gap-1 px-3 py-1.5 bg-white border border-indigo-200 rounded-full text-xs">
+        <svg class="w-3 h-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+        </svg>
+        <span class="text-gray-700 max-w-xs truncate">${this.escapeHtml(doc.filename)}</span>
+        <button
+          class="ml-1 text-gray-400 hover:text-red-600 transition remove-doc-btn"
+          data-doc-id="${doc.id}"
+          title="Remove ${this.escapeHtml(doc.filename)}"
+        >
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+    `).join('');
+
+    // Bind remove buttons
+    chipsContainer.querySelectorAll('.remove-doc-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const docId = btn.dataset.docId;
+        this.removeDocumentFromMode(docId);
+      });
+    });
+  }
+
+  /**
+   * Load chat state from backend
+   * Called when conversation is loaded/switched
+   */
+  async loadChatState() {
+    if (!this.currentConversationId) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${this.api.baseUrl}/api/chat/conversations/${this.currentConversationId}/state`, {
+        headers: {
+          'Authorization': `Bearer ${await this.api.getToken()}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to load chat state');
+      }
+
+      const data = await response.json();
+      this.chatState = data.state;
+
+      // Update UI to reflect loaded state
+      this.updateDocumentModeBanner();
+
+      console.log('[ChatState] Loaded from backend:', {
+        mode: this.chatState.mode,
+        activeDocuments: this.chatState.activeDocuments?.length || 0
+      });
+
+    } catch (error) {
+      console.error('[ChatState] Failed to load state:', error);
+      // Keep default state on error
+    }
+  }
+
+  /**
+   * Show a system message in the chat
+   */
+  showSystemMessage(message) {
+    const messagesContainer = this.container.querySelector('#chatMessages');
+    if (!messagesContainer) return;
+
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'flex justify-center';
+    messageDiv.innerHTML = `
+      <div class="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm max-w-md text-center">
+        ${this.escapeHtml(message)}
+      </div>
+    `;
+
+    messagesContainer.appendChild(messageDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+    // Auto-remove after 3 seconds
+    setTimeout(() => {
+      messageDiv.remove();
+    }, 3000);
+  }
+
+  /**
+   * Escape HTML to prevent XSS
+   */
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
   bindEvents() {
     // Close button
     const closeBtn = this.container.querySelector('#chatCloseBtn');
@@ -240,6 +568,15 @@ class LanaChat {
         }
       });
     });
+
+    // Document Mode Exit button
+    const exitDocModeBtn = this.container.querySelector('#exitDocMode');
+    if (exitDocModeBtn) {
+      exitDocModeBtn.addEventListener('click', () => {
+        this.exitDocumentMode();
+        this.showSystemMessage('Exited document chat mode');
+      });
+    }
   }
 
   initSSE() {
@@ -250,7 +587,7 @@ class LanaChat {
 
   async sendMessage() {
     const input = this.container.querySelector('#chatInput');
-    const content = input.value.trim();
+    let content = input.value.trim();
 
     if (!content) return;
 
@@ -264,6 +601,14 @@ class LanaChat {
     if (!this.demoMode) {
       await this.handleDocumentMentions(content);
     }
+
+    // NOTE: Document references are NO LONGER appended to messages
+    // The backend automatically uses active documents from chat state
+    // This eliminates the need to modify the user's query
+    console.log('[ChatState] Sending message with state:', {
+      mode: this.chatState.mode,
+      activeDocuments: this.chatState.activeDocuments?.length || 0
+    });
 
     // Clear citations when starting a NEW message (prevents race condition)
     this.currentMessageCitations = {};
@@ -324,6 +669,8 @@ class LanaChat {
         if (window.FileDrawer) {
           window.FileDrawer.loadDocuments(res.conversation_id);
         }
+        // Load chat state from backend
+        this.loadChatState();
       }
 
       const responseContent = res.message?.content || res.response || 'No response received.';
@@ -1052,6 +1399,13 @@ class LanaChat {
       if (doc) {
         console.log(`[Chat] Found document for mention: ${filename}`, doc);
 
+        // ADD TO DOCUMENT CHAT MODE (NEW BEHAVIOR)
+        // This activates persistent document context
+        const added = this.addDocumentToMode(doc.id, doc.filename);
+        if (added) {
+          console.log(`[DocumentMode] Added ${filename} to persistent document chat mode`);
+        }
+
         try {
           // Check if processing needed
           const status = await this.api.getDocumentProcessingStatus(doc.id);
@@ -1068,11 +1422,11 @@ class LanaChat {
               })
               .then(() => {
                 console.log(`[Chat] Processing completed for ${filename}`);
-                this.addSystemMessage(`Document "${filename}" processed and ready`);
+                this.showSystemMessage(`Document "${filename}" processed and ready`);
               })
               .catch(error => {
                 console.error(`[Chat] Failed to process ${filename}:`, error);
-                this.addSystemMessage(`Failed to process "${filename}"`);
+                this.showSystemMessage(`Failed to process "${filename}"`);
               });
 
             processingPromises.push(promise);

@@ -716,12 +716,12 @@ function renderGridView(folders, files) {
     const displayHtml = folder.isMatter
       ? `
         <h3 class="text-sm font-medium text-gray-900 text-center truncate w-full">${escapeHtml(folder.name)}</h3>
-        <p class="text-xs text-gray-600 font-mono">${escapeHtml(folder.matter_id)}</p>
-        <p class="text-xs text-gray-500 mt-1">${folder.document_count || 0} files • ${folder.child_folder_count || 0} folders</p>
+        <p class="text-xs text-gray-600 font-mono text-center truncate w-full" title="${escapeHtml(folder.matter_id)}">${escapeHtml(folder.matter_id)}</p>
+        <p class="text-xs text-gray-500 text-center mt-1">${folder.document_count || 0} files • ${folder.child_folder_count || 0} folders</p>
       `
       : `
         <h3 class="text-sm font-medium text-gray-900 text-center truncate w-full">${escapeHtml(folder.name)}</h3>
-        <p class="text-xs text-gray-500 mt-1">${folder.document_count || 0} files</p>
+        <p class="text-xs text-gray-500 text-center mt-1">${folder.document_count || 0} files</p>
       `;
 
     // Use data attributes to avoid escaping issues
@@ -799,12 +799,12 @@ function renderListView(folders, files) {
     const displayHtml = folder.isMatter
       ? `
         <div class="flex items-center">
-          <svg class="w-5 h-5 text-indigo-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-5 h-5 text-indigo-500 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
           </svg>
-          <div>
-            <div class="text-sm font-medium text-gray-900">${escapeHtml(folder.name)}</div>
-            <div class="text-xs text-gray-600 font-mono">${escapeHtml(folder.matter_id)}</div>
+          <div class="min-w-0 flex-1">
+            <div class="text-sm font-medium text-gray-900 truncate">${escapeHtml(folder.name)}</div>
+            <div class="text-xs text-gray-600 font-mono truncate" title="${escapeHtml(folder.matter_id)}">${escapeHtml(folder.matter_id)}</div>
           </div>
         </div>
       `
@@ -2076,10 +2076,10 @@ function renderMatterCard(matter, isPinned = false) {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
           </svg>
         </div>
-        <p class="text-sm font-medium text-gray-900 truncate w-full mb-1" title="${matterName}">
+        <p class="text-sm font-medium text-gray-900 text-center truncate w-full mb-1" title="${matterName}">
           ${matterName}
         </p>
-        ${matterNumber ? `<p class="text-xs text-gray-500 mb-1">${matterNumber}</p>` : ''}
+        ${matterNumber ? `<p class="text-xs text-gray-500 font-mono text-center truncate w-full mb-1" title="${matterNumber}">${matterNumber}</p>` : ''}
         <div class="flex items-center gap-2 text-xs text-gray-500">
           <span>${docCount} ${docCount === 1 ? 'file' : 'files'}</span>
           <span>•</span>

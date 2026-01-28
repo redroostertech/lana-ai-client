@@ -1146,6 +1146,11 @@ class ApiClient {
     return this.get(`/api/v1/matters?${params}`);
   }
 
+  async getPinnedMatters(page = 1, pageSize = 100, filters = {}) {
+    const params = new URLSearchParams({ page, page_size: pageSize, ...filters });
+    return this.get(`/api/v1/matters/pinned?${params}`);
+  }
+
   async searchMatters(query, page = 1, pageSize = 20) {
     const params = new URLSearchParams({ q: query, page, page_size: pageSize });
     return this.get(`/api/v1/matters?${params}`);
@@ -1195,8 +1200,8 @@ class ApiClient {
     return this.get(`/api/v1/activity/matter/${matterId}?limit=${limit}&offset=${offset}`);
   }
 
-  async getMatterConversations(matterId, limit = 5) {
-    return this.get(`/api/v1/chat/sessions?matter_id=${matterId}&limit=${limit}`);
+  async getMatterConversations(matterId, limit = 5, offset = 0) {
+    return this.get(`/api/v1/chat/sessions?matter_id=${matterId}&limit=${limit}&offset=${offset}`);
   }
 
   // ============================================================
@@ -1423,12 +1428,13 @@ class ApiClient {
   /**
    * Get comments for a matter
    * @param {string} matterId - The matter ID
-   * @param {Object} options - Query options (limit, sort, filter)
+   * @param {Object} options - Query options (limit, offset, sort, filter)
    * @returns {Promise<Object>} Comments response
    */
   async getComments(matterId, options = {}) {
     const params = new URLSearchParams();
-    if (options.limit) params.append('limit', options.limit);
+    if (options.limit !== undefined) params.append('limit', options.limit);
+    if (options.offset !== undefined) params.append('offset', options.offset);
     if (options.sort) params.append('sort', options.sort);
     if (options.filter) params.append('filter', options.filter);
 
