@@ -680,7 +680,7 @@
             </div>
           </div>
 
-          <!-- Run Sync Button -->
+          <!-- Date Range Selector -->
           <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-lg p-6 mb-6">
             <div class="flex items-start gap-4">
               <div class="flex-shrink-0">
@@ -691,11 +691,68 @@
                 </div>
               </div>
               <div class="flex-1">
-                <h4 class="font-semibold text-gray-900 mb-1">Sync GoHighLevel Data</h4>
+                <h4 class="font-semibold text-gray-900 mb-1">Import Data from GoHighLevel</h4>
                 <p class="text-sm text-gray-600 mb-4">
-                  Pull the latest contacts, opportunities, pipelines, and other data from your GoHighLevel account.
-                  This will sync all configured entity types.
+                  Select a date range to import contacts, opportunities, pipelines, and other data from your GoHighLevel account.
                 </p>
+
+                <!-- Date Range Selection -->
+                <div class="space-y-4 mb-4">
+                  <!-- Quick Select Buttons -->
+                  <div class="flex flex-wrap gap-2">
+                    <button
+                      onclick="setDateRange(7)"
+                      class="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-white hover:border-emerald-500 transition-colors"
+                    >
+                      Last 7 days
+                    </button>
+                    <button
+                      onclick="setDateRange(30)"
+                      class="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-white hover:border-emerald-500 transition-colors"
+                    >
+                      Last 30 days
+                    </button>
+                    <button
+                      onclick="setDateRange(90)"
+                      class="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-white hover:border-emerald-500 transition-colors"
+                    >
+                      Last 90 days
+                    </button>
+                    <button
+                      onclick="setDateRange(180)"
+                      class="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-white hover:border-emerald-500 transition-colors"
+                    >
+                      Last 6 months
+                    </button>
+                    <button
+                      onclick="setDateRange(365)"
+                      class="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-white hover:border-emerald-500 transition-colors"
+                    >
+                      Last year
+                    </button>
+                  </div>
+
+                  <!-- Custom Date Range -->
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                      <input
+                        type="date"
+                        id="syncStartDate"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                      <input
+                        type="date"
+                        id="syncEndDate"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 <button
                   onclick="runManualSync()"
                   id="runSyncBtn"
@@ -704,7 +761,7 @@
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                   </svg>
-                  Run Sync Now
+                  Import Data
                 </button>
               </div>
             </div>
@@ -719,11 +776,13 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
               </svg>
               <div class="text-sm text-blue-900">
-                <p class="font-medium mb-1">About Manual Sync</p>
+                <p class="font-medium mb-1">About Data Import</p>
                 <p class="text-blue-700">
-                  Manual sync pulls the latest data from GoHighLevel using your configured API credentials.
+                  Select a date range to import data from GoHighLevel using your configured API credentials.
+                  You can use the quick select buttons or choose a custom date range.
+                  If no date range is selected, all available data will be imported.
                   Depending on your sync frequency setting, automatic syncs may also run in the background.
-                  You can view sync history in the Execution Logs tab.
+                  You can view import history in the Execution Logs tab.
                 </p>
               </div>
             </div>
@@ -1172,6 +1231,24 @@
       });
     }
 
+    // Set date range helper function
+    function setDateRange(days) {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+
+      // Format dates as YYYY-MM-DD
+      const formatDate = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+
+      document.getElementById('syncStartDate').value = formatDate(startDate);
+      document.getElementById('syncEndDate').value = formatDate(endDate);
+    }
+
     // Run Manual Sync
     // Track active sync polling
     let activeSyncPolling = null;
@@ -1196,8 +1273,33 @@
           Starting...
         `;
 
+        // Get date range values
+        const startDateInput = document.getElementById('syncStartDate');
+        const endDateInput = document.getElementById('syncEndDate');
+
+        // Build request payload
+        const syncPayload = {};
+
+        // Add date range if both dates are provided
+        if (startDateInput && endDateInput && startDateInput.value && endDateInput.value) {
+          syncPayload.startDate = startDateInput.value;
+          syncPayload.endDate = endDateInput.value;
+
+          // Validate dates on client side
+          const startDate = new Date(startDateInput.value);
+          const endDate = new Date(endDateInput.value);
+
+          if (startDate > endDate) {
+            throw new Error('Start date must be before end date');
+          }
+
+          if (endDate > new Date()) {
+            throw new Error('End date cannot be in the future');
+          }
+        }
+
         // Trigger sync
-        const result = await api.post('/api/v1/leadly/sync');
+        const result = await api.post('/api/v1/leadly/sync', syncPayload);
         const syncLogId = result.sync_log_id || result.sync_id;
 
         if (!syncLogId) {
@@ -3165,8 +3267,8 @@
             <div class="px-6 py-4 border-b border-gray-200">
               <div class="flex items-center justify-between">
                 <h3 class="text-lg font-semibold text-gray-900">Active Jobs</h3>
-                <button onclick="refreshExecutionLogs()" class="text-sm text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <button onclick="refreshExecutionLogs()" id="refreshExecutionLogsBtn" class="text-sm text-emerald-600 hover:text-emerald-700 flex items-center gap-1 transition-all disabled:opacity-50">
+                  <svg id="refreshExecutionLogsIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                   </svg>
                   Refresh
@@ -3288,11 +3390,30 @@
 
     // Refresh all logs sections
     async function refreshExecutionLogs() {
-      await Promise.all([
-        loadActiveJobs(),
-        loadPendingReview(),
-        loadJobHistory()
-      ]);
+      const btn = document.getElementById('refreshExecutionLogsBtn');
+      const icon = document.getElementById('refreshExecutionLogsIcon');
+
+      try {
+        // Disable button and add spinning animation
+        if (btn) btn.disabled = true;
+        if (icon) icon.classList.add('animate-spin');
+
+        await Promise.all([
+          loadActiveJobs(),
+          loadPendingReview(),
+          loadJobHistory()
+        ]);
+
+        // Show success toast
+        Toast.success('Execution logs refreshed');
+      } catch (error) {
+        console.error('Failed to refresh execution logs:', error);
+        Toast.error('Failed to refresh execution logs');
+      } finally {
+        // Re-enable button and remove spinning animation
+        if (btn) btn.disabled = false;
+        if (icon) icon.classList.remove('animate-spin');
+      }
     }
 
     // Load active jobs (sync jobs only - Leadly doesn't use document ingestion)
