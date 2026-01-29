@@ -164,22 +164,56 @@
 
     <main class="p-4 lg:p-8">
       <!-- Statistics Cards -->
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-          <h3 class="text-sm font-medium text-gray-500">Total Events (30d)</h3>
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+        <div onclick="filterByCategory('all')" class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer hover:shadow-md transition-shadow">
+          <div class="flex items-center gap-2 mb-1">
+            <h3 class="text-sm font-medium text-gray-500">Total Events (30d)</h3>
+          </div>
           <p id="statTotal" class="text-2xl font-bold text-gray-900 mt-1">-</p>
         </div>
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-          <h3 class="text-sm font-medium text-gray-500">Security Events</h3>
+        <div onclick="filterByCategory('security')" class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer hover:shadow-md transition-shadow">
+          <div class="flex items-center gap-2 mb-1">
+            <h3 class="text-sm font-medium text-gray-500">Security Events</h3>
+            <button onclick="event.stopPropagation(); showEventInfoModal('security')" class="text-gray-400 hover:text-gray-600">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </button>
+          </div>
           <p id="statSecurity" class="text-2xl font-bold text-red-600 mt-1">-</p>
         </div>
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-          <h3 class="text-sm font-medium text-gray-500">User Actions</h3>
+        <div onclick="filterByCategory('user')" class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer hover:shadow-md transition-shadow">
+          <div class="flex items-center gap-2 mb-1">
+            <h3 class="text-sm font-medium text-gray-500">User Actions</h3>
+            <button onclick="event.stopPropagation(); showEventInfoModal('user')" class="text-gray-400 hover:text-gray-600">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </button>
+          </div>
           <p id="statUser" class="text-2xl font-bold text-blue-600 mt-1">-</p>
         </div>
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-          <h3 class="text-sm font-medium text-gray-500">System Events</h3>
+        <div onclick="filterByCategory('system')" class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer hover:shadow-md transition-shadow">
+          <div class="flex items-center gap-2 mb-1">
+            <h3 class="text-sm font-medium text-gray-500">System Events</h3>
+            <button onclick="event.stopPropagation(); showEventInfoModal('system')" class="text-gray-400 hover:text-gray-600">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </button>
+          </div>
           <p id="statSystem" class="text-2xl font-bold text-green-600 mt-1">-</p>
+        </div>
+        <div onclick="filterByCategory('other')" class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer hover:shadow-md transition-shadow">
+          <div class="flex items-center gap-2 mb-1">
+            <h3 class="text-sm font-medium text-gray-500">Other Events</h3>
+            <button onclick="event.stopPropagation(); showEventInfoModal('other')" class="text-gray-400 hover:text-gray-600">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </button>
+          </div>
+          <p id="statOther" class="text-2xl font-bold text-gray-600 mt-1">-</p>
         </div>
       </div>
 
@@ -203,10 +237,6 @@
           <div class="flex gap-2">
             <button id="applyFilters" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg">Apply</button>
             <button id="clearFilters" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg">Clear</button>
-            <button id="exportBtn" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center gap-2">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-              Export
-            </button>
           </div>
         </div>
       </div>
@@ -218,34 +248,6 @@
     </main>
   </div>
 
-  <!-- Export Modal -->
-  <div id="exportModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-xl shadow-xl max-w-md w-full">
-      <div class="px-6 py-4 border-b border-gray-200">
-        <h3 class="text-lg font-semibold text-gray-900">Export Audit Logs</h3>
-      </div>
-      <div class="p-6 space-y-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Export Format</label>
-          <div class="flex gap-4">
-            <label class="flex items-center gap-2">
-              <input type="radio" name="exportFormat" value="csv" checked class="w-4 h-4 text-indigo-600">
-              CSV
-            </label>
-            <label class="flex items-center gap-2">
-              <input type="radio" name="exportFormat" value="json" class="w-4 h-4 text-indigo-600">
-              JSON
-            </label>
-          </div>
-        </div>
-        <p class="text-sm text-gray-500">Export will include all logs matching current filters.</p>
-      </div>
-      <div class="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
-        <button id="cancelExport" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">Cancel</button>
-        <button id="confirmExport" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg">Export</button>
-      </div>
-    </div>
-  </div>
 
   <script>
     if (!api.requireAuth()) throw new Error('Not authenticated');
@@ -387,11 +389,15 @@
           : result.security_events || 0;
         document.getElementById('statSecurity').textContent = securityCount;
 
-        // Classify events into Security, User Actions, and System Events
+        // Classify events into Security, User Actions, System Events, and Other
         const byType = result.by_event_type || [];
         let securityEvents = 0;
         let userEvents = 0;
         let systemEvents = 0;
+        let otherEvents = 0;
+
+        // Track which events fall into "Other" category for the info modal
+        window.otherEventTypes = [];
 
         // Security Events: authentication, authorization, access denials, security violations
         const securityPatterns = [
@@ -471,7 +477,17 @@
           'session.started',
           'session.heartbeat',
           'session.ended',
-          'on_demand_processing_triggered'
+          'on_demand_processing_triggered',
+          'worker.started',
+          'worker.completed',
+          'worker.failed',
+          'system.startup',
+          'system.shutdown',
+          'cache.cleared',
+          'database.migration',
+          'health.check',
+          'backup.created',
+          'backup.restored'
         ];
 
         byType.forEach(item => {
@@ -480,20 +496,18 @@
 
           if (securityPatterns.includes(type)) {
             securityEvents += count;
+            console.log('[SECURITY EVENT]', type, 'count:', count);
           } else if (userActionPatterns.includes(type)) {
             userEvents += count;
+            console.log('[USER EVENT]', type, 'count:', count);
           } else if (systemEventPatterns.includes(type)) {
             systemEvents += count;
+            console.log('[SYSTEM EVENT]', type, 'count:', count);
           } else {
-            // Default: if it starts with known prefixes
-            if (type.startsWith('user.') || type.includes('login') || type.includes('logout')) {
-              userEvents += count;
-            } else if (type.startsWith('system.') || type.startsWith('worker.')) {
-              systemEvents += count;
-            } else {
-              // Unknown events count as user actions by default
-              userEvents += count;
-            }
+            // Uncategorized events go to "Other"
+            otherEvents += count;
+            window.otherEventTypes.push({ event_type: type, count: count });
+            console.log('[UNCATEGORIZED EVENT]', type, 'count:', count);
           }
         });
 
@@ -501,6 +515,7 @@
         document.getElementById('statSecurity').textContent = securityEvents;
         document.getElementById('statUser').textContent = userEvents;
         document.getElementById('statSystem').textContent = systemEvents;
+        document.getElementById('statOther').textContent = otherEvents;
       } catch (error) {
         console.error('Failed to load statistics:', error);
       }
@@ -513,12 +528,72 @@
         const fromDate = document.getElementById('fromDate').value;
         const toDate = document.getElementById('toDate').value;
 
-        const filters = {};
-        if (eventType) filters.event_type = eventType;
-        if (fromDate) filters.start_date = fromDate;
-        if (toDate) filters.end_date = toDate;
+        let result;
 
-        const result = await api.getAuditLogs(currentPage, pageSize, filters);
+        // Use category filter if set and no manual event type filter
+        if (window.currentCategoryFilter && window.currentCategoryFilter !== 'all' && !eventType) {
+          const categoryEventMap = {
+            security: ['auth.failed', 'auth.admin_denied', 'permission.denied', 'matter.access_denied', 'security_violation', 'user.login_failed'],
+            user: ['user.login', 'user.logout', 'user.deleted', 'user.created', 'user.updated', 'matter.created', 'matter.pinned', 'matter.unpinned', 'matter.updated', 'matter.deleted', 'matter.permanently_deleted', 'document_uploaded', 'document_upload', 'document.permanently_deleted', 'document_modification', 'document_access', 'folder.permanently_deleted', 'chat_stream', 'rag_query', 'search_query', 'hybrid_search', 'api_token.created', 'api_token.deleted', 'role.created', 'role.updated', 'role.deleted', 'role.assigned', 'role.unassigned', 'group.created', 'group.updated', 'group.deleted', 'group.member_added', 'group.member_removed', 'board_metric.created', 'board_metric.updated', 'board_metric.deleted', 'board_metric.reordered', 'board_metric.roles_assigned', 'management_board.created', 'management_board.updated', 'management_board.deleted', 'management_board.user_assigned', 'management_board.access_revoked', 'metric_submission.created', 'metric_submission.updated', 'metric_submission.deleted', 'actionstep_data_access'],
+            system: ['document_text_extraction_started', 'document_text_extracted', 'document_text_extraction_failed', 'document_ai_indexed', 'connector_document_sync', 'bulk_import_completed', 'metadata_update', 'privilege_filter', 'ml_classification', 'ml_fallback', 'ml_training', 'ml_feedback', 'session.started', 'session.heartbeat', 'session.ended', 'on_demand_processing_triggered', 'worker.started', 'worker.completed', 'worker.failed', 'system.startup', 'system.shutdown', 'cache.cleared', 'database.migration', 'health.check', 'backup.created', 'backup.restored'],
+            other: (window.otherEventTypes || []).map(e => e.event_type)
+          };
+
+          const category = window.currentCategoryFilter;
+
+          // Build query body for POST /api/v1/audit/query
+          const queryBody = {
+            limit: pageSize,
+            offset: (currentPage - 1) * pageSize
+          };
+
+          if (fromDate) queryBody.start_date = new Date(fromDate).toISOString();
+          if (toDate) queryBody.end_date = new Date(toDate).toISOString();
+
+          if (category === 'other') {
+            // For "other", we need to exclude all known categories
+            // The API doesn't support exclusion, so we'll get ALL records and filter client-side
+            const filters = {};
+            if (fromDate) filters.start_date = fromDate;
+            if (toDate) filters.end_date = toDate;
+
+            // Fetch a large batch to ensure we get "other" events after filtering
+            // Since "other" events are mixed with known events, we need to fetch more
+            result = await api.getAuditLogs(1, 1000, filters);
+
+            const allKnownEvents = [
+              ...categoryEventMap.security,
+              ...categoryEventMap.user,
+              ...categoryEventMap.system
+            ];
+
+            // Filter to get only "other" events
+            const allOtherEvents = (result.logs || []).filter(log => !allKnownEvents.includes(log.event_type));
+
+            // Apply pagination client-side
+            const startIndex = (currentPage - 1) * pageSize;
+            const endIndex = startIndex + pageSize;
+            logs = allOtherEvents.slice(startIndex, endIndex);
+            const total = allOtherEvents.length;
+
+            table.setData(logs, total);
+            return;
+          } else if (categoryEventMap[category]) {
+            // Use the query API for filtering by multiple event types
+            queryBody.event_types = categoryEventMap[category];
+          }
+
+          result = await api.queryAuditLogs(queryBody);
+        } else {
+          // Use simple GET endpoint for single event type or no filter
+          const filters = {};
+          if (eventType) filters.event_type = eventType;
+          if (fromDate) filters.start_date = fromDate;
+          if (toDate) filters.end_date = toDate;
+
+          result = await api.getAuditLogs(currentPage, pageSize, filters);
+        }
+
         logs = result.logs || [];
         const total = result.pagination?.total || result.total || logs.length;
         table.setData(logs, total);
@@ -570,6 +645,11 @@
 
     // Filters
     document.getElementById('applyFilters').addEventListener('click', () => {
+      // Clear category filter when manually applying filters
+      window.currentCategoryFilter = null;
+      document.querySelectorAll('[onclick^="filterByCategory"]').forEach(card => {
+        card.classList.remove('ring-2', 'ring-indigo-500', 'bg-indigo-50');
+      });
       currentPage = 1;
       loadLogs();
     });
@@ -578,44 +658,15 @@
       document.getElementById('eventTypeFilter').value = '';
       document.getElementById('fromDate').value = '';
       document.getElementById('toDate').value = '';
+      window.currentCategoryFilter = null; // Clear category filter
+
+      // Remove active state from all category cards
+      document.querySelectorAll('[onclick^="filterByCategory"]').forEach(card => {
+        card.classList.remove('ring-2', 'ring-indigo-500', 'bg-indigo-50');
+      });
+
       currentPage = 1;
       loadLogs();
-    });
-
-    // Export
-    const exportModal = document.getElementById('exportModal');
-    document.getElementById('exportBtn').addEventListener('click', () => exportModal.classList.remove('hidden'));
-    document.getElementById('cancelExport').addEventListener('click', () => exportModal.classList.add('hidden'));
-
-    document.getElementById('confirmExport').addEventListener('click', async () => {
-      const format = document.querySelector('input[name="exportFormat"]:checked').value;
-      const eventType = document.getElementById('eventTypeFilter').value;
-      const fromDate = document.getElementById('fromDate').value;
-      const toDate = document.getElementById('toDate').value;
-
-      try {
-        const result = await api.exportAuditLogs(format, {
-          event_type: eventType || undefined,
-          start_date: fromDate || undefined,
-          end_date: toDate || undefined
-        });
-
-        // Download the data
-        const blob = new Blob([format === 'csv' ? result.data : JSON.stringify(result.data, null, 2)], {
-          type: format === 'csv' ? 'text/csv' : 'application/json'
-        });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `audit-logs-${new Date().toISOString().split('T')[0]}.${format}`;
-        a.click();
-        URL.revokeObjectURL(url);
-
-        exportModal.classList.add('hidden');
-        Toast.success('Export downloaded');
-      } catch (error) {
-        Toast.error('Export failed');
-      }
     });
 
     // Set default date to today
@@ -897,5 +948,151 @@
       </div>
   </div>
   </div>
+
+  <!-- Event Info Modal -->
+  <div id="eventInfoModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <h3 id="eventInfoModalTitle" class="text-lg font-semibold text-gray-900"></h3>
+        <button onclick="closeEventInfoModal()" class="text-gray-400 hover:text-gray-600">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <div id="eventInfoModalContent" class="px-6 py-4 overflow-y-auto flex-1">
+        <!-- Content will be dynamically populated -->
+      </div>
+      <div class="px-6 py-4 border-t border-gray-200 flex justify-end">
+        <button onclick="closeEventInfoModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Filter table by category
+    function filterByCategory(category) {
+      const eventTypeFilter = document.getElementById('eventTypeFilter');
+
+      // Remove active state from all category cards
+      document.querySelectorAll('[onclick^="filterByCategory"]').forEach(card => {
+        card.classList.remove('ring-2', 'ring-indigo-500', 'bg-indigo-50');
+      });
+
+      // Add active state to selected card
+      event.currentTarget.classList.add('ring-2', 'ring-indigo-500', 'bg-indigo-50');
+
+      // Set the category filter and reload
+      eventTypeFilter.value = '';
+      window.currentCategoryFilter = category;
+      currentPage = 1; // Reset to first page
+      loadLogs();
+    }
+
+    // Show event info modal
+    function showEventInfoModal(category) {
+      const modal = document.getElementById('eventInfoModal');
+      const title = document.getElementById('eventInfoModalTitle');
+      const content = document.getElementById('eventInfoModalContent');
+
+      const eventDescriptions = {
+        security: {
+          title: 'Security Events',
+          description: 'Authentication, authorization, and access control failures',
+          events: [
+            { name: 'auth.failed', desc: 'Failed authentication attempts' },
+            { name: 'auth.admin_denied', desc: 'Admin access denied' },
+            { name: 'user.login_failed', desc: 'Failed login attempts' },
+            { name: 'permission.denied', desc: 'Permission check failures' },
+            { name: 'matter.access_denied', desc: 'Matter access violations' },
+            { name: 'security_violation', desc: 'Security policy violations' }
+          ]
+        },
+        user: {
+          title: 'User Actions',
+          description: 'User-initiated operations and activities',
+          events: [
+            { name: 'User Management', desc: 'login, logout, created, updated, deleted' },
+            { name: 'Matter Operations', desc: 'created, updated, deleted, pinned, unpinned' },
+            { name: 'Document Operations', desc: 'upload, access, modification, deletion' },
+            { name: 'AI & Search', desc: 'chat_stream, rag_query, search_query, hybrid_search' },
+            { name: 'Management Boards', desc: 'board metrics, submissions, board operations' },
+            { name: 'RBAC', desc: 'role/group management and assignments' },
+            { name: 'API Access', desc: 'token creation/deletion, ActionStep data access' }
+          ]
+        },
+        system: {
+          title: 'System Events',
+          description: 'Automated background processing and system operations',
+          events: [
+            { name: 'Document Processing', desc: 'text extraction, AI indexing' },
+            { name: 'Data Synchronization', desc: 'connector syncs, bulk imports' },
+            { name: 'ML Operations', desc: 'classification, training, feedback' },
+            { name: 'System Maintenance', desc: 'metadata updates, privilege filtering' },
+            { name: 'Session Management', desc: 'started, heartbeat, ended' },
+            { name: 'On-Demand Processing', desc: 'triggered processing tasks' }
+          ]
+        },
+        other: {
+          title: 'Other Events',
+          description: 'Events that don\'t fit into the standard categories',
+          events: window.otherEventTypes || []
+        }
+      };
+
+      const info = eventDescriptions[category];
+      title.textContent = info.title;
+
+      if (category === 'other') {
+        content.innerHTML = `
+          <p class="text-gray-600 mb-4">${info.description}</p>
+          ${info.events.length === 0 ? '<p class="text-gray-500 italic">No uncategorized events found.</p>' : `
+            <div class="space-y-2">
+              ${info.events.map(e => `
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <span class="font-mono text-sm">${e.event_type}</span>
+                  <span class="text-gray-600 text-sm">${e.count} events</span>
+                </div>
+              `).join('')}
+            </div>
+          `}
+        `;
+      } else {
+        content.innerHTML = `
+          <p class="text-gray-600 mb-4">${info.description}</p>
+          <div class="space-y-3">
+            ${info.events.map(e => `
+              <div class="border-l-4 border-${category === 'security' ? 'red' : category === 'user' ? 'blue' : 'green'}-500 pl-4 py-2">
+                <div class="font-medium text-gray-900">${e.name}</div>
+                <div class="text-sm text-gray-600">${e.desc}</div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      modal.classList.remove('hidden');
+    }
+
+    function closeEventInfoModal() {
+      document.getElementById('eventInfoModal').classList.add('hidden');
+    }
+
+    // Close modal on escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeEventInfoModal();
+      }
+    });
+
+    // Close modal on background click
+    document.getElementById('eventInfoModal').addEventListener('click', (e) => {
+      if (e.target.id === 'eventInfoModal') {
+        closeEventInfoModal();
+      }
+    });
+  </script>
 </body>
 </html>

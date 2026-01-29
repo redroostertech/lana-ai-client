@@ -221,13 +221,83 @@
             <!-- CPU info will be loaded here -->
           </div>
         </div>
+
+        <!-- Storage Information -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">Storage Information</h3>
+          <div id="storageInfo" class="space-y-4">
+            <!-- Storage info will be loaded here -->
+          </div>
+        </div>
+
+        <!-- LLM Token Usage -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">LLM Token Usage</h3>
+
+          <!-- Time Period Tabs -->
+          <div class="flex gap-2 mb-4 border-b border-gray-200">
+            <button id="tab7days" class="px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600" onclick="switchTokenPeriod('7days')">
+              Last 7 Days
+            </button>
+            <button id="tab3months" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchTokenPeriod('3months')">
+              Last 3 Months
+            </button>
+            <button id="taballtime" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchTokenPeriod('alltime')">
+              All Time
+            </button>
+          </div>
+
+          <div id="tokenUsageInfo" class="space-y-4">
+            <!-- Token usage info will be loaded here -->
+          </div>
+        </div>
       </div>
     </main>
   </div>
 
   <script>
     if (!api.requireAuth()) throw new Error('Not authenticated');
-    
+
+    // Cache configuration
+    const CACHE_DURATION = {
+      summary: 30000,      // 30 seconds - overall status changes frequently
+      services: 30000,     // 30 seconds - service status changes frequently
+      metrics: 60000,      // 1 minute - system metrics change but not critical
+      storage: 300000,     // 5 minutes - storage changes slowly
+      tokenUsage: 300000   // 5 minutes - token usage is historical data
+    };
+
+    // Cache storage
+    const healthCache = {
+      summary: null,
+      services: null,
+      metrics: null,
+      storage: null,
+      tokenUsage: {}  // Keyed by period (7days, 3months, alltime)
+    };
+
+    // Helper to check if cache is valid
+    function isCacheValid(cacheEntry, duration) {
+      if (!cacheEntry) return false;
+      return (Date.now() - cacheEntry.timestamp) < duration;
+    }
+
+    // Helper to get cached data or fetch fresh
+    async function getCachedOrFetch(cacheKey, fetchFn, duration) {
+      if (isCacheValid(healthCache[cacheKey], duration)) {
+        console.log(`[HealthCache] Using cached ${cacheKey}`);
+        return healthCache[cacheKey].data;
+      }
+
+      console.log(`[HealthCache] Fetching fresh ${cacheKey}`);
+      const data = await fetchFn();
+      healthCache[cacheKey] = {
+        data,
+        timestamp: Date.now()
+      };
+      return data;
+    }
+
     // Load full user profile with roles before rendering menu
     (async () => {
       try {
@@ -235,7 +305,7 @@
       } catch (error) {
         console.error('Failed to load user profile:', error);
       }
-      
+
       // Render dynamic menu (will now have access to roles)
       renderMenu('#mainNav');
 
@@ -291,9 +361,9 @@
     async function loadHealth() {
       try {
         const [summary, services, metrics] = await Promise.all([
-          api.getHealthSummary(),
-          api.getHealthServices(),
-          api.getHealthMetrics()
+          getCachedOrFetch('summary', () => api.getHealthSummary(), CACHE_DURATION.summary),
+          getCachedOrFetch('services', () => api.getHealthServices(), CACHE_DURATION.services),
+          getCachedOrFetch('metrics', () => api.getHealthMetrics(), CACHE_DURATION.metrics)
         ]);
 
         // Overall status
@@ -447,12 +517,154 @@
           </div>
         `;
 
+        // Storage information
+        await loadStorageInfo();
+
+        // Token usage (default to 7 days)
+        await loadTokenUsage('7days');
+
         // Last updated
         document.getElementById('lastUpdated').textContent = `Updated: ${formatDateTime(new Date())}`;
 
       } catch (error) {
         Toast.error('Failed to load health data');
       }
+    }
+
+    // Load storage information
+    async function loadStorageInfo() {
+      try {
+        const response = await getCachedOrFetch(
+          'storage',
+          () => api.get('/api/v1/admin/health/storage'),
+          CACHE_DURATION.storage
+        );
+        const storage = response.storage || {};
+
+        document.getElementById('storageInfo').innerHTML = `
+          <div class="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p class="text-gray-500">Total Storage</p>
+              <p class="font-medium">${formatBytes(storage.total_bytes || 0)}</p>
+            </div>
+            <div>
+              <p class="text-gray-500">Used Storage</p>
+              <p class="font-medium">${formatBytes(storage.used_bytes || 0)}</p>
+            </div>
+            <div>
+              <p class="text-gray-500">Available Storage</p>
+              <p class="font-medium">${formatBytes(storage.available_bytes || 0)}</p>
+            </div>
+            <div>
+              <p class="text-gray-500">Usage Percentage</p>
+              <p class="font-medium">${storage.usage_percent || 0}%</p>
+            </div>
+          </div>
+          <div class="mt-4">
+            <div class="flex justify-between text-sm mb-1">
+              <span class="text-gray-500">Storage Usage</span>
+              <span class="font-medium">${storage.usage_percent || 0}%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+              <div class="bg-indigo-600 h-2 rounded-full" style="width: ${storage.usage_percent || 0}%"></div>
+            </div>
+          </div>
+        `;
+      } catch (error) {
+        console.error('Failed to load storage info:', error);
+        document.getElementById('storageInfo').innerHTML = `
+          <p class="text-sm text-gray-500">Storage information unavailable</p>
+        `;
+      }
+    }
+
+    // Load token usage for a specific period
+    let currentTokenPeriod = '7days';
+    async function loadTokenUsage(period) {
+      try {
+        currentTokenPeriod = period;
+
+        // Check period-specific cache
+        const cacheKey = `tokenUsage_${period}`;
+        if (isCacheValid(healthCache.tokenUsage[period], CACHE_DURATION.tokenUsage)) {
+          console.log(`[HealthCache] Using cached token usage for ${period}`);
+          var response = healthCache.tokenUsage[period].data;
+        } else {
+          console.log(`[HealthCache] Fetching fresh token usage for ${period}`);
+          var response = await api.get(`/api/v1/admin/health/token-usage?period=${period}`);
+          healthCache.tokenUsage[period] = {
+            data: response,
+            timestamp: Date.now()
+          };
+        }
+
+        const usage = response.usage || {};
+
+        document.getElementById('tokenUsageInfo').innerHTML = `
+          <div class="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p class="text-gray-500">Total Tokens</p>
+              <p class="font-medium">${(usage.total_tokens || 0).toLocaleString()}</p>
+            </div>
+            <div>
+              <p class="text-gray-500">Input Tokens</p>
+              <p class="font-medium">${(usage.input_tokens || 0).toLocaleString()}</p>
+            </div>
+            <div>
+              <p class="text-gray-500">Output Tokens</p>
+              <p class="font-medium">${(usage.output_tokens || 0).toLocaleString()}</p>
+            </div>
+            <div>
+              <p class="text-gray-500">Total Requests</p>
+              <p class="font-medium">${(usage.total_requests || 0).toLocaleString()}</p>
+            </div>
+            <div>
+              <p class="text-gray-500">Avg Time to First Token</p>
+              <p class="font-medium">${formatMilliseconds(usage.avg_time_to_first_token_ms || 0)}</p>
+            </div>
+            <div>
+              <p class="text-gray-500">Avg Response Time</p>
+              <p class="font-medium">${formatMilliseconds(usage.avg_response_time_ms || 0)}</p>
+            </div>
+          </div>
+        `;
+      } catch (error) {
+        console.error('Failed to load token usage:', error);
+        document.getElementById('tokenUsageInfo').innerHTML = `
+          <p class="text-sm text-gray-500">Token usage information unavailable</p>
+        `;
+      }
+    }
+
+    // Switch token period tabs
+    window.switchTokenPeriod = function(period) {
+      // Update tab styling
+      const tabs = ['7days', '3months', 'alltime'];
+      tabs.forEach(tab => {
+        const btn = document.getElementById(`tab${tab}`);
+        if (tab === period) {
+          btn.className = 'px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600';
+        } else {
+          btn.className = 'px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700';
+        }
+      });
+
+      // Load data for the selected period
+      loadTokenUsage(period);
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes || bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function formatMilliseconds(ms) {
+      if (!ms || ms === 0) return '0ms';
+      if (ms < 1000) return `${Math.round(ms)}ms`;
+      return `${(ms / 1000).toFixed(2)}s`;
     }
 
     function formatUptime(seconds) {
@@ -467,13 +679,26 @@
       return parts.join(' ') || '< 1m';
     }
 
-    // Refresh button
-    document.getElementById('refreshBtn').addEventListener('click', loadHealth);
+    // Clear all health caches
+    function clearHealthCache() {
+      console.log('[HealthCache] Clearing all caches');
+      healthCache.summary = null;
+      healthCache.services = null;
+      healthCache.metrics = null;
+      healthCache.storage = null;
+      healthCache.tokenUsage = {};
+    }
+
+    // Refresh button - force refresh by clearing cache first
+    document.getElementById('refreshBtn').addEventListener('click', () => {
+      clearHealthCache();
+      loadHealth();
+    });
 
     // Initialize
     loadHealth();
 
-    // Auto-refresh every 30 seconds
+    // Auto-refresh every 30 seconds (cache will prevent unnecessary API calls)
     setInterval(loadHealth, 30000);
 
     // Conversation actions modal
