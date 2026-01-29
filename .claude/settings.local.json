@@ -32,7 +32,9 @@
       "Bash(npm run generate-version:*)",
       "Bash(git pull:*)",
       "Bash(git stash:*)",
-      "Bash(git status:*)"
+      "Bash(git status:*)",
+      "Bash(git fetch:*)",
+      "Bash(git rebase:*)"
     ],
     "deny": [],
     "ask": []
