@@ -30321,6 +30321,19 @@ function createWindow(serverUrl = null) {
   });
   const startUrl = createFileUrl(path.join(__dirname, "public_html/index.html"));
   mainWindow.loadURL(startUrl);
+  if (process.platform === "win32") {
+    const { screen } = require("electron");
+    const scaleFactor = screen.getPrimaryDisplay().scaleFactor;
+    logInfo(`Windows display scale factor: ${scaleFactor}`);
+    if (scaleFactor > 1) {
+      mainWindow.webContents.setZoomFactor(1 / scaleFactor);
+    }
+    mainWindow.webContents.on("did-finish-load", () => {
+      if (scaleFactor > 1) {
+        mainWindow.webContents.setZoomFactor(1 / scaleFactor);
+      }
+    });
+  }
   mainWindow.once("ready-to-show", () => {
     mainWindow.show();
     if (serverUrl && shouldCheckForUpdates()) {
@@ -30370,6 +30383,19 @@ function createLoginWindow() {
   });
   const loginUrl = createFileUrl(path.join(__dirname, "public_html/login.html"));
   mainWindow.loadURL(loginUrl);
+  if (process.platform === "win32") {
+    const { screen } = require("electron");
+    const scaleFactor = screen.getPrimaryDisplay().scaleFactor;
+    logInfo(`Windows login window display scale factor: ${scaleFactor}`);
+    if (scaleFactor > 1) {
+      mainWindow.webContents.setZoomFactor(1 / scaleFactor);
+    }
+    mainWindow.webContents.on("did-finish-load", () => {
+      if (scaleFactor > 1) {
+        mainWindow.webContents.setZoomFactor(1 / scaleFactor);
+      }
+    });
+  }
   mainWindow.once("ready-to-show", () => {
     mainWindow.show();
   });
