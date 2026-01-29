@@ -531,20 +531,6 @@ ipcMain.handle('session-tracker:initialize', async (event, backendUrl, authToken
   }
 });
 
-// Start session tracking
-ipcMain.handle('session-tracker:start', async () => {
-  try {
-    if (sessionTracker) {
-      const result = await sessionTracker.startSession();
-      return result;
-    } else {
-      return { success: false, error: 'Session tracker not initialized' };
-    }
-  } catch (error) {
-    logError('[SessionTracker] Failed to start session:', error);
-    return { success: false, error: error.message };
-  }
-});
 
 // Check for updates
 ipcMain.handle('check-updates', async (event, serverUrl) => {
