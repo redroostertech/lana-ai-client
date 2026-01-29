@@ -312,6 +312,7 @@ const Workflows = {
    * Create a new workflow
    */
   async create(config) {
+    let result;
     if (api.isDemoMode()) {
       await MockData.delay(500);
       const newWorkflow = {
@@ -325,9 +326,23 @@ const Workflows = {
         createdAt: new Date().toISOString()
       };
       WorkflowsMockData.workflows.push(newWorkflow);
-      return { success: true, workflow: newWorkflow };
+      result = { success: true, workflow: newWorkflow };
+    } else {
+      result = await api.post('/api/v1/workflows', config);
     }
-    return api.post('/api/v1/workflows', config);
+
+    // Track workflow creation
+    if (result.success && window.FeatureTracker) {
+      try {
+        await window.FeatureTracker.trackFeature(window.Features.WORKFLOW_CREATED, {
+          workflow_type: config.trigger?.type || 'unknown'
+        });
+      } catch (trackError) {
+        console.error('[FeatureTracker] Failed to track workflow creation:', trackError);
+      }
+    }
+
+    return result;
   },
 
   /**
@@ -379,6 +394,7 @@ const Workflows = {
    * Execute workflow manually
    */
   async execute(workflowId) {
+    let result;
     if (api.isDemoMode()) {
       await MockData.delay(2000);
       const workflow = WorkflowsMockData.workflows.find(w => w.id === workflowId);
@@ -386,9 +402,23 @@ const Workflows = {
         workflow.lastRun = new Date().toISOString();
         workflow.executionCount++;
       }
-      return { success: true, recordsProcessed: Math.floor(Math.random() * 10) + 1 };
+      result = { success: true, recordsProcessed: Math.floor(Math.random() * 10) + 1 };
+    } else {
+      result = await api.post(`/api/v1/workflows/${workflowId}/execute`);
     }
-    return api.post(`/api/v1/workflows/${workflowId}/execute`);
+
+    // Track workflow execution
+    if (result.success && window.FeatureTracker) {
+      try {
+        await window.FeatureTracker.trackFeature(window.Features.WORKFLOW_EXECUTED, {
+          workflow_id: workflowId
+        });
+      } catch (trackError) {
+        console.error('[FeatureTracker] Failed to track workflow execution:', trackError);
+      }
+    }
+
+    return result;
   },
 
   /**

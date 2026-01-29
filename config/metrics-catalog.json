@@ -1,0 +1,487 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "version": "1.0.0",
+  "lastUpdated": "2026-01-28",
+  "description": "Predefined metrics catalog for LANA AI Management Boards. Metrics are sourced from audit_logs and activity_feed tables.",
+
+  "categories": [
+    {
+      "id": "user_activity",
+      "name": "User Activity & Engagement",
+      "icon": "users",
+      "description": "Track user logins, sessions, and engagement patterns",
+      "color": "blue",
+      "metrics": [
+        {
+          "key": "total_logins",
+          "label": "Total User Logins",
+          "description": "Number of successful user logins in the time period",
+          "type": "number",
+          "source": "audit_logs",
+          "query": {
+            "table": "audit_logs",
+            "eventType": "user.login",
+            "aggregation": "COUNT(*)",
+            "groupBy": null,
+            "filters": []
+          },
+          "defaultTarget": 100,
+          "icon": "sign-in-alt",
+          "visualization": {
+            "type": "metric_card_with_trend",
+            "chartType": "line",
+            "showSparkline": true,
+            "trendPeriod": "previous_period"
+          },
+          "drilldown": {
+            "enabled": true,
+            "endpoint": "/api/v1/management-boards/metrics/total_logins/drilldown",
+            "columns": ["user_name", "email", "login_time", "ip_address"]
+          },
+          "helpText": "Tracks successful user authentication events. High login counts indicate active platform usage."
+        },
+        {
+          "key": "failed_logins",
+          "label": "Failed Login Attempts",
+          "description": "Number of failed authentication attempts (security metric)",
+          "type": "number",
+          "source": "audit_logs",
+          "query": {
+            "table": "audit_logs",
+            "eventType": "user.login_failed",
+            "aggregation": "COUNT(*)",
+            "groupBy": null,
+            "filters": []
+          },
+          "defaultTarget": 5,
+          "threshold": {
+            "warning": 10,
+            "critical": 20
+          },
+          "icon": "exclamation-triangle",
+          "visualization": ["number", "line_chart"],
+          "trend": true,
+          "alertOnExceed": true,
+          "helpText": "Monitor for potential security issues or user access problems. Spike in failed logins may indicate brute force attacks."
+        },
+        {
+          "key": "active_users",
+          "label": "Active Users",
+          "description": "Unique users who logged in during the time period",
+          "type": "number",
+          "source": "audit_logs",
+          "query": {
+            "table": "audit_logs",
+            "eventType": "user.login",
+            "aggregation": "COUNT(DISTINCT user_id)",
+            "groupBy": null,
+            "filters": []
+          },
+          "defaultTarget": 50,
+          "icon": "user-check",
+          "visualization": ["number", "line_chart"],
+          "trend": true,
+          "helpText": "Measures platform adoption. Tracks how many unique users are actively using LANA AI."
+        },
+        {
+          "key": "user_sessions_total",
+          "label": "Total Work Sessions",
+          "description": "Total number of work sessions started",
+          "type": "number",
+          "source": "activity_feed",
+          "query": {
+            "table": "activity_feed",
+            "eventType": "session.started",
+            "aggregation": "COUNT(*)",
+            "groupBy": null,
+            "filters": []
+          },
+          "defaultTarget": 200,
+          "icon": "clock",
+          "visualization": ["number", "bar_chart"],
+          "trend": true,
+          "helpText": "Tracks productivity sessions. More sessions indicate higher platform engagement and work activity."
+        }
+      ]
+    },
+
+    {
+      "id": "document_management",
+      "name": "Document Processing & Management",
+      "icon": "file-alt",
+      "description": "Track document uploads, processing, and AI ingestion",
+      "color": "green",
+      "metrics": [
+        {
+          "key": "documents_uploaded",
+          "label": "Documents Uploaded",
+          "description": "Total documents uploaded to the platform",
+          "type": "number",
+          "source": "audit_logs",
+          "query": {
+            "table": "audit_logs",
+            "eventType": "document_upload",
+            "aggregation": "COUNT(*)",
+            "groupBy": null,
+            "filters": []
+          },
+          "defaultTarget": 50,
+          "icon": "upload",
+          "visualization": ["number", "bar_chart", "line_chart"],
+          "trend": true,
+          "helpText": "Measures document intake volume. Tracks how many documents are being added to matters."
+        },
+        {
+          "key": "documents_processed",
+          "label": "Documents Processed Successfully",
+          "description": "Documents that completed AI processing (OCR + embeddings)",
+          "type": "number",
+          "source": "audit_logs",
+          "query": {
+            "table": "audit_logs",
+            "eventType": "document_processing_complete",
+            "aggregation": "COUNT(*)",
+            "groupBy": null,
+            "filters": []
+          },
+          "defaultTarget": 45,
+          "icon": "check-circle",
+          "visualization": ["number", "line_chart"],
+          "trend": true,
+          "helpText": "Shows AI processing success rate. Should track closely with uploads."
+        },
+        {
+          "key": "document_processing_success_rate",
+          "label": "Processing Success Rate",
+          "description": "Percentage of uploaded documents successfully processed",
+          "type": "percentage",
+          "source": "audit_logs",
+          "query": {
+            "table": "audit_logs",
+            "eventType": ["document_processing_complete", "document_upload"],
+            "aggregation": "CAST(COUNT(*) FILTER (WHERE event_type = 'document_processing_complete') AS FLOAT) / NULLIF(COUNT(*) FILTER (WHERE event_type = 'document_upload'), 0) * 100",
+            "groupBy": null,
+            "filters": []
+          },
+          "defaultTarget": 95,
+          "threshold": {
+            "warning": 90,
+            "critical": 80
+          },
+          "icon": "percentage",
+          "visualization": ["percentage", "gauge"],
+          "trend": true,
+          "alertOnBelow": true,
+          "helpText": "Quality metric for document pipeline. Low rates indicate processing issues that need investigation."
+        },
+        {
+          "key": "documents_accessed",
+          "label": "Document Access Events",
+          "description": "Total document access events (views + downloads)",
+          "type": "number",
+          "source": "audit_logs",
+          "query": {
+            "table": "audit_logs",
+            "eventType": "document_access",
+            "aggregation": "COUNT(*)",
+            "groupBy": null,
+            "filters": []
+          },
+          "defaultTarget": 100,
+          "icon": "eye",
+          "visualization": ["number", "line_chart"],
+          "trend": true,
+          "helpText": "Measures platform document access patterns and storage system utilization. Tracks how frequently users are retrieving documents from the system."
+        },
+        {
+          "key": "ai_ingestion_completed",
+          "label": "AI Ingestion Completed",
+          "description": "Documents successfully indexed with embeddings",
+          "type": "number",
+          "source": "activity_feed",
+          "query": {
+            "table": "activity_feed",
+            "eventType": "document_ai_ingestion_completed",
+            "aggregation": "COUNT(*)",
+            "groupBy": null,
+            "filters": []
+          },
+          "defaultTarget": 45,
+          "icon": "brain",
+          "visualization": ["number", "line_chart"],
+          "trend": true,
+          "helpText": "Tracks RAG readiness. Documents with embeddings are searchable via AI."
+        },
+        {
+          "key": "text_extraction_started",
+          "label": "OCR Jobs Started",
+          "description": "Document text extraction jobs initiated",
+          "type": "number",
+          "source": "activity_feed",
+          "query": {
+            "table": "activity_feed",
+            "eventType": "document_text_extraction_started",
+            "aggregation": "COUNT(*)",
+            "groupBy": null,
+            "filters": []
+          },
+          "defaultTarget": 50,
+          "icon": "file-invoice",
+          "visualization": ["number"],
+          "trend": true,
+          "helpText": "Shows OCR pipeline activity. Should match upload volume."
+        }
+      ]
+    },
+
+    {
+      "id": "ai_chat",
+      "name": "AI Chat & Conversations",
+      "icon": "comments",
+      "description": "Track conversational AI usage and chat activity",
+      "color": "purple",
+      "metrics": [
+        {
+          "key": "conversations_created",
+          "label": "New Conversations",
+          "description": "New chat conversations started",
+          "type": "number",
+          "source": "activity_feed",
+          "query": {
+            "table": "activity_feed",
+            "eventType": "conversation_created",
+            "aggregation": "COUNT(*)",
+            "groupBy": null,
+            "filters": []
+          },
+          "defaultTarget": 75,
+          "icon": "comment-medical",
+          "visualization": ["number", "bar_chart", "line_chart"],
+          "trend": true,
+          "helpText": "Measures AI chat adoption. New conversations indicate users are leveraging AI assistance."
+        },
+        {
+          "key": "chat_messages",
+          "label": "Chat Messages",
+          "description": "Total AI chat interactions",
+          "type": "number",
+          "source": "activity_feed",
+          "query": {
+            "table": "activity_feed",
+            "eventType": "chat_stream",
+            "aggregation": "COUNT(*)",
+            "groupBy": null,
+            "filters": []
+          },
+          "defaultTarget": 200,
+          "icon": "comment-dots",
+          "visualization": ["number", "line_chart"],
+          "trend": true,
+          "helpText": "Tracks total AI interactions. Higher volume shows deep engagement with conversational AI."
+        },
+        {
+          "key": "avg_messages_per_conversation",
+          "label": "Avg Messages per Conversation",
+          "description": "Average conversation depth (engagement metric)",
+          "type": "number",
+          "source": "activity_feed",
+          "query": {
+            "table": "activity_feed",
+            "eventType": ["chat_stream", "conversation_created"],
+            "aggregation": "CAST(COUNT(*) FILTER (WHERE event_type = 'chat_stream') AS FLOAT) / NULLIF(COUNT(*) FILTER (WHERE event_type = 'conversation_created'), 0)",
+            "groupBy": null,
+            "filters": [],
+            "decimals": 1
+          },
+          "defaultTarget": 5,
+          "icon": "layer-group",
+          "visualization": ["number", "gauge"],
+          "trend": true,
+          "helpText": "Measures conversation quality. Higher averages indicate users are having in-depth AI-assisted research sessions."
+        }
+      ]
+    },
+
+    {
+      "id": "integrations",
+      "name": "Integration Activity",
+      "icon": "plug",
+      "description": "Track third-party integration usage",
+      "color": "indigo",
+      "metrics": [
+        {
+          "key": "actionstep_queries",
+          "label": "ActionStep Queries",
+          "description": "ActionStep CRM data access events",
+          "type": "number",
+          "source": "audit_logs",
+          "query": {
+            "table": "audit_logs",
+            "eventType": "actionstep_data_access",
+            "aggregation": "COUNT(*)",
+            "groupBy": null,
+            "filters": []
+          },
+          "defaultTarget": 30,
+          "icon": "exchange-alt",
+          "visualization": ["number", "line_chart"],
+          "trend": true,
+          "helpText": "Measures ActionStep integration usage. Shows how often users are syncing CRM data."
+        }
+      ]
+    },
+
+    {
+      "id": "management_boards",
+      "name": "Management Boards",
+      "icon": "th-large",
+      "description": "Track management board usage and creation",
+      "color": "pink",
+      "metrics": [
+        {
+          "key": "boards_created",
+          "label": "Boards Created",
+          "description": "New management boards created",
+          "type": "number",
+          "source": "audit_logs",
+          "query": {
+            "table": "audit_logs",
+            "eventType": "management_board.created",
+            "aggregation": "COUNT(*)",
+            "groupBy": null,
+            "filters": []
+          },
+          "defaultTarget": 5,
+          "icon": "plus-square",
+          "visualization": ["number"],
+          "trend": false,
+          "helpText": "Tracks adoption of management boards feature. Shows how many custom boards are being created."
+        }
+      ]
+    },
+
+    {
+      "id": "system_health",
+      "name": "System Health & Performance",
+      "icon": "heartbeat",
+      "description": "Monitor system errors and processing failures",
+      "color": "red",
+      "metrics": [
+        {
+          "key": "extraction_failures",
+          "label": "Text Extraction Failures",
+          "description": "Failed OCR/text extraction jobs",
+          "type": "number",
+          "source": "audit_logs",
+          "query": {
+            "table": "audit_logs",
+            "eventType": "document_text_extraction_failed",
+            "aggregation": "COUNT(*)",
+            "groupBy": null,
+            "filters": []
+          },
+          "defaultTarget": 0,
+          "threshold": {
+            "warning": 5,
+            "critical": 10
+          },
+          "icon": "exclamation-circle",
+          "visualization": ["number", "line_chart"],
+          "trend": true,
+          "alertOnExceed": true,
+          "helpText": "System health metric. High failure rates indicate OCR processing issues that need attention."
+        },
+        {
+          "key": "ai_ingestion_failures",
+          "label": "AI Ingestion Failures",
+          "description": "Failed embedding generation jobs",
+          "type": "number",
+          "source": "activity_feed",
+          "query": {
+            "table": "activity_feed",
+            "eventType": "document_ai_ingestion_failed",
+            "aggregation": "COUNT(*)",
+            "groupBy": null,
+            "filters": []
+          },
+          "defaultTarget": 0,
+          "threshold": {
+            "warning": 3,
+            "critical": 10
+          },
+          "icon": "times-circle",
+          "visualization": ["number", "line_chart"],
+          "trend": true,
+          "alertOnExceed": true,
+          "helpText": "RAG pipeline health. Failures prevent documents from being AI-searchable."
+        }
+      ]
+    }
+  ],
+
+  "aggregationPeriods": [
+    {
+      "id": "1h",
+      "label": "Last Hour",
+      "interval": "1 hour",
+      "description": "Real-time monitoring"
+    },
+    {
+      "id": "24h",
+      "label": "Last 24 Hours",
+      "interval": "24 hours",
+      "description": "Daily activity"
+    },
+    {
+      "id": "7d",
+      "label": "Last 7 Days",
+      "interval": "7 days",
+      "description": "Weekly trends"
+    },
+    {
+      "id": "30d",
+      "label": "Last 30 Days",
+      "interval": "30 days",
+      "description": "Monthly overview"
+    },
+    {
+      "id": "90d",
+      "label": "Last 90 Days",
+      "interval": "90 days",
+      "description": "Quarterly analysis"
+    }
+  ],
+
+  "visualizationTypes": [
+    {
+      "id": "number",
+      "label": "Number Card",
+      "description": "Display single metric value with trend indicator",
+      "supportsTypes": ["number", "percentage", "currency"]
+    },
+    {
+      "id": "gauge",
+      "label": "Gauge Chart",
+      "description": "Progress towards target goal",
+      "supportsTypes": ["number", "percentage"]
+    },
+    {
+      "id": "line_chart",
+      "label": "Line Chart",
+      "description": "Trend over time",
+      "supportsTypes": ["number", "percentage", "currency"]
+    },
+    {
+      "id": "bar_chart",
+      "label": "Bar Chart",
+      "description": "Compare values across categories or time periods",
+      "supportsTypes": ["number", "currency"]
+    },
+    {
+      "id": "percentage",
+      "label": "Percentage Display",
+      "description": "Formatted percentage with visual indicator",
+      "supportsTypes": ["percentage"]
+    }
+  ]
+}

@@ -10,6 +10,7 @@
   <script src="js/config.js"></script>
   <script src="js/mock-data.js"></script>
   <script src="js/api.js"></script>
+  <script src="js/services/feature-tracker.js"></script>
   <script src="js/utils.js"></script>
   <script src="js/components.js"></script>
   <script src="js/version.js"></script>
@@ -23,6 +24,7 @@
   <script src="js/vendor/mammoth.min.js"></script>
   <script src="js/conflict-detection.js"></script>
   <script src="js/similar-matters-widget.js"></script>
+  <script src="js/analytics.js"></script>
 
   <!-- Inline preloader styles - Pure CSS, no dependencies -->
   <style>
@@ -1125,6 +1127,9 @@
     let allPinnedMatters = [];
     let totalPinnedCount = 0;
 
+    // Analytics: Track page view only once on initial load
+    let hasTrackedPageView = false;
+
     // Security: HTML escaping to prevent XSS attacks
     // Using explicit string replacement for better performance and security
     function escapeHtml(unsafe) {
@@ -1217,7 +1222,13 @@
       const grid = document.getElementById('mattersGrid');
       const loading = document.getElementById('mattersLoading');
       const pagination = document.getElementById('pagination');
-      
+
+      // Track page view on initial load (use one-time flag to prevent race conditions)
+      if (!hasTrackedPageView && window.analytics) {
+        window.analytics.trackPageView('matters', null);
+        hasTrackedPageView = true;
+      }
+
       // Show loading state
       loading.classList.remove('hidden');
       grid.classList.add('hidden');
@@ -1470,6 +1481,19 @@
 
     // Search and filter
     document.getElementById('searchInput').addEventListener('input', debounce(() => {
+      const searchQuery = document.getElementById('searchInput').value;
+
+      // Track matter searched event (truncate query to 200 chars for analytics)
+      if (searchQuery && window.analytics) {
+        const truncatedQuery = searchQuery.length > 200 ? searchQuery.substring(0, 200) : searchQuery;
+        window.analytics.trackEvent('matter.searched', 'matter', null, {
+          matter_id: null, // Search is global, not matter-specific
+          query: truncatedQuery,
+          query_length: searchQuery.length,
+          truncated: searchQuery.length > 200
+        });
+      }
+
       currentPage = 1;
       pinnedPage = 1;
       allPinnedMatters = [];
@@ -1478,6 +1502,17 @@
     }, 300));
 
     document.getElementById('statusFilter').addEventListener('change', () => {
+      const filterValue = document.getElementById('statusFilter').value;
+
+      // Track matter filtered event
+      if (window.analytics) {
+        window.analytics.trackEvent('matter.filtered', 'matter', null, {
+          matter_id: null, // Filter is global, not matter-specific
+          filter_type: 'status',
+          filter_value: filterValue
+        });
+      }
+
       currentPage = 1;
       pinnedPage = 1;
       allPinnedMatters = [];
@@ -2005,6 +2040,15 @@
 
         // Store data globally for tab switching
         currentMatterData = { matter, permissions, activities, activityPagination, chats, chatsPagination, documents, documentsPagination, orphanedFiles, tasks };
+
+        // Track matter opened event (with defensive null checks)
+        if (window.analytics && matter) {
+          window.analytics.trackEvent('matter.opened', 'matter', matter.matter_id, {
+            resource_name: matter?.matter_name || 'Unknown',
+            status: matter?.status || 'unknown',
+            default_tab: defaultTab
+          });
+        }
 
         // Update drawer header
         const drawerMatterIdEl = document.getElementById('drawerMatterId');
@@ -5222,9 +5266,21 @@
         // Call API
         if (isPinned) {
           await api.unpinMatter(matterId, source);
+
+          // Track matter unpinned event
+          if (window.analytics) {
+            window.analytics.trackEvent('matter.unpinned', 'matter', matterId, { source });
+          }
+
           Toast.success('Matter unpinned');
         } else {
           await api.pinMatter(matterId, source);
+
+          // Track matter pinned event
+          if (window.analytics) {
+            window.analytics.trackEvent('matter.pinned', 'matter', matterId, { source });
+          }
+
           Toast.success('Matter pinned');
         }
 
@@ -5244,6 +5300,15 @@
         } else {
           Toast.error(error.message || 'Failed to update pin status');
         }
+
+        // Track error for analytics
+        if (window.analytics) {
+          window.analytics.trackError(error, {
+            action: isPinned ? 'matter.unpin' : 'matter.pin',
+            matter_id: matterId,
+            source: source
+          });
+        }
       } finally {
         // Always remove from in-progress set (race condition fix)
         pinningInProgress.delete(key);
@@ -5254,11 +5319,26 @@
     window.deleteMatter = async function(matterId) {
       Modal.confirm('Delete Matter', 'Are you sure you want to delete this matter? This action cannot be undone.', async () => {
         try {
+          // Get matter details before deletion for tracking
+          const matterData = currentMatterData?.matter || {};
+
           await api.deleteMatter(matterId);
+
+          // Track matter deleted event (with defensive null checks)
+          if (window.analytics) {
+            window.analytics.trackEvent('matter.deleted', 'matter', matterId, {
+              resource_name: matterData?.matter_name || 'Unknown',
+              status: matterData?.status || 'unknown'
+            });
+          }
+
           Toast.success('Matter deleted');
           closeDrawer();
           loadMatters();
         } catch (error) {
+          if (window.analytics) {
+            window.analytics.trackError(error, { action: 'matter.delete', matter_id: matterId });
+          }
           Toast.error(error.message);
         }
       });
@@ -5351,6 +5431,17 @@
           try {
             const result = await api.bulkDeleteMatters(matterIds);
 
+            // Track matter bulk deleted event
+            if (window.analytics) {
+              window.analytics.trackEvent('matter.bulk_deleted', 'matter', null, {
+                matter_ids: matterIds,
+                count: matterIds.length,
+                soft_deleted: result.soft_deleted || 0,
+                hard_deleted: result.hard_deleted || 0,
+                failed: result.errors?.length || 0
+              });
+            }
+
             if (result.errors && result.errors.length > 0) {
               Toast.warning(`Deleted ${result.soft_deleted + result.hard_deleted} matters, ${result.errors.length} failed`);
             } else {
@@ -5363,6 +5454,13 @@
             closeDrawer();
             loadMatters();
           } catch (error) {
+            if (window.analytics) {
+              window.analytics.trackError(error, {
+                action: 'matter.bulk_delete',
+                matter_ids: matterIds,
+                count: matterIds.length
+              });
+            }
             Toast.error(error.message || 'Failed to delete matters');
           }
         }
@@ -5471,10 +5569,39 @@
           }
 
           createdMatterId = matterId;
+
+          // Track matter edited event - only track fields that actually changed
+          if (window.analytics && currentMatterData?.matter) {
+            const oldMatter = currentMatterData.matter;
+            const changedFields = [];
+
+            if (data.client_name !== oldMatter.client_name) changedFields.push('client_name');
+            if (data.name !== oldMatter.matter_name) changedFields.push('name');
+            if (data.description !== oldMatter.description) changedFields.push('description');
+            if (data.status !== oldMatter.status) changedFields.push('status');
+            if (data.visibility !== oldMatter.visibility) changedFields.push('visibility');
+
+            window.analytics.trackEvent('matter.edited', 'matter', matterId, {
+              resource_name: data.name,
+              status: data.status,
+              changed_fields: changedFields
+            });
+          }
+
           Toast.success('Matter updated');
         } else {
           const result = await api.createMatter(data);
           createdMatterId = result.matter?.id;
+
+          // Track matter created event
+          if (window.analytics) {
+            window.analytics.trackEvent('matter.created', 'matter', result.matter?.matter_id, {
+              resource_name: data.name,
+              client_name: data.client_name,
+              status: data.status
+            });
+          }
+
           Toast.success(`Matter created: ${result.matter?.matter_id || 'Success'}`);
         }
 
@@ -5512,6 +5639,15 @@
         loadMatters();
       } catch (error) {
         Toast.error(error.message);
+
+        // Track error for analytics
+        if (window.analytics) {
+          window.analytics.trackError(error, {
+            action: 'matter.create',
+            client_name: data?.client_name,
+            matter_type: data?.matter_type
+          });
+        }
       }
     });
 

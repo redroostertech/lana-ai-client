@@ -639,6 +639,20 @@ async function loadFolderContents() {
       buildFolderPath();  // Build and render breadcrumbs
       updateResultsCount();
       renderFolderContents();
+
+      // Track search if query is present
+      if (storageState.searchQuery && window.FeatureTracker) {
+        try {
+          await window.FeatureTracker.trackFeature(window.Features.SEARCH_PERFORMED, {
+            query_length: storageState.searchQuery.length,
+            result_count: storageState.files.length,
+            matter_id: storageState.currentMatterId,
+            source_filter: storageState.sourceFilter
+          });
+        } catch (trackError) {
+          console.error('[FeatureTracker] Failed to track search:', trackError);
+        }
+      }
     } else {
       throw new Error(filesResponse.error || 'Failed to load folder contents');
     }
@@ -1073,6 +1087,22 @@ async function handleSingleFileUploadWithHints() {
     console.log('[Storage] Upload successful:', result);
 
     showSuccessNotification('File uploaded successfully');
+
+    // Track successful file upload
+    if (window.FeatureTracker) {
+      try {
+        await window.FeatureTracker.trackFeature(window.Features.DOCUMENT_UPLOADED, {
+          file_type: file.type || 'unknown',
+          file_size: file.size,
+          matter_id: storageState.currentMatterId,
+          folder_id: storageState.currentFolderId || null,
+          has_hints: !!(hasSignatures || hasForms)
+        });
+      } catch (trackError) {
+        console.error('[FeatureTracker] Failed to track upload:', trackError);
+      }
+    }
+
     await loadFolderContents();
   } catch (error) {
     console.error('[Storage] Failed to upload file:', error);
@@ -1200,6 +1230,24 @@ async function handleBulkUploadWithHints() {
     console.log('[Storage] Bulk upload successful:', results);
 
     showSuccessNotification(`Successfully uploaded ${filesWithHints.length} file(s)`);
+
+    // Track each successful bulk upload
+    if (window.FeatureTracker) {
+      for (const { file } of filesWithHints) {
+        try {
+          await window.FeatureTracker.trackFeature(window.Features.DOCUMENT_UPLOADED, {
+            file_type: file.type || 'unknown',
+            file_size: file.size,
+            matter_id: storageState.currentMatterId,
+            folder_id: storageState.currentFolderId || null,
+            is_bulk_upload: true
+          });
+        } catch (trackError) {
+          console.error('[FeatureTracker] Failed to track bulk upload:', trackError);
+        }
+      }
+    }
+
     await loadFolderContents();
   } catch (error) {
     console.error('[Storage] Failed to upload files:', error);

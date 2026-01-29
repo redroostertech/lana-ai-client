@@ -18,6 +18,7 @@ const { verifyServer } = require('./electron-discovery');
 const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified } = require('./electron-storage');
 const { checkForUpdates, downloadAndInstallUpdate, showOptionalUpdateDialog, showForceUpdateDialog, shouldCheckForUpdates } = require('./electron-updater-custom');
 const { logInfo, logError, exportLogs, getLogFilePath } = require('./electron-logger');
+const SessionTracker = require('./js/session/session-tracker');
 
 /**
  * Get app version from centralized version system
@@ -39,6 +40,9 @@ function getAppVersion() {
 
 // Keep a global reference of the window object to prevent garbage collection
 let mainWindow;
+
+// Session tracker instance
+let sessionTracker = null;
 
 /**
  * Create a file:// URL that works on all platforms (Windows, macOS, Linux)
@@ -510,13 +514,45 @@ ipcMain.handle('clear-saved-server', async () => {
 });
 
 
+// Session Tracking IPC Handlers
+// Initialize session tracker with backend URL and auth token
+ipcMain.handle('session-tracker:initialize', async (event, backendUrl, authToken) => {
+  try {
+    if (sessionTracker && backendUrl && authToken) {
+      sessionTracker.initialize(backendUrl, authToken);
+      logInfo('[SessionTracker] Initialized with backend URL');
+      return { success: true };
+    } else {
+      return { success: false, error: 'Missing backend URL or auth token' };
+    }
+  } catch (error) {
+    logError('[SessionTracker] Failed to initialize:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Start session tracking
+ipcMain.handle('session-tracker:start', async () => {
+  try {
+    if (sessionTracker) {
+      const result = await sessionTracker.startSession();
+      return result;
+    } else {
+      return { success: false, error: 'Session tracker not initialized' };
+    }
+  } catch (error) {
+    logError('[SessionTracker] Failed to start session:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // Check for updates
 ipcMain.handle('check-updates', async (event, serverUrl) => {
   try {
     // Get saved server to retrieve orgId
     const savedServer = getSavedServer();
     const orgId = savedServer?.orgId || null;
-    
+
     const updateInfo = await checkForUpdates(serverUrl, null, orgId);
     return { success: true, updateInfo };
   } catch (error) {
@@ -745,6 +781,13 @@ app.whenReady().then(async () => {
     });
   });
 
+  // Initialize session tracker
+  sessionTracker = new SessionTracker({
+    heartbeatInterval: 30000, // 30 seconds
+    idleThreshold: 60 // 1 minute
+  });
+  logInfo('Session tracker initialized');
+
   // HOSTED DISCOVERY INITIALIZATION FLOW
   // With hosted discovery, we always start at login page
   // The login page handles org resolution via lanaai.io endpoint
@@ -794,9 +837,15 @@ app.on('window-all-closed', () => {
 });
 
 // Handle application quit
-app.on('before-quit', () => {
+app.on('before-quit', async () => {
   // Cleanup operations before quitting
   console.log('Application is quitting...');
+
+  // End session tracking
+  if (sessionTracker) {
+    await sessionTracker.shutdown();
+    logInfo('Session tracker shut down');
+  }
 });
 
 // Security: Prevent navigation to external URLs (allow local file navigation)

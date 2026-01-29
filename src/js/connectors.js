@@ -310,6 +310,7 @@ const Connectors = {
    * Configure a connector
    */
   async configure(connectorId, config) {
+    let result;
     if (api.isDemoMode()) {
       await MockData.delay(500);
       const connector = ConnectorsMockData.connectors.find(c => c.id === connectorId);
@@ -318,9 +319,23 @@ const Connectors = {
         connector.status = 'connected';
         connector.lastSync = new Date().toISOString();
       }
-      return { success: true, connector };
+      result = { success: true, connector };
+    } else {
+      result = await api.post(`/api/v1/integrations/connectors/${connectorId}/configure`, config);
     }
-    return api.post(`/api/v1/integrations/connectors/${connectorId}/configure`, config);
+
+    // Track integration connection
+    if (result.success && window.FeatureTracker) {
+      try {
+        await window.FeatureTracker.trackFeature(window.Features.INTEGRATION_CONNECTED, {
+          connector_type: connectorId
+        });
+      } catch (trackError) {
+        console.error('[FeatureTracker] Failed to track integration connection:', trackError);
+      }
+    }
+
+    return result;
   },
 
   /**

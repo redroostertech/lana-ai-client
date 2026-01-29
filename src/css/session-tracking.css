@@ -1,0 +1,317 @@
+/**
+ * Session Tracking Custom Styles
+ * Additional styles for session tracking UI components
+ */
+
+/* Animation for productivity widget */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* User Productivity Widget */
+#userProductivityWidget {
+  animation: fadeIn 0.6s ease-out;
+}
+
+#userProductivityWidget .stat-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+#userProductivityWidget .stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Focus bar animation */
+.focus-bar {
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Team Performance Board Styles */
+.kpi-card {
+  transition: all 0.3s ease;
+}
+
+.kpi-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.kpi-card .icon-circle {
+  transition: background-color 0.3s ease;
+}
+
+.kpi-card:hover .icon-circle {
+  background-color: rgba(99, 102, 241, 0.2);
+}
+
+/* Top Contributors Table */
+.contributors-table tbody tr {
+  animation: slideIn 0.3s ease-out;
+  animation-fill-mode: both;
+}
+
+.contributors-table tbody tr:nth-child(1) { animation-delay: 0.05s; }
+.contributors-table tbody tr:nth-child(2) { animation-delay: 0.1s; }
+.contributors-table tbody tr:nth-child(3) { animation-delay: 0.15s; }
+.contributors-table tbody tr:nth-child(4) { animation-delay: 0.2s; }
+.contributors-table tbody tr:nth-child(5) { animation-delay: 0.25s; }
+
+/* Feature Adoption Chart Container */
+.chart-container {
+  position: relative;
+  height: 300px;
+  max-height: 300px;
+}
+
+/* Improvement Opportunities */
+.opportunity-card {
+  animation: fadeIn 0.5s ease-out;
+  animation-fill-mode: both;
+}
+
+.opportunity-card:nth-child(1) { animation-delay: 0.1s; }
+.opportunity-card:nth-child(2) { animation-delay: 0.2s; }
+.opportunity-card:nth-child(3) { animation-delay: 0.3s; }
+
+/* User Drill-Down Modal */
+.drill-down-modal {
+  z-index: 9999;
+  backdrop-filter: blur(4px);
+}
+
+.drill-down-content {
+  animation: slideIn 0.4s ease-out;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+/* Session Timeline */
+.session-timeline-item {
+  transition: all 0.2s ease;
+}
+
+.session-timeline-item:hover {
+  background-color: rgba(229, 231, 235, 0.5);
+  transform: translateX(4px);
+}
+
+.session-timeline-item .timeline-dot {
+  transition: transform 0.2s ease;
+}
+
+.session-timeline-item:hover .timeline-dot {
+  transform: scale(1.3);
+}
+
+/* Loading States */
+.loading-skeleton {
+  background: linear-gradient(
+    90deg,
+    #f3f4f6 25%,
+    #e5e7eb 50%,
+    #f3f4f6 75%
+  );
+  background-size: 200% 100%;
+  animation: loading 1.5s ease-in-out infinite;
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Date Range Selector */
+.date-range-btn {
+  transition: all 0.2s ease;
+}
+
+.date-range-btn:not(.active):hover {
+  background-color: rgba(99, 102, 241, 0.1);
+  color: #4f46e5;
+}
+
+.date-range-btn.active {
+  background-color: #4f46e5;
+  color: white;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+}
+
+/* Responsive tweaks */
+@media (max-width: 768px) {
+  .chart-container {
+    height: 250px;
+  }
+
+  .drill-down-content {
+    max-height: 90vh;
+  }
+
+  #userProductivityWidget {
+    font-size: 0.9rem;
+  }
+}
+
+/* Smooth scrolling for session timeline */
+.session-timeline-container {
+  scroll-behavior: smooth;
+}
+
+/* Focus percentage color utility classes */
+.focus-high {
+  color: #10B981;
+}
+
+.focus-medium {
+  color: #F59E0B;
+}
+
+.focus-low {
+  color: #EF4444;
+}
+
+/* Glassmorphism effect for cards */
+.glass-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Gradient background for productivity widget */
+.productivity-gradient {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* Badge styles for rank */
+.rank-badge {
+  font-size: 1.25rem;
+  line-height: 1;
+  display: inline-block;
+}
+
+/* Hover effects for interactive elements */
+.interactive-hover {
+  transition: all 0.2s ease;
+}
+
+.interactive-hover:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Empty state illustrations */
+.empty-state {
+  animation: fadeIn 0.8s ease-out;
+}
+
+.empty-state svg {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* Progress bar animation */
+.progress-bar {
+  transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.progress-bar-container {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Tooltip styles (if needed) */
+.tooltip {
+  position: absolute;
+  background-color: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  z-index: 1000;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: rgba(0, 0, 0, 0.9);
+}
+
+/* Refresh button animation */
+.refresh-btn {
+  transition: transform 0.6s ease;
+}
+
+.refresh-btn.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Modal backdrop animation */
+.modal-backdrop {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.modal-content {
+  animation: slideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Success state animation */
+.success-checkmark {
+  animation: checkmark 0.6s ease-out;
+}
+
+@keyframes checkmark {
+  0% {
+    transform: scale(0) rotate(-45deg);
+  }
+  50% {
+    transform: scale(1.2) rotate(-45deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}

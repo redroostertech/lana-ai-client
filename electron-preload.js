@@ -73,6 +73,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   /**
+   * Session Tracking (time tracking and activity monitoring)
+   */
+  sessionTracking: {
+    getStatus: () => ipcRenderer.invoke('session-tracker:getStatus'),
+    updateMatter: (matterId) => ipcRenderer.invoke('session-tracker:updateMatter', matterId),
+    start: () => ipcRenderer.invoke('session-tracker:start'),
+    end: (reason) => ipcRenderer.invoke('session-tracker:end', reason)
+  },
+
+  /**
    * Generic IPC invoke (for extensibility)
    */
   invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),

@@ -118,6 +118,19 @@ class ApiClient {
         if (this.token) {
           this.startTokenRefresh();
           this.setupActivityListener();
+
+          // Initialize and start session tracking for auto-login (Electron only)
+          if (window.electronAPI) {
+            this._readyPromise.then(async () => {
+              try {
+                await window.electronAPI.invoke('session-tracker:initialize', this.baseUrl, this.token);
+                await window.electronAPI.invoke('session-tracker:start');
+                this.log('Session tracking initialized and started (auto-login)');
+              } catch (error) {
+                console.warn('[LanaAPI] Failed to start session tracking (auto-login):', error);
+              }
+            });
+          }
         }
       }
     }
@@ -938,6 +951,19 @@ class ApiClient {
     this.startTokenRefresh();
     this.setupActivityListener();
 
+    // Start session tracking (Electron client only)
+    if (window.electronAPI) {
+      try {
+        // First initialize session tracker with backend URL and token
+        await window.electronAPI.invoke('session-tracker:initialize', this.baseUrl, this.token);
+        // Then start the session
+        await window.electronAPI.invoke('session-tracker:start');
+        this.log('Session tracking initialized and started');
+      } catch (error) {
+        console.warn('[LanaAPI] Failed to start session tracking:', error);
+      }
+    }
+
     return result;
   }
 
@@ -1157,11 +1183,37 @@ class ApiClient {
   }
 
   async getMatter(matterId) {
-    return this.get(`/api/v1/matters/${matterId}`);
+    const result = await this.get(`/api/v1/matters/${matterId}`);
+
+    // Track matter view
+    if (result.success && window.FeatureTracker) {
+      try {
+        await window.FeatureTracker.trackFeature(window.Features.MATTER_VIEWED, {
+          matter_id: matterId
+        });
+      } catch (trackError) {
+        console.error('[FeatureTracker] Failed to track matter view:', trackError);
+      }
+    }
+
+    return result;
   }
 
   async createMatter(matterData) {
-    return this.post('/api/v1/matters', matterData);
+    const result = await this.post('/api/v1/matters', matterData);
+
+    // Track matter creation
+    if (result.success && window.FeatureTracker) {
+      try {
+        await window.FeatureTracker.trackFeature(window.Features.MATTER_CREATED, {
+          matter_type: matterData.matter_type || 'general'
+        });
+      } catch (trackError) {
+        console.error('[FeatureTracker] Failed to track matter creation:', trackError);
+      }
+    }
+
+    return result;
   }
 
   async updateMatter(matterId, matterData) {
@@ -1896,6 +1948,18 @@ class ApiClient {
   // ============================================================
   async getMyActivity(limit = 50, offset = 0) {
     return this.get(`/api/v1/activity/my?limit=${limit}&offset=${offset}`);
+  }
+
+  async getMyProductivity() {
+    return this.get(`/api/v1/activity/my/productivity`);
+  }
+
+  async getUserProductivity(userId) {
+    return this.get(`/api/v1/activity/user/${userId}/productivity`);
+  }
+
+  async getOrganizationUsers() {
+    return this.get(`/api/v1/activity/organization/users`);
   }
 
   async getOrganizationActivity(limit = 50, offset = 0) {

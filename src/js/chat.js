@@ -845,6 +845,20 @@ class LanaChat {
         this.hideTypingIndicator();
         this.addMessage('assistant', 'No response received.');
       }
+
+      // Track successful chat message
+      if (responseStarted && window.FeatureTracker) {
+        try {
+          await window.FeatureTracker.trackFeature(window.Features.CHAT_MESSAGE_SENT, {
+            conversation_id: this.currentConversationId,
+            has_file_drawer: !!(window.FileDrawer && window.FileDrawer.selectedFiles?.length > 0),
+            chat_mode: this.chatState?.mode || 'general',
+            active_documents: this.chatState?.activeDocuments?.length || 0
+          });
+        } catch (trackError) {
+          console.error('[FeatureTracker] Failed to track chat message:', trackError);
+        }
+      }
     } catch (error) {
       this.hideTypingIndicator();
       this.addSystemMessage('Failed to send message. Please try again.');
