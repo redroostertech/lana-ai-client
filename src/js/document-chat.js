@@ -85,12 +85,29 @@ class DocumentChat extends LanaChat {
         return false;
       };
 
+      // Try localStorage synchronously first (fastest path)
+      if (isInvalidUrl(baseUrl)) {
+        try {
+          const savedServer = localStorage.getItem('lana_saved_server');
+          if (savedServer) {
+            const serverInfo = JSON.parse(savedServer);
+            if (serverInfo.url) {
+              baseUrl = serverInfo.url;
+              if (this.api) this.api.baseUrl = baseUrl;
+              console.log('[DocumentChat] Got server URL from localStorage:', baseUrl);
+            }
+          }
+        } catch (err) { /* ignore */ }
+      }
+
+      // If still empty and in Electron, try IPC to main process
       if (isInvalidUrl(baseUrl) && window.electronAPI) {
         try {
           const result = await window.electronAPI.getSavedServer();
           if (result && result.success && result.server && result.server.url) {
             baseUrl = result.server.url;
             if (this.api) this.api.baseUrl = baseUrl;
+            console.log('[DocumentChat] Got server URL from Electron IPC:', baseUrl);
           }
         } catch (err) {
           console.error('[DocumentChat] Failed to get saved server:', err);

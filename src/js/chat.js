@@ -711,7 +711,22 @@ class LanaChat {
         return false;
       };
 
-      // If still empty and in Electron, try direct fetch from saved server
+      // If still empty, try localStorage synchronously first (fastest path)
+      if (isInvalidUrl(baseUrl)) {
+        try {
+          const savedServer = localStorage.getItem('lana_saved_server');
+          if (savedServer) {
+            const serverInfo = JSON.parse(savedServer);
+            if (serverInfo.url) {
+              baseUrl = serverInfo.url;
+              if (this.api) this.api.baseUrl = baseUrl;
+              console.log('[LanaChat] Got server URL from localStorage:', baseUrl);
+            }
+          }
+        } catch (err) { /* ignore */ }
+      }
+
+      // If still empty and in Electron, try IPC to main process
       if (isInvalidUrl(baseUrl) && window.electronAPI) {
         try {
           const result = await window.electronAPI.getSavedServer();
@@ -719,7 +734,7 @@ class LanaChat {
             baseUrl = result.server.url;
             // Update api.baseUrl for future requests
             if (this.api) this.api.baseUrl = baseUrl;
-            console.log('[LanaChat] Got server URL from Electron:', baseUrl);
+            console.log('[LanaChat] Got server URL from Electron IPC:', baseUrl);
           }
         } catch (err) {
           console.error('[LanaChat] Failed to get saved server:', err);
@@ -1603,12 +1618,27 @@ class LanaChat {
         return false;
       };
 
-      // If in Electron, try to get saved server
+      // Try localStorage synchronously first (fastest path)
+      if (isInvalidUrl(baseUrl)) {
+        try {
+          const savedServer = localStorage.getItem('lana_saved_server');
+          if (savedServer) {
+            const serverInfo = JSON.parse(savedServer);
+            if (serverInfo.url) {
+              baseUrl = serverInfo.url;
+              console.log('[Citations] Got server URL from localStorage:', baseUrl);
+            }
+          }
+        } catch (err) { /* ignore */ }
+      }
+
+      // If still empty and in Electron, try IPC to main process
       if (isInvalidUrl(baseUrl) && window.electronAPI) {
         try {
           const result = await window.electronAPI.getSavedServer();
           if (result && result.success && result.server && result.server.url) {
             baseUrl = result.server.url;
+            console.log('[Citations] Got server URL from Electron IPC:', baseUrl);
           }
         } catch (err) {
           console.error('[Citations] Failed to get saved server:', err);

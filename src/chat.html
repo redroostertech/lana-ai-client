@@ -4258,7 +4258,22 @@
           return false;
         };
 
-        // If still empty and in Electron, try direct fetch from saved server
+        // If still empty, try localStorage synchronously first (fastest path)
+        if (isInvalidUrl(baseUrl)) {
+          try {
+            const savedServer = localStorage.getItem('lana_saved_server');
+            if (savedServer) {
+              const serverInfo = JSON.parse(savedServer);
+              if (serverInfo.url) {
+                baseUrl = serverInfo.url;
+                if (window.api) window.api.baseUrl = baseUrl;
+                console.log('[Chat] Got server URL from localStorage:', baseUrl);
+              }
+            }
+          } catch (err) { /* ignore */ }
+        }
+
+        // If still empty and in Electron, try IPC to main process
         if (isInvalidUrl(baseUrl) && window.electronAPI) {
           try {
             const result = await window.electronAPI.getSavedServer();
@@ -4266,7 +4281,7 @@
               baseUrl = result.server.url;
               // Update api.baseUrl for future requests
               if (window.api) window.api.baseUrl = baseUrl;
-              console.log('[Chat] Got server URL from Electron:', baseUrl);
+              console.log('[Chat] Got server URL from Electron IPC:', baseUrl);
             }
           } catch (err) {
             console.error('[Chat] Failed to get saved server:', err);
