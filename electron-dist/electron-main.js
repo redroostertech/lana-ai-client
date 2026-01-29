@@ -29768,11 +29768,11 @@ var require_electron_updater_custom = __commonJS({
 var require_version = __commonJS({
   "src/version.js"(exports2, module2) {
     module2.exports = {
-      version: "3.0.0",
+      version: "3.1.0",
       buildNumber: "1",
       releaseType: "stable",
-      displayVersion: "3.0.0",
-      buildDate: "2026-01-17T02:30:33.135Z",
+      displayVersion: "3.1.0",
+      buildDate: "2026-01-28T02:10:51.331Z",
       /**
        * Get full version string
        * @returns {string} e.g., "v3.0.0b1"
@@ -29805,7 +29805,7 @@ var require_package = __commonJS({
     module2.exports = {
       name: "lana-ai",
       productName: "Lana AI",
-      version: "3.0.0",
+      version: "3.1.0",
       buildNumber: "1",
       releaseType: "stable",
       description: "Lana AI - Enterprise AI Platform",
@@ -29817,6 +29817,7 @@ var require_package = __commonJS({
       license: "Proprietary",
       scripts: {
         "generate-version": "node scripts/generate-version.js",
+        "bundle-electron": "node scripts/bundle-electron.js",
         "build:tiptap": "node scripts/build-tiptap.js",
         prestart: "npm run generate-version",
         start: "node --max-old-space-size=2048 src/index.js",
@@ -30476,7 +30477,12 @@ app.whenReady().then(async () => {
       createWindow(savedServer.url);
       return;
     } else {
-      logInfo("Saved server is not reachable, showing login...");
+      logInfo("Saved server is not reachable, clearing saved data and showing login...");
+      clearSavedServer();
+      await session.defaultSession.clearStorageData({
+        storages: ["localstorage", "sessionstorage"]
+      });
+      logInfo("Cleared session storage data");
     }
   } else {
     logInfo("No saved server found, showing login...");
@@ -30535,7 +30541,17 @@ app.on("web-contents-created", (event, contents) => {
         }
         const publicHtmlPath = path.join(__dirname, "public_html");
         const fullPath = path.join(publicHtmlPath, pagePath);
-        const correctPath = createFileUrl(fullPath);
+        let correctPath = createFileUrl(fullPath);
+        logInfo(`[Navigation] parsedUrl.search: ${parsedUrl.search}`);
+        logInfo(`[Navigation] parsedUrl.hash: ${parsedUrl.hash}`);
+        if (parsedUrl.search) {
+          correctPath += parsedUrl.search;
+          logInfo(`[Navigation] Added search: ${correctPath}`);
+        }
+        if (parsedUrl.hash) {
+          correctPath += parsedUrl.hash;
+          logInfo(`[Navigation] Added hash: ${correctPath}`);
+        }
         logInfo(`[Navigation] Final path: ${navigationUrl} -> ${correctPath}`);
         navigationEvent.preventDefault();
         contents.loadURL(correctPath);

@@ -29,7 +29,10 @@
       "Bash(node /tmp/test_navigation.js:*)",
       "Bash(grep:*)",
       "Bash(git -C /Users/michaelwestbrooksii/Documents/LanaAI/lana-ai-client log --oneline --all)",
-      "Bash(npm run generate-version:*)"
+      "Bash(npm run generate-version:*)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)",
+      "Bash(git status:*)"
     ],
     "deny": [],
     "ask": []

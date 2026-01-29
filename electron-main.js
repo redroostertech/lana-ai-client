@@ -793,7 +793,15 @@ app.whenReady().then(async () => {
       createWindow(savedServer.url);
       return;
     } else {
-      logInfo('Saved server is not reachable, showing login...');
+      logInfo('Saved server is not reachable, clearing saved data and showing login...');
+      // Clear saved server data from electron-store
+      clearSavedServer();
+      // Clear localStorage/sessionStorage from renderer to prevent auto-redirect to dashboard
+      // This clears auth tokens and saved server data that would cause login.html to redirect
+      await session.defaultSession.clearStorageData({
+        storages: ['localstorage', 'sessionstorage']
+      });
+      logInfo('Cleared session storage data');
     }
   } else {
     logInfo('No saved server found, showing login...');
