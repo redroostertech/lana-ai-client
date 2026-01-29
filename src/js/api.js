@@ -429,8 +429,12 @@ class ApiClient {
           baseUrl = origin;
         }
       } else {
-        console.error('[LanaAPI] No server URL available - cannot make API request');
-        throw new Error('No server connection. Please restart the app.');
+        console.error('[LanaAPI] No server URL available - redirecting to login');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('lana_saved_server');
+        window.location.href = 'login.html';
+        return;
       }
     }
 

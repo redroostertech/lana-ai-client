@@ -239,9 +239,17 @@
       console.warn('[Login] 🔧 Development mode enabled (config.js) - API override field is available');
     }
 
-    // Check if already logged in
-    if (api.isAuthenticated()) {
+    // Check if already logged in with a valid (non-expired) token
+    if (api.isAuthenticated() && !api.isTokenExpired()) {
       window.location.href = 'index.html';
+    } else if (api.isAuthenticated() && api.isTokenExpired()) {
+      // Token exists but is expired - clear stale auth data and stay on login
+      console.log('[Login] Token expired, clearing stale auth data');
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('lana_saved_server');
+      api.token = null;
+      api.user = null;
     }
 
     // DOM Elements - Step 1 (Discovery)

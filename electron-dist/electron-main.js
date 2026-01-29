@@ -29764,6 +29764,328 @@ var require_electron_updater_custom = __commonJS({
   }
 });
 
+// js/session/session-tracker.js
+var require_session_tracker = __commonJS({
+  "js/session/session-tracker.js"(exports2, module2) {
+    var { powerMonitor, ipcMain: ipcMain2 } = require("electron");
+    var Store2 = require("electron-store");
+    var https = require("https");
+    var http = require("http");
+    var SessionTracker2 = class {
+      constructor(options = {}) {
+        this.options = {
+          heartbeatInterval: options.heartbeatInterval || 3e4,
+          // 30 seconds
+          idleThreshold: options.idleThreshold || 60,
+          // 1 minute in seconds
+          ...options
+        };
+        this.currentSessionId = null;
+        this.currentMatterId = null;
+        this.isIdle = false;
+        this.lastHeartbeatTime = 0;
+        this.heartbeatTimer = null;
+        this.retryCount = 0;
+        this.maxRetries = 3;
+        this.rateLimitResetTime = 0;
+        this.isRateLimited = false;
+        this.store = new Store2({
+          name: "session-tracker",
+          defaults: {
+            sessionId: null,
+            startedAt: null,
+            matterId: null
+          }
+        });
+        this.backendUrl = null;
+        this.authToken = null;
+        this.setupIPC();
+        this.setupIdleDetection();
+      }
+      /**
+       * Setup IPC handlers for renderer communication
+       */
+      setupIPC() {
+        ipcMain2.handle("session-tracker:getStatus", () => {
+          return {
+            sessionId: this.currentSessionId,
+            matterId: this.currentMatterId,
+            isIdle: this.isIdle,
+            isActive: !!this.currentSessionId
+          };
+        });
+        ipcMain2.handle("session-tracker:updateMatter", (event, matterId) => {
+          this.currentMatterId = matterId;
+          this.store.set("matterId", matterId);
+          return { success: true };
+        });
+        ipcMain2.handle("session-tracker:start", async () => {
+          return await this.startSession();
+        });
+        ipcMain2.handle("session-tracker:end", async (event, reason = "manual") => {
+          return await this.endSession(reason);
+        });
+      }
+      /**
+       * Setup idle detection using power monitor
+       */
+      setupIdleDetection() {
+        powerMonitor.on("lock-screen", () => {
+          this.handleIdleStateChange(true);
+        });
+        powerMonitor.on("unlock-screen", () => {
+          this.handleIdleStateChange(false);
+        });
+        powerMonitor.on("suspend", () => {
+          this.handleIdleStateChange(true);
+        });
+        powerMonitor.on("resume", () => {
+          this.handleIdleStateChange(false);
+        });
+        setInterval(() => {
+          const idleTime = powerMonitor.getSystemIdleTime();
+          const wasIdle = this.isIdle;
+          this.isIdle = idleTime >= this.options.idleThreshold;
+          if (wasIdle !== this.isIdle) {
+            this.handleIdleStateChange(this.isIdle);
+          }
+        }, 1e4);
+      }
+      /**
+       * Handle idle state changes
+       * @param {boolean} isIdle - Is user now idle?
+       */
+      handleIdleStateChange(isIdle) {
+        if (this.isIdle === isIdle) return;
+        this.isIdle = isIdle;
+        if (this.currentSessionId) {
+          this.sendHeartbeat();
+        }
+      }
+      /**
+       * Initialize session tracker with backend URL and auth token
+       * @param {string} backendUrl - Backend server URL
+       * @param {string} authToken - JWT authentication token
+       */
+      initialize(backendUrl, authToken) {
+        this.backendUrl = backendUrl;
+        this.authToken = authToken;
+        const savedSessionId = this.store.get("sessionId");
+        const savedStartedAt = this.store.get("startedAt");
+        if (savedSessionId && savedStartedAt) {
+          const elapsed = Date.now() - new Date(savedStartedAt).getTime();
+          if (elapsed < 2 * 60 * 60 * 1e3) {
+            this.currentSessionId = savedSessionId;
+            this.currentMatterId = this.store.get("matterId");
+            this.startHeartbeatTimer();
+          } else {
+            this.clearStoredSession();
+          }
+        }
+      }
+      /**
+       * Start a new work session
+       * @returns {Promise<Object>} Session start response
+       */
+      async startSession() {
+        if (this.currentSessionId) {
+          return { success: true, sessionId: this.currentSessionId };
+        }
+        try {
+          const response = await this.makeApiRequest("/api/v1/session-tracking/start", "POST", {
+            client_type: "desktop",
+            client_version: require("electron").app.getVersion()
+          });
+          if (response.status === "success" && response.session_id) {
+            this.currentSessionId = response.session_id;
+            this.store.set("sessionId", response.session_id);
+            this.store.set("startedAt", response.created_at || (/* @__PURE__ */ new Date()).toISOString());
+            this.startHeartbeatTimer();
+            return { success: true, sessionId: this.currentSessionId };
+          } else {
+            throw new Error("Invalid response from backend");
+          }
+        } catch (error) {
+          console.error("[SessionTracker] Failed to start session:", error);
+          return { success: false, error: error.message };
+        }
+      }
+      /**
+       * End current work session
+       * @param {string} endReason - Reason for ending (manual, auto, logout, shutdown) - UNUSED, kept for API compatibility
+       * @returns {Promise<Object>} Session end response
+       */
+      async endSession(endReason = "manual") {
+        if (!this.currentSessionId) {
+          return { success: true, message: "No active session" };
+        }
+        try {
+          this.stopHeartbeatTimer();
+          const response = await this.makeApiRequest("/api/v1/session-tracking/end", "POST", {
+            session_id: this.currentSessionId
+          });
+          this.currentSessionId = null;
+          this.currentMatterId = null;
+          this.clearStoredSession();
+          return { success: true, data: response };
+        } catch (error) {
+          console.error("[SessionTracker] Failed to end session:", error);
+          this.currentSessionId = null;
+          this.clearStoredSession();
+          return { success: false, error: error.message };
+        }
+      }
+      /**
+       * Send heartbeat to maintain session
+       */
+      async sendHeartbeat() {
+        if (!this.currentSessionId) return;
+        if (this.isRateLimited) {
+          const now2 = Date.now();
+          if (now2 < this.rateLimitResetTime) {
+            return;
+          } else {
+            this.isRateLimited = false;
+            this.retryCount = 0;
+          }
+        }
+        const now = Date.now();
+        if (now - this.lastHeartbeatTime < 3e4) {
+          return;
+        }
+        this.lastHeartbeatTime = now;
+        try {
+          const response = await this.makeApiRequest("/api/v1/session-tracking/heartbeat", "POST", {
+            session_id: this.currentSessionId
+          });
+          if (response.status === "success") {
+            this.retryCount = 0;
+          }
+        } catch (error) {
+          if (error.message?.includes("429")) {
+            this.handleRateLimit();
+          } else if (error.message?.includes("401")) {
+            console.error("[SessionTracker] Unauthorized - clearing session");
+            this.currentSessionId = null;
+            this.clearStoredSession();
+            this.stopHeartbeatTimer();
+          } else {
+            this.retryCount++;
+            if (this.retryCount >= this.maxRetries) {
+              console.error("[SessionTracker] Max retries reached, ending session");
+              await this.endSession("error");
+            }
+          }
+        }
+      }
+      /**
+       * Handle rate limit with exponential backoff
+       */
+      handleRateLimit() {
+        this.isRateLimited = true;
+        const backoffMs = Math.min(3e4 * Math.pow(2, this.retryCount), 5 * 60 * 1e3);
+        this.rateLimitResetTime = Date.now() + backoffMs;
+        console.warn(`[SessionTracker] Rate limited, backing off for ${backoffMs}ms`);
+      }
+      /**
+       * Start heartbeat timer
+       */
+      startHeartbeatTimer() {
+        if (this.heartbeatTimer) {
+          clearInterval(this.heartbeatTimer);
+        }
+        this.sendHeartbeat();
+        this.heartbeatTimer = setInterval(() => {
+          this.sendHeartbeat();
+        }, this.options.heartbeatInterval);
+      }
+      /**
+       * Stop heartbeat timer
+       */
+      stopHeartbeatTimer() {
+        if (this.heartbeatTimer) {
+          clearInterval(this.heartbeatTimer);
+          this.heartbeatTimer = null;
+        }
+      }
+      /**
+       * Clear stored session data
+       */
+      clearStoredSession() {
+        this.store.delete("sessionId");
+        this.store.delete("startedAt");
+        this.store.delete("matterId");
+      }
+      /**
+       * Make API request to backend
+       * @param {string} endpoint - API endpoint path
+       * @param {string} method - HTTP method
+       * @param {Object} data - Request body
+       * @returns {Promise<Object>} Response data
+       */
+      makeApiRequest(endpoint, method = "GET", data = null) {
+        return new Promise((resolve, reject) => {
+          if (!this.backendUrl || !this.authToken) {
+            return reject(new Error("Backend not initialized"));
+          }
+          const urlObj = new URL(endpoint, this.backendUrl);
+          const isHttps = urlObj.protocol === "https:";
+          const httpModule = isHttps ? https : http;
+          const options = {
+            hostname: urlObj.hostname,
+            port: urlObj.port || (isHttps ? 443 : 80),
+            path: urlObj.pathname + urlObj.search,
+            method,
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${this.authToken}`
+            }
+          };
+          const req = httpModule.request(options, (res) => {
+            let body = "";
+            res.on("data", (chunk) => {
+              body += chunk;
+            });
+            res.on("end", () => {
+              try {
+                const response = JSON.parse(body);
+                if (res.statusCode === 200 || res.statusCode === 201) {
+                  resolve(response);
+                } else if (res.statusCode === 429) {
+                  reject(new Error("429 Rate Limit Exceeded"));
+                } else if (res.statusCode === 401) {
+                  reject(new Error("401 Unauthorized"));
+                } else {
+                  reject(new Error(`HTTP ${res.statusCode}: ${response.message || "Request failed"}`));
+                }
+              } catch (error) {
+                reject(new Error(`Failed to parse response: ${error.message}`));
+              }
+            });
+          });
+          req.on("error", (error) => {
+            reject(new Error(`Network error: ${error.message}`));
+          });
+          if (data) {
+            req.write(JSON.stringify(data));
+          }
+          req.end();
+        });
+      }
+      /**
+       * Cleanup on app shutdown
+       */
+      async shutdown() {
+        this.stopHeartbeatTimer();
+        if (this.currentSessionId) {
+          await this.endSession("shutdown");
+        }
+      }
+    };
+    module2.exports = SessionTracker2;
+  }
+});
+
 // src/version.js
 var require_version = __commonJS({
   "src/version.js"(exports2, module2) {
@@ -29922,6 +30244,7 @@ var { verifyServer } = require_electron_discovery();
 var { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified } = require_electron_storage();
 var { checkForUpdates, downloadAndInstallUpdate, showOptionalUpdateDialog, showForceUpdateDialog, shouldCheckForUpdates } = require_electron_updater_custom();
 var { logInfo, logError, exportLogs, getLogFilePath } = require_electron_logger();
+var SessionTracker = require_session_tracker();
 function getAppVersion() {
   try {
     const versionModule = require_version();
@@ -29936,6 +30259,7 @@ function getAppVersion() {
   }
 }
 var mainWindow;
+var sessionTracker = null;
 function createFileUrl(filePath) {
   let normalizedPath = filePath;
   if (process.platform === "win32") {
@@ -30302,6 +30626,20 @@ ipcMain.handle("clear-saved-server", async () => {
     return { success: false, error: error.message };
   }
 });
+ipcMain.handle("session-tracker:initialize", async (event, backendUrl, authToken) => {
+  try {
+    if (sessionTracker && backendUrl && authToken) {
+      sessionTracker.initialize(backendUrl, authToken);
+      logInfo("[SessionTracker] Initialized with backend URL");
+      return { success: true };
+    } else {
+      return { success: false, error: "Missing backend URL or auth token" };
+    }
+  } catch (error) {
+    logError("[SessionTracker] Failed to initialize:", error);
+    return { success: false, error: error.message };
+  }
+});
 ipcMain.handle("check-updates", async (event, serverUrl) => {
   try {
     const savedServer = getSavedServer();
@@ -30467,6 +30805,13 @@ app.whenReady().then(async () => {
       }
     });
   });
+  sessionTracker = new SessionTracker({
+    heartbeatInterval: 3e4,
+    // 30 seconds
+    idleThreshold: 60
+    // 1 minute
+  });
+  logInfo("Session tracker initialized");
   const savedServer = getSavedServer();
   if (savedServer) {
     logInfo(`Found saved server: ${savedServer.orgName || savedServer.orgId}`);
@@ -30477,12 +30822,8 @@ app.whenReady().then(async () => {
       createWindow(savedServer.url);
       return;
     } else {
-      logInfo("Saved server is not reachable, clearing saved data and showing login...");
+      logInfo("Saved server is not reachable, clearing saved server and showing login...");
       clearSavedServer();
-      await session.defaultSession.clearStorageData({
-        storages: ["localstorage", "sessionstorage"]
-      });
-      logInfo("Cleared session storage data");
     }
   } else {
     logInfo("No saved server found, showing login...");
@@ -30504,8 +30845,12 @@ app.on("window-all-closed", () => {
     app.quit();
   }
 });
-app.on("before-quit", () => {
+app.on("before-quit", async () => {
   console.log("Application is quitting...");
+  if (sessionTracker) {
+    await sessionTracker.shutdown();
+    logInfo("Session tracker shut down");
+  }
 });
 app.on("web-contents-created", (event, contents) => {
   contents.on("will-navigate", (navigationEvent, navigationUrl) => {
