@@ -387,21 +387,118 @@
           : result.security_events || 0;
         document.getElementById('statSecurity').textContent = securityCount;
 
-        // Calculate user and system events from by_event_type (array format)
+        // Classify events into Security, User Actions, and System Events
         const byType = result.by_event_type || [];
+        let securityEvents = 0;
         let userEvents = 0;
         let systemEvents = 0;
-        
+
+        // Security Events: authentication, authorization, access denials, security violations
+        const securityPatterns = [
+          'auth.failed',
+          'auth.admin_denied',
+          'permission.denied',
+          'matter.access_denied',
+          'security_violation',
+          'user.login_failed'
+        ];
+
+        // User Actions: user-initiated operations
+        const userActionPatterns = [
+          'user.login',
+          'user.logout',
+          'user.deleted',
+          'user.created',
+          'user.updated',
+          'matter.created',
+          'matter.pinned',
+          'matter.unpinned',
+          'matter.updated',
+          'matter.deleted',
+          'matter.permanently_deleted',
+          'document_uploaded',
+          'document_upload',
+          'document.permanently_deleted',
+          'document_modification',
+          'document_access',
+          'folder.permanently_deleted',
+          'chat_stream',
+          'rag_query',
+          'search_query',
+          'hybrid_search',
+          'api_token.created',
+          'api_token.deleted',
+          'role.created',
+          'role.updated',
+          'role.deleted',
+          'role.assigned',
+          'role.unassigned',
+          'group.created',
+          'group.updated',
+          'group.deleted',
+          'group.member_added',
+          'group.member_removed',
+          'board_metric.created',
+          'board_metric.updated',
+          'board_metric.deleted',
+          'board_metric.reordered',
+          'board_metric.roles_assigned',
+          'management_board.created',
+          'management_board.updated',
+          'management_board.deleted',
+          'management_board.user_assigned',
+          'management_board.access_revoked',
+          'metric_submission.created',
+          'metric_submission.updated',
+          'metric_submission.deleted',
+          'actionstep_data_access'
+        ];
+
+        // System Events: background processing, automated tasks, system operations
+        const systemEventPatterns = [
+          'document_text_extraction_started',
+          'document_text_extracted',
+          'document_text_extraction_failed',
+          'document_ai_indexed',
+          'connector_document_sync',
+          'bulk_import_completed',
+          'metadata_update',
+          'privilege_filter',
+          'ml_classification',
+          'ml_fallback',
+          'ml_training',
+          'ml_feedback',
+          'session.started',
+          'session.heartbeat',
+          'session.ended',
+          'on_demand_processing_triggered'
+        ];
+
         byType.forEach(item => {
           const type = item.event_type;
           const count = parseInt(item.count) || 0;
-          if (type.startsWith('user.') || type.includes('login') || type.includes('logout')) {
+
+          if (securityPatterns.includes(type)) {
+            securityEvents += count;
+          } else if (userActionPatterns.includes(type)) {
             userEvents += count;
-          } else if (type.startsWith('system.')) {
+          } else if (systemEventPatterns.includes(type)) {
             systemEvents += count;
+          } else {
+            // Default: if it starts with known prefixes
+            if (type.startsWith('user.') || type.includes('login') || type.includes('logout')) {
+              userEvents += count;
+            } else if (type.startsWith('system.') || type.startsWith('worker.')) {
+              systemEvents += count;
+            } else {
+              // Unknown events count as user actions by default
+              userEvents += count;
+            }
           }
         });
-        
+
+        // Override security count with our classification
+        document.getElementById('statSecurity').textContent = securityEvents;
         document.getElementById('statUser').textContent = userEvents;
         document.getElementById('statSystem').textContent = systemEvents;
       } catch (error) {
