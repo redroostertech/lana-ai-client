@@ -63,13 +63,41 @@ class ApiClient {
           this.baseUrl = result.server.url;
           console.log('[LanaAPI] Using discovered server URL from Electron:', this.baseUrl);
         } else if (!this.baseUrl) {
-          // No saved server and no config - this is normal during initial discovery
-          console.log('[LanaAPI] No server URL yet - waiting for discovery');
+          // No saved server in Electron storage - check localStorage as fallback
+          try {
+            const savedServer = localStorage.getItem('lana_saved_server');
+            if (savedServer) {
+              const serverInfo = JSON.parse(savedServer);
+              if (serverInfo.url) {
+                this.baseUrl = serverInfo.url;
+                console.log('[LanaAPI] Using server URL from localStorage fallback:', this.baseUrl);
+              } else {
+                console.log('[LanaAPI] No server URL in localStorage either');
+              }
+            } else {
+              console.log('[LanaAPI] No server URL yet - will redirect to login on first API call');
+            }
+          } catch (err) {
+            console.error('[LanaAPI] Failed to parse localStorage server info:', err);
+          }
         }
         this._ready = true;
         return this.baseUrl;
       }).catch((err) => {
         console.error('[LanaAPI] Failed to get saved server:', err);
+        // Fallback to localStorage if Electron storage fails
+        try {
+          const savedServer = localStorage.getItem('lana_saved_server');
+          if (savedServer) {
+            const serverInfo = JSON.parse(savedServer);
+            if (serverInfo.url) {
+              this.baseUrl = serverInfo.url;
+              console.log('[LanaAPI] Using server URL from localStorage (after Electron error):', this.baseUrl);
+            }
+          }
+        } catch (localStorageErr) {
+          console.error('[LanaAPI] localStorage fallback also failed:', localStorageErr);
+        }
         this._ready = true;
         return this.baseUrl;
       });
@@ -414,6 +442,17 @@ class ApiClient {
           baseUrl = result.server.url;
           this.baseUrl = baseUrl; // Cache it for future requests
           console.log('[LanaAPI] Got server URL from Electron:', baseUrl);
+        } else {
+          // Try localStorage as fallback
+          const savedServer = localStorage.getItem('lana_saved_server');
+          if (savedServer) {
+            const serverInfo = JSON.parse(savedServer);
+            if (serverInfo.url) {
+              baseUrl = serverInfo.url;
+              this.baseUrl = baseUrl;
+              console.log('[LanaAPI] Got server URL from localStorage:', baseUrl);
+            }
+          }
         }
       } catch (error) {
         console.error('[LanaAPI] Failed to get saved server:', error);
@@ -428,13 +467,19 @@ class ApiClient {
         if (origin && origin !== 'null' && !origin.startsWith('file:')) {
           baseUrl = origin;
         }
-      } else {
+      }
+
+      // If still no valid URL, redirect to login page
+      if (this.isInvalidUrl(baseUrl)) {
         console.error('[LanaAPI] No server URL available - redirecting to login');
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('lana_saved_server');
-        window.location.href = 'login.html';
-        return;
+        // Don't redirect if we're already on login page
+        if (!window.location.pathname.includes('login.html')) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          localStorage.removeItem('lana_saved_server');
+          window.location.href = getLoginPath();
+        }
+        throw new Error('No server connection. Redirecting to login...');
       }
     }
 

@@ -146,7 +146,7 @@ const ActivityHeatmap = (function() {
    */
   function createSVG(weeks, config) {
     const width = weeks.length * (config.cellSize + config.cellGap) + 30; // Extra space for day labels
-    const height = 7 * (config.cellSize + config.cellGap) + 18; // 7 days + space for month labels (compact)
+    const height = 7 * (config.cellSize + config.cellGap) + 14; // 7 days + space for month labels (compact)
 
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
@@ -154,6 +154,7 @@ const ActivityHeatmap = (function() {
     svg.setAttribute('class', 'activity-heatmap-svg');
     svg.style.width = '100%';
     svg.style.height = 'auto';
+    svg.style.maxHeight = '260px';
 
     return svg;
   }
@@ -275,7 +276,7 @@ const ActivityHeatmap = (function() {
     legend.className = 'activity-legend';
     legend.style.display = 'flex';
     legend.style.alignItems = 'center';
-    legend.style.justifyContent = 'flex-end';
+    legend.style.justifyContent = 'center';
     legend.style.marginTop = '8px';
     legend.style.fontSize = '12px';
     legend.style.color = '#6b7280';
