@@ -894,7 +894,26 @@
         closeModal();
         loadUsers();
       } catch (error) {
-        Toast.error(error.message);
+        // Extract the most specific error message available
+        let errorMessage = 'Request failed';
+
+        if (error.message) {
+          errorMessage = error.message;
+        } else if (error.data?.error?.message) {
+          errorMessage = error.data.error.message;
+        } else if (error.data?.detail) {
+          errorMessage = error.data.detail;
+        } else if (error.data?.message) {
+          errorMessage = error.data.message;
+        }
+
+        console.error('User creation/update failed:', {
+          errorMessage,
+          error,
+          errorData: error.data
+        });
+
+        Toast.error(errorMessage);
       }
     });
 

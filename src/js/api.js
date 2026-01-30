@@ -504,7 +504,20 @@ class ApiClient {
       const response = await fetch(url, config);
       clearTimeout(timeoutId);
 
-      const result = await response.json();
+      // Try to parse response as JSON
+      let result;
+      try {
+        result = await response.json();
+      } catch (jsonError) {
+        // If JSON parsing fails, try to get text for better error message
+        const text = await response.text();
+        console.error('[LanaAPI] Failed to parse JSON response:', text);
+        throw new ApiError(
+          `Server returned invalid response: ${text.substring(0, 100)}`,
+          response.status,
+          null
+        );
+      }
 
       if (!response.ok) {
         // Check for authentication/session errors - redirect to login
@@ -529,8 +542,20 @@ class ApiClient {
           throw new ApiError(result.error?.message || result.detail || 'Session expired', response.status, result);
         }
 
+        // Extract error message with comprehensive fallback chain
+        const finalErrorMessage = result.error?.message || result.detail || result.message || 'Request failed';
+
+        // Log the error details for debugging
+        console.error('[LanaAPI] Request failed:', {
+          endpoint,
+          status: response.status,
+          errorCode,
+          errorMessage: finalErrorMessage,
+          fullResponse: result
+        });
+
         // Support both error formats: {error: {message: ...}} and {detail: ...}
-        throw new ApiError(result.error?.message || result.detail || result.message || 'Request failed', response.status, result);
+        throw new ApiError(finalErrorMessage, response.status, result);
       }
 
       this.log(`Response:`, result);
@@ -540,7 +565,10 @@ class ApiClient {
         throw new ApiError('Request timeout', 408, null);
       }
       if (error instanceof ApiError) throw error;
-      throw new ApiError(error.message, 0, null);
+
+      // For non-ApiError exceptions, provide more context
+      console.error('[LanaAPI] Unexpected error:', error);
+      throw new ApiError(error.message || 'Network error occurred', 0, null);
     }
   }
 
