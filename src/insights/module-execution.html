@@ -270,6 +270,13 @@
           <!-- Override Type (Hidden - always 'manual') -->
           <input type="hidden" id="overrideType" value="manual">
 
+          <!-- Period Data (Hidden - populated when panel opens) -->
+          <input type="hidden" id="overridePeriodStart">
+          <input type="hidden" id="overridePeriodEnd">
+          <input type="hidden" id="overridePeriodType">
+          <input type="hidden" id="overrideModuleKey">
+          <input type="hidden" id="overrideMetricKey">
+
           <!-- Action Buttons -->
           <div class="flex gap-3 pt-4">
             <button
@@ -7627,6 +7634,7 @@
     // Open data override panel
     function openDataOverridePanel(metricKey, metricName, metricDescription, currentValue, overrideType = 'target') {
       const moduleKey = document.getElementById('moduleSelect').value;
+      const periodType = document.getElementById('periodType').value;
       const periodStart = document.getElementById('periodStart').value;
       const periodEnd = document.getElementById('periodEnd').value;
 
@@ -7662,6 +7670,13 @@
       document.getElementById('overrideValue').value = '';
       document.getElementById('overrideNotes').value = '';
       document.getElementById('overrideType').value = overrideType;
+
+      // Store period data in hidden form inputs (FIX for button click bug)
+      document.getElementById('overridePeriodStart').value = periodStart;
+      document.getElementById('overridePeriodEnd').value = periodEnd;
+      document.getElementById('overridePeriodType').value = periodType;
+      document.getElementById('overrideModuleKey').value = moduleKey;
+      document.getElementById('overrideMetricKey').value = metricKey;
 
       // Load existing overrides for this metric
       loadExistingOverrides(moduleKey, metricKey, periodStart, periodEnd);
@@ -7760,15 +7775,21 @@
         return;
       }
 
-      const moduleKey = document.getElementById('moduleSelect').value;
-      const periodType = document.getElementById('periodType').value;
-      const periodStart = document.getElementById('periodStart').value;
-      const periodEnd = document.getElementById('periodEnd').value;
+      // Read from hidden inputs in the form (FIX for button click bug)
+      const moduleKey = document.getElementById('overrideModuleKey').value;
+      const periodType = document.getElementById('overridePeriodType').value;
+      const periodStart = document.getElementById('overridePeriodStart').value;
+      const periodEnd = document.getElementById('overridePeriodEnd').value;
       const overrideValue = parseFloat(document.getElementById('overrideValue').value);
       const overrideNotes = document.getElementById('overrideNotes').value.trim();
       const overrideType = document.getElementById('overrideType').value;
 
       // Validation
+      if (!periodStart || !periodEnd) {
+        showError('Period dates are missing. Please close and reopen the panel.');
+        return;
+      }
+
       if (isNaN(overrideValue)) {
         showError('Please enter a valid numeric value');
         return;
