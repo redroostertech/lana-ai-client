@@ -299,12 +299,49 @@
     async function startOAuth() {
       try {
         Toast.info('Starting OAuth flow...');
-        const redirectUri = window.location.href;
-        const authUrl = `${api.baseUrl}/api/v1/integrations/oauth/${connectorId}/authorize?redirect_uri=${encodeURIComponent(redirectUri)}`;
-        window.location.href = authUrl;
+        let redirectUri = window.location.href;
+        let stateParam = '';
+
+        // Use custom URL scheme in Electron for proper OAuth redirect
+        if (window.isElectron && window.electronAPI) {
+          const state = await window.electronAPI.generateOAuthState();
+          redirectUri = `lana-ai://oauth/callback?provider=${connectorId}`;
+          stateParam = `&state=${encodeURIComponent(state)}`;
+        }
+
+        const authUrl = `${api.baseUrl}/api/v1/integrations/oauth/${connectorId}/authorize?redirect_uri=${encodeURIComponent(redirectUri)}${stateParam}`;
+
+        // Open in system browser for Electron (required for URL scheme callback)
+        if (window.isElectron && window.electronAPI) {
+          await window.electronAPI.invoke('open-external-url', authUrl);
+        } else {
+          window.location.href = authUrl;
+        }
       } catch (error) {
         Toast.error('Failed to start OAuth: ' + error.message);
       }
+    }
+
+    // Listen for OAuth callback from deep link (Electron only)
+    if (window.isElectron && window.electronAPI?.onOAuthCallback) {
+      window.electronAPI.onOAuthCallback(async (data) => {
+        if (data.provider !== connectorId) return;
+        if (data.error) {
+          Toast.error(`OAuth failed: ${data.error_description || data.error}`);
+          return;
+        }
+        try {
+          Toast.info('Completing authorization...');
+          await api.post(`/api/v1/integrations/oauth/${connectorId}/callback`, {
+            code: data.code,
+            state: data.state
+          });
+          Toast.success('Integration authorized successfully!');
+          setTimeout(() => window.location.reload(), 1500);
+        } catch (error) {
+          Toast.error('Failed to complete OAuth: ' + error.message);
+        }
+      });
     }
 
     // Handle API key form submission

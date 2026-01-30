@@ -331,7 +331,7 @@
     }
 
     // Start OAuth flow
-    function startOAuth(connectorId) {
+    async function startOAuth(connectorId) {
       if (api.isDemoMode()) {
         Toast.info('Demo mode: OAuth would redirect to provider');
         closeModal();
@@ -343,7 +343,38 @@
         }, 1000);
         return;
       }
-      window.location.href = Connectors.getOAuthUrl(connectorId, window.location.href);
+
+      // Use custom URL scheme in Electron for proper OAuth redirect
+      if (window.isElectron && window.electronAPI) {
+        const state = await window.electronAPI.generateOAuthState();
+        const redirectUri = `lana-ai://oauth/callback?provider=${connectorId}`;
+        const authUrl = Connectors.getOAuthUrl(connectorId, redirectUri) + `&state=${encodeURIComponent(state)}`;
+        await window.electronAPI.invoke('open-external-url', authUrl);
+      } else {
+        window.location.href = Connectors.getOAuthUrl(connectorId, window.location.href);
+      }
+    }
+
+    // Listen for OAuth callback from deep link (Electron only)
+    if (window.isElectron && window.electronAPI?.onOAuthCallback) {
+      window.electronAPI.onOAuthCallback(async (data) => {
+        if (data.error) {
+          Toast.error(`OAuth failed: ${data.error_description || data.error}`);
+          return;
+        }
+        try {
+          Toast.info('Completing authorization...');
+          await api.post(`/api/v1/integrations/oauth/${data.provider}/callback`, {
+            code: data.code,
+            state: data.state
+          });
+          Toast.success('Connected successfully!');
+          closeModal();
+          loadConnectors();
+        } catch (error) {
+          Toast.error('Failed to complete OAuth: ' + error.message);
+        }
+      });
     }
 
     // Save configuration

@@ -109,7 +109,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   onUpdateError: (callback) => {
     ipcRenderer.on('update-error', (event, info) => callback(info));
-  }
+  },
+
+  /**
+   * OAuth deep link callback (main process forwards lana-ai://oauth/callback here)
+   */
+  onOAuthCallback: (callback) => {
+    ipcRenderer.on('oauth-callback', (event, data) => callback(data));
+  },
+
+  /**
+   * Generate a CSRF-safe OAuth state parameter
+   */
+  generateOAuthState: () => ipcRenderer.invoke('generate-oauth-state')
 });
 
 /**

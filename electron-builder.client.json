@@ -43,6 +43,12 @@
     "!**/{.DS_Store,.git,.hg,.svn,.gitignore,.gitattributes}",
     "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs}"
   ],
+  "protocols": [
+    {
+      "name": "Lana AI",
+      "schemes": ["lana-ai"]
+    }
+  ],
   "asar": true,
   "npmRebuild": true,
   "mac": {

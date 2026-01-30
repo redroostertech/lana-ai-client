@@ -30399,10 +30399,31 @@ if (process.env.NODE_ENV === "development") {
 }
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient("lana", process.execPath, [path.resolve(process.argv[1])]);
+    app.setAsDefaultProtocolClient("lana-ai", process.execPath, [path.resolve(process.argv[1])]);
   }
 } else {
-  app.setAsDefaultProtocolClient("lana");
+  app.setAsDefaultProtocolClient("lana-ai");
+}
+var pendingOAuthStates = /* @__PURE__ */ new Map();
+var OAUTH_STATE_TTL = 10 * 60 * 1e3;
+function generateOAuthState() {
+  const crypto2 = require("crypto");
+  const state = crypto2.randomBytes(32).toString("hex");
+  pendingOAuthStates.set(state, Date.now());
+  for (const [key, timestamp] of pendingOAuthStates) {
+    if (Date.now() - timestamp > OAUTH_STATE_TTL) {
+      pendingOAuthStates.delete(key);
+    }
+  }
+  return state;
+}
+function validateOAuthState(state) {
+  if (!state || !pendingOAuthStates.has(state)) {
+    return false;
+  }
+  const timestamp = pendingOAuthStates.get(state);
+  pendingOAuthStates.delete(state);
+  return Date.now() - timestamp < OAUTH_STATE_TTL;
 }
 function createWindow(serverUrl = null) {
   logInfo(`Creating main window with server: ${serverUrl || "none"}`);
@@ -30786,6 +30807,9 @@ ipcMain.handle("open-external-url", async (event, url2) => {
   await shell.openExternal(url2);
   return true;
 });
+ipcMain.handle("generate-oauth-state", async () => {
+  return generateOAuthState();
+});
 ipcMain.handle("check-updates", async (event, serverUrl) => {
   try {
     const savedServer = getSavedServer();
@@ -30873,25 +30897,72 @@ var handleDeepLink = async (deepLinkUrl) => {
   logInfo(`Deep link received: ${deepLinkUrl}`);
   try {
     const urlObj = new URL(deepLinkUrl);
-    const orgId = urlObj.pathname.replace(/^\/+/, "");
-    if (!orgId) {
-      logError("No org ID in deep link");
-      dialog.showErrorBox("Connection Error", "Invalid connection link.");
-      return;
-    }
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.focus();
-      mainWindow.webContents.executeJavaScript(`
-        if (document.getElementById('orgId')) {
-          document.getElementById('orgId').value = '${orgId}';
-        }
-      `);
-    } else {
-      createLoginWindow();
+    const route = urlObj.hostname;
+    switch (route) {
+      case "oauth":
+        handleOAuthCallback(urlObj);
+        break;
+      case "connect":
+        handleConnectLink(urlObj);
+        break;
+      default:
+        logInfo(`Unknown deep link route: ${route}`);
+        break;
     }
   } catch (error) {
     logError("Failed to handle deep link", error);
-    dialog.showErrorBox("Connection Error", "Failed to process the connection link.");
+    dialog.showErrorBox("Error", "Failed to process the link.");
+  }
+};
+var handleOAuthCallback = (urlObj) => {
+  const params = urlObj.searchParams;
+  const provider = params.get("provider");
+  const code = params.get("code");
+  const state = params.get("state");
+  const error = params.get("error");
+  const errorDescription = params.get("error_description");
+  logInfo(`OAuth callback: provider=${provider}, hasCode=${!!code}, hasError=${!!error}`);
+  if (state && !validateOAuthState(state)) {
+    logError("OAuth state validation failed \u2014 possible CSRF");
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("oauth-callback", {
+        provider,
+        error: "state_mismatch",
+        error_description: "OAuth state validation failed. Please try again."
+      });
+    }
+    return;
+  }
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+    mainWindow.webContents.send("oauth-callback", {
+      provider,
+      code,
+      state,
+      error,
+      error_description: errorDescription
+    });
+  } else {
+    logError("OAuth callback received but no main window available");
+  }
+};
+var handleConnectLink = (urlObj) => {
+  const orgId = urlObj.pathname.replace(/^\/+/, "");
+  if (!orgId) {
+    logError("No org ID in connect deep link");
+    dialog.showErrorBox("Connection Error", "Invalid connection link.");
+    return;
+  }
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.focus();
+    mainWindow.webContents.executeJavaScript(`
+      if (document.getElementById('orgId')) {
+        document.getElementById('orgId').value = '${orgId}';
+      }
+    `);
+  } else {
+    createLoginWindow();
   }
 };
 app.on("open-url", (event, url2) => {
@@ -30907,7 +30978,7 @@ if (!gotTheLock) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
     }
-    const url2 = commandLine.find((arg) => arg.startsWith("lana://"));
+    const url2 = commandLine.find((arg) => arg.startsWith("lana-ai://"));
     if (url2) {
       handleDeepLink(url2);
     }

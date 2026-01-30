@@ -88,14 +88,40 @@ if (process.env.NODE_ENV === 'development') {
   logInfo('[Development] Certificate bypass enabled for localhost');
 }
 
-// Register protocol for deep links (lana://)
+// Register protocol for deep links (lana-ai://)
 // This must be called before app.whenReady()
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient('lana', process.execPath, [path.resolve(process.argv[1])]);
+    app.setAsDefaultProtocolClient('lana-ai', process.execPath, [path.resolve(process.argv[1])]);
   }
 } else {
-  app.setAsDefaultProtocolClient('lana');
+  app.setAsDefaultProtocolClient('lana-ai');
+}
+
+// OAuth state management for CSRF protection
+const pendingOAuthStates = new Map();
+const OAUTH_STATE_TTL = 10 * 60 * 1000; // 10 minutes
+
+function generateOAuthState() {
+  const crypto = require('crypto');
+  const state = crypto.randomBytes(32).toString('hex');
+  pendingOAuthStates.set(state, Date.now());
+  // Clean up expired states
+  for (const [key, timestamp] of pendingOAuthStates) {
+    if (Date.now() - timestamp > OAUTH_STATE_TTL) {
+      pendingOAuthStates.delete(key);
+    }
+  }
+  return state;
+}
+
+function validateOAuthState(state) {
+  if (!state || !pendingOAuthStates.has(state)) {
+    return false;
+  }
+  const timestamp = pendingOAuthStates.get(state);
+  pendingOAuthStates.delete(state);
+  return (Date.now() - timestamp) < OAUTH_STATE_TTL;
 }
 
 /**
@@ -583,6 +609,10 @@ ipcMain.handle('open-external-url', async (event, url) => {
   return true;
 });
 
+ipcMain.handle('generate-oauth-state', async () => {
+  return generateOAuthState();
+});
+
 ipcMain.handle('check-updates', async (event, serverUrl) => {
   try {
     // Get saved server to retrieve orgId
@@ -695,39 +725,104 @@ ipcMain.handle('vpn-get-device-id', async () => {
 });
 
 /**
- * Handle deep links (lana://connect/...)
- * With hosted discovery, deep links are simplified - just pass org ID
+ * Handle deep links (lana-ai://...)
+ * Routes incoming URLs to the appropriate handler based on path.
+ *
+ * Supported routes:
+ *   lana-ai://connect/<org-id>           — Pre-fill org on login
+ *   lana-ai://oauth/callback?provider=X  — OAuth redirect callback
  */
 const handleDeepLink = async (deepLinkUrl) => {
   logInfo(`Deep link received: ${deepLinkUrl}`);
 
   try {
-    // Parse deep link: lana://connect/org-id
     const urlObj = new URL(deepLinkUrl);
-    const orgId = urlObj.pathname.replace(/^\/+/, '');
+    // urlObj.hostname gives the first path segment for custom schemes
+    // e.g. lana-ai://oauth/callback -> hostname='oauth', pathname='/callback'
+    const route = urlObj.hostname;
 
-    if (!orgId) {
-      logError('No org ID in deep link');
-      dialog.showErrorBox('Connection Error', 'Invalid connection link.');
-      return;
+    switch (route) {
+      case 'oauth':
+        handleOAuthCallback(urlObj);
+        break;
+      case 'connect':
+        handleConnectLink(urlObj);
+        break;
+      default:
+        logInfo(`Unknown deep link route: ${route}`);
+        break;
     }
-
-    // Focus or create main window and navigate to login with org pre-filled
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.focus();
-      // Could send org ID to renderer to pre-fill the form
-      mainWindow.webContents.executeJavaScript(`
-        if (document.getElementById('orgId')) {
-          document.getElementById('orgId').value = '${orgId}';
-        }
-      `);
-    } else {
-      createLoginWindow();
-    }
-
   } catch (error) {
     logError('Failed to handle deep link', error);
-    dialog.showErrorBox('Connection Error', 'Failed to process the connection link.');
+    dialog.showErrorBox('Error', 'Failed to process the link.');
+  }
+};
+
+/**
+ * Handle OAuth callback deep links
+ * lana-ai://oauth/callback?provider=quickbooks&code=ABC&state=XYZ
+ */
+const handleOAuthCallback = (urlObj) => {
+  const params = urlObj.searchParams;
+  const provider = params.get('provider');
+  const code = params.get('code');
+  const state = params.get('state');
+  const error = params.get('error');
+  const errorDescription = params.get('error_description');
+
+  logInfo(`OAuth callback: provider=${provider}, hasCode=${!!code}, hasError=${!!error}`);
+
+  // Validate state for CSRF protection
+  if (state && !validateOAuthState(state)) {
+    logError('OAuth state validation failed — possible CSRF');
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('oauth-callback', {
+        provider,
+        error: 'state_mismatch',
+        error_description: 'OAuth state validation failed. Please try again.'
+      });
+    }
+    return;
+  }
+
+  // Focus the app window
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+    mainWindow.webContents.send('oauth-callback', {
+      provider,
+      code,
+      state,
+      error,
+      error_description: errorDescription
+    });
+  } else {
+    logError('OAuth callback received but no main window available');
+  }
+};
+
+/**
+ * Handle connect deep links
+ * lana-ai://connect/<org-id>
+ */
+const handleConnectLink = (urlObj) => {
+  const orgId = urlObj.pathname.replace(/^\/+/, '');
+
+  if (!orgId) {
+    logError('No org ID in connect deep link');
+    dialog.showErrorBox('Connection Error', 'Invalid connection link.');
+    return;
+  }
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.focus();
+    mainWindow.webContents.executeJavaScript(`
+      if (document.getElementById('orgId')) {
+        document.getElementById('orgId').value = '${orgId}';
+      }
+    `);
+  } else {
+    createLoginWindow();
   }
 };
 
@@ -751,7 +846,7 @@ if (!gotTheLock) {
     }
     
     // Check for deep link in command line
-    const url = commandLine.find(arg => arg.startsWith('lana://'));
+    const url = commandLine.find(arg => arg.startsWith('lana-ai://'));
     if (url) {
       handleDeepLink(url);
     }
