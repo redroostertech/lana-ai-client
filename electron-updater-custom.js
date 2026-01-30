@@ -128,7 +128,7 @@ async function checkForUpdates(serverUrl, authToken = null, orgId = null) {
  */
 function configureAutoUpdater(config = {}) {
   const {
-    owner = 'your-org',
+    owner = 'redroostertech',
     repo = 'lana-ai-client',
     channel = 'latest'
   } = config;
@@ -188,6 +188,9 @@ async function downloadAndInstallUpdate(serverUrl, authToken = null, orgId = nul
     if (!updateInfo.updateAvailable) {
       return false;
     }
+
+    // Ensure autoUpdater is configured before downloading
+    configureAutoUpdater();
 
     logInfo('Downloading update...');
 

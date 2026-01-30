@@ -16,7 +16,7 @@ const Store = require('electron-store');
 // Import thin client modules
 const { verifyServer } = require('./electron-discovery');
 const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified } = require('./electron-storage');
-const { checkForUpdates, downloadAndInstallUpdate, showOptionalUpdateDialog, showForceUpdateDialog, shouldCheckForUpdates } = require('./electron-updater-custom');
+const { checkForUpdates, downloadAndInstallUpdate, showOptionalUpdateDialog, showForceUpdateDialog, shouldCheckForUpdates, configureAutoUpdater } = require('./electron-updater-custom');
 const { logInfo, logError, exportLogs, getLogFilePath } = require('./electron-logger');
 const SessionTracker = require('./js/session/session-tracker');
 
@@ -144,6 +144,9 @@ function createWindow(serverUrl = null) {
   // Show window when ready to prevent visual flash
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
+
+    // Configure auto-updater with GitHub release feed
+    configureAutoUpdater();
 
     // Check for updates after window is shown (if server URL is available)
     if (serverUrl && shouldCheckForUpdates()) {
