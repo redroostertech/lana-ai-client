@@ -637,9 +637,10 @@ create_github_release() {
     else
         print_info "Creating git tag ${RELEASE_TAG}..."
         git tag "${RELEASE_TAG}"
-        git push origin "${RELEASE_TAG}"
-        print_success "Git tag ${RELEASE_TAG} created and pushed"
     fi
+    # Always ensure tag is pushed to remote (may exist locally but not on GitHub)
+    git push origin "${RELEASE_TAG}" 2>/dev/null || true
+    print_success "Git tag ${RELEASE_TAG} pushed to remote"
 
     # -------------------------------------------------------------------------
     # Step 2: Generate release notes from git history
@@ -695,13 +696,20 @@ create_github_release() {
     # Step 3: Create draft release with generated notes
     # -------------------------------------------------------------------------
     print_info "Creating draft release ${RELEASE_TAG}..."
-    echo "$RELEASE_NOTES" | gh release create "${RELEASE_TAG}" \
-        --title "${RELEASE_TAG}" \
-        --notes-file - \
-        --draft 2>/dev/null || print_warning "Release may already exist, updating notes..."
-
-    # If the release already existed, update its notes
-    echo "$RELEASE_NOTES" | gh release edit "${RELEASE_TAG}" --notes-file - 2>/dev/null || true
+    if gh release view "${RELEASE_TAG}" &>/dev/null; then
+        print_info "Release ${RELEASE_TAG} already exists, updating notes..."
+        echo "$RELEASE_NOTES" | gh release edit "${RELEASE_TAG}" --notes-file - 2>/dev/null || true
+    else
+        echo "$RELEASE_NOTES" | gh release create "${RELEASE_TAG}" \
+            --title "${RELEASE_TAG}" \
+            --notes-file - \
+            --draft
+        if [ $? -ne 0 ]; then
+            print_error "Failed to create GitHub release ${RELEASE_TAG}"
+            return 1
+        fi
+        print_success "Draft release ${RELEASE_TAG} created"
+    fi
 
     # -------------------------------------------------------------------------
     # Step 4: Upload build artifacts
