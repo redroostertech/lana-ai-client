@@ -1526,6 +1526,12 @@
     let allOrgUsers = [];
     let selectedUsers = [];
     let conflictDetection = null;
+    // Expose globally for inline onclick handlers in conflict-detection.js templates
+    Object.defineProperty(window, 'conflictDetection', {
+      get() { return conflictDetection; },
+      set(v) { conflictDetection = v; },
+      configurable: true
+    });
 
     // Load org users for sharing
     async function loadOrgUsers() {
