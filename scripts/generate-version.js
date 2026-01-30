@@ -7,7 +7,9 @@
  * 2. src/version.js - Backend version constant
  * 3. .env updates - Environment variable
  *
- * Usage: node scripts/generate-version.js
+ * Usage:
+ *   node scripts/generate-version.js          # reads version from package.json
+ *   node scripts/generate-version.js 3.2.0    # sets version to 3.2.0 (updates package.json)
  */
 
 const fs = require('fs');
@@ -16,6 +18,18 @@ const path = require('path');
 // Read package.json
 const packagePath = path.join(__dirname, '..', 'package.json');
 const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+
+// Check for CLI version argument
+const cliVersion = process.argv[2];
+if (cliVersion) {
+  if (!/^\d+\.\d+\.\d+/.test(cliVersion)) {
+    console.error(`Invalid version format: "${cliVersion}". Expected semver (e.g., 3.2.0)`);
+    process.exit(1);
+  }
+  packageJson.version = cliVersion;
+  fs.writeFileSync(packagePath, JSON.stringify(packageJson, null, 2) + '\n');
+  console.log(`Updated package.json version to ${cliVersion}`);
+}
 
 // Extract version info
 const version = packageJson.version;

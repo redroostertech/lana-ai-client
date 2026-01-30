@@ -29650,9 +29650,9 @@ var require_electron_updater_custom = __commonJS({
         };
       }
     }
-    function configureAutoUpdater(config = {}) {
+    function configureAutoUpdater2(config = {}) {
       const {
-        owner = "your-org",
+        owner = "redroostertech",
         repo = "lana-ai-client",
         channel = "latest"
       } = config;
@@ -29689,6 +29689,7 @@ var require_electron_updater_custom = __commonJS({
         if (!updateInfo.updateAvailable) {
           return false;
         }
+        configureAutoUpdater2();
         logInfo2("Downloading update...");
         await autoUpdater.downloadUpdate();
         logInfo2("Update downloaded successfully");
@@ -29751,7 +29752,7 @@ var require_electron_updater_custom = __commonJS({
     }
     module2.exports = {
       checkForUpdates: checkForUpdates2,
-      configureAutoUpdater,
+      configureAutoUpdater: configureAutoUpdater2,
       downloadAndInstallUpdate: downloadAndInstallUpdate2,
       showOptionalUpdateDialog: showOptionalUpdateDialog2,
       showForceUpdateDialog: showForceUpdateDialog2,
@@ -30090,11 +30091,11 @@ var require_session_tracker = __commonJS({
 var require_version = __commonJS({
   "src/version.js"(exports2, module2) {
     module2.exports = {
-      version: "3.1.0",
+      version: "3.1.1",
       buildNumber: "1",
       releaseType: "stable",
-      displayVersion: "3.1.0",
-      buildDate: "2026-01-28T02:10:51.331Z",
+      displayVersion: "3.1.1",
+      buildDate: "2026-01-30T00:42:37.368Z",
       /**
        * Get full version string
        * @returns {string} e.g., "v3.0.0b1"
@@ -30127,7 +30128,7 @@ var require_package = __commonJS({
     module2.exports = {
       name: "lana-ai",
       productName: "Lana AI",
-      version: "3.1.0",
+      version: "3.1.1",
       buildNumber: "1",
       releaseType: "stable",
       description: "Lana AI - Enterprise AI Platform",
@@ -30242,7 +30243,7 @@ var crypto = require("crypto");
 var Store = require("electron-store");
 var { verifyServer } = require_electron_discovery();
 var { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified } = require_electron_storage();
-var { checkForUpdates, downloadAndInstallUpdate, showOptionalUpdateDialog, showForceUpdateDialog, shouldCheckForUpdates } = require_electron_updater_custom();
+var { checkForUpdates, downloadAndInstallUpdate, showOptionalUpdateDialog, showForceUpdateDialog, shouldCheckForUpdates, configureAutoUpdater } = require_electron_updater_custom();
 var { logInfo, logError, exportLogs, getLogFilePath } = require_electron_logger();
 var SessionTracker = require_session_tracker();
 function getAppVersion() {
@@ -30336,6 +30337,7 @@ function createWindow(serverUrl = null) {
   }
   mainWindow.once("ready-to-show", () => {
     mainWindow.show();
+    configureAutoUpdater();
     if (serverUrl && shouldCheckForUpdates()) {
       setTimeout(() => {
         checkAndHandleUpdates(serverUrl);

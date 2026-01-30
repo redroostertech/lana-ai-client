@@ -884,7 +884,7 @@ class SidebarComponent {
       <!-- Sidebar -->
       <aside id="${this.sidebarId}" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30">
         <div class="flex items-center justify-between h-16 px-6 border-b border-gray-800">
-          <a href="${this.brandHref}" class="text-xl font-bold text-indigo-400">${this.brandName}</a>
+          <a href="${this.brandHref}"><img src="img/logo-light.png" alt="${this.brandName}" class="h-7"></a>
           ${brandSuffix}
           <button id="${this.closeBtnId}" class="lg:hidden text-gray-400 hover:text-white">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

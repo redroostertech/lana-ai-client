@@ -629,12 +629,84 @@ create_github_release() {
     DIST_DIR="$PROJECT_ROOT/dist"
     RELEASE_TAG="v${VERSION}"
 
-    # Create release (or skip if exists)
-    print_info "Creating release ${RELEASE_TAG}..."
-    gh release create "${RELEASE_TAG}" \
+    # -------------------------------------------------------------------------
+    # Step 1: Create and push git tag if it doesn't exist
+    # -------------------------------------------------------------------------
+    if git rev-parse "${RELEASE_TAG}" &>/dev/null; then
+        print_info "Git tag ${RELEASE_TAG} already exists"
+    else
+        print_info "Creating git tag ${RELEASE_TAG}..."
+        git tag "${RELEASE_TAG}"
+        git push origin "${RELEASE_TAG}"
+        print_success "Git tag ${RELEASE_TAG} created and pushed"
+    fi
+
+    # -------------------------------------------------------------------------
+    # Step 2: Generate release notes from git history
+    # -------------------------------------------------------------------------
+    print_info "Generating release notes..."
+
+    # Find the previous tag (most recent tag before the current one)
+    PREV_TAG=$(git tag --sort=-v:refname | grep -v "^${RELEASE_TAG}$" | grep -v "pre-release" | head -1)
+
+    RELEASE_NOTES="## LANA AI Client ${RELEASE_TAG} — Release Notes"$'\n\n'
+
+    if [ -n "$PREV_TAG" ]; then
+        print_info "Generating changelog from ${PREV_TAG} to ${RELEASE_TAG}..."
+        COMMIT_RANGE="${PREV_TAG}..${RELEASE_TAG}"
+
+        # Collect features
+        FEATURES=$(git log "$COMMIT_RANGE" --pretty=format:"%s|%h" --no-merges | grep -i "^feat" | while IFS='|' read -r msg hash; do
+            # Strip conventional commit prefix
+            clean_msg=$(echo "$msg" | sed -E 's/^feat(\([^)]*\))?:\s*//')
+            echo "- ${clean_msg} (\`${hash}\`)"
+        done)
+
+        # Collect bug fixes
+        FIXES=$(git log "$COMMIT_RANGE" --pretty=format:"%s|%h" --no-merges | grep -i "^fix" | while IFS='|' read -r msg hash; do
+            clean_msg=$(echo "$msg" | sed -E 's/^fix(\([^)]*\))?:\s*//')
+            echo "- ${clean_msg} (\`${hash}\`)"
+        done)
+
+        # Collect other notable commits (exclude chore, debug, test, merge, and generic messages)
+        OTHER=$(git log "$COMMIT_RANGE" --pretty=format:"%s|%h" --no-merges | grep -iv "^feat\|^fix\|^chore\|^debug\|^test\|^Bump\|^Commiting\|^Merge" | while IFS='|' read -r msg hash; do
+            echo "- ${msg} (\`${hash}\`)"
+        done)
+
+        if [ -n "$FEATURES" ]; then
+            RELEASE_NOTES+="### Features"$'\n\n'"${FEATURES}"$'\n\n'
+        fi
+
+        if [ -n "$FIXES" ]; then
+            RELEASE_NOTES+="### Bug Fixes"$'\n\n'"${FIXES}"$'\n\n'
+        fi
+
+        if [ -n "$OTHER" ]; then
+            RELEASE_NOTES+="### Other Changes"$'\n\n'"${OTHER}"$'\n\n'
+        fi
+
+        RELEASE_NOTES+="---"$'\n'"**Full Changelog**: ${PREV_TAG}...${RELEASE_TAG}"
+    else
+        print_warning "No previous tag found, using generic notes"
+        RELEASE_NOTES+="Initial release."
+    fi
+
+    # -------------------------------------------------------------------------
+    # Step 3: Create draft release with generated notes
+    # -------------------------------------------------------------------------
+    print_info "Creating draft release ${RELEASE_TAG}..."
+    echo "$RELEASE_NOTES" | gh release create "${RELEASE_TAG}" \
         --title "${RELEASE_TAG}" \
-        --notes "Release ${RELEASE_TAG}" \
-        --draft 2>/dev/null || print_warning "Release may already exist, continuing with upload..."
+        --notes-file - \
+        --draft 2>/dev/null || print_warning "Release may already exist, updating notes..."
+
+    # If the release already existed, update its notes
+    echo "$RELEASE_NOTES" | gh release edit "${RELEASE_TAG}" --notes-file - 2>/dev/null || true
+
+    # -------------------------------------------------------------------------
+    # Step 4: Upload build artifacts
+    # -------------------------------------------------------------------------
+    print_step "Uploading build artifacts..."
 
     # Upload macOS ARM64 files
     if [ -d "$DIST_DIR/macos-arm64" ]; then
@@ -684,7 +756,13 @@ create_github_release() {
         }
     done
 
-    print_success "GitHub release ${RELEASE_TAG} created and artifacts uploaded!"
+    # -------------------------------------------------------------------------
+    # Step 5: Publish the release (remove draft status)
+    # -------------------------------------------------------------------------
+    print_info "Publishing release ${RELEASE_TAG}..."
+    gh release edit "${RELEASE_TAG}" --draft=false
+
+    print_success "GitHub release ${RELEASE_TAG} published with release notes and artifacts!"
     echo ""
     echo -e "  ${GREEN}Release URL:${NC} https://github.com/redroostertech/lana-ai-client/releases/tag/${RELEASE_TAG}"
     echo ""
