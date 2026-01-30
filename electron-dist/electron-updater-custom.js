@@ -83,14 +83,14 @@ var require_polyfills = __commonJS({
       fs.fstatSync = statFixSync(fs.fstatSync);
       fs.lstatSync = statFixSync(fs.lstatSync);
       if (fs.chmod && !fs.lchmod) {
-        fs.lchmod = function(path, mode, cb) {
+        fs.lchmod = function(path2, mode, cb) {
           if (cb) process.nextTick(cb);
         };
         fs.lchmodSync = function() {
         };
       }
       if (fs.chown && !fs.lchown) {
-        fs.lchown = function(path, uid, gid, cb) {
+        fs.lchown = function(path2, uid, gid, cb) {
           if (cb) process.nextTick(cb);
         };
         fs.lchownSync = function() {
@@ -157,9 +157,9 @@ var require_polyfills = __commonJS({
         };
       })(fs.readSync);
       function patchLchmod(fs2) {
-        fs2.lchmod = function(path, mode, callback) {
+        fs2.lchmod = function(path2, mode, callback) {
           fs2.open(
-            path,
+            path2,
             constants.O_WRONLY | constants.O_SYMLINK,
             mode,
             function(err, fd) {
@@ -175,8 +175,8 @@ var require_polyfills = __commonJS({
             }
           );
         };
-        fs2.lchmodSync = function(path, mode) {
-          var fd = fs2.openSync(path, constants.O_WRONLY | constants.O_SYMLINK, mode);
+        fs2.lchmodSync = function(path2, mode) {
+          var fd = fs2.openSync(path2, constants.O_WRONLY | constants.O_SYMLINK, mode);
           var threw = true;
           var ret;
           try {
@@ -197,8 +197,8 @@ var require_polyfills = __commonJS({
       }
       function patchLutimes(fs2) {
         if (constants.hasOwnProperty("O_SYMLINK") && fs2.futimes) {
-          fs2.lutimes = function(path, at, mt, cb) {
-            fs2.open(path, constants.O_SYMLINK, function(er, fd) {
+          fs2.lutimes = function(path2, at, mt, cb) {
+            fs2.open(path2, constants.O_SYMLINK, function(er, fd) {
               if (er) {
                 if (cb) cb(er);
                 return;
@@ -210,8 +210,8 @@ var require_polyfills = __commonJS({
               });
             });
           };
-          fs2.lutimesSync = function(path, at, mt) {
-            var fd = fs2.openSync(path, constants.O_SYMLINK);
+          fs2.lutimesSync = function(path2, at, mt) {
+            var fd = fs2.openSync(path2, constants.O_SYMLINK);
             var ret;
             var threw = true;
             try {
@@ -329,11 +329,11 @@ var require_legacy_streams = __commonJS({
         ReadStream,
         WriteStream
       };
-      function ReadStream(path, options) {
-        if (!(this instanceof ReadStream)) return new ReadStream(path, options);
+      function ReadStream(path2, options) {
+        if (!(this instanceof ReadStream)) return new ReadStream(path2, options);
         Stream.call(this);
         var self2 = this;
-        this.path = path;
+        this.path = path2;
         this.fd = null;
         this.readable = true;
         this.paused = false;
@@ -378,10 +378,10 @@ var require_legacy_streams = __commonJS({
           self2._read();
         });
       }
-      function WriteStream(path, options) {
-        if (!(this instanceof WriteStream)) return new WriteStream(path, options);
+      function WriteStream(path2, options) {
+        if (!(this instanceof WriteStream)) return new WriteStream(path2, options);
         Stream.call(this);
-        this.path = path;
+        this.path = path2;
         this.fd = null;
         this.writable = true;
         this.flags = "w";
@@ -524,14 +524,14 @@ var require_graceful_fs = __commonJS({
       fs2.createWriteStream = createWriteStream;
       var fs$readFile = fs2.readFile;
       fs2.readFile = readFile;
-      function readFile(path, options, cb) {
+      function readFile(path2, options, cb) {
         if (typeof options === "function")
           cb = options, options = null;
-        return go$readFile(path, options, cb);
-        function go$readFile(path2, options2, cb2, startTime) {
-          return fs$readFile(path2, options2, function(err) {
+        return go$readFile(path2, options, cb);
+        function go$readFile(path3, options2, cb2, startTime) {
+          return fs$readFile(path3, options2, function(err) {
             if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
-              enqueue([go$readFile, [path2, options2, cb2], err, startTime || Date.now(), Date.now()]);
+              enqueue([go$readFile, [path3, options2, cb2], err, startTime || Date.now(), Date.now()]);
             else {
               if (typeof cb2 === "function")
                 cb2.apply(this, arguments);
@@ -541,14 +541,14 @@ var require_graceful_fs = __commonJS({
       }
       var fs$writeFile = fs2.writeFile;
       fs2.writeFile = writeFile;
-      function writeFile(path, data, options, cb) {
+      function writeFile(path2, data, options, cb) {
         if (typeof options === "function")
           cb = options, options = null;
-        return go$writeFile(path, data, options, cb);
-        function go$writeFile(path2, data2, options2, cb2, startTime) {
-          return fs$writeFile(path2, data2, options2, function(err) {
+        return go$writeFile(path2, data, options, cb);
+        function go$writeFile(path3, data2, options2, cb2, startTime) {
+          return fs$writeFile(path3, data2, options2, function(err) {
             if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
-              enqueue([go$writeFile, [path2, data2, options2, cb2], err, startTime || Date.now(), Date.now()]);
+              enqueue([go$writeFile, [path3, data2, options2, cb2], err, startTime || Date.now(), Date.now()]);
             else {
               if (typeof cb2 === "function")
                 cb2.apply(this, arguments);
@@ -559,14 +559,14 @@ var require_graceful_fs = __commonJS({
       var fs$appendFile = fs2.appendFile;
       if (fs$appendFile)
         fs2.appendFile = appendFile;
-      function appendFile(path, data, options, cb) {
+      function appendFile(path2, data, options, cb) {
         if (typeof options === "function")
           cb = options, options = null;
-        return go$appendFile(path, data, options, cb);
-        function go$appendFile(path2, data2, options2, cb2, startTime) {
-          return fs$appendFile(path2, data2, options2, function(err) {
+        return go$appendFile(path2, data, options, cb);
+        function go$appendFile(path3, data2, options2, cb2, startTime) {
+          return fs$appendFile(path3, data2, options2, function(err) {
             if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
-              enqueue([go$appendFile, [path2, data2, options2, cb2], err, startTime || Date.now(), Date.now()]);
+              enqueue([go$appendFile, [path3, data2, options2, cb2], err, startTime || Date.now(), Date.now()]);
             else {
               if (typeof cb2 === "function")
                 cb2.apply(this, arguments);
@@ -597,31 +597,31 @@ var require_graceful_fs = __commonJS({
       var fs$readdir = fs2.readdir;
       fs2.readdir = readdir;
       var noReaddirOptionVersions = /^v[0-5]\./;
-      function readdir(path, options, cb) {
+      function readdir(path2, options, cb) {
         if (typeof options === "function")
           cb = options, options = null;
-        var go$readdir = noReaddirOptionVersions.test(process.version) ? function go$readdir2(path2, options2, cb2, startTime) {
-          return fs$readdir(path2, fs$readdirCallback(
-            path2,
+        var go$readdir = noReaddirOptionVersions.test(process.version) ? function go$readdir2(path3, options2, cb2, startTime) {
+          return fs$readdir(path3, fs$readdirCallback(
+            path3,
             options2,
             cb2,
             startTime
           ));
-        } : function go$readdir2(path2, options2, cb2, startTime) {
-          return fs$readdir(path2, options2, fs$readdirCallback(
-            path2,
+        } : function go$readdir2(path3, options2, cb2, startTime) {
+          return fs$readdir(path3, options2, fs$readdirCallback(
+            path3,
             options2,
             cb2,
             startTime
           ));
         };
-        return go$readdir(path, options, cb);
-        function fs$readdirCallback(path2, options2, cb2, startTime) {
+        return go$readdir(path2, options, cb);
+        function fs$readdirCallback(path3, options2, cb2, startTime) {
           return function(err, files) {
             if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
               enqueue([
                 go$readdir,
-                [path2, options2, cb2],
+                [path3, options2, cb2],
                 err,
                 startTime || Date.now(),
                 Date.now()
@@ -692,7 +692,7 @@ var require_graceful_fs = __commonJS({
         enumerable: true,
         configurable: true
       });
-      function ReadStream(path, options) {
+      function ReadStream(path2, options) {
         if (this instanceof ReadStream)
           return fs$ReadStream.apply(this, arguments), this;
         else
@@ -712,7 +712,7 @@ var require_graceful_fs = __commonJS({
           }
         });
       }
-      function WriteStream(path, options) {
+      function WriteStream(path2, options) {
         if (this instanceof WriteStream)
           return fs$WriteStream.apply(this, arguments), this;
         else
@@ -730,22 +730,22 @@ var require_graceful_fs = __commonJS({
           }
         });
       }
-      function createReadStream(path, options) {
-        return new fs2.ReadStream(path, options);
+      function createReadStream(path2, options) {
+        return new fs2.ReadStream(path2, options);
       }
-      function createWriteStream(path, options) {
-        return new fs2.WriteStream(path, options);
+      function createWriteStream(path2, options) {
+        return new fs2.WriteStream(path2, options);
       }
       var fs$open = fs2.open;
       fs2.open = open;
-      function open(path, flags, mode, cb) {
+      function open(path2, flags, mode, cb) {
         if (typeof mode === "function")
           cb = mode, mode = null;
-        return go$open(path, flags, mode, cb);
-        function go$open(path2, flags2, mode2, cb2, startTime) {
-          return fs$open(path2, flags2, mode2, function(err, fd) {
+        return go$open(path2, flags, mode, cb);
+        function go$open(path3, flags2, mode2, cb2, startTime) {
+          return fs$open(path3, flags2, mode2, function(err, fd) {
             if (err && (err.code === "EMFILE" || err.code === "ENFILE"))
-              enqueue([go$open, [path2, flags2, mode2, cb2], err, startTime || Date.now(), Date.now()]);
+              enqueue([go$open, [path3, flags2, mode2, cb2], err, startTime || Date.now(), Date.now()]);
             else {
               if (typeof cb2 === "function")
                 cb2.apply(this, arguments);
@@ -915,10 +915,10 @@ var require_fs = __commonJS({
 var require_utils = __commonJS({
   "node_modules/electron-updater/node_modules/fs-extra/lib/mkdirs/utils.js"(exports2, module2) {
     "use strict";
-    var path = require("path");
+    var path2 = require("path");
     module2.exports.checkPath = function checkPath(pth) {
       if (process.platform === "win32") {
-        const pathHasInvalidWinCharacters = /[<>:"|?*]/.test(pth.replace(path.parse(pth).root, ""));
+        const pathHasInvalidWinCharacters = /[<>:"|?*]/.test(pth.replace(path2.parse(pth).root, ""));
         if (pathHasInvalidWinCharacters) {
           const error = new Error(`Path contains invalid characters: ${pth}`);
           error.code = "EINVAL";
@@ -982,8 +982,8 @@ var require_path_exists = __commonJS({
     "use strict";
     var u = require_universalify().fromPromise;
     var fs = require_fs();
-    function pathExists(path) {
-      return fs.access(path).then(() => true).catch(() => false);
+    function pathExists(path2) {
+      return fs.access(path2).then(() => true).catch(() => false);
     }
     module2.exports = {
       pathExists: u(pathExists),
@@ -997,8 +997,8 @@ var require_utimes = __commonJS({
   "node_modules/electron-updater/node_modules/fs-extra/lib/util/utimes.js"(exports2, module2) {
     "use strict";
     var fs = require_graceful_fs();
-    function utimesMillis(path, atime, mtime, callback) {
-      fs.open(path, "r+", (err, fd) => {
+    function utimesMillis(path2, atime, mtime, callback) {
+      fs.open(path2, "r+", (err, fd) => {
         if (err) return callback(err);
         fs.futimes(fd, atime, mtime, (futimesErr) => {
           fs.close(fd, (closeErr) => {
@@ -1007,8 +1007,8 @@ var require_utimes = __commonJS({
         });
       });
     }
-    function utimesMillisSync(path, atime, mtime) {
-      const fd = fs.openSync(path, "r+");
+    function utimesMillisSync(path2, atime, mtime) {
+      const fd = fs.openSync(path2, "r+");
       fs.futimesSync(fd, atime, mtime);
       return fs.closeSync(fd);
     }
@@ -1024,7 +1024,7 @@ var require_stat = __commonJS({
   "node_modules/electron-updater/node_modules/fs-extra/lib/util/stat.js"(exports2, module2) {
     "use strict";
     var fs = require_fs();
-    var path = require("path");
+    var path2 = require("path");
     var util = require("util");
     function getStats(src, dest, opts) {
       const statFunc = opts.dereference ? (file) => fs.stat(file, { bigint: true }) : (file) => fs.lstat(file, { bigint: true });
@@ -1054,8 +1054,8 @@ var require_stat = __commonJS({
         const { srcStat, destStat } = stats;
         if (destStat) {
           if (areIdentical(srcStat, destStat)) {
-            const srcBaseName = path.basename(src);
-            const destBaseName = path.basename(dest);
+            const srcBaseName = path2.basename(src);
+            const destBaseName = path2.basename(dest);
             if (funcName === "move" && srcBaseName !== destBaseName && srcBaseName.toLowerCase() === destBaseName.toLowerCase()) {
               return cb(null, { srcStat, destStat, isChangingCase: true });
             }
@@ -1078,8 +1078,8 @@ var require_stat = __commonJS({
       const { srcStat, destStat } = getStatsSync(src, dest, opts);
       if (destStat) {
         if (areIdentical(srcStat, destStat)) {
-          const srcBaseName = path.basename(src);
-          const destBaseName = path.basename(dest);
+          const srcBaseName = path2.basename(src);
+          const destBaseName = path2.basename(dest);
           if (funcName === "move" && srcBaseName !== destBaseName && srcBaseName.toLowerCase() === destBaseName.toLowerCase()) {
             return { srcStat, destStat, isChangingCase: true };
           }
@@ -1098,9 +1098,9 @@ var require_stat = __commonJS({
       return { srcStat, destStat };
     }
     function checkParentPaths(src, srcStat, dest, funcName, cb) {
-      const srcParent = path.resolve(path.dirname(src));
-      const destParent = path.resolve(path.dirname(dest));
-      if (destParent === srcParent || destParent === path.parse(destParent).root) return cb();
+      const srcParent = path2.resolve(path2.dirname(src));
+      const destParent = path2.resolve(path2.dirname(dest));
+      if (destParent === srcParent || destParent === path2.parse(destParent).root) return cb();
       fs.stat(destParent, { bigint: true }, (err, destStat) => {
         if (err) {
           if (err.code === "ENOENT") return cb();
@@ -1113,9 +1113,9 @@ var require_stat = __commonJS({
       });
     }
     function checkParentPathsSync(src, srcStat, dest, funcName) {
-      const srcParent = path.resolve(path.dirname(src));
-      const destParent = path.resolve(path.dirname(dest));
-      if (destParent === srcParent || destParent === path.parse(destParent).root) return;
+      const srcParent = path2.resolve(path2.dirname(src));
+      const destParent = path2.resolve(path2.dirname(dest));
+      if (destParent === srcParent || destParent === path2.parse(destParent).root) return;
       let destStat;
       try {
         destStat = fs.statSync(destParent, { bigint: true });
@@ -1132,8 +1132,8 @@ var require_stat = __commonJS({
       return destStat.ino && destStat.dev && destStat.ino === srcStat.ino && destStat.dev === srcStat.dev;
     }
     function isSrcSubdir(src, dest) {
-      const srcArr = path.resolve(src).split(path.sep).filter((i) => i);
-      const destArr = path.resolve(dest).split(path.sep).filter((i) => i);
+      const srcArr = path2.resolve(src).split(path2.sep).filter((i) => i);
+      const destArr = path2.resolve(dest).split(path2.sep).filter((i) => i);
       return srcArr.reduce((acc, cur, i) => acc && destArr[i] === cur, true);
     }
     function errMsg(src, dest, funcName) {
@@ -1155,7 +1155,7 @@ var require_copy = __commonJS({
   "node_modules/electron-updater/node_modules/fs-extra/lib/copy/copy.js"(exports2, module2) {
     "use strict";
     var fs = require_graceful_fs();
-    var path = require("path");
+    var path2 = require("path");
     var mkdirs = require_mkdirs().mkdirs;
     var pathExists = require_path_exists().pathExists;
     var utimesMillis = require_utimes().utimesMillis;
@@ -1190,7 +1190,7 @@ var require_copy = __commonJS({
       });
     }
     function checkParentDir(destStat, src, dest, opts, cb) {
-      const destParent = path.dirname(dest);
+      const destParent = path2.dirname(dest);
       pathExists(destParent, (err, dirExists) => {
         if (err) return cb(err);
         if (dirExists) return getStats(destStat, src, dest, opts, cb);
@@ -1298,8 +1298,8 @@ var require_copy = __commonJS({
       return copyDirItem(items, item, src, dest, opts, cb);
     }
     function copyDirItem(items, item, src, dest, opts, cb) {
-      const srcItem = path.join(src, item);
-      const destItem = path.join(dest, item);
+      const srcItem = path2.join(src, item);
+      const destItem = path2.join(dest, item);
       stat.checkPaths(srcItem, destItem, "copy", opts, (err, stats) => {
         if (err) return cb(err);
         const { destStat } = stats;
@@ -1313,7 +1313,7 @@ var require_copy = __commonJS({
       fs.readlink(src, (err, resolvedSrc) => {
         if (err) return cb(err);
         if (opts.dereference) {
-          resolvedSrc = path.resolve(process.cwd(), resolvedSrc);
+          resolvedSrc = path2.resolve(process.cwd(), resolvedSrc);
         }
         if (!destStat) {
           return fs.symlink(resolvedSrc, dest, cb);
@@ -1324,7 +1324,7 @@ var require_copy = __commonJS({
               return cb(err2);
             }
             if (opts.dereference) {
-              resolvedDest = path.resolve(process.cwd(), resolvedDest);
+              resolvedDest = path2.resolve(process.cwd(), resolvedDest);
             }
             if (stat.isSrcSubdir(resolvedSrc, resolvedDest)) {
               return cb(new Error(`Cannot copy '${resolvedSrc}' to a subdirectory of itself, '${resolvedDest}'.`));
@@ -1352,7 +1352,7 @@ var require_copy_sync = __commonJS({
   "node_modules/electron-updater/node_modules/fs-extra/lib/copy/copy-sync.js"(exports2, module2) {
     "use strict";
     var fs = require_graceful_fs();
-    var path = require("path");
+    var path2 = require("path");
     var mkdirsSync = require_mkdirs().mkdirsSync;
     var utimesMillisSync = require_utimes().utimesMillisSync;
     var stat = require_stat();
@@ -1376,7 +1376,7 @@ var require_copy_sync = __commonJS({
     }
     function handleFilterAndCopy(destStat, src, dest, opts) {
       if (opts.filter && !opts.filter(src, dest)) return;
-      const destParent = path.dirname(dest);
+      const destParent = path2.dirname(dest);
       if (!fs.existsSync(destParent)) mkdirsSync(destParent);
       return getStats(destStat, src, dest, opts);
     }
@@ -1441,15 +1441,15 @@ var require_copy_sync = __commonJS({
       fs.readdirSync(src).forEach((item) => copyDirItem(item, src, dest, opts));
     }
     function copyDirItem(item, src, dest, opts) {
-      const srcItem = path.join(src, item);
-      const destItem = path.join(dest, item);
+      const srcItem = path2.join(src, item);
+      const destItem = path2.join(dest, item);
       const { destStat } = stat.checkPathsSync(srcItem, destItem, "copy", opts);
       return startCopy(destStat, srcItem, destItem, opts);
     }
     function onLink(destStat, src, dest, opts) {
       let resolvedSrc = fs.readlinkSync(src);
       if (opts.dereference) {
-        resolvedSrc = path.resolve(process.cwd(), resolvedSrc);
+        resolvedSrc = path2.resolve(process.cwd(), resolvedSrc);
       }
       if (!destStat) {
         return fs.symlinkSync(resolvedSrc, dest);
@@ -1462,7 +1462,7 @@ var require_copy_sync = __commonJS({
           throw err;
         }
         if (opts.dereference) {
-          resolvedDest = path.resolve(process.cwd(), resolvedDest);
+          resolvedDest = path2.resolve(process.cwd(), resolvedDest);
         }
         if (stat.isSrcSubdir(resolvedSrc, resolvedDest)) {
           throw new Error(`Cannot copy '${resolvedSrc}' to a subdirectory of itself, '${resolvedDest}'.`);
@@ -1498,7 +1498,7 @@ var require_rimraf = __commonJS({
   "node_modules/electron-updater/node_modules/fs-extra/lib/remove/rimraf.js"(exports2, module2) {
     "use strict";
     var fs = require_graceful_fs();
-    var path = require("path");
+    var path2 = require("path");
     var assert = require("assert");
     var isWindows = process.platform === "win32";
     function defaults(options) {
@@ -1643,7 +1643,7 @@ var require_rimraf = __commonJS({
         let errState;
         if (n === 0) return options.rmdir(p, cb);
         files.forEach((f) => {
-          rimraf(path.join(p, f), options, (er2) => {
+          rimraf(path2.join(p, f), options, (er2) => {
             if (errState) {
               return;
             }
@@ -1708,7 +1708,7 @@ var require_rimraf = __commonJS({
     function rmkidsSync(p, options) {
       assert(p);
       assert(options);
-      options.readdirSync(p).forEach((f) => rimrafSync(path.join(p, f), options));
+      options.readdirSync(p).forEach((f) => rimrafSync(path2.join(p, f), options));
       if (isWindows) {
         const startTime = Date.now();
         do {
@@ -1735,13 +1735,13 @@ var require_remove = __commonJS({
     var fs = require_graceful_fs();
     var u = require_universalify().fromCallback;
     var rimraf = require_rimraf();
-    function remove(path, callback) {
-      if (fs.rm) return fs.rm(path, { recursive: true, force: true }, callback);
-      rimraf(path, callback);
+    function remove(path2, callback) {
+      if (fs.rm) return fs.rm(path2, { recursive: true, force: true }, callback);
+      rimraf(path2, callback);
     }
-    function removeSync(path) {
-      if (fs.rmSync) return fs.rmSync(path, { recursive: true, force: true });
-      rimraf.sync(path);
+    function removeSync(path2) {
+      if (fs.rmSync) return fs.rmSync(path2, { recursive: true, force: true });
+      rimraf.sync(path2);
     }
     module2.exports = {
       remove: u(remove),
@@ -1756,7 +1756,7 @@ var require_empty = __commonJS({
     "use strict";
     var u = require_universalify().fromPromise;
     var fs = require_fs();
-    var path = require("path");
+    var path2 = require("path");
     var mkdir = require_mkdirs();
     var remove = require_remove();
     var emptyDir = u(async function emptyDir2(dir) {
@@ -1766,7 +1766,7 @@ var require_empty = __commonJS({
       } catch {
         return mkdir.mkdirs(dir);
       }
-      return Promise.all(items.map((item) => remove.remove(path.join(dir, item))));
+      return Promise.all(items.map((item) => remove.remove(path2.join(dir, item))));
     });
     function emptyDirSync(dir) {
       let items;
@@ -1776,7 +1776,7 @@ var require_empty = __commonJS({
         return mkdir.mkdirsSync(dir);
       }
       items.forEach((item) => {
-        item = path.join(dir, item);
+        item = path2.join(dir, item);
         remove.removeSync(item);
       });
     }
@@ -1794,7 +1794,7 @@ var require_file = __commonJS({
   "node_modules/electron-updater/node_modules/fs-extra/lib/ensure/file.js"(exports2, module2) {
     "use strict";
     var u = require_universalify().fromCallback;
-    var path = require("path");
+    var path2 = require("path");
     var fs = require_graceful_fs();
     var mkdir = require_mkdirs();
     function createFile(file, callback) {
@@ -1806,7 +1806,7 @@ var require_file = __commonJS({
       }
       fs.stat(file, (err, stats) => {
         if (!err && stats.isFile()) return callback();
-        const dir = path.dirname(file);
+        const dir = path2.dirname(file);
         fs.stat(dir, (err2, stats2) => {
           if (err2) {
             if (err2.code === "ENOENT") {
@@ -1833,7 +1833,7 @@ var require_file = __commonJS({
       } catch {
       }
       if (stats && stats.isFile()) return;
-      const dir = path.dirname(file);
+      const dir = path2.dirname(file);
       try {
         if (!fs.statSync(dir).isDirectory()) {
           fs.readdirSync(dir);
@@ -1856,7 +1856,7 @@ var require_link = __commonJS({
   "node_modules/electron-updater/node_modules/fs-extra/lib/ensure/link.js"(exports2, module2) {
     "use strict";
     var u = require_universalify().fromCallback;
-    var path = require("path");
+    var path2 = require("path");
     var fs = require_graceful_fs();
     var mkdir = require_mkdirs();
     var pathExists = require_path_exists().pathExists;
@@ -1875,7 +1875,7 @@ var require_link = __commonJS({
             return callback(err);
           }
           if (dstStat && areIdentical(srcStat, dstStat)) return callback(null);
-          const dir = path.dirname(dstpath);
+          const dir = path2.dirname(dstpath);
           pathExists(dir, (err2, dirExists) => {
             if (err2) return callback(err2);
             if (dirExists) return makeLink(srcpath, dstpath);
@@ -1900,7 +1900,7 @@ var require_link = __commonJS({
         err.message = err.message.replace("lstat", "ensureLink");
         throw err;
       }
-      const dir = path.dirname(dstpath);
+      const dir = path2.dirname(dstpath);
       const dirExists = fs.existsSync(dir);
       if (dirExists) return fs.linkSync(srcpath, dstpath);
       mkdir.mkdirsSync(dir);
@@ -1917,11 +1917,11 @@ var require_link = __commonJS({
 var require_symlink_paths = __commonJS({
   "node_modules/electron-updater/node_modules/fs-extra/lib/ensure/symlink-paths.js"(exports2, module2) {
     "use strict";
-    var path = require("path");
+    var path2 = require("path");
     var fs = require_graceful_fs();
     var pathExists = require_path_exists().pathExists;
     function symlinkPaths(srcpath, dstpath, callback) {
-      if (path.isAbsolute(srcpath)) {
+      if (path2.isAbsolute(srcpath)) {
         return fs.lstat(srcpath, (err) => {
           if (err) {
             err.message = err.message.replace("lstat", "ensureSymlink");
@@ -1933,8 +1933,8 @@ var require_symlink_paths = __commonJS({
           });
         });
       } else {
-        const dstdir = path.dirname(dstpath);
-        const relativeToDst = path.join(dstdir, srcpath);
+        const dstdir = path2.dirname(dstpath);
+        const relativeToDst = path2.join(dstdir, srcpath);
         return pathExists(relativeToDst, (err, exists) => {
           if (err) return callback(err);
           if (exists) {
@@ -1950,7 +1950,7 @@ var require_symlink_paths = __commonJS({
               }
               return callback(null, {
                 toCwd: srcpath,
-                toDst: path.relative(dstdir, srcpath)
+                toDst: path2.relative(dstdir, srcpath)
               });
             });
           }
@@ -1959,7 +1959,7 @@ var require_symlink_paths = __commonJS({
     }
     function symlinkPathsSync(srcpath, dstpath) {
       let exists;
-      if (path.isAbsolute(srcpath)) {
+      if (path2.isAbsolute(srcpath)) {
         exists = fs.existsSync(srcpath);
         if (!exists) throw new Error("absolute srcpath does not exist");
         return {
@@ -1967,8 +1967,8 @@ var require_symlink_paths = __commonJS({
           toDst: srcpath
         };
       } else {
-        const dstdir = path.dirname(dstpath);
-        const relativeToDst = path.join(dstdir, srcpath);
+        const dstdir = path2.dirname(dstpath);
+        const relativeToDst = path2.join(dstdir, srcpath);
         exists = fs.existsSync(relativeToDst);
         if (exists) {
           return {
@@ -1980,7 +1980,7 @@ var require_symlink_paths = __commonJS({
           if (!exists) throw new Error("relative srcpath does not exist");
           return {
             toCwd: srcpath,
-            toDst: path.relative(dstdir, srcpath)
+            toDst: path2.relative(dstdir, srcpath)
           };
         }
       }
@@ -2029,7 +2029,7 @@ var require_symlink = __commonJS({
   "node_modules/electron-updater/node_modules/fs-extra/lib/ensure/symlink.js"(exports2, module2) {
     "use strict";
     var u = require_universalify().fromCallback;
-    var path = require("path");
+    var path2 = require("path");
     var fs = require_fs();
     var _mkdirs = require_mkdirs();
     var mkdirs = _mkdirs.mkdirs;
@@ -2063,7 +2063,7 @@ var require_symlink = __commonJS({
         srcpath = relative.toDst;
         symlinkType(relative.toCwd, type, (err2, type2) => {
           if (err2) return callback(err2);
-          const dir = path.dirname(dstpath);
+          const dir = path2.dirname(dstpath);
           pathExists(dir, (err3, dirExists) => {
             if (err3) return callback(err3);
             if (dirExists) return fs.symlink(srcpath, dstpath, type2, callback);
@@ -2089,7 +2089,7 @@ var require_symlink = __commonJS({
       const relative = symlinkPathsSync(srcpath, dstpath);
       srcpath = relative.toDst;
       type = symlinkTypeSync(relative.toCwd, type);
-      const dir = path.dirname(dstpath);
+      const dir = path2.dirname(dstpath);
       const exists = fs.existsSync(dir);
       if (exists) return fs.symlinkSync(srcpath, dstpath, type);
       mkdirsSync(dir);
@@ -2238,7 +2238,7 @@ var require_output_file = __commonJS({
     "use strict";
     var u = require_universalify().fromCallback;
     var fs = require_graceful_fs();
-    var path = require("path");
+    var path2 = require("path");
     var mkdir = require_mkdirs();
     var pathExists = require_path_exists().pathExists;
     function outputFile(file, data, encoding, callback) {
@@ -2246,7 +2246,7 @@ var require_output_file = __commonJS({
         callback = encoding;
         encoding = "utf8";
       }
-      const dir = path.dirname(file);
+      const dir = path2.dirname(file);
       pathExists(dir, (err, itDoes) => {
         if (err) return callback(err);
         if (itDoes) return fs.writeFile(file, data, encoding, callback);
@@ -2257,7 +2257,7 @@ var require_output_file = __commonJS({
       });
     }
     function outputFileSync(file, ...args) {
-      const dir = path.dirname(file);
+      const dir = path2.dirname(file);
       if (fs.existsSync(dir)) {
         return fs.writeFileSync(file, ...args);
       }
@@ -2322,7 +2322,7 @@ var require_move = __commonJS({
   "node_modules/electron-updater/node_modules/fs-extra/lib/move/move.js"(exports2, module2) {
     "use strict";
     var fs = require_graceful_fs();
-    var path = require("path");
+    var path2 = require("path");
     var copy = require_copy2().copy;
     var remove = require_remove().remove;
     var mkdirp = require_mkdirs().mkdirp;
@@ -2341,7 +2341,7 @@ var require_move = __commonJS({
         stat.checkParentPaths(src, srcStat, dest, "move", (err2) => {
           if (err2) return cb(err2);
           if (isParentRoot(dest)) return doRename(src, dest, overwrite, isChangingCase, cb);
-          mkdirp(path.dirname(dest), (err3) => {
+          mkdirp(path2.dirname(dest), (err3) => {
             if (err3) return cb(err3);
             return doRename(src, dest, overwrite, isChangingCase, cb);
           });
@@ -2349,8 +2349,8 @@ var require_move = __commonJS({
       });
     }
     function isParentRoot(dest) {
-      const parent = path.dirname(dest);
-      const parsedPath = path.parse(parent);
+      const parent = path2.dirname(dest);
+      const parsedPath = path2.parse(parent);
       return parsedPath.root === parent;
     }
     function doRename(src, dest, overwrite, isChangingCase, cb) {
@@ -2393,7 +2393,7 @@ var require_move_sync = __commonJS({
   "node_modules/electron-updater/node_modules/fs-extra/lib/move/move-sync.js"(exports2, module2) {
     "use strict";
     var fs = require_graceful_fs();
-    var path = require("path");
+    var path2 = require("path");
     var copySync = require_copy2().copySync;
     var removeSync = require_remove().removeSync;
     var mkdirpSync = require_mkdirs().mkdirpSync;
@@ -2403,12 +2403,12 @@ var require_move_sync = __commonJS({
       const overwrite = opts.overwrite || opts.clobber || false;
       const { srcStat, isChangingCase = false } = stat.checkPathsSync(src, dest, "move", opts);
       stat.checkParentPathsSync(src, srcStat, dest, "move");
-      if (!isParentRoot(dest)) mkdirpSync(path.dirname(dest));
+      if (!isParentRoot(dest)) mkdirpSync(path2.dirname(dest));
       return doRename(src, dest, overwrite, isChangingCase);
     }
     function isParentRoot(dest) {
-      const parent = path.dirname(dest);
-      const parsedPath = path.parse(parent);
+      const parent = path2.dirname(dest);
+      const parsedPath = path2.parse(parent);
       return parsedPath.root === parent;
     }
     function doRename(src, dest, overwrite, isChangingCase) {
@@ -3573,7 +3573,7 @@ Please double check that your authentication token is correct. Due to security r
           }
         });
       }
-      async downloadToBuffer(url, options) {
+      async downloadToBuffer(url2, options) {
         return await options.cancellationToken.createPromise((resolve, reject, onCancel) => {
           const responseChunks = [];
           const requestOptions = {
@@ -3581,7 +3581,7 @@ Please double check that your authentication token is correct. Due to security r
             // because PrivateGitHubProvider requires HttpExecutor.prepareRedirectUrlOptions logic, so, we need to redirect manually
             redirect: "manual"
           };
-          configureRequestUrl(url, requestOptions);
+          configureRequestUrl(url2, requestOptions);
           configureRequestOptions(requestOptions);
           this.doDownload(requestOptions, {
             destination: null,
@@ -3675,20 +3675,20 @@ Please double check that your authentication token is correct. Due to security r
       }
     };
     exports2.HttpExecutor = HttpExecutor;
-    function configureRequestOptionsFromUrl(url, options) {
+    function configureRequestOptionsFromUrl(url2, options) {
       const result = configureRequestOptions(options);
-      configureRequestUrl(new url_1.URL(url), result);
+      configureRequestUrl(new url_1.URL(url2), result);
       return result;
     }
-    function configureRequestUrl(url, options) {
-      options.protocol = url.protocol;
-      options.hostname = url.hostname;
-      if (url.port) {
-        options.port = url.port;
+    function configureRequestUrl(url2, options) {
+      options.protocol = url2.protocol;
+      options.hostname = url2.hostname;
+      if (url2.port) {
+        options.port = url2.port;
       } else if (options.port) {
         delete options.port;
       }
-      options.path = url.pathname + url.search;
+      options.path = url2.pathname + url2.search;
     }
     var DigestTransform = class extends stream_1.Transform {
       // noinspection JSUnusedGlobalSymbols
@@ -3881,35 +3881,35 @@ var require_publishOptions = __commonJS({
       throw new Error(`Not supported provider: ${provider}`);
     }
     function s3Url(options) {
-      let url;
+      let url2;
       if (options.accelerate == true) {
-        url = `https://${options.bucket}.s3-accelerate.amazonaws.com`;
+        url2 = `https://${options.bucket}.s3-accelerate.amazonaws.com`;
       } else if (options.endpoint != null) {
-        url = `${options.endpoint}/${options.bucket}`;
+        url2 = `${options.endpoint}/${options.bucket}`;
       } else if (options.bucket.includes(".")) {
         if (options.region == null) {
           throw new Error(`Bucket name "${options.bucket}" includes a dot, but S3 region is missing`);
         }
         if (options.region === "us-east-1") {
-          url = `https://s3.amazonaws.com/${options.bucket}`;
+          url2 = `https://s3.amazonaws.com/${options.bucket}`;
         } else {
-          url = `https://s3-${options.region}.amazonaws.com/${options.bucket}`;
+          url2 = `https://s3-${options.region}.amazonaws.com/${options.bucket}`;
         }
       } else if (options.region === "cn-north-1") {
-        url = `https://${options.bucket}.s3.${options.region}.amazonaws.com.cn`;
+        url2 = `https://${options.bucket}.s3.${options.region}.amazonaws.com.cn`;
       } else {
-        url = `https://${options.bucket}.s3.amazonaws.com`;
+        url2 = `https://${options.bucket}.s3.amazonaws.com`;
       }
-      return appendPath(url, options.path);
+      return appendPath(url2, options.path);
     }
-    function appendPath(url, p) {
+    function appendPath(url2, p) {
       if (p != null && p.length > 0) {
         if (!p.startsWith("/")) {
-          url += "/";
+          url2 += "/";
         }
-        url += p;
+        url2 += p;
       }
-      return url;
+      return url2;
     }
     function spacesUrl(options) {
       if (options.name == null) {
@@ -11339,7 +11339,7 @@ var require_DownloadedUpdateHelper = __commonJS({
     var fs_1 = require("fs");
     var isEqual = require_lodash();
     var fs_extra_1 = require_lib();
-    var path = require("path");
+    var path2 = require("path");
     var DownloadedUpdateHelper = class {
       constructor(cacheDir) {
         this.cacheDir = cacheDir;
@@ -11359,7 +11359,7 @@ var require_DownloadedUpdateHelper = __commonJS({
         return this._packageFile;
       }
       get cacheDirForPendingUpdate() {
-        return path.join(this.cacheDir, "pending");
+        return path2.join(this.cacheDir, "pending");
       }
       async validateDownloadedPath(updateFile, updateInfo, fileInfo, logger) {
         if (this.versionInfo != null && this.file === updateFile && this.fileInfo != null) {
@@ -11438,7 +11438,7 @@ var require_DownloadedUpdateHelper = __commonJS({
           await this.cleanCacheDirForPendingUpdate();
           return null;
         }
-        const updateFile = path.join(this.cacheDirForPendingUpdate, cachedInfo.fileName);
+        const updateFile = path2.join(this.cacheDirForPendingUpdate, cachedInfo.fileName);
         if (!await (0, fs_extra_1.pathExists)(updateFile)) {
           logger.info("Cached update file doesn't exist");
           return null;
@@ -11453,7 +11453,7 @@ var require_DownloadedUpdateHelper = __commonJS({
         return updateFile;
       }
       getUpdateInfoFile() {
-        return path.join(this.cacheDirForPendingUpdate, "update-info.json");
+        return path2.join(this.cacheDirForPendingUpdate, "update-info.json");
       }
     };
     exports2.DownloadedUpdateHelper = DownloadedUpdateHelper;
@@ -11473,7 +11473,7 @@ var require_DownloadedUpdateHelper = __commonJS({
     }
     async function createTempUpdateFile(name, cacheDir, log) {
       let nameCounter = 0;
-      let result = path.join(cacheDir, name);
+      let result = path2.join(cacheDir, name);
       for (let i = 0; i < 3; i++) {
         try {
           await (0, fs_extra_1.unlink)(result);
@@ -11483,7 +11483,7 @@ var require_DownloadedUpdateHelper = __commonJS({
             return result;
           }
           log.warn(`Error on remove temp update file: ${e}`);
-          result = path.join(cacheDir, `${nameCounter++}-${name}`);
+          result = path2.join(cacheDir, `${nameCounter++}-${name}`);
         }
       }
       return result;
@@ -11497,17 +11497,17 @@ var require_AppAdapter = __commonJS({
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.getAppCacheDir = getAppCacheDir;
-    var path = require("path");
+    var path2 = require("path");
     var os_1 = require("os");
     function getAppCacheDir() {
       const homedir = (0, os_1.homedir)();
       let result;
       if (process.platform === "win32") {
-        result = process.env["LOCALAPPDATA"] || path.join(homedir, "AppData", "Local");
+        result = process.env["LOCALAPPDATA"] || path2.join(homedir, "AppData", "Local");
       } else if (process.platform === "darwin") {
-        result = path.join(homedir, "Library", "Caches");
+        result = path2.join(homedir, "Library", "Caches");
       } else {
-        result = process.env["XDG_CACHE_HOME"] || path.join(homedir, ".cache");
+        result = process.env["XDG_CACHE_HOME"] || path2.join(homedir, ".cache");
       }
       return result;
     }
@@ -11520,7 +11520,7 @@ var require_ElectronAppAdapter = __commonJS({
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.ElectronAppAdapter = void 0;
-    var path = require("path");
+    var path2 = require("path");
     var AppAdapter_1 = require_AppAdapter();
     var ElectronAppAdapter = class {
       constructor(app2 = require("electron").app) {
@@ -11539,7 +11539,7 @@ var require_ElectronAppAdapter = __commonJS({
         return this.app.isPackaged === true;
       }
       get appUpdateConfigPath() {
-        return this.isPackaged ? path.join(process.resourcesPath, "app-update.yml") : path.join(this.app.getAppPath(), "dev-app-update.yml");
+        return this.isPackaged ? path2.join(process.resourcesPath, "app-update.yml") : path2.join(this.app.getAppPath(), "dev-app-update.yml");
       }
       get userDataPath() {
         return this.app.getPath("userData");
@@ -11581,13 +11581,13 @@ var require_electronHttpExecutor = __commonJS({
         this.proxyLoginCallback = proxyLoginCallback;
         this.cachedSession = null;
       }
-      async download(url, destination, options) {
+      async download(url2, destination, options) {
         return await options.cancellationToken.createPromise((resolve, reject, onCancel) => {
           const requestOptions = {
             headers: options.headers || void 0,
             redirect: "manual"
           };
-          (0, builder_util_runtime_1.configureRequestUrl)(url, requestOptions);
+          (0, builder_util_runtime_1.configureRequestUrl)(url2, requestOptions);
           (0, builder_util_runtime_1.configureRequestOptions)(requestOptions);
           this.doDownload(requestOptions, {
             destination,
@@ -11690,8 +11690,8 @@ var require_util = __commonJS({
     exports2.blockmapFiles = blockmapFiles;
     var url_1 = require("url");
     var escapeRegExp = require_lodash2();
-    function newBaseUrl(url) {
-      const result = new url_1.URL(url);
+    function newBaseUrl(url2) {
+      const result = new url_1.URL(url2);
       if (!result.pathname.endsWith("/")) {
         result.pathname += "/";
       }
@@ -11765,10 +11765,10 @@ var require_Provider = __commonJS({
       /**
        * Method to perform API request only to resolve update info, but not to download update.
        */
-      httpRequest(url, headers, cancellationToken) {
-        return this.executor.request(this.createRequestOptions(url, headers), cancellationToken);
+      httpRequest(url2, headers, cancellationToken) {
+        return this.executor.request(this.createRequestOptions(url2, headers), cancellationToken);
       }
-      createRequestOptions(url, headers) {
+      createRequestOptions(url2, headers) {
         const result = {};
         if (this.requestHeaders == null) {
           if (headers != null) {
@@ -11777,7 +11777,7 @@ var require_Provider = __commonJS({
         } else {
           result.headers = headers == null ? this.requestHeaders : { ...this.requestHeaders, ...headers };
         }
-        (0, builder_util_runtime_1.configureRequestUrl)(url, result);
+        (0, builder_util_runtime_1.configureRequestUrl)(url2, result);
         return result;
       }
     };
@@ -12084,16 +12084,16 @@ ${feedXml}`, "ERR_UPDATER_INVALID_RELEASE_FEED");
       }
       async getLatestTagName(cancellationToken) {
         const options = this.options;
-        const url = options.host == null || options.host === "github.com" ? (0, util_1.newUrlFromBase)(`${this.basePath}/latest`, this.baseUrl) : new url_1.URL(`${this.computeGithubBasePath(`/repos/${options.owner}/${options.repo}/releases`)}/latest`, this.baseApiUrl);
+        const url2 = options.host == null || options.host === "github.com" ? (0, util_1.newUrlFromBase)(`${this.basePath}/latest`, this.baseUrl) : new url_1.URL(`${this.computeGithubBasePath(`/repos/${options.owner}/${options.repo}/releases`)}/latest`, this.baseApiUrl);
         try {
-          const rawData = await this.httpRequest(url, { Accept: "application/json" }, cancellationToken);
+          const rawData = await this.httpRequest(url2, { Accept: "application/json" }, cancellationToken);
           if (rawData == null) {
             return null;
           }
           const releaseInfo = JSON.parse(rawData);
           return releaseInfo.tag_name;
         } catch (e) {
-          throw (0, builder_util_runtime_1.newError)(`Unable to find latest version on GitHub (${url}), please ensure a production release exists: ${e.stack || e.message}`, "ERR_UPDATER_LATEST_VERSION_NOT_FOUND");
+          throw (0, builder_util_runtime_1.newError)(`Unable to find latest version on GitHub (${url2}), please ensure a production release exists: ${e.stack || e.message}`, "ERR_UPDATER_LATEST_VERSION_NOT_FOUND");
         }
       }
       get basePath() {
@@ -12188,7 +12188,7 @@ var require_PrivateGitHubProvider = __commonJS({
     exports2.PrivateGitHubProvider = void 0;
     var builder_util_runtime_1 = require_out();
     var js_yaml_1 = require_js_yaml();
-    var path = require("path");
+    var path2 = require("path");
     var url_1 = require("url");
     var util_1 = require_util();
     var GitHubProvider_1 = require_GitHubProvider();
@@ -12199,8 +12199,8 @@ var require_PrivateGitHubProvider = __commonJS({
         this.updater = updater;
         this.token = token;
       }
-      createRequestOptions(url, headers) {
-        const result = super.createRequestOptions(url, headers);
+      createRequestOptions(url2, headers) {
+        const result = super.createRequestOptions(url2, headers);
         result.redirect = "manual";
         return result;
       }
@@ -12212,13 +12212,13 @@ var require_PrivateGitHubProvider = __commonJS({
         if (asset == null) {
           throw (0, builder_util_runtime_1.newError)(`Cannot find ${channelFile} in the release ${releaseInfo.html_url || releaseInfo.name}`, "ERR_UPDATER_CHANNEL_FILE_NOT_FOUND");
         }
-        const url = new url_1.URL(asset.url);
+        const url2 = new url_1.URL(asset.url);
         let result;
         try {
-          result = (0, js_yaml_1.load)(await this.httpRequest(url, this.configureHeaders("application/octet-stream"), cancellationToken));
+          result = (0, js_yaml_1.load)(await this.httpRequest(url2, this.configureHeaders("application/octet-stream"), cancellationToken));
         } catch (e) {
           if (e instanceof builder_util_runtime_1.HttpError && e.statusCode === 404) {
-            throw (0, builder_util_runtime_1.newError)(`Cannot find ${channelFile} in the latest release artifacts (${url}): ${e.stack || e.message}`, "ERR_UPDATER_CHANNEL_FILE_NOT_FOUND");
+            throw (0, builder_util_runtime_1.newError)(`Cannot find ${channelFile} in the latest release artifacts (${url2}): ${e.stack || e.message}`, "ERR_UPDATER_CHANNEL_FILE_NOT_FOUND");
           }
           throw e;
         }
@@ -12241,16 +12241,16 @@ var require_PrivateGitHubProvider = __commonJS({
         if (!allowPrerelease) {
           basePath = `${basePath}/latest`;
         }
-        const url = (0, util_1.newUrlFromBase)(basePath, this.baseUrl);
+        const url2 = (0, util_1.newUrlFromBase)(basePath, this.baseUrl);
         try {
-          const version = JSON.parse(await this.httpRequest(url, this.configureHeaders("application/vnd.github.v3+json"), cancellationToken));
+          const version = JSON.parse(await this.httpRequest(url2, this.configureHeaders("application/vnd.github.v3+json"), cancellationToken));
           if (allowPrerelease) {
             return version.find((it) => it.prerelease) || version[0];
           } else {
             return version;
           }
         } catch (e) {
-          throw (0, builder_util_runtime_1.newError)(`Unable to find latest version on GitHub (${url}), please ensure a production release exists: ${e.stack || e.message}`, "ERR_UPDATER_LATEST_VERSION_NOT_FOUND");
+          throw (0, builder_util_runtime_1.newError)(`Unable to find latest version on GitHub (${url2}), please ensure a production release exists: ${e.stack || e.message}`, "ERR_UPDATER_LATEST_VERSION_NOT_FOUND");
         }
       }
       get basePath() {
@@ -12258,7 +12258,7 @@ var require_PrivateGitHubProvider = __commonJS({
       }
       resolveFiles(updateInfo) {
         return (0, Provider_1.getFileList)(updateInfo).map((it) => {
-          const name = path.posix.basename(it.url).replace(/ /g, "-");
+          const name = path2.posix.basename(it.url).replace(/ /g, "-");
           const asset = updateInfo.assets.find((it2) => it2 != null && it2.name === name);
           if (asset == null) {
             throw (0, builder_util_runtime_1.newError)(`Cannot find asset "${name}" in: ${JSON.stringify(updateInfo.assets, null, 2)}`, "ERR_UPDATER_ASSET_NOT_FOUND");
@@ -12287,8 +12287,8 @@ var require_providerFactory = __commonJS({
     var GitHubProvider_1 = require_GitHubProvider();
     var KeygenProvider_1 = require_KeygenProvider();
     var PrivateGitHubProvider_1 = require_PrivateGitHubProvider();
-    function isUrlProbablySupportMultiRangeRequests(url) {
-      return !url.includes("s3.amazonaws.com");
+    function isUrlProbablySupportMultiRangeRequests(url2) {
+      return !url2.includes("s3.amazonaws.com");
     }
     function createClient(data, updater, runtimeOptions) {
       if (typeof data === "string") {
@@ -13095,9 +13095,9 @@ var require_DifferentialDownloader = __commonJS({
     function formatBytes(value, symbol = " KB") {
       return new Intl.NumberFormat("en").format((value / 1024).toFixed(2)) + symbol;
     }
-    function removeQuery(url) {
-      const index = url.indexOf("?");
-      return index < 0 ? url : url.substring(0, index);
+    function removeQuery(url2) {
+      const index = url2.indexOf("?");
+      return index < 0 ? url2 : url2.substring(0, index);
     }
   }
 });
@@ -13179,7 +13179,7 @@ var require_AppUpdater = __commonJS({
     var fs_extra_1 = require_lib();
     var js_yaml_1 = require_js_yaml();
     var lazy_val_1 = require_main();
-    var path = require("path");
+    var path2 = require("path");
     var semver_1 = require_semver2();
     var DownloadedUpdateHelper_1 = require_DownloadedUpdateHelper();
     var ElectronAppAdapter_1 = require_ElectronAppAdapter();
@@ -13563,7 +13563,7 @@ var require_AppUpdater = __commonJS({
         return this.computeFinalHeaders({ accept: "*/*" });
       }
       async getOrCreateStagingUserId() {
-        const file = path.join(this.app.userDataPath, ".updaterId");
+        const file = path2.join(this.app.userDataPath, ".updaterId");
         try {
           const id2 = await (0, fs_extra_1.readFile)(file, "utf-8");
           if (builder_util_runtime_1.UUID.check(id2)) {
@@ -13607,7 +13607,7 @@ var require_AppUpdater = __commonJS({
           if (dirName == null) {
             logger.error("updaterCacheDirName is not specified in app-update.yml Was app build using at least electron-builder 20.34.0?");
           }
-          const cacheDir = path.join(this.app.baseCachePath, dirName || this.app.name);
+          const cacheDir = path2.join(this.app.baseCachePath, dirName || this.app.name);
           if (logger.debug != null) {
             logger.debug(`updater cache dir: ${cacheDir}`);
           }
@@ -13633,7 +13633,7 @@ var require_AppUpdater = __commonJS({
         function getCacheUpdateFileName() {
           const urlPath = decodeURIComponent(taskOptions.fileInfo.url.pathname);
           if (urlPath.endsWith(`.${taskOptions.fileExtension}`)) {
-            return path.basename(urlPath);
+            return path2.basename(urlPath);
           } else {
             return taskOptions.fileInfo.info.url;
           }
@@ -13642,8 +13642,8 @@ var require_AppUpdater = __commonJS({
         const cacheDir = downloadedUpdateHelper.cacheDirForPendingUpdate;
         await (0, fs_extra_1.mkdir)(cacheDir, { recursive: true });
         const updateFileName = getCacheUpdateFileName();
-        let updateFile = path.join(cacheDir, updateFileName);
-        const packageFile = packageInfo == null ? null : path.join(cacheDir, `package-${version}${path.extname(packageInfo.path) || ".7z"}`);
+        let updateFile = path2.join(cacheDir, updateFileName);
+        const packageFile = packageInfo == null ? null : path2.join(cacheDir, `package-${version}${path2.extname(packageInfo.path) || ".7z"}`);
         const done = async (isSaveCache) => {
           await downloadedUpdateHelper.setDownloadedFile(updateFile, packageFile, updateInfo, fileInfo, updateFileName, isSaveCache);
           await taskOptions.done({
@@ -13686,23 +13686,23 @@ var require_AppUpdater = __commonJS({
           }
           const blockmapFileUrls = (0, util_1.blockmapFiles)(fileInfo.url, this.app.version, downloadUpdateOptions.updateInfoAndProvider.info.version);
           this._logger.info(`Download block maps (old: "${blockmapFileUrls[0]}", new: ${blockmapFileUrls[1]})`);
-          const downloadBlockMap = async (url) => {
-            const data = await this.httpExecutor.downloadToBuffer(url, {
+          const downloadBlockMap = async (url2) => {
+            const data = await this.httpExecutor.downloadToBuffer(url2, {
               headers: downloadUpdateOptions.requestHeaders,
               cancellationToken: downloadUpdateOptions.cancellationToken
             });
             if (data == null || data.length === 0) {
-              throw new Error(`Blockmap "${url.href}" is empty`);
+              throw new Error(`Blockmap "${url2.href}" is empty`);
             }
             try {
               return JSON.parse((0, zlib_1.gunzipSync)(data).toString());
             } catch (e) {
-              throw new Error(`Cannot parse blockmap "${url.href}", error: ${e}`);
+              throw new Error(`Cannot parse blockmap "${url2.href}", error: ${e}`);
             }
           };
           const downloadOptions = {
             newUrl: fileInfo.url,
-            oldFile: path.join(this.downloadedUpdateHelper.cacheDir, oldInstallerFileName),
+            oldFile: path2.join(this.downloadedUpdateHelper.cacheDir, oldInstallerFileName),
             logger: this._logger,
             newFile: installerPath,
             isUseMultipleRangeRequest: provider.isUseMultipleRangeRequest,
@@ -13944,7 +13944,7 @@ var require_AppImageUpdater = __commonJS({
     var child_process_1 = require("child_process");
     var fs_extra_1 = require_lib();
     var fs_1 = require("fs");
-    var path = require("path");
+    var path2 = require("path");
     var BaseUpdater_1 = require_BaseUpdater();
     var FileWithEmbeddedBlockMapDifferentialDownloader_1 = require_FileWithEmbeddedBlockMapDifferentialDownloader();
     var Provider_1 = require_Provider();
@@ -14012,16 +14012,16 @@ var require_AppImageUpdater = __commonJS({
         }
         (0, fs_1.unlinkSync)(appImageFile);
         let destination;
-        const existingBaseName = path.basename(appImageFile);
+        const existingBaseName = path2.basename(appImageFile);
         const installerPath = this.installerPath;
         if (installerPath == null) {
           this.dispatchError(new Error("No valid update available, can't quit and install"));
           return false;
         }
-        if (path.basename(installerPath) === existingBaseName || !/\d+\.\d+\.\d+/.test(existingBaseName)) {
+        if (path2.basename(installerPath) === existingBaseName || !/\d+\.\d+\.\d+/.test(existingBaseName)) {
           destination = appImageFile;
         } else {
-          destination = path.join(path.dirname(appImageFile), path.basename(installerPath));
+          destination = path2.join(path2.dirname(appImageFile), path2.basename(installerPath));
         }
         (0, child_process_1.execFileSync)("mv", ["-f", installerPath, destination]);
         if (destination !== appImageFile) {
@@ -14219,7 +14219,7 @@ var require_MacUpdater = __commonJS({
     var builder_util_runtime_1 = require_out();
     var fs_extra_1 = require_lib();
     var fs_1 = require("fs");
-    var path = require("path");
+    var path2 = require("path");
     var http_1 = require("http");
     var AppUpdater_1 = require_AppUpdater();
     var Provider_1 = require_Provider();
@@ -14298,7 +14298,7 @@ var require_MacUpdater = __commonJS({
           fileInfo: zipFileInfo,
           downloadUpdateOptions,
           task: async (destinationFile, downloadOptions) => {
-            const cachedUpdateFilePath = path.join(this.downloadedUpdateHelper.cacheDir, CURRENT_MAC_APP_ZIP_FILE_NAME);
+            const cachedUpdateFilePath = path2.join(this.downloadedUpdateHelper.cacheDir, CURRENT_MAC_APP_ZIP_FILE_NAME);
             const canDifferentialDownload = () => {
               if (!(0, fs_extra_1.pathExistsSync)(cachedUpdateFilePath)) {
                 log.info("Unable to locate previous update.zip for differential download (is this first install?), falling back to full download");
@@ -14317,7 +14317,7 @@ var require_MacUpdater = __commonJS({
           done: async (event) => {
             if (!downloadUpdateOptions.disableDifferentialDownload) {
               try {
-                const cachedUpdateFilePath = path.join(this.downloadedUpdateHelper.cacheDir, CURRENT_MAC_APP_ZIP_FILE_NAME);
+                const cachedUpdateFilePath = path2.join(this.downloadedUpdateHelper.cacheDir, CURRENT_MAC_APP_ZIP_FILE_NAME);
                 await (0, fs_extra_1.copyFile)(event.downloadedFile, cachedUpdateFilePath);
               } catch (error) {
                 this._logger.warn(`Unable to copy file for caching for future differential downloads: ${error.message}`);
@@ -14460,7 +14460,7 @@ var require_windowsExecutableCodeSignatureVerifier = __commonJS({
     var builder_util_runtime_1 = require_out();
     var child_process_1 = require("child_process");
     var os = require("os");
-    var path = require("path");
+    var path2 = require("path");
     function verifySignature(publisherNames, unescapedTempUpdateFile, logger) {
       return new Promise((resolve, reject) => {
         const tempUpdateFile = unescapedTempUpdateFile.replace(/'/g, "''");
@@ -14479,8 +14479,8 @@ var require_windowsExecutableCodeSignatureVerifier = __commonJS({
             const data = parseOut(stdout);
             if (data.Status === 0) {
               try {
-                const normlaizedUpdateFilePath = path.normalize(data.Path);
-                const normalizedTempUpdateFile = path.normalize(unescapedTempUpdateFile);
+                const normlaizedUpdateFilePath = path2.normalize(data.Path);
+                const normalizedTempUpdateFile = path2.normalize(unescapedTempUpdateFile);
                 logger.info(`LiteralPath: ${normlaizedUpdateFilePath}. Update Path: ${normalizedTempUpdateFile}`);
                 if (normlaizedUpdateFilePath !== normalizedTempUpdateFile) {
                   handleError(logger, new Error(`LiteralPath of ${normlaizedUpdateFilePath} is different than ${normalizedTempUpdateFile}`), stderr, reject);
@@ -14567,7 +14567,7 @@ var require_NsisUpdater = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.NsisUpdater = void 0;
     var builder_util_runtime_1 = require_out();
-    var path = require("path");
+    var path2 = require("path");
     var BaseUpdater_1 = require_BaseUpdater();
     var FileWithEmbeddedBlockMapDifferentialDownloader_1 = require_FileWithEmbeddedBlockMapDifferentialDownloader();
     var types_1 = require_types();
@@ -14676,7 +14676,7 @@ var require_NsisUpdater = __commonJS({
           args.push(`--package-file=${packagePath}`);
         }
         const callUsingElevation = () => {
-          this.spawnLog(path.join(process.resourcesPath, "elevate.exe"), [installerPath].concat(args)).catch((e) => this.dispatchError(e));
+          this.spawnLog(path2.join(process.resourcesPath, "elevate.exe"), [installerPath].concat(args)).catch((e) => this.dispatchError(e));
         };
         if (options.isAdminRightsRequired) {
           this._logger.info("isAdminRightsRequired is set to true, run installer using elevate.exe");
@@ -14703,7 +14703,7 @@ var require_NsisUpdater = __commonJS({
         try {
           const downloadOptions = {
             newUrl: new url_1.URL(packageInfo.path),
-            oldFile: path.join(this.downloadedUpdateHelper.cacheDir, builder_util_runtime_1.CURRENT_APP_PACKAGE_FILE_NAME),
+            oldFile: path2.join(this.downloadedUpdateHelper.cacheDir, builder_util_runtime_1.CURRENT_APP_PACKAGE_FILE_NAME),
             logger: this._logger,
             newFile: packagePath,
             requestHeaders: this.requestHeaders,
@@ -14748,7 +14748,7 @@ var require_main2 = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.NsisUpdater = exports2.MacUpdater = exports2.RpmUpdater = exports2.PacmanUpdater = exports2.DebUpdater = exports2.AppImageUpdater = exports2.Provider = exports2.NoOpLogger = exports2.AppUpdater = exports2.BaseUpdater = void 0;
     var fs_extra_1 = require_lib();
-    var path = require("path");
+    var path2 = require("path");
     var BaseUpdater_1 = require_BaseUpdater();
     Object.defineProperty(exports2, "BaseUpdater", { enumerable: true, get: function() {
       return BaseUpdater_1.BaseUpdater;
@@ -14798,7 +14798,7 @@ var require_main2 = __commonJS({
       } else {
         _autoUpdater = new (require_AppImageUpdater()).AppImageUpdater();
         try {
-          const identity = path.join(process.resourcesPath, "package-type");
+          const identity = path2.join(process.resourcesPath, "package-type");
           if (!(0, fs_extra_1.existsSync)(identity)) {
             return _autoUpdater;
           }
@@ -23680,11 +23680,11 @@ var require_mime_types = __commonJS({
       }
       return exts[0];
     }
-    function lookup(path) {
-      if (!path || typeof path !== "string") {
+    function lookup(path2) {
+      if (!path2 || typeof path2 !== "string") {
         return false;
       }
-      var extension2 = extname("x." + path).toLowerCase().substr(1);
+      var extension2 = extname("x." + path2).toLowerCase().substr(1);
       if (!extension2) {
         return false;
       }
@@ -24789,7 +24789,7 @@ var require_form_data = __commonJS({
     "use strict";
     var CombinedStream = require_combined_stream();
     var util = require("util");
-    var path = require("path");
+    var path2 = require("path");
     var http = require("http");
     var https = require("https");
     var parseUrl = require("url").parse;
@@ -24917,11 +24917,11 @@ var require_form_data = __commonJS({
     FormData2.prototype._getContentDisposition = function(value, options) {
       var filename;
       if (typeof options.filepath === "string") {
-        filename = path.normalize(options.filepath).replace(/\\/g, "/");
+        filename = path2.normalize(options.filepath).replace(/\\/g, "/");
       } else if (options.filename || value && (value.name || value.path)) {
-        filename = path.basename(options.filename || value && (value.name || value.path));
+        filename = path2.basename(options.filename || value && (value.name || value.path));
       } else if (value && value.readable && hasOwn(value, "httpVersion")) {
-        filename = path.basename(value.client._httpMessage.path || "");
+        filename = path2.basename(value.client._httpMessage.path || "");
       }
       if (filename) {
         return 'filename="' + filename + '"';
@@ -25118,8 +25118,8 @@ var require_proxy_from_env = __commonJS({
     var stringEndsWith = String.prototype.endsWith || function(s) {
       return s.length <= this.length && this.indexOf(s, this.length - s.length) !== -1;
     };
-    function getProxyForUrl(url) {
-      var parsedUrl = typeof url === "string" ? parseUrl(url) : url || {};
+    function getProxyForUrl(url2) {
+      var parsedUrl = typeof url2 === "string" ? parseUrl(url2) : url2 || {};
       var proto = parsedUrl.protocol;
       var hostname = parsedUrl.host;
       var port = parsedUrl.port;
@@ -25195,8 +25195,8 @@ var require_debug2 = __commonJS({
 // node_modules/follow-redirects/index.js
 var require_follow_redirects = __commonJS({
   "node_modules/follow-redirects/index.js"(exports2, module2) {
-    var url = require("url");
-    var URL2 = url.URL;
+    var url2 = require("url");
+    var URL2 = url2.URL;
     var http = require("http");
     var https = require("https");
     var Writable = require("stream").Writable;
@@ -25448,7 +25448,7 @@ var require_follow_redirects = __commonJS({
       for (var event of events) {
         request.on(event, eventHandlers[event]);
       }
-      this._currentUrl = /^\//.test(this._options.path) ? url.format(this._options) : (
+      this._currentUrl = /^\//.test(this._options.path) ? url2.format(this._options) : (
         // When making a request to a proxy, […]
         // a client MUST send the target URI in absolute-form […].
         this._options.path
@@ -25516,7 +25516,7 @@ var require_follow_redirects = __commonJS({
       var currentHostHeader = removeMatchingHeaders(/^host$/i, this._options.headers);
       var currentUrlParts = parseUrl(this._currentUrl);
       var currentHost = currentHostHeader || currentUrlParts.host;
-      var currentUrl = /^\w+:/.test(location) ? this._currentUrl : url.format(Object.assign(currentUrlParts, { host: currentHost }));
+      var currentUrl = /^\w+:/.test(location) ? this._currentUrl : url2.format(Object.assign(currentUrlParts, { host: currentHost }));
       var redirectUrl = resolveUrl(location, currentUrl);
       debug("redirecting to", redirectUrl.href);
       this._isRedirect = true;
@@ -25594,7 +25594,7 @@ var require_follow_redirects = __commonJS({
       if (useNativeURL) {
         parsed = new URL2(input);
       } else {
-        parsed = validateUrl(url.parse(input));
+        parsed = validateUrl(url2.parse(input));
         if (!isString(parsed.protocol)) {
           throw new InvalidUrlError({ input });
         }
@@ -25602,7 +25602,7 @@ var require_follow_redirects = __commonJS({
       return parsed;
     }
     function resolveUrl(relative, base) {
-      return useNativeURL ? new URL2(relative, base) : parseUrl(url.resolve(base, relative));
+      return useNativeURL ? new URL2(relative, base) : parseUrl(url2.resolve(base, relative));
     }
     function validateUrl(input) {
       if (/^\[/.test(input.hostname) && !/^\[[:0-9a-f]+\]$/i.test(input.hostname)) {
@@ -25694,7 +25694,7 @@ var require_axios = __commonJS({
     "use strict";
     var FormData$1 = require_form_data();
     var crypto = require("crypto");
-    var url = require("url");
+    var url2 = require("url");
     var proxyFromEnv = require_proxy_from_env();
     var http = require("http");
     var https = require("https");
@@ -25709,7 +25709,7 @@ var require_axios = __commonJS({
     }
     var FormData__default = /* @__PURE__ */ _interopDefaultLegacy(FormData$1);
     var crypto__default = /* @__PURE__ */ _interopDefaultLegacy(crypto);
-    var url__default = /* @__PURE__ */ _interopDefaultLegacy(url);
+    var url__default = /* @__PURE__ */ _interopDefaultLegacy(url2);
     var proxyFromEnv__default = /* @__PURE__ */ _interopDefaultLegacy(proxyFromEnv);
     var http__default = /* @__PURE__ */ _interopDefaultLegacy(http);
     var https__default = /* @__PURE__ */ _interopDefaultLegacy(https);
@@ -26188,9 +26188,9 @@ var require_axios = __commonJS({
     function removeBrackets(key) {
       return utils$1.endsWith(key, "[]") ? key.slice(0, -2) : key;
     }
-    function renderKey(path, key, dots) {
-      if (!path) return key;
-      return path.concat(key).map(function each(token, i) {
+    function renderKey(path2, key, dots) {
+      if (!path2) return key;
+      return path2.concat(key).map(function each(token, i) {
         token = removeBrackets(token);
         return !dots && i ? "[" + token + "]" : token;
       }).join(dots ? "." : "");
@@ -26238,9 +26238,9 @@ var require_axios = __commonJS({
         }
         return value;
       }
-      function defaultVisitor(value, key, path) {
+      function defaultVisitor(value, key, path2) {
         let arr = value;
-        if (value && !path && typeof value === "object") {
+        if (value && !path2 && typeof value === "object") {
           if (utils$1.endsWith(key, "{}")) {
             key = metaTokens ? key : key.slice(0, -2);
             value = JSON.stringify(value);
@@ -26259,7 +26259,7 @@ var require_axios = __commonJS({
         if (isVisitable(value)) {
           return true;
         }
-        formData.append(renderKey(path, key, dots), convertValue(value));
+        formData.append(renderKey(path2, key, dots), convertValue(value));
         return false;
       }
       const stack = [];
@@ -26268,10 +26268,10 @@ var require_axios = __commonJS({
         convertValue,
         isVisitable
       });
-      function build(value, path) {
+      function build(value, path2) {
         if (utils$1.isUndefined(value)) return;
         if (stack.indexOf(value) !== -1) {
-          throw Error("Circular reference detected in " + path.join("."));
+          throw Error("Circular reference detected in " + path2.join("."));
         }
         stack.push(value);
         utils$1.forEach(value, function each(el, key) {
@@ -26279,11 +26279,11 @@ var require_axios = __commonJS({
             formData,
             el,
             utils$1.isString(key) ? key.trim() : key,
-            path,
+            path2,
             exposedHelpers
           );
           if (result === true) {
-            build(el, path ? path.concat(key) : [key]);
+            build(el, path2 ? path2.concat(key) : [key]);
           }
         });
         stack.pop();
@@ -26327,9 +26327,9 @@ var require_axios = __commonJS({
     function encode(val) {
       return encodeURIComponent(val).replace(/%3A/gi, ":").replace(/%24/g, "$").replace(/%2C/gi, ",").replace(/%20/g, "+");
     }
-    function buildURL(url2, params, options) {
+    function buildURL(url3, params, options) {
       if (!params) {
-        return url2;
+        return url3;
       }
       const _encode = options && options.encode || encode;
       if (utils$1.isFunction(options)) {
@@ -26345,13 +26345,13 @@ var require_axios = __commonJS({
         serializedParams = utils$1.isURLSearchParams(params) ? params.toString() : new AxiosURLSearchParams(params, options).toString(_encode);
       }
       if (serializedParams) {
-        const hashmarkIndex = url2.indexOf("#");
+        const hashmarkIndex = url3.indexOf("#");
         if (hashmarkIndex !== -1) {
-          url2 = url2.slice(0, hashmarkIndex);
+          url3 = url3.slice(0, hashmarkIndex);
         }
-        url2 += (url2.indexOf("?") === -1 ? "?" : "&") + serializedParams;
+        url3 += (url3.indexOf("?") === -1 ? "?" : "&") + serializedParams;
       }
-      return url2;
+      return url3;
     }
     var InterceptorManager = class {
       constructor() {
@@ -26471,7 +26471,7 @@ var require_axios = __commonJS({
     };
     function toURLEncodedForm(data, options) {
       return toFormData(data, new platform.classes.URLSearchParams(), {
-        visitor: function(value, key, path, helpers) {
+        visitor: function(value, key, path2, helpers) {
           if (platform.isNode && utils$1.isBuffer(value)) {
             this.append(key, value.toString("base64"));
             return false;
@@ -26499,11 +26499,11 @@ var require_axios = __commonJS({
       return obj;
     }
     function formDataToJSON(formData) {
-      function buildPath(path, value, target, index) {
-        let name = path[index++];
+      function buildPath(path2, value, target, index) {
+        let name = path2[index++];
         if (name === "__proto__") return true;
         const isNumericKey = Number.isFinite(+name);
-        const isLast = index >= path.length;
+        const isLast = index >= path2.length;
         name = !name && utils$1.isArray(target) ? target.length : name;
         if (isLast) {
           if (utils$1.hasOwnProp(target, name)) {
@@ -26516,7 +26516,7 @@ var require_axios = __commonJS({
         if (!target[name] || !utils$1.isObject(target[name])) {
           target[name] = [];
         }
-        const result = buildPath(path, value, target[name], index);
+        const result = buildPath(path2, value, target[name], index);
         if (result && utils$1.isArray(target[name])) {
           target[name] = arrayToObject(target[name]);
         }
@@ -26943,8 +26943,8 @@ var require_axios = __commonJS({
         ));
       }
     }
-    function isAbsoluteURL(url2) {
-      return /^([a-z][a-z\d+\-.]*:)?\/\//i.test(url2);
+    function isAbsoluteURL(url3) {
+      return /^([a-z][a-z\d+\-.]*:)?\/\//i.test(url3);
     }
     function combineURLs(baseURL, relativeURL) {
       return relativeURL ? baseURL.replace(/\/?\/$/, "") + "/" + relativeURL.replace(/^\/+/, "") : baseURL;
@@ -26957,8 +26957,8 @@ var require_axios = __commonJS({
       return requestedURL;
     }
     var VERSION = "1.13.2";
-    function parseProtocol(url2) {
-      const match = /^([-+\w]{1,25})(:?\/\/|:)/.exec(url2);
+    function parseProtocol(url3) {
+      const match = /^([-+\w]{1,25})(:?\/\/|:)/.exec(url3);
       return match && match[1] || "";
     }
     var DATA_URL_PATTERN = /^(?:([^;]+);)?(?:[^;]+;)?(base64|),([\s\S]*)$/;
@@ -27320,13 +27320,13 @@ var require_axios = __commonJS({
       }), throttled[1]];
     };
     var asyncDecorator = (fn) => (...args) => utils$1.asap(() => fn(...args));
-    function estimateDataURLDecodedBytes(url2) {
-      if (!url2 || typeof url2 !== "string") return 0;
-      if (!url2.startsWith("data:")) return 0;
-      const comma = url2.indexOf(",");
+    function estimateDataURLDecodedBytes(url3) {
+      if (!url3 || typeof url3 !== "string") return 0;
+      if (!url3.startsWith("data:")) return 0;
+      const comma = url3.indexOf(",");
       if (comma < 0) return 0;
-      const meta = url2.slice(5, comma);
-      const body = url2.slice(comma + 1);
+      const meta = url3.slice(5, comma);
+      const body = url3.slice(comma + 1);
       const isBase64 = /;base64/i.test(meta);
       if (isBase64) {
         let effectiveLen = body.length;
@@ -27767,9 +27767,9 @@ var require_axios = __commonJS({
           auth = urlUsername + ":" + urlPassword;
         }
         auth && headers.delete("authorization");
-        let path;
+        let path2;
         try {
-          path = buildURL(
+          path2 = buildURL(
             parsed.pathname + parsed.search,
             config.params,
             config.paramsSerializer
@@ -27787,7 +27787,7 @@ var require_axios = __commonJS({
           false
         );
         const options = {
-          path,
+          path: path2,
           method,
           headers: headers.toJSON(),
           agents: { http: config.httpAgent, https: config.httpsAgent },
@@ -28009,9 +28009,9 @@ var require_axios = __commonJS({
         }
       });
     };
-    var isURLSameOrigin = platform.hasStandardBrowserEnv ? /* @__PURE__ */ ((origin2, isMSIE) => (url2) => {
-      url2 = new URL(url2, platform.origin);
-      return origin2.protocol === url2.protocol && origin2.host === url2.host && (isMSIE || origin2.port === url2.port);
+    var isURLSameOrigin = platform.hasStandardBrowserEnv ? /* @__PURE__ */ ((origin2, isMSIE) => (url3) => {
+      url3 = new URL(url3, platform.origin);
+      return origin2.protocol === url3.protocol && origin2.host === url3.host && (isMSIE || origin2.port === url3.port);
     })(
       new URL(platform.origin),
       platform.navigator && /(msie|trident)/i.test(platform.navigator.userAgent)
@@ -28019,14 +28019,14 @@ var require_axios = __commonJS({
     var cookies = platform.hasStandardBrowserEnv ? (
       // Standard browser envs support document.cookie
       {
-        write(name, value, expires, path, domain, secure, sameSite) {
+        write(name, value, expires, path2, domain, secure, sameSite) {
           if (typeof document === "undefined") return;
           const cookie = [`${name}=${encodeURIComponent(value)}`];
           if (utils$1.isNumber(expires)) {
             cookie.push(`expires=${new Date(expires).toUTCString()}`);
           }
-          if (utils$1.isString(path)) {
-            cookie.push(`path=${path}`);
+          if (utils$1.isString(path2)) {
+            cookie.push(`path=${path2}`);
           }
           if (utils$1.isString(domain)) {
             cookie.push(`domain=${domain}`);
@@ -28497,7 +28497,7 @@ var require_axios = __commonJS({
       };
       return async (config) => {
         let {
-          url: url2,
+          url: url3,
           method,
           data,
           signal,
@@ -28520,7 +28520,7 @@ var require_axios = __commonJS({
         let requestContentLength;
         try {
           if (onUploadProgress && supportsRequestStream && method !== "get" && method !== "head" && (requestContentLength = await resolveBodyLength(headers, data)) !== 0) {
-            let _request = new Request(url2, {
+            let _request = new Request(url3, {
               method: "POST",
               body: data,
               duplex: "half"
@@ -28550,8 +28550,8 @@ var require_axios = __commonJS({
             duplex: "half",
             credentials: isCredentialsSupported ? withCredentials : void 0
           };
-          request = isRequestSupported && new Request(url2, resolvedOptions);
-          let response = await (isRequestSupported ? _fetch(request, fetchOptions) : _fetch(url2, resolvedOptions));
+          request = isRequestSupported && new Request(url3, resolvedOptions);
+          let response = await (isRequestSupported ? _fetch(request, fetchOptions) : _fetch(url3, resolvedOptions));
           const isStreamResponse = supportsResponseStream && (responseType === "stream" || responseType === "response");
           if (supportsResponseStream && (onDownloadProgress || isStreamResponse && unsubscribe)) {
             const options = {};
@@ -28930,23 +28930,23 @@ var require_axios = __commonJS({
       }
     };
     utils$1.forEach(["delete", "get", "head", "options"], function forEachMethodNoData(method) {
-      Axios.prototype[method] = function(url2, config) {
+      Axios.prototype[method] = function(url3, config) {
         return this.request(mergeConfig(config || {}, {
           method,
-          url: url2,
+          url: url3,
           data: (config || {}).data
         }));
       };
     });
     utils$1.forEach(["post", "put", "patch"], function forEachMethodWithData(method) {
       function generateHTTPMethod(isForm) {
-        return function httpMethod(url2, data, config) {
+        return function httpMethod(url3, data, config) {
           return this.request(mergeConfig(config || {}, {
             method,
             headers: isForm ? {
               "Content-Type": "multipart/form-data"
             } : {},
-            url: url2,
+            url: url3,
             data
           }));
         };
@@ -29172,7 +29172,7 @@ var require_axios = __commonJS({
 var require_electron_logger = __commonJS({
   "electron-logger.js"(exports2, module2) {
     var fs = require("fs");
-    var path = require("path");
+    var path2 = require("path");
     var { app: app2 } = require("electron");
     var LOG_LEVELS = {
       DEBUG: 0,
@@ -29229,7 +29229,7 @@ var require_electron_logger = __commonJS({
     }
     function getLogFilePath() {
       const userDataPath = app2?.getPath?.("userData") || ".";
-      return path.join(userDataPath, "lana-debug.log");
+      return path2.join(userDataPath, "lana-debug.log");
     }
     function exportLogs() {
       const logPath = getLogFilePath();
@@ -29284,8 +29284,10 @@ var require_electron_logger = __commonJS({
 
 // electron-updater-custom.js
 var { autoUpdater } = require_main2();
-var { app, dialog } = require("electron");
+var { app, dialog, BrowserWindow, ipcMain } = require("electron");
 var axios = require_axios();
+var path = require("path");
+var url = require("url");
 var { logInfo, logError, logWarn } = require_electron_logger();
 var updateCheckInProgress = false;
 var lastUpdateCheck = null;
@@ -29382,6 +29384,7 @@ function configureAutoUpdater(config = {}) {
   });
   autoUpdater.allowDowngrade = true;
   autoUpdater.autoDownload = false;
+  autoUpdater.forceDevUpdateConfig = true;
   autoUpdater.on("checking-for-update", () => {
     logInfo("Checking for update...");
   });
@@ -29403,14 +29406,13 @@ function configureAutoUpdater(config = {}) {
 }
 async function downloadAndInstallUpdate(serverUrl, authToken = null, orgId = null) {
   try {
-    const updateInfo = await checkForUpdates(serverUrl, authToken, orgId);
-    if (!updateInfo.updateAvailable) {
-      return false;
-    }
     configureAutoUpdater();
+    logInfo("Checking GitHub releases for update...");
+    await autoUpdater.checkForUpdates();
     logInfo("Downloading update...");
     await autoUpdater.downloadUpdate();
     logInfo("Update downloaded successfully");
+    await new Promise((resolve) => setTimeout(resolve, 1500));
     logInfo("Installing update and restarting...");
     autoUpdater.quitAndInstall(false, true);
     return true;
@@ -29419,34 +29421,139 @@ async function downloadAndInstallUpdate(serverUrl, authToken = null, orgId = nul
     return false;
   }
 }
-async function showOptionalUpdateDialog(updateInfo, mainWindow) {
-  const response = await dialog.showMessageBox(mainWindow, {
-    type: "info",
-    title: "Update Available",
-    message: `A new version of Lana AI is available (v${updateInfo.version})`,
-    detail: updateInfo.releaseNotes || "Would you like to update now?",
-    buttons: ["Update Now", "Remind Me Later", "Skip This Version"],
-    defaultId: 0,
-    cancelId: 1
+var updateDialogWindow = null;
+function createUpdateDialogUrl(params) {
+  const dialogPath = path.join(__dirname, "public_html", "update-dialog.html");
+  const queryString = Object.entries(params).map(([k, v]) => `${k}=${encodeURIComponent(v || "")}`).join("&");
+  let normalizedPath = dialogPath;
+  if (process.platform === "win32") {
+    normalizedPath = dialogPath.replace(/\\/g, "/");
+    if (!normalizedPath.startsWith("/")) {
+      normalizedPath = "/" + normalizedPath;
+    }
+  }
+  return url.format({
+    pathname: normalizedPath,
+    protocol: "file:",
+    slashes: true
+  }) + "?" + queryString;
+}
+function showUpdateDialog(updateInfo, parentWindow, type = "optional") {
+  return new Promise((resolve) => {
+    const isForced = type === "forced";
+    const dialogWidth = 480;
+    const dialogHeight = isForced ? 480 : 520;
+    updateDialogWindow = new BrowserWindow({
+      width: dialogWidth,
+      height: dialogHeight,
+      resizable: false,
+      minimizable: false,
+      maximizable: false,
+      closable: !isForced,
+      frame: false,
+      transparent: true,
+      modal: true,
+      parent: parentWindow || void 0,
+      show: false,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        preload: path.join(__dirname, "electron-preload.js"),
+        sandbox: false
+      }
+    });
+    const dialogUrl = createUpdateDialogUrl({
+      type,
+      currentVersion: updateInfo.currentVersion,
+      version: updateInfo.version,
+      releaseNotes: updateInfo.releaseNotes || "",
+      platform: process.platform,
+      arch: process.arch
+    });
+    updateDialogWindow.loadURL(dialogUrl);
+    updateDialogWindow.once("ready-to-show", () => {
+      updateDialogWindow.show();
+    });
+    const responseChannel = "update-dialog-response";
+    const responseHandler = async (event, choice) => {
+      logInfo(`Update dialog response: ${choice}`);
+      if (choice === "update") {
+        resolve("update");
+      } else if (choice === "retry") {
+        logInfo("Retrying update download...");
+        try {
+          configureAutoUpdater();
+          setupDialogListeners();
+          await autoUpdater.checkForUpdates();
+          await autoUpdater.downloadUpdate();
+          logInfo("Retry download succeeded");
+          await new Promise((r) => setTimeout(r, 1500));
+          autoUpdater.quitAndInstall(false, true);
+        } catch (error) {
+          logError("Retry download failed", error);
+          if (updateDialogWindow && !updateDialogWindow.isDestroyed()) {
+            updateDialogWindow.webContents.send("update-error", {
+              message: error?.message || "Download failed. Please try again."
+            });
+          }
+        }
+      } else {
+        if (updateDialogWindow && !updateDialogWindow.isDestroyed()) {
+          updateDialogWindow.close();
+          updateDialogWindow = null;
+        }
+        ipcMain.removeListener(responseChannel, responseHandler);
+        resolve(choice);
+      }
+    };
+    ipcMain.removeAllListeners(responseChannel);
+    ipcMain.on(responseChannel, responseHandler);
+    updateDialogWindow.on("closed", () => {
+      updateDialogWindow = null;
+      ipcMain.removeAllListeners(responseChannel);
+      resolve("later");
+    });
+    function setupDialogListeners() {
+      autoUpdater.removeAllListeners("download-progress");
+      autoUpdater.on("download-progress", (progress) => {
+        logInfo(`Download progress: ${progress.percent.toFixed(2)}%`);
+        if (updateDialogWindow && !updateDialogWindow.isDestroyed()) {
+          updateDialogWindow.webContents.send("update-progress", progress);
+        }
+      });
+      autoUpdater.removeAllListeners("update-downloaded");
+      autoUpdater.on("update-downloaded", (info) => {
+        logInfo(`Update downloaded: ${info.version}`);
+        if (updateDialogWindow && !updateDialogWindow.isDestroyed()) {
+          updateDialogWindow.webContents.send("update-downloaded", info);
+        }
+      });
+      autoUpdater.removeAllListeners("error");
+      autoUpdater.on("error", (error) => {
+        logError("Auto-updater error", error);
+        if (updateDialogWindow && !updateDialogWindow.isDestroyed()) {
+          updateDialogWindow.webContents.send("update-error", {
+            message: error?.message || "Download failed. Please try again."
+          });
+        }
+      });
+    }
+    setupDialogListeners();
   });
-  const choices = ["update", "later", "skip"];
-  return choices[response.response];
+}
+async function showOptionalUpdateDialog(updateInfo, mainWindow) {
+  return showUpdateDialog(updateInfo, mainWindow, "optional");
 }
 async function showForceUpdateDialog(updateInfo, mainWindow) {
-  await dialog.showMessageBox(mainWindow, {
-    type: "warning",
-    title: "Update Required",
-    message: `A required update is available (v${updateInfo.version})`,
-    detail: "This update must be installed before you can continue using Lana AI.\n\n" + (updateInfo.releaseNotes || "Please update to continue."),
-    buttons: ["Update Now"],
-    defaultId: 0
-  });
+  await showUpdateDialog(updateInfo, mainWindow, "forced");
 }
-function updateProgressDialog(progressWindow, percent) {
-  if (progressWindow && !progressWindow.isDestroyed()) {
-    progressWindow.webContents.send("update-progress", {
-      percent
-    });
+function getUpdateDialogWindow() {
+  return updateDialogWindow;
+}
+function closeUpdateDialog() {
+  if (updateDialogWindow && !updateDialogWindow.isDestroyed()) {
+    updateDialogWindow.close();
+    updateDialogWindow = null;
   }
 }
 function getCurrentUpdateInfo() {
@@ -29474,7 +29581,8 @@ module.exports = {
   downloadAndInstallUpdate,
   showOptionalUpdateDialog,
   showForceUpdateDialog,
-  updateProgressDialog,
+  getUpdateDialogWindow,
+  closeUpdateDialog,
   getCurrentUpdateInfo,
   getLastUpdateCheck,
   resetUpdateState,

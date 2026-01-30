@@ -6,8 +6,10 @@
  */
 
 const { autoUpdater } = require('electron-updater');
-const { app, dialog } = require('electron');
+const { app, dialog, BrowserWindow, ipcMain } = require('electron');
 const axios = require('axios');
+const path = require('path');
+const url = require('url');
 const { logInfo, logError, logWarn } = require('./electron-logger');
 
 // Update state
@@ -147,6 +149,9 @@ function configureAutoUpdater(config = {}) {
   // Auto-download updates
   autoUpdater.autoDownload = false; // We'll control this manually
 
+  // Force dev update config so checkForUpdates works in unpackaged mode
+  autoUpdater.forceDevUpdateConfig = true;
+
   // Setup event listeners
   autoUpdater.on('checking-for-update', () => {
     logInfo('Checking for update...');
@@ -182,23 +187,24 @@ function configureAutoUpdater(config = {}) {
  */
 async function downloadAndInstallUpdate(serverUrl, authToken = null, orgId = null) {
   try {
-    // First check if update is available
-    const updateInfo = await checkForUpdates(serverUrl, authToken, orgId);
-
-    if (!updateInfo.updateAvailable) {
-      return false;
-    }
-
-    // Ensure autoUpdater is configured before downloading
+    // Ensure autoUpdater feed URL is configured before downloading
     configureAutoUpdater();
+
+    // electron-updater requires checkForUpdates() before downloadUpdate()
+    logInfo('Checking GitHub releases for update...');
+    await autoUpdater.checkForUpdates();
 
     logInfo('Downloading update...');
 
     // Download update using electron-updater
+    // Progress and completion events are handled by showUpdateDialog listeners
     await autoUpdater.downloadUpdate();
 
     logInfo('Update downloaded successfully');
-    
+
+    // Short delay so user sees 100% before restart
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
     // Install and restart
     logInfo('Installing update and restarting...');
     autoUpdater.quitAndInstall(false, true);
@@ -206,59 +212,209 @@ async function downloadAndInstallUpdate(serverUrl, authToken = null, orgId = nul
     return true;
   } catch (error) {
     logError('Failed to download and install update', error);
+    // Error event is forwarded to dialog by showUpdateDialog listeners
     return false;
   }
 }
 
+// Active update dialog window reference
+let updateDialogWindow = null;
+
 /**
- * Show update dialog to user (optional update)
+ * Create a file:// URL for the update dialog
+ * @param {Object} params - Query parameters
+ * @returns {string} File URL with query params
+ */
+function createUpdateDialogUrl(params) {
+  const dialogPath = path.join(__dirname, 'public_html', 'update-dialog.html');
+  const queryString = Object.entries(params)
+    .map(([k, v]) => `${k}=${encodeURIComponent(v || '')}`)
+    .join('&');
+
+  let normalizedPath = dialogPath;
+  if (process.platform === 'win32') {
+    normalizedPath = dialogPath.replace(/\\/g, '/');
+    if (!normalizedPath.startsWith('/')) {
+      normalizedPath = '/' + normalizedPath;
+    }
+  }
+
+  return url.format({
+    pathname: normalizedPath,
+    protocol: 'file:',
+    slashes: true
+  }) + '?' + queryString;
+}
+
+/**
+ * Show a custom styled update dialog in a BrowserWindow
+ * @param {Object} updateInfo - Update information
+ * @param {BrowserWindow} parentWindow - Parent window reference
+ * @param {string} type - 'optional' or 'forced'
+ * @returns {Promise<string>} User choice ('update', 'later', 'skip', 'retry')
+ */
+function showUpdateDialog(updateInfo, parentWindow, type = 'optional') {
+  return new Promise((resolve) => {
+    const isForced = type === 'forced';
+    const dialogWidth = 480;
+    const dialogHeight = isForced ? 480 : 520;
+
+    updateDialogWindow = new BrowserWindow({
+      width: dialogWidth,
+      height: dialogHeight,
+      resizable: false,
+      minimizable: false,
+      maximizable: false,
+      closable: !isForced,
+      frame: false,
+      transparent: true,
+      modal: true,
+      parent: parentWindow || undefined,
+      show: false,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        preload: path.join(__dirname, 'electron-preload.js'),
+        sandbox: false
+      }
+    });
+
+    const dialogUrl = createUpdateDialogUrl({
+      type: type,
+      currentVersion: updateInfo.currentVersion,
+      version: updateInfo.version,
+      releaseNotes: updateInfo.releaseNotes || '',
+      platform: process.platform,
+      arch: process.arch
+    });
+
+    updateDialogWindow.loadURL(dialogUrl);
+
+    updateDialogWindow.once('ready-to-show', () => {
+      updateDialogWindow.show();
+    });
+
+    // Handle user response from dialog
+    // Use ipcMain.on (not .handle) so it can receive multiple messages (e.g. retry)
+    const responseChannel = 'update-dialog-response';
+    const responseHandler = async (event, choice) => {
+      logInfo(`Update dialog response: ${choice}`);
+
+      if (choice === 'update') {
+        // Don't close dialog — it will show download progress
+        resolve('update');
+      } else if (choice === 'retry') {
+        // Retry download directly without going back through the promise chain
+        logInfo('Retrying update download...');
+        try {
+          // Re-configure feed URL
+          configureAutoUpdater();
+          // Re-register dialog-forwarding listeners (configureAutoUpdater overwrites them)
+          setupDialogListeners();
+          await autoUpdater.checkForUpdates();
+          await autoUpdater.downloadUpdate();
+          logInfo('Retry download succeeded');
+          await new Promise(r => setTimeout(r, 1500));
+          autoUpdater.quitAndInstall(false, true);
+        } catch (error) {
+          logError('Retry download failed', error);
+          // Send error to dialog so it shows error state again
+          if (updateDialogWindow && !updateDialogWindow.isDestroyed()) {
+            updateDialogWindow.webContents.send('update-error', {
+              message: error?.message || 'Download failed. Please try again.'
+            });
+          }
+        }
+      } else {
+        // Close dialog for later/skip
+        if (updateDialogWindow && !updateDialogWindow.isDestroyed()) {
+          updateDialogWindow.close();
+          updateDialogWindow = null;
+        }
+        ipcMain.removeListener(responseChannel, responseHandler);
+        resolve(choice);
+      }
+    };
+
+    // Remove any existing listeners before registering
+    ipcMain.removeAllListeners(responseChannel);
+    ipcMain.on(responseChannel, responseHandler);
+
+    // Handle dialog close (for optional updates only)
+    updateDialogWindow.on('closed', () => {
+      updateDialogWindow = null;
+      ipcMain.removeAllListeners(responseChannel);
+      resolve('later');
+    });
+
+    // Setup listeners that forward autoUpdater events to the dialog window
+    function setupDialogListeners() {
+      autoUpdater.removeAllListeners('download-progress');
+      autoUpdater.on('download-progress', (progress) => {
+        logInfo(`Download progress: ${progress.percent.toFixed(2)}%`);
+        if (updateDialogWindow && !updateDialogWindow.isDestroyed()) {
+          updateDialogWindow.webContents.send('update-progress', progress);
+        }
+      });
+
+      autoUpdater.removeAllListeners('update-downloaded');
+      autoUpdater.on('update-downloaded', (info) => {
+        logInfo(`Update downloaded: ${info.version}`);
+        if (updateDialogWindow && !updateDialogWindow.isDestroyed()) {
+          updateDialogWindow.webContents.send('update-downloaded', info);
+        }
+      });
+
+      autoUpdater.removeAllListeners('error');
+      autoUpdater.on('error', (error) => {
+        logError('Auto-updater error', error);
+        if (updateDialogWindow && !updateDialogWindow.isDestroyed()) {
+          updateDialogWindow.webContents.send('update-error', {
+            message: error?.message || 'Download failed. Please try again.'
+          });
+        }
+      });
+    }
+
+    setupDialogListeners();
+  });
+}
+
+/**
+ * Show styled optional update dialog
  * @param {Object} updateInfo - Update information
  * @param {BrowserWindow} mainWindow - Main window reference
  * @returns {Promise<string>} User choice ('update', 'later', 'skip')
  */
 async function showOptionalUpdateDialog(updateInfo, mainWindow) {
-  const response = await dialog.showMessageBox(mainWindow, {
-    type: 'info',
-    title: 'Update Available',
-    message: `A new version of Lana AI is available (v${updateInfo.version})`,
-    detail: updateInfo.releaseNotes || 'Would you like to update now?',
-    buttons: ['Update Now', 'Remind Me Later', 'Skip This Version'],
-    defaultId: 0,
-    cancelId: 1
-  });
-
-  const choices = ['update', 'later', 'skip'];
-  return choices[response.response];
+  return showUpdateDialog(updateInfo, mainWindow, 'optional');
 }
 
 /**
- * Show force update dialog (blocks app usage)
+ * Show styled force update dialog (blocks app usage, not closable)
  * @param {Object} updateInfo - Update information
  * @param {BrowserWindow} mainWindow - Main window reference
  * @returns {Promise<void>}
  */
 async function showForceUpdateDialog(updateInfo, mainWindow) {
-  await dialog.showMessageBox(mainWindow, {
-    type: 'warning',
-    title: 'Update Required',
-    message: `A required update is available (v${updateInfo.version})`,
-    detail: 'This update must be installed before you can continue using Lana AI.\n\n' +
-            (updateInfo.releaseNotes || 'Please update to continue.'),
-    buttons: ['Update Now'],
-    defaultId: 0
-  });
+  await showUpdateDialog(updateInfo, mainWindow, 'forced');
 }
 
 /**
- * Show update progress dialog
- * @param {BrowserWindow} progressWindow - Progress window reference
- * @param {number} percent - Progress percentage
+ * Get the active update dialog window (for sending progress events)
+ * @returns {BrowserWindow|null}
  */
-function updateProgressDialog(progressWindow, percent) {
-  if (progressWindow && !progressWindow.isDestroyed()) {
-    progressWindow.webContents.send('update-progress', {
-      percent: percent
-    });
+function getUpdateDialogWindow() {
+  return updateDialogWindow;
+}
+
+/**
+ * Close the update dialog window
+ */
+function closeUpdateDialog() {
+  if (updateDialogWindow && !updateDialogWindow.isDestroyed()) {
+    updateDialogWindow.close();
+    updateDialogWindow = null;
   }
 }
 
@@ -307,7 +463,8 @@ module.exports = {
   downloadAndInstallUpdate,
   showOptionalUpdateDialog,
   showForceUpdateDialog,
-  updateProgressDialog,
+  getUpdateDialogWindow,
+  closeUpdateDialog,
   getCurrentUpdateInfo,
   getLastUpdateCheck,
   resetUpdateState,

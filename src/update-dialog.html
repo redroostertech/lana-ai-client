@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lana AI — Update</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: transparent;
+      color: #111827;
+      overflow: hidden;
+      -webkit-app-region: drag;
+      user-select: none;
+    }
+
+    button, a { -webkit-app-region: no-drag; cursor: pointer; }
+
+    .dialog {
+      width: 100%;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: #ffffff;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 28px 28px 0 28px;
+    }
+
+    .icon-wrapper {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .icon-wrapper.optional {
+      background: #eef2ff;
+    }
+
+    .icon-wrapper.forced {
+      background: #fef2f2;
+    }
+
+    .icon-wrapper svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    .icon-wrapper.optional svg { color: #4f46e5; }
+    .icon-wrapper.forced svg { color: #dc2626; }
+
+    .header-text h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #111827;
+      line-height: 1.3;
+    }
+
+    .header-text p {
+      font-size: 13px;
+      color: #6b7280;
+      margin-top: 2px;
+    }
+
+    /* ── Version Badge ── */
+    .version-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 20px 28px 0 28px;
+      padding: 12px 16px;
+      background: #f9fafb;
+      border-radius: 10px;
+      border: 1px solid #f3f4f6;
+    }
+
+    .version-badge {
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .version-badge.current {
+      background: #f3f4f6;
+      color: #6b7280;
+    }
+
+    .version-badge.new {
+      background: #eef2ff;
+      color: #4f46e5;
+    }
+
+    .version-badge.new.forced {
+      background: #fef2f2;
+      color: #dc2626;
+    }
+
+    .version-arrow {
+      color: #d1d5db;
+      font-size: 14px;
+    }
+
+    /* ── Release Notes ── */
+    .release-notes {
+      flex: 1;
+      margin: 16px 28px 0 28px;
+      padding: 14px 16px;
+      background: #f9fafb;
+      border: 1px solid #f3f4f6;
+      border-radius: 10px;
+      overflow-y: auto;
+      max-height: 160px;
+    }
+
+    .release-notes-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #9ca3af;
+      margin-bottom: 8px;
+    }
+
+    .release-notes-content {
+      font-size: 13px;
+      line-height: 1.6;
+      color: #4b5563;
+      white-space: pre-wrap;
+    }
+
+    /* ── Forced Warning ── */
+    .forced-warning {
+      display: none;
+      margin: 16px 28px 0 28px;
+      padding: 12px 16px;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 10px;
+      font-size: 13px;
+      color: #991b1b;
+      line-height: 1.5;
+    }
+
+    .forced-warning svg {
+      width: 16px;
+      height: 16px;
+      color: #dc2626;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .forced-warning .warning-content {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    body.forced .forced-warning { display: block; }
+
+    /* ── Footer / Actions ── */
+    .footer {
+      padding: 20px 28px 28px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      transition: all 0.15s ease;
+      outline: none;
+    }
+
+    .btn:focus-visible {
+      box-shadow: 0 0 0 2px #fff, 0 0 0 4px #4f46e5;
+    }
+
+    .btn-primary {
+      background: #4f46e5;
+      color: #ffffff;
+    }
+    .btn-primary:hover { background: #4338ca; }
+    .btn-primary:active { background: #3730a3; transform: scale(0.98); }
+
+    .btn-primary.forced {
+      background: #dc2626;
+    }
+    .btn-primary.forced:hover { background: #b91c1c; }
+    .btn-primary.forced:active { background: #991b1b; }
+
+    .btn-secondary {
+      background: #ffffff;
+      color: #374151;
+      border: 1px solid #e5e7eb;
+    }
+    .btn-secondary:hover { background: #f9fafb; border-color: #d1d5db; }
+    .btn-secondary:active { background: #f3f4f6; }
+
+    .btn-text {
+      background: none;
+      color: #9ca3af;
+      font-weight: 500;
+      font-size: 13px;
+      padding: 6px 20px;
+    }
+    .btn-text:hover { color: #6b7280; }
+
+    .btn-manual-download {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: 1px solid #e5e7eb;
+      color: #4b5563;
+      font-weight: 600;
+      font-size: 13px;
+      padding: 10px 20px;
+      margin-top: 4px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      outline: none;
+    }
+    .btn-manual-download:hover {
+      background: #f9fafb;
+      border-color: #d1d5db;
+      color: #374151;
+    }
+    .btn-manual-download:active {
+      background: #f3f4f6;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .button-row .btn { flex: 1; }
+
+    /* ── Download Progress ── */
+    .progress-section {
+      display: none;
+      margin: 20px 28px 0 28px;
+    }
+
+    .progress-section.active { display: block; }
+
+    .progress-bar-track {
+      width: 100%;
+      height: 8px;
+      background: #f3f4f6;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #6366f1, #4f46e5);
+      border-radius: 999px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+
+    .progress-bar-fill.forced {
+      background: linear-gradient(90deg, #ef4444, #dc2626);
+    }
+
+    .progress-label {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+      font-size: 12px;
+      color: #6b7280;
+    }
+
+    .progress-label .percent {
+      font-weight: 600;
+      color: #4f46e5;
+    }
+
+    .progress-label .percent.forced {
+      color: #dc2626;
+    }
+
+    /* ── States ── */
+    .state-choice { display: flex; flex-direction: column; }
+    .state-downloading { display: none; }
+    .state-error { display: none; }
+
+    body.downloading .state-choice { display: none; }
+    body.downloading .state-downloading { display: flex; flex-direction: column; }
+    body.downloading .progress-section { display: block; }
+    body.downloading .release-notes { display: none; }
+    body.downloading .forced-warning { display: none; }
+
+    body.error .state-choice { display: none; }
+    body.error .state-downloading { display: none; }
+    body.error .state-error { display: flex; flex-direction: column; }
+    body.error .progress-section { display: none; }
+
+    /* ── Error State ── */
+    .error-message {
+      margin: 20px 28px 0 28px;
+      padding: 14px 16px;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 10px;
+      font-size: 13px;
+      color: #991b1b;
+      line-height: 1.5;
+    }
+
+    /* ── Animations ── */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .dialog {
+      animation: fadeInUp 0.25s ease-out;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+
+    .progress-bar-fill.indeterminate {
+      width: 100% !important;
+      background: linear-gradient(90deg, #e0e7ff 25%, #6366f1 50%, #e0e7ff 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+    }
+  </style>
+</head>
+<body>
+  <div class="dialog">
+
+    <!-- ── Header ── -->
+    <div class="header">
+      <div class="icon-wrapper optional" id="iconWrapper">
+        <!-- Optional: arrow-up-circle icon -->
+        <svg id="iconOptional" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 11l3-3m0 0l3 3m-3-3v8m0-13a9 9 0 110 18 9 9 0 010-18z"/>
+        </svg>
+        <!-- Forced: exclamation-triangle icon -->
+        <svg id="iconForced" style="display:none" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+        </svg>
+      </div>
+      <div class="header-text">
+        <h1 id="dialogTitle">Update Available</h1>
+        <p id="dialogSubtitle">A new version of Lana AI is ready</p>
+      </div>
+    </div>
+
+    <!-- ── Version Badges ── -->
+    <div class="version-info">
+      <span class="version-badge current" id="currentVersion">v3.1.1</span>
+      <span class="version-arrow">&rarr;</span>
+      <span class="version-badge new" id="newVersion">v3.2.0</span>
+    </div>
+
+    <!-- ── Release Notes ── -->
+    <div class="release-notes">
+      <div class="release-notes-label">What's New</div>
+      <div class="release-notes-content" id="releaseNotes">Loading...</div>
+    </div>
+
+    <!-- ── Forced Warning ── -->
+    <div class="forced-warning" id="forcedWarning">
+      <div class="warning-content">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+        </svg>
+        <span>This update is required to continue using Lana AI. Please update now to proceed.</span>
+      </div>
+    </div>
+
+    <!-- ── Download Progress ── -->
+    <div class="progress-section" id="progressSection">
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill" id="progressFill"></div>
+      </div>
+      <div class="progress-label">
+        <span id="progressStatus">Downloading update...</span>
+        <span class="percent" id="progressPercent">0%</span>
+      </div>
+    </div>
+
+    <!-- ── Footer: Choice State ── -->
+    <div class="footer state-choice" id="choiceFooter">
+      <div class="button-row">
+        <button class="btn btn-secondary" id="btnLater" onclick="respond('later')">Remind Me Later</button>
+        <button class="btn btn-primary" id="btnUpdate" onclick="respond('update')">Update Now</button>
+      </div>
+      <button class="btn btn-text" id="btnSkip" onclick="respond('skip')">Skip This Version</button>
+    </div>
+
+    <!-- ── Footer: Downloading State ── -->
+    <div class="footer state-downloading" id="downloadingFooter">
+      <button class="btn btn-secondary" disabled style="opacity:0.5; cursor:not-allowed;">Downloading...</button>
+    </div>
+
+    <!-- ── Footer: Error State ── -->
+    <div class="footer state-error" id="errorFooter">
+      <div class="error-message" id="errorMessage">Auto-update failed. You can download the update manually instead.</div>
+      <div class="button-row" style="margin-top:12px">
+        <button class="btn btn-secondary" id="btnErrorCancel" onclick="respond('later')">Cancel</button>
+        <button class="btn btn-primary" id="btnRetry" onclick="respond('retry')">Try Again</button>
+      </div>
+      <button class="btn btn-manual-download" id="btnManualDownload" onclick="openManualDownload()">
+        <svg style="width:15px;height:15px;margin-right:8px;vertical-align:middle;display:inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/>
+        </svg>
+        Download manually instead
+      </button>
+    </div>
+
+  </div>
+
+  <script>
+    // Parse query params
+    const params = new URLSearchParams(window.location.search);
+    const type = params.get('type') || 'optional';
+    const currentVer = params.get('currentVersion') || '';
+    const newVer = params.get('version') || '';
+    const notes = decodeURIComponent(params.get('releaseNotes') || '');
+    const platform = params.get('platform') || '';
+    const arch = params.get('arch') || '';
+    const isForced = type === 'forced';
+
+    // Build platform-specific direct download URL
+    function getDirectDownloadUrl() {
+      const tag = `v${newVer}`;
+      const base = `https://github.com/redroostertech/lana-ai-client/releases/download/${tag}`;
+      const name = `LanaAI--genesis--${newVer}`;
+
+      if (platform === 'darwin') {
+        const archSuffix = arch === 'arm64' ? 'arm64' : 'x64';
+        return `${base}/${name}-${archSuffix}.dmg`;
+      } else if (platform === 'win32') {
+        return `${base}/${name}-setup.exe`;
+      } else if (platform === 'linux') {
+        return `${base}/${name}.AppImage`;
+      }
+      // Fallback to releases page
+      return `https://github.com/redroostertech/lana-ai-client/releases/tag/${tag}`;
+    }
+
+    function openManualDownload() {
+      const url = getDirectDownloadUrl();
+      if (window.electronAPI) {
+        // Open in system browser which will trigger the download
+        window.electronAPI.invoke('open-external-url', url);
+      }
+    }
+
+    // Apply forced styling
+    if (isForced) {
+      document.body.classList.add('forced');
+      document.getElementById('dialogTitle').textContent = 'Update Required';
+      document.getElementById('dialogSubtitle').textContent = 'A critical update must be installed';
+      document.getElementById('iconWrapper').classList.remove('optional');
+      document.getElementById('iconWrapper').classList.add('forced');
+      document.getElementById('iconOptional').style.display = 'none';
+      document.getElementById('iconForced').style.display = '';
+      document.getElementById('newVersion').classList.add('forced');
+      document.getElementById('btnUpdate').classList.add('forced');
+      document.getElementById('progressFill').classList.add('forced');
+      document.getElementById('progressPercent').classList.add('forced');
+      // Hide dismiss buttons for forced
+      document.getElementById('btnLater').style.display = 'none';
+      document.getElementById('btnSkip').style.display = 'none';
+      // Make Update Now full width
+      document.getElementById('btnUpdate').style.flex = '1';
+      // Hide Cancel in error state for forced updates, style retry red
+      document.getElementById('btnErrorCancel').style.display = 'none';
+      document.getElementById('btnRetry').classList.add('forced');
+      document.getElementById('btnRetry').style.flex = '1';
+    }
+
+    // Populate content
+    document.getElementById('currentVersion').textContent = currentVer ? `v${currentVer}` : '';
+    document.getElementById('newVersion').textContent = newVer ? `v${newVer}` : '';
+    document.getElementById('releaseNotes').textContent = notes || 'Bug fixes and improvements.';
+
+    // Send response back to main process
+    function respond(choice) {
+      if (window.electronAPI) {
+        window.electronAPI.send('update-dialog-response', choice);
+      }
+    }
+
+    // Listen for download progress from main process
+    if (window.electronAPI) {
+      window.electronAPI.onUpdateProgress((progress) => {
+        document.body.classList.remove('error');
+        document.body.classList.add('downloading');
+        const percent = Math.round(progress.percent || 0);
+        document.getElementById('progressFill').style.width = percent + '%';
+        document.getElementById('progressPercent').textContent = percent + '%';
+
+        if (progress.bytesPerSecond) {
+          const mbps = (progress.bytesPerSecond / 1048576).toFixed(1);
+          document.getElementById('progressStatus').textContent = `Downloading update... (${mbps} MB/s)`;
+        }
+      });
+
+      window.electronAPI.onUpdateDownloaded(() => {
+        document.getElementById('progressFill').style.width = '100%';
+        document.getElementById('progressPercent').textContent = '100%';
+        document.getElementById('progressStatus').textContent = 'Installing update...';
+      });
+
+      window.electronAPI.onUpdateError((error) => {
+        document.body.classList.remove('downloading');
+        document.body.classList.add('error');
+        const msg = error?.message || error || 'Download failed. Please try again.';
+        document.getElementById('errorMessage').textContent = msg;
+      });
+    }
+
+    // When user clicks Update Now, switch to downloading state
+    document.getElementById('btnUpdate').addEventListener('click', () => {
+      document.body.classList.add('downloading');
+      // Show indeterminate progress until real progress events arrive
+      document.getElementById('progressFill').classList.add('indeterminate');
+    });
+
+    // Remove indeterminate shimmer once real progress arrives
+    if (window.electronAPI) {
+      window.electronAPI.onUpdateProgress(() => {
+        document.getElementById('progressFill').classList.remove('indeterminate');
+      });
+    }
+  </script>
+</body>
+</html>

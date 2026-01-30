@@ -13,6 +13,10 @@ const url = require('url');
 const crypto = require('crypto');
 const Store = require('electron-store');
 
+// Set app version from package.json (prevents app.getVersion() returning the Electron framework version)
+const packageJson = require('./package.json');
+app.setVersion(packageJson.version);
+
 // Import thin client modules
 const { verifyServer } = require('./electron-discovery');
 const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified } = require('./electron-storage');
@@ -148,12 +152,10 @@ function createWindow(serverUrl = null) {
     // Configure auto-updater with GitHub release feed
     configureAutoUpdater();
 
-    // Check for updates after window is shown (if server URL is available)
-    if (serverUrl && shouldCheckForUpdates()) {
-      setTimeout(() => {
-        checkAndHandleUpdates(serverUrl);
-      }, 5000); // Wait 5 seconds after launch
-    }
+    // Check for updates after window is shown
+    setTimeout(() => {
+      checkAndHandleUpdates(serverUrl);
+    }, 5000); // Wait 5 seconds after launch
   });
 
   // Open DevTools in development mode
@@ -235,6 +237,13 @@ function createLoginWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
+
+    // Configure auto-updater and check for updates
+    configureAutoUpdater();
+    setTimeout(() => {
+      logInfo('Login window: triggering update check...');
+      checkAndHandleUpdates(null);
+    }, 5000);
   });
 
   mainWindow.on('closed', () => {
@@ -567,6 +576,13 @@ ipcMain.handle('session-tracker:initialize', async (event, backendUrl, authToken
 
 
 // Check for updates
+// Open URL in system browser (used by update dialog for manual download)
+ipcMain.handle('open-external-url', async (event, url) => {
+  const { shell } = require('electron');
+  await shell.openExternal(url);
+  return true;
+});
+
 ipcMain.handle('check-updates', async (event, serverUrl) => {
   try {
     // Get saved server to retrieve orgId

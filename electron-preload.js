@@ -88,6 +88,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
 
   /**
+   * Generic IPC send (fire-and-forget, for one-way messages to main process)
+   */
+  send: (channel, ...args) => ipcRenderer.send(channel, ...args),
+
+  /**
    * Event listeners (one-way communication from main to renderer)
    */
   onUpdateAvailable: (callback) => {
@@ -100,6 +105,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   onUpdateProgress: (callback) => {
     ipcRenderer.on('update-progress', (event, info) => callback(info));
+  },
+
+  onUpdateError: (callback) => {
+    ipcRenderer.on('update-error', (event, info) => callback(info));
   }
 });
 

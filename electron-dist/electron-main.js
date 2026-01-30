@@ -3,6 +3,119 @@ var __commonJS = (cb, mod) => function __require() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
 
+// package.json
+var require_package = __commonJS({
+  "package.json"(exports2, module2) {
+    module2.exports = {
+      name: "lana-ai",
+      productName: "Lana AI",
+      version: "3.2.0",
+      buildNumber: "1",
+      releaseType: "stable",
+      description: "Lana AI - Enterprise AI Platform",
+      main: "src/index.js",
+      author: {
+        name: "Red Rooster Technologies",
+        email: "support@redroostertec.com"
+      },
+      license: "Proprietary",
+      scripts: {
+        "generate-version": "node scripts/generate-version.js",
+        "bundle-electron": "node scripts/bundle-electron.js",
+        "build:tiptap": "node scripts/build-tiptap.js",
+        prestart: "npm run generate-version",
+        start: "node --max-old-space-size=2048 src/index.js",
+        "start:prod": "node --max-old-space-size=16384 src/index.js",
+        dev: "nodemon --max-old-space-size=2048 src/index.js",
+        test: "jest",
+        "test:unit": "jest tests/unit",
+        "test:integration": "jest tests/integration",
+        "test:validation": "jest tests/validation",
+        "test:watch": "jest --watch",
+        "test:coverage": "jest --coverage",
+        "test:ci": "jest --ci --coverage --maxWorkers=2",
+        lint: "eslint src/",
+        migrate: "node scripts/migrate.js",
+        "migrate:phase2": "node scripts/migrate-phase2.js",
+        electron: "electron electron-main.js --disable-gpu-driver-bug-workarounds",
+        "electron:dev": "NODE_ENV=development electron electron-main.js --disable-gpu-driver-bug-workarounds",
+        "electron:rebuild": "electron-rebuild -f -w bcrypt",
+        "postinstall:electron": "npm run electron:rebuild",
+        "build:client": "electron-builder -c electron-builder.client.json",
+        "build:mac": "electron-builder --mac -c electron-builder.client.json",
+        "build:mac-arm64": "electron-builder --mac --arm64 -c electron-builder.client.json",
+        "build:mac-x64": "electron-builder --mac --x64 -c electron-builder.client.json",
+        "build:win": "electron-builder --win -c electron-builder.client.json",
+        "build:linux": "electron-builder --linux -c electron-builder.client.json",
+        "build:all": "electron-builder --mac --x64 --arm64 --win --linux -c electron-builder.client.json"
+      },
+      keywords: [
+        "ai",
+        "enterprise",
+        "legal",
+        "document-processing",
+        "electron"
+      ],
+      dependencies: {
+        "@tiptap/core": "^3.14.0",
+        "@tiptap/extension-link": "^3.14.0",
+        "@tiptap/extension-placeholder": "^3.14.0",
+        "@tiptap/extension-table": "^3.14.0",
+        "@tiptap/extension-table-cell": "^3.14.0",
+        "@tiptap/extension-table-header": "^3.14.0",
+        "@tiptap/extension-table-row": "^3.14.0",
+        "@tiptap/extension-task-item": "^3.14.0",
+        "@tiptap/extension-task-list": "^3.14.0",
+        "@tiptap/extension-text-align": "^3.14.0",
+        "@tiptap/extension-typography": "^3.14.0",
+        "@tiptap/extension-underline": "^3.14.0",
+        "@tiptap/pm": "^3.14.0",
+        "@tiptap/starter-kit": "^3.14.0",
+        archiver: "^7.0.1",
+        axios: "^1.13.2",
+        bcrypt: "^6.0.0",
+        compression: "^1.8.1",
+        cors: "^2.8.5",
+        "csv-parser": "^3.2.0",
+        dotenv: "^16.4.5",
+        "electron-store": "^8.2.0",
+        express: "^5.1.0",
+        "form-data": "^4.0.4",
+        "gpt-3-encoder": "^1.1.4",
+        jsonwebtoken: "^9.0.2",
+        marked: "^17.0.1",
+        minio: "^8.0.6",
+        multer: "^2.0.2",
+        "node-cache": "^5.1.2",
+        "p-limit": "^3.1.0",
+        pg: "^8.16.3",
+        "pg-boss": "^9.0.3",
+        pgvector: "^0.2.1",
+        pino: "^10.1.0",
+        "pino-pretty": "^13.1.2",
+        qrcode: "^1.5.4",
+        semver: "^7.7.3",
+        speakeasy: "^2.0.0",
+        "unstructured-client": "^0.29.0",
+        uuid: "^9.0.1",
+        zod: "^3.23.8"
+      },
+      devDependencies: {
+        "@electron/rebuild": "^4.0.1",
+        "@jest/globals": "^29.7.0",
+        "babel-jest": "^29.7.0",
+        electron: "^32.0.0",
+        "electron-builder": "^25.0.0",
+        "electron-updater": "^6.3.9",
+        esbuild: "^0.27.1",
+        jest: "^29.7.0",
+        "jest-junit": "^16.0.0",
+        nodemon: "^3.0.0"
+      }
+    };
+  }
+});
+
 // node_modules/delayed-stream/lib/delayed_stream.js
 var require_delayed_stream = __commonJS({
   "node_modules/delayed-stream/lib/delayed_stream.js"(exports2, module2) {
@@ -29566,8 +29679,10 @@ var require_main2 = __commonJS({
 var require_electron_updater_custom = __commonJS({
   "electron-updater-custom.js"(exports2, module2) {
     var { autoUpdater } = require_main2();
-    var { app: app2, dialog: dialog2 } = require("electron");
+    var { app: app2, dialog: dialog2, BrowserWindow: BrowserWindow2, ipcMain: ipcMain2 } = require("electron");
     var axios = require_axios();
+    var path2 = require("path");
+    var url2 = require("url");
     var { logInfo: logInfo2, logError: logError2, logWarn } = require_electron_logger();
     var updateCheckInProgress = false;
     var lastUpdateCheck = null;
@@ -29664,6 +29779,7 @@ var require_electron_updater_custom = __commonJS({
       });
       autoUpdater.allowDowngrade = true;
       autoUpdater.autoDownload = false;
+      autoUpdater.forceDevUpdateConfig = true;
       autoUpdater.on("checking-for-update", () => {
         logInfo2("Checking for update...");
       });
@@ -29685,14 +29801,13 @@ var require_electron_updater_custom = __commonJS({
     }
     async function downloadAndInstallUpdate2(serverUrl, authToken = null, orgId = null) {
       try {
-        const updateInfo = await checkForUpdates2(serverUrl, authToken, orgId);
-        if (!updateInfo.updateAvailable) {
-          return false;
-        }
         configureAutoUpdater2();
+        logInfo2("Checking GitHub releases for update...");
+        await autoUpdater.checkForUpdates();
         logInfo2("Downloading update...");
         await autoUpdater.downloadUpdate();
         logInfo2("Update downloaded successfully");
+        await new Promise((resolve) => setTimeout(resolve, 1500));
         logInfo2("Installing update and restarting...");
         autoUpdater.quitAndInstall(false, true);
         return true;
@@ -29701,34 +29816,139 @@ var require_electron_updater_custom = __commonJS({
         return false;
       }
     }
-    async function showOptionalUpdateDialog2(updateInfo, mainWindow2) {
-      const response = await dialog2.showMessageBox(mainWindow2, {
-        type: "info",
-        title: "Update Available",
-        message: `A new version of Lana AI is available (v${updateInfo.version})`,
-        detail: updateInfo.releaseNotes || "Would you like to update now?",
-        buttons: ["Update Now", "Remind Me Later", "Skip This Version"],
-        defaultId: 0,
-        cancelId: 1
+    var updateDialogWindow = null;
+    function createUpdateDialogUrl(params) {
+      const dialogPath = path2.join(__dirname, "public_html", "update-dialog.html");
+      const queryString = Object.entries(params).map(([k, v]) => `${k}=${encodeURIComponent(v || "")}`).join("&");
+      let normalizedPath = dialogPath;
+      if (process.platform === "win32") {
+        normalizedPath = dialogPath.replace(/\\/g, "/");
+        if (!normalizedPath.startsWith("/")) {
+          normalizedPath = "/" + normalizedPath;
+        }
+      }
+      return url2.format({
+        pathname: normalizedPath,
+        protocol: "file:",
+        slashes: true
+      }) + "?" + queryString;
+    }
+    function showUpdateDialog(updateInfo, parentWindow, type = "optional") {
+      return new Promise((resolve) => {
+        const isForced = type === "forced";
+        const dialogWidth = 480;
+        const dialogHeight = isForced ? 480 : 520;
+        updateDialogWindow = new BrowserWindow2({
+          width: dialogWidth,
+          height: dialogHeight,
+          resizable: false,
+          minimizable: false,
+          maximizable: false,
+          closable: !isForced,
+          frame: false,
+          transparent: true,
+          modal: true,
+          parent: parentWindow || void 0,
+          show: false,
+          webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path2.join(__dirname, "electron-preload.js"),
+            sandbox: false
+          }
+        });
+        const dialogUrl = createUpdateDialogUrl({
+          type,
+          currentVersion: updateInfo.currentVersion,
+          version: updateInfo.version,
+          releaseNotes: updateInfo.releaseNotes || "",
+          platform: process.platform,
+          arch: process.arch
+        });
+        updateDialogWindow.loadURL(dialogUrl);
+        updateDialogWindow.once("ready-to-show", () => {
+          updateDialogWindow.show();
+        });
+        const responseChannel = "update-dialog-response";
+        const responseHandler = async (event, choice) => {
+          logInfo2(`Update dialog response: ${choice}`);
+          if (choice === "update") {
+            resolve("update");
+          } else if (choice === "retry") {
+            logInfo2("Retrying update download...");
+            try {
+              configureAutoUpdater2();
+              setupDialogListeners();
+              await autoUpdater.checkForUpdates();
+              await autoUpdater.downloadUpdate();
+              logInfo2("Retry download succeeded");
+              await new Promise((r) => setTimeout(r, 1500));
+              autoUpdater.quitAndInstall(false, true);
+            } catch (error) {
+              logError2("Retry download failed", error);
+              if (updateDialogWindow && !updateDialogWindow.isDestroyed()) {
+                updateDialogWindow.webContents.send("update-error", {
+                  message: error?.message || "Download failed. Please try again."
+                });
+              }
+            }
+          } else {
+            if (updateDialogWindow && !updateDialogWindow.isDestroyed()) {
+              updateDialogWindow.close();
+              updateDialogWindow = null;
+            }
+            ipcMain2.removeListener(responseChannel, responseHandler);
+            resolve(choice);
+          }
+        };
+        ipcMain2.removeAllListeners(responseChannel);
+        ipcMain2.on(responseChannel, responseHandler);
+        updateDialogWindow.on("closed", () => {
+          updateDialogWindow = null;
+          ipcMain2.removeAllListeners(responseChannel);
+          resolve("later");
+        });
+        function setupDialogListeners() {
+          autoUpdater.removeAllListeners("download-progress");
+          autoUpdater.on("download-progress", (progress) => {
+            logInfo2(`Download progress: ${progress.percent.toFixed(2)}%`);
+            if (updateDialogWindow && !updateDialogWindow.isDestroyed()) {
+              updateDialogWindow.webContents.send("update-progress", progress);
+            }
+          });
+          autoUpdater.removeAllListeners("update-downloaded");
+          autoUpdater.on("update-downloaded", (info) => {
+            logInfo2(`Update downloaded: ${info.version}`);
+            if (updateDialogWindow && !updateDialogWindow.isDestroyed()) {
+              updateDialogWindow.webContents.send("update-downloaded", info);
+            }
+          });
+          autoUpdater.removeAllListeners("error");
+          autoUpdater.on("error", (error) => {
+            logError2("Auto-updater error", error);
+            if (updateDialogWindow && !updateDialogWindow.isDestroyed()) {
+              updateDialogWindow.webContents.send("update-error", {
+                message: error?.message || "Download failed. Please try again."
+              });
+            }
+          });
+        }
+        setupDialogListeners();
       });
-      const choices = ["update", "later", "skip"];
-      return choices[response.response];
+    }
+    async function showOptionalUpdateDialog2(updateInfo, mainWindow2) {
+      return showUpdateDialog(updateInfo, mainWindow2, "optional");
     }
     async function showForceUpdateDialog2(updateInfo, mainWindow2) {
-      await dialog2.showMessageBox(mainWindow2, {
-        type: "warning",
-        title: "Update Required",
-        message: `A required update is available (v${updateInfo.version})`,
-        detail: "This update must be installed before you can continue using Lana AI.\n\n" + (updateInfo.releaseNotes || "Please update to continue."),
-        buttons: ["Update Now"],
-        defaultId: 0
-      });
+      await showUpdateDialog(updateInfo, mainWindow2, "forced");
     }
-    function updateProgressDialog(progressWindow, percent) {
-      if (progressWindow && !progressWindow.isDestroyed()) {
-        progressWindow.webContents.send("update-progress", {
-          percent
-        });
+    function getUpdateDialogWindow() {
+      return updateDialogWindow;
+    }
+    function closeUpdateDialog() {
+      if (updateDialogWindow && !updateDialogWindow.isDestroyed()) {
+        updateDialogWindow.close();
+        updateDialogWindow = null;
       }
     }
     function getCurrentUpdateInfo() {
@@ -29756,7 +29976,8 @@ var require_electron_updater_custom = __commonJS({
       downloadAndInstallUpdate: downloadAndInstallUpdate2,
       showOptionalUpdateDialog: showOptionalUpdateDialog2,
       showForceUpdateDialog: showForceUpdateDialog2,
-      updateProgressDialog,
+      getUpdateDialogWindow,
+      closeUpdateDialog,
       getCurrentUpdateInfo,
       getLastUpdateCheck,
       resetUpdateState,
@@ -30091,11 +30312,11 @@ var require_session_tracker = __commonJS({
 var require_version = __commonJS({
   "src/version.js"(exports2, module2) {
     module2.exports = {
-      version: "3.1.1",
+      version: "3.2.0",
       buildNumber: "1",
       releaseType: "stable",
-      displayVersion: "3.1.1",
-      buildDate: "2026-01-30T00:42:37.368Z",
+      displayVersion: "3.2.0",
+      buildDate: "2026-01-30T03:23:38.872Z",
       /**
        * Get full version string
        * @returns {string} e.g., "v3.0.0b1"
@@ -30122,125 +30343,14 @@ var require_version = __commonJS({
   }
 });
 
-// package.json
-var require_package = __commonJS({
-  "package.json"(exports2, module2) {
-    module2.exports = {
-      name: "lana-ai",
-      productName: "Lana AI",
-      version: "3.1.1",
-      buildNumber: "1",
-      releaseType: "stable",
-      description: "Lana AI - Enterprise AI Platform",
-      main: "src/index.js",
-      author: {
-        name: "Red Rooster Technologies",
-        email: "support@redroostertec.com"
-      },
-      license: "Proprietary",
-      scripts: {
-        "generate-version": "node scripts/generate-version.js",
-        "bundle-electron": "node scripts/bundle-electron.js",
-        "build:tiptap": "node scripts/build-tiptap.js",
-        prestart: "npm run generate-version",
-        start: "node --max-old-space-size=2048 src/index.js",
-        "start:prod": "node --max-old-space-size=16384 src/index.js",
-        dev: "nodemon --max-old-space-size=2048 src/index.js",
-        test: "jest",
-        "test:unit": "jest tests/unit",
-        "test:integration": "jest tests/integration",
-        "test:validation": "jest tests/validation",
-        "test:watch": "jest --watch",
-        "test:coverage": "jest --coverage",
-        "test:ci": "jest --ci --coverage --maxWorkers=2",
-        lint: "eslint src/",
-        migrate: "node scripts/migrate.js",
-        "migrate:phase2": "node scripts/migrate-phase2.js",
-        electron: "electron electron-main.js --disable-gpu-driver-bug-workarounds",
-        "electron:dev": "NODE_ENV=development electron electron-main.js --disable-gpu-driver-bug-workarounds",
-        "electron:rebuild": "electron-rebuild -f -w bcrypt",
-        "postinstall:electron": "npm run electron:rebuild",
-        "build:client": "electron-builder -c electron-builder.client.json",
-        "build:mac": "electron-builder --mac -c electron-builder.client.json",
-        "build:mac-arm64": "electron-builder --mac --arm64 -c electron-builder.client.json",
-        "build:mac-x64": "electron-builder --mac --x64 -c electron-builder.client.json",
-        "build:win": "electron-builder --win -c electron-builder.client.json",
-        "build:linux": "electron-builder --linux -c electron-builder.client.json",
-        "build:all": "electron-builder --mac --x64 --arm64 --win --linux -c electron-builder.client.json"
-      },
-      keywords: [
-        "ai",
-        "enterprise",
-        "legal",
-        "document-processing",
-        "electron"
-      ],
-      dependencies: {
-        "@tiptap/core": "^3.14.0",
-        "@tiptap/extension-link": "^3.14.0",
-        "@tiptap/extension-placeholder": "^3.14.0",
-        "@tiptap/extension-table": "^3.14.0",
-        "@tiptap/extension-table-cell": "^3.14.0",
-        "@tiptap/extension-table-header": "^3.14.0",
-        "@tiptap/extension-table-row": "^3.14.0",
-        "@tiptap/extension-task-item": "^3.14.0",
-        "@tiptap/extension-task-list": "^3.14.0",
-        "@tiptap/extension-text-align": "^3.14.0",
-        "@tiptap/extension-typography": "^3.14.0",
-        "@tiptap/extension-underline": "^3.14.0",
-        "@tiptap/pm": "^3.14.0",
-        "@tiptap/starter-kit": "^3.14.0",
-        archiver: "^7.0.1",
-        axios: "^1.13.2",
-        bcrypt: "^6.0.0",
-        compression: "^1.8.1",
-        cors: "^2.8.5",
-        "csv-parser": "^3.2.0",
-        dotenv: "^16.4.5",
-        "electron-store": "^8.2.0",
-        express: "^5.1.0",
-        "form-data": "^4.0.4",
-        "gpt-3-encoder": "^1.1.4",
-        jsonwebtoken: "^9.0.2",
-        marked: "^17.0.1",
-        minio: "^8.0.6",
-        multer: "^2.0.2",
-        "node-cache": "^5.1.2",
-        "p-limit": "^3.1.0",
-        pg: "^8.16.3",
-        "pg-boss": "^9.0.3",
-        pgvector: "^0.2.1",
-        pino: "^10.1.0",
-        "pino-pretty": "^13.1.2",
-        qrcode: "^1.5.4",
-        semver: "^7.7.3",
-        speakeasy: "^2.0.0",
-        "unstructured-client": "^0.29.0",
-        uuid: "^9.0.1",
-        zod: "^3.23.8"
-      },
-      devDependencies: {
-        "@electron/rebuild": "^4.0.1",
-        "@jest/globals": "^29.7.0",
-        "babel-jest": "^29.7.0",
-        electron: "^32.0.0",
-        "electron-builder": "^25.0.0",
-        "electron-updater": "^6.3.9",
-        esbuild: "^0.27.1",
-        jest: "^29.7.0",
-        "jest-junit": "^16.0.0",
-        nodemon: "^3.0.0"
-      }
-    };
-  }
-});
-
 // electron-main.js
 var { app, BrowserWindow, ipcMain, dialog, Menu, session } = require("electron");
 var path = require("path");
 var url = require("url");
 var crypto = require("crypto");
 var Store = require("electron-store");
+var packageJson = require_package();
+app.setVersion(packageJson.version);
 var { verifyServer } = require_electron_discovery();
 var { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified } = require_electron_storage();
 var { checkForUpdates, downloadAndInstallUpdate, showOptionalUpdateDialog, showForceUpdateDialog, shouldCheckForUpdates, configureAutoUpdater } = require_electron_updater_custom();
@@ -30252,8 +30362,8 @@ function getAppVersion() {
     return versionModule.displayVersion;
   } catch (e) {
     try {
-      const packageJson = require_package();
-      return `v${packageJson.version}`;
+      const packageJson2 = require_package();
+      return `v${packageJson2.version}`;
     } catch (e2) {
       return `v${app.getVersion()}`;
     }
@@ -30338,11 +30448,9 @@ function createWindow(serverUrl = null) {
   mainWindow.once("ready-to-show", () => {
     mainWindow.show();
     configureAutoUpdater();
-    if (serverUrl && shouldCheckForUpdates()) {
-      setTimeout(() => {
-        checkAndHandleUpdates(serverUrl);
-      }, 5e3);
-    }
+    setTimeout(() => {
+      checkAndHandleUpdates(serverUrl);
+    }, 5e3);
   });
   if (process.env.NODE_ENV === "development") {
     mainWindow.webContents.openDevTools();
@@ -30400,6 +30508,11 @@ function createLoginWindow() {
   }
   mainWindow.once("ready-to-show", () => {
     mainWindow.show();
+    configureAutoUpdater();
+    setTimeout(() => {
+      logInfo("Login window: triggering update check...");
+      checkAndHandleUpdates(null);
+    }, 5e3);
   });
   mainWindow.on("closed", () => {
     mainWindow = null;
@@ -30667,6 +30780,11 @@ ipcMain.handle("session-tracker:initialize", async (event, backendUrl, authToken
     logError("[SessionTracker] Failed to initialize:", error);
     return { success: false, error: error.message };
   }
+});
+ipcMain.handle("open-external-url", async (event, url2) => {
+  const { shell } = require("electron");
+  await shell.openExternal(url2);
+  return true;
 });
 ipcMain.handle("check-updates", async (event, serverUrl) => {
   try {
