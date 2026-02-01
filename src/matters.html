@@ -538,6 +538,9 @@
         <button id="tabTasks" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('tasks')">
           Tasks
         </button>
+        <button id="tabLinks" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('links')">
+          Linked Matters
+        </button>
       </div>
 
       <!-- Tab Content -->
@@ -548,6 +551,7 @@
         <div id="tabContentActivity" class="hidden p-6"></div>
         <div id="tabContentComments" class="hidden p-6"></div>
         <div id="tabContentTasks" class="hidden p-6"></div>
+        <div id="tabContentLinks" class="hidden p-6"></div>
       </div>
 
       <!-- Footer Actions -->
@@ -627,6 +631,92 @@
           </button>
           <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors">
             Save Task
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Create Link Modal -->
+  <div id="createLinkModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl">
+      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+            <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900">Link Related Matter</h3>
+            <p class="text-sm text-gray-500">Connect this matter to another matter</p>
+          </div>
+        </div>
+        <button onclick="closeCreateLinkModal()" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <form onsubmit="createLink(event)" class="p-6 space-y-4">
+        <input type="hidden" id="linkSourceMatterId" value="">
+
+        <!-- Matter Search -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Search for Matter to Link
+          </label>
+          <div class="relative">
+            <input
+              type="text"
+              id="linkMatterSearch"
+              oninput="searchMattersForLink(event)"
+              placeholder="Type matter name or ID to search..."
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              autocomplete="off"
+            >
+            <div id="linkMatterSearchResults" class="hidden absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+              <!-- Search results populated dynamically -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Selected Matter Display -->
+        <div id="selectedLinkMatter" class="hidden">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Selected Matter</label>
+          <div class="flex items-center justify-between p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+            <div class="flex-1 min-w-0">
+              <p id="selectedLinkMatterName" class="text-sm font-medium text-gray-900 truncate"></p>
+              <p id="selectedLinkMatterId" class="text-xs text-gray-500 font-mono"></p>
+            </div>
+            <button type="button" onclick="clearLinkMatterSelection()" class="ml-3 p-1 text-indigo-600 hover:text-indigo-800">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Link Type -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Link Type</label>
+          <select id="linkType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+            <option value="related_to">Related To (bidirectional)</option>
+            <option value="parent_of">Parent Of (this matter is parent)</option>
+            <option value="child_of">Child Of (this matter is child)</option>
+          </select>
+          <p class="mt-1 text-xs text-gray-500">
+            Choose how these matters are related to each other
+          </p>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
+          <button type="button" onclick="closeCreateLinkModal()" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors">
+            Cancel
+          </button>
+          <button type="submit" id="createLinkBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+            Create Link
           </button>
         </div>
       </form>
@@ -2248,7 +2338,7 @@
       const { matter, permissions, activities, activityPagination, chats, chatsPagination, documents, orphanedFiles, tasks } = currentMatterData;
 
       // Update tab buttons
-      const tabs = ['Details', 'Documents', 'Conversations', 'Activity', 'Comments', 'Tasks'];
+      const tabs = ['Details', 'Documents', 'Conversations', 'Activity', 'Comments', 'Tasks', 'Links'];
       tabs.forEach(tab => {
         const btn = document.getElementById(`tab${tab}`);
         const content = document.getElementById(`tabContent${tab}`);
@@ -2282,6 +2372,9 @@
           break;
         case 'tasks':
           renderTasksTab(matter, tasks || []);
+          break;
+        case 'links':
+          renderLinkedMattersTab(matter);
           break;
       }
     }
@@ -5203,6 +5296,494 @@
 
       // Render Kanban Board
       renderKanbanBoard(matter.matter_id, tasks);
+    }
+
+    // Render Linked Matters Tab
+    async function renderLinkedMattersTab(matter) {
+      const content = document.getElementById('tabContentLinks');
+
+      // Show loading state
+      content.innerHTML = `
+        <div class="flex items-center justify-center py-12">
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        </div>
+      `;
+
+      try {
+        // Load linked matters from API
+        const response = await fetch(`${window.API_BASE_URL}/api/v1/entity-links/matter/${matter.matter_id}`, {
+          headers: {
+            'Authorization': `Bearer ${api.token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to load linked matters');
+        }
+
+        const data = await response.json();
+        const { links, total_links } = data;
+
+        // Render the links UI
+        renderLinkedMattersContent(matter, links, total_links);
+
+      } catch (error) {
+        console.error('Error loading linked matters:', error);
+        content.innerHTML = `
+          <div class="text-center py-12">
+            <div class="text-red-600 mb-4">
+              <svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <h4 class="text-lg font-semibold text-gray-900 mb-2">Failed to load linked matters</h4>
+            <p class="text-gray-500">${error.message}</p>
+          </div>
+        `;
+      }
+    }
+
+    function renderLinkedMattersContent(matter, links, totalLinks) {
+      const content = document.getElementById('tabContentLinks');
+      const isWorkspace = matter.matter_type === 'workspace';
+      const isMatter = matter.matter_type === 'matter';
+
+      // Empty state
+      if (totalLinks === 0) {
+        content.innerHTML = `
+          <div class="text-center py-12">
+            <div class="w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+              </svg>
+            </div>
+            <h4 class="text-lg font-semibold text-gray-900 mb-2">No linked matters</h4>
+            <p class="text-gray-500 mb-4">${isWorkspace ? 'Link matters to this workspace to organize related work' : 'Link this matter to related matters or add it to a workspace'}</p>
+            ${isMatter ? `
+              <button
+                onclick="openCreateLinkModal('${matter.matter_id}')"
+                class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                Link Related Matter
+              </button>
+            ` : ''}
+          </div>
+        `;
+        return;
+      }
+
+      // Build HTML for each link group
+      let html = '<div class="space-y-6">';
+
+      // Add create link button at top for matters
+      if (isMatter) {
+        html += `
+          <div class="flex justify-end">
+            <button
+              onclick="openCreateLinkModal('${matter.matter_id}')"
+              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+              Link Related Matter
+            </button>
+          </div>
+        `;
+      }
+
+      // Workspace Matters
+      if (links.workspace_matters && links.workspace_matters.length > 0) {
+        html += renderLinkSection(
+          isWorkspace ? 'Matters in this Workspace' : 'Part of Workspace',
+          links.workspace_matters,
+          matter.matter_id,
+          'workspace_matter'
+        );
+      }
+
+      // Related Matters
+      if (links.related_matters && links.related_matters.length > 0) {
+        html += renderLinkSection(
+          'Related Matters',
+          links.related_matters,
+          matter.matter_id,
+          'related_to'
+        );
+      }
+
+      // Parent Matters
+      if (links.parent_matters && links.parent_matters.length > 0) {
+        html += renderLinkSection(
+          'Parent Matters',
+          links.parent_matters,
+          matter.matter_id,
+          'parent'
+        );
+      }
+
+      // Child Matters
+      if (links.child_matters && links.child_matters.length > 0) {
+        html += renderLinkSection(
+          'Child Matters',
+          links.child_matters,
+          matter.matter_id,
+          'child'
+        );
+      }
+
+      // Shadow Records (ActionStep)
+      if (links.shadow_records && links.shadow_records.length > 0) {
+        html += renderLinkSection(
+          'ActionStep Connector',
+          links.shadow_records,
+          matter.matter_id,
+          'shadow_record',
+          true // read-only
+        );
+      }
+
+      html += '</div>';
+      content.innerHTML = html;
+    }
+
+    function renderLinkSection(title, linksList, currentMatterId, linkType, isReadOnly = false) {
+      return `
+        <div class="bg-gray-50 rounded-lg p-4">
+          <h5 class="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+            ${getLinkIcon(linkType)}
+            ${title}
+            <span class="ml-auto text-xs text-gray-500">${linksList.length} ${linksList.length === 1 ? 'link' : 'links'}</span>
+          </h5>
+          <div class="space-y-2">
+            ${linksList.map(link => renderLinkCard(link, currentMatterId, isReadOnly)).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function getLinkIcon(linkType) {
+      switch(linkType) {
+        case 'workspace_matter':
+          return '<svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>';
+        case 'related_to':
+          return '<svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>';
+        case 'parent':
+          return '<svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>';
+        case 'child':
+          return '<svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>';
+        case 'shadow_record':
+          return '<svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>';
+        default:
+          return '<svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>';
+      }
+    }
+
+    function renderLinkCard(link, currentMatterId, isReadOnly) {
+      const linkedName = link.linked_name || 'Unknown';
+      const linkedId = link.linked_entity_id;
+      const linkId = link.link_id;
+      const createdAt = link.created_at ? new Date(link.created_at).toLocaleDateString() : '';
+      const createdBy = link.created_by_name || link.created_by_email || '';
+
+      return `
+        <div class="bg-white border border-gray-200 hover:border-indigo-300 rounded-lg p-3 flex items-center justify-between gap-3 transition-all">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2">
+              <button
+                onclick="loadMatterDetails('${linkedId}')"
+                class="text-sm font-medium text-indigo-600 hover:text-indigo-800 truncate"
+              >
+                ${linkedName}
+              </button>
+              <span class="text-xs text-gray-400 font-mono">${linkedId}</span>
+            </div>
+            ${createdAt || createdBy ? `
+              <div class="text-xs text-gray-500 mt-1">
+                ${createdAt ? `Linked ${createdAt}` : ''}
+                ${createdBy ? ` by ${createdBy}` : ''}
+              </div>
+            ` : ''}
+          </div>
+          <div class="flex-shrink-0">
+            ${isReadOnly ? `
+              <span class="text-xs text-gray-400 px-2 py-1 rounded border border-gray-200" title="System-generated link cannot be deleted">
+                <svg class="w-3 h-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                </svg>
+              </span>
+            ` : `
+              <button
+                onclick="deleteLinkConfirm('${linkId}', '${linkedName}')"
+                class="text-red-600 hover:text-red-800 p-1"
+                title="Remove link"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            `}
+          </div>
+        </div>
+      `;
+    }
+
+    // =============================================================================
+    // LINK MANAGEMENT FUNCTIONS
+    // =============================================================================
+
+    let linkSearchTimeout = null;
+    let selectedLinkTargetMatter = null;
+
+    /**
+     * Open the create link modal
+     */
+    function openCreateLinkModal(sourceMatterId) {
+      const modal = document.getElementById('createLinkModal');
+      const sourceInput = document.getElementById('linkSourceMatterId');
+      const searchInput = document.getElementById('linkMatterSearch');
+      const submitBtn = document.getElementById('createLinkBtn');
+
+      // Set source matter ID
+      sourceInput.value = sourceMatterId;
+
+      // Reset form
+      searchInput.value = '';
+      document.getElementById('linkMatterSearchResults').classList.add('hidden');
+      document.getElementById('selectedLinkMatter').classList.add('hidden');
+      document.getElementById('linkType').value = 'related_to';
+      submitBtn.disabled = true;
+      selectedLinkTargetMatter = null;
+
+      // Show modal
+      modal.classList.remove('hidden');
+      setTimeout(() => searchInput.focus(), 100);
+    }
+
+    /**
+     * Close the create link modal
+     */
+    function closeCreateLinkModal() {
+      const modal = document.getElementById('createLinkModal');
+      modal.classList.add('hidden');
+      selectedLinkTargetMatter = null;
+
+      // Clear any pending search
+      if (linkSearchTimeout) {
+        clearTimeout(linkSearchTimeout);
+        linkSearchTimeout = null;
+      }
+    }
+
+    /**
+     * Search for matters to link (debounced)
+     */
+    function searchMattersForLink(event) {
+      const query = event.target.value.trim();
+      const resultsDiv = document.getElementById('linkMatterSearchResults');
+      const sourceMatterId = document.getElementById('linkSourceMatterId').value;
+
+      // Clear previous timeout
+      if (linkSearchTimeout) {
+        clearTimeout(linkSearchTimeout);
+      }
+
+      // Hide results if query is too short
+      if (query.length < 2) {
+        resultsDiv.classList.add('hidden');
+        return;
+      }
+
+      // Debounce search
+      linkSearchTimeout = setTimeout(async () => {
+        try {
+          // Show loading state
+          resultsDiv.innerHTML = `
+            <div class="p-4 text-center text-gray-500">
+              <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto mb-2"></div>
+              Searching...
+            </div>
+          `;
+          resultsDiv.classList.remove('hidden');
+
+          // Search matters
+          const response = await fetch(
+            `${window.API_BASE_URL}/api/v1/matters?search=${encodeURIComponent(query)}&limit=10`,
+            {
+              headers: {
+                'Authorization': `Bearer ${api.token}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error('Search failed');
+          }
+
+          const data = await response.json();
+          const matters = data.matters || [];
+
+          // Filter out source matter and workspaces
+          const filteredMatters = matters.filter(m =>
+            m.matter_id !== sourceMatterId && m.matter_type === 'matter'
+          );
+
+          if (filteredMatters.length === 0) {
+            resultsDiv.innerHTML = `
+              <div class="p-4 text-center text-gray-500 text-sm">
+                No matters found
+              </div>
+            `;
+          } else {
+            resultsDiv.innerHTML = filteredMatters.map(matter => `
+              <button
+                type="button"
+                onclick="selectLinkMatter('${matter.matter_id}', '${matter.name.replace(/'/g, "&apos;")}', '${matter.matter_type}')"
+                class="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition-colors"
+              >
+                <div class="font-medium text-gray-900 text-sm">${matter.name}</div>
+                <div class="text-xs text-gray-500 font-mono mt-1">${matter.matter_id}</div>
+              </button>
+            `).join('');
+          }
+
+        } catch (error) {
+          console.error('Matter search error:', error);
+          resultsDiv.innerHTML = `
+            <div class="p-4 text-center text-red-600 text-sm">
+              Search failed. Please try again.
+            </div>
+          `;
+        }
+      }, 300);
+    }
+
+    /**
+     * Select a matter from search results
+     */
+    function selectLinkMatter(matterId, matterName, matterType) {
+      selectedLinkTargetMatter = { matter_id: matterId, name: matterName, matter_type: matterType };
+
+      // Hide search results
+      document.getElementById('linkMatterSearchResults').classList.add('hidden');
+      document.getElementById('linkMatterSearch').value = '';
+
+      // Show selected matter
+      document.getElementById('selectedLinkMatterName').textContent = matterName;
+      document.getElementById('selectedLinkMatterId').textContent = matterId;
+      document.getElementById('selectedLinkMatter').classList.remove('hidden');
+
+      // Enable submit button
+      document.getElementById('createLinkBtn').disabled = false;
+    }
+
+    /**
+     * Clear selected matter
+     */
+    function clearLinkMatterSelection() {
+      selectedLinkTargetMatter = null;
+      document.getElementById('selectedLinkMatter').classList.add('hidden');
+      document.getElementById('linkMatterSearch').value = '';
+      document.getElementById('createLinkBtn').disabled = true;
+    }
+
+    /**
+     * Create a link between matters
+     */
+    async function createLink(event) {
+      event.preventDefault();
+
+      const sourceMatterId = document.getElementById('linkSourceMatterId').value;
+      const linkType = document.getElementById('linkType').value;
+      const submitBtn = document.getElementById('createLinkBtn');
+
+      if (!selectedLinkTargetMatter) {
+        showNotification('Please select a matter to link', 'error');
+        return;
+      }
+
+      try {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Creating...';
+
+        const response = await fetch(`${window.API_BASE_URL}/api/v1/entity-links`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${api.token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            source_matter_id: sourceMatterId,
+            target_matter_id: selectedLinkTargetMatter.matter_id,
+            link_type: linkType
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error?.message || 'Failed to create link');
+        }
+
+        const data = await response.json();
+
+        showNotification('Link created successfully', 'success');
+        closeCreateLinkModal();
+
+        // Refresh the linked matters tab if we're viewing it
+        const currentMatter = window.currentMatterDetails;
+        if (currentMatter && document.getElementById('tabContentLinks').classList.contains('block')) {
+          renderLinkedMattersTab(currentMatter);
+        }
+
+      } catch (error) {
+        console.error('Create link error:', error);
+        showNotification(error.message || 'Failed to create link', 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Create Link';
+      }
+    }
+
+    /**
+     * Confirm link deletion
+     */
+    function deleteLinkConfirm(linkId, linkedMatterName) {
+      if (confirm(`Are you sure you want to remove the link to "${linkedMatterName}"?\n\nThis action cannot be undone.`)) {
+        deleteLink(linkId);
+      }
+    }
+
+    /**
+     * Delete a link
+     */
+    async function deleteLink(linkId) {
+      try {
+        const response = await fetch(`${window.API_BASE_URL}/api/v1/entity-links/${linkId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${api.token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error?.message || 'Failed to delete link');
+        }
+
+        showNotification('Link removed successfully', 'success');
+
+        // Refresh the linked matters tab
+        const currentMatter = window.currentMatterDetails;
+        if (currentMatter) {
+          renderLinkedMattersTab(currentMatter);
+        }
+
+      } catch (error) {
+        console.error('Delete link error:', error);
+        showNotification(error.message || 'Failed to delete link', 'error');
+      }
     }
 
     // =============================================================================
