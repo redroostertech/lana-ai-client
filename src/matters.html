@@ -5854,14 +5854,29 @@
     window.createLink = async function(event) {
       event.preventDefault();
 
-      const sourceMatterId = document.getElementById('linkSourceMatterId').value;
-      const linkType = document.getElementById('linkType').value;
+      const sourceInput = document.getElementById('linkSourceMatterId');
+      const sourceMatterId = sourceInput.value;
+      const isWorkspace = sourceInput.dataset.isWorkspace === 'true';
+
+      // Get link type - if workspace, force to workspace_matter, otherwise use selected value
+      let linkType = document.getElementById('linkType').value;
+      if (isWorkspace) {
+        linkType = 'workspace_matter';
+      }
+
       const submitBtn = document.getElementById('createLinkBtn');
 
       if (!selectedLinkTargetMatter) {
-        showNotification('Please select a matter to link', 'error');
+        Toast.error('Please select a matter to link');
         return;
       }
+
+      console.log('[Create Link] Request data:', {
+        source_matter_id: sourceMatterId,
+        target_matter_id: selectedLinkTargetMatter.matter_id,
+        link_type: linkType,
+        isWorkspace
+      });
 
       try {
         submitBtn.disabled = true;
@@ -5882,12 +5897,13 @@
 
         if (!response.ok) {
           const error = await response.json();
+          console.error('[Create Link] API Error:', error);
           throw new Error(error.error?.message || 'Failed to create link');
         }
 
         const data = await response.json();
 
-        showNotification('Link created successfully', 'success');
+        Toast.success('Link created successfully');
         closeCreateLinkModal();
 
         // Refresh the linked matters tab if we're viewing it
@@ -5898,7 +5914,7 @@
 
       } catch (error) {
         console.error('Create link error:', error);
-        showNotification(error.message || 'Failed to create link', 'error');
+        Toast.error(error.message || 'Failed to create link');
         submitBtn.disabled = false;
         submitBtn.textContent = 'Create Link';
       }
@@ -5931,7 +5947,7 @@
           throw new Error(error.error?.message || 'Failed to delete link');
         }
 
-        showNotification('Link removed successfully', 'success');
+        Toast.success('Link removed successfully');
 
         // Refresh the linked matters tab
         const currentMatter = window.currentMatterDetails;
@@ -5941,7 +5957,7 @@
 
       } catch (error) {
         console.error('Delete link error:', error);
-        showNotification(error.message || 'Failed to delete link', 'error');
+        Toast.error(error.message || 'Failed to delete link');
       }
     }
 
