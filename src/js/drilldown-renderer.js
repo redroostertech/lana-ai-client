@@ -39,6 +39,11 @@ class DrilldownRenderer {
     this.initialized = false;
     this.currentTableView = null; // Stores current table view filter state
 
+    // Bind pagination methods to preserve 'this' context when called from onclick
+    this.prevPage = this.prevPage.bind(this);
+    this.nextPage = this.nextPage.bind(this);
+    this.goToPage = this.goToPage.bind(this);
+
     // Don't call init() here - defer until first use
   }
 
