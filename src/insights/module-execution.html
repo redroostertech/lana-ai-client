@@ -5638,17 +5638,17 @@
         totalCount = metric.current.reduce((sum, item) => sum + (item.count || 0), 0);
       }
 
+      // Get status colors for card background
+      const statusColors = getStatusColors(statusColor);
+
       return `
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+        <div class="${statusColors.bg} rounded-xl shadow-sm border ${statusColors.border} p-6 hover:shadow-md transition-shadow">
           <!-- Metric Header -->
           <div class="flex items-start justify-between mb-4">
             <div class="flex-1">
               <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide">${metric.name}</h3>
               <p class="text-xs text-gray-400 mt-1">${metric.description || ''}</p>
               <p class="text-xs text-indigo-600 mt-2 font-medium">Click any bar to see actual leads</p>
-            </div>
-            <div class="flex items-center gap-2">
-              ${getStatusBadge(statusColor)}
             </div>
           </div>
 
