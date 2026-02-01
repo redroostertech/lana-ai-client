@@ -2120,6 +2120,7 @@
               type="text"
               placeholder="Search by name, email, or phone..."
               value="${state.searchQuery}"
+              autocomplete="off"
               oninput="window.updateSearchQuery(event)"
               onkeypress="window.handleSearchKeypress(event)"
               class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -2309,6 +2310,14 @@
         const endIdx = Math.min(startIdx + state.rowsPerPage, totalRecords);
         const paginatedOpportunities = filteredOpportunities.slice(startIdx, endIdx);
 
+        // Helper function to change page
+        window.goToPage = function(page) {
+          if (page >= 1 && page <= totalPages) {
+            state.currentPage = page;
+            window.renderOpportunitiesTable(state.currentFilter);
+          }
+        };
+
         const getSortIcon = (column) => {
           if (state.sortColumn !== column) {
             return '<svg class="w-4 h-4 text-gray-400 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path></svg>';
@@ -2330,6 +2339,7 @@
               type="text"
               placeholder="Search by name, contact, or status..."
               value="${state.searchQuery}"
+              autocomplete="off"
               oninput="window.updateSearchQuery(event)"
               onkeypress="window.handleSearchKeypress(event)"
               class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -2476,6 +2486,14 @@
         const endIdx = Math.min(startIdx + state.rowsPerPage, totalRecords);
         const paginatedContacts = contactsWithOpps.slice(startIdx, endIdx);
 
+        // Helper function to change page
+        window.goToPage = function(page) {
+          if (page >= 1 && page <= totalPages) {
+            state.currentPage = page;
+            window.renderContactOpportunitiesTable();
+          }
+        };
+
         const tableHTML = `
           <div class="flex items-center justify-between mb-3">
             <h4 class="font-semibold text-gray-900">Contacts with Opportunities</h4>
@@ -2487,6 +2505,7 @@
               type="text"
               placeholder="Search by contact name or email..."
               value="${state.searchQuery}"
+              autocomplete="off"
               oninput="window.updateSearchQuery(event)"
               onkeypress="window.handleSearchKeypress(event)"
               class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -2659,6 +2678,14 @@
         const endIdx = Math.min(startIdx + state.rowsPerPage, totalRecords);
         const paginatedContacts = filteredContacts.slice(startIdx, endIdx);
 
+        // Helper function to change page
+        window.goToPage = function(page) {
+          if (page >= 1 && page <= totalPages) {
+            state.currentPage = page;
+            window.renderUniqueContactIdsTable();
+          }
+        };
+
         const tableHTML = `
           <div class="flex items-center justify-between mb-3">
             <h4 class="font-semibold text-gray-900">Unique Contact IDs (${totalRecords} total)</h4>
@@ -2670,6 +2697,7 @@
               type="text"
               placeholder="Search by name, email, or contact ID..."
               value="${state.searchQuery}"
+              autocomplete="off"
               oninput="window.updateSearchQuery(event)"
               onkeypress="window.handleSearchKeypress(event)"
               class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -3097,6 +3125,7 @@
               type="text"
               placeholder="Search by opportunity name, contact, or email..."
               value="${state.searchQuery}"
+              autocomplete="off"
               oninput="window.updateConsultationSearch(event)"
               onkeypress="window.handleConsultationKeypress(event)"
               class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -3525,6 +3554,7 @@
               type="text"
               placeholder="Search by name, email, or phone..."
               value="${state.searchQuery}"
+              autocomplete="off"
               oninput="window.updateResponseTimeSearch(event)"
               onkeypress="window.handleResponseTimeKeypress(event)"
               class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -3891,6 +3921,7 @@
               type="text"
               placeholder="Search by name, email, phone, or tags..."
               value="${state.searchQuery}"
+              autocomplete="off"
               oninput="window.updateLeadQualitySearch(event)"
               onkeypress="window.handleLeadQualityKeypress(event)"
               class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -4306,6 +4337,7 @@
               type="text"
               placeholder="Search by opportunity name, contact, or email..."
               value="${state.searchQuery}"
+              autocomplete="off"
               oninput="window.updateShowRateSearch(event)"
               onkeypress="window.handleShowRateKeypress(event)"
               class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -4733,6 +4765,7 @@
               type="text"
               placeholder="Search by opportunity name, contact, email, or source..."
               value="${state.searchQuery}"
+              autocomplete="off"
               oninput="window.updateCaseValueSearch(event)"
               onkeypress="window.handleCaseValueKeypress(event)"
               class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -5170,6 +5203,7 @@
               type="text"
               placeholder="Search by opportunity name, contact, or email..."
               value="${state.searchQuery}"
+              autocomplete="off"
               oninput="window.updateConsultationsHeldSearch(event)"
               onkeypress="window.handleConsultationsHeldKeypress(event)"
               class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
