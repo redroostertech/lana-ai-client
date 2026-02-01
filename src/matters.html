@@ -5586,7 +5586,7 @@
      * @param {string} sourceMatterId - The source matter/workspace ID
      * @param {boolean} isWorkspace - Whether the source is a workspace
      */
-    function openCreateLinkModal(sourceMatterId, isWorkspace = false) {
+    window.openCreateLinkModal = function(sourceMatterId, isWorkspace = false) {
       const modal = document.getElementById('createLinkModal');
       const sourceInput = document.getElementById('linkSourceMatterId');
       const searchInput = document.getElementById('linkMatterSearch');
@@ -5627,7 +5627,7 @@
     /**
      * Close the create link modal
      */
-    function closeCreateLinkModal() {
+    window.closeCreateLinkModal = function() {
       const modal = document.getElementById('createLinkModal');
       modal.classList.add('hidden');
       selectedLinkTargetMatter = null;
@@ -5642,7 +5642,7 @@
     /**
      * Search for matters to link (debounced)
      */
-    function searchMattersForLink(event) {
+    window.searchMattersForLink = function(event) {
       const query = event.target.value.trim();
       const resultsDiv = document.getElementById('linkMatterSearchResults');
       const sourceMatterId = document.getElementById('linkSourceMatterId').value;
@@ -5726,7 +5726,7 @@
     /**
      * Select a matter from search results
      */
-    function selectLinkMatter(matterId, matterName, matterType) {
+    window.selectLinkMatter = function(matterId, matterName, matterType) {
       selectedLinkTargetMatter = { matter_id: matterId, name: matterName, matter_type: matterType };
 
       // Hide search results
@@ -5745,7 +5745,7 @@
     /**
      * Clear selected matter
      */
-    function clearLinkMatterSelection() {
+    window.clearLinkMatterSelection = function() {
       selectedLinkTargetMatter = null;
       document.getElementById('selectedLinkMatter').classList.add('hidden');
       document.getElementById('linkMatterSearch').value = '';
@@ -5755,7 +5755,7 @@
     /**
      * Create a link between matters
      */
-    async function createLink(event) {
+    window.createLink = async function(event) {
       event.preventDefault();
 
       const sourceMatterId = document.getElementById('linkSourceMatterId').value;
@@ -5811,7 +5811,7 @@
     /**
      * Confirm link deletion
      */
-    function deleteLinkConfirm(linkId, linkedMatterName) {
+    window.deleteLinkConfirm = function(linkId, linkedMatterName) {
       if (confirm(`Are you sure you want to remove the link to "${linkedMatterName}"?\n\nThis action cannot be undone.`)) {
         deleteLink(linkId);
       }
@@ -5820,7 +5820,7 @@
     /**
      * Delete a link
      */
-    async function deleteLink(linkId) {
+    window.deleteLink = async function(linkId) {
       try {
         const response = await fetch(`${api.baseUrl}/api/v1/entity-links/${linkId}`, {
           method: 'DELETE',
@@ -5853,7 +5853,7 @@
      * Open the create matter modal from within a workspace
      * After matter is created, it will be automatically linked to the workspace
      */
-    function openCreateMatterDrawer(workspaceId) {
+    window.openCreateMatterDrawer = function(workspaceId) {
       // Store the workspace ID for later use after matter creation
       createMatterForWorkspaceId = workspaceId;
 
