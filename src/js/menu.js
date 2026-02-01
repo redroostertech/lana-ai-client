@@ -52,6 +52,7 @@ const MenuIcons = {
   analytics: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>',
   label: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>',
   folder: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>',
+  plus: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>',
 };
 
 // ============================================================
@@ -120,15 +121,15 @@ const MenuConfig = {
       },
       {
         id: 'projects',
-        title: 'Projects',
+        title: 'Your Chats',
         requiredRoles: [],
         isConversationList: true,
         items: [
           {
             id: 'new-matter-chat',
-            label: 'New Matters Chat',
+            label: 'Start a New Chat',
             href: '#',
-            icon: 'document',
+            icon: 'plus',
             isButton: true,
             onClick: 'openNewProjectModal'
           }
@@ -220,15 +221,15 @@ const MenuConfig = {
       },
       {
         id: 'projects',
-        title: 'Projects',
+        title: 'Your Chats',
         requiredRoles: [],
         isConversationList: true,
         items: [
           {
             id: 'new-matter-chat',
-            label: 'New Matters Chat',
+            label: 'Start a New Chat',
             href: '#',
-            icon: 'document',
+            icon: 'plus',
             isButton: true,
             onClick: 'openNewProjectModal'
           }
@@ -279,15 +280,15 @@ const MenuConfig = {
       },
       {
         id: 'projects',
-        title: 'Projects',
+        title: 'Your Chats',
         requiredRoles: [],
         isConversationList: true,
         items: [
           {
             id: 'new-matter-chat',
-            label: 'New Matters Chat',
+            label: 'Start a New Chat',
             href: '#',
-            icon: 'document',
+            icon: 'plus',
             isButton: true,
             onClick: 'openNewProjectModal'
           }
@@ -338,15 +339,15 @@ const MenuConfig = {
       },
       {
         id: 'projects',
-        title: 'Projects',
+        title: 'Your Chats',
         requiredRoles: [],
         isConversationList: true,
         items: [
           {
             id: 'new-matter-chat',
-            label: 'New Matters Chat',
+            label: 'Start a New Chat',
             href: '#',
-            icon: 'document',
+            icon: 'plus',
             isButton: true,
             onClick: 'openNewProjectModal'
           }
@@ -397,15 +398,15 @@ const MenuConfig = {
       },
       {
         id: 'chat-projects',
-        title: 'Projects',
+        title: 'Your Chats',
         requiredRoles: [],
         isConversationList: true, // Special flag for conversation list rendering
         items: [
           {
             id: 'chat-new-matter',
-            label: 'New Matters Chat',
+            label: 'Start a New Chat',
             href: '#',
-            icon: 'document',
+            icon: 'plus',
             isButton: true,
             onClick: 'openNewProjectModal'
           }

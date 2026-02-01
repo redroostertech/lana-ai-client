@@ -2104,8 +2104,8 @@
           window.renderContactTable();
         };
 
-        // Helper function to change page
-        window.goToPage = function(page) {
+        // Helper function to change page (unique for contacts table)
+        window.goToPage_contacts = function(page) {
           if (page >= 1 && page <= totalPages) {
             state.currentPage = page;
             window.renderContactTable();
@@ -2219,7 +2219,7 @@
             </div>
             <div class="flex items-center gap-2">
               <button
-                onclick="window.goToPage(${state.currentPage - 1})"
+                onclick="window.goToPage_contacts(${state.currentPage - 1})"
                 ${state.currentPage === 1 ? 'disabled' : ''}
                 class="px-3 py-1 text-sm border rounded ${state.currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
               >
@@ -2240,7 +2240,7 @@
 
                   return `
                     <button
-                      onclick="window.goToPage(${pageNum})"
+                      onclick="window.goToPage_contacts(${pageNum})"
                       class="px-3 py-1 text-sm border rounded ${state.currentPage === pageNum ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}"
                     >
                       ${pageNum}
@@ -2249,7 +2249,7 @@
                 }).join('')}
               </div>
               <button
-                onclick="window.goToPage(${state.currentPage + 1})"
+                onclick="window.goToPage_contacts(${state.currentPage + 1})"
                 ${state.currentPage === totalPages ? 'disabled' : ''}
                 class="px-3 py-1 text-sm border rounded ${state.currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
               >
@@ -2345,8 +2345,8 @@
         const endIdx = Math.min(startIdx + state.rowsPerPage, totalRecords);
         const paginatedOpportunities = filteredOpportunities.slice(startIdx, endIdx);
 
-        // Helper function to change page
-        window.goToPage = function(page) {
+        // Helper function to change page (unique for opportunities table)
+        window.goToPage_opportunities = function(page) {
           if (page >= 1 && page <= totalPages) {
             state.currentPage = page;
             window.renderOpportunitiesTable(state.currentFilter);
@@ -2434,7 +2434,7 @@
             </div>
             <div class="flex items-center gap-2">
               <button
-                onclick="window.goToPage(${state.currentPage - 1})"
+                onclick="window.goToPage_opportunities(${state.currentPage - 1})"
                 ${state.currentPage === 1 ? 'disabled' : ''}
                 class="px-3 py-1 text-sm border rounded ${state.currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
               >
@@ -2454,7 +2454,7 @@
                   }
                   return `
                     <button
-                      onclick="window.goToPage(${pageNum})"
+                      onclick="window.goToPage_opportunities(${pageNum})"
                       class="px-3 py-1 text-sm border rounded ${state.currentPage === pageNum ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}"
                     >
                       ${pageNum}
@@ -2463,7 +2463,7 @@
                 }).join('')}
               </div>
               <button
-                onclick="window.goToPage(${state.currentPage + 1})"
+                onclick="window.goToPage_opportunities(${state.currentPage + 1})"
                 ${state.currentPage === totalPages ? 'disabled' : ''}
                 class="px-3 py-1 text-sm border rounded ${state.currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
               >
@@ -2521,8 +2521,8 @@
         const endIdx = Math.min(startIdx + state.rowsPerPage, totalRecords);
         const paginatedContacts = contactsWithOpps.slice(startIdx, endIdx);
 
-        // Helper function to change page
-        window.goToPage = function(page) {
+        // Helper function to change page (unique for contact opportunities table)
+        window.goToPage_contactOpportunities = function(page) {
           if (page >= 1 && page <= totalPages) {
             state.currentPage = page;
             window.renderContactOpportunitiesTable();
@@ -2602,7 +2602,7 @@
             </div>
             <div class="flex items-center gap-2">
               <button
-                onclick="window.goToPage(${state.currentPage - 1})"
+                onclick="window.goToPage_contactOpportunities(${state.currentPage - 1})"
                 ${state.currentPage === 1 ? 'disabled' : ''}
                 class="px-3 py-1 text-sm border rounded ${state.currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
               >
@@ -2622,7 +2622,7 @@
                   }
                   return `
                     <button
-                      onclick="window.goToPage(${pageNum})"
+                      onclick="window.goToPage_contactOpportunities(${pageNum})"
                       class="px-3 py-1 text-sm border rounded ${state.currentPage === pageNum ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}"
                     >
                       ${pageNum}
@@ -2631,7 +2631,7 @@
                 }).join('')}
               </div>
               <button
-                onclick="window.goToPage(${state.currentPage + 1})"
+                onclick="window.goToPage_contactOpportunities(${state.currentPage + 1})"
                 ${state.currentPage === totalPages ? 'disabled' : ''}
                 class="px-3 py-1 text-sm border rounded ${state.currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
               >
@@ -2713,8 +2713,8 @@
         const endIdx = Math.min(startIdx + state.rowsPerPage, totalRecords);
         const paginatedContacts = filteredContacts.slice(startIdx, endIdx);
 
-        // Helper function to change page
-        window.goToPage = function(page) {
+        // Helper function to change page (unique for unique contact IDs table)
+        window.goToPage_uniqueContactIds = function(page) {
           if (page >= 1 && page <= totalPages) {
             state.currentPage = page;
             window.renderUniqueContactIdsTable();
@@ -2793,7 +2793,7 @@
             </div>
             <div class="flex items-center gap-2">
               <button
-                onclick="window.goToPage(${state.currentPage - 1})"
+                onclick="window.goToPage_uniqueContactIds(${state.currentPage - 1})"
                 ${state.currentPage === 1 ? 'disabled' : ''}
                 class="px-3 py-1 text-sm border rounded ${state.currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
               >
@@ -2814,7 +2814,7 @@
                   const isActive = pageNum === state.currentPage;
                   return `
                     <button
-                      onclick="window.goToPage(${pageNum})"
+                      onclick="window.goToPage_uniqueContactIds(${pageNum})"
                       class="px-3 py-1 text-sm border rounded ${isActive ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 hover:bg-gray-50'}"
                     >
                       ${pageNum}
@@ -2823,7 +2823,7 @@
                 }).join('')}
               </div>
               <button
-                onclick="window.goToPage(${state.currentPage + 1})"
+                onclick="window.goToPage_uniqueContactIds(${state.currentPage + 1})"
                 ${state.currentPage === totalPages ? 'disabled' : ''}
                 class="px-3 py-1 text-sm border rounded ${state.currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
               >
