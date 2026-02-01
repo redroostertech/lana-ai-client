@@ -1321,7 +1321,9 @@ class ApiClient {
   }
 
   async getMatterConversations(matterId, limit = 5, offset = 0) {
-    return this.get(`/api/v1/chat/sessions?matter_id=${matterId}&limit=${limit}&offset=${offset}`);
+    // Add cache-busting timestamp to ensure fresh data after conversation creation
+    const timestamp = Date.now();
+    return this.get(`/api/v1/chat/sessions?matter_id=${matterId}&limit=${limit}&offset=${offset}&_t=${timestamp}`);
   }
 
   // ============================================================

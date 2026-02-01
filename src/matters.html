@@ -1856,8 +1856,30 @@
     window.createMatterConversation = async function(matterId, matterName) {
       console.log('[matters.html.createMatterConversation] Creating conversation for matter:', { matterId, matterName });
 
+      // Find the button that triggered this action
+      const buttons = document.querySelectorAll(`button[onclick*="createMatterConversation('${matterId}'"]`);
+
+      // Disable all matching buttons and show loading state
+      buttons.forEach(button => {
+        button.disabled = true;
+        button.classList.add('opacity-50', 'cursor-not-allowed');
+
+        // Store original HTML
+        if (!button.dataset.originalHtml) {
+          button.dataset.originalHtml = button.innerHTML;
+        }
+
+        // Replace with loading spinner
+        button.innerHTML = `
+          <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span>Creating...</span>
+        `;
+      });
+
       try {
-        // Show loading indicator (could add a toast or button spinner here)
         console.log('[matters.html.createMatterConversation] Calling API to create conversation...');
 
         // Create conversation via API
@@ -1915,6 +1937,15 @@
 
       } catch (error) {
         console.error('[matters.html.createMatterConversation] Failed to create conversation:', error);
+
+        // Restore buttons on error
+        buttons.forEach(button => {
+          button.disabled = false;
+          button.classList.remove('opacity-50', 'cursor-not-allowed');
+          if (button.dataset.originalHtml) {
+            button.innerHTML = button.dataset.originalHtml;
+          }
+        });
 
         // Show user-friendly error message
         if (error.response?.data?.error?.code === 'MATTER_NOT_FOUND') {
@@ -4317,6 +4348,7 @@
 
     async function postComment(matterId) {
       const input = document.getElementById('commentInput');
+      const postBtn = document.getElementById('postComment');
 
       // Convert contenteditable HTML to raw text format for storage
       const mentions = [];
@@ -4365,6 +4397,18 @@
         return;
       }
 
+      // Show loading state on button
+      const originalButtonHtml = postBtn.innerHTML;
+      postBtn.disabled = true;
+      postBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      postBtn.innerHTML = `
+        <svg class="animate-spin h-4 w-4 inline-block mr-2" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        Posting...
+      `;
+
       try {
         await api.createComment(matterId, {
           content,
@@ -4375,9 +4419,19 @@
         input.innerHTML = '';
         Toast.success('Comment posted');
         await loadComments(matterId);
+
+        // Restore button state
+        postBtn.disabled = false;
+        postBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        postBtn.innerHTML = originalButtonHtml;
       } catch (error) {
         console.error('Failed to post comment:', error);
         Toast.error('Failed to post comment');
+
+        // Restore button state on error
+        postBtn.disabled = false;
+        postBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        postBtn.innerHTML = originalButtonHtml;
       }
     }
 
@@ -4757,9 +4811,23 @@
         await updateTaskStatus(task.id, newStatus);
         Toast.success(`Task moved to ${newStatus.replace('_', ' ')}`);
 
-        // Refresh the matter drawer to reload tasks
-        if (currentMatterData && currentMatterData.matter) {
-          await viewMatter(currentMatterData.matter.matter_id, 'tasks');
+        // CRITICAL FIX: Refresh tasks immediately instead of full viewMatter() reload
+        const matterId = (currentMatterData && currentMatterData.matter_id) ||
+                        (currentMatterData && currentMatterData.matter && currentMatterData.matter.matter_id);
+
+        if (matterId) {
+          const response = await api.getMatterTasks(matterId);
+          const updatedTasks = response.tasks || [];
+
+          // Update currentMatterData if it exists
+          if (currentMatterData) {
+            currentMatterData.tasks = updatedTasks;
+            renderTasksTab(currentMatterData, updatedTasks);
+          } else {
+            // Fallback: Render Kanban board directly
+            currentTasksList = updatedTasks;
+            renderKanbanBoard(matterId, updatedTasks);
+          }
         }
       } catch (error) {
         console.error('Failed to update task status:', error);
@@ -5116,14 +5184,22 @@
     window.quickCompleteTask = async function(taskId) {
       try {
         await api.completeTask(taskId);
-        Toast.success('Task completed - Refresh page to see updates');
+        Toast.success('Task completed');
 
-        // Refresh tasks (use cached matter ID or currentMatterData if available)
+        // Refresh tasks - CRITICAL FIX: Always refresh UI regardless of currentMatterData state
         const matterId = currentTaskMatterId || (currentMatterData && currentMatterData.matter_id);
         if (matterId) {
           const response = await api.getMatterTasks(matterId);
+          const updatedTasks = response.tasks || [];
+
+          // Update currentMatterData if it exists
           if (currentMatterData) {
-            renderTasksTab(currentMatterData, response.tasks || []);
+            currentMatterData.tasks = updatedTasks;
+            renderTasksTab(currentMatterData, updatedTasks);
+          } else {
+            // Fallback: Render Kanban board directly even if currentMatterData is not set
+            currentTasksList = updatedTasks;
+            renderKanbanBoard(matterId, updatedTasks);
           }
         }
       } catch (error) {
@@ -5142,10 +5218,21 @@
         await api.deleteTask(taskId);
         Toast.success('Task deleted successfully');
 
-        // Refresh tasks (use currentMatterData if available)
-        if (currentMatterData && currentMatterData.matter_id) {
-          const response = await api.getMatterTasks(currentMatterData.matter_id);
-          renderTasksTab(currentMatterData, response.tasks || []);
+        // Refresh tasks - CRITICAL FIX: Always refresh UI regardless of currentMatterData state
+        const matterId = currentTaskMatterId || (currentMatterData && currentMatterData.matter_id);
+        if (matterId) {
+          const response = await api.getMatterTasks(matterId);
+          const updatedTasks = response.tasks || [];
+
+          // Update currentMatterData if it exists
+          if (currentMatterData) {
+            currentMatterData.tasks = updatedTasks;
+            renderTasksTab(currentMatterData, updatedTasks);
+          } else {
+            // Fallback: Render Kanban board directly even if currentMatterData is not set
+            currentTasksList = updatedTasks;
+            renderKanbanBoard(matterId, updatedTasks);
+          }
         }
       } catch (error) {
         console.error('Delete task error:', error);
@@ -5164,14 +5251,26 @@
         title: document.getElementById('taskTitle').value,
         description: document.getElementById('taskDescription').value || null,
         notes: document.getElementById('taskNotes').value || null,
+        status: document.getElementById('taskStatus').value,
         priority: document.getElementById('taskPriority').value,
         due_date: document.getElementById('taskDueDate').value || null,
         assigned_to_user_id: document.getElementById('taskAssignedTo').value || null
       };
 
-      if (isEdit) {
-        taskData.status = document.getElementById('taskStatus').value;
-      }
+      // Get the submit button from the form
+      const submitBtn = event.target.querySelector('button[type="submit"]');
+      const originalButtonHtml = submitBtn.innerHTML;
+
+      // Show loading state on button
+      submitBtn.disabled = true;
+      submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      submitBtn.innerHTML = `
+        <svg class="animate-spin h-4 w-4 inline-block mr-2" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        ${isEdit ? 'Updating...' : 'Creating...'}
+      `;
 
       try {
         if (isEdit) {
@@ -5185,17 +5284,36 @@
         // Close modal
         document.getElementById('taskModal').classList.add('hidden');
 
-        // Refresh tasks using the matter ID from the task (not currentMatterData which might be undefined)
+        // Restore button state (will be reset when modal reopens anyway)
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        submitBtn.innerHTML = originalButtonHtml;
+
+        // Refresh tasks - CRITICAL FIX: Always refresh UI regardless of currentMatterData state
         const matterId = currentTaskMatterId || (currentMatterData && currentMatterData.matter_id);
         if (matterId) {
           const response = await api.getMatterTasks(matterId);
+          const updatedTasks = response.tasks || [];
+
+          // Update currentMatterData if it exists
           if (currentMatterData) {
-            renderTasksTab(currentMatterData, response.tasks || []);
+            currentMatterData.tasks = updatedTasks;
+            renderTasksTab(currentMatterData, updatedTasks);
+          } else {
+            // Fallback: Render Kanban board directly even if currentMatterData is not set
+            // This ensures tasks appear immediately after creation
+            currentTasksList = updatedTasks;
+            renderKanbanBoard(matterId, updatedTasks);
           }
         }
       } catch (error) {
         console.error('Save task error:', error);
         Toast.error(isEdit ? 'Failed to update task' : 'Failed to create task');
+
+        // Restore button state on error
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        submitBtn.innerHTML = originalButtonHtml;
       }
     };
 
