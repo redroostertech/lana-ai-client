@@ -497,6 +497,93 @@
     </div>
   </div>
 
+  <!-- Create Matter from Workspace Modal -->
+  <div id="workspaceMatterModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <div>
+          <h3 class="text-lg font-semibold text-gray-900">Create New Matter in Workspace</h3>
+          <p class="text-sm text-gray-500 mt-1">This matter will be automatically linked to the workspace</p>
+        </div>
+        <button id="closeWorkspaceMatterModal" class="text-gray-400 hover:text-gray-600">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <form id="workspaceMatterForm" class="p-6 space-y-5">
+        <input type="hidden" id="workspaceIdForMatter">
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Matter Name <span class="text-red-500">*</span></label>
+            <input type="text" id="workspaceMatterName" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Client Name</label>
+            <input type="text" id="workspaceClientName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+          <textarea id="workspaceMatterDescription" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Brief description of the matter..."></textarea>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Visibility</label>
+          <select id="workspaceMatterVisibility" class="select-standard w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+            <option value="private">Private - Only shared users can access</option>
+            <option value="organization">Organization - All org members can view</option>
+          </select>
+        </div>
+
+        <div class="mt-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+          <select id="workspaceMatterStatus" class="select-standard w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+            <option value="active">Active</option>
+            <option value="closed">Closed</option>
+            <option value="archived">Archived</option>
+          </select>
+        </div>
+
+        <!-- Share with Users Section -->
+        <div id="workspaceShareWithSection">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Share with Team Members</label>
+          <div class="border border-gray-200 rounded-lg">
+            <!-- Search users input -->
+            <div class="p-3 border-b border-gray-200">
+              <div class="relative">
+                <input type="text" id="workspaceUserSearchInput" placeholder="Search users to add..."
+                  class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+              </div>
+              <!-- User search results dropdown -->
+              <div id="workspaceUserSearchResults" class="hidden mt-2 max-h-40 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+                <!-- Results populated by JS -->
+              </div>
+            </div>
+            <!-- Selected users list -->
+            <div class="p-3">
+              <div id="workspaceSelectedUsersList" class="space-y-2">
+                <p class="text-sm text-gray-500 italic" id="workspaceNoUsersSelected">No users selected. Start typing to search and add team members.</p>
+              </div>
+            </div>
+          </div>
+          <p class="text-xs text-gray-500 mt-1">Selected users will have read and write access to this matter.</p>
+        </div>
+
+        <!-- Conflict Detection Section -->
+        <div id="workspaceConflictDetectionContainer"></div>
+
+        <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
+          <button type="button" id="cancelWorkspaceMatterBtn" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium">Cancel</button>
+          <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg">Create Matter</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Matter Details Drawer -->
   <div id="matterDrawer" class="hidden fixed inset-y-0 right-0 w-full bg-white shadow-xl z-40 transform translate-x-full transition-transform">
     <div class="h-full flex flex-col">
@@ -1705,6 +1792,15 @@
     Object.defineProperty(window, 'conflictDetection', {
       get() { return conflictDetection; },
       set(v) { conflictDetection = v; },
+      configurable: true
+    });
+
+    // Workspace matter modal variables
+    let workspaceSelectedUsers = [];
+    let workspaceConflictDetection = null;
+    Object.defineProperty(window, 'workspaceConflictDetection', {
+      get() { return workspaceConflictDetection; },
+      set(v) { workspaceConflictDetection = v; },
       configurable: true
     });
 
@@ -5854,22 +5950,26 @@
      * After matter is created, it will be automatically linked to the workspace
      */
     window.openCreateMatterDrawer = function(workspaceId) {
-      // Store the workspace ID for later use after matter creation
-      createMatterForWorkspaceId = workspaceId;
+      const modal = document.getElementById('workspaceMatterModal');
+      const form = document.getElementById('workspaceMatterForm');
 
-      // Trigger the existing create matter button to open the modal
-      const createBtn = document.getElementById('createMatterBtn');
-      if (createBtn) {
-        createBtn.click();
+      // Store workspace ID
+      document.getElementById('workspaceIdForMatter').value = workspaceId;
 
-        // After modal opens, change the matter type to "matter" (not workspace)
-        setTimeout(() => {
-          const matterRadio = document.querySelector('input[name="matterType"][value="matter"]');
-          if (matterRadio) {
-            matterRadio.checked = true;
-          }
-        }, 100);
+      // Reset form
+      form.reset();
+      workspaceSelectedUsers = [];
+      document.getElementById('workspaceSelectedUsersList').innerHTML = '<p class="text-sm text-gray-500 italic" id="workspaceNoUsersSelected">No users selected. Start typing to search and add team members.</p>';
+
+      // Initialize conflict detection for workspace matter
+      if (workspaceConflictDetection) {
+        workspaceConflictDetection.reset();
       }
+      workspaceConflictDetection = new ConflictDetection(api);
+      workspaceConflictDetection.initialize('workspaceConflictDetectionContainer');
+
+      // Show modal
+      modal.classList.remove('hidden');
     }
 
     // =============================================================================
@@ -6603,6 +6703,201 @@
             action: 'matter.create',
             client_name: data?.client_name,
             matter_type: data?.matter_type
+          });
+        }
+      }
+    });
+
+    // =============================================================================
+    // WORKSPACE MATTER MODAL HANDLERS
+    // =============================================================================
+
+    const workspaceMatterModal = document.getElementById('workspaceMatterModal');
+    const workspaceMatterForm = document.getElementById('workspaceMatterForm');
+
+    // Close modal handlers
+    document.getElementById('closeWorkspaceMatterModal').addEventListener('click', () => {
+      workspaceMatterModal.classList.add('hidden');
+      if (workspaceConflictDetection) {
+        workspaceConflictDetection.reset();
+      }
+    });
+
+    document.getElementById('cancelWorkspaceMatterBtn').addEventListener('click', () => {
+      workspaceMatterModal.classList.add('hidden');
+      if (workspaceConflictDetection) {
+        workspaceConflictDetection.reset();
+      }
+    });
+
+    // User search for workspace matter
+    document.getElementById('workspaceUserSearchInput').addEventListener('input', (e) => {
+      const query = e.target.value.toLowerCase().trim();
+      const resultsDiv = document.getElementById('workspaceUserSearchResults');
+
+      if (query.length < 2) {
+        resultsDiv.classList.add('hidden');
+        return;
+      }
+
+      const filtered = allOrgUsers.filter(u =>
+        (u.first_name?.toLowerCase() + ' ' + u.last_name?.toLowerCase()).includes(query) ||
+        u.email?.toLowerCase().includes(query)
+      );
+
+      if (filtered.length === 0) {
+        resultsDiv.innerHTML = '<p class="p-3 text-sm text-gray-500">No users found</p>';
+      } else {
+        resultsDiv.innerHTML = filtered.map(u => `
+          <button type="button" onclick="addWorkspaceUserToShare('${u.id}')"
+            class="w-full text-left px-3 py-2 hover:bg-gray-50 transition-colors">
+            <div class="font-medium text-sm">${u.first_name} ${u.last_name}</div>
+            <div class="text-xs text-gray-500">${u.email}</div>
+          </button>
+        `).join('');
+      }
+
+      resultsDiv.classList.remove('hidden');
+    });
+
+    window.addWorkspaceUserToShare = function(userId) {
+      const user = allOrgUsers.find(u => u.id === userId);
+      if (!user || workspaceSelectedUsers.find(u => u.id === userId)) return;
+
+      workspaceSelectedUsers.push(user);
+      renderWorkspaceSelectedUsers();
+
+      document.getElementById('workspaceUserSearchInput').value = '';
+      document.getElementById('workspaceUserSearchResults').classList.add('hidden');
+    };
+
+    window.removeWorkspaceUserFromShare = function(userId) {
+      workspaceSelectedUsers = workspaceSelectedUsers.filter(u => u.id !== userId);
+      renderWorkspaceSelectedUsers();
+    };
+
+    function renderWorkspaceSelectedUsers() {
+      const container = document.getElementById('workspaceSelectedUsersList');
+      const noUsersMsg = document.getElementById('workspaceNoUsersSelected');
+
+      if (workspaceSelectedUsers.length === 0) {
+        container.innerHTML = '<p class="text-sm text-gray-500 italic" id="workspaceNoUsersSelected">No users selected. Start typing to search and add team members.</p>';
+      } else {
+        container.innerHTML = workspaceSelectedUsers.map(u => `
+          <div class="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+            <div class="flex-1 min-w-0">
+              <div class="font-medium text-sm">${u.first_name} ${u.last_name}</div>
+              <div class="text-xs text-gray-500 truncate">${u.email}</div>
+            </div>
+            <button type="button" onclick="removeWorkspaceUserFromShare('${u.id}')"
+              class="ml-2 text-red-600 hover:text-red-800 p-1">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+        `).join('');
+      }
+    }
+
+    // Form submission for workspace matter
+    workspaceMatterForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      // Check if conflicts are acknowledged
+      if (workspaceConflictDetection && !workspaceConflictDetection.canProceed()) {
+        Toast.error('Please acknowledge the conflicts before proceeding');
+        return;
+      }
+
+      const workspaceId = document.getElementById('workspaceIdForMatter').value;
+      const data = {
+        client_name: document.getElementById('workspaceClientName').value,
+        name: document.getElementById('workspaceMatterName').value,
+        description: document.getElementById('workspaceMatterDescription').value,
+        status: document.getElementById('workspaceMatterStatus').value,
+        visibility: document.getElementById('workspaceMatterVisibility').value,
+        share_with: workspaceSelectedUsers.map(u => u.id),
+        matter_type: 'matter' // Always create as matter, not workspace
+      };
+
+      try {
+        const result = await api.createMatter(data);
+        const createdMatterId = result.matter?.matter_id;
+
+        Toast.success(`Matter created: ${createdMatterId || 'Success'}`);
+
+        // Save parties if any
+        if (workspaceConflictDetection && workspaceConflictDetection.getParties().length > 0) {
+          try {
+            const response = await fetch(`${api.baseURL}/api/v1/conflicts/parties`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${api.token}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                matter_id: result.matter?.id,
+                parties: workspaceConflictDetection.getParties()
+              })
+            });
+
+            if (response.ok) {
+              const partyResult = await response.json();
+              console.log(`Saved ${partyResult.data.count} parties to matter`);
+            }
+          } catch (error) {
+            console.error('Error saving parties:', error);
+          }
+        }
+
+        // Auto-link to workspace
+        if (workspaceId && createdMatterId) {
+          try {
+            const linkResponse = await fetch(`${api.baseUrl}/api/v1/entity-links`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${api.token}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                source_matter_id: workspaceId,
+                target_matter_id: createdMatterId,
+                link_type: 'workspace_matter'
+              })
+            });
+
+            if (linkResponse.ok) {
+              console.log('[Workspace Matter Creation] Auto-linked to workspace:', workspaceId);
+              Toast.success('Matter linked to workspace successfully');
+            } else {
+              console.error('[Workspace Matter Creation] Failed to auto-link');
+            }
+          } catch (error) {
+            console.error('[Workspace Matter Creation] Error auto-linking:', error);
+          }
+        }
+
+        workspaceMatterModal.classList.add('hidden');
+        workspaceSelectedUsers = [];
+        if (workspaceConflictDetection) {
+          workspaceConflictDetection.reset();
+        }
+        loadMatters();
+
+        // Refresh linked matters tab if viewing the workspace
+        const currentMatter = window.currentMatterDetails;
+        if (currentMatter && currentMatter.matter_id === workspaceId &&
+            document.getElementById('tabContentLinks').classList.contains('block')) {
+          renderLinkedMattersTab(currentMatter);
+        }
+
+      } catch (error) {
+        Toast.error(error.message);
+        if (window.analytics) {
+          window.analytics.trackError(error, {
+            action: 'workspace_matter.create',
+            workspace_id: workspaceId
           });
         }
       }
