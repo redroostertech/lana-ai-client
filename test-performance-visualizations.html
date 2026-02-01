@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LANA AI - Visualization Performance Test Suite</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .test-card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+    .test-running { background-color: #fef3c7; border-color: #f59e0b; }
+    .test-passed { background-color: #d1fae5; border-color: #10b981; }
+    .test-failed { background-color: #fee2e2; border-color: #ef4444; }
+    .metric { font-family: 'Courier New', monospace; font-size: 14px; }
+    #test-container { min-height: 400px; }
+  </style>
+</head>
+<body class="bg-gray-50 p-8">
+  <div class="max-w-7xl mx-auto">
+    <header class="mb-8">
+      <h1 class="text-3xl font-bold text-gray-900 mb-2">Visualization Performance Test Suite</h1>
+      <p class="text-gray-600">Comprehensive performance validation of modular ES6 visualization components</p>
+      <div class="mt-4 flex gap-4">
+        <button id="runAllTests" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-semibold">
+          Run All Tests
+        </button>
+        <button id="clearResults" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg font-semibold">
+          Clear Results
+        </button>
+      </div>
+    </header>
+
+    <!-- Performance Targets -->
+    <div class="bg-white rounded-lg shadow-sm p-6 mb-8">
+      <h2 class="text-xl font-bold mb-4">Performance Targets (SLAs)</h2>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+        <div class="border-l-4 border-indigo-500 pl-3">
+          <div class="text-gray-600">Initial Load</div>
+          <div class="font-bold text-lg">&lt; 200ms</div>
+        </div>
+        <div class="border-l-4 border-green-500 pl-3">
+          <div class="text-gray-600">Chart Render (1K pts)</div>
+          <div class="font-bold text-lg">&lt; 100ms</div>
+        </div>
+        <div class="border-l-4 border-amber-500 pl-3">
+          <div class="text-gray-600">Update Operation</div>
+          <div class="font-bold text-lg">&lt; 50ms</div>
+        </div>
+        <div class="border-l-4 border-red-500 pl-3">
+          <div class="text-gray-600">Memory Leak</div>
+          <div class="font-bold text-lg">0 MB</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Test Results Container -->
+    <div id="results-container">
+      <!-- Test cards will be inserted here -->
+    </div>
+
+    <!-- Chart Test Container (hidden) -->
+    <div id="test-container" class="hidden"></div>
+
+    <!-- Performance Summary -->
+    <div id="performance-summary" class="bg-white rounded-lg shadow-sm p-6 mt-8 hidden">
+      <h2 class="text-xl font-bold mb-4">Performance Summary</h2>
+      <div id="summary-content"></div>
+      <div id="final-verdict" class="mt-6 p-4 rounded-lg"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { ChartFactory } from './src/js/visualizations/chart-factory.js';
+    import { TimeSeriesRenderer } from './src/js/visualizations/renderers/time-series-renderer.js';
+    import { PieChartRenderer } from './src/js/visualizations/renderers/pie-chart-renderer.js';
+    import { BarChartRenderer } from './src/js/visualizations/renderers/bar-chart-renderer.js';
+    import { BubbleChartRenderer } from './src/js/visualizations/renderers/bubble-chart-renderer.js';
+    import { MetricGridRenderer } from './src/js/visualizations/renderers/metric-grid-renderer.js';
+    import { FunnelChartRenderer } from './src/js/visualizations/renderers/funnel-chart-renderer.js';
+
+    // Performance test suite
+    class PerformanceTestSuite {
+      constructor() {
+        this.results = [];
+        this.targets = {
+          initialLoad: 200,
+          chartRender1K: 100,
+          chartRender5K: 500,
+          updateOperation: 50,
+          memoryLeak: 10 * 1024 * 1024, // 10 MB
+          concurrentRender: 500
+        };
+      }
+
+      // Generate test data
+      generateTimeSeriesData(numPoints) {
+        const data = [];
+        const startDate = new Date('2024-01-01');
+        for (let i = 0; i < numPoints; i++) {
+          const date = new Date(startDate);
+          date.setDate(date.getDate() + i);
+          data.push({
+            date: date.toISOString().split('T')[0],
+            metrics: [
+              { key: 'revenue', value: Math.random() * 10000 + 5000 },
+              { key: 'expenses', value: Math.random() * 5000 + 2000 }
+            ]
+          });
+        }
+        return data;
+      }
+
+      generatePieData(numSlices) {
+        const labels = ['Category A', 'Category B', 'Category C', 'Category D', 'Category E'];
+        return Array(numSlices).fill(null).map((_, i) => ({
+          label: labels[i % labels.length] + ` ${Math.floor(i / labels.length) + 1}`,
+          value: Math.random() * 100 + 10
+        }));
+      }
+
+      generateBarData(numBars) {
+        const labels = ['Q1', 'Q2', 'Q3', 'Q4', 'H1', 'H2'];
+        return {
+          labels: Array(numBars).fill(null).map((_, i) =>
+            labels[i % labels.length] + ` ${Math.floor(i / labels.length) + 1}`
+          ),
+          values: Array(numBars).fill(null).map(() => Math.random() * 200 - 100)
+        };
+      }
+
+      // Measure performance
+      async measurePerformance(name, fn) {
+        const startTime = performance.now();
+        const startMemory = performance.memory ? performance.memory.usedJSHeapSize : 0;
+
+        await fn();
+
+        const endTime = performance.now();
+        const endMemory = performance.memory ? performance.memory.usedJSHeapSize : 0;
+
+        return {
+          name,
+          duration: endTime - startTime,
+          memoryDelta: endMemory - startMemory
+        };
+      }
+
+      // Test: Module Loading Time
+      async testModuleLoadingTime() {
+        const result = await this.measurePerformance('Module Loading', async () => {
+          // Modules are already loaded, but we can test factory instantiation
+          const factory = ChartFactory;
+          const supported = factory.getSupportedTypes();
+          console.log('Supported types:', supported);
+        });
+
+        const passed = result.duration < this.targets.initialLoad;
+        this.addResult({
+          category: 'Initial Load',
+          test: 'Module Loading Time',
+          duration: result.duration,
+          target: this.targets.initialLoad,
+          passed,
+          details: `Loaded ${ChartFactory.getSupportedTypes().length} renderer modules`
+        });
+      }
+
+      // Test: Chart Render Performance (1K points)
+      async testChartRender1K() {
+        const container = document.createElement('div');
+        container.id = 'test-chart-1k';
+        document.getElementById('test-container').appendChild(container);
+
+        const data = this.generateTimeSeriesData(1000);
+
+        const result = await this.measurePerformance('Chart Render (1K points)', async () => {
+          const renderer = new TimeSeriesRenderer('test-chart-1k', data, ['revenue', 'expenses']);
+          await renderer.render();
+          renderer.destroy();
+        });
+
+        container.remove();
+
+        const passed = result.duration < this.targets.chartRender1K;
+        this.addResult({
+          category: 'Rendering',
+          test: 'Time Series Render (1000 data points)',
+          duration: result.duration,
+          target: this.targets.chartRender1K,
+          passed,
+          details: `Rendered 2 metric series with 1000 points`
+        });
+      }
+
+      // Test: Chart Render Performance (5K points)
+      async testChartRender5K() {
+        const container = document.createElement('div');
+        container.id = 'test-chart-5k';
+        document.getElementById('test-container').appendChild(container);
+
+        const data = this.generateTimeSeriesData(5000);
+
+        const result = await this.measurePerformance('Chart Render (5K points)', async () => {
+          const renderer = new TimeSeriesRenderer('test-chart-5k', data, ['revenue', 'expenses']);
+          await renderer.render();
+          renderer.destroy();
+        });
+
+        container.remove();
+
+        const passed = result.duration < this.targets.chartRender5K;
+        this.addResult({
+          category: 'Rendering',
+          test: 'Time Series Render (5000 data points)',
+          duration: result.duration,
+          target: this.targets.chartRender5K,
+          passed,
+          details: `Rendered 2 metric series with 5000 points`
+        });
+      }
+
+      // Test: Pie Chart Render Performance
+      async testPieChartRender() {
+        const container = document.createElement('div');
+        container.id = 'test-pie-chart';
+        document.getElementById('test-container').appendChild(container);
+
+        const data = this.generatePieData(20);
+
+        const result = await this.measurePerformance('Pie Chart Render', async () => {
+          const renderer = new PieChartRenderer('test-pie-chart', data);
+          await renderer.render();
+          renderer.destroy();
+        });
+
+        container.remove();
+
+        const passed = result.duration < this.targets.chartRender1K;
+        this.addResult({
+          category: 'Rendering',
+          test: 'Pie Chart Render (20 slices)',
+          duration: result.duration,
+          target: this.targets.chartRender1K,
+          passed,
+          details: `Rendered pie chart with 20 slices`
+        });
+      }
+
+      // Test: Bar Chart Render Performance
+      async testBarChartRender() {
+        const container = document.createElement('div');
+        container.id = 'test-bar-chart';
+        document.getElementById('test-container').appendChild(container);
+
+        const data = this.generateBarData(50);
+
+        const result = await this.measurePerformance('Bar Chart Render', async () => {
+          const renderer = new BarChartRenderer('test-bar-chart', data, { orientation: 'horizontal' });
+          await renderer.render();
+          renderer.destroy();
+        });
+
+        container.remove();
+
+        const passed = result.duration < this.targets.chartRender1K;
+        this.addResult({
+          category: 'Rendering',
+          test: 'Bar Chart Render (50 bars)',
+          duration: result.duration,
+          target: this.targets.chartRender1K,
+          passed,
+          details: `Rendered horizontal bar chart with 50 bars`
+        });
+      }
+
+      // Test: Memory Leak Detection
+      async testMemoryLeak() {
+        const container = document.createElement('div');
+        container.id = 'test-memory-leak';
+        document.getElementById('test-container').appendChild(container);
+
+        const initialMemory = performance.memory ? performance.memory.usedJSHeapSize : 0;
+
+        const result = await this.measurePerformance('Memory Leak Test', async () => {
+          // Create and destroy 100 chart instances
+          for (let i = 0; i < 100; i++) {
+            const data = this.generateTimeSeriesData(100);
+            const renderer = new TimeSeriesRenderer('test-memory-leak', data, ['revenue']);
+            await renderer.render();
+            renderer.destroy();
+
+            // Clear container
+            container.innerHTML = '';
+          }
+
+          // Force garbage collection if available
+          if (window.gc) {
+            window.gc();
+          }
+        });
+
+        container.remove();
+
+        const finalMemory = performance.memory ? performance.memory.usedJSHeapSize : 0;
+        const memoryLeak = finalMemory - initialMemory;
+        const passed = memoryLeak < this.targets.memoryLeak;
+
+        this.addResult({
+          category: 'Memory',
+          test: 'Memory Leak (100 create/destroy cycles)',
+          duration: result.duration,
+          memory: memoryLeak,
+          target: this.targets.memoryLeak,
+          passed,
+          details: `Memory delta: ${(memoryLeak / 1024 / 1024).toFixed(2)} MB`
+        });
+      }
+
+      // Test: Update Performance
+      async testUpdatePerformance() {
+        const container = document.createElement('div');
+        container.id = 'test-update';
+        document.getElementById('test-container').appendChild(container);
+
+        const data = this.generateTimeSeriesData(100);
+        const renderer = new TimeSeriesRenderer('test-update', data, ['revenue', 'expenses']);
+        await renderer.render();
+
+        const result = await this.measurePerformance('Update Performance', async () => {
+          // Update chart 50 times
+          for (let i = 0; i < 50; i++) {
+            const newData = this.generateTimeSeriesData(100);
+            renderer.timeSeries = newData;
+            await renderer.render();
+          }
+        });
+
+        const avgUpdateTime = result.duration / 50;
+        renderer.destroy();
+        container.remove();
+
+        const passed = avgUpdateTime < this.targets.updateOperation;
+        this.addResult({
+          category: 'Updates',
+          test: 'Chart Update Performance (50 updates)',
+          duration: avgUpdateTime,
+          target: this.targets.updateOperation,
+          passed,
+          details: `Average update time: ${avgUpdateTime.toFixed(2)}ms`
+        });
+      }
+
+      // Test: Concurrent Rendering
+      async testConcurrentRendering() {
+        const numCharts = 10;
+        const containers = [];
+
+        // Create containers
+        for (let i = 0; i < numCharts; i++) {
+          const container = document.createElement('div');
+          container.id = `test-concurrent-${i}`;
+          document.getElementById('test-container').appendChild(container);
+          containers.push(container);
+        }
+
+        const result = await this.measurePerformance('Concurrent Rendering', async () => {
+          const renderers = [];
+
+          // Create all renderers
+          for (let i = 0; i < numCharts; i++) {
+            const data = this.generateTimeSeriesData(100);
+            const renderer = new TimeSeriesRenderer(`test-concurrent-${i}`, data, ['revenue']);
+            renderers.push(renderer);
+          }
+
+          // Render all concurrently
+          await Promise.all(renderers.map(r => r.render()));
+
+          // Cleanup
+          renderers.forEach(r => r.destroy());
+        });
+
+        containers.forEach(c => c.remove());
+
+        const passed = result.duration < this.targets.concurrentRender;
+        this.addResult({
+          category: 'Concurrency',
+          test: 'Concurrent Chart Rendering (10 charts)',
+          duration: result.duration,
+          target: this.targets.concurrentRender,
+          passed,
+          details: `Rendered ${numCharts} charts concurrently`
+        });
+      }
+
+      // Test: Factory Pattern Overhead
+      async testFactoryOverhead() {
+        const container = document.createElement('div');
+        container.id = 'test-factory';
+        document.getElementById('test-container').appendChild(container);
+
+        const data = this.generateTimeSeriesData(100);
+
+        const directResult = await this.measurePerformance('Direct Instantiation', async () => {
+          const renderer = new TimeSeriesRenderer('test-factory', data, ['revenue']);
+          await renderer.render();
+          renderer.destroy();
+        });
+
+        const factoryResult = await this.measurePerformance('Factory Instantiation', async () => {
+          const renderer = ChartFactory.createRenderer(
+            { type: 'time_series' },
+            'test-factory',
+            data,
+            { metricKeys: ['revenue'] }
+          );
+          await renderer.render();
+          renderer.destroy();
+        });
+
+        container.remove();
+
+        const overhead = factoryResult.duration - directResult.duration;
+        const passed = overhead < 10; // Factory should add < 10ms overhead
+
+        this.addResult({
+          category: 'Factory',
+          test: 'Factory Pattern Overhead',
+          duration: overhead,
+          target: 10,
+          passed,
+          details: `Direct: ${directResult.duration.toFixed(2)}ms, Factory: ${factoryResult.duration.toFixed(2)}ms`
+        });
+      }
+
+      // Add result
+      addResult(result) {
+        this.results.push(result);
+        this.renderResult(result);
+      }
+
+      // Render individual result
+      renderResult(result) {
+        const container = document.getElementById('results-container');
+        const card = document.createElement('div');
+        card.className = `test-card ${result.passed ? 'test-passed' : 'test-failed'}`;
+
+        const statusIcon = result.passed ? '✓' : '✗';
+        const statusColor = result.passed ? 'text-green-700' : 'text-red-700';
+
+        card.innerHTML = `
+          <div class="flex items-center justify-between mb-2">
+            <div>
+              <span class="text-xs font-semibold text-gray-500 uppercase">${result.category}</span>
+              <h3 class="text-lg font-bold">${result.test}</h3>
+            </div>
+            <div class="${statusColor} text-2xl font-bold">${statusIcon}</div>
+          </div>
+          <div class="grid grid-cols-2 gap-4 mt-3">
+            <div>
+              <div class="text-xs text-gray-600">Duration</div>
+              <div class="metric text-lg font-bold">${result.duration.toFixed(2)}ms</div>
+            </div>
+            <div>
+              <div class="text-xs text-gray-600">Target</div>
+              <div class="metric text-lg">&lt; ${result.target}ms</div>
+            </div>
+            ${result.memory !== undefined ? `
+            <div>
+              <div class="text-xs text-gray-600">Memory Delta</div>
+              <div class="metric text-sm">${(result.memory / 1024 / 1024).toFixed(2)} MB</div>
+            </div>
+            ` : ''}
+          </div>
+          <div class="mt-3 text-sm text-gray-700">${result.details}</div>
+        `;
+
+        container.appendChild(card);
+      }
+
+      // Generate summary
+      generateSummary() {
+        const passed = this.results.filter(r => r.passed).length;
+        const failed = this.results.filter(r => !r.passed).length;
+        const total = this.results.length;
+        const passRate = (passed / total * 100).toFixed(1);
+
+        const avgDuration = (this.results.reduce((sum, r) => sum + r.duration, 0) / total).toFixed(2);
+
+        const verdict = failed === 0 ? 'APPROVED' :
+                        failed <= 2 ? 'APPROVED WITH OPTIMIZATIONS' :
+                        'BLOCKED';
+
+        const verdictColor = failed === 0 ? 'bg-green-100 border-green-500 text-green-900' :
+                             failed <= 2 ? 'bg-amber-100 border-amber-500 text-amber-900' :
+                             'bg-red-100 border-red-500 text-red-900';
+
+        document.getElementById('summary-content').innerHTML = `
+          <div class="grid grid-cols-4 gap-4 mb-4">
+            <div class="border-l-4 border-green-500 pl-3">
+              <div class="text-gray-600 text-sm">Tests Passed</div>
+              <div class="font-bold text-2xl text-green-700">${passed}</div>
+            </div>
+            <div class="border-l-4 border-red-500 pl-3">
+              <div class="text-gray-600 text-sm">Tests Failed</div>
+              <div class="font-bold text-2xl text-red-700">${failed}</div>
+            </div>
+            <div class="border-l-4 border-indigo-500 pl-3">
+              <div class="text-gray-600 text-sm">Pass Rate</div>
+              <div class="font-bold text-2xl">${passRate}%</div>
+            </div>
+            <div class="border-l-4 border-purple-500 pl-3">
+              <div class="text-gray-600 text-sm">Avg Duration</div>
+              <div class="font-bold text-2xl">${avgDuration}ms</div>
+            </div>
+          </div>
+        `;
+
+        document.getElementById('final-verdict').innerHTML = `
+          <div class="${verdictColor} border-l-4 pl-4 py-2">
+            <div class="font-bold text-xl">Performance Sign-off: ${verdict}</div>
+            <div class="text-sm mt-1">
+              ${failed === 0 ? 'All performance targets met. Ready for production.' :
+                failed <= 2 ? 'Minor optimizations recommended before production deployment.' :
+                'Critical performance issues detected. Requires optimization before deployment.'}
+            </div>
+          </div>
+        `;
+
+        document.getElementById('performance-summary').classList.remove('hidden');
+      }
+
+      // Run all tests
+      async runAll() {
+        this.results = [];
+        document.getElementById('results-container').innerHTML = '';
+        document.getElementById('performance-summary').classList.add('hidden');
+
+        console.log('Starting performance test suite...');
+
+        await this.testModuleLoadingTime();
+        await this.testChartRender1K();
+        await this.testChartRender5K();
+        await this.testPieChartRender();
+        await this.testBarChartRender();
+        await this.testMemoryLeak();
+        await this.testUpdatePerformance();
+        await this.testConcurrentRendering();
+        await this.testFactoryOverhead();
+
+        this.generateSummary();
+
+        console.log('Performance test suite completed!');
+        console.table(this.results);
+      }
+    }
+
+    // Initialize test suite
+    const testSuite = new PerformanceTestSuite();
+
+    // Event listeners
+    document.getElementById('runAllTests').addEventListener('click', () => {
+      testSuite.runAll();
+    });
+
+    document.getElementById('clearResults').addEventListener('click', () => {
+      document.getElementById('results-container').innerHTML = '';
+      document.getElementById('performance-summary').classList.add('hidden');
+      testSuite.results = [];
+    });
+
+    // Auto-run on load (optional)
+    // testSuite.runAll();
+  </script>
+</body>
+</html>

@@ -1250,8 +1250,10 @@ class ApiClient {
     return this.get(`/api/v1/matters?${params}`);
   }
 
-  async getMatter(matterId) {
-    const result = await this.get(`/api/v1/matters/${matterId}`);
+  async getMatter(matterId, options = {}) {
+    // Add cache-busting parameter if requested (used after updates to force fresh data)
+    const cacheBust = options.bustCache ? `?_t=${Date.now()}` : '';
+    const result = await this.get(`/api/v1/matters/${matterId}${cacheBust}`);
 
     // Track matter view
     if (result.success && window.FeatureTracker) {

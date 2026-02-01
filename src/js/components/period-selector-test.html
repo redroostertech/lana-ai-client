@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PeriodSelector Component Test</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 p-8">
+  <div class="max-w-4xl mx-auto">
+    <h1 class="text-3xl font-bold mb-6">PeriodSelector Component Test</h1>
+    
+    <!-- Test Container -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+      <h2 class="text-xl font-semibold mb-4">Period Selector</h2>
+      <div id="period-selector-container"></div>
+    </div>
+    
+    <!-- Output Display -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <h2 class="text-xl font-semibold mb-4">Current Period</h2>
+      <pre id="period-output" class="bg-gray-50 p-4 rounded-lg text-sm"></pre>
+      
+      <div class="mt-4 flex gap-2">
+        <button id="validateBtn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+          Validate Period
+        </button>
+        <button id="getBtn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+          Get Period
+        </button>
+        <button id="setBtn" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">
+          Set Custom Period
+        </button>
+      </div>
+      
+      <div id="validation-result" class="mt-4 hidden"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { PeriodSelector } from './period-selector.js';
+
+    // Create period selector instance
+    const selector = new PeriodSelector({
+      containerId: 'period-selector-container',
+      defaultPreset: 'last30days',
+      defaultPeriodType: 'monthly',
+      onChange: (period) => {
+        console.log('Period changed:', period);
+        updateOutput(period);
+      }
+    });
+
+    // Render the component
+    selector.render();
+
+    // Update output display
+    function updateOutput(period) {
+      document.getElementById('period-output').textContent = JSON.stringify(period, null, 2);
+    }
+
+    // Initial output
+    updateOutput(selector.getPeriod());
+
+    // Validate button
+    document.getElementById('validateBtn').addEventListener('click', () => {
+      const validation = selector.validate();
+      const resultDiv = document.getElementById('validation-result');
+      
+      if (validation.valid) {
+        resultDiv.className = 'mt-4 bg-green-50 border border-green-200 rounded-lg p-4';
+        resultDiv.innerHTML = `
+          <div class="flex items-center gap-2">
+            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            <span class="text-green-800 font-medium">Period is valid!</span>
+          </div>
+        `;
+      } else {
+        resultDiv.className = 'mt-4 bg-red-50 border border-red-200 rounded-lg p-4';
+        resultDiv.innerHTML = `
+          <div class="flex items-center gap-2">
+            <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+            <span class="text-red-800 font-medium">${validation.error}</span>
+          </div>
+        `;
+      }
+      
+      resultDiv.classList.remove('hidden');
+    });
+
+    // Get period button
+    document.getElementById('getBtn').addEventListener('click', () => {
+      const period = selector.getPeriod();
+      alert(`Current Period:\nStart: ${period.start}\nEnd: ${period.end}\nType: ${period.type}`);
+    });
+
+    // Set custom period button
+    document.getElementById('setBtn').addEventListener('click', () => {
+      // Set to Q4 2025
+      selector.setPeriod('2025-10-01', '2025-12-31', 'quarterly');
+      alert('Period set to Q4 2025 (quarterly)');
+    });
+  </script>
+</body>
+</html>

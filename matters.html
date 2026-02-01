@@ -1957,6 +1957,11 @@
 
     // Edit matter
     window.editMatter = async function(matterId) {
+      // Remember if drawer was open for this matter when editing started
+      // So we can re-open it after the update
+      const wasDrawerOpen = currentMatterData?.matter?.matter_id === matterId;
+      window._editingMatterFromDrawer = wasDrawerOpen ? matterId : null;
+
       try {
         const [matterResult, permResult] = await Promise.all([
           api.getMatter(matterId),
@@ -1964,7 +1969,7 @@
         ]);
         const matter = matterResult.matter;
         const permissions = permResult.permissions || [];
-        
+
         document.getElementById('matterModalTitle').textContent = 'Edit Matter';
         document.getElementById('matterId').value = matter.matter_id;
         document.getElementById('matterIdDisplay').classList.remove('hidden');
@@ -2004,7 +2009,7 @@
     // Store current matter data globally for tab switching
     let currentMatterData = null;
 
-    window.viewMatter = async function(matterId, defaultTab = 'details') {
+    window.viewMatter = async function(matterId, defaultTab = 'details', options = {}) {
       const drawer = document.getElementById('matterDrawer');
       const overlay = document.getElementById('drawerOverlay');
 
@@ -2012,13 +2017,14 @@
       console.log('[viewMatter] Loading matter details:', {
         matterId,
         format: matterId.startsWith('MATT-') ? 'MATT-XXXXX' : 'other',
-        defaultTab
+        defaultTab,
+        bustCache: options.bustCache || false
       });
 
       try {
         // Fetch all matter data in parallel
         const [matterResult, permissionsResult, activityResult, chatsResult, docsResult, orphanedResult, tasksResult, commentsResult] = await Promise.all([
-          api.getMatter(matterId),
+          api.getMatter(matterId, { bustCache: options.bustCache }),
           api.getMatterPermissions(matterId).catch(() => ({ permissions: [] })),
           api.getMatterActivity(matterId, 20, 0).catch(() => ({ activities: [], pagination: { total: 0, limit: 20, offset: 0 } })), // Get first page for activity tab
           api.getMatterConversations(matterId, 25, 0).catch((err) => {
@@ -5761,11 +5767,13 @@
         }
         loadMatters();
 
-        // If the matter drawer is currently open for this matter, refresh it
+        // If the drawer was open when editing started, re-open it with refreshed data
         // This ensures the drawer shows the updated matter name and refreshed conversation list
-        if (matterId && currentMatterData?.matter?.matter_id === matterId) {
-          console.log('[Matter Edit] Refreshing open drawer for updated matter:', matterId);
-          await viewMatter(matterId, 'details');
+        if (matterId && window._editingMatterFromDrawer === matterId) {
+          console.log('[Matter Edit] Re-opening drawer with updated matter data:', matterId);
+          // Bust browser cache to force fresh data after update
+          await viewMatter(matterId, 'details', { bustCache: true });
+          window._editingMatterFromDrawer = null; // Clear the flag
         }
       } catch (error) {
         Toast.error(error.message);
