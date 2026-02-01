@@ -699,7 +699,7 @@
         </div>
 
         <!-- Link Type -->
-        <div>
+        <div id="linkTypeContainer">
           <label class="block text-sm font-medium text-gray-700 mb-1">Link Type</label>
           <select id="linkType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
             <option value="related_to">Related To (bidirectional)</option>
@@ -5311,7 +5311,7 @@
 
       try {
         // Load linked matters from API
-        const response = await fetch(`${window.API_BASE_URL}/api/v1/entity-links/matter/${matter.matter_id}`, {
+        const response = await fetch(`${api.baseUrl}/api/v1/entity-links/matter/${matter.matter_id}`, {
           headers: {
             'Authorization': `Bearer ${api.token}`,
             'Content-Type': 'application/json'
@@ -5360,14 +5360,35 @@
             </div>
             <h4 class="text-lg font-semibold text-gray-900 mb-2">No linked matters</h4>
             <p class="text-gray-500 mb-4">${isWorkspace ? 'Link matters to this workspace to organize related work' : 'Link this matter to related matters or add it to a workspace'}</p>
-            ${isMatter ? `
-              <button
-                onclick="openCreateLinkModal('${matter.matter_id}')"
-                class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-              >
-                Link Related Matter
-              </button>
-            ` : ''}
+<div class="flex items-center justify-center gap-3">
+              ${isWorkspace ? `
+                <button
+                  onclick="openCreateLinkModal('${matter.matter_id}', true)"
+                  class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                  </svg>
+                  Link Existing Matter
+                </button>
+                <button
+                  onclick="openCreateMatterDrawer('${matter.matter_id}')"
+                  class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                  </svg>
+                  Create New Matter
+                </button>
+              ` : `
+                <button
+                  onclick="openCreateLinkModal('${matter.matter_id}', false)"
+                  class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                >
+                  Link Related Matter
+                </button>
+              `}
+            </div>
           </div>
         `;
         return;
@@ -5376,12 +5397,35 @@
       // Build HTML for each link group
       let html = '<div class="space-y-6">';
 
-      // Add create link button at top for matters
-      if (isMatter) {
+      // Add action buttons at top
+      if (isWorkspace) {
+        html += `
+          <div class="flex justify-end gap-3">
+            <button
+              onclick="openCreateLinkModal('${matter.matter_id}', true)"
+              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+              </svg>
+              Link Existing Matter
+            </button>
+            <button
+              onclick="openCreateMatterDrawer('${matter.matter_id}')"
+              class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+              Create New Matter
+            </button>
+          </div>
+        `;
+      } else if (isMatter) {
         html += `
           <div class="flex justify-end">
             <button
-              onclick="openCreateLinkModal('${matter.matter_id}')"
+              onclick="openCreateLinkModal('${matter.matter_id}', false)"
               class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -5535,24 +5579,43 @@
 
     let linkSearchTimeout = null;
     let selectedLinkTargetMatter = null;
+    let createMatterForWorkspaceId = null; // Store workspace ID when creating matter from workspace
 
     /**
      * Open the create link modal
+     * @param {string} sourceMatterId - The source matter/workspace ID
+     * @param {boolean} isWorkspace - Whether the source is a workspace
      */
-    function openCreateLinkModal(sourceMatterId) {
+    function openCreateLinkModal(sourceMatterId, isWorkspace = false) {
       const modal = document.getElementById('createLinkModal');
       const sourceInput = document.getElementById('linkSourceMatterId');
       const searchInput = document.getElementById('linkMatterSearch');
       const submitBtn = document.getElementById('createLinkBtn');
+      const modalTitle = modal.querySelector('h3');
+      const modalSubtitle = modal.querySelector('p.text-sm.text-gray-500');
+      const linkTypeContainer = document.getElementById('linkTypeContainer');
 
       // Set source matter ID
       sourceInput.value = sourceMatterId;
+      sourceInput.dataset.isWorkspace = isWorkspace;
+
+      // Update modal text based on source type
+      if (isWorkspace) {
+        modalTitle.textContent = 'Add Matter to Workspace';
+        modalSubtitle.textContent = 'Link an existing matter to this workspace';
+        linkTypeContainer.style.display = 'none'; // Hide link type for workspaces
+        document.getElementById('linkType').value = 'workspace_matter';
+      } else {
+        modalTitle.textContent = 'Link Related Matter';
+        modalSubtitle.textContent = 'Connect this matter to another matter';
+        linkTypeContainer.style.display = 'block'; // Show link type for matters
+        document.getElementById('linkType').value = 'related_to';
+      }
 
       // Reset form
       searchInput.value = '';
       document.getElementById('linkMatterSearchResults').classList.add('hidden');
       document.getElementById('selectedLinkMatter').classList.add('hidden');
-      document.getElementById('linkType').value = 'related_to';
       submitBtn.disabled = true;
       selectedLinkTargetMatter = null;
 
@@ -5609,7 +5672,7 @@
 
           // Search matters
           const response = await fetch(
-            `${window.API_BASE_URL}/api/v1/matters?search=${encodeURIComponent(query)}&limit=10`,
+            `${api.baseUrl}/api/v1/matters?search=${encodeURIComponent(query)}&limit=10`,
             {
               headers: {
                 'Authorization': `Bearer ${api.token}`,
@@ -5708,7 +5771,7 @@
         submitBtn.disabled = true;
         submitBtn.textContent = 'Creating...';
 
-        const response = await fetch(`${window.API_BASE_URL}/api/v1/entity-links`, {
+        const response = await fetch(`${api.baseUrl}/api/v1/entity-links`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${api.token}`,
@@ -5759,7 +5822,7 @@
      */
     async function deleteLink(linkId) {
       try {
-        const response = await fetch(`${window.API_BASE_URL}/api/v1/entity-links/${linkId}`, {
+        const response = await fetch(`${api.baseUrl}/api/v1/entity-links/${linkId}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${api.token}`,
@@ -5783,6 +5846,29 @@
       } catch (error) {
         console.error('Delete link error:', error);
         showNotification(error.message || 'Failed to delete link', 'error');
+      }
+    }
+
+    /**
+     * Open the create matter modal from within a workspace
+     * After matter is created, it will be automatically linked to the workspace
+     */
+    function openCreateMatterDrawer(workspaceId) {
+      // Store the workspace ID for later use after matter creation
+      createMatterForWorkspaceId = workspaceId;
+
+      // Trigger the existing create matter button to open the modal
+      const createBtn = document.getElementById('createMatterBtn');
+      if (createBtn) {
+        createBtn.click();
+
+        // After modal opens, change the matter type to "matter" (not workspace)
+        setTimeout(() => {
+          const matterRadio = document.querySelector('input[name="matterType"][value="matter"]');
+          if (matterRadio) {
+            matterRadio.checked = true;
+          }
+        }, 100);
       }
     }
 
@@ -6436,6 +6522,35 @@
           }
 
           Toast.success(`Matter created: ${result.matter?.matter_id || 'Success'}`);
+
+          // Auto-link to workspace if created from workspace
+          if (createMatterForWorkspaceId && result.matter?.matter_id) {
+            try {
+              const linkResponse = await fetch(`${api.baseUrl}/api/v1/entity-links`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${api.token}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  source_matter_id: createMatterForWorkspaceId,
+                  target_matter_id: result.matter.matter_id,
+                  link_type: 'workspace_matter'
+                })
+              });
+
+              if (linkResponse.ok) {
+                console.log('[Matter Creation] Auto-linked matter to workspace:', createMatterForWorkspaceId);
+              } else {
+                console.error('[Matter Creation] Failed to auto-link to workspace');
+              }
+            } catch (error) {
+              console.error('[Matter Creation] Error auto-linking to workspace:', error);
+            } finally {
+              // Clear the workspace ID
+              createMatterForWorkspaceId = null;
+            }
+          }
         }
 
         // Save parties if any were added
