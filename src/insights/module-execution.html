@@ -1597,6 +1597,7 @@
 
         if (!drilldownRenderer) {
           drilldownRenderer = new DrilldownRenderer();
+          window.drilldownRenderer = drilldownRenderer;
         }
 
         await drilldownRenderer.open(moduleKey, metricKey, {
@@ -1668,18 +1669,17 @@
     // Generic drilldown handler (uses DrilldownRenderer class)
     async function tryGenericDrilldown(content, moduleKey, metricKey, periodStart, periodEnd) {
       try {
-        // Use the DrilldownRenderer class instead of custom rendering
-        if (window.drilldownRenderer) {
-          await window.drilldownRenderer.open(moduleKey, metricKey, {
-            periodStart,
-            periodEnd,
-            organizationId: api.user.organization_id
-          });
-          return true;
+        // Ensure global instance exists so pagination onclick (window.drilldownRenderer) works
+        if (!window.drilldownRenderer) {
+          window.drilldownRenderer = drilldownRenderer || new DrilldownRenderer();
+          drilldownRenderer = window.drilldownRenderer;
         }
-
-        console.error('[Drilldown] DrilldownRenderer not available');
-        return false;
+        await window.drilldownRenderer.open(moduleKey, metricKey, {
+          periodStart,
+          periodEnd,
+          organizationId: api.user.organization_id
+        });
+        return true;
       } catch (error) {
         // If drilldown not found (404), return false to fall back to legacy
         if (error.response?.status === 404 || error.status === 404) {
