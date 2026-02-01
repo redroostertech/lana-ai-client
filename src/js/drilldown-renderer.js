@@ -359,6 +359,10 @@ class DrilldownRenderer {
     this.filters = {};
     this.searchQuery = '';
 
+    // Clear search input so previous drilldown's query is not persisted
+    const searchInput = document.getElementById('drilldown-search');
+    if (searchInput) searchInput.value = '';
+
     // Show loading state
     this.showLoading();
 
