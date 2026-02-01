@@ -442,10 +442,19 @@ class DrilldownRenderer {
    * Close the drilldown modal
    */
   close() {
-    this.modal.classList.add('hidden');
+    if (!this.modal) {
+      this.modal = document.getElementById('drilldown-modal');
+    }
+
+    if (this.modal) {
+      this.modal.classList.add('hidden');
+    }
+
     document.body.classList.remove('overflow-hidden');
     this.currentConfig = null;
     this.currentData = null;
+
+    console.log('[DrilldownRenderer] Modal closed, state cleared');
   }
 
   /**
