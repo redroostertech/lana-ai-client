@@ -6372,8 +6372,8 @@
      */
     function renderPieChart(viz, data, uniqueId) {
       const metric = data.metrics.find(m => viz.metrics?.includes(m.key));
-      if (!metric || !metric.current || !Array.isArray(metric.current)) {
-        return null;
+      if (!metric || !Array.isArray(metric.current)) {
+        return null; // Metric not found or not a distribution type
       }
 
       const containerId = `pie-chart-container-${uniqueId}`;
@@ -6383,6 +6383,25 @@
       containerDiv.id = containerId;
       containerDiv.className = 'mb-6';
 
+      // Handle empty data - show empty state instead of blank chart
+      if (metric.current.length === 0) {
+        containerDiv.innerHTML = `
+          <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold mb-2">${viz.title || 'Distribution'}</h3>
+            ${viz.description ? `<p class="text-sm text-gray-600 mb-4">${viz.description}</p>` : ''}
+            <div class="text-center py-12 text-gray-500">
+              <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+              </svg>
+              <p class="mt-2 text-sm">No data available for this period</p>
+              <p class="text-xs text-gray-400 mt-1">Try adjusting your date range or filters</p>
+            </div>
+          </div>
+        `;
+        return containerDiv;
+      }
+
+      // Render chart with data
       const renderer = new PieChartRenderer(containerId, metric.current, {
         title: viz.title,
         description: viz.description,
@@ -6442,7 +6461,6 @@
 
       // Extract data (distribution metrics use 'current' field which is an array)
       const chartData = Array.isArray(metric.current) ? metric.current : (Array.isArray(metric.result) ? metric.result : []);
-      if (chartData.length === 0) return null;
 
       const containerId = `bar-chart-container-${uniqueId}`;
 
@@ -6451,6 +6469,25 @@
       containerDiv.id = containerId;
       containerDiv.className = 'mb-6';
 
+      // Handle empty data - show empty state instead of returning null
+      if (chartData.length === 0) {
+        containerDiv.innerHTML = `
+          <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold mb-2">${viz.title || 'Chart'}</h3>
+            ${viz.description ? `<p class="text-sm text-gray-600 mb-4">${viz.description}</p>` : ''}
+            <div class="text-center py-12 text-gray-500">
+              <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+              </svg>
+              <p class="mt-2 text-sm">No data available for this period</p>
+              <p class="text-xs text-gray-400 mt-1">Try adjusting your date range or filters</p>
+            </div>
+          </div>
+        `;
+        return containerDiv;
+      }
+
+      // Render chart with data
       // Pass the DOM element directly instead of ID string
       const renderer = new BarChartRenderer(containerDiv, {
         labels: chartData.map(d => d.label || 'Unknown'),
