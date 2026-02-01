@@ -112,6 +112,8 @@ export class BubbleChartRenderer {
     const defaultConfig = {
       title: 'Bubble Chart',
       description: null,
+      maxDataPoints: 1000,
+      enableSampling: true,
       xAxis: {
         label: 'X Axis',
         min: 0,
@@ -147,6 +149,37 @@ export class BubbleChartRenderer {
       colors: { ...defaultConfig.colors, ...(userConfig.colors || {}) },
       tooltip: { ...defaultConfig.tooltip, ...(userConfig.tooltip || {}) }
     };
+  }
+
+  /**
+   * Samples large datasets to improve rendering performance
+   *
+   * For large datasets (> 1000 points), automatic data sampling is applied
+   * to maintain performance. Configure with `maxDataPoints` and `enableSampling` options.
+   *
+   * @private
+   * @param {Array} data - Original dataset
+   * @param {number} maxPoints - Maximum number of points to render (default: 1000)
+   * @returns {Array} - Sampled dataset
+   */
+  _sampleData(data, maxPoints = 1000) {
+    if (!Array.isArray(data) || data.length <= maxPoints) {
+      return data;
+    }
+
+    const step = Math.ceil(data.length / maxPoints);
+    const sampled = [];
+
+    for (let i = 0; i < data.length; i += step) {
+      sampled.push(data[i]);
+    }
+
+    // Always include last data point
+    if (sampled[sampled.length - 1] !== data[data.length - 1]) {
+      sampled.push(data[data.length - 1]);
+    }
+
+    return sampled;
   }
 
   /**
@@ -266,6 +299,9 @@ export class BubbleChartRenderer {
   /**
    * Render the bubble chart
    *
+   * For large datasets (> 1000 points), automatic data sampling is applied
+   * to maintain performance. Configure with `maxDataPoints` and `enableSampling` options.
+   *
    * @public
    * @returns {BubbleChartRenderer} Returns this for method chaining
    *
@@ -289,8 +325,19 @@ export class BubbleChartRenderer {
       return this;
     }
 
+    // Apply sampling if enabled and dataset is large
+    let sampledData = this.data;
+    if (this.config.enableSampling && this.data.length > this.config.maxDataPoints) {
+      sampledData = this._sampleData(this.data, this.config.maxDataPoints);
+      console.info(`[BubbleChartRenderer] Sampled ${this.data.length} points to ${sampledData.length} for performance`);
+    }
+
     // Create canvas element
     this._createCanvas();
+
+    // Temporarily override data for chart building
+    const originalData = this.data;
+    this.data = sampledData;
 
     // Small delay to ensure DOM is ready
     setTimeout(() => {
@@ -303,6 +350,9 @@ export class BubbleChartRenderer {
       // Create Chart.js instance
       const chartConfig = this._buildChartConfig();
       this.chartInstance = new Chart(ctx, chartConfig);
+
+      // Restore original data
+      this.data = originalData;
 
       // Store in global registry for cleanup (optional)
       if (!window.chartInstances) {

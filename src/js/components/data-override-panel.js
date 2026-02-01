@@ -13,6 +13,7 @@
  * @example
  * import { DataOverridePanel } from './data-override-panel.js';
  *
+ * // Basic usage with default endpoints
  * const panel = new DataOverridePanel({
  *   apiClient: api,
  *   onSaveSuccess: (metricName) => {
@@ -20,6 +21,18 @@
  *   },
  *   onDeleteSuccess: (overrideId) => {
  *     console.log(`Override ${overrideId} deleted`);
+ *   }
+ * });
+ *
+ * // Advanced usage with custom API endpoints
+ * const customPanel = new DataOverridePanel({
+ *   apiClient: api,
+ *   apiEndpoints: {
+ *     overrides: '/api/v2/custom/overrides/{moduleKey}',
+ *     targets: '/api/v2/custom/targets/{moduleKey}'
+ *   },
+ *   onSaveSuccess: (metricName) => {
+ *     console.log(`Override saved for ${metricName}`);
  *   }
  * });
  *
@@ -31,7 +44,7 @@
  * });
  *
  * @author LANA AI Platform Team
- * @version 1.0.0
+ * @version 1.1.0
  */
 
 export class DataOverridePanel {
@@ -40,6 +53,9 @@ export class DataOverridePanel {
    *
    * @param {Object} config - Configuration object
    * @param {Object} config.apiClient - API client instance with get/post/delete methods
+   * @param {Object} [config.apiEndpoints] - Custom API endpoint configuration
+   * @param {string} [config.apiEndpoints.overrides='/api/v1/modules/{moduleKey}/data-overrides'] - Override CRUD endpoint
+   * @param {string} [config.apiEndpoints.targets='/api/v1/modules/{moduleKey}/targets'] - Target values endpoint
    * @param {Function} [config.onSaveSuccess] - Callback after successful save (metricName) => void
    * @param {Function} [config.onDeleteSuccess] - Callback after successful delete (overrideId) => void
    * @param {Function} [config.onError] - Callback for errors (error) => void
@@ -48,9 +64,20 @@ export class DataOverridePanel {
    */
   constructor(config = {}) {
     this.apiClient = config.apiClient;
-    this.onSaveSuccess = config.onSaveSuccess;
-    this.onDeleteSuccess = config.onDeleteSuccess;
-    this.onError = config.onError;
+
+    // Default API endpoints (can be overridden via config)
+    this.apiEndpoints = {
+      overrides: '/api/v1/modules/{moduleKey}/data-overrides',
+      targets: '/api/v1/modules/{moduleKey}/targets',
+      ...(config.apiEndpoints || {})
+    };
+
+    this.onSaveSuccess = config.onSaveSuccess || (() => {});
+    this.onDeleteSuccess = config.onDeleteSuccess || (() => {});
+    this.onError = config.onError || ((error) => {
+      // Default error handling - show alert
+      alert(error.message || 'An unexpected error occurred');
+    });
     this.formatNumber = config.formatNumber || this._defaultFormatNumber.bind(this);
     this.formatDateRange = config.formatDateRange || this._defaultFormatDateRange.bind(this);
 
@@ -68,6 +95,31 @@ export class DataOverridePanel {
 
     // Bind event listeners
     this._bindEvents();
+  }
+
+  /**
+   * Build API endpoint URL with module key substitution
+   * @private
+   * @param {string} endpointTemplate - Endpoint template with {moduleKey} placeholder
+   * @param {string} moduleKey - Module key to substitute
+   * @param {string} [resourceId] - Optional resource ID to append
+   * @returns {string} Complete endpoint URL
+   *
+   * @example
+   * this._buildEndpoint('/api/v1/modules/{moduleKey}/data-overrides', 'finance-module')
+   * // Returns: '/api/v1/modules/finance-module/data-overrides'
+   *
+   * this._buildEndpoint('/api/v1/modules/{moduleKey}/data-overrides', 'finance-module', '12345')
+   * // Returns: '/api/v1/modules/finance-module/data-overrides/12345'
+   */
+  _buildEndpoint(endpointTemplate, moduleKey, resourceId = null) {
+    let endpoint = endpointTemplate.replace('{moduleKey}', moduleKey);
+
+    if (resourceId) {
+      endpoint = `${endpoint}/${resourceId}`;
+    }
+
+    return endpoint;
   }
 
   /**
@@ -369,8 +421,11 @@ export class DataOverridePanel {
       const periodStartISO = new Date(periodStart + 'T00:00:00Z').toISOString();
       const periodEndISO = new Date(periodEnd + 'T23:59:59Z').toISOString();
 
+      // Build endpoint URL using configurable template
+      const endpoint = this._buildEndpoint(this.apiEndpoints.overrides, moduleKey);
+
       // Fetch overrides from API
-      const data = await this.apiClient.get(`/api/v1/modules/${moduleKey}/data-overrides`, {
+      const data = await this.apiClient.get(endpoint, {
         periodStart: periodStartISO,
         periodEnd: periodEndISO
       });
@@ -467,7 +522,10 @@ export class DataOverridePanel {
     this._setLoadingState(true);
 
     try {
-      await this.apiClient.post(`/api/v1/modules/${moduleKey}/data-overrides`, {
+      // Build endpoint URL using configurable template
+      const endpoint = this._buildEndpoint(this.apiEndpoints.overrides, moduleKey);
+
+      await this.apiClient.post(endpoint, {
         metricKey: this.currentMetric.key,
         periodStart: periodStartISO,
         periodEnd: periodEndISO,
@@ -512,7 +570,14 @@ export class DataOverridePanel {
     const moduleKey = this.currentPeriod.moduleKey;
 
     try {
-      await this.apiClient.delete(`/api/v1/modules/${moduleKey}/data-overrides/${overrideId}`);
+      // Build endpoint URL using configurable template
+      const endpoint = this._buildEndpoint(
+        this.apiEndpoints.overrides,
+        moduleKey,
+        overrideId
+      );
+
+      await this.apiClient.delete(endpoint);
 
       // Success callback
       if (this.onDeleteSuccess) {
@@ -555,12 +620,8 @@ export class DataOverridePanel {
    * @param {Error} error - Error object
    */
   _handleError(error) {
-    if (this.onError) {
-      this.onError(error);
-    } else {
-      // Default error handling - show alert
-      alert(error.message || 'An unexpected error occurred');
-    }
+    // Always call error handler (defaults to alert if not provided)
+    this.onError(error);
   }
 
   /**

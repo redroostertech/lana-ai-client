@@ -86,6 +86,8 @@ export class GroupedBarChartRenderer {
     this.config = {
       title: 'Grouped Bar Chart',
       description: null,
+      maxDataPoints: 1000,
+      enableSampling: true,
       xAxis: {
         field: 'category',
         label: 'Categories'
@@ -130,8 +132,42 @@ export class GroupedBarChartRenderer {
   }
 
   /**
+   * Samples large datasets to improve rendering performance
+   *
+   * For large datasets (> 1000 points), automatic data sampling is applied
+   * to maintain performance. Configure with `maxDataPoints` and `enableSampling` options.
+   *
+   * @private
+   * @param {Array} data - Original dataset
+   * @param {number} maxPoints - Maximum number of points to render (default: 1000)
+   * @returns {Array} - Sampled dataset
+   */
+  _sampleData(data, maxPoints = 1000) {
+    if (!Array.isArray(data) || data.length <= maxPoints) {
+      return data;
+    }
+
+    const step = Math.ceil(data.length / maxPoints);
+    const sampled = [];
+
+    for (let i = 0; i < data.length; i += step) {
+      sampled.push(data[i]);
+    }
+
+    // Always include last data point
+    if (sampled[sampled.length - 1] !== data[data.length - 1]) {
+      sampled.push(data[data.length - 1]);
+    }
+
+    return sampled;
+  }
+
+  /**
    * Render the grouped bar chart
    * Creates the DOM structure and initializes Chart.js
+   *
+   * For large datasets (> 1000 points), automatic data sampling is applied
+   * to maintain performance. Configure with `maxDataPoints` and `enableSampling` options.
    */
   render() {
     // Validate data
@@ -149,6 +185,14 @@ export class GroupedBarChartRenderer {
     if (!this.config.series || this.config.series.length === 0) {
       this._renderError('No series configured. Please provide at least one series in config.series');
       return;
+    }
+
+    // Apply sampling if enabled and dataset is large
+    let dataToRender = this.data;
+
+    if (this.config.enableSampling && this.data.length > this.config.maxDataPoints) {
+      dataToRender = this._sampleData(this.data, this.config.maxDataPoints);
+      console.info(`[GroupedBarChartRenderer] Sampled ${this.data.length} points to ${dataToRender.length} for performance`);
     }
 
     // Clear container
@@ -177,7 +221,7 @@ export class GroupedBarChartRenderer {
 
     // Render chart after DOM insertion (allows proper sizing)
     setTimeout(() => {
-      this._renderChart();
+      this._renderChart(dataToRender);
     }, 100);
   }
 
@@ -331,21 +375,24 @@ export class GroupedBarChartRenderer {
    * Render the Chart.js grouped bar chart
    * @private
    */
-  _renderChart() {
+  _renderChart(data = null) {
     if (!this.canvas) {
       console.error('[GroupedBarChartRenderer] Canvas element not found');
       return;
     }
 
+    // Use provided data or fall back to this.data (for backward compatibility)
+    const dataToRender = data || this.data;
+
     // Extract labels from data using xAxis field
     const xField = this.config.xAxis.field;
-    const labels = this.data.map(row => row[xField] || 'Unknown');
+    const labels = dataToRender.map(row => row[xField] || 'Unknown');
 
     // Build datasets from series configuration
     const datasets = this.config.series.map(serie => {
       return {
         label: serie.label,
-        data: this.data.map(row => parseFloat(row[serie.field]) || 0),
+        data: dataToRender.map(row => parseFloat(row[serie.field]) || 0),
         backgroundColor: this._hexToRgba(serie.color, 0.8),
         borderColor: serie.color,
         borderWidth: 1

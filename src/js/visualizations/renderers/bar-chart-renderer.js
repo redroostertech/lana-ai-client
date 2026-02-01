@@ -69,6 +69,15 @@ export class BarChartRenderer {
 
     // Store data and configuration
     this.data = data;
+
+    // Default colors that will be merged with user-provided colors
+    const defaultColors = {
+      positive: '#10b981',
+      negative: '#ef4444',
+      neutral: '#6b7280',
+      default: '#6366f1' // Default indigo color
+    };
+
     this.config = {
       orientation: 'horizontal',
       title: 'Chart',
@@ -76,17 +85,19 @@ export class BarChartRenderer {
       metricName: 'Value',
       unit: null,
       isPercentage: false,
-      colors: {
-        positive: '#10b981',
-        negative: '#ef4444',
-        neutral: '#6b7280',
-        default: '#6366f1' // Default indigo color
-      },
+      maxDataPoints: 1000,
+      enableSampling: true,
+      colors: defaultColors,
       colorRule: null,
       onBarClick: null,
       helpText: null,
       uniqueId: `bar-chart-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      ...config
+      ...config,
+      // Merge colors properly to preserve defaults
+      colors: {
+        ...defaultColors,
+        ...(config.colors || {})
+      }
     };
 
     // Chart instance reference (for cleanup)
@@ -100,8 +111,42 @@ export class BarChartRenderer {
   }
 
   /**
+   * Samples large datasets to improve rendering performance
+   *
+   * For large datasets (> 1000 points), automatic data sampling is applied
+   * to maintain performance. Configure with `maxDataPoints` and `enableSampling` options.
+   *
+   * @private
+   * @param {Array} data - Original dataset
+   * @param {number} maxPoints - Maximum number of points to render (default: 1000)
+   * @returns {Array} - Sampled dataset
+   */
+  _sampleData(data, maxPoints = 1000) {
+    if (!Array.isArray(data) || data.length <= maxPoints) {
+      return data;
+    }
+
+    const step = Math.ceil(data.length / maxPoints);
+    const sampled = [];
+
+    for (let i = 0; i < data.length; i += step) {
+      sampled.push(data[i]);
+    }
+
+    // Always include last data point
+    if (sampled[sampled.length - 1] !== data[data.length - 1]) {
+      sampled.push(data[data.length - 1]);
+    }
+
+    return sampled;
+  }
+
+  /**
    * Render the bar chart
    * Creates the DOM structure and initializes Chart.js
+   *
+   * For large datasets (> 1000 points), automatic data sampling is applied
+   * to maintain performance. Configure with `maxDataPoints` and `enableSampling` options.
    */
   render() {
     // Validate data
@@ -118,6 +163,16 @@ export class BarChartRenderer {
     if (this.data.labels.length !== this.data.values.length) {
       this._renderError('Data mismatch: labels and values arrays must have the same length');
       return;
+    }
+
+    // Apply sampling if enabled and dataset is large
+    let labelsToRender = this.data.labels;
+    let valuesToRender = this.data.values;
+
+    if (this.config.enableSampling && this.data.labels.length > this.config.maxDataPoints) {
+      labelsToRender = this._sampleData(this.data.labels, this.config.maxDataPoints);
+      valuesToRender = this._sampleData(this.data.values, this.config.maxDataPoints);
+      console.info(`[BarChartRenderer] Sampled ${this.data.labels.length} points to ${labelsToRender.length} for performance`);
     }
 
     // Clear container
@@ -146,7 +201,7 @@ export class BarChartRenderer {
 
     // Render chart after DOM insertion (allows proper sizing)
     setTimeout(() => {
-      this._renderChart();
+      this._renderChart(labelsToRender, valuesToRender);
     }, 100);
   }
 
@@ -298,14 +353,16 @@ export class BarChartRenderer {
    * Render the Chart.js chart
    * @private
    */
-  _renderChart() {
+  _renderChart(labels = null, values = null) {
     if (!this.canvas) {
       console.error('[BarChartRenderer] Canvas element not found');
       return;
     }
 
-    const { labels, values } = this.data;
-    const { backgroundColors, borderColors } = this._calculateColors(values);
+    // Use provided data or fall back to this.data (for backward compatibility)
+    const labelsToRender = labels || this.data.labels;
+    const valuesToRender = values || this.data.values;
+    const { backgroundColors, borderColors } = this._calculateColors(valuesToRender);
 
     // Determine if percentage formatting should be used
     const isPercentage = this.config.isPercentage || this.config.unit === 'percent';
@@ -315,10 +372,10 @@ export class BarChartRenderer {
     const chartConfig = {
       type: 'bar',
       data: {
-        labels: labels,
+        labels: labelsToRender,
         datasets: [{
           label: this.config.metricName,
-          data: values,
+          data: valuesToRender,
           backgroundColor: backgroundColors,
           borderColor: borderColors,
           borderWidth: 1

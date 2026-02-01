@@ -66,6 +66,37 @@ export class TimeSeriesRenderer {
   }
 
   /**
+   * Samples large datasets to improve rendering performance
+   *
+   * For large datasets (> 1000 points), automatic data sampling is applied
+   * to maintain performance. Configure with `maxDataPoints` and `enableSampling` options.
+   *
+   * @private
+   * @param {Array} data - Original dataset
+   * @param {number} maxPoints - Maximum number of points to render (default: 1000)
+   * @returns {Array} - Sampled dataset
+   */
+  _sampleData(data, maxPoints = 1000) {
+    if (!Array.isArray(data) || data.length <= maxPoints) {
+      return data;
+    }
+
+    const step = Math.ceil(data.length / maxPoints);
+    const sampled = [];
+
+    for (let i = 0; i < data.length; i += step) {
+      sampled.push(data[i]);
+    }
+
+    // Always include last data point
+    if (sampled[sampled.length - 1] !== data[data.length - 1]) {
+      sampled.push(data[data.length - 1]);
+    }
+
+    return sampled;
+  }
+
+  /**
    * Merge user config with defaults
    * @private
    * @param {Object} userConfig - User-provided configuration
@@ -78,6 +109,8 @@ export class TimeSeriesRenderer {
       tension: 0.4,
       responsive: true,
       maintainAspectRatio: false,
+      maxDataPoints: 1000,
+      enableSampling: true,
       colors: ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'],
       legend: {
         position: 'bottom',
@@ -173,6 +206,9 @@ export class TimeSeriesRenderer {
    * Render the time-series chart
    * Creates a Chart.js instance and renders it to the canvas element
    *
+   * For large datasets (> 1000 points), automatic data sampling is applied
+   * to maintain performance. Configure with `maxDataPoints` and `enableSampling` options.
+   *
    * @throws {Error} If canvas element is not found
    * @returns {Chart} Chart.js instance
    *
@@ -202,9 +238,23 @@ export class TimeSeriesRenderer {
       return null;
     }
 
+    // Apply sampling if enabled and dataset is large
+    let sampledTimeSeries = this.timeSeries;
+    if (this.config.enableSampling && this.timeSeries.length > this.config.maxDataPoints) {
+      sampledTimeSeries = this._sampleData(this.timeSeries, this.config.maxDataPoints);
+      console.info(`[TimeSeriesRenderer] Sampled ${this.timeSeries.length} points to ${sampledTimeSeries.length} for performance`);
+    }
+
+    // Temporarily override timeSeries for dataset building
+    const originalTimeSeries = this.timeSeries;
+    this.timeSeries = sampledTimeSeries;
+
     // Build datasets and labels
     const datasets = this._buildDatasets();
     const labels = this._buildLabels();
+
+    // Restore original timeSeries
+    this.timeSeries = originalTimeSeries;
 
     // Create Chart.js instance
     this.chartInstance = new Chart(ctx, {

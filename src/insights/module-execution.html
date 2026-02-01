@@ -533,7 +533,19 @@
     </main>
   </div>
 
-  <script>
+  <script type="module">
+    // Import modular chart renderers
+    import { TimeSeriesRenderer } from '../js/visualizations/renderers/time-series-renderer.js';
+    import { PieChartRenderer } from '../js/visualizations/renderers/pie-chart-renderer.js';
+    import { FunnelChartRenderer } from '../js/visualizations/renderers/funnel-chart-renderer.js';
+    import { BarChartRenderer } from '../js/visualizations/renderers/bar-chart-renderer.js';
+
+    // Make renderers available globally for non-module code
+    window.TimeSeriesRenderer = TimeSeriesRenderer;
+    window.PieChartRenderer = PieChartRenderer;
+    window.FunnelChartRenderer = FunnelChartRenderer;
+    window.BarChartRenderer = BarChartRenderer;
+
     if (!api.requireAuth()) throw new Error('Not authenticated');
 
     // Configure marked library for markdown rendering (loaded globally via script tag)
@@ -1119,24 +1131,32 @@
       }
     }
 
-    // Get status badge HTML
-    function getStatusBadge(color) {
+    // Get status colors for card background
+    function getStatusColors(color) {
       const colors = {
-        green: { bg: 'bg-green-100', text: 'text-green-800', icon: 'M5 13l4 4L19 7' },
-        yellow: { bg: 'bg-yellow-100', text: 'text-yellow-800', icon: 'M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
-        red: { bg: 'bg-red-100', text: 'text-red-800', icon: 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
-        gray: { bg: 'bg-gray-100', text: 'text-gray-800', icon: 'M8 7h12M8 12h12M8 17h12' }
+        green: {
+          bg: 'bg-green-50',
+          border: 'border-green-200',
+          text: 'text-green-700'
+        },
+        yellow: {
+          bg: 'bg-yellow-50',
+          border: 'border-yellow-200',
+          text: 'text-yellow-700'
+        },
+        red: {
+          bg: 'bg-red-50',
+          border: 'border-red-200',
+          text: 'text-red-700'
+        },
+        gray: {
+          bg: 'bg-white',
+          border: 'border-gray-100',
+          text: 'text-gray-700'
+        }
       };
 
-      const c = colors[color] || colors.gray;
-      return `
-        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full ${c.bg} ${c.text}">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${c.icon}"></path>
-          </svg>
-          <span class="text-xs font-medium uppercase">${color}</span>
-        </div>
-      `;
+      return colors[color] || colors.gray;
     }
 
     // Format date range (using UTC to avoid timezone offset issues)
@@ -1231,6 +1251,9 @@
       const modal = document.getElementById('dataSourcesModal');
       modal.classList.add('hidden');
     }
+
+    // Expose to global scope for onclick handlers
+    window.closeDataSourcesModal = closeDataSourcesModal;
 
     // Refresh page function
     function refreshPage() {
@@ -1342,6 +1365,9 @@
       const modal = document.getElementById('missingEntitiesModal');
       modal.classList.add('hidden');
     }
+
+    // Expose to global scope for onclick handlers
+    window.closeMissingEntitiesModal = closeMissingEntitiesModal;
 
     // Update missing entities for the selected module
     function updateMissingEntitiesForModule(moduleKey) {
@@ -1588,6 +1614,9 @@
       document.getElementById('drilldownModal').classList.add('hidden');
     }
 
+    // Expose to global scope for onclick handlers
+    window.closeDrilldownModal = closeDrilldownModal;
+
     // Show module info modal
     function showModuleInfo() {
       if (!currentModuleMetadata) {
@@ -1632,6 +1661,9 @@
     function closeModuleInfo() {
       document.getElementById('moduleInfoModal').classList.add('hidden');
     }
+
+    // Expose to global scope for onclick handlers
+    window.closeModuleInfo = closeModuleInfo;
 
     // Generic drilldown handler (uses DrilldownRenderer class)
     async function tryGenericDrilldown(content, moduleKey, metricKey, periodStart, periodEnd) {
@@ -1891,6 +1923,9 @@
         content.innerHTML = `<div class="text-center py-8 text-red-600">Failed to load data: ${error.message || 'Unknown error'}</div>`;
       }
     }
+
+    // Expose showMetricDrilldown globally so onclick handlers can access it
+    window.showMetricDrilldown = showMetricDrilldown;
 
     // Drill-down: Qualified Leads (with Contact → Opportunity relationship)
     async function showQualifiedLeadsDrilldown(content, periodStart, periodEnd) {
@@ -5701,15 +5736,18 @@
       // Determine if override button should be shown (for N/A or 0 values, or always show)
       const showOverrideButton = true; // Show for all metrics - user can override any value
 
+      const statusColors = getStatusColors(statusColor);
+
       return `
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+        <div class="${statusColors.bg} rounded-xl shadow-sm border ${statusColors.border} p-6 hover:shadow-md transition-shadow">
           <!-- Metric Header -->
           <div class="mb-4">
-            <!-- Row 1: Metric Name, Status Badge, Details Button -->
+            <!-- Row 1: Metric Name and Details Button -->
             <div class="flex items-center justify-between gap-2 mb-2">
-              <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide">${metric.name}</h3>
               <div class="flex items-center gap-2">
-                ${getStatusBadge(statusColor)}
+                <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide">${metric.name}</h3>
+              </div>
+              <div class="flex items-center gap-2">
                 ${metric.hasDrilldown === true ? `
                 <button
                   onclick="openGenericDrilldown('${metric.key}', '${metric.name}')"
@@ -5807,7 +5845,7 @@
     // SECTION-BASED VISUALIZATION RENDERING (DATA-DRIVEN)
     // ========================================================================
 
-    let chartInstances = {}; // Store chart instances for cleanup
+    let chartInstances = {}; // Store chart/renderer instances for cleanup
 
     /**
      * Main visualization renderer - reads backend response and renders by section
@@ -5815,9 +5853,12 @@
     function renderVisualizations(data) {
       const container = document.getElementById('visualizationsContainer');
 
-      // Clear existing content and destroy old charts
-      Object.values(chartInstances).forEach(chart => {
-        if (chart && typeof chart.destroy === 'function') chart.destroy();
+      // Clear existing content and destroy old charts/renderers
+      // Works with both Chart.js instances and TimeSeriesRenderer instances
+      Object.values(chartInstances).forEach(instance => {
+        if (instance && typeof instance.destroy === 'function') {
+          instance.destroy();
+        }
       });
       chartInstances = {};
       container.innerHTML = '';
@@ -6137,69 +6178,27 @@
 
     /**
      * Render time series chart for a specific trend visualization
+     * Uses TimeSeriesRenderer class for modular, reusable chart rendering
      */
     function renderTimeSeriesChartForVisualization(canvasId, timeSeries, metricKeys) {
       const ctx = document.getElementById(canvasId);
       if (!ctx) return;
 
-      // Build datasets for each metric in this visualization
-      const datasets = metricKeys.map((metricKey, index) => {
-        const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
-        const color = colors[index % colors.length];
-
-        return {
-          label: metricKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-          data: timeSeries.map(point => {
-            const metric = point.metrics.find(m => m.key === metricKey);
-            return metric ? parseFloat(metric.value) || 0 : 0;
-          }),
-          borderColor: color,
-          backgroundColor: color + '20',
-          borderWidth: 2,
-          fill: true,
-          tension: 0.4
-        };
+      // Create TimeSeriesRenderer instance with configuration
+      const renderer = new TimeSeriesRenderer(canvasId, timeSeries, metricKeys, {
+        fill: true,
+        tension: 0.4,
+        responsive: true,
+        maintainAspectRatio: false
       });
 
-      const chart = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: timeSeries.map(point => new Date(point.date).toLocaleDateString()),
-          datasets: datasets
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              position: 'bottom',
-              labels: {
-                padding: 15,
-                font: { size: 11 }
-              }
-            },
-            tooltip: {
-              mode: 'index',
-              intersect: false
-            }
-          },
-          scales: {
-            y: {
-              beginAtZero: true,
-              grid: {
-                color: '#f3f4f6'
-              }
-            },
-            x: {
-              grid: {
-                display: false
-              }
-            }
-          }
-        }
-      });
+      // Render the chart
+      const chart = renderer.render();
 
-      chartInstances[canvasId] = chart;
+      // Store renderer instance for cleanup (not just the chart)
+      chartInstances[canvasId] = renderer;
+
+      return chart;
     }
 
     /**
@@ -6369,406 +6368,118 @@
     }
 
     /**
-     * Render pie_chart visualization
+     * Render pie_chart visualization using modular PieChartRenderer
      */
     function renderPieChart(viz, data, uniqueId) {
-      const div = document.createElement('div');
-      div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
-
-      const canvasId = `chart-${uniqueId}`;
-      const helpTextHTML = renderHelpTextModal(viz.helpText, uniqueId);
-
-      div.innerHTML = `
-        <div class="mb-4">
-          <div class="flex items-center mb-1">
-            <h3 class="text-lg font-semibold text-gray-900">${viz.title || 'Distribution'}</h3>
-            ${helpTextHTML}
-          </div>
-          ${viz.description ? `<p class="text-sm text-gray-600">${viz.description}</p>` : ''}
-        </div>
-        <div class="h-64">
-          <canvas id="${canvasId}"></canvas>
-        </div>
-      `;
-
-      setTimeout(() => {
-        const ctx = document.getElementById(canvasId);
-        if (!ctx) return;
-
-        // Find the metric with distribution data
-        const metric = data.metrics.find(m => viz.metrics.includes(m.key));
-        if (!metric || !Array.isArray(metric.current)) return;
-
-        const distributionData = metric.current;
-
-        const chart = new Chart(ctx, {
-          type: 'pie',
-          data: {
-            labels: distributionData.map(d => d.label),
-            datasets: [{
-              data: distributionData.map(d => d.value),
-              backgroundColor: [
-                '#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-                '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#84cc16'
-              ]
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: {
-                position: 'right',
-                labels: {
-                  padding: 10,
-                  font: { size: 10 }
-                }
-              }
-            }
-          }
-        });
-
-        chartInstances[canvasId] = chart;
-      }, 100);
-
-      return div;
-    }
-
-    /**
-     * Render funnel_chart visualization - Custom flow chart with visual funnel
-     */
-    function renderFunnelChart(viz, data, uniqueId) {
-      console.log('[renderFunnelChart] START', { viz, data, uniqueId });
-
-      const div = document.createElement('div');
-      div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
-
-      const helpTextHTML = renderHelpTextModal(viz.helpText, uniqueId);
-
-      // Find the metric with funnel progression data
-      const metric = data.metrics.find(m => viz.metrics && viz.metrics.includes(m.key));
-
-      if (!metric || !Array.isArray(metric.current)) {
-        div.innerHTML = `
-          <div class="flex items-center mb-4">
-            <h3 class="text-lg font-semibold text-gray-900">${viz.title || 'Funnel Chart'}</h3>
-          </div>
-          <p class="text-gray-500 text-center py-8">No funnel data available</p>
-        `;
-        return div;
+      const metric = data.metrics.find(m => viz.metrics?.includes(m.key));
+      if (!metric || !metric.current || !Array.isArray(metric.current)) {
+        return null;
       }
 
-      const funnelData = metric.current;
-      console.log('[renderFunnelChart] Funnel data:', funnelData);
+      const containerId = `pie-chart-container-${uniqueId}`;
 
-      // Build funnel stages HTML
-      let funnelHTML = '';
-      funnelData.forEach((stage, index) => {
-        const value = stage.value || 0;
-        const percentage = stage.percentage || 0;
-        const dropoffRate = stage.dropoff_rate || 0;
-        const previousCount = stage.previous_stage_count || 0;
-        const dropped = previousCount - value;
+      // Create container div element that the renderer will populate
+      const containerDiv = document.createElement('div');
+      containerDiv.id = containerId;
+      containerDiv.className = 'mb-6';
 
-        // Color scheme based on stage type
-        let bgColor = 'bg-blue-500';
-        let textColor = 'text-blue-700';
-
-        if (stage.label.includes('Initial Contact')) {
-          bgColor = 'bg-indigo-500';
-          textColor = 'text-indigo-700';
-        } else if (stage.label.includes('Became Opportunity')) {
-          bgColor = 'bg-purple-500';
-          textColor = 'text-purple-700';
-        } else if (stage.label.includes('Won') || stage.label.includes('Matter')) {
-          bgColor = 'bg-green-500';
-          textColor = 'text-green-700';
-        } else if (stage.label.includes('Stage')) {
-          bgColor = 'bg-blue-500';
-          textColor = 'text-blue-700';
-        }
-
-        // Calculate bar width based on percentage of initial
-        const barWidth = Math.max(percentage, 5); // Minimum 5% width for visibility
-
-        funnelHTML += `
-          <div class="mb-3">
-            <!-- Stage Card -->
-            <div class="relative bg-white rounded-lg p-4 border-2 border-gray-200 hover:border-${bgColor.replace('bg-', 'border-')} hover:shadow-md transition-all">
-              <div class="flex items-start justify-between gap-4 mb-3">
-                <div class="flex items-start gap-3 flex-1 min-w-0">
-                  <div class="flex-shrink-0 mt-1">
-                    <div class="w-4 h-4 rounded-full ${bgColor}"></div>
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <div class="font-semibold text-gray-900 mb-1">${stage.label}</div>
-                    <div class="text-sm text-gray-600">${value.toLocaleString()} leads</div>
-                  </div>
-                </div>
-                <div class="flex-shrink-0 text-right">
-                  <div class="text-2xl font-bold ${textColor}">${percentage.toFixed(1)}%</div>
-                  <div class="text-xs text-gray-500">of initial</div>
-                </div>
-              </div>
-              <!-- Progress Bar -->
-              <div class="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
-                <div class="${bgColor} h-full rounded-full transition-all duration-500" style="width: ${barWidth}%"></div>
-              </div>
-            </div>
-
-            ${index < funnelData.length - 1 && dropoffRate > 0 ? `
-              <!-- Dropoff Indicator -->
-              <div class="flex items-center gap-2 my-3 ml-6">
-                <svg class="w-5 h-5 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clip-rule="evenodd"></path>
-                </svg>
-                <span class="text-sm text-red-600 font-semibold">
-                  ${dropped.toLocaleString()} leads dropped (${dropoffRate.toFixed(1)}% loss)
-                </span>
-              </div>
-            ` : index < funnelData.length - 1 ? `
-              <!-- Flow Indicator -->
-              <div class="flex items-center gap-2 my-3 ml-6">
-                <svg class="w-5 h-5 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clip-rule="evenodd"></path>
-                </svg>
-                <span class="text-sm text-green-600 font-semibold">All ${value.toLocaleString()} leads continue</span>
-              </div>
-            ` : ''}
-          </div>
-        `;
+      const renderer = new PieChartRenderer(containerId, metric.current, {
+        title: viz.title,
+        description: viz.description,
+        legendPosition: 'right',
+        helpText: viz.helpText ? { content: viz.helpText } : null
       });
 
-      div.innerHTML = `
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold text-gray-900">${viz.title || 'Funnel Chart'}</h3>
-          ${helpTextHTML}
-        </div>
-        ${viz.description ? `<p class="text-sm text-gray-500 mb-6">${viz.description}</p>` : ''}
+      chartInstances[containerId] = renderer;
 
-        <div class="space-y-2">
-          ${funnelHTML}
-        </div>
+      // Render into the container after a small delay to ensure DOM is ready
+      setTimeout(() => {
+        renderer.render();
+      }, 0);
 
-        <div class="mt-6 pt-4 border-t border-gray-200">
-          <div class="grid grid-cols-2 gap-4 text-xs">
-            <div class="flex items-center gap-2 text-gray-600">
-              <div class="w-3 h-3 rounded-full bg-indigo-500"></div>
-              <span>Initial Contact</span>
-            </div>
-            <div class="flex items-center gap-2 text-gray-600">
-              <div class="w-3 h-3 rounded-full bg-purple-500"></div>
-              <span>Became Opportunity</span>
-            </div>
-            <div class="flex items-center gap-2 text-gray-600">
-              <div class="w-3 h-3 rounded-full bg-blue-500"></div>
-              <span>Pipeline Stages</span>
-            </div>
-            <div class="flex items-center gap-2 text-gray-600">
-              <div class="w-3 h-3 rounded-full bg-green-500"></div>
-              <span>Won (Client)</span>
-            </div>
-          </div>
-        </div>
-      `;
-
-      return div;
+      return containerDiv;
     }
 
     /**
-     * Helper: Convert hex color to rgba
+     * Render funnel_chart visualization using modular FunnelChartRenderer
      */
-    function hexToRgba(hex, alpha = 1) {
-      // Remove # if present
-      hex = hex.replace('#', '');
+    function renderFunnelChart(viz, data, uniqueId) {
+      const metric = data.metrics.find(m => viz.metrics?.includes(m.key));
+      if (!metric?.current) return null;
 
-      // Parse hex values
-      const r = parseInt(hex.substring(0, 2), 16);
-      const g = parseInt(hex.substring(2, 4), 16);
-      const b = parseInt(hex.substring(4, 6), 16);
+      const containerId = `funnel-chart-${uniqueId}`;
 
-      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      // Create container div element that the renderer will populate
+      const containerDiv = document.createElement('div');
+      containerDiv.id = containerId;
+      containerDiv.className = 'mb-6';
+
+      const renderer = new FunnelChartRenderer(containerId, metric.current, {
+        title: viz.title || 'Funnel Chart',
+        description: viz.description,
+        helpText: viz.helpText
+      });
+
+      chartInstances[containerId] = renderer;
+
+      // Render into the container after a small delay to ensure DOM is ready
+      setTimeout(() => {
+        renderer.render();
+      }, 0);
+
+      return containerDiv;
     }
 
     /**
-     * Render horizontal_bar_chart visualization
+     * Render horizontal_bar_chart visualization using modular BarChartRenderer
      */
     function renderHorizontalBarChart(viz, data, uniqueId) {
-      const div = document.createElement('div');
-      div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
-
-      // Title, help button, and description
-      const helpTextHTML = renderHelpTextModal(viz.helpText, uniqueId);
-      const header = document.createElement('div');
-      header.className = 'mb-4';
-      header.innerHTML = `
-        <div class="flex items-center mb-1">
-          <h3 class="text-lg font-semibold text-gray-900">${viz.title || 'Chart'}</h3>
-          ${helpTextHTML}
-        </div>
-        ${viz.description ? `<p class="text-sm text-gray-600">${viz.description}</p>` : ''}
-      `;
-      div.appendChild(header);
-
-      // Chart container
-      const chartContainer = document.createElement('div');
-      chartContainer.className = 'h-96';
-      div.appendChild(chartContainer);
-
-      // Render chart after DOM insertion
-      setTimeout(() => {
-        renderHorizontalBarChartCanvas(chartContainer, viz, data, uniqueId);
-      }, 100);
-
-      return div;
-    }
-
-    /**
-     * Render horizontal bar chart on canvas using Chart.js
-     */
-    function renderHorizontalBarChartCanvas(container, viz, data, uniqueId) {
-      // Find the metric data
       const metricKey = viz.metrics?.[0];
-      if (!metricKey) {
-        console.error('[renderHorizontalBarChart] No metric specified');
-        container.innerHTML = '<p class="text-gray-500 text-center py-8">No metric configured</p>';
-        return;
-      }
+      if (!metricKey) return null;
 
       const metric = data.metrics?.find(m => m.key === metricKey);
-      if (!metric) {
-        console.error('[renderHorizontalBarChart] Metric not found', { metricKey });
-        container.innerHTML = '<p class="text-gray-500 text-center py-8">Metric not found</p>';
-        return;
-      }
+      if (!metric) return null;
 
       // Extract data (distribution metrics use 'current' field which is an array)
       const chartData = Array.isArray(metric.current) ? metric.current : (Array.isArray(metric.result) ? metric.result : []);
+      if (chartData.length === 0) return null;
 
-      if (chartData.length === 0) {
-        container.innerHTML = '<p class="text-gray-500 text-center py-8">No data for this period</p>';
-        return;
-      }
+      const containerId = `bar-chart-container-${uniqueId}`;
 
-      // Extract labels and values
-      const labels = chartData.map(d => d.label || 'Unknown');
-      const values = chartData.map(d => d.value || 0);
+      // Create container div element that the renderer will populate
+      const containerDiv = document.createElement('div');
+      containerDiv.id = containerId;
+      containerDiv.className = 'mb-6';
 
-      // Determine if this is a percentage metric (check suffix or format)
-      const isPercentage = metric.format?.suffix === '%' || metric.unit === 'percent';
-
-      // Determine bar colors (conditional coloring based on value)
-      let backgroundColors;
-      let borderColors;
-
-      if (viz.barColors && viz.colorRule) {
-        // Conditional coloring: evaluate colorRule for each value
-        backgroundColors = values.map(value => {
-          // Evaluate the colorRule expression
-          // colorRule example: "value < 0 ? 'negative' : value > 0 ? 'positive' : 'neutral'"
-          const colorKey = eval(viz.colorRule);
-          const colorHex = viz.barColors[colorKey] || viz.barColors.neutral || '#6b7280';
-
-          // Convert hex to rgba with 0.8 opacity
-          return hexToRgba(colorHex, 0.8);
-        });
-
-        borderColors = values.map(value => {
-          const colorKey = eval(viz.colorRule);
-          const colorHex = viz.barColors[colorKey] || viz.barColors.neutral || '#6b7280';
-          return colorHex;
-        });
-      } else {
-        // Default single color (indigo)
-        backgroundColors = 'rgba(99, 102, 241, 0.8)';
-        borderColors = 'rgba(99, 102, 241, 1)';
-      }
-
-      // Create canvas
-      const canvas = document.createElement('canvas');
-      container.appendChild(canvas);
-
-      // Create chart
-      const chart = new Chart(canvas, {
-        type: 'bar',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: metric.name,
-            data: values,
-            backgroundColor: backgroundColors,
-            borderColor: borderColors,
-            borderWidth: 1
-          }]
-        },
-        options: {
-          indexAxis: 'y', // Horizontal bars
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              display: false
-            },
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  const value = context.parsed.x;
-
-                  // Handle growth/change percentages (percent_change unit)
-                  if (metric.unit === 'percent_change') {
-                    const sign = value > 0 ? '+' : ''; // Negative already has minus
-                    return `${sign}${value}%`;
-                  }
-
-                  // Handle regular percentages
-                  if (isPercentage) {
-                    return `${value}%`;
-                  }
-
-                  // Handle other units
-                  return `${value} ${metric.unit || ''}`.trim();
-                }
-              }
-            }
-          },
-          scales: {
-            x: {
-              beginAtZero: true,
-              title: {
-                display: true,
-                text: isPercentage ? 'Percentage (%)' : (metric.unit || 'Value')
-              },
-              ticks: {
-                callback: function(value) {
-                  return isPercentage ? `${value}%` : value;
-                }
-              }
-            },
-            y: {
-              title: {
-                display: false
-              }
-            }
-          },
-          onClick: (event, elements) => {
-            if (elements.length > 0) {
-              const index = elements[0].index;
-              const label = labels[index];
-              // Trigger drilldown if available
-              if (metric.drilldown?.enabled && window.openDrilldown) {
-                // Pass the label as drill_source parameter
-                window.openDrilldown(metricKey, { drill_source: label });
-              }
-            }
+      // Pass the DOM element directly instead of ID string
+      const renderer = new BarChartRenderer(containerDiv, {
+        labels: chartData.map(d => d.label || 'Unknown'),
+        values: chartData.map(d => d.value || 0)
+      }, {
+        title: viz.title,
+        description: viz.description,
+        orientation: 'horizontal',
+        metricName: metric.name,
+        unit: metric.unit,
+        isPercentage: metric.format?.suffix === '%' || metric.unit === 'percent',
+        colorRule: viz.colorRule,
+        colors: viz.barColors,
+        helpText: viz.helpText ? { content: viz.helpText } : null,
+        onBarClick: (index, label) => {
+          if (metric.drilldown?.enabled && window.openDrilldown) {
+            window.openDrilldown(metricKey, { drill_source: label });
           }
         }
       });
 
-      // Store chart instance for cleanup
-      if (!window.chartInstances) {
-        window.chartInstances = {};
-      }
-      window.chartInstances[`${uniqueId}_horizontal_bar`] = chart;
+      chartInstances[containerId] = renderer;
+
+      // Render into the container after a small delay to ensure DOM is ready
+      setTimeout(() => {
+        renderer.render();
+      }, 0);
+
+      return containerDiv;
     }
 
     /**
@@ -7745,6 +7456,16 @@
     // Close panel when clicking overlay
     document.getElementById('dataOverrideOverlay').addEventListener('click', closeDataOverridePanel);
     document.getElementById('closeDataOverridePanel').addEventListener('click', closeDataOverridePanel);
+
+    // Expose data override panel functions globally for onclick handlers
+    window.openDataOverridePanel = openDataOverridePanel;
+    window.closeDataOverridePanel = closeDataOverridePanel;
+
+    // Expose drilldown functions globally for onclick handlers
+    window.openGenericDrilldown = openGenericDrilldown;
+
+    // Expose module info function for Learn More button
+    window.showModuleInfo = showModuleInfo;
 
     // Load existing overrides for a metric
     async function loadExistingOverrides(moduleKey, metricKey, periodStart, periodEnd) {
