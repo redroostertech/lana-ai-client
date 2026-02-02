@@ -2578,9 +2578,9 @@
      * Re-fetches all data and refreshes the current tab
      */
     window.refreshCurrentMatter = async function() {
-      const currentMatter = window.currentMatterDetails;
-      if (!currentMatter || !currentMatter.matter_id) {
+      if (!currentMatterData || !currentMatterData.matter || !currentMatterData.matter.matter_id) {
         console.warn('[refreshCurrentMatter] No matter currently open');
+        Toast.error('No matter is currently open');
         return;
       }
 
@@ -2588,7 +2588,7 @@
       const currentTab = getCurrentActiveTab();
 
       console.log('[refreshCurrentMatter] Refreshing matter:', {
-        matterId: currentMatter.matter_id,
+        matterId: currentMatterData.matter.matter_id,
         currentTab
       });
 
@@ -2599,7 +2599,7 @@
         }
 
         // Re-fetch matter with cache busting
-        await viewMatter(currentMatter.matter_id, currentTab, { bustCache: true });
+        await viewMatter(currentMatterData.matter.matter_id, currentTab, { bustCache: true });
 
         Toast.success('Matter details refreshed');
       } catch (error) {
@@ -5976,9 +5976,8 @@
         closeCreateLinkModal();
 
         // Refresh the linked matters tab if we're viewing it
-        const currentMatter = window.currentMatterDetails;
-        if (currentMatter && document.getElementById('tabContentLinks').classList.contains('block')) {
-          renderLinkedMattersTab(currentMatter);
+        if (currentMatterData && currentMatterData.matter && !document.getElementById('tabContentLinks').classList.contains('hidden')) {
+          renderLinkedMattersTab(currentMatterData.matter);
         }
 
       } catch (error) {
@@ -6019,9 +6018,8 @@
         Toast.success('Link removed successfully');
 
         // Refresh the linked matters tab
-        const currentMatter = window.currentMatterDetails;
-        if (currentMatter) {
-          renderLinkedMattersTab(currentMatter);
+        if (currentMatterData && currentMatterData.matter) {
+          renderLinkedMattersTab(currentMatterData.matter);
         }
 
       } catch (error) {
@@ -6971,10 +6969,10 @@
         loadMatters();
 
         // Refresh linked matters tab if viewing the workspace
-        const currentMatter = window.currentMatterDetails;
-        if (currentMatter && currentMatter.matter_id === workspaceId &&
-            document.getElementById('tabContentLinks').classList.contains('block')) {
-          renderLinkedMattersTab(currentMatter);
+        if (currentMatterData && currentMatterData.matter &&
+            currentMatterData.matter.matter_id === workspaceId &&
+            !document.getElementById('tabContentLinks').classList.contains('hidden')) {
+          renderLinkedMattersTab(currentMatterData.matter);
         }
 
       } catch (error) {
