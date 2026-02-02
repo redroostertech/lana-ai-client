@@ -5746,6 +5746,8 @@
      * @param {boolean} isWorkspace - Whether the source is a workspace
      */
     window.openCreateLinkModal = function(sourceMatterId, isWorkspace = false) {
+      console.log('[openCreateLinkModal] Called with:', { sourceMatterId, isWorkspace, typeOfIsWorkspace: typeof isWorkspace });
+
       const modal = document.getElementById('createLinkModal');
       const sourceInput = document.getElementById('linkSourceMatterId');
       const searchInput = document.getElementById('linkMatterSearch');
@@ -5756,7 +5758,9 @@
 
       // Set source matter ID
       sourceInput.value = sourceMatterId;
-      sourceInput.dataset.isWorkspace = isWorkspace;
+      sourceInput.dataset.isWorkspace = isWorkspace.toString();
+
+      console.log('[openCreateLinkModal] Dataset set to:', sourceInput.dataset.isWorkspace);
 
       // Update modal text based on source type
       if (isWorkspace) {
@@ -5938,7 +5942,9 @@
         source_matter_id: sourceMatterId,
         target_matter_id: selectedLinkTargetMatter.matter_id,
         link_type: linkType,
-        isWorkspace
+        isWorkspace,
+        isWorkspaceDataset: sourceInput.dataset.isWorkspace,
+        linkTypeSelectValue: document.getElementById('linkType').value
       });
 
       try {
