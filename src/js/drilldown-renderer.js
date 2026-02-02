@@ -1180,7 +1180,14 @@ class DrilldownRenderer {
       `;
     }).join('');
 
-    document.getElementById('drilldown-table-header').innerHTML = headerHTML;
+    // Add "Actions" header column for raw data viewer
+    const actionsHeader = `
+      <th scope="col" class="px-3 py-3.5 text-center text-xs font-semibold text-gray-900">
+        Actions
+      </th>
+    `;
+
+    document.getElementById('drilldown-table-header').innerHTML = headerHTML + actionsHeader;
 
     // Attach sort handlers
     document.querySelectorAll('[data-sort]').forEach(th => {
@@ -1197,7 +1204,7 @@ class DrilldownRenderer {
     });
 
     // Render rows
-    const rowsHTML = this.currentData.rows.map(row => {
+    const rowsHTML = this.currentData.rows.map((row, rowIndex) => {
       const cellsHTML = this.currentConfig.columns.map(col => {
         const value = row[col.field];
         // Use badge renderer for badge columns, otherwise use standard formatter
@@ -1211,7 +1218,35 @@ class DrilldownRenderer {
         `;
       }).join('');
 
-      return `<tr class="hover:bg-gray-50">${cellsHTML}</tr>`;
+      // Add "View Raw Data" action column
+      const rawDataJSON = JSON.stringify(row).replace(/"/g, '&quot;');
+      const actionCell = `
+        <td class="whitespace-nowrap px-3 py-4 text-sm text-center">
+          <button
+            onclick="window.drilldownRenderer.toggleRawData(${rowIndex})"
+            class="text-indigo-600 hover:text-indigo-900 font-medium"
+            title="View complete row data">
+            <svg class="w-5 h-5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+            </svg>
+          </button>
+        </td>
+      `;
+
+      // Data row
+      const dataRow = `<tr class="hover:bg-gray-50" data-raw-data="${rawDataJSON}">${cellsHTML}${actionCell}</tr>`;
+
+      // Raw data viewer row (hidden by default)
+      const rawDataRow = `
+        <tr id="raw-data-row-${rowIndex}" class="hidden bg-gray-50">
+          <td colspan="${this.currentConfig.columns.length + 1}" class="px-0 py-0">
+            <div id="raw-data-content-${rowIndex}"></div>
+          </td>
+        </tr>
+      `;
+
+      return dataRow + rawDataRow;
     }).join('');
 
     document.getElementById('drilldown-table-body').innerHTML = rowsHTML;
@@ -1938,6 +1973,53 @@ class DrilldownRenderer {
     const title = typeof value === 'number' ? `Score: ${value}` : '';
 
     return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colorClass}" title="${title}">${this.escapeHtml(displayValue)}</span>`;
+  }
+
+  /**
+   * Toggle raw data viewer for a specific row
+   * @param {Number} rowIndex - Index of the row to toggle
+   */
+  toggleRawData(rowIndex) {
+    const rawDataRow = document.getElementById(`raw-data-row-${rowIndex}`);
+    const rawDataContent = document.getElementById(`raw-data-content-${rowIndex}`);
+
+    if (!rawDataRow || !rawDataContent) {
+      console.error(`[DrilldownRenderer] Raw data elements not found for row ${rowIndex}`);
+      return;
+    }
+
+    // Toggle visibility
+    if (rawDataRow.classList.contains('hidden')) {
+      // Show raw data
+      rawDataRow.classList.remove('hidden');
+
+      // Get the row data
+      const rowData = this.currentData.rows[rowIndex];
+
+      if (!rowData) {
+        console.error(`[DrilldownRenderer] No data found for row ${rowIndex}`);
+        rawDataContent.innerHTML = '<div class="p-4 text-red-600">Error: Row data not found</div>';
+        return;
+      }
+
+      // Create and render the raw data viewer
+      if (typeof RawDataViewer !== 'undefined') {
+        const viewer = new RawDataViewer(rowData);
+        rawDataContent.innerHTML = viewer.render();
+      } else {
+        // Fallback if RawDataViewer not loaded
+        console.warn('[DrilldownRenderer] RawDataViewer class not found, using fallback JSON display');
+        rawDataContent.innerHTML = `
+          <div class="p-4">
+            <pre class="bg-gray-100 p-4 rounded overflow-x-auto text-xs">${JSON.stringify(rowData, null, 2)}</pre>
+          </div>
+        `;
+      }
+    } else {
+      // Hide raw data
+      rawDataRow.classList.add('hidden');
+      rawDataContent.innerHTML = ''; // Clear content to save memory
+    }
   }
 }
 
