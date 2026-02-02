@@ -595,9 +595,16 @@
             <h3 id="drawerMatterName" class="text-lg font-semibold text-gray-900">Matter Details</h3>
             <p id="drawerClientName" class="text-sm text-gray-500"></p>
           </div>
-          <button id="closeDrawer" class="text-gray-400 hover:text-gray-600 flex-shrink-0">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-          </button>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <button id="refreshMatterBtn" onclick="refreshCurrentMatter()" class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Refresh matter details">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+              </svg>
+            </button>
+            <button id="closeDrawer" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+          </div>
         </div>
         <div id="drawerStatusBadge" class="mt-2"></div>
       </div>
@@ -2564,6 +2571,62 @@
         // Navigate to the selected matter
         viewMatter(matterId, 'details');
       }, { once: true }); // Use once to prevent duplicate listeners
+    }
+
+    /**
+     * Refresh the currently open matter
+     * Re-fetches all data and refreshes the current tab
+     */
+    window.refreshCurrentMatter = async function() {
+      const currentMatter = window.currentMatterDetails;
+      if (!currentMatter || !currentMatter.matter_id) {
+        console.warn('[refreshCurrentMatter] No matter currently open');
+        return;
+      }
+
+      const refreshBtn = document.getElementById('refreshMatterBtn');
+      const currentTab = getCurrentActiveTab();
+
+      console.log('[refreshCurrentMatter] Refreshing matter:', {
+        matterId: currentMatter.matter_id,
+        currentTab
+      });
+
+      try {
+        // Add spinning animation
+        if (refreshBtn) {
+          refreshBtn.classList.add('animate-spin');
+        }
+
+        // Re-fetch matter with cache busting
+        await viewMatter(currentMatter.matter_id, currentTab, { bustCache: true });
+
+        Toast.success('Matter details refreshed');
+      } catch (error) {
+        console.error('[refreshCurrentMatter] Error refreshing matter:', error);
+        Toast.error('Failed to refresh matter details');
+      } finally {
+        // Remove spinning animation
+        if (refreshBtn) {
+          setTimeout(() => {
+            refreshBtn.classList.remove('animate-spin');
+          }, 300);
+        }
+      }
+    }
+
+    /**
+     * Get the currently active tab
+     */
+    function getCurrentActiveTab() {
+      const tabs = ['details', 'documents', 'conversations', 'activity', 'comments', 'tasks', 'links'];
+      for (const tab of tabs) {
+        const tabContent = document.getElementById(`tabContent${tab.charAt(0).toUpperCase() + tab.slice(1)}`);
+        if (tabContent && !tabContent.classList.contains('hidden')) {
+          return tab;
+        }
+      }
+      return 'details'; // Default to details tab
     }
 
     // Render Documents Tab
