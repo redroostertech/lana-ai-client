@@ -459,36 +459,6 @@
         <!-- Conflict Detection Section -->
         <div id="conflictDetectionContainer"></div>
 
-        <!-- Document Upload Section (only shown when editing existing matter) -->
-        <div id="documentUploadSection" class="hidden">
-          <label class="block text-sm font-medium text-gray-700 mb-2">Upload Documents</label>
-          <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-indigo-400 transition-colors cursor-pointer"
-               id="dropZone">
-            <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.txt,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.pptx,.ppt" class="hidden">
-            <div id="dropZoneContent">
-              <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-              </svg>
-              <p class="mt-2 text-sm text-gray-600">
-                <button type="button" onclick="document.getElementById('fileInput').click()" class="text-indigo-600 hover:text-indigo-800 font-medium">
-                  Click to upload
-                </button>
-                or drag and drop
-              </p>
-              <p class="mt-1 text-xs text-gray-500">PDF, Word, Excel, PowerPoint, Images up to 50MB each</p>
-            </div>
-            <div id="uploadProgress" class="hidden">
-              <div class="flex items-center justify-center gap-3">
-                <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full"></div>
-                <span id="uploadProgressText" class="text-sm text-gray-600">Uploading...</span>
-              </div>
-            </div>
-          </div>
-          
-          <!-- Uploaded Files List -->
-          <div id="uploadedFilesList" class="mt-3 space-y-2 max-h-40 overflow-y-auto"></div>
-        </div>
-
         <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
           <button type="button" id="cancelMatterBtn" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium">Cancel</button>
           <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg">Save Matter</button>
@@ -632,8 +602,8 @@
         <button id="tabTasks" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('tasks')">
           Tasks
         </button>
-        <button id="tabLinks" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('links')">
-          Linked Matters
+        <button id="tabContacts" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('contacts')">
+          Contacts
         </button>
       </div>
 
@@ -645,7 +615,7 @@
         <div id="tabContentActivity" class="hidden p-6"></div>
         <div id="tabContentComments" class="hidden p-6"></div>
         <div id="tabContentTasks" class="hidden p-6"></div>
-        <div id="tabContentLinks" class="hidden p-6"></div>
+        <div id="tabContentContacts" class="hidden p-6"></div>
       </div>
 
       <!-- Footer Actions -->
@@ -725,6 +695,176 @@
           </button>
           <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors">
             Save Task
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Contact Modal -->
+  <div id="contactModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-900">Add Contact</h3>
+        <button onclick="closeContactModal()" class="text-gray-400 hover:text-gray-600">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <form id="contactForm" onsubmit="saveContact(event)" class="p-6 space-y-5">
+        <input type="hidden" id="contactMatterId">
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">First Name <span class="text-red-500">*</span></label>
+            <input type="text" id="contactFirstName" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Last Name <span class="text-red-500">*</span></label>
+            <input type="text" id="contactLastName" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Display Name</label>
+          <input type="text" id="contactDisplayName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Optional - defaults to First Last">
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+            <input type="text" id="contactCompanyName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Company name">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Title/Position</label>
+            <input type="text" id="contactTitle" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g., Partner, CEO">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <input type="email" id="contactEmail" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="email@example.com">
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Mobile Phone</label>
+            <input type="tel" id="contactPhoneMobile" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="(555) 555-5555">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Work Phone</label>
+            <input type="tel" id="contactPhoneWork" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="(555) 555-5555">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Contact Type</label>
+          <select id="contactType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+            <option value="contact:participant">Participant</option>
+            <option value="contact:opportunity">Opportunity</option>
+            <option value="contact:lead">Lead</option>
+            <option value="contact:other">Other</option>
+          </select>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
+          <button type="button" onclick="closeContactModal()" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors">
+            Cancel
+          </button>
+          <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors">
+            Save Contact
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Contact Detail Modal -->
+  <div id="contactDetailModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between p-6 border-b border-gray-200">
+        <h2 class="text-xl font-semibold text-gray-900">Contact Details</h2>
+        <button onclick="closeContactDetailModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <div id="contactDetailContent" class="p-6">
+        <!-- Content populated by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Contact Modal -->
+  <div id="editContactModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between p-6 border-b border-gray-200">
+        <h2 class="text-xl font-semibold text-gray-900">Edit Contact</h2>
+        <button onclick="closeEditContactModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <form id="editContactForm" onsubmit="updateContact(event)" class="p-6 space-y-5">
+        <input type="hidden" id="editContactId">
+        <input type="hidden" id="editContactMatterId">
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">First Name <span class="text-red-500">*</span></label>
+            <input type="text" id="editContactFirstName" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Last Name <span class="text-red-500">*</span></label>
+            <input type="text" id="editContactLastName" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Display Name</label>
+          <input type="text" id="editContactDisplayName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Optional - defaults to First Last">
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+            <input type="text" id="editContactCompanyName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Company name">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Title/Position</label>
+            <input type="text" id="editContactTitle" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g., Partner, CEO">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <input type="email" id="editContactEmail" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="email@example.com">
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Mobile Phone</label>
+            <input type="tel" id="editContactPhoneMobile" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="(555) 555-5555">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Work Phone</label>
+            <input type="tel" id="editContactPhoneWork" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="(555) 555-5555">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Contact Type</label>
+          <select id="editContactType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+            <option value="contact:participant">Participant</option>
+            <option value="contact:opportunity">Opportunity</option>
+            <option value="contact:lead">Lead</option>
+            <option value="contact:other">Other</option>
+          </select>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
+          <button type="button" onclick="closeEditContactModal()" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors">
+            Cancel
+          </button>
+          <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors">
+            Save Changes
           </button>
         </div>
       </form>
@@ -1269,6 +1409,12 @@
   <script>
     if (!api.requireAuth()) throw new Error('Not authenticated');
 
+    // Utility: Format number with thousand separators
+    function formatNumber(num) {
+      if (num === null || num === undefined) return '0';
+      return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+
     // Load full user profile with roles before rendering menu
     (async () => {
       try {
@@ -1397,24 +1543,6 @@
                 <p class="text-sm text-gray-500">${escapedClientName}</p>
               </div>
               <div class="flex items-center gap-2">
-                <!-- Matter Type Badge -->
-                ${matter.matter_type === 'matter' ? `
-                  <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800" title="Client Matter - Included in analytics">
-                    <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
-                      <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
-                    </svg>
-                    Matter
-                  </span>
-                ` : `
-                  <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800" title="Workspace - Excluded from analytics">
-                    <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                      <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/>
-                    </svg>
-                    Workspace
-                  </span>
-                `}
-
                 <!-- Pin Button -->
                 <button
                   onclick="event.stopPropagation(); togglePin('${escapedMatterId}', '${escapedSource}', ${matter.is_pinned || false})"
@@ -1432,10 +1560,29 @@
                     </svg>
                   `}
                 </button>
-                ${statusBadge(matter.status || 'active')}
               </div>
             </div>
             <p class="text-sm text-gray-600 line-clamp-2 mb-4">${escapedDescription}</p>
+            <!-- Matter Type and Status Badges -->
+            <div class="flex items-center gap-2 mb-4">
+              ${matter.matter_type === 'matter' ? `
+                <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800" title="Client Matter - Included in analytics">
+                  <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+                    <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
+                  </svg>
+                  Matter
+                </span>
+              ` : `
+                <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800" title="Workspace - Excluded from analytics">
+                  <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/>
+                  </svg>
+                  Workspace
+                </span>
+              `}
+              ${statusBadge(matter.status || 'active')}
+            </div>
             <div class="flex items-center justify-between text-xs text-gray-400">
               <span>Created ${formatDate(matter.created_at)}</span>
               <div class="flex gap-2">
@@ -1573,14 +1720,21 @@
         // Pinned Matters Section (only show on page 1)
         if (allPinnedMatters.length > 0 && currentPage === 1) {
           console.log('[Matters] Rendering pinned matters section');
+          // Dynamic heading based on filter
+          let pinnedHeading = 'Pinned Matters';
+          if (matterTypeFilterValue === 'matter') {
+            pinnedHeading = 'Pinned Client Matters';
+          } else if (matterTypeFilterValue === 'workspace') {
+            pinnedHeading = 'Pinned Workspaces';
+          }
           html += `
             <div class="col-span-full">
               <div class="flex items-center gap-2 mb-4">
                 <svg class="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/>
                 </svg>
-                <h2 class="text-lg font-semibold text-gray-900">Pinned Matters</h2>
-                <span class="text-sm text-gray-500">(${totalPinnedCount > allPinnedMatters.length ? `Showing ${allPinnedMatters.length} of ${totalPinnedCount}` : allPinnedMatters.length})</span>
+                <h2 class="text-lg font-semibold text-gray-900">${pinnedHeading}</h2>
+                <span class="text-sm text-gray-500">(${totalPinnedCount > allPinnedMatters.length ? `Showing ${formatNumber(allPinnedMatters.length)} of ${formatNumber(totalPinnedCount)}` : formatNumber(allPinnedMatters.length)})</span>
               </div>
             </div>
           `;
@@ -1608,14 +1762,21 @@
         // All Matters Section
         if (unpinnedMatters.length > 0) {
           const totalUnpinned = unpinnedResult.total || 0;
+          // Dynamic heading based on filter
+          let sectionHeading = 'All Matters';
+          if (matterTypeFilterValue === 'matter') {
+            sectionHeading = 'Client Matters';
+          } else if (matterTypeFilterValue === 'workspace') {
+            sectionHeading = 'Workspaces';
+          }
           html += `
             <div class="col-span-full ${allPinnedMatters.length > 0 && currentPage === 1 ? 'mt-8' : ''}">
               <div class="flex items-center gap-2 mb-4">
                 <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
                 </svg>
-                <h2 class="text-lg font-semibold text-gray-900">All Matters</h2>
-                <span class="text-sm text-gray-500">(${totalUnpinned})</span>
+                <h2 class="text-lg font-semibold text-gray-900">${sectionHeading}</h2>
+                <span class="text-sm text-gray-500">(${formatNumber(totalUnpinned)})</span>
               </div>
             </div>
           `;
@@ -1718,7 +1879,7 @@
       pagination.innerHTML = `
         <div class="flex gap-2">
           <button ${currentPage === 1 ? 'disabled' : ''} onclick="goToPage(${currentPage - 1})" class="px-3 py-1 border rounded ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'}">Previous</button>
-          <span class="px-3 py-1 text-gray-600">Page ${currentPage} of ${totalPages}</span>
+          <span class="px-3 py-1 text-gray-600">Page ${formatNumber(currentPage)} of ${formatNumber(totalPages)}</span>
           <button ${currentPage === totalPages ? 'disabled' : ''} onclick="goToPage(${currentPage + 1})" class="px-3 py-1 border rounded ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'}">Next</button>
         </div>
       `;
@@ -1947,168 +2108,15 @@
       updateShareSectionVisibility();
     }
 
-    // ================== DOCUMENT UPLOAD HANDLING ==================
-    
-    const dropZone = document.getElementById('dropZone');
-    const fileInput = document.getElementById('fileInput');
-    const uploadProgress = document.getElementById('uploadProgress');
-    const dropZoneContent = document.getElementById('dropZoneContent');
-    const uploadProgressText = document.getElementById('uploadProgressText');
-    const uploadedFilesList = document.getElementById('uploadedFilesList');
-    let uploadedFiles = [];
-
-    // Drag and drop handlers
-    dropZone.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      dropZone.classList.add('border-indigo-400', 'bg-indigo-50');
-    });
-
-    dropZone.addEventListener('dragleave', (e) => {
-      e.preventDefault();
-      dropZone.classList.remove('border-indigo-400', 'bg-indigo-50');
-    });
-
-    dropZone.addEventListener('drop', async (e) => {
-      e.preventDefault();
-      dropZone.classList.remove('border-indigo-400', 'bg-indigo-50');
-      const files = e.dataTransfer.files;
-      if (files.length > 0) {
-        await handleFileUpload(files);
-      }
-    });
-
-    // Click on drop zone to open file picker
-    dropZone.addEventListener('click', (e) => {
-      if (e.target.tagName !== 'BUTTON') {
-        fileInput.click();
-      }
-    });
-
-    fileInput.addEventListener('change', async (e) => {
-      if (e.target.files.length > 0) {
-        await handleFileUpload(e.target.files);
-      }
-    });
-
-    async function handleFileUpload(files) {
-      const matterId = document.getElementById('matterId').value;
-      if (!matterId) {
-        Toast.error('Please save the matter first before uploading documents');
-        return;
-      }
-
-      // Show progress
-      dropZoneContent.classList.add('hidden');
-      uploadProgress.classList.remove('hidden');
-
-      const fileArray = Array.from(files);
-      let successCount = 0;
-      const CONCURRENT_UPLOADS = 3; // Upload 3 files in parallel
-
-      // Process files in batches of 3 for better performance
-      for (let i = 0; i < fileArray.length; i += CONCURRENT_UPLOADS) {
-        const batch = fileArray.slice(i, i + CONCURRENT_UPLOADS);
-
-        // Create promises for this batch
-        const batchPromises = batch.map(async (file, idx) => {
-          const fileIndex = i + idx;
-          uploadProgressText.textContent = `Uploading ${fileIndex + 1}/${fileArray.length}: ${file.name}`;
-
-          try {
-            const result = await api.uploadDocument(file, matterId);
-
-            // Add to uploaded files list
-            uploadedFiles.push({
-              name: file.name,
-              size: file.size,
-              document_id: result.document_id,
-              status: 'uploaded'
-            });
-            successCount++;
-            renderUploadedFiles();
-          } catch (error) {
-            Toast.error(`Failed to upload ${file.name}: ${error.message}`);
-
-            // Add as failed
-            uploadedFiles.push({
-              name: file.name,
-              size: file.size,
-              status: 'failed',
-              error: error.message
-            });
-            renderUploadedFiles();
-          }
-        });
-
-        // Wait for all uploads in this batch to complete
-        await Promise.all(batchPromises);
-      }
-
-      // Reset upload zone
-      dropZoneContent.classList.remove('hidden');
-      uploadProgress.classList.add('hidden');
-      fileInput.value = '';
-      
-      if (successCount > 0) {
-        Toast.success(`Uploaded ${successCount} document(s) - processing will begin shortly`);
-      }
-    }
-
-    function renderUploadedFiles() {
-      if (uploadedFiles.length === 0) {
-        uploadedFilesList.innerHTML = '';
-        return;
-      }
-
-      uploadedFilesList.innerHTML = uploadedFiles.map((file, index) => `
-        <div class="flex items-center justify-between bg-gray-50 rounded-lg p-2 ${file.status === 'failed' ? 'border border-red-200' : ''}">
-          <div class="flex items-center gap-2 min-w-0">
-            <svg class="w-5 h-5 flex-shrink-0 ${file.status === 'failed' ? 'text-red-500' : 'text-green-500'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              ${file.status === 'failed' 
-                ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>'
-                : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>'
-              }
-            </svg>
-            <div class="min-w-0">
-              <p class="text-sm font-medium text-gray-900 truncate">${file.name}</p>
-              <p class="text-xs text-gray-500">${formatFileSize(file.size)}${file.status === 'failed' ? ' - ' + file.error : ''}</p>
-            </div>
-          </div>
-          <button type="button" onclick="removeUploadedFile(${index})" class="text-gray-400 hover:text-red-600 p-1 flex-shrink-0">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-          </button>
-        </div>
-      `).join('');
-    }
-
-    window.removeUploadedFile = function(index) {
-      uploadedFiles.splice(index, 1);
-      renderUploadedFiles();
-    }
-
-    function formatFileSize(bytes) {
-      if (bytes < 1024) return bytes + ' B';
-      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-    }
-
-    function resetUploadSection() {
-      uploadedFiles = [];
-      renderUploadedFiles();
-      if (fileInput) fileInput.value = '';
-      if (dropZoneContent) dropZoneContent.classList.remove('hidden');
-      if (uploadProgress) uploadProgress.classList.add('hidden');
-    }
+    // ================== DOCUMENT UPLOAD HANDLING (Removed - use Documents tab in matter drawer) ==================
 
     document.getElementById('createMatterBtn').addEventListener('click', () => {
       document.getElementById('matterModalTitle').textContent = 'Create Matter';
       document.getElementById('matterId').value = '';
       document.getElementById('matterIdDisplay').classList.add('hidden');
       document.getElementById('shareWithSection').classList.remove('hidden');
-      document.getElementById('documentUploadSection').classList.add('hidden'); // Hide upload for new matters
       form.reset();
       resetShareForm();
-      resetUploadSection();
 
       // Enable matter type selection and reset to workspace default
       document.getElementById('matterTypeSection').classList.remove('hidden');
@@ -2285,11 +2293,7 @@
         // Show share section in edit mode and update visibility state
         document.getElementById('shareWithSection').classList.remove('hidden');
         updateShareSectionVisibility();
-        
-        // Show upload section for existing matters
-        document.getElementById('documentUploadSection').classList.remove('hidden');
-        resetUploadSection();
-        
+
         modal.classList.remove('hidden');
       } catch (error) {
         Toast.error('Failed to load matter');
@@ -2352,6 +2356,10 @@
         const tasks = tasksResult.tasks || [];
         const commentCount = commentsResult.pagination?.total || 0;
 
+        // Extract shadow table data from matter object (when full_details=true)
+        const contacts = matter.contacts || [];
+        const notes = matter.notes || [];
+
         // Log conversation results for debugging
         console.log('[viewMatter] Conversations loaded:', {
           matterId,
@@ -2371,8 +2379,15 @@
           orphanedCount: orphanedFiles.length
         });
 
+        console.log('[viewMatter] Shadow tables loaded:', {
+          matterId,
+          tasksCount: tasks.length,
+          contactsCount: contacts.length,
+          notesCount: notes.length
+        });
+
         // Store data globally for tab switching
-        currentMatterData = { matter, permissions, activities, activityPagination, chats, chatsPagination, documents, documentsPagination, orphanedFiles, tasks };
+        currentMatterData = { matter, permissions, activities, activityPagination, chats, chatsPagination, documents, documentsPagination, orphanedFiles, tasks, contacts, notes };
 
         // Track matter opened event (with defensive null checks)
         if (window.analytics && matter) {
@@ -2409,8 +2424,18 @@
         `;
 
         document.getElementById('drawerStatusBadge').innerHTML = matterTypeBadge + statusBadge(matter.status || 'active');
-        document.getElementById('conversationCount').textContent = chats.length || '';
-        document.getElementById('documentCount').textContent = documentsPagination.total_count || documents.length || '';
+
+        // Update conversation count and hide badge if 0
+        const conversationCountEl = document.getElementById('conversationCount');
+        const conversationCount = chats.length || 0;
+        conversationCountEl.textContent = conversationCount || '';
+        conversationCountEl.style.display = conversationCount > 0 ? 'inline' : 'none';
+
+        // Update document count and hide badge if 0
+        const documentCountEl = document.getElementById('documentCount');
+        const documentCount = documentsPagination.total_count || documents.length || 0;
+        documentCountEl.textContent = documentCount || '';
+        documentCountEl.style.display = documentCount > 0 ? 'inline' : 'none';
         // Task count removed - no longer displayed in tab header
 
         // Update comment count badge
@@ -2438,10 +2463,10 @@
     window.switchMatterTab = function(tabName) {
       if (!currentMatterData) return;
 
-      const { matter, permissions, activities, activityPagination, chats, chatsPagination, documents, orphanedFiles, tasks } = currentMatterData;
+      const { matter, permissions, activities, activityPagination, chats, chatsPagination, documents, orphanedFiles, tasks, contacts, notes } = currentMatterData;
 
       // Update tab buttons
-      const tabs = ['Details', 'Documents', 'Conversations', 'Activity', 'Comments', 'Tasks', 'Links'];
+      const tabs = ['Details', 'Documents', 'Conversations', 'Activity', 'Comments', 'Tasks', 'Contacts'];
       tabs.forEach(tab => {
         const btn = document.getElementById(`tab${tab}`);
         const content = document.getElementById(`tabContent${tab}`);
@@ -2476,8 +2501,8 @@
         case 'tasks':
           renderTasksTab(matter, tasks || []);
           break;
-        case 'links':
-          renderLinkedMattersTab(matter);
+        case 'contacts':
+          renderContactsTab(matter, contacts || []);
           break;
       }
     }
@@ -2550,10 +2575,18 @@
             </div>
           </div>
 
+          <!-- Linked Matters Section -->
+          <div id="linkedMattersSection">
+            <!-- Linked matters content will be loaded here -->
+          </div>
+
           <!-- Similar Matters Widget - TEMPORARILY HIDDEN -->
           <!-- <div id="similarMattersWidgetContainer" class="mt-6"></div> -->
         </div>
       `;
+
+      // Load Linked Matters into the Details tab
+      renderLinkedMattersInDetails(matter);
 
       // Initialize Similar Matters Widget - TEMPORARILY DISABLED
       /*
@@ -2621,7 +2654,7 @@
      * Get the currently active tab
      */
     function getCurrentActiveTab() {
-      const tabs = ['details', 'documents', 'conversations', 'activity', 'comments', 'tasks', 'links'];
+      const tabs = ['details', 'documents', 'conversations', 'activity', 'comments', 'tasks', 'contacts'];
       for (const tab of tabs) {
         const tabContent = document.getElementById(`tabContent${tab.charAt(0).toUpperCase() + tab.slice(1)}`);
         if (tabContent && !tabContent.classList.contains('hidden')) {
@@ -3106,8 +3139,11 @@
           currentMatterData.documentsPagination = pagination;
         }
 
-        // Update document count badge
-        document.getElementById('documentCount').textContent = pagination.total_count || documents.length || '';
+        // Update document count badge and hide if 0
+        const documentCountEl = document.getElementById('documentCount');
+        const documentCount = pagination.total_count || documents.length || 0;
+        documentCountEl.textContent = documentCount || '';
+        documentCountEl.style.display = documentCount > 0 ? 'inline' : 'none';
 
         // Re-render the documents tab
         renderDocumentsTab(currentMatterData.matter, documents);
@@ -3906,7 +3942,7 @@
             <div class="border-t pt-4 mt-6">
               <div class="flex items-center justify-between">
                 <div class="text-sm text-gray-600">
-                  Showing ${currentOffset + 1}-${currentOffset + chats.length} of ${total} conversations
+                  Showing ${formatNumber(currentOffset + 1)}-${formatNumber(currentOffset + chats.length)} of ${formatNumber(total)} conversations
                 </div>
                 <div class="flex items-center gap-2">
                   <button
@@ -3917,7 +3953,7 @@
                     Previous
                   </button>
                   <span class="text-sm text-gray-600">
-                    Page ${currentPage} of ${totalPages}
+                    Page ${formatNumber(currentPage)} of ${formatNumber(totalPages)}
                   </span>
                   <button
                     onclick="loadConversationsPage('${matter.matter_id}', ${currentOffset + limit})"
@@ -3995,7 +4031,7 @@
             <div class="border-t pt-4 mt-6">
               <div class="flex items-center justify-between">
                 <div class="text-sm text-gray-600">
-                  Showing ${currentOffset + 1}-${currentOffset + activities.length} of ${total}
+                  Showing ${formatNumber(currentOffset + 1)}-${formatNumber(currentOffset + activities.length)} of ${formatNumber(total)}
                 </div>
                 <div class="flex items-center gap-2">
                   <button
@@ -4006,7 +4042,7 @@
                     Previous
                   </button>
                   <span class="text-sm text-gray-600">
-                    Page ${currentPage} of ${totalPages}
+                    Page ${formatNumber(currentPage)} of ${formatNumber(totalPages)}
                   </span>
                   <button
                     onclick="loadActivityPage('${matter.matter_id}', ${currentOffset + limit})"
@@ -4331,11 +4367,11 @@
       const endRange = Math.min(currentCommentsPage * commentsPerPage, totalComments);
 
       // Update pagination info
-      document.getElementById('commentsRangeStart').textContent = startRange;
-      document.getElementById('commentsRangeEnd').textContent = endRange;
-      document.getElementById('commentsTotalCount').textContent = totalComments;
-      document.getElementById('commentsCurrentPage').textContent = currentCommentsPage;
-      document.getElementById('commentsTotalPages').textContent = totalPages || 1;
+      document.getElementById('commentsRangeStart').textContent = formatNumber(startRange);
+      document.getElementById('commentsRangeEnd').textContent = formatNumber(endRange);
+      document.getElementById('commentsTotalCount').textContent = formatNumber(totalComments);
+      document.getElementById('commentsCurrentPage').textContent = formatNumber(currentCommentsPage);
+      document.getElementById('commentsTotalPages').textContent = formatNumber(totalPages || 1);
 
       // Always show pagination controls
       const paginationContainer = document.getElementById('commentsPagination');
@@ -5131,7 +5167,7 @@
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
                 </svg>
               </button>
-              <span class="text-gray-600">Page ${pagination.page} of ${totalPages}</span>
+              <span class="text-gray-600">Page ${formatNumber(pagination.page)} of ${formatNumber(totalPages)}</span>
               <button
                 onclick="changeKanbanPage('${status}', ${pagination.page + 1})"
                 class="px-2 py-1 rounded ${hasMore ? 'text-indigo-600 hover:bg-indigo-50' : 'text-gray-300 cursor-not-allowed'}"
@@ -5563,6 +5599,757 @@
       }
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // CONTACT MODAL FUNCTIONS
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    // Open Add Contact Modal
+    window.openAddContactModal = function(matterId) {
+      const modal = document.getElementById('contactModal');
+      document.getElementById('contactForm').reset();
+      document.getElementById('contactMatterId').value = matterId;
+      modal.classList.remove('hidden');
+    };
+
+    // Close Contact Modal
+    window.closeContactModal = function() {
+      document.getElementById('contactModal').classList.add('hidden');
+      document.getElementById('contactForm').reset();
+    };
+
+    // Save Contact (Create)
+    window.saveContact = async function(event) {
+      event.preventDefault();
+
+      const matterId = document.getElementById('contactMatterId').value;
+      const contactData = {
+        first_name: document.getElementById('contactFirstName').value.trim(),
+        last_name: document.getElementById('contactLastName').value.trim(),
+        display_name: document.getElementById('contactDisplayName').value.trim() || null,
+        company_name: document.getElementById('contactCompanyName').value.trim() || null,
+        title: document.getElementById('contactTitle').value.trim() || null,
+        email: document.getElementById('contactEmail').value.trim() || null,
+        phone_mobile: document.getElementById('contactPhoneMobile').value.trim() || null,
+        phone_work: document.getElementById('contactPhoneWork').value.trim() || null,
+        contact_type: document.getElementById('contactType').value
+      };
+
+      // Get the submit button from the form
+      const submitBtn = event.target.querySelector('button[type="submit"]');
+      const originalButtonHtml = submitBtn.innerHTML;
+
+      // Show loading state on button
+      submitBtn.disabled = true;
+      submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      submitBtn.innerHTML = `
+        <svg class="animate-spin h-4 w-4 inline-block mr-2" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        Creating...
+      `;
+
+      try {
+        await api.createContact(matterId, contactData);
+        Toast.success('Contact created successfully');
+
+        // Close modal
+        document.getElementById('contactModal').classList.add('hidden');
+
+        // Restore button state
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        submitBtn.innerHTML = originalButtonHtml;
+
+        // Refresh matter data to get updated contacts
+        if (currentMatterData) {
+          const result = await api.getMatter(matterId, { bustCache: true });
+          if (result.success && result.matter) {
+            const updatedContacts = result.matter.contacts || [];
+            currentMatterData.contacts = updatedContacts;
+            renderContactsTab(currentMatterData.matter, updatedContacts);
+          }
+        }
+      } catch (error) {
+        console.error('Save contact error:', error);
+        Toast.error('Failed to create contact');
+
+        // Restore button state on error
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        submitBtn.innerHTML = originalButtonHtml;
+      }
+    };
+
+    // Open Contact Detail Modal
+    window.openContactDetail = async function(contactId) {
+      const modal = document.getElementById('contactDetailModal');
+      const content = document.getElementById('contactDetailContent');
+
+      // Show loading state
+      content.innerHTML = `
+        <div class="flex items-center justify-center py-12">
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        </div>
+      `;
+      modal.classList.remove('hidden');
+
+      try {
+        // Get current matter ID from drawer
+        const matterId = currentMatterData?.matter?.matter_id;
+        if (!matterId) {
+          throw new Error('Matter ID not found');
+        }
+
+        // Fetch contact details
+        const response = await fetch(`${api.baseUrl}/api/v1/matters/${matterId}/contacts/${contactId}`, {
+          headers: {
+            'Authorization': `Bearer ${api.token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to load contact details');
+        }
+
+        const data = await response.json();
+        const contact = data.contact;
+
+        // Contact type badge styling
+        const typeLabels = {
+          'contact:participant': { label: 'Participant', class: 'bg-blue-100 text-blue-800' },
+          'contact:opportunity': { label: 'Opportunity', class: 'bg-green-100 text-green-800' },
+          'contact:lead': { label: 'Lead', class: 'bg-yellow-100 text-yellow-800' },
+          'contact:other': { label: 'Other', class: 'bg-gray-100 text-gray-800' }
+        };
+        const contactTypeInfo = typeLabels[contact.contact_type] || typeLabels['contact:other'];
+        const displayName = contact.display_name || `${contact.first_name} ${contact.last_name}`;
+        const isExternal = contact.source === 'actionstep';
+
+        // Render contact details
+        content.innerHTML = `
+          <div class="space-y-6">
+            <!-- Header with name and badges -->
+            <div>
+              <div class="flex items-center gap-2 flex-wrap mb-2">
+                <h3 class="text-2xl font-semibold text-gray-900">${displayName}</h3>
+                <span class="text-sm ${contactTypeInfo.class} px-2 py-1 rounded">${contactTypeInfo.label}</span>
+                ${isExternal ? `<span class="text-sm bg-purple-100 text-purple-800 px-2 py-1 rounded">ActionStep</span>` : ''}
+              </div>
+              ${contact.title || contact.company_name ? `
+                <p class="text-gray-600">
+                  ${contact.title ? contact.title : ''}${contact.title && contact.company_name ? ' at ' : ''}${contact.company_name ? contact.company_name : ''}
+                </p>
+              ` : ''}
+            </div>
+
+            <!-- Contact Information Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label class="block text-sm font-medium text-gray-500 mb-1">First Name</label>
+                <p class="text-gray-900">${contact.first_name || '—'}</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-500 mb-1">Last Name</label>
+                <p class="text-gray-900">${contact.last_name || '—'}</p>
+              </div>
+              ${contact.display_name ? `
+                <div class="md:col-span-2">
+                  <label class="block text-sm font-medium text-gray-500 mb-1">Display Name</label>
+                  <p class="text-gray-900">${contact.display_name}</p>
+                </div>
+              ` : ''}
+              ${contact.company_name ? `
+                <div>
+                  <label class="block text-sm font-medium text-gray-500 mb-1">Company</label>
+                  <p class="text-gray-900">${contact.company_name}</p>
+                </div>
+              ` : ''}
+              ${contact.title ? `
+                <div>
+                  <label class="block text-sm font-medium text-gray-500 mb-1">Title/Position</label>
+                  <p class="text-gray-900">${contact.title}</p>
+                </div>
+              ` : ''}
+              ${contact.email ? `
+                <div class="md:col-span-2">
+                  <label class="block text-sm font-medium text-gray-500 mb-1">Email</label>
+                  <a href="mailto:${contact.email}" class="text-indigo-600 hover:text-indigo-800">${contact.email}</a>
+                </div>
+              ` : ''}
+              ${contact.phone_mobile ? `
+                <div>
+                  <label class="block text-sm font-medium text-gray-500 mb-1">Mobile Phone</label>
+                  <a href="tel:${contact.phone_mobile}" class="text-indigo-600 hover:text-indigo-800">${contact.phone_mobile}</a>
+                </div>
+              ` : ''}
+              ${contact.phone_work ? `
+                <div>
+                  <label class="block text-sm font-medium text-gray-500 mb-1">Work Phone</label>
+                  <a href="tel:${contact.phone_work}" class="text-indigo-600 hover:text-indigo-800">${contact.phone_work}</a>
+                </div>
+              ` : ''}
+            </div>
+
+            <!-- Action Buttons -->
+            ${!isExternal ? `
+              <div class="flex justify-end gap-3 pt-6 border-t border-gray-200">
+                <button
+                  onclick="confirmDeleteContact('${contact.id}', '${displayName}')"
+                  class="px-4 py-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg font-medium transition-colors flex items-center gap-2"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                  </svg>
+                  Delete Contact
+                </button>
+                <button
+                  onclick="openEditContactModal('${contact.id}')"
+                  class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                  </svg>
+                  Edit Contact
+                </button>
+              </div>
+            ` : `
+              <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <p class="text-sm text-purple-800">
+                  <strong>Note:</strong> This contact is synced from ActionStep and cannot be edited or deleted from LANA.
+                </p>
+              </div>
+            `}
+          </div>
+        `;
+      } catch (error) {
+        console.error('Error loading contact details:', error);
+        content.innerHTML = `
+          <div class="text-center py-12">
+            <div class="text-red-600 mb-4">
+              <svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <h4 class="text-lg font-semibold text-gray-900 mb-2">Failed to load contact</h4>
+            <p class="text-gray-500">${error.message}</p>
+          </div>
+        `;
+      }
+    };
+
+    // Close Contact Detail Modal
+    window.closeContactDetailModal = function() {
+      document.getElementById('contactDetailModal').classList.add('hidden');
+    };
+
+    // Open Edit Contact Modal
+    window.openEditContactModal = async function(contactId) {
+      try {
+        // Close detail modal
+        closeContactDetailModal();
+
+        const matterId = currentMatterData?.matter?.matter_id;
+        if (!matterId) {
+          throw new Error('Matter ID not found');
+        }
+
+        // Fetch contact data
+        const response = await fetch(`${api.baseUrl}/api/v1/matters/${matterId}/contacts/${contactId}`, {
+          headers: {
+            'Authorization': `Bearer ${api.token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to load contact');
+        }
+
+        const data = await response.json();
+        const contact = data.contact;
+
+        // Populate form
+        document.getElementById('editContactId').value = contact.id;
+        document.getElementById('editContactMatterId').value = matterId;
+        document.getElementById('editContactFirstName').value = contact.first_name || '';
+        document.getElementById('editContactLastName').value = contact.last_name || '';
+        document.getElementById('editContactDisplayName').value = contact.display_name || '';
+        document.getElementById('editContactCompanyName').value = contact.company_name || '';
+        document.getElementById('editContactTitle').value = contact.title || '';
+        document.getElementById('editContactEmail').value = contact.email || '';
+        document.getElementById('editContactPhoneMobile').value = contact.phone_mobile || '';
+        document.getElementById('editContactPhoneWork').value = contact.phone_work || '';
+        document.getElementById('editContactType').value = contact.contact_type || 'contact:other';
+
+        // Show modal
+        document.getElementById('editContactModal').classList.remove('hidden');
+      } catch (error) {
+        console.error('Error loading contact for editing:', error);
+        Toast.error('Failed to load contact');
+      }
+    };
+
+    // Close Edit Contact Modal
+    window.closeEditContactModal = function() {
+      document.getElementById('editContactModal').classList.add('hidden');
+      document.getElementById('editContactForm').reset();
+    };
+
+    // Update Contact
+    window.updateContact = async function(event) {
+      event.preventDefault();
+
+      const contactId = document.getElementById('editContactId').value;
+      const matterId = document.getElementById('editContactMatterId').value;
+      const contactData = {
+        first_name: document.getElementById('editContactFirstName').value.trim(),
+        last_name: document.getElementById('editContactLastName').value.trim(),
+        display_name: document.getElementById('editContactDisplayName').value.trim() || null,
+        company_name: document.getElementById('editContactCompanyName').value.trim() || null,
+        title: document.getElementById('editContactTitle').value.trim() || null,
+        email: document.getElementById('editContactEmail').value.trim() || null,
+        phone_mobile: document.getElementById('editContactPhoneMobile').value.trim() || null,
+        phone_work: document.getElementById('editContactPhoneWork').value.trim() || null,
+        contact_type: document.getElementById('editContactType').value
+      };
+
+      const submitBtn = event.target.querySelector('button[type="submit"]');
+      const originalButtonHtml = submitBtn.innerHTML;
+
+      submitBtn.disabled = true;
+      submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      submitBtn.innerHTML = `
+        <svg class="animate-spin h-4 w-4 inline-block mr-2" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        Updating...
+      `;
+
+      try {
+        const response = await fetch(`${api.baseUrl}/api/v1/matters/${matterId}/contacts/${contactId}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${api.token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(contactData)
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to update contact');
+        }
+
+        Toast.success('Contact updated successfully');
+        closeEditContactModal();
+
+        // Refresh matter data
+        if (currentMatterData) {
+          const result = await api.getMatter(matterId, { bustCache: true });
+          if (result.success && result.matter) {
+            const updatedContacts = result.matter.contacts || [];
+            currentMatterData.contacts = updatedContacts;
+            renderContactsTab(currentMatterData.matter, updatedContacts);
+          }
+        }
+      } catch (error) {
+        console.error('Update contact error:', error);
+        Toast.error('Failed to update contact');
+
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        submitBtn.innerHTML = originalButtonHtml;
+      }
+    };
+
+    // Confirm Delete Contact
+    window.confirmDeleteContact = function(contactId, contactName) {
+      if (confirm(`Are you sure you want to delete the contact "${contactName}"? This action cannot be undone.`)) {
+        deleteContact(contactId);
+      }
+    };
+
+    // Delete Contact
+    window.deleteContact = async function(contactId) {
+      const matterId = currentMatterData?.matter?.matter_id;
+      if (!matterId) {
+        Toast.error('Matter ID not found');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${api.baseUrl}/api/v1/matters/${matterId}/contacts/${contactId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${api.token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to delete contact');
+        }
+
+        Toast.success('Contact deleted successfully');
+        closeContactDetailModal();
+
+        // Refresh matter data
+        if (currentMatterData) {
+          const result = await api.getMatter(matterId, { bustCache: true });
+          if (result.success && result.matter) {
+            const updatedContacts = result.matter.contacts || [];
+            currentMatterData.contacts = updatedContacts;
+            renderContactsTab(currentMatterData.matter, updatedContacts);
+          }
+        }
+      } catch (error) {
+        console.error('Delete contact error:', error);
+        Toast.error('Failed to delete contact');
+      }
+    };
+
+    // Contacts tab state
+    let contactsSearchQuery = '';
+    let contactsFilterType = 'all';
+    let contactsSortBy = 'name';
+    let contactsPage = 1;
+    const contactsPerPage = 10;
+
+    // Render Contacts Tab
+    function renderContactsTab(matter, contacts) {
+      const content = document.getElementById('tabContentContacts');
+
+      if (!contacts || contacts.length === 0) {
+        content.innerHTML = `
+          <div class="text-center py-12">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">No contacts</h3>
+            <p class="mt-1 text-sm text-gray-500">No contacts are associated with this matter yet.</p>
+            <button onclick="openAddContactModal('${matter.matter_id}')" class="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+              Add First Contact
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      // Filter contacts
+      let filteredContacts = contacts.filter(contact => {
+        // Type filter
+        if (contactsFilterType !== 'all' && contact.contact_type !== contactsFilterType) {
+          return false;
+        }
+
+        // Search filter
+        if (contactsSearchQuery) {
+          const query = contactsSearchQuery.toLowerCase();
+          const displayName = (contact.display_name || `${contact.first_name || ''} ${contact.last_name || ''}`).toLowerCase();
+          const email = (contact.email || '').toLowerCase();
+          const company = (contact.company_name || '').toLowerCase();
+          const title = (contact.title || '').toLowerCase();
+
+          return displayName.includes(query) ||
+                 email.includes(query) ||
+                 company.includes(query) ||
+                 title.includes(query);
+        }
+
+        return true;
+      });
+
+      // Sort contacts
+      filteredContacts.sort((a, b) => {
+        const getDisplayName = (c) => c.display_name || `${c.first_name || ''} ${c.last_name || ''}`;
+
+        switch (contactsSortBy) {
+          case 'name':
+            return getDisplayName(a).localeCompare(getDisplayName(b));
+          case 'name-desc':
+            return getDisplayName(b).localeCompare(getDisplayName(a));
+          case 'company':
+            return (a.company_name || '').localeCompare(b.company_name || '');
+          case 'company-desc':
+            return (b.company_name || '').localeCompare(a.company_name || '');
+          case 'type':
+            return (a.contact_type || '').localeCompare(b.contact_type || '');
+          case 'type-desc':
+            return (b.contact_type || '').localeCompare(a.contact_type || '');
+          case 'date':
+            return new Date(a.created_at || 0) - new Date(b.created_at || 0);
+          case 'date-desc':
+            return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+          default:
+            return 0;
+        }
+      });
+
+      // Pagination
+      const totalContacts = filteredContacts.length;
+      const totalPages = Math.ceil(totalContacts / contactsPerPage);
+      const startIndex = (contactsPage - 1) * contactsPerPage;
+      const endIndex = startIndex + contactsPerPage;
+      const paginatedContacts = filteredContacts.slice(startIndex, endIndex);
+
+      function renderContactCard(contact) {
+        const displayName = contact.display_name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unknown';
+        const isExternal = contact.source === 'actionstep';
+
+        // Contact type badge styling
+        const typeLabels = {
+          'contact:participant': { label: 'Participant', class: 'bg-blue-100 text-blue-800' },
+          'contact:opportunity': { label: 'Opportunity', class: 'bg-green-100 text-green-800' },
+          'contact:lead': { label: 'Lead', class: 'bg-yellow-100 text-yellow-800' },
+          'contact:other': { label: 'Other', class: 'bg-gray-100 text-gray-800' }
+        };
+        const contactTypeInfo = typeLabels[contact.contact_type] || typeLabels['contact:other'];
+
+        return `
+          <div onclick="openContactDetail('${contact.id}')" class="bg-white border border-gray-200 hover:border-indigo-300 hover:shadow-sm rounded-lg p-4 transition-all cursor-pointer">
+            <div class="flex items-start justify-between gap-4">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h4 class="text-sm font-medium text-gray-900 truncate">${displayName}</h4>
+                  <span class="text-xs ${contactTypeInfo.class} px-2 py-0.5 rounded">${contactTypeInfo.label}</span>
+                  ${isExternal ? `<span class="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded">ActionStep</span>` : ''}
+                </div>
+                ${contact.title || contact.company_name ? `
+                  <p class="text-xs text-gray-600 mt-0.5">
+                    ${contact.title ? contact.title : ''}${contact.title && contact.company_name ? ' at ' : ''}${contact.company_name ? contact.company_name : ''}
+                  </p>
+                ` : ''}
+                ${contact.email ? `
+                  <div class="flex items-center gap-1 mt-1">
+                    <svg class="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                    </svg>
+                    <a href="mailto:${contact.email}" onclick="event.stopPropagation()" class="text-xs text-indigo-600 hover:text-indigo-800 truncate">${contact.email}</a>
+                  </div>
+                ` : ''}
+                ${contact.phone_mobile || contact.phone_work ? `
+                  <div class="flex items-center gap-1 mt-1">
+                    <svg class="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>
+                    </svg>
+                    <a href="tel:${contact.phone_mobile || contact.phone_work}" onclick="event.stopPropagation()" class="text-xs text-gray-600 hover:text-indigo-600 truncate">${contact.phone_mobile || contact.phone_work}</a>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderContactSection(title, contactsList, iconColor = 'text-indigo-600') {
+        if (contactsList.length === 0) return '';
+
+        return `
+          <div class="mb-6">
+            <h3 class="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+              <svg class="w-4 h-4 ${iconColor}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+              </svg>
+              ${title} (${contactsList.length})
+            </h3>
+            <div class="space-y-2">
+              ${contactsList.map(contact => renderContactCard(contact)).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      content.innerHTML = `
+        <div class="space-y-6">
+          <!-- Header with Add Button -->
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-gray-900">Contacts</h2>
+            <button onclick="openAddContactModal('${matter.matter_id}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium flex items-center gap-1.5">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+              Add Contact
+            </button>
+          </div>
+
+          <!-- Search, Filter, Sort Controls -->
+          <div class="bg-gray-50 rounded-lg p-4 space-y-3">
+            <!-- Search Bar -->
+            <div class="relative">
+              <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+              </svg>
+              <input
+                type="text"
+                id="contactsSearchInput"
+                placeholder="Search by name, email, company, or title..."
+                value="${contactsSearchQuery}"
+                oninput="updateContactsSearch(this.value)"
+                class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+
+            <!-- Filter and Sort Row -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <!-- Filter by Type -->
+              <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Filter by Type</label>
+                <select
+                  id="contactsFilterSelect"
+                  onchange="updateContactsFilter(this.value)"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
+                >
+                  <option value="all" ${contactsFilterType === 'all' ? 'selected' : ''}>All Types</option>
+                  <option value="contact:participant" ${contactsFilterType === 'contact:participant' ? 'selected' : ''}>Participants</option>
+                  <option value="contact:opportunity" ${contactsFilterType === 'contact:opportunity' ? 'selected' : ''}>Opportunities</option>
+                  <option value="contact:lead" ${contactsFilterType === 'contact:lead' ? 'selected' : ''}>Leads</option>
+                  <option value="contact:other" ${contactsFilterType === 'contact:other' ? 'selected' : ''}>Other</option>
+                </select>
+              </div>
+
+              <!-- Sort By -->
+              <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Sort By</label>
+                <select
+                  id="contactsSortSelect"
+                  onchange="updateContactsSort(this.value)"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
+                >
+                  <option value="name" ${contactsSortBy === 'name' ? 'selected' : ''}>Name (A-Z)</option>
+                  <option value="name-desc" ${contactsSortBy === 'name-desc' ? 'selected' : ''}>Name (Z-A)</option>
+                  <option value="company" ${contactsSortBy === 'company' ? 'selected' : ''}>Company (A-Z)</option>
+                  <option value="company-desc" ${contactsSortBy === 'company-desc' ? 'selected' : ''}>Company (Z-A)</option>
+                  <option value="type" ${contactsSortBy === 'type' ? 'selected' : ''}>Type (A-Z)</option>
+                  <option value="type-desc" ${contactsSortBy === 'type-desc' ? 'selected' : ''}>Type (Z-A)</option>
+                  <option value="date" ${contactsSortBy === 'date' ? 'selected' : ''}>Date Added (Oldest)</option>
+                  <option value="date-desc" ${contactsSortBy === 'date-desc' ? 'selected' : ''}>Date Added (Newest)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Results Count -->
+            <div class="flex items-center justify-between text-sm text-gray-600">
+              <span>Showing ${startIndex + 1}-${Math.min(endIndex, totalContacts)} of ${totalContacts} contacts</span>
+              ${contactsSearchQuery || contactsFilterType !== 'all' ? `
+                <button
+                  onclick="clearContactsFilters()"
+                  class="text-indigo-600 hover:text-indigo-800 font-medium"
+                >
+                  Clear Filters
+                </button>
+              ` : ''}
+            </div>
+          </div>
+
+          <!-- Contacts List -->
+          ${paginatedContacts.length > 0 ? `
+            <div class="space-y-2">
+              ${paginatedContacts.map(contact => renderContactCard(contact)).join('')}
+            </div>
+          ` : `
+            <div class="text-center py-12 bg-gray-50 rounded-lg">
+              <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+              </svg>
+              <h3 class="mt-2 text-sm font-medium text-gray-900">No contacts found</h3>
+              <p class="mt-1 text-sm text-gray-500">Try adjusting your search or filters</p>
+            </div>
+          `}
+
+          <!-- Pagination -->
+          ${totalPages > 1 ? `
+            <div class="flex items-center justify-between pt-4 border-t border-gray-200">
+              <button
+                onclick="changeContactsPage(${contactsPage - 1})"
+                ${contactsPage === 1 ? 'disabled' : ''}
+                class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+                Previous
+              </button>
+
+              <div class="flex items-center gap-2">
+                ${Array.from({length: totalPages}, (_, i) => i + 1).map(page => `
+                  <button
+                    onclick="changeContactsPage(${page})"
+                    class="px-3 py-2 text-sm font-medium rounded-lg ${
+                      page === contactsPage
+                        ? 'bg-indigo-600 text-white'
+                        : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                    }"
+                  >
+                    ${page}
+                  </button>
+                `).join('')}
+              </div>
+
+              <button
+                onclick="changeContactsPage(${contactsPage + 1})"
+                ${contactsPage === totalPages ? 'disabled' : ''}
+                class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                Next
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+              </button>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    // Update contacts search
+    window.updateContactsSearch = function(query) {
+      contactsSearchQuery = query;
+      contactsPage = 1; // Reset to first page
+      if (currentMatterData) {
+        renderContactsTab(currentMatterData.matter, currentMatterData.contacts || []);
+      }
+    };
+
+    // Update contacts filter
+    window.updateContactsFilter = function(filterType) {
+      contactsFilterType = filterType;
+      contactsPage = 1; // Reset to first page
+      if (currentMatterData) {
+        renderContactsTab(currentMatterData.matter, currentMatterData.contacts || []);
+      }
+    };
+
+    // Update contacts sort
+    window.updateContactsSort = function(sortBy) {
+      contactsSortBy = sortBy;
+      if (currentMatterData) {
+        renderContactsTab(currentMatterData.matter, currentMatterData.contacts || []);
+      }
+    };
+
+    // Change contacts page
+    window.changeContactsPage = function(page) {
+      contactsPage = page;
+      if (currentMatterData) {
+        renderContactsTab(currentMatterData.matter, currentMatterData.contacts || []);
+      }
+    };
+
+    // Clear contacts filters
+    window.clearContactsFilters = function() {
+      contactsSearchQuery = '';
+      contactsFilterType = 'all';
+      contactsPage = 1;
+      if (currentMatterData) {
+        renderContactsTab(currentMatterData.matter, currentMatterData.contacts || []);
+      }
+    };
+
     function renderLinkedMattersContent(matter, links, totalLinks) {
       const content = document.getElementById('tabContentLinks');
       const isWorkspace = matter.matter_type === 'workspace';
@@ -5790,6 +6577,190 @@
           </div>
         </div>
       `;
+    }
+
+    // Render Linked Matters in Details Tab (not as separate tab)
+    async function renderLinkedMattersInDetails(matter) {
+      const content = document.getElementById('linkedMattersSection');
+
+      // Show loading state
+      content.innerHTML = `
+        <div class="flex items-center justify-center py-6">
+          <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
+        </div>
+      `;
+
+      try {
+        // Load linked matters from API
+        const response = await fetch(`${api.baseUrl}/api/v1/entity-links/matter/${matter.matter_id}`, {
+          headers: {
+            'Authorization': `Bearer ${api.token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to load linked matters');
+        }
+
+        const data = await response.json();
+        const { links, total_links } = data;
+
+        // Render the links UI inline in details
+        renderLinkedMattersInlineContent(matter, links, total_links);
+
+      } catch (error) {
+        console.error('Error loading linked matters:', error);
+        content.innerHTML = `
+          <div class="text-center py-6">
+            <div class="text-red-600 mb-2">
+              <svg class="w-8 h-8 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <h5 class="text-sm font-semibold text-gray-900 mb-1">Failed to load linked matters</h5>
+            <p class="text-xs text-gray-500">${error.message}</p>
+          </div>
+        `;
+      }
+    }
+
+    function renderLinkedMattersInlineContent(matter, links, totalLinks) {
+      const content = document.getElementById('linkedMattersSection');
+      const isWorkspace = matter.matter_type === 'workspace';
+      const isMatter = matter.matter_type === 'matter';
+
+      // If no links, show minimal message or hide completely
+      if (totalLinks === 0) {
+        content.innerHTML = `
+          <div class="bg-gray-50 rounded-lg p-4 text-center">
+            <p class="text-sm text-gray-500 mb-2">No linked matters</p>
+            <div class="flex items-center justify-center gap-2">
+              ${isWorkspace ? `
+                <button
+                  onclick="openCreateLinkModal('${matter.matter_id}', true)"
+                  class="px-3 py-1.5 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+                >
+                  Link Existing Matter
+                </button>
+                <button
+                  onclick="openCreateMatterDrawer('${matter.matter_id}')"
+                  class="px-3 py-1.5 text-xs bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
+                >
+                  Create New Matter
+                </button>
+              ` : `
+                <button
+                  onclick="openCreateLinkModal('${matter.matter_id}', false)"
+                  class="px-3 py-1.5 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+                >
+                  Link Related Matter
+                </button>
+              `}
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      // Build HTML for linked matters - compact version for details tab
+      let html = '<div class="space-y-4">';
+
+      html += '<div class="flex items-center justify-between">';
+      html += '<h5 class="text-sm font-medium text-gray-700">Linked Matters</h5>';
+
+      // Action buttons
+      if (isWorkspace) {
+        html += `
+          <div class="flex gap-2">
+            <button
+              onclick="openCreateLinkModal('${matter.matter_id}', true)"
+              class="px-2 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+              title="Link Existing Matter"
+            >
+              <svg class="w-3 h-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+              </svg>
+            </button>
+            <button
+              onclick="openCreateMatterDrawer('${matter.matter_id}')"
+              class="px-2 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
+              title="Create New Matter"
+            >
+              <svg class="w-3 h-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+            </button>
+          </div>
+        `;
+      } else if (isMatter) {
+        html += `
+          <button
+            onclick="openCreateLinkModal('${matter.matter_id}', false)"
+            class="px-2 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+            title="Link Related Matter"
+          >
+            <svg class="w-3 h-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+          </button>
+        `;
+      }
+      html += '</div>';
+
+      // Workspace Matters
+      if (links.workspace_matters && links.workspace_matters.length > 0) {
+        html += renderLinkSection(
+          isWorkspace ? 'Matters in this Workspace' : 'Part of Workspace',
+          links.workspace_matters,
+          matter.matter_id,
+          'workspace_matter'
+        );
+      }
+
+      // Related Matters
+      if (links.related_matters && links.related_matters.length > 0) {
+        html += renderLinkSection(
+          'Related Matters',
+          links.related_matters,
+          matter.matter_id,
+          'related_to'
+        );
+      }
+
+      // Parent Matters
+      if (links.parent_matters && links.parent_matters.length > 0) {
+        html += renderLinkSection(
+          'Parent Matters',
+          links.parent_matters,
+          matter.matter_id,
+          'parent'
+        );
+      }
+
+      // Child Matters
+      if (links.child_matters && links.child_matters.length > 0) {
+        html += renderLinkSection(
+          'Child Matters',
+          links.child_matters,
+          matter.matter_id,
+          'child'
+        );
+      }
+
+      // Shadow Records (ActionStep)
+      if (links.shadow_records && links.shadow_records.length > 0) {
+        html += renderLinkSection(
+          'ActionStep Connector',
+          links.shadow_records,
+          matter.matter_id,
+          'shadow_record',
+          true // read-only
+        );
+      }
+
+      html += '</div>';
+      content.innerHTML = html;
     }
 
     // =============================================================================
@@ -6052,9 +7023,32 @@
      * Confirm link deletion
      */
     window.deleteLinkConfirm = function(linkId, linkedMatterName) {
-      if (confirm(`Are you sure you want to remove the link to "${linkedMatterName}"?\n\nThis action cannot be undone.`)) {
-        deleteLink(linkId);
-      }
+      // Store the link ID for later use
+      window.pendingUnlinkId = linkId;
+
+      // Show the custom unlink confirmation modal
+      document.getElementById('unlinkMatterName').textContent = `"${linkedMatterName}"`;
+
+      const modal = document.getElementById('unlinkConfirmModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+
+      // Set up the confirm button click handler
+      const confirmBtn = document.getElementById('confirmUnlinkButton');
+      confirmBtn.onclick = function() {
+        closeUnlinkConfirmModal();
+        deleteLink(window.pendingUnlinkId);
+      };
+    }
+
+    /**
+     * Close unlink confirmation modal
+     */
+    window.closeUnlinkConfirmModal = function() {
+      const modal = document.getElementById('unlinkConfirmModal');
+      modal.classList.remove('flex');
+      modal.classList.add('hidden');
+      window.pendingUnlinkId = null;
     }
 
     /**
@@ -6439,6 +7433,12 @@
 
           Toast.success('Matter pinned');
         }
+
+        // Clear pinned matters cache to force fresh load
+        currentPage = 1;
+        pinnedPage = 1;
+        allPinnedMatters = [];
+        totalPinnedCount = 0;
 
         // Reload matters to reflect new order
         await loadMatters();
@@ -7310,6 +8310,47 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
           </svg>
           Delete
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Unlink Confirmation Modal -->
+  <div id="unlinkConfirmModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 10001;" onclick="if(event.target === this) closeUnlinkConfirmModal()">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md" onclick="event.stopPropagation()">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between p-6 border-b border-gray-200">
+        <div class="flex items-center gap-3">
+          <div class="flex-shrink-0 w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+            <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+            </svg>
+          </div>
+          <h2 class="text-xl font-semibold text-gray-900">Remove Link</h2>
+        </div>
+        <button onclick="closeUnlinkConfirmModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6">
+        <p class="text-gray-900 font-medium mb-2">Are you sure you want to remove the link to <span id="unlinkMatterName" class="text-indigo-600"></span>?</p>
+        <p class="text-sm text-gray-500">This action cannot be undone.</p>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+        <button onclick="closeUnlinkConfirmModal()" class="px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          Cancel
+        </button>
+        <button id="confirmUnlinkButton" class="px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+          </svg>
+          Remove Link
         </button>
       </div>
     </div>

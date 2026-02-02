@@ -1,0 +1,536 @@
+/**
+ * Raw Data Viewer Styles
+ * Modern, professional styling for collapsible JSON viewer in drill-down tables
+ *
+ * @file raw-data-viewer.css
+ * @version 1.0.0
+ * @created 2026-02-02
+ */
+
+/* ============================================================================
+   MAIN CONTAINER
+   ============================================================================ */
+
+.raw-data-viewer {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin: 12px 0;
+  overflow: hidden;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.raw-data-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  background: #f9fafb;
+  border: 2px dashed #e5e7eb;
+  border-radius: 8px;
+  margin: 12px 0;
+}
+
+.raw-data-empty svg {
+  width: 32px;
+  height: 32px;
+  color: #d1d5db;
+  margin-bottom: 8px;
+}
+
+.raw-data-empty p {
+  color: #9ca3af;
+  font-size: 14px;
+  margin: 0;
+}
+
+/* ============================================================================
+   HEADER
+   ============================================================================ */
+
+.raw-data-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: linear-gradient(to bottom, #ffffff, #f9fafb);
+  border-bottom: 1px solid #e5e7eb;
+  gap: 12px;
+}
+
+.raw-data-header h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.raw-data-header svg {
+  width: 20px;
+  height: 20px;
+  color: #6366f1;
+  flex-shrink: 0;
+}
+
+.field-count {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  background: #eef2ff;
+  color: #6366f1;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+/* ============================================================================
+   COPY BUTTON
+   ============================================================================ */
+
+.copy-json-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+}
+
+.copy-json-btn:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+  color: #111827;
+}
+
+.copy-json-btn:active {
+  transform: scale(0.98);
+}
+
+.copy-json-btn.success {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #166534;
+}
+
+.copy-json-btn svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* ============================================================================
+   BODY (JSON CONTENT)
+   ============================================================================ */
+
+.raw-data-body {
+  padding: 16px;
+  background: #ffffff;
+  max-height: 500px;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+/* Custom scrollbar */
+.raw-data-body::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.raw-data-body::-webkit-scrollbar-track {
+  background: #f3f4f6;
+}
+
+.raw-data-body::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+}
+
+.raw-data-body::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* ============================================================================
+   FIELD STRUCTURE
+   ============================================================================ */
+
+.raw-data-object {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.raw-data-field {
+  display: flex;
+  gap: 8px;
+  padding: 4px 0;
+  word-wrap: break-word;
+  word-break: break-word;
+}
+
+.field-key {
+  color: #3b82f6;
+  font-weight: 600;
+  flex-shrink: 0;
+  user-select: all;
+}
+
+.field-value {
+  color: #111827;
+  word-wrap: break-word;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+/* ============================================================================
+   VALUE TYPE COLORS (SYNTAX HIGHLIGHTING)
+   ============================================================================ */
+
+.field-value.null {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.field-value.boolean {
+  color: #8b5cf6;
+  font-weight: 600;
+}
+
+.field-value.number {
+  color: #f59e0b;
+  font-weight: 500;
+}
+
+.field-value.string {
+  color: #10b981;
+}
+
+.field-value.date {
+  color: #06b6d4;
+  background: #ecfeff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.field-value.array,
+.field-value.object {
+  color: #6b7280;
+  font-style: italic;
+}
+
+.field-value.unknown {
+  color: #ef4444;
+}
+
+/* ============================================================================
+   LONG TEXT HANDLING
+   ============================================================================ */
+
+.field-value.long {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field-value.long .truncated,
+.field-value.long .full-text {
+  display: block;
+}
+
+.field-value.long .hidden {
+  display: none;
+}
+
+.show-more-btn {
+  align-self: flex-start;
+  padding: 4px 8px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  color: #6366f1;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 4px;
+}
+
+.show-more-btn:hover {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+}
+
+/* ============================================================================
+   NESTED OBJECTS & ARRAYS (COLLAPSIBLE)
+   ============================================================================ */
+
+.field-value.nested-object {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toggle-nested-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  color: #4b5563;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: fit-content;
+}
+
+.toggle-nested-btn:hover {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+.toggle-nested-btn:active {
+  transform: scale(0.98);
+}
+
+.toggle-icon {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.toggle-icon.expanded {
+  transform: rotate(90deg);
+}
+
+/* ============================================================================
+   NESTED CONTENT (COLLAPSED/EXPANDED STATES)
+   ============================================================================ */
+
+.nested-content {
+  padding-left: 20px;
+  border-left: 2px solid #e5e7eb;
+  margin-left: 8px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.nested-content.collapsed {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-top: 0;
+}
+
+.nested-content.expanded {
+  max-height: 10000px;
+  opacity: 1;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  margin-top: 8px;
+}
+
+/* ============================================================================
+   ARRAY ITEMS
+   ============================================================================ */
+
+.array-item {
+  display: flex;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.array-item:last-child {
+  border-bottom: none;
+}
+
+.array-index {
+  color: #6b7280;
+  font-weight: 600;
+  flex-shrink: 0;
+  font-size: 11px;
+  background: #f9fafb;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+/* ============================================================================
+   RESPONSIVE DESIGN
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  .raw-data-viewer {
+    font-size: 12px;
+  }
+
+  .raw-data-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .raw-data-body {
+    max-height: 300px;
+    padding: 12px;
+  }
+
+  .field-key {
+    min-width: 80px;
+  }
+}
+
+/* ============================================================================
+   ACCESSIBILITY
+   ============================================================================ */
+
+.copy-json-btn:focus,
+.toggle-nested-btn:focus,
+.show-more-btn:focus {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+.copy-json-btn:focus:not(:focus-visible),
+.toggle-nested-btn:focus:not(:focus-visible),
+.show-more-btn:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .raw-data-viewer {
+    border-width: 2px;
+  }
+
+  .field-key {
+    font-weight: 700;
+  }
+
+  .toggle-nested-btn,
+  .copy-json-btn {
+    border-width: 2px;
+  }
+}
+
+/* Dark mode support (optional) */
+@media (prefers-color-scheme: dark) {
+  .raw-data-viewer {
+    background: #1f2937;
+    border-color: #374151;
+  }
+
+  .raw-data-header {
+    background: linear-gradient(to bottom, #111827, #1f2937);
+    border-color: #374151;
+  }
+
+  .raw-data-header h4 {
+    color: #f9fafb;
+  }
+
+  .field-count {
+    background: #312e81;
+    color: #c7d2fe;
+  }
+
+  .raw-data-body {
+    background: #111827;
+  }
+
+  .raw-data-body::-webkit-scrollbar-track {
+    background: #1f2937;
+  }
+
+  .raw-data-body::-webkit-scrollbar-thumb {
+    background: #4b5563;
+  }
+
+  .field-key {
+    color: #60a5fa;
+  }
+
+  .field-value {
+    color: #f9fafb;
+  }
+
+  .field-value.string {
+    color: #34d399;
+  }
+
+  .field-value.date {
+    background: #164e63;
+    color: #67e8f9;
+  }
+
+  .copy-json-btn,
+  .toggle-nested-btn,
+  .show-more-btn {
+    background: #374151;
+    border-color: #4b5563;
+    color: #d1d5db;
+  }
+
+  .copy-json-btn:hover,
+  .toggle-nested-btn:hover,
+  .show-more-btn:hover {
+    background: #4b5563;
+    border-color: #6b7280;
+    color: #f9fafb;
+  }
+
+  .nested-content {
+    border-color: #374151;
+  }
+
+  .array-item {
+    border-color: #374151;
+  }
+
+  .array-index {
+    background: #1f2937;
+    color: #9ca3af;
+  }
+}
+
+/* ============================================================================
+   PRINT STYLES
+   ============================================================================ */
+
+@media print {
+  .raw-data-viewer {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .copy-json-btn {
+    display: none;
+  }
+
+  .nested-content.collapsed {
+    max-height: none;
+    opacity: 1;
+  }
+
+  .toggle-nested-btn {
+    display: none;
+  }
+}

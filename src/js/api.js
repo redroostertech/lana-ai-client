@@ -1251,9 +1251,16 @@ class ApiClient {
   }
 
   async getMatter(matterId, options = {}) {
-    // Add cache-busting parameter if requested (used after updates to force fresh data)
-    const cacheBust = options.bustCache ? `?_t=${Date.now()}` : '';
-    const result = await this.get(`/api/v1/matters/${matterId}${cacheBust}`);
+    // Build query parameters
+    const params = new URLSearchParams();
+    if (options.bustCache) {
+      params.append('_t', Date.now().toString());
+    }
+    // Always request full details (includes tasks, notes, contacts from shadow tables)
+    params.append('full_details', 'true');
+
+    const queryString = params.toString() ? `?${params.toString()}` : '';
+    const result = await this.get(`/api/v1/matters/${matterId}${queryString}`);
 
     // Track matter view
     if (result.success && window.FeatureTracker) {
@@ -1543,6 +1550,20 @@ class ApiClient {
    */
   async deleteTask(taskId) {
     return this.delete(`/api/v1/matters/tasks/${taskId}`);
+  }
+
+  // ============================================================================
+  // Matter Contacts API (Shadow Table)
+  // ============================================================================
+
+  /**
+   * Create a contact for a matter
+   * @param {string} matterId - The matter ID
+   * @param {Object} contactData - Contact data (first_name, last_name, display_name, email, phone_mobile, phone_work, contact_type)
+   * @returns {Promise<Object>} Created contact
+   */
+  async createContact(matterId, contactData) {
+    return this.post(`/api/v1/matters/${matterId}/contacts`, contactData);
   }
 
   // ============================================================================

@@ -59,7 +59,8 @@
       "Bash(python3 -m huggingface_hub.cli download:*)",
       "Bash(wget:*)",
       "Bash(python3:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(git check-ignore:*)"
     ],
     "deny": [],
     "ask": []
