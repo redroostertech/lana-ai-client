@@ -51,7 +51,15 @@
       "WebFetch(domain:www.redroostertec.com)",
       "Bash(python3 -m json.tool:*)",
       "Bash(npx electron:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "WebSearch",
+      "Bash(cmake:*)",
+      "Bash(pip3 install:*)",
+      "Bash(huggingface-cli download:*)",
+      "Bash(python3 -m huggingface_hub.cli download:*)",
+      "Bash(wget:*)",
+      "Bash(python3:*)",
+      "Bash(chmod:*)"
     ],
     "deny": [],
     "ask": []

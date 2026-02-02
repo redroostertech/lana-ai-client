@@ -248,6 +248,13 @@
             <option value="shared">Shared with Me</option>
           </select>
 
+          <!-- Matter Type Filter -->
+          <select id="matterTypeFilter" class="select-standard inline-block w-auto pl-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+            <option value="">All Types</option>
+            <option value="matter">Client Matters Only</option>
+            <option value="workspace">Workspaces Only</option>
+          </select>
+
           <!-- New Matter Button -->
           <button id="createMatterBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -363,6 +370,42 @@
           </div>
         </div>
 
+        <!-- Matter Type Selector -->
+        <div id="matterTypeSection">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Matter Type <span class="text-red-500">*</span></label>
+          <div class="space-y-3">
+            <label class="flex items-start gap-3 p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-indigo-300 hover:bg-indigo-50 transition-colors">
+              <input type="radio" name="matterType" value="matter" class="mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500">
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="font-semibold text-gray-900">Client Matter</span>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">Billable</span>
+                </div>
+                <p class="text-sm text-gray-600 mt-1">Individual client case with isolated data. Included in analytics, billing reports, and practice area metrics.</p>
+              </div>
+            </label>
+
+            <label class="flex items-start gap-3 p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-indigo-300 hover:bg-indigo-50 transition-colors">
+              <input type="radio" name="matterType" value="workspace" class="mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500" checked>
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="font-semibold text-gray-900">Workspace</span>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">Collaborative</span>
+                </div>
+                <p class="text-sm text-gray-600 mt-1">Collaborative container that can link multiple matters, upload shared documents, and enable AI reasoning across connected data sources. Excluded from billing analytics.</p>
+              </div>
+            </label>
+          </div>
+          <div class="mt-2 bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
+            <svg class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+            <p class="text-xs text-amber-800">
+              <strong>Important:</strong> Once created, this type cannot be changed. Choose carefully.
+            </p>
+          </div>
+        </div>
+
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
           <textarea id="matterDescription" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Brief description of the matter..."></textarea>
@@ -454,6 +497,93 @@
     </div>
   </div>
 
+  <!-- Create Matter from Workspace Modal -->
+  <div id="workspaceMatterModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <div>
+          <h3 class="text-lg font-semibold text-gray-900">Create New Matter in Workspace</h3>
+          <p class="text-sm text-gray-500 mt-1">This matter will be automatically linked to the workspace</p>
+        </div>
+        <button id="closeWorkspaceMatterModal" class="text-gray-400 hover:text-gray-600">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <form id="workspaceMatterForm" class="p-6 space-y-5">
+        <input type="hidden" id="workspaceIdForMatter">
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Matter Name <span class="text-red-500">*</span></label>
+            <input type="text" id="workspaceMatterName" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Client Name</label>
+            <input type="text" id="workspaceClientName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+          <textarea id="workspaceMatterDescription" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Brief description of the matter..."></textarea>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Visibility</label>
+          <select id="workspaceMatterVisibility" class="select-standard w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+            <option value="private">Private - Only shared users can access</option>
+            <option value="organization">Organization - All org members can view</option>
+          </select>
+        </div>
+
+        <div class="mt-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+          <select id="workspaceMatterStatus" class="select-standard w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+            <option value="active">Active</option>
+            <option value="closed">Closed</option>
+            <option value="archived">Archived</option>
+          </select>
+        </div>
+
+        <!-- Share with Users Section -->
+        <div id="workspaceShareWithSection">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Share with Team Members</label>
+          <div class="border border-gray-200 rounded-lg">
+            <!-- Search users input -->
+            <div class="p-3 border-b border-gray-200">
+              <div class="relative">
+                <input type="text" id="workspaceUserSearchInput" placeholder="Search users to add..."
+                  class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+              </div>
+              <!-- User search results dropdown -->
+              <div id="workspaceUserSearchResults" class="hidden mt-2 max-h-40 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+                <!-- Results populated by JS -->
+              </div>
+            </div>
+            <!-- Selected users list -->
+            <div class="p-3">
+              <div id="workspaceSelectedUsersList" class="space-y-2">
+                <p class="text-sm text-gray-500 italic" id="workspaceNoUsersSelected">No users selected. Start typing to search and add team members.</p>
+              </div>
+            </div>
+          </div>
+          <p class="text-xs text-gray-500 mt-1">Selected users will have read and write access to this matter.</p>
+        </div>
+
+        <!-- Conflict Detection Section -->
+        <div id="workspaceConflictDetectionContainer"></div>
+
+        <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
+          <button type="button" id="cancelWorkspaceMatterBtn" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium">Cancel</button>
+          <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg">Create Matter</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Matter Details Drawer -->
   <div id="matterDrawer" class="hidden fixed inset-y-0 right-0 w-full bg-white shadow-xl z-40 transform translate-x-full transition-transform">
     <div class="h-full flex flex-col">
@@ -465,9 +595,16 @@
             <h3 id="drawerMatterName" class="text-lg font-semibold text-gray-900">Matter Details</h3>
             <p id="drawerClientName" class="text-sm text-gray-500"></p>
           </div>
-          <button id="closeDrawer" class="text-gray-400 hover:text-gray-600 flex-shrink-0">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-          </button>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <button id="refreshMatterBtn" onclick="refreshCurrentMatter()" class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Refresh matter details">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+              </svg>
+            </button>
+            <button id="closeDrawer" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+          </div>
         </div>
         <div id="drawerStatusBadge" class="mt-2"></div>
       </div>
@@ -494,7 +631,9 @@
         </button>
         <button id="tabTasks" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('tasks')">
           Tasks
-          <span id="taskCount" class="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-full"></span>
+        </button>
+        <button id="tabLinks" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('links')">
+          Linked Matters
         </button>
       </div>
 
@@ -506,6 +645,7 @@
         <div id="tabContentActivity" class="hidden p-6"></div>
         <div id="tabContentComments" class="hidden p-6"></div>
         <div id="tabContentTasks" class="hidden p-6"></div>
+        <div id="tabContentLinks" class="hidden p-6"></div>
       </div>
 
       <!-- Footer Actions -->
@@ -585,6 +725,92 @@
           </button>
           <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors">
             Save Task
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Create Link Modal -->
+  <div id="createLinkModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl">
+      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+            <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900">Link Related Matter</h3>
+            <p class="text-sm text-gray-500">Connect this matter to another matter</p>
+          </div>
+        </div>
+        <button onclick="closeCreateLinkModal()" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <form onsubmit="createLink(event)" class="p-6 space-y-4">
+        <input type="hidden" id="linkSourceMatterId" value="">
+
+        <!-- Matter Search -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Search for Matter to Link
+          </label>
+          <div class="relative">
+            <input
+              type="text"
+              id="linkMatterSearch"
+              oninput="searchMattersForLink(event)"
+              placeholder="Type matter name or ID to search..."
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              autocomplete="off"
+            >
+            <div id="linkMatterSearchResults" class="hidden absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+              <!-- Search results populated dynamically -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Selected Matter Display -->
+        <div id="selectedLinkMatter" class="hidden">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Selected Matter</label>
+          <div class="flex items-center justify-between p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+            <div class="flex-1 min-w-0">
+              <p id="selectedLinkMatterName" class="text-sm font-medium text-gray-900 truncate"></p>
+              <p id="selectedLinkMatterId" class="text-xs text-gray-500 font-mono"></p>
+            </div>
+            <button type="button" onclick="clearLinkMatterSelection()" class="ml-3 p-1 text-indigo-600 hover:text-indigo-800">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Link Type -->
+        <div id="linkTypeContainer">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Link Type</label>
+          <select id="linkType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+            <option value="related_to">Related To (bidirectional)</option>
+            <option value="parent_of">Parent Of (this matter is parent)</option>
+            <option value="child_of">Child Of (this matter is child)</option>
+          </select>
+          <p class="mt-1 text-xs text-gray-500">
+            Choose how these matters are related to each other
+          </p>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
+          <button type="button" onclick="closeCreateLinkModal()" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors">
+            Cancel
+          </button>
+          <button type="submit" id="createLinkBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+            Create Link
           </button>
         </div>
       </form>
@@ -1171,6 +1397,24 @@
                 <p class="text-sm text-gray-500">${escapedClientName}</p>
               </div>
               <div class="flex items-center gap-2">
+                <!-- Matter Type Badge -->
+                ${matter.matter_type === 'matter' ? `
+                  <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800" title="Client Matter - Included in analytics">
+                    <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+                      <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
+                    </svg>
+                    Matter
+                  </span>
+                ` : `
+                  <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800" title="Workspace - Excluded from analytics">
+                    <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/>
+                    </svg>
+                    Workspace
+                  </span>
+                `}
+
                 <!-- Pin Button -->
                 <button
                   onclick="event.stopPropagation(); togglePin('${escapedMatterId}', '${escapedSource}', ${matter.is_pinned || false})"
@@ -1237,6 +1481,7 @@
       try {
         const search = document.getElementById('searchInput').value;
         const statusFilterValue = document.getElementById('statusFilter').value;
+        const matterTypeFilterValue = document.getElementById('matterTypeFilter').value;
 
         // Handle "shared" filter separately
         let filters = { search };
@@ -1244,6 +1489,11 @@
           filters.shared_only = true;
         } else if (statusFilterValue) {
           filters.status = statusFilterValue;
+        }
+
+        // Add matter type filter if selected
+        if (matterTypeFilterValue) {
+          filters.matter_type = matterTypeFilterValue;
         }
 
         // org_admin sees all matters, others see only their own (unless filtering for shared)
@@ -1520,6 +1770,25 @@
       loadMatters();
     });
 
+    document.getElementById('matterTypeFilter').addEventListener('change', () => {
+      const filterValue = document.getElementById('matterTypeFilter').value;
+
+      // Track matter type filtered event
+      if (window.analytics) {
+        window.analytics.trackEvent('matter.filtered', 'matter', null, {
+          matter_id: null,
+          filter_type: 'matter_type',
+          filter_value: filterValue
+        });
+      }
+
+      currentPage = 1;
+      pinnedPage = 1;
+      allPinnedMatters = [];
+      totalPinnedCount = 0;
+      loadMatters();
+    });
+
     // Modal
     const modal = document.getElementById('matterModal');
     const form = document.getElementById('matterForm');
@@ -1530,6 +1799,15 @@
     Object.defineProperty(window, 'conflictDetection', {
       get() { return conflictDetection; },
       set(v) { conflictDetection = v; },
+      configurable: true
+    });
+
+    // Workspace matter modal variables
+    let workspaceSelectedUsers = [];
+    let workspaceConflictDetection = null;
+    Object.defineProperty(window, 'workspaceConflictDetection', {
+      get() { return workspaceConflictDetection; },
+      set(v) { workspaceConflictDetection = v; },
       configurable: true
     });
 
@@ -1832,6 +2110,15 @@
       resetShareForm();
       resetUploadSection();
 
+      // Enable matter type selection and reset to workspace default
+      document.getElementById('matterTypeSection').classList.remove('hidden');
+      document.querySelectorAll('input[name="matterType"]').forEach(radio => {
+        radio.disabled = false;
+        if (radio.value === 'workspace') {
+          radio.checked = true;
+        }
+      });
+
       // Initialize conflict detection
       conflictDetection = new ConflictDetection(api);
       conflictDetection.initialize('conflictDetectionContainer');
@@ -1856,8 +2143,30 @@
     window.createMatterConversation = async function(matterId, matterName) {
       console.log('[matters.html.createMatterConversation] Creating conversation for matter:', { matterId, matterName });
 
+      // Find the button that triggered this action
+      const buttons = document.querySelectorAll(`button[onclick*="createMatterConversation('${matterId}'"]`);
+
+      // Disable all matching buttons and show loading state
+      buttons.forEach(button => {
+        button.disabled = true;
+        button.classList.add('opacity-50', 'cursor-not-allowed');
+
+        // Store original HTML
+        if (!button.dataset.originalHtml) {
+          button.dataset.originalHtml = button.innerHTML;
+        }
+
+        // Replace with loading spinner
+        button.innerHTML = `
+          <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span>Creating...</span>
+        `;
+      });
+
       try {
-        // Show loading indicator (could add a toast or button spinner here)
         console.log('[matters.html.createMatterConversation] Calling API to create conversation...');
 
         // Create conversation via API
@@ -1916,6 +2225,15 @@
       } catch (error) {
         console.error('[matters.html.createMatterConversation] Failed to create conversation:', error);
 
+        // Restore buttons on error
+        buttons.forEach(button => {
+          button.disabled = false;
+          button.classList.remove('opacity-50', 'cursor-not-allowed');
+          if (button.dataset.originalHtml) {
+            button.innerHTML = button.dataset.originalHtml;
+          }
+        });
+
         // Show user-friendly error message
         if (error.response?.data?.error?.code === 'MATTER_NOT_FOUND') {
           Toast.error(`Matter not found. Please refresh the page and try again.`);
@@ -1927,6 +2245,11 @@
 
     // Edit matter
     window.editMatter = async function(matterId) {
+      // Remember if drawer was open for this matter when editing started
+      // So we can re-open it after the update
+      const wasDrawerOpen = currentMatterData?.matter?.matter_id === matterId;
+      window._editingMatterFromDrawer = wasDrawerOpen ? matterId : null;
+
       try {
         const [matterResult, permResult] = await Promise.all([
           api.getMatter(matterId),
@@ -1934,7 +2257,7 @@
         ]);
         const matter = matterResult.matter;
         const permissions = permResult.permissions || [];
-        
+
         document.getElementById('matterModalTitle').textContent = 'Edit Matter';
         document.getElementById('matterId').value = matter.matter_id;
         document.getElementById('matterIdDisplay').classList.remove('hidden');
@@ -1946,7 +2269,10 @@
         document.getElementById('matterDescription').value = matter.description || '';
         document.getElementById('matterStatus').value = matter.status || 'active';
         document.getElementById('matterVisibility').value = matter.visibility || 'private';
-        
+
+        // Hide matter type section when editing (type is immutable)
+        document.getElementById('matterTypeSection').classList.add('hidden');
+
         // Load existing shared users
         selectedUsers = permissions.map(p => ({
           id: p.user_id,
@@ -1974,7 +2300,7 @@
     // Store current matter data globally for tab switching
     let currentMatterData = null;
 
-    window.viewMatter = async function(matterId, defaultTab = 'details') {
+    window.viewMatter = async function(matterId, defaultTab = 'details', options = {}) {
       const drawer = document.getElementById('matterDrawer');
       const overlay = document.getElementById('drawerOverlay');
 
@@ -1982,13 +2308,14 @@
       console.log('[viewMatter] Loading matter details:', {
         matterId,
         format: matterId.startsWith('MATT-') ? 'MATT-XXXXX' : 'other',
-        defaultTab
+        defaultTab,
+        bustCache: options.bustCache || false
       });
 
       try {
         // Fetch all matter data in parallel
         const [matterResult, permissionsResult, activityResult, chatsResult, docsResult, orphanedResult, tasksResult, commentsResult] = await Promise.all([
-          api.getMatter(matterId),
+          api.getMatter(matterId, { bustCache: options.bustCache }),
           api.getMatterPermissions(matterId).catch(() => ({ permissions: [] })),
           api.getMatterActivity(matterId, 20, 0).catch(() => ({ activities: [], pagination: { total: 0, limit: 20, offset: 0 } })), // Get first page for activity tab
           api.getMatterConversations(matterId, 25, 0).catch((err) => {
@@ -2062,10 +2389,29 @@
         drawerMatterIdEl.title = matter.matter_id; // Show full ID on hover
         document.getElementById('drawerMatterName').textContent = matter.matter_name || 'Untitled';
         document.getElementById('drawerClientName').textContent = matter.client_name || '';
-        document.getElementById('drawerStatusBadge').innerHTML = statusBadge(matter.status || 'active');
+
+        // Update status badge with matter type badge
+        const matterTypeBadge = matter.matter_type === 'matter' ? `
+          <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800 mr-2" title="Client Matter - Included in analytics">
+            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+              <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
+            </svg>
+            Matter
+          </span>
+        ` : `
+          <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800 mr-2" title="Workspace - Excluded from analytics">
+            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/>
+            </svg>
+            Workspace
+          </span>
+        `;
+
+        document.getElementById('drawerStatusBadge').innerHTML = matterTypeBadge + statusBadge(matter.status || 'active');
         document.getElementById('conversationCount').textContent = chats.length || '';
         document.getElementById('documentCount').textContent = documentsPagination.total_count || documents.length || '';
-        document.getElementById('taskCount').textContent = tasks.length || '';
+        // Task count removed - no longer displayed in tab header
 
         // Update comment count badge
         const commentBadge = document.getElementById('commentCountBadge');
@@ -2095,7 +2441,7 @@
       const { matter, permissions, activities, activityPagination, chats, chatsPagination, documents, orphanedFiles, tasks } = currentMatterData;
 
       // Update tab buttons
-      const tabs = ['Details', 'Documents', 'Conversations', 'Activity', 'Comments', 'Tasks'];
+      const tabs = ['Details', 'Documents', 'Conversations', 'Activity', 'Comments', 'Tasks', 'Links'];
       tabs.forEach(tab => {
         const btn = document.getElementById(`tab${tab}`);
         const content = document.getElementById(`tabContent${tab}`);
@@ -2129,6 +2475,9 @@
           break;
         case 'tasks':
           renderTasksTab(matter, tasks || []);
+          break;
+        case 'links':
+          renderLinkedMattersTab(matter);
           break;
       }
     }
@@ -2201,12 +2550,13 @@
             </div>
           </div>
 
-          <!-- Similar Matters Widget -->
-          <div id="similarMattersWidgetContainer" class="mt-6"></div>
+          <!-- Similar Matters Widget - TEMPORARILY HIDDEN -->
+          <!-- <div id="similarMattersWidgetContainer" class="mt-6"></div> -->
         </div>
       `;
 
-      // Initialize Similar Matters Widget
+      // Initialize Similar Matters Widget - TEMPORARILY DISABLED
+      /*
       if (!similarMattersWidget) {
         similarMattersWidget = new SimilarMattersWidget(api);
       }
@@ -2222,6 +2572,63 @@
         // Navigate to the selected matter
         viewMatter(matterId, 'details');
       }, { once: true }); // Use once to prevent duplicate listeners
+      */
+    }
+
+    /**
+     * Refresh the currently open matter
+     * Re-fetches all data and refreshes the current tab
+     */
+    window.refreshCurrentMatter = async function() {
+      if (!currentMatterData || !currentMatterData.matter || !currentMatterData.matter.matter_id) {
+        console.warn('[refreshCurrentMatter] No matter currently open');
+        Toast.error('No matter is currently open');
+        return;
+      }
+
+      const refreshBtn = document.getElementById('refreshMatterBtn');
+      const currentTab = getCurrentActiveTab();
+
+      console.log('[refreshCurrentMatter] Refreshing matter:', {
+        matterId: currentMatterData.matter.matter_id,
+        currentTab
+      });
+
+      try {
+        // Add spinning animation
+        if (refreshBtn) {
+          refreshBtn.classList.add('animate-spin');
+        }
+
+        // Re-fetch matter with cache busting
+        await viewMatter(currentMatterData.matter.matter_id, currentTab, { bustCache: true });
+
+        Toast.success('Matter details refreshed');
+      } catch (error) {
+        console.error('[refreshCurrentMatter] Error refreshing matter:', error);
+        Toast.error('Failed to refresh matter details');
+      } finally {
+        // Remove spinning animation
+        if (refreshBtn) {
+          setTimeout(() => {
+            refreshBtn.classList.remove('animate-spin');
+          }, 300);
+        }
+      }
+    }
+
+    /**
+     * Get the currently active tab
+     */
+    function getCurrentActiveTab() {
+      const tabs = ['details', 'documents', 'conversations', 'activity', 'comments', 'tasks', 'links'];
+      for (const tab of tabs) {
+        const tabContent = document.getElementById(`tabContent${tab.charAt(0).toUpperCase() + tab.slice(1)}`);
+        if (tabContent && !tabContent.classList.contains('hidden')) {
+          return tab;
+        }
+      }
+      return 'details'; // Default to details tab
     }
 
     // Render Documents Tab
@@ -2354,7 +2761,7 @@
                           Cancel
                         </button>
                       ` : ''}
-                      <button onclick="replaceDrawerDocument('${doc.id}', '${matter.matter_id}')" class="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1" title="Replace file and re-index">
+                      <button onclick="replaceDrawerDocument('${doc.id}', '${matter.matter_id}')" class="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1" title="Replace file and re-index" style="display: none;">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
                         Replace
                       </button>
@@ -3571,8 +3978,8 @@
               <div class="space-y-3">
                 ${dayActivities.map(activity => `
                   <div class="flex items-start gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                    <div class="w-8 h-8 ${getActivityBgColor(activity.action_type)} rounded-full flex items-center justify-center flex-shrink-0">
-                      ${getActivityIcon(activity.action_type)}
+                    <div class="w-8 h-8 ${getActivityBgColor(activity)} rounded-full flex items-center justify-center flex-shrink-0">
+                      ${getActivityIcon(activity)}
                     </div>
                     <div class="flex-1 min-w-0">
                       <p class="text-sm text-gray-900 leading-relaxed">${getActivityDescription(activity)}</p>
@@ -3617,40 +4024,98 @@
     }
 
     // Activity helper functions
-    function getActivityIcon(actionType) {
+    function getActivityIcon(activity) {
+      // Determine the activity type
+      let activityType = activity.action_type; // Old format (backward compatibility)
+
+      if (activity.type === 'comment') {
+        activityType = 'comment';
+      } else if (activity.type === 'system_event') {
+        activityType = activity.event_type;
+      }
+
       const icons = {
+        'comment': '<svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>',
         'document_uploaded': '<svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>',
         'document_viewed': '<svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>',
+        'document_deleted': '<svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>',
         'matter_created': '<svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>',
         'matter_updated': '<svg class="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>',
         'chat_message': '<svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>',
+        'conversation_created': '<svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>',
+        'task_created': '<svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>',
+        'task_updated': '<svg class="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>',
         'user_shared': '<svg class="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>'
       };
-      return icons[actionType] || '<svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+      return icons[activityType] || '<svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
     }
 
-    function getActivityBgColor(actionType) {
+    function getActivityBgColor(activity) {
+      // Determine the activity type
+      let activityType = activity.action_type; // Old format (backward compatibility)
+
+      if (activity.type === 'comment') {
+        activityType = 'comment';
+      } else if (activity.type === 'system_event') {
+        activityType = activity.event_type;
+      }
+
       const colors = {
+        'comment': 'bg-blue-100',
         'document_uploaded': 'bg-blue-100',
         'document_viewed': 'bg-green-100',
+        'document_deleted': 'bg-red-100',
         'matter_created': 'bg-indigo-100',
         'matter_updated': 'bg-yellow-100',
         'chat_message': 'bg-purple-100',
+        'conversation_created': 'bg-purple-100',
+        'task_created': 'bg-green-100',
+        'task_updated': 'bg-yellow-100',
         'user_shared': 'bg-teal-100'
       };
-      return colors[actionType] || 'bg-gray-100';
+      return colors[activityType] || 'bg-gray-100';
     }
 
     function getActivityDescription(activity) {
-      const descriptions = {
-        'document_uploaded': `Document uploaded: ${activity.metadata?.filename || 'file'}`,
-        'document_viewed': `Document viewed: ${activity.metadata?.filename || 'file'}`,
-        'matter_created': 'Matter was created',
-        'matter_updated': `Matter was updated${activity.metadata?.field ? ': ' + activity.metadata.field : ''}`,
-        'chat_message': 'New chat message',
-        'user_shared': `Shared with ${activity.metadata?.user_email || 'user'}`
-      };
-      return descriptions[activity.action_type] || activity.description || activity.action_type?.replace(/_/g, ' ') || 'Activity';
+      // Get user name
+      const userName = activity.user ? `${activity.user.first_name} ${activity.user.last_name}` : 'Someone';
+
+      // Use display_message if provided
+      if (activity.display_message) {
+        return `<strong>${userName}</strong> ${activity.display_message.toLowerCase()}`;
+      }
+
+      // Handle comments (old format)
+      if (activity.type === 'comment' && activity.content) {
+        const actorName = activity.actor?.name || 'Someone';
+        return `<strong>${actorName}</strong> commented: ${activity.content}`;
+      }
+
+      // Handle system events (old format)
+      if (activity.type === 'system_event' && activity.event_type) {
+        const actorName = activity.actor?.name || 'System';
+        return `<strong>${actorName}</strong> ${activity.event_type.replace(/_/g, ' ')}`;
+      }
+
+      // Fallback for old action_type format (backward compatibility)
+      if (activity.action_type) {
+        const descriptions = {
+          'document_uploaded': `Document uploaded: ${activity.metadata?.filename || 'file'}`,
+          'document_viewed': `Document viewed: ${activity.metadata?.filename || 'file'}`,
+          'matter_created': 'Matter was created',
+          'matter_updated': `Matter was updated${activity.metadata?.field ? ': ' + activity.metadata.field : ''}`,
+          'chat_message': 'New chat message',
+          'user_shared': `Shared with ${activity.metadata?.user_email || 'user'}`
+        };
+        return descriptions[activity.action_type] || activity.action_type.replace(/_/g, ' ');
+      }
+
+      // Fallback to event_type if present
+      if (activity.event_type) {
+        return `<strong>${userName}</strong> ${activity.event_type.replace(/_/g, ' ').replace(/\./g, ' ')}`;
+      }
+
+      return activity.description || activity.content || 'Activity';
     }
 
     // Load Activity Page (for pagination)
@@ -4317,6 +4782,7 @@
 
     async function postComment(matterId) {
       const input = document.getElementById('commentInput');
+      const postBtn = document.getElementById('postComment');
 
       // Convert contenteditable HTML to raw text format for storage
       const mentions = [];
@@ -4365,6 +4831,18 @@
         return;
       }
 
+      // Show loading state on button
+      const originalButtonHtml = postBtn.innerHTML;
+      postBtn.disabled = true;
+      postBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      postBtn.innerHTML = `
+        <svg class="animate-spin h-4 w-4 inline-block mr-2" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        Posting...
+      `;
+
       try {
         await api.createComment(matterId, {
           content,
@@ -4375,9 +4853,19 @@
         input.innerHTML = '';
         Toast.success('Comment posted');
         await loadComments(matterId);
+
+        // Restore button state
+        postBtn.disabled = false;
+        postBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        postBtn.innerHTML = originalButtonHtml;
       } catch (error) {
         console.error('Failed to post comment:', error);
         Toast.error('Failed to post comment');
+
+        // Restore button state on error
+        postBtn.disabled = false;
+        postBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        postBtn.innerHTML = originalButtonHtml;
       }
     }
 
@@ -4757,9 +5245,23 @@
         await updateTaskStatus(task.id, newStatus);
         Toast.success(`Task moved to ${newStatus.replace('_', ' ')}`);
 
-        // Refresh the matter drawer to reload tasks
-        if (currentMatterData && currentMatterData.matter) {
-          await viewMatter(currentMatterData.matter.matter_id, 'tasks');
+        // CRITICAL FIX: Refresh tasks immediately instead of full viewMatter() reload
+        const matterId = (currentMatterData && currentMatterData.matter_id) ||
+                        (currentMatterData && currentMatterData.matter && currentMatterData.matter.matter_id);
+
+        if (matterId) {
+          const response = await api.getMatterTasks(matterId);
+          const updatedTasks = response.tasks || [];
+
+          // Update currentMatterData if it exists
+          if (currentMatterData) {
+            currentMatterData.tasks = updatedTasks;
+            renderTasksTab(currentMatterData, updatedTasks);
+          } else {
+            // Fallback: Render Kanban board directly
+            currentTasksList = updatedTasks;
+            renderKanbanBoard(matterId, updatedTasks);
+          }
         }
       } catch (error) {
         console.error('Failed to update task status:', error);
@@ -5015,6 +5517,604 @@
       renderKanbanBoard(matter.matter_id, tasks);
     }
 
+    // Render Linked Matters Tab
+    async function renderLinkedMattersTab(matter) {
+      const content = document.getElementById('tabContentLinks');
+
+      // Show loading state
+      content.innerHTML = `
+        <div class="flex items-center justify-center py-12">
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        </div>
+      `;
+
+      try {
+        // Load linked matters from API
+        const response = await fetch(`${api.baseUrl}/api/v1/entity-links/matter/${matter.matter_id}`, {
+          headers: {
+            'Authorization': `Bearer ${api.token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to load linked matters');
+        }
+
+        const data = await response.json();
+        const { links, total_links } = data;
+
+        // Render the links UI
+        renderLinkedMattersContent(matter, links, total_links);
+
+      } catch (error) {
+        console.error('Error loading linked matters:', error);
+        content.innerHTML = `
+          <div class="text-center py-12">
+            <div class="text-red-600 mb-4">
+              <svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <h4 class="text-lg font-semibold text-gray-900 mb-2">Failed to load linked matters</h4>
+            <p class="text-gray-500">${error.message}</p>
+          </div>
+        `;
+      }
+    }
+
+    function renderLinkedMattersContent(matter, links, totalLinks) {
+      const content = document.getElementById('tabContentLinks');
+      const isWorkspace = matter.matter_type === 'workspace';
+      const isMatter = matter.matter_type === 'matter';
+
+      // Empty state
+      if (totalLinks === 0) {
+        content.innerHTML = `
+          <div class="text-center py-12">
+            <div class="w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+              </svg>
+            </div>
+            <h4 class="text-lg font-semibold text-gray-900 mb-2">No linked matters</h4>
+            <p class="text-gray-500 mb-4">${isWorkspace ? 'Link matters to this workspace to organize related work' : 'Link this matter to related matters or add it to a workspace'}</p>
+<div class="flex items-center justify-center gap-3">
+              ${isWorkspace ? `
+                <button
+                  onclick="openCreateLinkModal('${matter.matter_id}', true)"
+                  class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                  </svg>
+                  Link Existing Matter
+                </button>
+                <button
+                  onclick="openCreateMatterDrawer('${matter.matter_id}')"
+                  class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                  </svg>
+                  Create New Matter
+                </button>
+              ` : `
+                <button
+                  onclick="openCreateLinkModal('${matter.matter_id}', false)"
+                  class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                >
+                  Link Related Matter
+                </button>
+              `}
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      // Build HTML for each link group
+      let html = '<div class="space-y-6">';
+
+      // Add action buttons at top
+      if (isWorkspace) {
+        html += `
+          <div class="flex justify-end gap-3">
+            <button
+              onclick="openCreateLinkModal('${matter.matter_id}', true)"
+              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+              </svg>
+              Link Existing Matter
+            </button>
+            <button
+              onclick="openCreateMatterDrawer('${matter.matter_id}')"
+              class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+              Create New Matter
+            </button>
+          </div>
+        `;
+      } else if (isMatter) {
+        html += `
+          <div class="flex justify-end">
+            <button
+              onclick="openCreateLinkModal('${matter.matter_id}', false)"
+              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+              Link Related Matter
+            </button>
+          </div>
+        `;
+      }
+
+      // Workspace Matters
+      if (links.workspace_matters && links.workspace_matters.length > 0) {
+        html += renderLinkSection(
+          isWorkspace ? 'Matters in this Workspace' : 'Part of Workspace',
+          links.workspace_matters,
+          matter.matter_id,
+          'workspace_matter'
+        );
+      }
+
+      // Related Matters
+      if (links.related_matters && links.related_matters.length > 0) {
+        html += renderLinkSection(
+          'Related Matters',
+          links.related_matters,
+          matter.matter_id,
+          'related_to'
+        );
+      }
+
+      // Parent Matters
+      if (links.parent_matters && links.parent_matters.length > 0) {
+        html += renderLinkSection(
+          'Parent Matters',
+          links.parent_matters,
+          matter.matter_id,
+          'parent'
+        );
+      }
+
+      // Child Matters
+      if (links.child_matters && links.child_matters.length > 0) {
+        html += renderLinkSection(
+          'Child Matters',
+          links.child_matters,
+          matter.matter_id,
+          'child'
+        );
+      }
+
+      // Shadow Records (ActionStep)
+      if (links.shadow_records && links.shadow_records.length > 0) {
+        html += renderLinkSection(
+          'ActionStep Connector',
+          links.shadow_records,
+          matter.matter_id,
+          'shadow_record',
+          true // read-only
+        );
+      }
+
+      html += '</div>';
+      content.innerHTML = html;
+    }
+
+    function renderLinkSection(title, linksList, currentMatterId, linkType, isReadOnly = false) {
+      return `
+        <div class="bg-gray-50 rounded-lg p-4">
+          <h5 class="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+            ${getLinkIcon(linkType)}
+            ${title}
+            <span class="ml-auto text-xs text-gray-500">${linksList.length} ${linksList.length === 1 ? 'link' : 'links'}</span>
+          </h5>
+          <div class="space-y-2">
+            ${linksList.map(link => renderLinkCard(link, currentMatterId, isReadOnly)).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function getLinkIcon(linkType) {
+      switch(linkType) {
+        case 'workspace_matter':
+          return '<svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>';
+        case 'related_to':
+          return '<svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>';
+        case 'parent':
+          return '<svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>';
+        case 'child':
+          return '<svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>';
+        case 'shadow_record':
+          return '<svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>';
+        default:
+          return '<svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>';
+      }
+    }
+
+    function renderLinkCard(link, currentMatterId, isReadOnly) {
+      const linkedName = link.linked_name || 'Unknown';
+      const linkedId = link.linked_entity_id;
+      const linkId = link.link_id;
+      const createdAt = link.created_at ? new Date(link.created_at).toLocaleDateString() : '';
+      const createdBy = link.created_by_name || link.created_by_email || '';
+
+      return `
+        <div class="bg-white border border-gray-200 hover:border-indigo-300 rounded-lg p-3 flex items-center justify-between gap-3 transition-all">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2">
+              <button
+                onclick="viewMatter('${linkedId}')"
+                class="text-sm font-medium text-indigo-600 hover:text-indigo-800 truncate"
+              >
+                ${linkedName}
+              </button>
+              <span class="text-xs text-gray-400 font-mono">${linkedId}</span>
+            </div>
+            ${createdAt || createdBy ? `
+              <div class="text-xs text-gray-500 mt-1">
+                ${createdAt ? `Linked ${createdAt}` : ''}
+                ${createdBy ? ` by ${createdBy}` : ''}
+              </div>
+            ` : ''}
+          </div>
+          <div class="flex-shrink-0">
+            ${isReadOnly ? `
+              <span class="text-xs text-gray-400 px-2 py-1 rounded border border-gray-200" title="System-generated link cannot be deleted">
+                <svg class="w-3 h-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                </svg>
+              </span>
+            ` : `
+              <button
+                onclick="deleteLinkConfirm('${linkId}', '${linkedName}')"
+                class="text-red-600 hover:text-red-800 p-1"
+                title="Remove link"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            `}
+          </div>
+        </div>
+      `;
+    }
+
+    // =============================================================================
+    // LINK MANAGEMENT FUNCTIONS
+    // =============================================================================
+
+    let linkSearchTimeout = null;
+    let selectedLinkTargetMatter = null;
+    let createMatterForWorkspaceId = null; // Store workspace ID when creating matter from workspace
+
+    /**
+     * Open the create link modal
+     * @param {string} sourceMatterId - The source matter/workspace ID
+     * @param {boolean} isWorkspace - Whether the source is a workspace
+     */
+    window.openCreateLinkModal = function(sourceMatterId, isWorkspace = false) {
+      console.log('[openCreateLinkModal] Called with:', { sourceMatterId, isWorkspace, typeOfIsWorkspace: typeof isWorkspace });
+
+      const modal = document.getElementById('createLinkModal');
+      const sourceInput = document.getElementById('linkSourceMatterId');
+      const searchInput = document.getElementById('linkMatterSearch');
+      const submitBtn = document.getElementById('createLinkBtn');
+      const modalTitle = modal.querySelector('h3');
+      const modalSubtitle = modal.querySelector('p.text-sm.text-gray-500');
+      const linkTypeContainer = document.getElementById('linkTypeContainer');
+
+      // Set source matter ID
+      sourceInput.value = sourceMatterId;
+      sourceInput.dataset.isWorkspace = isWorkspace.toString();
+
+      console.log('[openCreateLinkModal] Dataset set to:', sourceInput.dataset.isWorkspace);
+
+      // Update modal text based on source type
+      if (isWorkspace) {
+        modalTitle.textContent = 'Add Matter to Workspace';
+        modalSubtitle.textContent = 'Link an existing matter to this workspace';
+        linkTypeContainer.style.display = 'none'; // Hide link type for workspaces
+        document.getElementById('linkType').value = 'workspace_matter';
+      } else {
+        modalTitle.textContent = 'Link Related Matter';
+        modalSubtitle.textContent = 'Connect this matter to another matter';
+        linkTypeContainer.style.display = 'block'; // Show link type for matters
+        document.getElementById('linkType').value = 'related_to';
+      }
+
+      // Reset form
+      searchInput.value = '';
+      document.getElementById('linkMatterSearchResults').classList.add('hidden');
+      document.getElementById('selectedLinkMatter').classList.add('hidden');
+      submitBtn.disabled = true;
+      selectedLinkTargetMatter = null;
+
+      // Show modal
+      modal.classList.remove('hidden');
+      setTimeout(() => searchInput.focus(), 100);
+    }
+
+    /**
+     * Close the create link modal
+     */
+    window.closeCreateLinkModal = function() {
+      const modal = document.getElementById('createLinkModal');
+      modal.classList.add('hidden');
+      selectedLinkTargetMatter = null;
+
+      // Clear any pending search
+      if (linkSearchTimeout) {
+        clearTimeout(linkSearchTimeout);
+        linkSearchTimeout = null;
+      }
+    }
+
+    /**
+     * Search for matters to link (debounced)
+     */
+    window.searchMattersForLink = function(event) {
+      const query = event.target.value.trim();
+      const resultsDiv = document.getElementById('linkMatterSearchResults');
+      const sourceMatterId = document.getElementById('linkSourceMatterId').value;
+
+      // Clear previous timeout
+      if (linkSearchTimeout) {
+        clearTimeout(linkSearchTimeout);
+      }
+
+      // Hide results if query is too short
+      if (query.length < 2) {
+        resultsDiv.classList.add('hidden');
+        return;
+      }
+
+      // Debounce search
+      linkSearchTimeout = setTimeout(async () => {
+        try {
+          // Show loading state
+          resultsDiv.innerHTML = `
+            <div class="p-4 text-center text-gray-500">
+              <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto mb-2"></div>
+              Searching...
+            </div>
+          `;
+          resultsDiv.classList.remove('hidden');
+
+          // Search matters
+          const response = await fetch(
+            `${api.baseUrl}/api/v1/matters?search=${encodeURIComponent(query)}&limit=10`,
+            {
+              headers: {
+                'Authorization': `Bearer ${api.token}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error('Search failed');
+          }
+
+          const data = await response.json();
+          const matters = data.matters || [];
+
+          // Filter out source matter and workspaces
+          const filteredMatters = matters.filter(m =>
+            m.matter_id !== sourceMatterId && m.matter_type === 'matter'
+          );
+
+          if (filteredMatters.length === 0) {
+            resultsDiv.innerHTML = `
+              <div class="p-4 text-center text-gray-500 text-sm">
+                No matters found
+              </div>
+            `;
+          } else {
+            resultsDiv.innerHTML = filteredMatters.map(matter => `
+              <button
+                type="button"
+                onclick="selectLinkMatter('${matter.matter_id}', '${matter.name.replace(/'/g, "&apos;")}', '${matter.matter_type}')"
+                class="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition-colors"
+              >
+                <div class="font-medium text-gray-900 text-sm">${matter.name}</div>
+                <div class="text-xs text-gray-500 font-mono mt-1">${matter.matter_id}</div>
+              </button>
+            `).join('');
+          }
+
+        } catch (error) {
+          console.error('Matter search error:', error);
+          resultsDiv.innerHTML = `
+            <div class="p-4 text-center text-red-600 text-sm">
+              Search failed. Please try again.
+            </div>
+          `;
+        }
+      }, 300);
+    }
+
+    /**
+     * Select a matter from search results
+     */
+    window.selectLinkMatter = function(matterId, matterName, matterType) {
+      selectedLinkTargetMatter = { matter_id: matterId, name: matterName, matter_type: matterType };
+
+      // Hide search results
+      document.getElementById('linkMatterSearchResults').classList.add('hidden');
+      document.getElementById('linkMatterSearch').value = '';
+
+      // Show selected matter
+      document.getElementById('selectedLinkMatterName').textContent = matterName;
+      document.getElementById('selectedLinkMatterId').textContent = matterId;
+      document.getElementById('selectedLinkMatter').classList.remove('hidden');
+
+      // Enable submit button
+      document.getElementById('createLinkBtn').disabled = false;
+    }
+
+    /**
+     * Clear selected matter
+     */
+    window.clearLinkMatterSelection = function() {
+      selectedLinkTargetMatter = null;
+      document.getElementById('selectedLinkMatter').classList.add('hidden');
+      document.getElementById('linkMatterSearch').value = '';
+      document.getElementById('createLinkBtn').disabled = true;
+    }
+
+    /**
+     * Create a link between matters
+     */
+    window.createLink = async function(event) {
+      event.preventDefault();
+
+      const sourceInput = document.getElementById('linkSourceMatterId');
+      const sourceMatterId = sourceInput.value;
+      const isWorkspace = sourceInput.dataset.isWorkspace === 'true';
+
+      // Get link type - if workspace, force to workspace_matter, otherwise use selected value
+      let linkType = document.getElementById('linkType').value;
+      if (isWorkspace) {
+        linkType = 'workspace_matter';
+      }
+
+      const submitBtn = document.getElementById('createLinkBtn');
+
+      if (!selectedLinkTargetMatter) {
+        Toast.error('Please select a matter to link');
+        return;
+      }
+
+      console.log('[Create Link] Request data:', {
+        source_matter_id: sourceMatterId,
+        target_matter_id: selectedLinkTargetMatter.matter_id,
+        link_type: linkType,
+        isWorkspace,
+        isWorkspaceDataset: sourceInput.dataset.isWorkspace,
+        linkTypeSelectValue: document.getElementById('linkType').value
+      });
+
+      try {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Creating...';
+
+        const response = await fetch(`${api.baseUrl}/api/v1/entity-links`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${api.token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            source_matter_id: sourceMatterId,
+            target_matter_id: selectedLinkTargetMatter.matter_id,
+            link_type: linkType
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          console.error('[Create Link] API Error:', error);
+          throw new Error(error.error?.message || 'Failed to create link');
+        }
+
+        const data = await response.json();
+
+        Toast.success('Link created successfully');
+        closeCreateLinkModal();
+
+        // Refresh the linked matters tab if we're viewing it
+        if (currentMatterData && currentMatterData.matter && !document.getElementById('tabContentLinks').classList.contains('hidden')) {
+          renderLinkedMattersTab(currentMatterData.matter);
+        }
+
+      } catch (error) {
+        console.error('Create link error:', error);
+        Toast.error(error.message || 'Failed to create link');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Create Link';
+      }
+    }
+
+    /**
+     * Confirm link deletion
+     */
+    window.deleteLinkConfirm = function(linkId, linkedMatterName) {
+      if (confirm(`Are you sure you want to remove the link to "${linkedMatterName}"?\n\nThis action cannot be undone.`)) {
+        deleteLink(linkId);
+      }
+    }
+
+    /**
+     * Delete a link
+     */
+    window.deleteLink = async function(linkId) {
+      try {
+        const response = await fetch(`${api.baseUrl}/api/v1/entity-links/${linkId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${api.token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error?.message || 'Failed to delete link');
+        }
+
+        Toast.success('Link removed successfully');
+
+        // Refresh the linked matters tab
+        if (currentMatterData && currentMatterData.matter) {
+          renderLinkedMattersTab(currentMatterData.matter);
+        }
+
+      } catch (error) {
+        console.error('Delete link error:', error);
+        Toast.error(error.message || 'Failed to delete link');
+      }
+    }
+
+    /**
+     * Open the create matter modal from within a workspace
+     * After matter is created, it will be automatically linked to the workspace
+     */
+    window.openCreateMatterDrawer = function(workspaceId) {
+      const modal = document.getElementById('workspaceMatterModal');
+      const form = document.getElementById('workspaceMatterForm');
+
+      // Store workspace ID
+      document.getElementById('workspaceIdForMatter').value = workspaceId;
+
+      // Reset form
+      form.reset();
+      workspaceSelectedUsers = [];
+      document.getElementById('workspaceSelectedUsersList').innerHTML = '<p class="text-sm text-gray-500 italic" id="workspaceNoUsersSelected">No users selected. Start typing to search and add team members.</p>';
+
+      // Initialize conflict detection for workspace matter
+      if (workspaceConflictDetection) {
+        workspaceConflictDetection.reset();
+      }
+      workspaceConflictDetection = new ConflictDetection(api);
+      workspaceConflictDetection.initialize('workspaceConflictDetectionContainer');
+
+      // Show modal
+      modal.classList.remove('hidden');
+    }
+
     // =============================================================================
     // TASK MANAGEMENT FUNCTIONS
     // =============================================================================
@@ -5116,14 +6216,22 @@
     window.quickCompleteTask = async function(taskId) {
       try {
         await api.completeTask(taskId);
-        Toast.success('Task completed - Refresh page to see updates');
+        Toast.success('Task completed');
 
-        // Refresh tasks (use cached matter ID or currentMatterData if available)
+        // Refresh tasks - CRITICAL FIX: Always refresh UI regardless of currentMatterData state
         const matterId = currentTaskMatterId || (currentMatterData && currentMatterData.matter_id);
         if (matterId) {
           const response = await api.getMatterTasks(matterId);
+          const updatedTasks = response.tasks || [];
+
+          // Update currentMatterData if it exists
           if (currentMatterData) {
-            renderTasksTab(currentMatterData, response.tasks || []);
+            currentMatterData.tasks = updatedTasks;
+            renderTasksTab(currentMatterData, updatedTasks);
+          } else {
+            // Fallback: Render Kanban board directly even if currentMatterData is not set
+            currentTasksList = updatedTasks;
+            renderKanbanBoard(matterId, updatedTasks);
           }
         }
       } catch (error) {
@@ -5142,10 +6250,21 @@
         await api.deleteTask(taskId);
         Toast.success('Task deleted successfully');
 
-        // Refresh tasks (use currentMatterData if available)
-        if (currentMatterData && currentMatterData.matter_id) {
-          const response = await api.getMatterTasks(currentMatterData.matter_id);
-          renderTasksTab(currentMatterData, response.tasks || []);
+        // Refresh tasks - CRITICAL FIX: Always refresh UI regardless of currentMatterData state
+        const matterId = currentTaskMatterId || (currentMatterData && currentMatterData.matter_id);
+        if (matterId) {
+          const response = await api.getMatterTasks(matterId);
+          const updatedTasks = response.tasks || [];
+
+          // Update currentMatterData if it exists
+          if (currentMatterData) {
+            currentMatterData.tasks = updatedTasks;
+            renderTasksTab(currentMatterData, updatedTasks);
+          } else {
+            // Fallback: Render Kanban board directly even if currentMatterData is not set
+            currentTasksList = updatedTasks;
+            renderKanbanBoard(matterId, updatedTasks);
+          }
         }
       } catch (error) {
         console.error('Delete task error:', error);
@@ -5164,14 +6283,26 @@
         title: document.getElementById('taskTitle').value,
         description: document.getElementById('taskDescription').value || null,
         notes: document.getElementById('taskNotes').value || null,
+        status: document.getElementById('taskStatus').value,
         priority: document.getElementById('taskPriority').value,
         due_date: document.getElementById('taskDueDate').value || null,
         assigned_to_user_id: document.getElementById('taskAssignedTo').value || null
       };
 
-      if (isEdit) {
-        taskData.status = document.getElementById('taskStatus').value;
-      }
+      // Get the submit button from the form
+      const submitBtn = event.target.querySelector('button[type="submit"]');
+      const originalButtonHtml = submitBtn.innerHTML;
+
+      // Show loading state on button
+      submitBtn.disabled = true;
+      submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      submitBtn.innerHTML = `
+        <svg class="animate-spin h-4 w-4 inline-block mr-2" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        ${isEdit ? 'Updating...' : 'Creating...'}
+      `;
 
       try {
         if (isEdit) {
@@ -5185,17 +6316,36 @@
         // Close modal
         document.getElementById('taskModal').classList.add('hidden');
 
-        // Refresh tasks using the matter ID from the task (not currentMatterData which might be undefined)
+        // Restore button state (will be reset when modal reopens anyway)
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        submitBtn.innerHTML = originalButtonHtml;
+
+        // Refresh tasks - CRITICAL FIX: Always refresh UI regardless of currentMatterData state
         const matterId = currentTaskMatterId || (currentMatterData && currentMatterData.matter_id);
         if (matterId) {
           const response = await api.getMatterTasks(matterId);
+          const updatedTasks = response.tasks || [];
+
+          // Update currentMatterData if it exists
           if (currentMatterData) {
-            renderTasksTab(currentMatterData, response.tasks || []);
+            currentMatterData.tasks = updatedTasks;
+            renderTasksTab(currentMatterData, updatedTasks);
+          } else {
+            // Fallback: Render Kanban board directly even if currentMatterData is not set
+            // This ensures tasks appear immediately after creation
+            currentTasksList = updatedTasks;
+            renderKanbanBoard(matterId, updatedTasks);
           }
         }
       } catch (error) {
         console.error('Save task error:', error);
         Toast.error(isEdit ? 'Failed to update task' : 'Failed to create task');
+
+        // Restore button state on error
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        submitBtn.innerHTML = originalButtonHtml;
       }
     };
 
@@ -5541,6 +6691,7 @@
       }
 
       const matterId = document.getElementById('matterId').value;
+      const matterTypeRadio = document.querySelector('input[name="matterType"]:checked');
       const data = {
         client_name: document.getElementById('clientName').value,
         name: document.getElementById('matterName').value,
@@ -5549,6 +6700,11 @@
         visibility: document.getElementById('matterVisibility').value,
         share_with: selectedUsers.map(u => u.id)
       };
+
+      // Add matter_type only when creating (not when updating)
+      if (!matterId && matterTypeRadio) {
+        data.matter_type = matterTypeRadio.value;
+      }
 
       try {
         let createdMatterId;
@@ -5609,6 +6765,35 @@
           }
 
           Toast.success(`Matter created: ${result.matter?.matter_id || 'Success'}`);
+
+          // Auto-link to workspace if created from workspace
+          if (createMatterForWorkspaceId && result.matter?.matter_id) {
+            try {
+              const linkResponse = await fetch(`${api.baseUrl}/api/v1/entity-links`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${api.token}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  source_matter_id: createMatterForWorkspaceId,
+                  target_matter_id: result.matter.matter_id,
+                  link_type: 'workspace_matter'
+                })
+              });
+
+              if (linkResponse.ok) {
+                console.log('[Matter Creation] Auto-linked matter to workspace:', createMatterForWorkspaceId);
+              } else {
+                console.error('[Matter Creation] Failed to auto-link to workspace');
+              }
+            } catch (error) {
+              console.error('[Matter Creation] Error auto-linking to workspace:', error);
+            } finally {
+              // Clear the workspace ID
+              createMatterForWorkspaceId = null;
+            }
+          }
         }
 
         // Save parties if any were added
@@ -5643,6 +6828,15 @@
           conflictDetection.reset();
         }
         loadMatters();
+
+        // If the drawer was open when editing started, re-open it with refreshed data
+        // This ensures the drawer shows the updated matter name and refreshed conversation list
+        if (matterId && window._editingMatterFromDrawer === matterId) {
+          console.log('[Matter Edit] Re-opening drawer with updated matter data:', matterId);
+          // Bust browser cache to force fresh data after update
+          await viewMatter(matterId, 'details', { bustCache: true });
+          window._editingMatterFromDrawer = null; // Clear the flag
+        }
       } catch (error) {
         Toast.error(error.message);
 
@@ -5652,6 +6846,201 @@
             action: 'matter.create',
             client_name: data?.client_name,
             matter_type: data?.matter_type
+          });
+        }
+      }
+    });
+
+    // =============================================================================
+    // WORKSPACE MATTER MODAL HANDLERS
+    // =============================================================================
+
+    const workspaceMatterModal = document.getElementById('workspaceMatterModal');
+    const workspaceMatterForm = document.getElementById('workspaceMatterForm');
+
+    // Close modal handlers
+    document.getElementById('closeWorkspaceMatterModal').addEventListener('click', () => {
+      workspaceMatterModal.classList.add('hidden');
+      if (workspaceConflictDetection) {
+        workspaceConflictDetection.reset();
+      }
+    });
+
+    document.getElementById('cancelWorkspaceMatterBtn').addEventListener('click', () => {
+      workspaceMatterModal.classList.add('hidden');
+      if (workspaceConflictDetection) {
+        workspaceConflictDetection.reset();
+      }
+    });
+
+    // User search for workspace matter
+    document.getElementById('workspaceUserSearchInput').addEventListener('input', (e) => {
+      const query = e.target.value.toLowerCase().trim();
+      const resultsDiv = document.getElementById('workspaceUserSearchResults');
+
+      if (query.length < 2) {
+        resultsDiv.classList.add('hidden');
+        return;
+      }
+
+      const filtered = allOrgUsers.filter(u =>
+        (u.first_name?.toLowerCase() + ' ' + u.last_name?.toLowerCase()).includes(query) ||
+        u.email?.toLowerCase().includes(query)
+      );
+
+      if (filtered.length === 0) {
+        resultsDiv.innerHTML = '<p class="p-3 text-sm text-gray-500">No users found</p>';
+      } else {
+        resultsDiv.innerHTML = filtered.map(u => `
+          <button type="button" onclick="addWorkspaceUserToShare('${u.id}')"
+            class="w-full text-left px-3 py-2 hover:bg-gray-50 transition-colors">
+            <div class="font-medium text-sm">${u.first_name} ${u.last_name}</div>
+            <div class="text-xs text-gray-500">${u.email}</div>
+          </button>
+        `).join('');
+      }
+
+      resultsDiv.classList.remove('hidden');
+    });
+
+    window.addWorkspaceUserToShare = function(userId) {
+      const user = allOrgUsers.find(u => u.id === userId);
+      if (!user || workspaceSelectedUsers.find(u => u.id === userId)) return;
+
+      workspaceSelectedUsers.push(user);
+      renderWorkspaceSelectedUsers();
+
+      document.getElementById('workspaceUserSearchInput').value = '';
+      document.getElementById('workspaceUserSearchResults').classList.add('hidden');
+    };
+
+    window.removeWorkspaceUserFromShare = function(userId) {
+      workspaceSelectedUsers = workspaceSelectedUsers.filter(u => u.id !== userId);
+      renderWorkspaceSelectedUsers();
+    };
+
+    function renderWorkspaceSelectedUsers() {
+      const container = document.getElementById('workspaceSelectedUsersList');
+      const noUsersMsg = document.getElementById('workspaceNoUsersSelected');
+
+      if (workspaceSelectedUsers.length === 0) {
+        container.innerHTML = '<p class="text-sm text-gray-500 italic" id="workspaceNoUsersSelected">No users selected. Start typing to search and add team members.</p>';
+      } else {
+        container.innerHTML = workspaceSelectedUsers.map(u => `
+          <div class="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+            <div class="flex-1 min-w-0">
+              <div class="font-medium text-sm">${u.first_name} ${u.last_name}</div>
+              <div class="text-xs text-gray-500 truncate">${u.email}</div>
+            </div>
+            <button type="button" onclick="removeWorkspaceUserFromShare('${u.id}')"
+              class="ml-2 text-red-600 hover:text-red-800 p-1">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+        `).join('');
+      }
+    }
+
+    // Form submission for workspace matter
+    workspaceMatterForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      // Check if conflicts are acknowledged
+      if (workspaceConflictDetection && !workspaceConflictDetection.canProceed()) {
+        Toast.error('Please acknowledge the conflicts before proceeding');
+        return;
+      }
+
+      const workspaceId = document.getElementById('workspaceIdForMatter').value;
+      const data = {
+        client_name: document.getElementById('workspaceClientName').value,
+        name: document.getElementById('workspaceMatterName').value,
+        description: document.getElementById('workspaceMatterDescription').value,
+        status: document.getElementById('workspaceMatterStatus').value,
+        visibility: document.getElementById('workspaceMatterVisibility').value,
+        share_with: workspaceSelectedUsers.map(u => u.id),
+        matter_type: 'matter' // Always create as matter, not workspace
+      };
+
+      try {
+        const result = await api.createMatter(data);
+        const createdMatterId = result.matter?.matter_id;
+
+        Toast.success(`Matter created: ${createdMatterId || 'Success'}`);
+
+        // Save parties if any
+        if (workspaceConflictDetection && workspaceConflictDetection.getParties().length > 0) {
+          try {
+            const response = await fetch(`${api.baseURL}/api/v1/conflicts/parties`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${api.token}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                matter_id: result.matter?.id,
+                parties: workspaceConflictDetection.getParties()
+              })
+            });
+
+            if (response.ok) {
+              const partyResult = await response.json();
+              console.log(`Saved ${partyResult.data.count} parties to matter`);
+            }
+          } catch (error) {
+            console.error('Error saving parties:', error);
+          }
+        }
+
+        // Auto-link to workspace
+        if (workspaceId && createdMatterId) {
+          try {
+            const linkResponse = await fetch(`${api.baseUrl}/api/v1/entity-links`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${api.token}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                source_matter_id: workspaceId,
+                target_matter_id: createdMatterId,
+                link_type: 'workspace_matter'
+              })
+            });
+
+            if (linkResponse.ok) {
+              console.log('[Workspace Matter Creation] Auto-linked to workspace:', workspaceId);
+              Toast.success('Matter linked to workspace successfully');
+            } else {
+              console.error('[Workspace Matter Creation] Failed to auto-link');
+            }
+          } catch (error) {
+            console.error('[Workspace Matter Creation] Error auto-linking:', error);
+          }
+        }
+
+        workspaceMatterModal.classList.add('hidden');
+        workspaceSelectedUsers = [];
+        if (workspaceConflictDetection) {
+          workspaceConflictDetection.reset();
+        }
+        loadMatters();
+
+        // Refresh linked matters tab if viewing the workspace
+        if (currentMatterData && currentMatterData.matter &&
+            currentMatterData.matter.matter_id === workspaceId &&
+            !document.getElementById('tabContentLinks').classList.contains('hidden')) {
+          renderLinkedMattersTab(currentMatterData.matter);
+        }
+
+      } catch (error) {
+        Toast.error(error.message);
+        if (window.analytics) {
+          window.analytics.trackError(error, {
+            action: 'workspace_matter.create',
+            workspace_id: workspaceId
           });
         }
       }

@@ -9,6 +9,7 @@
   <script src="../js/config.js"></script>
   <script src="../js/mock-data.js"></script>
   <script src="../js/api.js"></script>
+  <script src="../js/utils/event-display-names.js"></script>
   <script src="../js/components.js"></script>
   <script src="../js/menu.js"></script>
   <script src="../js/navigation-helpers.js"></script>
@@ -328,7 +329,10 @@
         {
           key: 'event_type',
           label: 'Event Type',
-          render: (val) => `<span class="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded font-mono">${val}</span>`
+          render: (val) => {
+            const displayName = EventDisplayNames.getEventDisplayName(val);
+            return `<span class="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">${displayName}</span>`;
+          }
         },
         {
           key: 'user_email',
@@ -610,11 +614,12 @@
 
       const content = document.createElement('div');
       content.className = 'space-y-4 text-sm';
+      const eventDisplayName = EventDisplayNames.getEventDisplayName(log.event_type);
       content.innerHTML = `
         <div class="grid grid-cols-2 gap-4">
           <div>
             <p class="text-gray-500">Event Type</p>
-            <p class="font-medium">${log.event_type}</p>
+            <p class="font-medium">${eventDisplayName}</p>
           </div>
           <div>
             <p class="text-gray-500">Timestamp</p>

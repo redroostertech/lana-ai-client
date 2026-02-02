@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pagination Diagnostic Tool</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+    }
+    .instruction {
+      background: #e3f2fd;
+      border-left: 4px solid #2196f3;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+    button {
+      background: #2196f3;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 5px;
+    }
+    button:hover {
+      background: #1976d2;
+    }
+    .output {
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+      padding: 15px;
+      border-radius: 4px;
+      margin-top: 20px;
+      font-family: monospace;
+      white-space: pre-wrap;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .success { color: #4caf50; font-weight: bold; }
+    .error { color: #f44336; font-weight: bold; }
+    .warning { color: #ff9800; font-weight: bold; }
+    .info { color: #2196f3; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 Pagination Diagnostic Tool</h1>
+    <p class="subtitle">Use this tool to diagnose pagination issues</p>
+
+    <div class="instruction">
+      <strong>Instructions:</strong>
+      <ol>
+        <li>Open the Reports page with the table that has pagination issues</li>
+        <li>Open this diagnostic page in a separate tab</li>
+        <li>Click the buttons below to test pagination functions</li>
+      </ol>
+    </div>
+
+    <h2>Step 1: Check if functions exist</h2>
+    <button onclick="checkFunctions()">Check All Pagination Functions</button>
+
+    <h2>Step 2: Check DrilldownRenderer</h2>
+    <button onclick="checkDrilldownRenderer()">Check DrilldownRenderer</button>
+
+    <h2>Step 3: Test Inline Tables</h2>
+    <button onclick="testInlineTables()">Test Inline Table Functions</button>
+
+    <h2>Step 4: Check Browser Cache</h2>
+    <button onclick="checkCache()">Check Script Load Times</button>
+
+    <div id="output" class="output"></div>
+  </div>
+
+  <script>
+    const output = document.getElementById('output');
+
+    function log(message, type = 'info') {
+      const timestamp = new Date().toLocaleTimeString();
+      const className = type;
+      const line = `[${timestamp}] ${message}\n`;
+      const span = document.createElement('span');
+      span.className = className;
+      span.textContent = line;
+      output.appendChild(span);
+      output.scrollTop = output.scrollHeight;
+    }
+
+    function clear() {
+      output.innerHTML = '';
+    }
+
+    function checkFunctions() {
+      clear();
+      log('=== Checking All Pagination Functions ===', 'info');
+
+      const functions = [
+        'goToPage_contacts',
+        'goToPage_opportunities',
+        'goToPage_contactOpportunities',
+        'goToPage_uniqueContactIds',
+        'goToConsultationPage',
+        'goToResponseTimePage',
+        'goToLeadQualityPage',
+        'goToShowRatePage',
+        'goToCaseValuePage',
+        'goToConsultationsHeldPage'
+      ];
+
+      functions.forEach(fn => {
+        const exists = typeof window[fn] === 'function';
+        if (exists) {
+          log(`✅ ${fn} - FOUND`, 'success');
+        } else {
+          log(`❌ ${fn} - NOT FOUND`, 'error');
+        }
+      });
+    }
+
+    function checkDrilldownRenderer() {
+      clear();
+      log('=== Checking DrilldownRenderer ===', 'info');
+
+      if (typeof window.drilldownRenderer === 'undefined') {
+        log('❌ window.drilldownRenderer - NOT FOUND', 'error');
+        log('   DrilldownRenderer not loaded or not initialized', 'error');
+        return;
+      }
+
+      log('✅ window.drilldownRenderer - FOUND', 'success');
+
+      const methods = ['prevPage', 'nextPage', 'goToPage'];
+      methods.forEach(method => {
+        const exists = typeof window.drilldownRenderer[method] === 'function';
+        if (exists) {
+          log(`✅ drilldownRenderer.${method} - FOUND`, 'success');
+
+          // Check if bound
+          const isBound = window.drilldownRenderer[method].name === 'bound ' + method;
+          if (isBound) {
+            log(`   ✅ Method is properly bound`, 'success');
+          } else {
+            log(`   ⚠️  Method might not be bound (could lose 'this' context)`, 'warning');
+          }
+        } else {
+          log(`❌ drilldownRenderer.${method} - NOT FOUND`, 'error');
+        }
+      });
+    }
+
+    function testInlineTables() {
+      clear();
+      log('=== Testing Inline Table Functions ===', 'info');
+      log('NOTE: These tests will only work if the tables are rendered on the page', 'warning');
+
+      // Test if we can call the functions
+      const testFunctions = [
+        { name: 'goToPage_contacts', state: 'qualifiedLeadsData' },
+        { name: 'goToPage_opportunities', state: 'qualifiedLeadsData' }
+      ];
+
+      testFunctions.forEach(({ name, state }) => {
+        if (typeof window[name] === 'function') {
+          log(`✅ ${name} exists`, 'success');
+
+          // Check if state exists
+          if (window[state]) {
+            log(`   ✅ State object '${state}' exists`, 'success');
+            log(`   Current page: ${window[state].currentPage}`, 'info');
+          } else {
+            log(`   ⚠️  State object '${state}' not found (table may not be rendered)`, 'warning');
+          }
+        } else {
+          log(`❌ ${name} not found`, 'error');
+        }
+      });
+    }
+
+    function checkCache() {
+      clear();
+      log('=== Checking Browser Cache ===', 'info');
+
+      // Check performance API for script load times
+      const scripts = performance.getEntriesByType('resource').filter(r => r.name.includes('drilldown-renderer.js'));
+
+      if (scripts.length === 0) {
+        log('❌ drilldown-renderer.js not found in performance entries', 'error');
+        log('   This could mean the page has not loaded the script', 'error');
+      } else {
+        scripts.forEach(script => {
+          log('✅ Found drilldown-renderer.js', 'success');
+          log(`   URL: ${script.name}`, 'info');
+          log(`   Load time: ${script.duration.toFixed(2)}ms`, 'info');
+
+          // Check for cache-busting parameter
+          if (script.name.includes('bust=6')) {
+            log('   ✅ Cache-busting parameter is updated (bust=6)', 'success');
+          } else if (script.name.includes('bust=5')) {
+            log('   ❌ OLD cache-busting parameter (bust=5)', 'error');
+            log('   🔄 You need to HARD REFRESH the page!', 'error');
+          } else {
+            log('   ⚠️  No cache-busting parameter found', 'warning');
+          }
+        });
+      }
+
+      log('\n=== Recommendation ===', 'info');
+      log('If you see OLD cache-busting parameter:', 'warning');
+      log('  Mac: Press Cmd + Shift + R', 'warning');
+      log('  Windows/Linux: Press Ctrl + Shift + R', 'warning');
+    }
+
+    // Auto-run on load
+    window.onload = function() {
+      log('=== Pagination Diagnostic Tool Ready ===', 'info');
+      log('Click the buttons above to run diagnostics\n', 'info');
+    };
+  </script>
+</body>
+</html>

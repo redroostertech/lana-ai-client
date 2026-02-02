@@ -39,6 +39,11 @@ class DrilldownRenderer {
     this.initialized = false;
     this.currentTableView = null; // Stores current table view filter state
 
+    // Bind pagination methods to preserve 'this' context when called from onclick
+    this.prevPage = this.prevPage.bind(this);
+    this.nextPage = this.nextPage.bind(this);
+    this.goToPage = this.goToPage.bind(this);
+
     // Don't call init() here - defer until first use
   }
 
@@ -354,6 +359,10 @@ class DrilldownRenderer {
     this.filters = {};
     this.searchQuery = '';
 
+    // Clear search input so previous drilldown's query is not persisted
+    const searchInput = document.getElementById('drilldown-search');
+    if (searchInput) searchInput.value = '';
+
     // Show loading state
     this.showLoading();
 
@@ -437,10 +446,19 @@ class DrilldownRenderer {
    * Close the drilldown modal
    */
   close() {
-    this.modal.classList.add('hidden');
+    if (!this.modal) {
+      this.modal = document.getElementById('drilldown-modal');
+    }
+
+    if (this.modal) {
+      this.modal.classList.add('hidden');
+    }
+
     document.body.classList.remove('overflow-hidden');
     this.currentConfig = null;
     this.currentData = null;
+
+    console.log('[DrilldownRenderer] Modal closed, state cleared');
   }
 
   /**

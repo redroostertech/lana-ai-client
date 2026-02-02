@@ -52,6 +52,7 @@ const MenuIcons = {
   analytics: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>',
   label: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>',
   folder: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>',
+  plus: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>',
 };
 
 // ============================================================
@@ -102,6 +103,7 @@ const MenuConfig = {
         id: 'main',
         title: null,
         requiredRoles: [],
+        isStaticTop: true,
         items: [
           { id: 'dashboard', label: 'Dashboard', href: '/index.html', icon: 'home' },
           {
@@ -114,21 +116,28 @@ const MenuConfig = {
           },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
           { id: 'storage', label: 'My Drive', href: '/storage.html', icon: 'folder' },
+        ]
+      },
+      {
+        id: 'nav-links',
+        title: null,
+        requiredRoles: [],
+        items: [
           { id: 'connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
           { id: 'insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
         ]
       },
       {
         id: 'projects',
-        title: 'Projects',
+        title: 'Your Chats',
         requiredRoles: [],
         isConversationList: true,
         items: [
           {
             id: 'new-matter-chat',
-            label: 'New Matters Chat',
+            label: 'Start a New Chat',
             href: '#',
-            icon: 'document',
+            icon: 'plus',
             isButton: true,
             onClick: 'openNewProjectModal'
           }
@@ -195,13 +204,14 @@ const MenuConfig = {
     ]
   },
 
-  // Workflows section menu (matches portal menu style)
+  // Workflows section menu (same static/scroll structure as portal)
   workflows: {
     sections: [
       {
         id: 'main',
         title: null,
         requiredRoles: [],
+        isStaticTop: true,
         items: [
           { id: 'dashboard', label: 'Dashboard', href: '/index.html', icon: 'home' },
           {
@@ -214,21 +224,28 @@ const MenuConfig = {
           },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
           { id: 'storage', label: 'My Drive', href: '/storage.html', icon: 'folder' },
+        ]
+      },
+      {
+        id: 'nav-links',
+        title: null,
+        requiredRoles: [],
+        items: [
           { id: 'connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
           { id: 'insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
         ]
       },
       {
         id: 'projects',
-        title: 'Projects',
+        title: 'Your Chats',
         requiredRoles: [],
         isConversationList: true,
         items: [
           {
             id: 'new-matter-chat',
-            label: 'New Matters Chat',
+            label: 'Start a New Chat',
             href: '#',
-            icon: 'document',
+            icon: 'plus',
             isButton: true,
             onClick: 'openNewProjectModal'
           }
@@ -254,13 +271,14 @@ const MenuConfig = {
     ]
   },
 
-  // Insights section menu
+  // Insights section menu (same static/scroll structure as portal)
   insights: {
     sections: [
       {
         id: 'main',
         title: null,
         requiredRoles: [],
+        isStaticTop: true,
         items: [
           { id: 'dashboard', label: 'Dashboard', href: '/index.html', icon: 'home' },
           {
@@ -273,21 +291,28 @@ const MenuConfig = {
           },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
           { id: 'storage', label: 'My Drive', href: '/storage.html', icon: 'folder' },
+        ]
+      },
+      {
+        id: 'nav-links',
+        title: null,
+        requiredRoles: [],
+        items: [
           { id: 'connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
           { id: 'insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
         ]
       },
       {
         id: 'projects',
-        title: 'Projects',
+        title: 'Your Chats',
         requiredRoles: [],
         isConversationList: true,
         items: [
           {
             id: 'new-matter-chat',
-            label: 'New Matters Chat',
+            label: 'Start a New Chat',
             href: '#',
-            icon: 'document',
+            icon: 'plus',
             isButton: true,
             onClick: 'openNewProjectModal'
           }
@@ -313,13 +338,14 @@ const MenuConfig = {
     ]
   },
 
-  // Integrations section menu (matches portal menu style)
+  // Integrations section menu (same static/scroll structure as portal)
   integrations: {
     sections: [
       {
         id: 'main',
         title: null,
         requiredRoles: [],
+        isStaticTop: true,
         items: [
           { id: 'dashboard', label: 'Dashboard', href: '/index.html', icon: 'home' },
           {
@@ -332,21 +358,28 @@ const MenuConfig = {
           },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
           { id: 'storage', label: 'My Drive', href: '/storage.html', icon: 'folder' },
+        ]
+      },
+      {
+        id: 'nav-links',
+        title: null,
+        requiredRoles: [],
+        items: [
           { id: 'connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
           { id: 'insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
         ]
       },
       {
         id: 'projects',
-        title: 'Projects',
+        title: 'Your Chats',
         requiredRoles: [],
         isConversationList: true,
         items: [
           {
             id: 'new-matter-chat',
-            label: 'New Matters Chat',
+            label: 'Start a New Chat',
             href: '#',
-            icon: 'document',
+            icon: 'plus',
             isButton: true,
             onClick: 'openNewProjectModal'
           }
@@ -372,13 +405,14 @@ const MenuConfig = {
     ]
   },
 
-  // Chat page specific menu with conversation list
+  // Chat page specific menu with conversation list (same static/scroll structure)
   chat: {
     sections: [
       {
         id: 'chat-main',
         title: null,
         requiredRoles: [],
+        isStaticTop: true,
         items: [
           { id: 'chat-dashboard', label: 'Dashboard', href: '/index.html', icon: 'home' },
           {
@@ -391,21 +425,28 @@ const MenuConfig = {
           },
           { id: 'chat-matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
           { id: 'chat-storage', label: 'My Drive', href: '/storage.html', icon: 'folder' },
+        ]
+      },
+      {
+        id: 'chat-nav-links',
+        title: null,
+        requiredRoles: [],
+        items: [
           { id: 'chat-connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
           { id: 'chat-insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
         ]
       },
       {
         id: 'chat-projects',
-        title: 'Projects',
+        title: 'Your Chats',
         requiredRoles: [],
         isConversationList: true, // Special flag for conversation list rendering
         items: [
           {
             id: 'chat-new-matter',
-            label: 'New Matters Chat',
+            label: 'Start a New Chat',
             href: '#',
-            icon: 'document',
+            icon: 'plus',
             isButton: true,
             onClick: 'openNewProjectModal'
           }
@@ -441,6 +482,11 @@ class MenuSystem {
     this.currentPath = options.currentPath || window.location.pathname;
     this.containerSelector = options.containerSelector || '#sidebar nav';
     this.menuType = options.menuType || this._detectMenuType();
+    const config = MenuConfig[this.menuType];
+    const hasFooter = config?.sections?.some(s => s.isFooter);
+    this.footerSelector = options.footerSelector !== undefined
+      ? options.footerSelector
+      : (hasFooter ? '#navFooter' : null);
     this.activeItemClass = options.activeItemClass || 'text-white bg-gray-800';
     this.inactiveItemClass = options.inactiveItemClass || 'text-gray-300 hover:text-white hover:bg-gray-800';
     this.onItemClick = options.onItemClick || null;
@@ -677,15 +723,15 @@ class MenuSystem {
 
     let html = '';
 
-    // Handle conversation list section specially
+    // Handle conversation list section specially (no inner scroll - entire nav scrolls)
     if (section.isConversationList) {
       html += `
-        <div class="mt-8 flex-1 flex flex-col min-h-0">
+        <div class="mt-8">
           <p class="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">${section.title || ''}</p>
           <div class="mt-3 space-y-1">
             ${visibleItems.map(item => this.renderItem(item)).join('')}
           </div>
-          <div class="mt-3 flex-1 overflow-y-auto space-y-1" id="conversationListContainer">
+          <div class="mt-3 space-y-1" id="conversationListContainer">
             <!-- Conversations will be dynamically loaded here -->
             <p class="text-sm text-gray-400 italic px-3 py-2">Loading conversations...</p>
           </div>
@@ -727,6 +773,8 @@ class MenuSystem {
     // Separate regular sections from footer sections
     const regularSections = config.sections.filter(s => !s.isFooter);
     const footerSections = config.sections.filter(s => s.isFooter);
+    const staticTopSections = regularSections.filter(s => s.isStaticTop);
+    const scrollableSections = regularSections.filter(s => !s.isStaticTop);
 
     const regularHtml = regularSections
       .map(section => this.renderSection(section))
@@ -738,17 +786,16 @@ class MenuSystem {
       .filter(html => html.length > 0)
       .join('');
 
-    // If there are footer sections, wrap in a flex container to push footer to bottom
-    if (footerHtml) {
-      // Get version from centralized version system
+    // When using separate footer (footerSelector), only return scrollable content
+    const includeFooterInContent = footerHtml && !this.footerSelector;
+    if (includeFooterInContent) {
       const version = window.APP_VERSION?.getVersion() || 'Loading...';
-
       return `
-        <div class="flex flex-col h-full">
-          <div class="flex-1 flex flex-col min-h-0 pb-4">
+        <div class="flex flex-col pb-4">
+          <div class="pb-4">
             ${regularHtml}
           </div>
-          <div class="flex-shrink-0 border-t border-gray-800 pt-4 pb-4">
+          <div class="border-t border-gray-800 pt-4 pb-4">
             ${footerHtml}
             <p id="app-version" class="px-4 mt-3 text-xs text-gray-500">${version}</p>
           </div>
@@ -756,11 +803,56 @@ class MenuSystem {
       `;
     }
 
-    // Even without footer, use flex layout for conversation list scrolling
+    // When using separate footer and we have static top: static block + scrollable block
+    if (this.footerSelector && staticTopSections.length > 0) {
+      const staticTopHtml = staticTopSections
+        .map(section => this.renderSection(section))
+        .filter(html => html.length > 0)
+        .join('');
+      const scrollableHtml = scrollableSections
+        .map(section => this.renderSection(section))
+        .filter(html => html.length > 0)
+        .join('');
+      return `
+        <div class="flex flex-col flex-1 min-h-0">
+          <div class="flex-shrink-0 space-y-1 pb-4">
+            ${staticTopHtml}
+          </div>
+          <div class="flex-1 min-h-0 overflow-y-auto">
+            ${scrollableHtml}
+          </div>
+        </div>
+      `;
+    }
+
     return `
-      <div class="flex flex-col h-full pb-4">
+      <div class="flex flex-col pb-4">
         ${regularHtml}
       </div>
+    `;
+  }
+
+  /**
+   * Render footer content (Administration, Settings, Help, version) for fixed footer area
+   */
+  renderFooter() {
+    const config = MenuConfig[this.menuType];
+    if (!config) return '';
+    const footerSections = config.sections.filter(s => s.isFooter);
+    if (footerSections.length === 0) return '';
+
+    const footerHtml = footerSections
+      .map(section => this.renderSection(section))
+      .filter(html => html.length > 0)
+      .join('');
+    if (!footerHtml) return '';
+
+    const version = window.APP_VERSION?.getVersion() || 'Loading...';
+    return `
+      <div class="space-y-1">
+        ${footerHtml}
+      </div>
+      <p id="app-version" class="px-4 mt-3 text-xs text-gray-500">${version}</p>
     `;
   }
 
@@ -774,7 +866,30 @@ class MenuSystem {
       return false;
     }
 
+    // Scrollable content only when using separate footer; otherwise full content
     container.innerHTML = this.render();
+
+    // When using separate footer: layout nav and inject footer below nav
+    if (this.footerSelector) {
+      const config = MenuConfig[this.menuType];
+      const hasStaticTop = config && config.sections.filter(s => !s.isFooter).some(s => s.isStaticTop);
+      container.classList.add('flex', 'flex-col', 'flex-1', 'min-h-0');
+      container.classList.remove('overflow-hidden');
+      // Only make the nav itself scroll when there is no static top (scroll is on inner div)
+      if (!hasStaticTop) container.classList.add('overflow-y-auto');
+
+      const footerHtml = this.renderFooter();
+      if (footerHtml) {
+        let footerEl = document.querySelector(this.footerSelector);
+        if (!footerEl && container.parentNode) {
+          footerEl = document.createElement('div');
+          footerEl.id = this.footerSelector.replace(/^#/, '');
+          footerEl.className = 'flex-shrink-0 border-t border-gray-800 pt-4 pb-4 px-3';
+          container.parentNode.appendChild(footerEl);
+        }
+        if (footerEl) footerEl.innerHTML = footerHtml;
+      }
+    }
 
     // Add click handlers if provided
     if (this.onItemClick) {

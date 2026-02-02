@@ -80,7 +80,7 @@
   <!-- Sidebar -->
   <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
     <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
-      <a href="../index.html"><img src="../img/logo-light.png" alt="LanaAI" class="h-7"></a>
+      <a href="../index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
       <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
       </button>
@@ -251,6 +251,17 @@
             <!-- Token usage info will be loaded here -->
           </div>
         </div>
+
+        <!-- Connector DLQ (Dead Letter Queue) -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">Connector Sync Failures</h3>
+            <div id="dlqStatusBadge"></div>
+          </div>
+          <div id="dlqMetrics" class="space-y-4">
+            <!-- DLQ metrics will be loaded here -->
+          </div>
+        </div>
       </div>
     </main>
   </div>
@@ -264,7 +275,8 @@
       services: 30000,     // 30 seconds - service status changes frequently
       metrics: 60000,      // 1 minute - system metrics change but not critical
       storage: 300000,     // 5 minutes - storage changes slowly
-      tokenUsage: 300000   // 5 minutes - token usage is historical data
+      tokenUsage: 300000,  // 5 minutes - token usage is historical data
+      dlq: 60000           // 1 minute - DLQ metrics change frequently
     };
 
     // Cache storage
@@ -273,7 +285,8 @@
       services: null,
       metrics: null,
       storage: null,
-      tokenUsage: {}  // Keyed by period (7days, 3months, alltime)
+      tokenUsage: {},  // Keyed by period (7days, 3months, alltime)
+      dlq: null
     };
 
     // Helper to check if cache is valid
@@ -523,6 +536,9 @@
         // Token usage (default to 7 days)
         await loadTokenUsage('7days');
 
+        // DLQ metrics
+        await loadDLQMetrics();
+
         // Last updated
         document.getElementById('lastUpdated').textContent = `Updated: ${formatDateTime(new Date())}`;
 
@@ -679,6 +695,86 @@
       return parts.join(' ') || '< 1m';
     }
 
+    // Load DLQ (Dead Letter Queue) metrics
+    async function loadDLQMetrics() {
+      try {
+        const response = await getCachedOrFetch(
+          'dlq',
+          () => api.get('/api/v1/dlq/stats'),
+          CACHE_DURATION.dlq
+        );
+
+        const stats = response.stats || {};
+        const pending = stats.pending || 0;
+        const retrying = stats.retrying || 0;
+        const permanentlyFailed = stats.permanently_failed || 0;
+        const successRate = stats.retry_success_rate || 0;
+        const total = pending + retrying + permanentlyFailed;
+
+        // Status badge based on queue health
+        const dlqStatusBadge = document.getElementById('dlqStatusBadge');
+        let badgeClass = 'bg-green-100 text-green-800';
+        let badgeText = 'HEALTHY';
+
+        if (permanentlyFailed > 50 || pending > 100) {
+          badgeClass = 'bg-red-100 text-red-800';
+          badgeText = 'CRITICAL';
+        } else if (permanentlyFailed > 10 || pending > 50 || successRate < 80) {
+          badgeClass = 'bg-yellow-100 text-yellow-800';
+          badgeText = 'WARNING';
+        }
+
+        dlqStatusBadge.innerHTML = `<span class="px-3 py-1 text-sm font-semibold rounded-full ${badgeClass}">${badgeText}</span>`;
+
+        // DLQ metrics display
+        document.getElementById('dlqMetrics').innerHTML = `
+          <div class="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p class="text-gray-500">Pending Retry</p>
+              <p class="font-medium text-lg">${pending.toLocaleString()}</p>
+            </div>
+            <div>
+              <p class="text-gray-500">Currently Retrying</p>
+              <p class="font-medium text-lg">${retrying.toLocaleString()}</p>
+            </div>
+            <div>
+              <p class="text-gray-500">Permanently Failed</p>
+              <p class="font-medium text-lg ${permanentlyFailed > 0 ? 'text-red-600' : ''}">${permanentlyFailed.toLocaleString()}</p>
+            </div>
+            <div>
+              <p class="text-gray-500">Retry Success Rate</p>
+              <p class="font-medium text-lg ${successRate >= 90 ? 'text-green-600' : successRate >= 80 ? 'text-yellow-600' : 'text-red-600'}">${successRate.toFixed(1)}%</p>
+            </div>
+          </div>
+          <div class="mt-4">
+            <div class="flex justify-between text-sm mb-1">
+              <span class="text-gray-500">Queue Health</span>
+              <span class="font-medium">${total === 0 ? 'No Failed Records' : `${total.toLocaleString()} Total`}</span>
+            </div>
+            ${total > 0 ? `
+              <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                ${pending > 0 ? `<div class="bg-yellow-500 h-2 float-left" style="width: ${(pending / total * 100).toFixed(1)}%" title="Pending: ${pending}"></div>` : ''}
+                ${retrying > 0 ? `<div class="bg-blue-500 h-2 float-left" style="width: ${(retrying / total * 100).toFixed(1)}%" title="Retrying: ${retrying}"></div>` : ''}
+                ${permanentlyFailed > 0 ? `<div class="bg-red-500 h-2 float-left" style="width: ${(permanentlyFailed / total * 100).toFixed(1)}%" title="Failed: ${permanentlyFailed}"></div>` : ''}
+              </div>
+              <div class="flex justify-between text-xs text-gray-400 mt-1">
+                <span>🟡 Pending</span>
+                <span>🔵 Retrying</span>
+                <span>🔴 Failed</span>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      } catch (error) {
+        console.error('Failed to load DLQ metrics:', error);
+        // Show "No Data" state instead of error to avoid alarming users
+        document.getElementById('dlqStatusBadge').innerHTML = `<span class="px-3 py-1 text-sm font-semibold rounded-full bg-gray-100 text-gray-800">N/A</span>`;
+        document.getElementById('dlqMetrics').innerHTML = `
+          <p class="text-sm text-gray-500">DLQ metrics unavailable. This feature will be available in Phase 3.</p>
+        `;
+      }
+    }
+
     // Clear all health caches
     function clearHealthCache() {
       console.log('[HealthCache] Clearing all caches');
@@ -687,6 +783,7 @@
       healthCache.metrics = null;
       healthCache.storage = null;
       healthCache.tokenUsage = {};
+      healthCache.dlq = null;
     }
 
     // Refresh button - force refresh by clearing cache first
