@@ -16,6 +16,7 @@
   <script src="../js/conversation-menu.js"></script>
   <script src="../js/conversation-search-modal.js"></script>
   <script src="../js/notifications.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
   <!-- Inline preloader styles - Pure CSS, no dependencies -->
   <style>
@@ -260,6 +261,99 @@
           </div>
           <div id="dlqMetrics" class="space-y-4">
             <!-- DLQ metrics will be loaded here -->
+          </div>
+        </div>
+
+        <!-- Energy Consumption & Efficiency -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 col-span-full">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">Energy Consumption & Efficiency</h3>
+            <div class="flex items-center gap-3">
+              <!-- Period Selector -->
+              <select id="energyPeriodSelector" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                <option value="1hour">Last Hour</option>
+                <option value="6hours">Last 6 Hours</option>
+                <option value="24hours" selected>Last 24 Hours</option>
+                <option value="7days">Last 7 Days</option>
+              </select>
+              <div id="energyStatusBadge"></div>
+            </div>
+          </div>
+
+          <!-- Current Status Row -->
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-sm text-gray-600">Current Power</p>
+                  <p id="currentPowerWatts" class="text-2xl font-bold text-indigo-600 mt-1">-- W</p>
+                </div>
+                <div class="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center">
+                  <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-gradient-to-br from-amber-50 to-orange-50 rounded-lg p-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-sm text-gray-600">Thermal Level</p>
+                  <p id="currentThermalLevel" class="text-2xl font-bold text-orange-600 mt-1">--%</p>
+                </div>
+                <div class="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                  <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-sm text-gray-600">LLM Activity</p>
+                  <p id="currentLLMRequests" class="text-2xl font-bold text-green-600 mt-1">0</p>
+                  <p class="text-xs text-gray-500 mt-0.5">active requests</p>
+                </div>
+                <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                  <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg p-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-sm text-gray-600">Power Source</p>
+                  <p id="currentPowerSource" class="text-xl font-bold text-purple-600 mt-1">AC Power</p>
+                </div>
+                <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                  <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Power Consumption Chart -->
+          <div class="mb-6">
+            <h4 class="text-sm font-medium text-gray-700 mb-3">Power Consumption Over Time</h4>
+            <div class="bg-gray-50 rounded-lg p-4" style="height: 300px;">
+              <canvas id="powerChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Process Energy Breakdown -->
+          <div>
+            <h4 class="text-sm font-medium text-gray-700 mb-3">Energy Impact by Process</h4>
+            <div id="processEnergyBreakdown" class="space-y-3">
+              <!-- Process breakdown will be loaded here -->
+            </div>
           </div>
         </div>
       </div>
@@ -797,6 +891,262 @@
 
     // Auto-refresh every 30 seconds (cache will prevent unnecessary API calls)
     setInterval(loadHealth, 30000);
+
+    // ========================================
+    // ENERGY MONITORING
+    // ========================================
+
+    let powerChart = null;
+    let currentEnergyPeriod = '24hours';
+
+    // Load energy metrics
+    async function loadEnergyMetrics() {
+      try {
+        const period = currentEnergyPeriod;
+
+        // Fetch energy data
+        const energyData = await api.get(`/api/v1/admin/health/energy?period=${period}`);
+        const processData = await api.get('/api/v1/admin/health/energy/processes');
+
+        // Update current status cards
+        if (energyData.current) {
+          document.getElementById('currentPowerWatts').textContent =
+            energyData.current.total_power_watts ? `${energyData.current.total_power_watts.toFixed(1)} W` : '-- W';
+
+          document.getElementById('currentThermalLevel').textContent =
+            energyData.current.thermal_level !== null ? `${energyData.current.thermal_level}%` : '--%';
+
+          document.getElementById('currentLLMRequests').textContent =
+            energyData.current.active_llm_requests || 0;
+
+          document.getElementById('currentPowerSource').textContent =
+            energyData.current.power_source || 'Unknown';
+        }
+
+        // Update status badge
+        const statusBadge = document.getElementById('energyStatusBadge');
+        if (energyData.current) {
+          const thermalLevel = energyData.current.thermal_level || 0;
+          let badgeClass = 'bg-green-100 text-green-800';
+          let badgeText = 'NOMINAL';
+
+          if (thermalLevel > 75) {
+            badgeClass = 'bg-red-100 text-red-800';
+            badgeText = 'CRITICAL';
+          } else if (thermalLevel > 50) {
+            badgeClass = 'bg-orange-100 text-orange-800';
+            badgeText = 'ELEVATED';
+          } else if (thermalLevel > 25) {
+            badgeClass = 'bg-yellow-100 text-yellow-800';
+            badgeText = 'FAIR';
+          }
+
+          statusBadge.innerHTML = `<span class="px-3 py-1 text-sm font-semibold rounded-full ${badgeClass}">${badgeText}</span>`;
+        }
+
+        // Render power chart
+        renderPowerChart(energyData.timeseries || []);
+
+        // Render process breakdown
+        renderProcessBreakdown(processData.processes || []);
+
+      } catch (error) {
+        console.error('Failed to load energy metrics:', error);
+        document.getElementById('energyStatusBadge').innerHTML =
+          '<span class="px-3 py-1 text-sm font-semibold rounded-full bg-gray-100 text-gray-800">N/A</span>';
+      }
+    }
+
+    // Render power consumption chart
+    function renderPowerChart(timeseries) {
+      const ctx = document.getElementById('powerChart');
+      if (!ctx) return;
+
+      // Destroy existing chart
+      if (powerChart) {
+        powerChart.destroy();
+      }
+
+      // Prepare data
+      const labels = timeseries.map(d => new Date(d.timestamp).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+        month: 'short',
+        day: 'numeric'
+      }));
+
+      const powerData = timeseries.map(d => d.total_watts);
+      const thermalData = timeseries.map(d => d.thermal_level);
+      const llmActivity = timeseries.map(d => d.llm_requests);
+
+      // Create chart
+      powerChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Power (Watts)',
+              data: powerData,
+              borderColor: 'rgb(79, 70, 229)',
+              backgroundColor: 'rgba(79, 70, 229, 0.1)',
+              borderWidth: 2,
+              tension: 0.3,
+              yAxisID: 'y',
+              fill: true
+            },
+            {
+              label: 'Thermal Level (%)',
+              data: thermalData,
+              borderColor: 'rgb(249, 115, 22)',
+              backgroundColor: 'rgba(249, 115, 22, 0.1)',
+              borderWidth: 2,
+              tension: 0.3,
+              yAxisID: 'y1',
+              fill: false
+            },
+            {
+              label: 'LLM Activity',
+              data: llmActivity,
+              borderColor: 'rgb(34, 197, 94)',
+              backgroundColor: 'rgba(34, 197, 94, 0.3)',
+              borderWidth: 0,
+              type: 'bar',
+              yAxisID: 'y2',
+              barThickness: 4
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: {
+            mode: 'index',
+            intersect: false,
+          },
+          plugins: {
+            legend: {
+              display: true,
+              position: 'top',
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  let label = context.dataset.label || '';
+                  if (label) {
+                    label += ': ';
+                  }
+                  if (context.parsed.y !== null) {
+                    if (context.dataset.label === 'Power (Watts)') {
+                      label += context.parsed.y.toFixed(1) + ' W';
+                    } else if (context.dataset.label === 'Thermal Level (%)') {
+                      label += context.parsed.y.toFixed(0) + '%';
+                    } else {
+                      label += context.parsed.y;
+                    }
+                  }
+                  return label;
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              type: 'linear',
+              display: true,
+              position: 'left',
+              title: {
+                display: true,
+                text: 'Power (Watts)'
+              },
+              beginAtZero: true
+            },
+            y1: {
+              type: 'linear',
+              display: true,
+              position: 'right',
+              title: {
+                display: true,
+                text: 'Thermal (%)'
+              },
+              beginAtZero: true,
+              max: 100,
+              grid: {
+                drawOnChartArea: false,
+              },
+            },
+            y2: {
+              type: 'linear',
+              display: false,
+              position: 'right',
+              beginAtZero: true,
+              grid: {
+                drawOnChartArea: false,
+              },
+            }
+          }
+        }
+      });
+    }
+
+    // Render process energy breakdown
+    function renderProcessBreakdown(processes) {
+      const container = document.getElementById('processEnergyBreakdown');
+      if (!container) return;
+
+      if (processes.length === 0) {
+        container.innerHTML = '<p class="text-sm text-gray-500">No process data available yet.</p>';
+        return;
+      }
+
+      container.innerHTML = processes.map(process => {
+        const statusColors = {
+          high: 'bg-red-100 text-red-800 border-red-300',
+          medium: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+          low: 'bg-green-100 text-green-800 border-green-300'
+        };
+
+        const statusColor = statusColors[process.status] || 'bg-gray-100 text-gray-800 border-gray-300';
+
+        return `
+          <div class="flex items-center justify-between p-3 border-2 ${statusColor} rounded-lg">
+            <div class="flex-1">
+              <div class="flex items-center gap-2">
+                <span class="font-medium text-gray-900">${process.name}</span>
+                <span class="px-2 py-0.5 text-xs font-semibold rounded ${statusColor}">
+                  ${process.status.toUpperCase()}
+                </span>
+              </div>
+              <div class="flex gap-4 mt-1 text-sm text-gray-600">
+                <span>CPU: ${process.cpu_percent?.toFixed(1) || 0}%</span>
+                <span>Memory: ${process.memory_mb || 0} MB</span>
+                ${process.threads ? `<span>Threads: ${process.threads}</span>` : ''}
+              </div>
+            </div>
+            <div class="text-right">
+              <div class="text-lg font-bold text-gray-900">
+                ${process.estimated_watts || '0'} W
+              </div>
+              <div class="text-xs text-gray-500">
+                Impact: ${process.energy_impact?.toFixed(1) || 0}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Period selector change handler
+    document.getElementById('energyPeriodSelector').addEventListener('change', (e) => {
+      currentEnergyPeriod = e.target.value;
+      loadEnergyMetrics();
+    });
+
+    // Load energy metrics on page load
+    loadEnergyMetrics();
+
+    // Refresh energy metrics every minute
+    setInterval(loadEnergyMetrics, 60000);
 
     // Conversation actions modal
     let selectedConversationId = null;
