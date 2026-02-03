@@ -911,7 +911,9 @@
         // Update current status cards
         if (energyData.current) {
           document.getElementById('currentPowerWatts').textContent =
-            energyData.current.total_power_watts ? `${energyData.current.total_power_watts.toFixed(1)} W` : '-- W';
+            (energyData.current.total_power_watts !== null && typeof energyData.current.total_power_watts === 'number')
+              ? `${energyData.current.total_power_watts.toFixed(1)} W`
+              : '-- W';
 
           document.getElementById('currentThermalLevel').textContent =
             energyData.current.thermal_level !== null ? `${energyData.current.thermal_level}%` : '--%';
