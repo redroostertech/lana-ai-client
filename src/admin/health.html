@@ -81,12 +81,12 @@
   <!-- Sidebar -->
   <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
     <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
-      <a href="../index.html" class="text-xl font-bold text-indigo-400">LanaAI</a>
+      <a href="../index.html"><img src="../img/logo-light.png" alt="LanaAI" class="h-7"></a>
       <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
       </button>
     </div>
-    <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
+    <nav id="mainNav" class="flex-1 mt-6 px-3 overflow-hidden">
       <!-- Menu will be dynamically rendered by menu.js -->
     </nav>
   </aside>
@@ -190,7 +190,8 @@
       </div>
 
       <!-- Metrics -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Row 1: System Metrics | Process Metrics | CPU Information -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <!-- System Metrics -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <h3 class="text-lg font-semibold text-gray-900 mb-4">System Metrics</h3>
@@ -207,6 +208,17 @@
           </div>
         </div>
 
+        <!-- CPU Info -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">CPU Information</h3>
+          <div id="cpuInfo" class="space-y-4">
+            <!-- CPU info will be loaded here -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 2: Database Metrics | Storage Information -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <!-- Database Metrics -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <h3 class="text-lg font-semibold text-gray-900 mb-4">Database Metrics</h3>
@@ -215,19 +227,25 @@
           </div>
         </div>
 
-        <!-- CPU Info -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 class="text-lg font-semibold text-gray-900 mb-4">CPU Information</h3>
-          <div id="cpuInfo" class="space-y-4">
-            <!-- CPU info will be loaded here -->
-          </div>
-        </div>
-
         <!-- Storage Information -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <h3 class="text-lg font-semibold text-gray-900 mb-4">Storage Information</h3>
           <div id="storageInfo" class="space-y-4">
             <!-- Storage info will be loaded here -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 3: Connector Sync Failures | LLM Token Usage -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Connector DLQ (Dead Letter Queue) -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">Connector Sync Failures</h3>
+            <div id="dlqStatusBadge"></div>
+          </div>
+          <div id="dlqMetrics" class="space-y-4">
+            <!-- DLQ metrics will be loaded here -->
           </div>
         </div>
 
@@ -252,24 +270,20 @@
             <!-- Token usage info will be loaded here -->
           </div>
         </div>
-
-        <!-- Connector DLQ (Dead Letter Queue) -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-semibold text-gray-900">Connector Sync Failures</h3>
-            <div id="dlqStatusBadge"></div>
-          </div>
-          <div id="dlqMetrics" class="space-y-4">
-            <!-- DLQ metrics will be loaded here -->
-          </div>
-        </div>
+      </div>
 
         <!-- Energy Consumption & Efficiency -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 col-span-full">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 col-span-full mt-8">
           <div class="flex items-center justify-between mb-6">
-            <div>
-              <h3 class="text-lg font-semibold text-gray-900">Energy Consumption & Environmental Impact</h3>
-              <p class="text-sm text-gray-500 mt-1">On-premises AI with minimal environmental footprint</p>
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900">Energy Consumptiont</h3>
+              </div>
             </div>
             <div class="flex items-center gap-3">
               <!-- Period Selector -->
@@ -283,155 +297,84 @@
             </div>
           </div>
 
-          <!-- Current Status Row -->
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4">
-              <div class="flex items-center justify-between">
-                <div>
-                  <p class="text-sm text-gray-600">Current Power</p>
-                  <p id="currentPowerWatts" class="text-2xl font-bold text-indigo-600 mt-1">-- W</p>
-                </div>
-                <div class="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center">
-                  <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+          <!-- Energy metric cards -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <!-- Energy Consumed -->
+            <div class="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+              <div class="flex items-center gap-1.5 mb-1">
+                <p class="text-xs text-gray-500">Energy Consumed</p>
+                <div class="group relative">
+                  <svg class="w-4 h-4 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                   </svg>
+                  <div class="invisible group-hover:visible absolute z-50 w-72 p-3 -mt-2 left-0 bg-gray-900 text-white text-xs rounded-lg shadow-lg">
+                    <div class="font-semibold mb-2">Energy Consumed</div>
+                    <p class="text-gray-300">
+                      Total electricity used by the system over the selected period (1 hour to 7 days). Measured in kilowatt-hours (kWh)—the same unit used on utility bills. Helps you understand environmental impact and compare usage over time.
+                    </p>
+                  </div>
                 </div>
               </div>
+              <p id="energyConsumedKwh" class="text-2xl font-bold text-gray-900">--</p>
+              <p class="text-xs text-gray-500 mt-1">kWh this period</p>
             </div>
 
-            <div class="bg-gradient-to-br from-amber-50 to-orange-50 rounded-lg p-4">
-              <div class="flex items-center justify-between">
-                <div class="flex-1">
-                  <div class="flex items-center gap-1.5">
-                    <p class="text-sm text-gray-600">Thermal Level</p>
-                    <div class="group relative">
-                      <svg class="w-4 h-4 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                      </svg>
-                      <div class="invisible group-hover:visible absolute z-50 w-72 p-3 -mt-2 -ml-36 bg-gray-900 text-white text-xs rounded-lg shadow-lg">
-                        <div class="font-semibold mb-2">Thermal Level Guide:</div>
-                        <div class="space-y-1">
-                          <div class="flex items-center gap-2">
-                            <span class="w-16 text-green-400">0-25%</span>
-                            <span class="text-gray-300">Nominal - System running optimally</span>
-                          </div>
-                          <div class="flex items-center gap-2">
-                            <span class="w-16 text-yellow-400">25-50%</span>
-                            <span class="text-gray-300">Fair - Normal operation under load</span>
-                          </div>
-                          <div class="flex items-center gap-2">
-                            <span class="w-16 text-orange-400">50-75%</span>
-                            <span class="text-gray-300">Elevated - System warming up</span>
-                          </div>
-                          <div class="flex items-center gap-2">
-                            <span class="w-16 text-red-400">75-100%</span>
-                            <span class="text-gray-300">Critical - Thermal throttling active</span>
-                          </div>
-                        </div>
-                        <div class="mt-2 pt-2 border-t border-gray-700 text-gray-400">
-                          Lower is better. 0% indicates optimal cooling and efficiency.
-                        </div>
+            <!-- Current Power -->
+            <div class="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+              <div class="flex items-center gap-1.5 mb-1">
+                <p class="text-xs text-gray-500">Current Power</p>
+                <div class="group relative">
+                  <svg class="w-4 h-4 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  <div class="invisible group-hover:visible absolute z-50 w-72 p-3 -mt-2 left-0 bg-gray-900 text-white text-xs rounded-lg shadow-lg">
+                    <div class="font-semibold mb-2">Current Power</div>
+                    <p class="text-gray-300">
+                      Instantaneous power draw in watts (W) right now. Higher values mean the system is working harder (e.g., during LLM inference or indexing). Idle systems typically use less; this updates with each refresh.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <p id="currentPowerWatts2" class="text-2xl font-bold text-indigo-600">-- W</p>
+              <p class="text-xs text-gray-500 mt-1">real-time usage</p>
+            </div>
+
+            <!-- Thermal Level -->
+            <div class="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+              <div class="flex items-center gap-1.5 mb-1">
+                <p class="text-xs text-gray-500">Thermal Level</p>
+                <div class="group relative">
+                  <svg class="w-4 h-4 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  <div class="invisible group-hover:visible absolute z-50 w-72 p-3 -mt-2 -ml-36 bg-gray-900 text-white text-xs rounded-lg shadow-lg">
+                    <div class="font-semibold mb-2">Thermal Level Guide:</div>
+                    <div class="space-y-1">
+                      <div class="flex items-center gap-2">
+                        <span class="w-16 text-green-400">0-25%</span>
+                        <span class="text-gray-300">Nominal - System running optimally</span>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <span class="w-16 text-yellow-400">25-50%</span>
+                        <span class="text-gray-300">Fair - Normal operation under load</span>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <span class="w-16 text-orange-400">50-75%</span>
+                        <span class="text-gray-300">Elevated - System warming up</span>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <span class="w-16 text-red-400">75-100%</span>
+                        <span class="text-gray-300">Critical - Thermal throttling active</span>
                       </div>
                     </div>
-                  </div>
-                  <p id="currentThermalLevel" class="text-2xl font-bold text-orange-600 mt-1">--%</p>
-                </div>
-                <div class="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-                  <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-4">
-              <div class="flex items-center justify-between">
-                <div>
-                  <p class="text-sm text-gray-600">LLM Activity</p>
-                  <p id="currentLLMRequests" class="text-2xl font-bold text-green-600 mt-1">0</p>
-                  <p class="text-xs text-gray-500 mt-0.5">active requests</p>
-                </div>
-                <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                  <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg p-4">
-              <div class="flex items-center justify-between">
-                <div>
-                  <p class="text-sm text-gray-600">Power Source</p>
-                  <p id="currentPowerSource" class="text-xl font-bold text-purple-600 mt-1">AC Power</p>
-                </div>
-                <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                  <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path>
-                  </svg>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Environmental Impact Story -->
-          <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-6 mb-6 border border-green-200">
-            <div class="flex items-start gap-4">
-              <div class="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center flex-shrink-0">
-                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-              </div>
-              <div class="flex-1">
-                <h4 class="text-lg font-semibold text-gray-900 mb-3">On-Premises AI Environmental Impact</h4>
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <!-- Energy Consumed -->
-                  <div class="bg-white rounded-lg p-4 shadow-sm">
-                    <p class="text-xs text-gray-500 mb-1">Energy Consumed</p>
-                    <p id="energyConsumedKwh" class="text-2xl font-bold text-gray-900">--</p>
-                    <p class="text-xs text-gray-500 mt-1">kWh this period</p>
-                  </div>
-
-                  <!-- Estimated Cost -->
-                  <div class="bg-white rounded-lg p-4 shadow-sm">
-                    <p class="text-xs text-gray-500 mb-1">Estimated Cost</p>
-                    <p id="energyCostUsd" class="text-2xl font-bold text-gray-900">--</p>
-                    <p class="text-xs text-gray-500 mt-1">@ $0.12/kWh average</p>
-                  </div>
-
-                  <!-- CO2 Emissions -->
-                  <div class="bg-white rounded-lg p-4 shadow-sm">
-                    <p class="text-xs text-gray-500 mb-1">CO₂ Emissions</p>
-                    <p id="energyCo2Kg" class="text-2xl font-bold text-gray-900">--</p>
-                    <p class="text-xs text-gray-500 mt-1">kg CO₂ equivalent</p>
-                  </div>
-
-                  <!-- Cloud Comparison -->
-                  <div class="bg-white rounded-lg p-4 shadow-sm">
-                    <p class="text-xs text-gray-500 mb-1">vs. Cloud AI</p>
-                    <p id="cloudComparison" class="text-2xl font-bold text-green-600">--</p>
-                    <p class="text-xs text-gray-500 mt-1">less energy used</p>
-                  </div>
-                </div>
-
-                <!-- Impact Story -->
-                <div class="mt-4 p-4 bg-white rounded-lg border border-green-200">
-                  <div class="flex items-start gap-2">
-                    <svg class="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    <div>
-                      <p class="text-sm font-medium text-gray-900">Why On-Premises AI Matters</p>
-                      <p class="text-xs text-gray-600 mt-1" id="impactStory">
-                        Running AI on-premises with a Mac Studio uses significantly less energy than cloud-based AI services.
-                        Your system processes documents and generates insights using local compute power, eliminating data
-                        center overhead, network transmission costs, and redundant cooling systems. This translates to lower
-                        operating costs and a smaller carbon footprint.
-                      </p>
+                    <div class="mt-2 pt-2 border-t border-gray-700 text-gray-400">
+                      Lower is better. 0% indicates optimal cooling and efficiency.
                     </div>
                   </div>
                 </div>
               </div>
+              <p id="currentThermalLevel2" class="text-2xl font-bold text-orange-600">--%</p>
+              <p class="text-xs text-gray-500 mt-1">system temperature</p>
             </div>
           </div>
 
@@ -443,8 +386,8 @@
             </div>
           </div>
 
-          <!-- Process Energy Breakdown -->
-          <div>
+          <!-- Process Energy Breakdown (hidden) -->
+          <div class="hidden">
             <h4 class="text-sm font-medium text-gray-700 mb-3">Energy Impact by Process</h4>
             <div id="processEnergyBreakdown" class="space-y-3">
               <!-- Process breakdown will be loaded here -->
@@ -994,123 +937,99 @@
     let powerChart = null;
     let currentEnergyPeriod = '24hours';
 
+    // Parse numeric value from API (may be string or number)
+    function parseEnergyValue(val) {
+      if (val == null) return null;
+      const n = typeof val === 'string' ? parseFloat(val) : val;
+      return Number.isFinite(n) ? n : null;
+    }
+
     // Load energy metrics
     async function loadEnergyMetrics() {
       try {
         const period = currentEnergyPeriod;
 
-        // Fetch energy data
-        const energyData = await api.get(`/api/v1/admin/health/energy?period=${period}`);
-        const processData = await api.get('/api/v1/admin/health/energy/processes');
+        // Fetch energy data with energy_unit parameter (default: kwh)
+        const energyData = await api.get(`/api/v1/admin/health/energy?period=${period}&energy_unit=kwh`);
 
-        // Update current status cards
+        // Update Energy Consumption section (API: current.total_power_watts, thermal_level, etc.)
         if (energyData.current) {
-          document.getElementById('currentPowerWatts').textContent =
-            (energyData.current.total_power_watts !== null && typeof energyData.current.total_power_watts === 'number')
-              ? `${energyData.current.total_power_watts.toFixed(1)} W`
-              : '-- W';
+          const totalWatts = parseEnergyValue(energyData.current.total_power_watts);
+          const wattsDisplay = totalWatts != null ? `${totalWatts.toFixed(2)} W` : '-- W';
+          document.getElementById('currentPowerWatts2').textContent = wattsDisplay;
 
-          document.getElementById('currentThermalLevel').textContent =
-            energyData.current.thermal_level !== null ? `${energyData.current.thermal_level}%` : '--%';
-
-          document.getElementById('currentLLMRequests').textContent =
-            energyData.current.active_llm_requests || 0;
-
-          document.getElementById('currentPowerSource').textContent =
-            energyData.current.power_source || 'Unknown';
+          const thermalLevel = energyData.current.thermal_level;
+          const thermalDisplay = thermalLevel != null ? `${thermalLevel}%` : '--%';
+          document.getElementById('currentThermalLevel2').textContent = thermalDisplay;
         }
 
-        // Update status badge
+        // Update status badge (use thermal_state from API when available, else derive from thermal_level)
         const statusBadge = document.getElementById('energyStatusBadge');
         if (energyData.current) {
-          const thermalLevel = energyData.current.thermal_level || 0;
+          const thermalLevel = energyData.current.thermal_level ?? 0;
+          const thermalState = (energyData.current.thermal_state || '').toLowerCase();
           let badgeClass = 'bg-green-100 text-green-800';
-          let badgeText = 'NOMINAL';
+          let badgeText = thermalState === 'nominal' ? 'NOMINAL' : 'NOMINAL';
 
-          if (thermalLevel > 75) {
+          if (thermalState === 'critical' || thermalLevel > 75) {
             badgeClass = 'bg-red-100 text-red-800';
             badgeText = 'CRITICAL';
-          } else if (thermalLevel > 50) {
+          } else if (thermalState === 'elevated' || thermalLevel > 50) {
             badgeClass = 'bg-orange-100 text-orange-800';
             badgeText = 'ELEVATED';
-          } else if (thermalLevel > 25) {
+          } else if (thermalState === 'fair' || thermalLevel > 25) {
             badgeClass = 'bg-yellow-100 text-yellow-800';
             badgeText = 'FAIR';
+          } else if (thermalState) {
+            badgeText = thermalState.toUpperCase();
           }
 
           statusBadge.innerHTML = `<span class="px-3 py-1 text-sm font-semibold rounded-full ${badgeClass}">${badgeText}</span>`;
         }
 
-        // Calculate environmental impact metrics
+        // Calculate environmental impact metrics (API: summary.total_energy in kWh by default)
         if (energyData.summary) {
-          // Calculate energy consumed in kWh
-          // Average watts * hours in period / 1000
-          const periodHours = {
-            '1hour': 1,
-            '6hours': 6,
-            '24hours': 24,
-            '7days': 168  // 7 * 24
-          };
+          // Energy consumed: use API total_energy (in kWh when energy_unit=kwh)
+          // If energy_unit is 'wh', convert to kWh
+          const energyUnit = energyData.energy_unit || 'kwh';
+          const totalEnergy = parseEnergyValue(energyData.summary.total_energy);
 
-          const hours = periodHours[period] || 1;
-          const avgWatts = parseFloat(energyData.summary.avg_power_watts) || 0;
-          const kWhConsumed = (avgWatts * hours) / 1000;
-
-          // Estimated cost ($0.12/kWh is US average)
-          const costPerKwh = 0.12;
-          const estimatedCost = kWhConsumed * costPerKwh;
-
-          // CO2 emissions (US grid average: 0.42 kg CO2 per kWh)
-          const co2PerKwh = 0.42;
-          const co2Emissions = kWhConsumed * co2PerKwh;
-
-          // Cloud AI comparison (estimated 3-5x more energy for cloud-based inference)
-          // This accounts for data center PUE (Power Usage Effectiveness), network transmission, and cooling
-          const cloudMultiplier = 4; // Conservative 4x estimate
-          const cloudKwh = kWhConsumed * cloudMultiplier;
-          const savingsPercentage = ((cloudKwh - kWhConsumed) / cloudKwh * 100).toFixed(0);
-
-          // Update impact cards
-          document.getElementById('energyConsumedKwh').textContent = kWhConsumed > 0
-            ? kWhConsumed.toFixed(2)
-            : '--';
-
-          document.getElementById('energyCostUsd').textContent = kWhConsumed > 0
-            ? `$${estimatedCost.toFixed(2)}`
-            : '--';
-
-          document.getElementById('energyCo2Kg').textContent = kWhConsumed > 0
-            ? co2Emissions.toFixed(2)
-            : '--';
-
-          document.getElementById('cloudComparison').textContent = kWhConsumed > 0
-            ? `${savingsPercentage}%`
-            : '--';
-
-          // Update impact story with dynamic data
-          if (kWhConsumed > 0) {
-            const savedKwh = cloudKwh - kWhConsumed;
-            const savedCo2 = savedKwh * co2PerKwh;
-
-            // Calculate trees equivalent (1 tree absorbs ~21 kg CO2 per year, or ~0.058 kg per day)
-            const treesPerDay = (savedCo2 / 0.058).toFixed(1);
-
-            document.getElementById('impactStory').innerHTML = `
-              Over the <strong>${period.replace('hours', ' hours').replace('days', ' days')}</strong> period,
-              your on-premises Mac Studio consumed <strong>${kWhConsumed.toFixed(2)} kWh</strong> of energy.
-              Compared to cloud-based AI services, you've saved approximately <strong>${savedKwh.toFixed(2)} kWh</strong>
-              and avoided <strong>${savedCo2.toFixed(2)} kg of CO₂</strong> emissions—equivalent to the daily absorption
-              of ${treesPerDay} trees. This efficiency comes from eliminating data center overhead, network transmission,
-              and redundant cooling systems.
-            `;
+          let kWhConsumed;
+          if (totalEnergy != null) {
+            // Use total_energy from API, converting to kWh if needed
+            kWhConsumed = energyUnit === 'wh' ? totalEnergy / 1000 : totalEnergy;
+          } else {
+            // Fallback: derive from avg_power_watts * hours
+            const periodHours = {
+              '1hour': 1,
+              '6hours': 6,
+              '24hours': 24,
+              '7days': 168  // 7 * 24
+            };
+            const hours = periodHours[period] || 1;
+            const avgWatts = parseEnergyValue(energyData.summary.avg_power_watts) || 0;
+            kWhConsumed = (avgWatts * hours) / 1000;
           }
+
+          // Format kWh for display (more decimals for small values)
+          const formatKwh = (k) => (k < 0.01 && k > 0 ? k.toFixed(4) : k.toFixed(2));
+
+          // Update Energy Consumption card
+          document.getElementById('energyConsumedKwh').textContent = formatKwh(kWhConsumed);
         }
 
-        // Render power chart
+        // Render power chart (timeseries: total_watts, cpu_watts, thermal_level, llm_requests, *_impact)
         renderPowerChart(energyData.timeseries || []);
 
-        // Render process breakdown
-        renderProcessBreakdown(processData.processes || []);
+        // Process breakdown: use /energy/processes if available, else derive from timeseries (llamacpp_impact, backend_impact, postgres_impact, minio_impact)
+        let processList = [];
+        try {
+          const processData = await api.get('/api/v1/admin/health/energy/processes');
+          processList = processData.processes || [];
+        } catch (_) {
+          // Processes endpoint not available – breakdown will be derived from timeseries in renderProcessBreakdown
+        }
+        renderProcessBreakdown(processList, energyData.timeseries || []);
 
       } catch (error) {
         console.error('Failed to load energy metrics:', error);
@@ -1137,9 +1056,10 @@
         day: 'numeric'
       }));
 
-      const powerData = timeseries.map(d => d.total_watts);
-      const thermalData = timeseries.map(d => d.thermal_level);
-      const llmActivity = timeseries.map(d => d.llm_requests);
+      // API returns total_watts, cpu_watts as strings; parse for chart
+      const powerData = timeseries.map(d => parseEnergyValue(d.total_watts) ?? 0);
+      const thermalData = timeseries.map(d => d.thermal_level ?? 0);
+      const llmActivity = timeseries.map(d => d.llm_requests ?? 0);
 
       // Create chart
       powerChart = new Chart(ctx, {
@@ -1251,12 +1171,29 @@
       });
     }
 
-    // Render process energy breakdown
-    function renderProcessBreakdown(processes) {
+    // Render process energy breakdown (processes from API or derived from timeseries *_impact)
+    function renderProcessBreakdown(processes, timeseries) {
       const container = document.getElementById('processEnergyBreakdown');
       if (!container) return;
 
       if (processes.length === 0) {
+        // Derive from latest timeseries impact fields (API: llamacpp_impact, backend_impact, postgres_impact, minio_impact)
+        const latest = (timeseries || []).length > 0 ? timeseries[timeseries.length - 1] : null;
+        if (latest) {
+          const items = [
+            { name: 'LlamaCPP', impact: parseEnergyValue(latest.llamacpp_impact) },
+            { name: 'Backend', impact: parseEnergyValue(latest.backend_impact) },
+            { name: 'Postgres', impact: parseEnergyValue(latest.postgres_impact) },
+            { name: 'MinIO', impact: parseEnergyValue(latest.minio_impact) }
+          ];
+          container.innerHTML = items.map(p => `
+            <div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+              <span class="font-medium text-gray-900">${p.name}</span>
+              <span class="text-lg font-bold text-gray-900">${(p.impact || 0).toFixed(2)} W</span>
+            </div>
+          `).join('');
+          return;
+        }
         container.innerHTML = '<p class="text-sm text-gray-500">No process data available yet.</p>';
         return;
       }
@@ -1269,6 +1206,8 @@
         };
 
         const statusColor = statusColors[process.status] || 'bg-gray-100 text-gray-800 border-gray-300';
+        const watts = typeof process.estimated_watts === 'number' ? process.estimated_watts : parseEnergyValue(process.estimated_watts) ?? 0;
+        const impact = typeof process.energy_impact === 'number' ? process.energy_impact : parseEnergyValue(process.energy_impact) ?? 0;
 
         return `
           <div class="flex items-center justify-between p-3 border-2 ${statusColor} rounded-lg">
@@ -1276,21 +1215,21 @@
               <div class="flex items-center gap-2">
                 <span class="font-medium text-gray-900">${process.name}</span>
                 <span class="px-2 py-0.5 text-xs font-semibold rounded ${statusColor}">
-                  ${process.status.toUpperCase()}
+                  ${(process.status || 'low').toUpperCase()}
                 </span>
               </div>
               <div class="flex gap-4 mt-1 text-sm text-gray-600">
-                <span>CPU: ${process.cpu_percent?.toFixed(1) || 0}%</span>
-                <span>Memory: ${process.memory_mb || 0} MB</span>
-                ${process.threads ? `<span>Threads: ${process.threads}</span>` : ''}
+                ${process.cpu_percent != null ? `<span>CPU: ${Number(process.cpu_percent).toFixed(1)}%</span>` : ''}
+                ${process.memory_mb != null ? `<span>Memory: ${process.memory_mb} MB</span>` : ''}
+                ${process.threads != null ? `<span>Threads: ${process.threads}</span>` : ''}
               </div>
             </div>
             <div class="text-right">
               <div class="text-lg font-bold text-gray-900">
-                ${process.estimated_watts || '0'} W
+                ${watts.toFixed(2)} W
               </div>
               <div class="text-xs text-gray-500">
-                Impact: ${process.energy_impact?.toFixed(1) || 0}
+                Impact: ${impact.toFixed(2)}
               </div>
             </div>
           </div>

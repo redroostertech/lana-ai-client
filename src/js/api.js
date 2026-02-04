@@ -504,13 +504,14 @@ class ApiClient {
       const response = await fetch(url, config);
       clearTimeout(timeoutId);
 
-      // Try to parse response as JSON
+      // Read response as text first, then parse as JSON
+      // This avoids "body stream already read" errors
+      const text = await response.text();
       let result;
       try {
-        result = await response.json();
+        result = JSON.parse(text);
       } catch (jsonError) {
-        // If JSON parsing fails, try to get text for better error message
-        const text = await response.text();
+        // If JSON parsing fails, we already have the text for error message
         console.error('[LanaAPI] Failed to parse JSON response:', text);
         throw new ApiError(
           `Server returned invalid response: ${text.substring(0, 100)}`,
