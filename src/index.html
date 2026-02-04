@@ -374,7 +374,7 @@
             </div>
           </div>
           <h3 class="text-2xl font-bold text-gray-900" id="statStorage">-</h3>
-          <p class="text-gray-500 text-sm">Total Storage <span id="storageRemaining" class="font-semibold"></span></p>
+          <p class="text-gray-500 text-sm">Storage Used <span id="storageUsagePercent" class="font-semibold"></span></p>
           <div id="storageBreakdown" class="mt-3 pt-3 border-t border-gray-200 text-xs text-gray-600 space-y-1 hidden">
             <div class="flex justify-between">
               <span>Database:</span>
@@ -930,7 +930,7 @@
               const totalSize = totalSizeBytes + deletedSizeBytes;
 
               document.getElementById('statDocuments').textContent = totalDocs.toLocaleString();
-              document.getElementById('statStorage').textContent = formatBytes(totalSize);
+              // Note: statStorage is set from /api/v1/admin/health/storage below (system storage, not document storage)
 
               // Always show document breakdown for admins (even if 0/0)
               document.getElementById('activeDocuments').textContent = totalFiles.toLocaleString();
@@ -940,12 +940,19 @@
               // Fallback to basic stats if enhanced endpoint fails
               console.error('Failed to load enhanced storage stats:', storageError);
               document.getElementById('statDocuments').textContent = (stats.total_documents || 0).toLocaleString();
-              document.getElementById('statStorage').textContent = formatBytes(stats.total_storage_bytes || stats.storage_used || 0);
+              // Note: statStorage is set from /api/v1/admin/health/storage below (system storage, not document storage)
             }
 
             // Load system storage information for storage card breakdown
             try {
               const storageInfo = await api.get('/api/v1/admin/health/storage');
+
+              // Set main storage stat from system storage (same endpoint as health.html)
+              // Show used bytes and percentage, not total
+              if (storageInfo.storage && storageInfo.storage.used_bytes) {
+                document.getElementById('statStorage').textContent = formatBytes(storageInfo.storage.used_bytes);
+                document.getElementById('storageUsagePercent').textContent = `(${storageInfo.storage.usage_percent || 0}%)`;
+              }
 
               // Show storage card
               document.getElementById('statStorageCard').classList.remove('hidden');

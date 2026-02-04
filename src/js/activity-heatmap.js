@@ -27,7 +27,7 @@ const ActivityHeatmap = (function() {
       3: '#30a14e',      // High activity (darker green)
       4: '#216e39'       // Very high activity (darkest green)
     },
-    thresholds: [0, 5, 10, 15, 20]  // Activity count thresholds for each color level
+    thresholds: [0, 10, 50, 150, 300]  // Activity count thresholds for each color level (0, 10-49, 50-149, 150-299, 300+)
   };
 
   /**
