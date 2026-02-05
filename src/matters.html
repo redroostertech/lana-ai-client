@@ -413,6 +413,20 @@
           </div>
         </div>
 
+        <!-- Workspace Selector (only for Client Matters) -->
+        <div id="workspaceSelectorSection" class="hidden">
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Link to Workspace <span class="text-gray-400">(Optional)</span>
+          </label>
+          <select id="workspaceSelector" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+            <option value="">No workspace (standalone matter)</option>
+            <!-- Workspaces populated by JavaScript -->
+          </select>
+          <p class="text-xs text-gray-500 mt-1">
+            Linking to a workspace allows this matter to access documents from the workspace and other linked matters (read-only).
+          </p>
+        </div>
+
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
           <textarea id="matterDescription" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Brief description of the matter..."></textarea>
@@ -2009,6 +2023,63 @@
       configurable: true
     });
 
+    // Load workspaces for linking
+    let allWorkspaces = [];
+    async function loadWorkspaces() {
+      try {
+        const result = await api.getMatters(1, 500, 'workspace'); // Get all workspaces
+        allWorkspaces = result.matters || [];
+        console.log('[loadWorkspaces] Loaded workspaces:', allWorkspaces.length);
+      } catch (error) {
+        console.error('Failed to load workspaces:', error);
+        allWorkspaces = [];
+      }
+    }
+
+    // Populate workspace selector dropdown
+    function populateWorkspaceSelector() {
+      const workspaceSelector = document.getElementById('workspaceSelector');
+      if (!workspaceSelector) return;
+
+      // Keep the default "No workspace" option
+      const defaultOption = workspaceSelector.querySelector('option[value=""]');
+      workspaceSelector.innerHTML = '';
+      if (defaultOption) {
+        workspaceSelector.appendChild(defaultOption);
+      }
+
+      // Add workspace options
+      allWorkspaces.forEach(workspace => {
+        const option = document.createElement('option');
+        option.value = workspace.matter_id;
+        option.textContent = workspace.matter_name || workspace.matter_id;
+        workspaceSelector.appendChild(option);
+      });
+
+      console.log('[populateWorkspaceSelector] Added workspace options:', allWorkspaces.length);
+    }
+
+    // Show/hide workspace selector based on matter type
+    function updateWorkspaceSelectorVisibility() {
+      const matterTypeRadio = document.querySelector('input[name="matterType"]:checked');
+      const workspaceSelectorSection = document.getElementById('workspaceSelectorSection');
+
+      if (matterTypeRadio && matterTypeRadio.value === 'matter') {
+        // Show workspace selector for Client Matters
+        workspaceSelectorSection.classList.remove('hidden');
+      } else {
+        // Hide workspace selector for Workspaces
+        workspaceSelectorSection.classList.add('hidden');
+        // Reset selection
+        document.getElementById('workspaceSelector').value = '';
+      }
+    }
+
+    // Add event listeners for matter type radio buttons
+    document.querySelectorAll('input[name="matterType"]').forEach(radio => {
+      radio.addEventListener('change', updateWorkspaceSelectorVisibility);
+    });
+
     // Load org users for sharing
     async function loadOrgUsers() {
       try {
@@ -2018,7 +2089,11 @@
         console.error('Failed to load org users:', error);
       }
     }
-    loadOrgUsers();
+
+    // Load both users and workspaces on page load
+    Promise.all([loadOrgUsers(), loadWorkspaces()]).then(() => {
+      populateWorkspaceSelector();
+    });
 
     // User search functionality
     const userSearchInput = document.getElementById('userSearchInput');
@@ -2163,6 +2238,9 @@
           radio.checked = true;
         }
       });
+
+      // Update workspace selector visibility based on default selection (workspace)
+      updateWorkspaceSelectorVisibility();
 
       // Initialize conflict detection
       conflictDetection = new ConflictDetection(api);
@@ -2318,6 +2396,36 @@
         // Hide matter type section when editing (type is immutable)
         document.getElementById('matterTypeSection').classList.add('hidden');
 
+        // Show workspace selector for editing if matter is a client matter
+        if (matter.matter_type === 'matter') {
+          document.getElementById('workspaceSelectorSection').classList.remove('hidden');
+
+          // Load current workspace link if any
+          try {
+            const linksResponse = await fetch(`${api.baseUrl}/api/v1/entity-links/matter/${matterId}`, {
+              headers: {
+                'Authorization': `Bearer ${api.token}`
+              }
+            });
+
+            if (linksResponse.ok) {
+              const linksData = await linksResponse.json();
+              const workspaceLink = linksData.links?.workspace_matters?.[0]; // Get first workspace link
+
+              if (workspaceLink) {
+                // Set the workspace selector to the linked workspace
+                document.getElementById('workspaceSelector').value = workspaceLink.source_matter_id;
+                console.log('[Edit Matter] Loaded existing workspace link:', workspaceLink.source_matter_id);
+              }
+            }
+          } catch (error) {
+            console.error('[Edit Matter] Failed to load workspace links:', error);
+          }
+        } else {
+          // Hide workspace selector for workspaces
+          document.getElementById('workspaceSelectorSection').classList.add('hidden');
+        }
+
         // Load existing shared users
         selectedUsers = permissions.map(p => ({
           id: p.user_id,
@@ -2326,7 +2434,7 @@
           last_name: p.last_name
         }));
         renderSelectedUsers();
-        
+
         // Show share section in edit mode and update visibility state
         document.getElementById('shareWithSection').classList.remove('hidden');
         updateShareSectionVisibility();
@@ -5888,8 +5996,11 @@
             <p class="text-gray-500 mb-4">Create a task or connect ActionStep to import tasks</p>
             <button
               onclick="openCreateTaskModal('${matter.matter_id}')"
-              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium transition-colors"
             >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+              </svg>
               Create Task
             </button>
           </div>
@@ -7221,6 +7332,12 @@
               </svg>
               <h3 class="mt-2 text-sm font-medium text-gray-900">No connected data</h3>
               <p class="mt-1 text-sm text-gray-500">When data is synced from integrations, it will appear here.</p>
+              <button onclick="showManualConnectModal('${matter.matter_id}')" class="mt-4 inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                </svg>
+                Link Data Manually
+              </button>
             </div>
           `;
           return;
@@ -7260,16 +7377,24 @@
             <!-- Summary -->
             <div class="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-4 border border-indigo-100">
               <div class="flex items-center justify-between">
-                <div>
+                <div class="flex-1">
                   <h3 class="text-sm font-medium text-gray-900">Connected Data Summary</h3>
                   <p class="text-xs text-gray-500 mt-1">${summary.total_records} record${summary.total_records !== 1 ? 's' : ''} from ${summary.connectors.length} connector${summary.connectors.length !== 1 ? 's' : ''}</p>
                 </div>
-                <div class="flex gap-2">
-                  ${summary.connectors.map(conn => `
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-white border border-gray-200">
-                      ${conn.name}
-                    </span>
-                  `).join('')}
+                <div class="flex items-center gap-3">
+                  <div class="flex gap-2">
+                    ${summary.connectors.map(conn => `
+                      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-white border border-gray-200">
+                        ${conn.name}
+                      </span>
+                    `).join('')}
+                  </div>
+                  <button onclick="showManualConnectModal('${matter.matter_id}')" class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-indigo-700 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <svg class="-ml-0.5 mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                    Link Data
+                  </button>
                 </div>
               </div>
             </div>
@@ -8669,6 +8794,69 @@
 
           createdMatterId = matterId;
 
+          // Update workspace link if matter is a client matter
+          const selectedWorkspaceId = document.getElementById('workspaceSelector')?.value;
+          if (currentMatterData?.matter?.matter_type === 'matter') {
+            try {
+              // Get current workspace links
+              const linksResponse = await fetch(`${api.baseUrl}/api/v1/entity-links/matter/${matterId}`, {
+                headers: {
+                  'Authorization': `Bearer ${api.token}`
+                }
+              });
+
+              let currentWorkspaceLink = null;
+              if (linksResponse.ok) {
+                const linksData = await linksResponse.json();
+                currentWorkspaceLink = linksData.links?.workspace_matters?.[0];
+              }
+
+              const currentWorkspaceId = currentWorkspaceLink?.source_matter_id;
+
+              // If workspace selection changed, update the link
+              if (currentWorkspaceId !== selectedWorkspaceId) {
+                // Delete old link if it exists
+                if (currentWorkspaceLink) {
+                  await fetch(`${api.baseUrl}/api/v1/entity-links/${currentWorkspaceLink.id}`, {
+                    method: 'DELETE',
+                    headers: {
+                      'Authorization': `Bearer ${api.token}`
+                    }
+                  });
+                  console.log('[Edit Matter] Removed old workspace link');
+                }
+
+                // Create new link if workspace is selected
+                if (selectedWorkspaceId) {
+                  const createLinkResponse = await fetch(`${api.baseUrl}/api/v1/entity-links`, {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${api.token}`,
+                      'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                      source_matter_id: selectedWorkspaceId,
+                      target_matter_id: matterId,
+                      link_type: 'workspace_matter'
+                    })
+                  });
+
+                  if (createLinkResponse.ok) {
+                    console.log('[Edit Matter] Created new workspace link:', selectedWorkspaceId);
+                    Toast.success('Workspace link updated');
+                  } else {
+                    const errorData = await createLinkResponse.json().catch(() => ({}));
+                    console.error('[Edit Matter] Failed to create workspace link:', errorData);
+                    Toast.error(`Failed to update workspace link: ${errorData.error || 'Unknown error'}`);
+                  }
+                }
+              }
+            } catch (error) {
+              console.error('[Edit Matter] Error updating workspace link:', error);
+              Toast.error('Failed to update workspace link');
+            }
+          }
+
           // Track matter edited event - only track fields that actually changed
           if (window.analytics && currentMatterData?.matter) {
             const oldMatter = currentMatterData.matter;
@@ -8703,8 +8891,13 @@
 
           Toast.success(`Matter created: ${result.matter?.matter_id || 'Success'}`);
 
-          // Auto-link to workspace if created from workspace
-          if (createMatterForWorkspaceId && result.matter?.matter_id) {
+          // Get selected workspace from dropdown
+          const selectedWorkspaceId = document.getElementById('workspaceSelector')?.value;
+
+          // Auto-link to workspace if selected from dropdown OR if created from workspace modal
+          const workspaceToLinkTo = selectedWorkspaceId || createMatterForWorkspaceId;
+
+          if (workspaceToLinkTo && result.matter?.matter_id) {
             try {
               const linkResponse = await fetch(`${api.baseUrl}/api/v1/entity-links`, {
                 method: 'POST',
@@ -8713,19 +8906,23 @@
                   'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                  source_matter_id: createMatterForWorkspaceId,
+                  source_matter_id: workspaceToLinkTo,
                   target_matter_id: result.matter.matter_id,
                   link_type: 'workspace_matter'
                 })
               });
 
               if (linkResponse.ok) {
-                console.log('[Matter Creation] Auto-linked matter to workspace:', createMatterForWorkspaceId);
+                console.log('[Matter Creation] Auto-linked matter to workspace:', workspaceToLinkTo);
+                Toast.success('Matter linked to workspace successfully');
               } else {
-                console.error('[Matter Creation] Failed to auto-link to workspace');
+                const errorData = await linkResponse.json().catch(() => ({}));
+                console.error('[Matter Creation] Failed to auto-link to workspace:', errorData);
+                Toast.error(`Failed to link to workspace: ${errorData.error || 'Unknown error'}`);
               }
             } catch (error) {
               console.error('[Matter Creation] Error auto-linking to workspace:', error);
+              Toast.error('Failed to link to workspace');
             } finally {
               // Clear the workspace ID
               createMatterForWorkspaceId = null;
@@ -9292,6 +9489,260 @@
       </div>
     </div>
   </div>
+
+  <!-- Manual Connect Data Modal -->
+  <div id="manualConnectModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 10001;">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between p-6 border-b border-gray-200">
+        <div class="flex items-center gap-3">
+          <div class="flex-shrink-0 w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+            <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-xl font-semibold text-gray-900">Link Data to Matter</h2>
+            <p class="text-sm text-gray-500">Search and select connector data to link</p>
+          </div>
+        </div>
+        <button onclick="closeManualConnectModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Search Bar -->
+      <div class="p-6 border-b border-gray-200">
+        <div class="relative">
+          <input type="text" id="manualConnectSearch" placeholder="Search by ID, name, or content..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+          <svg class="absolute left-3 top-2.5 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+          </svg>
+        </div>
+        <div class="mt-3 flex gap-2">
+          <select id="manualConnectEntityType" class="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500">
+            <option value="">All Types</option>
+            <option value="matter">Matters</option>
+            <option value="contact">Contacts</option>
+            <option value="document">Documents</option>
+            <option value="task">Tasks</option>
+            <option value="time_entry">Time Entries</option>
+            <option value="expense">Expenses</option>
+            <option value="invoice">Invoices</option>
+          </select>
+          <select id="manualConnectConnector" class="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500">
+            <option value="">All Connectors</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Results Area -->
+      <div id="manualConnectResults" class="flex-1 overflow-y-auto p-6">
+        <div class="text-center py-8 text-gray-500">
+          <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+          </svg>
+          <p class="mt-2">Start typing to search for data to link</p>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+        <button onclick="closeManualConnectModal()" class="px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Manual Connect Modal State
+    let currentManualConnectMatter = null;
+    let manualConnectSearchTimeout = null;
+
+    // Show manual connect modal
+    function showManualConnectModal(matterId) {
+      currentManualConnectMatter = matterId;
+      const modal = document.getElementById('manualConnectModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+
+      // Load available connectors for filter
+      loadAvailableConnectors();
+
+      // Set up search handlers
+      const searchInput = document.getElementById('manualConnectSearch');
+      const entityTypeSelect = document.getElementById('manualConnectEntityType');
+      const connectorSelect = document.getElementById('manualConnectConnector');
+
+      searchInput.addEventListener('input', () => {
+        clearTimeout(manualConnectSearchTimeout);
+        manualConnectSearchTimeout = setTimeout(() => performManualConnectSearch(), 300);
+      });
+
+      entityTypeSelect.addEventListener('change', performManualConnectSearch);
+      connectorSelect.addEventListener('change', performManualConnectSearch);
+
+      // Clear previous search
+      searchInput.value = '';
+      entityTypeSelect.value = '';
+      connectorSelect.value = '';
+    }
+
+    // Close manual connect modal
+    function closeManualConnectModal() {
+      const modal = document.getElementById('manualConnectModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      currentManualConnectMatter = null;
+    }
+
+    // Load available connectors
+    async function loadAvailableConnectors() {
+      try {
+        const response = await api.get('/api/v1/connectors/integration-sources?status=active');
+        const connectors = response.sources || [];
+
+        const select = document.getElementById('manualConnectConnector');
+        select.innerHTML = '<option value="">All Connectors</option>';
+
+        connectors.forEach(conn => {
+          const option = document.createElement('option');
+          option.value = conn.connector_id;
+          option.textContent = conn.connector_name || conn.connector_id;
+          select.appendChild(option);
+        });
+      } catch (error) {
+        console.error('[loadAvailableConnectors] Error:', error);
+      }
+    }
+
+    // Perform search
+    async function performManualConnectSearch() {
+      const searchInput = document.getElementById('manualConnectSearch');
+      const entityTypeSelect = document.getElementById('manualConnectEntityType');
+      const connectorSelect = document.getElementById('manualConnectConnector');
+      const resultsDiv = document.getElementById('manualConnectResults');
+
+      const search = searchInput.value.trim();
+      const entityType = entityTypeSelect.value;
+      const connectorId = connectorSelect.value;
+
+      // Show loading
+      resultsDiv.innerHTML = `
+        <div class="text-center py-8">
+          <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto mb-4"></div>
+          <p class="text-gray-500">Searching...</p>
+        </div>
+      `;
+
+      try {
+        const response = await api.searchConnectorDataForLinking(currentManualConnectMatter, {
+          search,
+          entity_type: entityType,
+          connector_id: connectorId,
+          limit: 20
+        });
+
+        const results = response.results || [];
+
+        if (results.length === 0) {
+          resultsDiv.innerHTML = `
+            <div class="text-center py-8 text-gray-500">
+              <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M12 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <p class="mt-2">No results found</p>
+            </div>
+          `;
+          return;
+        }
+
+        // Render results
+        resultsDiv.innerHTML = `
+          <div class="space-y-2">
+            ${results.map(item => renderSearchResultCard(item)).join('')}
+          </div>
+        `;
+
+      } catch (error) {
+        console.error('[performManualConnectSearch] Error:', error);
+        resultsDiv.innerHTML = `
+          <div class="text-center py-8 text-red-600">
+            <svg class="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <p class="mt-2">Error loading results</p>
+            <p class="text-sm text-gray-500">${error.message}</p>
+          </div>
+        `;
+      }
+    }
+
+    // Render search result card
+    function renderSearchResultCard(item) {
+      const data = item.data || {};
+      const title = data.name || data.title || item.external_id;
+      const subtitle = data.description || data.status || item.entity_type;
+
+      return `
+        <div class="border border-gray-200 rounded-lg p-4 hover:border-indigo-300 hover:bg-indigo-50 transition-colors">
+          <div class="flex items-start justify-between">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                  ${item.entity_type.replace('_', ' ')}
+                </span>
+                ${item.connector_name ? `
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                    ${item.connector_name}
+                  </span>
+                ` : ''}
+              </div>
+              <h4 class="text-sm font-medium text-gray-900 truncate">${escapeHtml(title)}</h4>
+              <p class="text-xs text-gray-500 mt-1">${escapeHtml(subtitle)}</p>
+              <p class="text-xs text-gray-400 mt-1">ID: ${escapeHtml(item.external_id)}</p>
+            </div>
+            <button onclick="linkConnectorData('${item.id}')" class="ml-4 flex-shrink-0 inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+              <svg class="-ml-0.5 mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+              </svg>
+              Link
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    // Link connector data
+    async function linkConnectorData(connectorDataId) {
+      try {
+        await api.linkConnectorDataToMatter(currentManualConnectMatter, connectorDataId);
+
+        showToast('Data linked successfully!', 'success');
+        closeManualConnectModal();
+
+        // Reload the connected data tab
+        const matter = window.currentViewedMatter;
+        if (matter) {
+          await renderConnectedDataTab(matter);
+        }
+      } catch (error) {
+        console.error('[linkConnectorData] Error:', error);
+        showToast(error.message || 'Failed to link data', 'error');
+      }
+    }
+
+    // Helper: Escape HTML
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+  </script>
 
   </div>
 </body>
