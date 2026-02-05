@@ -2596,15 +2596,47 @@
       if (!container) return;
 
       try {
-        // Try to fetch matter profile from API (may not be implemented yet)
+        // Try to fetch matter profile from API
         let profile = null;
 
         try {
           const response = await api.get(`/matters/${matter.id}/profile`);
           profile = response?.profile;
         } catch (apiError) {
-          // API endpoint may not exist yet - check if profile is in matter object
-          console.log('[renderMatterProfileSection] Profile API not available, checking matter object');
+          // If 404, profile doesn't exist yet - trigger lazy initialization
+          if (apiError.status === 404 || apiError.errorCode === 'NOT_FOUND') {
+            console.log('[renderMatterProfileSection] Profile not found - triggering lazy initialization');
+
+            // Trigger profile initialization for backward compatibility
+            try {
+              await api.post(`/matters/${matter.id}/profile/initialize`);
+              console.log('[renderMatterProfileSection] Profile initialization triggered');
+
+              // Show a "generating" message
+              container.innerHTML = `
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div class="flex items-start">
+                    <svg class="w-5 h-5 text-blue-600 mr-3 mt-0.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <div>
+                      <h5 class="text-sm font-medium text-blue-800">Profile Initializing...</h5>
+                      <p class="text-sm text-blue-700 mt-1">Analyzing matter information. This will take about 30 seconds. Refresh the page to see results.</p>
+                    </div>
+                  </div>
+                </div>
+              `;
+            } catch (initError) {
+              console.error('[renderMatterProfileSection] Failed to initialize profile', initError);
+              // Silently fail - profile initialization is non-critical
+              container.innerHTML = '';
+            }
+            return;
+          }
+
+          // Other errors - check if profile is in matter object
+          console.log('[renderMatterProfileSection] Profile API error, checking matter object');
           profile = matter.profile || matter.matter_profile;
         }
 
@@ -3803,6 +3835,39 @@
     const viewerText = document.getElementById('viewerText');
     const viewerTable = document.getElementById('viewerTable');
     const viewerImage = document.getElementById('viewerImage');
+    const viewerContent = document.getElementById('viewerContent');
+    const viewerMetadataSidebar = document.getElementById('viewerMetadataSidebar');
+
+    // Initialize Document Metadata Viewer component
+    let documentMetadataViewer = null;
+
+    // Layout toggle buttons
+    const layoutPreviewOnly = document.getElementById('layoutPreviewOnly');
+    const layoutSplit = document.getElementById('layoutSplit');
+    const layoutMetadataOnly = document.getElementById('layoutMetadataOnly');
+
+    // Layout toggle handlers
+    layoutPreviewOnly.addEventListener('click', () => setViewerLayout('preview-only'));
+    layoutSplit.addEventListener('click', () => setViewerLayout('split'));
+    layoutMetadataOnly.addEventListener('click', () => setViewerLayout('metadata-only'));
+
+    function setViewerLayout(layout) {
+      // Update button states
+      [layoutPreviewOnly, layoutSplit, layoutMetadataOnly].forEach(btn => btn.classList.remove('active'));
+      if (layout === 'preview-only') {
+        layoutPreviewOnly.classList.add('active');
+        viewerContent.classList.remove('hidden');
+        viewerMetadataSidebar.classList.add('hidden');
+      } else if (layout === 'split') {
+        layoutSplit.classList.add('active');
+        viewerContent.classList.remove('hidden');
+        viewerMetadataSidebar.classList.remove('hidden');
+      } else if (layout === 'metadata-only') {
+        layoutMetadataOnly.classList.add('active');
+        viewerContent.classList.add('hidden');
+        viewerMetadataSidebar.classList.remove('hidden');
+      }
+    }
 
     document.getElementById('closeDocumentViewer').addEventListener('click', closeDocumentViewer);
     viewerModal.addEventListener('click', (e) => {
@@ -3819,6 +3884,12 @@
       viewerImage.src = '';
       viewerImage.classList.add('hidden');
       viewerError.classList.add('hidden');
+
+      // Clean up metadata viewer
+      if (documentMetadataViewer) {
+        documentMetadataViewer.destroy();
+        documentMetadataViewer = null;
+      }
     }
 
     function formatFileSize(bytes) {
@@ -4039,6 +4110,32 @@
           viewerError.classList.remove('hidden');
           document.getElementById('viewerErrorMsg').textContent = `Preview not available for ${contentType || 'this file type'}`;
         }
+
+        // Initialize and load document metadata
+        if (!documentMetadataViewer) {
+          documentMetadataViewer = new DocumentMetadataViewer('viewerMetadataSidebar', {
+            showLayoutToggle: false, // Layout toggle is in header
+            defaultLayout: 'split',
+            collapseSections: true,
+            showEmptySections: false,
+            truncateSummary: true,
+            summaryMaxLength: 300,
+            entitiesMaxItems: 10,
+            autoRefreshInterval: null,
+            onMetadataLoaded: (metadata) => {
+              console.log('[DocumentViewer] Metadata loaded:', metadata);
+            },
+            onError: (error) => {
+              console.error('[DocumentViewer] Metadata error:', error);
+            }
+          });
+        }
+
+        // Load metadata for this document
+        documentMetadataViewer.loadMetadata(fileId).catch(err => {
+          console.error('[DocumentViewer] Failed to load metadata:', err);
+        });
+
       } catch (error) {
         console.error('Failed to load document:', error);
         viewerLoading.classList.add('hidden');
@@ -7113,9 +7210,14 @@
       `;
 
       try {
-        // Fetch connector data for this matter
-        const response = await api.getMatterConnectorData(matter.matter_id);
-        const { summary, data } = response;
+        // Fetch connector data AND pending matches in parallel
+        const [connectorResponse, pendingResponse] = await Promise.all([
+          api.getMatterConnectorData(matter.matter_id),
+          api.getMatterPendingMatches(matter.matter_id, { status: 'pending', limit: 50 })
+        ]);
+
+        const { summary, data } = connectorResponse;
+        const pendingMatches = pendingResponse.pending_matches || [];
 
         // Update badge count
         const badge = document.getElementById('connectedDataCount');
@@ -7139,8 +7241,36 @@
         }
 
         // Render grouped connector data
-        let html = `
-          <div class="space-y-6">
+        let html = `<div class="space-y-6">`;
+
+        // Render pending matches section if there are any
+        if (pendingMatches.length > 0) {
+          html += `
+            <!-- Pending Matches Section -->
+            <div class="bg-amber-50 border-2 border-amber-200 rounded-lg p-4">
+              <div class="flex items-start gap-3">
+                <svg class="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+                <div class="flex-1">
+                  <h3 class="text-sm font-semibold text-amber-900">Pending Matches Require Review</h3>
+                  <p class="text-xs text-amber-700 mt-1">
+                    ${pendingMatches.length} potential match${pendingMatches.length !== 1 ? 'es' : ''} found.
+                    Review and approve or decline below.
+                  </p>
+                </div>
+              </div>
+
+              <div class="mt-4 space-y-2">
+                ${pendingMatches.map(match => renderPendingMatchCard(match, matter.matter_id)).join('')}
+              </div>
+            </div>
+          `;
+        }
+
+        // Summary section
+        if (summary.total_records > 0) {
+          html += `
             <!-- Summary -->
             <div class="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-4 border border-indigo-100">
               <div class="flex items-center justify-between">
@@ -7157,7 +7287,8 @@
                 </div>
               </div>
             </div>
-        `;
+          `;
+        }
 
         // Render each entity type group
         for (const [entityType, records] of Object.entries(data)) {
@@ -7256,6 +7387,251 @@
           </div>
         </div>
       `;
+    }
+
+    // =============================================================================
+    // PENDING MATCHES FUNCTIONS
+    // =============================================================================
+
+    function renderPendingMatchCard(match, matterId) {
+      const { id, entity_type, external_id, connector_name, connector_category, match_confidence, match_strategy, match_details, connector_data } = match;
+
+      // Match confidence badge color
+      let confidenceColor = 'gray';
+      if (match_confidence >= 90) confidenceColor = 'green';
+      else if (match_confidence >= 70) confidenceColor = 'yellow';
+      else if (match_confidence >= 50) confidenceColor = 'orange';
+      else confidenceColor = 'red';
+
+      // Get preview based on entity type
+      const preview = getPendingMatchPreview(connector_data, entity_type);
+
+      // Get match reason from match_details
+      const matchReason = match_details?.confidence_reason || 'Similar data detected';
+
+      return `
+        <div id="pending-match-${id}" class="bg-white border-2 border-amber-300 rounded-lg p-4 hover:border-amber-400 transition-colors">
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex-1 min-w-0">
+              <!-- Badges -->
+              <div class="flex flex-wrap items-center gap-2 mb-2">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                  ${connector_name || 'Unknown Connector'}
+                </span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+                  ${entity_type.replace(/_/g, ' ')}
+                </span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-${confidenceColor}-100 text-${confidenceColor}-800">
+                  ${Math.round(match_confidence)}% match
+                </span>
+              </div>
+
+              <!-- Preview -->
+              ${preview}
+
+              <!-- Match reason -->
+              <div class="mt-2 flex items-start gap-2">
+                <svg class="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <p class="text-xs text-gray-600">
+                  <span class="font-medium">Why this matched:</span> ${matchReason}
+                </p>
+              </div>
+
+              <!-- Metadata -->
+              <div class="mt-2 text-xs text-gray-500">
+                <span>ID: ${external_id}</span>
+                <span class="mx-2">•</span>
+                <span>Strategy: ${match_strategy.replace(/_/g, ' ')}</span>
+              </div>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="flex flex-col gap-2 flex-shrink-0">
+              <button
+                onclick="showApprovePendingMatchModal('${id}', '${matterId}')"
+                class="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 transition-colors"
+                title="Approve this match"
+              >
+                ✓ Approve
+              </button>
+              <button
+                onclick="showDeclinePendingMatchModal('${id}', '${matterId}')"
+                class="px-3 py-1.5 bg-gray-200 text-gray-700 text-xs font-medium rounded hover:bg-gray-300 transition-colors"
+                title="Decline this match"
+              >
+                ✗ Decline
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function getPendingMatchPreview(data, entityType) {
+      if (!data) return '<p class="text-sm text-gray-500">No preview available</p>';
+
+      switch (entityType) {
+        case 'contact':
+        case 'participant':
+          return `
+            <h5 class="text-sm font-medium text-gray-900">
+              ${data.name?.display_name || (data.first_name + ' ' + data.last_name) || 'Unknown Contact'}
+            </h5>
+            <p class="text-sm text-gray-600">${data.contact?.email || data.email || 'No email'}</p>
+            ${data.contact?.phone_primary ? `<p class="text-sm text-gray-600">${data.contact.phone_primary}</p>` : ''}
+          `;
+
+        case 'opportunity':
+        case 'deal':
+          return `
+            <h5 class="text-sm font-medium text-gray-900">${data.name || data.title || 'Untitled Opportunity'}</h5>
+            <p class="text-sm text-gray-600">
+              ${data.status || data.pipeline_stage || 'No status'}
+              ${data.monetaryValue || data.value ? '• $' + (data.monetaryValue || data.value).toLocaleString() : ''}
+            </p>
+          `;
+
+        case 'activity':
+        case 'event':
+        case 'calendar_event':
+          return `
+            <h5 class="text-sm font-medium text-gray-900">${data.title || data.name || data.subject || 'Activity'}</h5>
+            <p class="text-sm text-gray-600">${data.description || data.notes || ''}</p>
+          `;
+
+        case 'note':
+          const noteText = data.content || data.text || data.description || '';
+          const preview = noteText.length > 100 ? noteText.substring(0, 100) + '...' : noteText;
+          return `
+            <h5 class="text-sm font-medium text-gray-900">${data.title || 'Note'}</h5>
+            <p class="text-sm text-gray-600">${preview}</p>
+          `;
+
+        default:
+          return `
+            <h5 class="text-sm font-medium text-gray-900">${data.name || data.title || entityType}</h5>
+            <p class="text-sm text-gray-600">${JSON.stringify(data).substring(0, 100)}...</p>
+          `;
+      }
+    }
+
+    async function showApprovePendingMatchModal(matchId, matterId) {
+      const confirmResult = await showConfirmDialog(
+        'Approve Match?',
+        'This will create a permanent link between this matter and the connector data. The data will appear in the Connected Data tab.',
+        'Approve',
+        'Cancel',
+        'green'
+      );
+
+      if (confirmResult) {
+        await approvePendingMatch(matchId, matterId);
+      }
+    }
+
+    async function showDeclinePendingMatchModal(matchId, matterId) {
+      // Show custom modal with optional reason
+      const modalHtml = `
+        <div id="declineMatchModal" class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+          <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div class="p-6">
+              <h3 class="text-lg font-semibold text-gray-900 mb-2">Decline Match</h3>
+              <p class="text-sm text-gray-600 mb-4">
+                This match will be permanently declined and never suggested again.
+                Optionally provide a reason to help improve future matching.
+              </p>
+
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Reason (optional)
+              </label>
+              <textarea
+                id="declineReason"
+                rows="3"
+                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="E.g., Wrong client, Different matter, Incorrect data..."
+              ></textarea>
+
+              <div class="mt-6 flex gap-3 justify-end">
+                <button
+                  onclick="closeDeclineMatchModal()"
+                  class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onclick="confirmDeclinePendingMatch('${matchId}', '${matterId}')"
+                  class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+                >
+                  Decline Match
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.body.insertAdjacentHTML('beforeend', modalHtml);
+    }
+
+    function closeDeclineMatchModal() {
+      const modal = document.getElementById('declineMatchModal');
+      if (modal) modal.remove();
+    }
+
+    async function confirmDeclinePendingMatch(matchId, matterId) {
+      const reason = document.getElementById('declineReason')?.value || null;
+      closeDeclineMatchModal();
+      await declinePendingMatch(matchId, matterId, reason);
+    }
+
+    async function approvePendingMatch(matchId, matterId) {
+      try {
+        showToast('Approving match...', 'info');
+
+        await api.approvePendingMatch(matterId, matchId);
+
+        // Remove from UI
+        const matchCard = document.getElementById(`pending-match-${matchId}`);
+        if (matchCard) {
+          matchCard.style.opacity = '0';
+          setTimeout(() => matchCard.remove(), 300);
+        }
+
+        showToast('Match approved successfully! The data will now appear in Connected Data.', 'success');
+
+        // Reload the tab after a short delay
+        setTimeout(() => {
+          const matter = window.currentMatter;
+          if (matter) renderConnectedDataTab(matter);
+        }, 1500);
+
+      } catch (error) {
+        console.error('[approvePendingMatch] Error:', error);
+        showToast(error.message || 'Failed to approve match', 'error');
+      }
+    }
+
+    async function declinePendingMatch(matchId, matterId, reason) {
+      try {
+        showToast('Declining match...', 'info');
+
+        await api.declinePendingMatch(matterId, matchId, reason);
+
+        // Remove from UI
+        const matchCard = document.getElementById(`pending-match-${matchId}`);
+        if (matchCard) {
+          matchCard.style.opacity = '0';
+          setTimeout(() => matchCard.remove(), 300);
+        }
+
+        showToast('Match declined. This suggestion will not appear again.', 'success');
+
+      } catch (error) {
+        console.error('[declinePendingMatch] Error:', error);
+        showToast(error.message || 'Failed to decline match', 'error');
+      }
     }
 
     function getConnectorDataPreview(record) {
