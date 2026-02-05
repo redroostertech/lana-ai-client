@@ -2600,7 +2600,7 @@
         let profile = null;
 
         try {
-          const response = await api.get(`/matters/${matter.id}/profile`);
+          const response = await api.get(`/api/v1/matters/${matter.matter_id}/profile`);
           profile = response?.profile;
         } catch (apiError) {
           // If 404, profile doesn't exist yet - trigger lazy initialization
@@ -2609,7 +2609,7 @@
 
             // Trigger profile initialization for backward compatibility
             try {
-              await api.post(`/matters/${matter.id}/profile/initialize`);
+              await api.post(`/api/v1/matters/${matter.matter_id}/profile/initialize`);
               console.log('[renderMatterProfileSection] Profile initialization triggered');
 
               // Show a "generating" message
