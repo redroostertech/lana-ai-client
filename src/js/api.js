@@ -1516,6 +1516,66 @@ class ApiClient {
   }
 
   /**
+   * Get connector data for a matter (Connected Data tab)
+   * @param {string} matterId - The matter ID
+   * @param {Object} options - Filter options
+   * @param {string[]} options.entity_types - Filter by entity types
+   * @param {number} options.min_confidence - Minimum match confidence (0-100)
+   * @returns {Promise<Object>} Connector data grouped by entity type
+   */
+  async getMatterConnectorData(matterId, options = {}) {
+    const params = new URLSearchParams();
+    if (options.entity_types) {
+      params.append('entity_types', Array.isArray(options.entity_types) ? options.entity_types.join(',') : options.entity_types);
+    }
+    if (options.min_confidence !== undefined) {
+      params.append('min_confidence', options.min_confidence);
+    }
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return this.get(`/api/v1/matters/${matterId}/connector-data${query}`);
+  }
+
+  /**
+   * Get pending connector matches requiring user review
+   * @param {string} matterId - The matter ID
+   * @param {Object} options - Query options (page, limit, status, entity_type, sort, order, search)
+   * @returns {Promise<Object>} Pending matches with pagination
+   */
+  async getMatterPendingMatches(matterId, options = {}) {
+    const params = new URLSearchParams();
+    if (options.page) params.append('page', options.page);
+    if (options.limit) params.append('limit', options.limit);
+    if (options.status) params.append('status', options.status);
+    if (options.entity_type) params.append('entity_type', options.entity_type);
+    if (options.sort) params.append('sort', options.sort);
+    if (options.order) params.append('order', options.order);
+    if (options.search) params.append('search', options.search);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return this.get(`/api/v1/matters/${matterId}/pending-matches${query}`);
+  }
+
+  /**
+   * Approve a pending connector match
+   * @param {string} matterId - The matter ID
+   * @param {string} matchId - The pending match ID
+   * @returns {Promise<Object>} Approval result
+   */
+  async approvePendingMatch(matterId, matchId) {
+    return this.post(`/api/v1/matters/${matterId}/pending-matches/${matchId}/approve`, {});
+  }
+
+  /**
+   * Decline a pending connector match
+   * @param {string} matterId - The matter ID
+   * @param {string} matchId - The pending match ID
+   * @param {string} reason - Optional reason for declining
+   * @returns {Promise<Object>} Decline result
+   */
+  async declinePendingMatch(matterId, matchId, reason = null) {
+    return this.post(`/api/v1/matters/${matterId}/pending-matches/${matchId}/decline`, { reason });
+  }
+
+  /**
    * Create a LANA-native task for a matter
    * @param {string} matterId - The matter ID
    * @param {Object} taskData - Task data (title, description, notes, priority, due_date, assigned_to_user_id)

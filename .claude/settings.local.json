@@ -60,7 +60,8 @@
       "Bash(wget:*)",
       "Bash(python3:*)",
       "Bash(chmod:*)",
-      "Bash(git check-ignore:*)"
+      "Bash(git check-ignore:*)",
+      "Bash(pm2 logs:*)"
     ],
     "deny": [],
     "ask": []
