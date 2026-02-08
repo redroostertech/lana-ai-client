@@ -4190,20 +4190,29 @@
       });
     }
 
-    // Load user info
+    // Load user info (navbar and sidebar user block)
     function loadUserInfo() {
       if (isDemoMode) {
         document.getElementById('userName').textContent = 'Demo User';
         document.getElementById('userInitials').textContent = 'D';
+        const suName = document.getElementById('sidebarUserName');
+        const suInitials = document.getElementById('sidebarUserInitials');
+        if (suName) suName.textContent = 'Demo';
+        if (suInitials) suInitials.textContent = 'D';
         return;
       }
 
       const user = api.user;
       if (user) {
         const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+        const firstName = user.firstName || (name && name.split(/\s+/)[0]) || user.email || 'User';
         const initials = (user.firstName?.[0] || '') + (user.lastName?.[0] || '') || user.email[0].toUpperCase();
         document.getElementById('userName').textContent = name;
         document.getElementById('userInitials').textContent = initials;
+        const suName = document.getElementById('sidebarUserName');
+        const suInitials = document.getElementById('sidebarUserInitials');
+        if (suName) suName.textContent = firstName;
+        if (suInitials) suInitials.textContent = initials;
       }
     }
 

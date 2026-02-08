@@ -96,9 +96,10 @@ const UserRoles = {
  * - external: boolean - if true, opens in new tab
  */
 const MenuConfig = {
-  // Default menu for main portal pages - now with conversation list
+  // Default menu for main portal pages - three sections: static top (4 items), scrollable (Your Chats + conversations), static footer
   portal: {
     sections: [
+      // Section 1: Non-scrollable – Dashboard, Search Conversations, Matters, Drive
       {
         id: 'main',
         title: null,
@@ -118,6 +119,7 @@ const MenuConfig = {
           { id: 'storage', label: 'My Drive', href: '/storage.html', icon: 'folder' },
         ]
       },
+      // Section 2: Infinite scrolling – Your Chats, New Chat, {{conversations}} (Data Connectors + Reports scroll with this)
       {
         id: 'nav-links',
         title: null,
@@ -135,7 +137,7 @@ const MenuConfig = {
         items: [
           {
             id: 'new-matter-chat',
-            label: 'Start a New Chat',
+            label: 'New Chat',
             href: '#',
             icon: 'plus',
             isButton: true,
@@ -143,6 +145,7 @@ const MenuConfig = {
           }
         ]
       },
+      // Section 3: Non-scrollable static footer (user block + version rendered separately)
       {
         id: 'account',
         title: null,
@@ -243,7 +246,7 @@ const MenuConfig = {
         items: [
           {
             id: 'new-matter-chat',
-            label: 'Start a New Chat',
+            label: 'New Chat',
             href: '#',
             icon: 'plus',
             isButton: true,
@@ -310,7 +313,7 @@ const MenuConfig = {
         items: [
           {
             id: 'new-matter-chat',
-            label: 'Start a New Chat',
+            label: 'New Chat',
             href: '#',
             icon: 'plus',
             isButton: true,
@@ -377,7 +380,7 @@ const MenuConfig = {
         items: [
           {
             id: 'new-matter-chat',
-            label: 'Start a New Chat',
+            label: 'New Chat',
             href: '#',
             icon: 'plus',
             isButton: true,
@@ -405,9 +408,10 @@ const MenuConfig = {
     ]
   },
 
-  // Chat page specific menu with conversation list (same static/scroll structure)
+  // Chat page: same three-section structure – Section 1 static (4 items), Section 2 scrollable (Your Chats + conversations), Section 3 footer
   chat: {
     sections: [
+      // Section 1: Non-scrollable – Dashboard, Search Conversations, Matters, Drive
       {
         id: 'chat-main',
         title: null,
@@ -427,6 +431,7 @@ const MenuConfig = {
           { id: 'chat-storage', label: 'My Drive', href: '/storage.html', icon: 'folder' },
         ]
       },
+      // Section 2: Infinite scrolling – Your Chats, New Chat, {{conversations}} (Data Connectors + Reports scroll with this)
       {
         id: 'chat-nav-links',
         title: null,
@@ -440,11 +445,11 @@ const MenuConfig = {
         id: 'chat-projects',
         title: 'Your Chats',
         requiredRoles: [],
-        isConversationList: true, // Special flag for conversation list rendering
+        isConversationList: true,
         items: [
           {
             id: 'chat-new-matter',
-            label: 'Start a New Chat',
+            label: 'New Chat',
             href: '#',
             icon: 'plus',
             isButton: true,
@@ -452,6 +457,7 @@ const MenuConfig = {
           }
         ]
       },
+      // Section 3: Non-scrollable static footer (user block + version rendered separately)
       {
         id: 'chat-footer',
         title: null,
@@ -688,7 +694,7 @@ class MenuSystem {
     if (item.isButton && item.onClick) {
       return `
         <button onclick="${item.onClick}()"
-           class="w-full flex items-center gap-3 px-4 py-3 ${activeClass} rounded-lg transition-colors"
+           class="w-full flex items-center gap-3 py-2 ${activeClass} rounded-lg transition-colors"
            data-menu-id="${item.id}">
           ${icon}
           ${item.label}
@@ -702,7 +708,7 @@ class MenuSystem {
 
     return `
       <a href="${resolvedHref}"
-         class="flex items-center gap-3 px-4 py-3 ${activeClass} rounded-lg transition-colors"
+         class="flex items-center gap-3 py-2 ${activeClass} rounded-lg transition-colors"
          data-menu-id="${item.id}"
          ${target}>
         ${icon}
@@ -727,7 +733,7 @@ class MenuSystem {
     if (section.isConversationList) {
       html += `
         <div class="mt-8">
-          <p class="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">${section.title || ''}</p>
+          <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">${section.title || ''}</p>
           <div class="mt-3 space-y-1">
             ${visibleItems.map(item => this.renderItem(item)).join('')}
           </div>
@@ -743,7 +749,7 @@ class MenuSystem {
     if (section.title) {
       html += `
         <div class="mt-8">
-          <p class="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">${section.title}</p>
+          <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">${section.title}</p>
           <div class="mt-3 space-y-1">
             ${visibleItems.map(item => this.renderItem(item)).join('')}
           </div>
@@ -815,7 +821,7 @@ class MenuSystem {
         .join('');
       return `
         <div class="flex flex-col flex-1 min-h-0">
-          <div class="flex-shrink-0 space-y-1 pb-4">
+          <div class="flex-shrink-0 space-y-1">
             ${staticTopHtml}
           </div>
           <div class="flex-1 min-h-0 overflow-y-auto">
@@ -826,14 +832,15 @@ class MenuSystem {
     }
 
     return `
-      <div class="flex flex-col pb-4">
+      <div class="flex flex-col">
         ${regularHtml}
       </div>
     `;
   }
 
   /**
-   * Render footer content (Administration, Settings, Help, version) for fixed footer area
+   * Render footer content. All pages with a footer get the sidebar user block (avatar + first name);
+   * tapping the user block opens an overlay with user details, menu options, and version.
    */
   renderFooter() {
     const config = MenuConfig[this.menuType];
@@ -841,18 +848,25 @@ class MenuSystem {
     const footerSections = config.sections.filter(s => s.isFooter);
     if (footerSections.length === 0) return '';
 
-    const footerHtml = footerSections
-      .map(section => this.renderSection(section))
-      .filter(html => html.length > 0)
-      .join('');
-    if (!footerHtml) return '';
+    const user = this.user;
+    const fullName = user ? `${user.firstName || user.first_name || ''} ${user.lastName || user.last_name || ''}`.trim() || user.email || 'User' : 'User';
+    const firstName = user
+      ? (user.firstName || user.first_name || (fullName && fullName.split(/\s+/)[0]) || 'User')
+      : 'User';
+    const initials = user
+      ? ((user.firstName || user.first_name || '')?.[0] || '') + ((user.lastName || user.last_name || '')?.[0] || '') || (user.email || 'U')[0].toUpperCase()
+      : 'U';
 
-    const version = window.APP_VERSION?.getVersion() || 'Loading...';
     return `
       <div class="space-y-1">
-        ${footerHtml}
+        <button type="button" id="sidebarUserMenuTrigger" class="w-full flex items-center gap-3 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors text-left min-w-0">
+          <div class="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center flex-shrink-0">
+            <span id="sidebarUserInitials" class="text-sm font-medium text-white">${initials}</span>
+          </div>
+          <span id="sidebarUserName" class="flex-1 min-w-0 truncate text-sm font-medium">${firstName}</span>
+          <svg class="w-4 h-4 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+        </button>
       </div>
-      <p id="app-version" class="px-4 mt-3 text-xs text-gray-500">${version}</p>
     `;
   }
 
@@ -874,9 +888,12 @@ class MenuSystem {
       const config = MenuConfig[this.menuType];
       const hasStaticTop = config && config.sections.filter(s => !s.isFooter).some(s => s.isStaticTop);
       container.classList.add('flex', 'flex-col', 'flex-1', 'min-h-0');
-      container.classList.remove('overflow-hidden');
-      // Only make the nav itself scroll when there is no static top (scroll is on inner div)
-      if (!hasStaticTop) container.classList.add('overflow-y-auto');
+      // Keep overflow-hidden so the nav constrains height; scroll happens in the inner div (scrollable section)
+      container.classList.add('overflow-hidden');
+      if (!hasStaticTop) {
+        container.classList.remove('overflow-hidden');
+        container.classList.add('overflow-y-auto');
+      }
 
       const footerHtml = this.renderFooter();
       if (footerHtml) {
@@ -887,7 +904,10 @@ class MenuSystem {
           footerEl.className = 'flex-shrink-0 border-t border-gray-800 pt-4 pb-4 px-3';
           container.parentNode.appendChild(footerEl);
         }
-        if (footerEl) footerEl.innerHTML = footerHtml;
+        if (footerEl) {
+          footerEl.innerHTML = footerHtml;
+          this._setupSidebarUserMenuOverlay();
+        }
       }
     }
 
@@ -904,6 +924,98 @@ class MenuSystem {
     this._updateVersionFromElectron();
 
     return true;
+  }
+
+  /**
+   * Create sidebar user menu overlay and wire trigger (all pages with footer).
+   * Dark-themed panel with user header (avatar, name, handle) and menu: Administration, Settings, Help & Support, Sign Out.
+   */
+  _setupSidebarUserMenuOverlay() {
+    const trigger = document.getElementById('sidebarUserMenuTrigger');
+    if (!trigger) return;
+
+    let overlay = document.getElementById('sidebarUserMenuOverlay');
+    if (!overlay) {
+      const showAdmin = this.hasRole([UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN, UserRoles.ADMIN]);
+      const isAdminPath = (this.currentPath || '').toLowerCase().includes('/admin/');
+      const adminHref = this._resolveHref('/admin/index.html');
+      const settingsHref = this._resolveHref('/settings.html');
+      const helpHref = this._resolveHref('/help.html');
+      const portalHref = this._resolveHref('/index.html');
+
+      const user = this.user;
+      const fullName = user ? `${user.firstName || user.first_name || ''} ${user.lastName || user.last_name || ''}`.trim() || user.email || 'User' : 'User';
+      const nameEsc = String(fullName).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      const initials = user
+        ? ((user.firstName || user.first_name || '')?.[0] || '') + ((user.lastName || user.last_name || '')?.[0] || '') || (user.email || 'U')[0].toUpperCase()
+        : 'U';
+      const rawHandle = (user && (user.username || user.email)) ? (user.username ? `@${user.username}` : user.email) : '';
+      const handle = rawHandle ? String(rawHandle).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') : '';
+      const version = window.APP_VERSION?.getVersion() || 'Loading...';
+
+      overlay = document.createElement('div');
+      overlay.id = 'sidebarUserMenuOverlay';
+      overlay.className = 'fixed inset-0 z-[100] hidden';
+      overlay.innerHTML = `
+        <div class="fixed inset-0" data-dismiss="sidebarUserMenuOverlay" aria-hidden="true"></div>
+        <div class="fixed bottom-0 left-0 w-64 bg-gray-800 rounded-t-2xl shadow-2xl max-h-[85vh] overflow-hidden flex flex-col z-[101]" onclick="event.stopPropagation()">
+          <div class="p-4 pb-3">
+            <div class="flex justify-center mb-3">
+              <div class="w-10 h-1 bg-gray-600 rounded-full"></div>
+            </div>
+            <div class="flex items-center gap-3 px-2">
+              <div class="w-12 h-12 bg-indigo-600 rounded-full flex items-center justify-center flex-shrink-0">
+                <span class="text-lg font-medium text-white">${initials}</span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="text-white font-medium text-sm break-words leading-tight min-w-0">${nameEsc}</p>
+                ${handle ? `<p class="text-gray-400 text-sm truncate">${handle}</p>` : ''}
+              </div>
+            </div>
+          </div>
+          <nav class="px-2 pb-4 overflow-y-auto flex-1 min-h-0">
+            ${showAdmin ? `<a href="${adminHref}" class="sidebar-user-menu-item flex items-center gap-3 py-2 text-gray-200 hover:bg-gray-700 rounded-xl transition-colors w-full">
+              <span class="text-gray-400 w-5 h-5 flex-shrink-0">${MenuIcons.users}</span>
+              <span>Administration</span>
+            </a>` : ''}
+            <a href="${settingsHref}" class="sidebar-user-menu-item flex items-center gap-3 py-2 text-gray-200 hover:bg-gray-700 rounded-xl transition-colors w-full">
+              <span class="text-gray-400 w-5 h-5 flex-shrink-0">${MenuIcons.settings}</span>
+              <span>Settings</span>
+            </a>
+            <a href="${helpHref}" class="sidebar-user-menu-item flex items-center gap-3 py-2 text-gray-200 hover:bg-gray-700 rounded-xl transition-colors w-full">
+              <span class="text-gray-400 w-5 h-5 flex-shrink-0">${MenuIcons.help}</span>
+              <span>Help & Support</span>
+              <svg class="w-4 h-4 ml-auto text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+            </a>
+            ${isAdminPath ? `<a href="${portalHref}" class="sidebar-user-menu-item flex items-center gap-3 py-2 text-gray-200 hover:bg-gray-700 rounded-xl transition-colors w-full">
+              <span class="text-gray-400 w-5 h-5 flex-shrink-0">${MenuIcons.back}</span>
+              <span>Back to Portal</span>
+            </a>` : ''}
+            <button type="button" id="sidebarUserMenuSignOut" class="sidebar-user-menu-item flex items-center gap-3 py-2 text-left w-full rounded-xl transition-colors text-red-400 hover:bg-gray-700 hover:text-red-300">
+              <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+              <span>Sign Out</span>
+            </button>
+          </nav>
+          <p id="app-version" class="px-4 pt-2 pb-4 text-xs text-gray-500 border-t border-gray-700 mt-1">${version}</p>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      overlay.querySelector('[data-dismiss="sidebarUserMenuOverlay"]').addEventListener('click', () => overlay.classList.add('hidden'));
+      overlay.querySelectorAll('.sidebar-user-menu-item').forEach(link => {
+        link.addEventListener('click', () => overlay.classList.add('hidden'));
+      });
+      overlay.querySelector('#sidebarUserMenuSignOut').addEventListener('click', () => {
+        overlay.classList.add('hidden');
+        if (window.api && typeof window.api.logout === 'function') {
+          window.api.logout().then(() => { window.location.href = this._resolveHref('/login.html'); }).catch(() => { window.location.href = this._resolveHref('/login.html'); });
+        } else {
+          window.location.href = this._resolveHref('/login.html');
+        }
+      });
+    }
+
+    trigger.addEventListener('click', () => overlay.classList.remove('hidden'));
   }
 
   /**
@@ -944,7 +1056,7 @@ class MenuSystem {
       const item = this._findItemById(itemId);
       if (item) {
         const isActive = this.isActive(item);
-        link.className = `flex items-center gap-3 px-4 py-3 ${isActive ? this.activeItemClass : this.inactiveItemClass} rounded-lg transition-colors`;
+        link.className = `flex items-center gap-3 py-2 ${isActive ? this.activeItemClass : this.inactiveItemClass} rounded-lg transition-colors`;
       }
     });
   }
