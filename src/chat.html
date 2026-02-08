@@ -432,13 +432,10 @@
 
           <!-- User Menu -->
           <div class="relative" id="userMenu">
-            <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900">
-              <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
-                <span id="userInitials" class="text-sm font-medium text-indigo-600">U</span>
-              </div>
-              <span id="userName" class="hidden sm:block text-sm font-medium">User</span>
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900 p-1" title="Settings">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
               </svg>
             </button>
             <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
@@ -522,14 +519,6 @@
           <!-- Welcome Message -->
           <div id="welcomeMessage" class="flex justify-center py-8">
             <div class="text-center max-w-2xl px-6">
-              <div class="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg class="w-10 h-10 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
-                </svg>
-              </div>
-              <h2 class="text-2xl font-bold text-gray-900 mb-3">Welcome to Lana AI</h2>
-              <p class="text-gray-600 mb-8">I'm your AI legal assistant, ready to help with documents, legal research, contracts, and more.</p>
-              
               <!-- Getting Started Steps -->
               <div class="bg-gray-50 rounded-xl p-6 mb-6 text-left">
                 <h3 class="text-lg font-semibold text-gray-800 mb-4 text-center">Getting Started</h3>
@@ -537,7 +526,7 @@
                   <div class="flex items-start space-x-3">
                     <div class="flex-shrink-0 w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center font-semibold text-sm">1</div>
                     <div class="flex-1 pt-1">
-                      <p class="text-gray-700">Click <span class="font-semibold text-indigo-600">+ New Project</span> in the left sidebar to start a new conversation</p>
+                      <p class="text-gray-700">Click <span class="font-semibold text-indigo-600">+ New Chat</span> in the left sidebar to start a new conversation</p>
                     </div>
                   </div>
                   <div class="flex items-start space-x-3">
@@ -569,10 +558,7 @@
 
               <!-- New Project Button -->
               <button onclick="openNewProjectModal()" class="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                </svg>
-                New Project
+                Select a matter
               </button>
             </div>
           </div>
@@ -1106,7 +1092,7 @@
         <!-- Modal Header -->
         <div class="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
-            <h2 class="text-xl font-semibold text-gray-900">Start New Project Chat</h2>
+            <h2 class="text-xl font-semibold text-gray-900">Start New Chat</h2>
             <p class="text-sm text-gray-500 mt-1">Select a matter to associate this conversation with</p>
           </div>
           <button onclick="closeNewProjectModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
@@ -4193,8 +4179,10 @@
     // Load user info (navbar and sidebar user block)
     function loadUserInfo() {
       if (isDemoMode) {
-        document.getElementById('userName').textContent = 'Demo User';
-        document.getElementById('userInitials').textContent = 'D';
+        const navName = document.getElementById('userName');
+        const navInitials = document.getElementById('userInitials');
+        if (navName) navName.textContent = 'Demo User';
+        if (navInitials) navInitials.textContent = 'D';
         const suName = document.getElementById('sidebarUserName');
         const suInitials = document.getElementById('sidebarUserInitials');
         if (suName) suName.textContent = 'Demo';
@@ -4207,8 +4195,10 @@
         const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
         const firstName = user.firstName || (name && name.split(/\s+/)[0]) || user.email || 'User';
         const initials = (user.firstName?.[0] || '') + (user.lastName?.[0] || '') || user.email[0].toUpperCase();
-        document.getElementById('userName').textContent = name;
-        document.getElementById('userInitials').textContent = initials;
+        const navName = document.getElementById('userName');
+        const navInitials = document.getElementById('userInitials');
+        if (navName) navName.textContent = name;
+        if (navInitials) navInitials.textContent = initials;
         const suName = document.getElementById('sidebarUserName');
         const suInitials = document.getElementById('sidebarUserInitials');
         if (suName) suName.textContent = firstName;
@@ -6831,14 +6821,6 @@
         <!-- Welcome Message -->
         <div id="welcomeMessage" class="flex justify-center py-8">
           <div class="text-center max-w-2xl px-6">
-            <div class="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg class="w-10 h-10 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
-              </svg>
-            </div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-3">Welcome to Lana AI</h2>
-            <p class="text-gray-600 mb-8">I'm your AI legal assistant, ready to help with documents, legal research, contracts, and more.</p>
-            
             <!-- Getting Started Steps -->
             <div class="bg-gray-50 rounded-xl p-6 mb-6 text-left">
               <h3 class="text-lg font-semibold text-gray-800 mb-4 text-center">Getting Started</h3>
@@ -6846,7 +6828,7 @@
                 <div class="flex items-start space-x-3">
                   <div class="flex-shrink-0 w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center font-semibold text-sm">1</div>
                   <div class="flex-1 pt-1">
-                    <p class="text-gray-700">Click <span class="font-semibold text-indigo-600">+ New Project</span> in the left sidebar to start a new conversation</p>
+                    <p class="text-gray-700">Click <span class="font-semibold text-indigo-600">+ New Chat</span> in the left sidebar to start a new conversation</p>
                   </div>
                 </div>
                 <div class="flex items-start space-x-3">

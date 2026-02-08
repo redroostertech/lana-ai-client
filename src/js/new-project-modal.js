@@ -34,7 +34,7 @@ const NewProjectModal = {
           <!-- Modal Header -->
           <div class="flex items-center justify-between p-6 border-b border-gray-200">
             <div>
-              <h2 class="text-xl font-semibold text-gray-900">Start New Project Chat</h2>
+              <h2 class="text-xl font-semibold text-gray-900">Start New Chat
               <p class="text-sm text-gray-500 mt-1">Select a matter to associate this conversation with</p>
             </div>
             <button onclick="NewProjectModal.close()" class="text-gray-400 hover:text-gray-600 transition-colors">
