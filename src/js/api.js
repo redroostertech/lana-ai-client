@@ -1576,6 +1576,35 @@ class ApiClient {
   }
 
   /**
+   * Search available connector data for manual linking
+   * @param {string} matterId - The matter ID
+   * @param {Object} options - Search options (search, entity_type, connector_id, page, limit)
+   * @returns {Promise<Object>} Search results with pagination
+   */
+  async searchConnectorDataForLinking(matterId, options = {}) {
+    const params = new URLSearchParams();
+    if (options.search) params.append('search', options.search);
+    if (options.entity_type) params.append('entity_type', options.entity_type);
+    if (options.connector_id) params.append('connector_id', options.connector_id);
+    if (options.page) params.append('page', options.page);
+    if (options.limit) params.append('limit', options.limit);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return this.get(`/api/v1/matters/${matterId}/search-connector-data${query}`);
+  }
+
+  /**
+   * Manually link connector data to a matter
+   * @param {string} matterId - The matter ID
+   * @param {string} connectorDataId - The connector data ID to link
+   * @returns {Promise<Object>} Link result
+   */
+  async linkConnectorDataToMatter(matterId, connectorDataId) {
+    return this.post(`/api/v1/matters/${matterId}/link-connector-data`, {
+      connector_data_id: connectorDataId
+    });
+  }
+
+  /**
    * Create a LANA-native task for a matter
    * @param {string} matterId - The matter ID
    * @param {Object} taskData - Task data (title, description, notes, priority, due_date, assigned_to_user_id)

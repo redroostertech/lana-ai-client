@@ -1477,8 +1477,11 @@
       // Render dynamic menu (will now have access to roles)
       renderMenu('#mainNav');
 
-      // Continue with page initialization
-      initializePage();
+      // Continue with page initialization AFTER menu renders
+      // Use requestAnimationFrame to ensure DOM is ready
+      requestAnimationFrame(() => {
+        initializePage();
+      });
     })();
 
     function initializePage() {
@@ -1487,9 +1490,19 @@
       NotificationPanel.init();
 
       // Initialize conversation menu in sidebar
-      if (typeof ConversationMenu !== 'undefined' && ConversationMenu.init()) {
-        // Load conversations into the menu
-        ConversationMenu.loadConversations(true);
+      // Wait for menu to be in DOM before initializing
+      if (typeof ConversationMenu !== 'undefined') {
+        // Try to initialize, with retry if container doesn't exist yet
+        const initConversations = () => {
+          if (ConversationMenu.init()) {
+            console.log('[matters.html] ConversationMenu initialized, loading conversations');
+            ConversationMenu.loadConversations(true);
+          } else {
+            console.warn('[matters.html] ConversationMenu init failed, retrying in 100ms');
+            setTimeout(initConversations, 100);
+          }
+        };
+        initConversations();
       }
 
       // Initialize conversation search modal
@@ -2663,42 +2676,105 @@
       const container = document.getElementById('customFieldsSection');
       if (!container) return;
 
-      // Extract custom fields from matter object
-      const customFields = {};
+      // Extract custom field definitions and values
+      const customFieldDefs = matter.metadata?.custom_field_definitions || [];
+      const customFieldValues = matter.metadata?.custom_fields || [];
 
-      // Check for shadow_table data
-      if (matter.shadow_table && typeof matter.shadow_table === 'object') {
-        Object.assign(customFields, matter.shadow_table);
-      }
+      // Build a map of definitions for quick lookup
+      const defsMap = {};
+      customFieldDefs.forEach(def => {
+        defsMap[def.key] = def;
+      });
 
-      // Check for any other custom_ prefixed fields
-      Object.keys(matter).forEach(key => {
-        if (key.startsWith('custom_') && matter[key] !== null && matter[key] !== undefined) {
-          customFields[key] = matter[key];
+      // Build a map of values
+      const valuesMap = {};
+      customFieldValues.forEach(field => {
+        valuesMap[field.key] = field.value;
+      });
+
+      // Helper function to check if value is valid (not empty, not empty object/array)
+      const isValidValue = (value) => {
+        if (value === null || value === undefined || value === '') return false;
+        if (typeof value === 'object') {
+          if (Array.isArray(value)) return value.length > 0;
+          return Object.keys(value).length > 0;
+        }
+        return true;
+      };
+
+      // Build display array with definitions and values
+      const fieldsToDisplay = [];
+
+      // Add fields from definitions that have values
+      customFieldDefs.forEach(def => {
+        const value = valuesMap[def.key];
+        if (isValidValue(value)) {
+          fieldsToDisplay.push({
+            key: def.key,
+            displayName: def.display_name || def.key,
+            value: value,
+            type: def.type
+          });
         }
       });
 
-      // Only render if there are custom fields
-      if (Object.keys(customFields).length === 0) {
-        container.innerHTML = '';
-        container.style.display = 'none';
-        return;
+      // Also check for legacy shadow_table data
+      if (matter.shadow_table && typeof matter.shadow_table === 'object') {
+        Object.keys(matter.shadow_table).forEach(key => {
+          if (isValidValue(matter.shadow_table[key]) && !valuesMap[key]) {
+            fieldsToDisplay.push({
+              key: key,
+              displayName: defsMap[key]?.display_name || formatFieldName(key),
+              value: matter.shadow_table[key],
+              type: defsMap[key]?.type || 'text'
+            });
+          }
+        });
       }
 
-      // Show container if we have custom fields
+      // Always show container
       container.style.display = 'block';
 
       container.innerHTML = `
-        <div class="bg-gray-50 rounded-lg p-4">
-          <h5 class="text-sm font-medium text-gray-700 mb-3">Custom Fields</h5>
-          <dl class="space-y-2 text-sm">
-            ${Object.entries(customFields).map(([key, value]) => `
-              <div class="flex justify-between">
-                <dt class="text-gray-500">${formatFieldName(key)}</dt>
-                <dd class="text-gray-900 text-right max-w-md truncate" title="${escapeHtml(String(value))}">${formatFieldValue(value)}</dd>
-              </div>
-            `).join('')}
-          </dl>
+        <div class="bg-gray-50 rounded-lg p-4 mt-6">
+          <div class="flex items-center justify-between mb-3">
+            <h5 class="text-sm font-medium text-gray-700">Custom Fields</h5>
+            <button
+              onclick="openEditCustomFieldsModal('${matter.matter_id}')"
+              class="text-indigo-600 hover:text-indigo-800 p-1 rounded hover:bg-indigo-50 transition-colors"
+              title="Edit custom fields"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+              </svg>
+            </button>
+          </div>
+          ${fieldsToDisplay.length === 0 ? `
+            <p class="text-sm text-gray-500 text-center py-3">No custom fields yet</p>
+          ` : `
+            <dl class="space-y-2 text-sm">
+              ${fieldsToDisplay.map(field => {
+                let displayValue = field.value;
+
+                // Format currency values
+                if (field.type === 'currency' && field.value !== null && field.value !== undefined && field.value !== '') {
+                  const numValue = parseFloat(field.value);
+                  if (!isNaN(numValue)) {
+                    displayValue = '$' + numValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                  }
+                } else {
+                  displayValue = formatFieldValue(field.value);
+                }
+
+                return `
+                  <div class="flex justify-between">
+                    <dt class="text-gray-500">${escapeHtml(field.displayName)}</dt>
+                    <dd class="text-gray-900 text-right max-w-md truncate" title="${escapeHtml(String(field.value))}">${displayValue}</dd>
+                  </div>
+                `;
+              }).join('')}
+            </dl>
+          `}
         </div>
       `;
     }
@@ -2957,27 +3033,27 @@
             </div>
           </div>
 
-          <!-- Custom Fields Section -->
-          <div id="customFieldsSection"></div>
-
           <!-- Linked Matters Section -->
           <div id="linkedMattersSection">
             <!-- Linked matters content will be loaded here -->
           </div>
+
+          <!-- Custom Fields Section -->
+          <div id="customFieldsSection"></div>
 
           <!-- Similar Matters Widget - TEMPORARILY HIDDEN -->
           <!-- <div id="similarMattersWidgetContainer" class="mt-6"></div> -->
         </div>
       `;
 
-      // Render Custom Fields
-      renderCustomFieldsSection(matter);
-
       // Render Matter Profile
       renderMatterProfileSection(matter);
 
       // Load Linked Matters into the Details tab
       renderLinkedMattersInDetails(matter);
+
+      // Render Custom Fields (after linked matters)
+      renderCustomFieldsSection(matter);
 
       // Initialize Similar Matters Widget - TEMPORARILY DISABLED
       /*
@@ -3156,6 +3232,23 @@
                           <span>${formatSize(doc.file_size)}</span>
                           <span class="text-gray-300">|</span>
                           <span>${timeAgo(doc.created_at)}</span>
+                          ${doc.source === 'workspace' ? `
+                            <span class="text-gray-300">|</span>
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded">
+                              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                              </svg>
+                              From Workspace
+                            </span>
+                          ` : doc.source === 'inherited' ? `
+                            <span class="text-gray-300">|</span>
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                              </svg>
+                              Shared
+                            </span>
+                          ` : ''}
                         </p>
                       </div>
                       <div class="flex items-center gap-2 flex-shrink-0">
@@ -3184,15 +3277,39 @@
                           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                           Cancel
                         </button>
+                      ` : ['failed', 'error'].includes(doc.status) ? `
+                        ${doc.error_message ? `
+                          <span class="text-xs text-red-600 italic flex items-center gap-1" title="${doc.error_message}">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                            </svg>
+                            ${doc.error_message.substring(0, 50)}${doc.error_message.length > 50 ? '...' : ''}
+                          </span>
+                        ` : ''}
+                        <button onclick="retryDocumentIngestion('${doc.id}', '${matter.matter_id}', '${doc.filename}')" class="text-xs text-amber-600 hover:text-amber-800 font-medium flex items-center gap-1">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                          </svg>
+                          Retry Ingestion
+                        </button>
                       ` : ''}
-                      <button onclick="replaceDrawerDocument('${doc.id}', '${matter.matter_id}')" class="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1" title="Replace file and re-index" style="display: none;">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-                        Replace
-                      </button>
-                      <button onclick="deleteDrawerDocument('${doc.id}', '${matter.matter_id}')" class="text-xs text-red-600 hover:text-red-800 font-medium flex items-center gap-1">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                        Delete
-                      </button>
+                      ${!doc.read_only ? `
+                        <button onclick="replaceDrawerDocument('${doc.id}', '${matter.matter_id}')" class="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1" title="Replace file and re-index" style="display: none;">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                          Replace
+                        </button>
+                        <button onclick="deleteDrawerDocument('${doc.id}', '${matter.matter_id}')" class="text-xs text-red-600 hover:text-red-800 font-medium flex items-center gap-1">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                          Delete
+                        </button>
+                      ` : `
+                        <span class="text-xs text-gray-400 italic flex items-center gap-1">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                          </svg>
+                          Read-only
+                        </span>
+                      `}
                     </div>
                   </div>
                 </div>
@@ -3554,6 +3671,33 @@
           Toast.error(error.message || 'Failed to delete document');
         }
       });
+    }
+
+    // Retry document ingestion for failed documents
+    window.retryDocumentIngestion = async function(fileId, matterId, filename) {
+      Modal.confirm(
+        'Retry Document Processing',
+        `Retry processing for "${filename}"? This will re-attempt to parse, chunk, and embed the document.`,
+        async () => {
+          try {
+            Toast.info('Retriggering document ingestion...');
+
+            // Call the retry endpoint
+            const result = await api.post(`/api/v1/documents/${fileId}/retry-ingestion`, {});
+
+            Toast.success('Document processing started. This may take a few minutes.');
+
+            // Refresh the documents list after a short delay
+            setTimeout(async () => {
+              await refreshDrawerDocuments(matterId);
+            }, 2000);
+
+          } catch (error) {
+            console.error('Failed to retry document ingestion:', error);
+            Toast.error(error.message || 'Failed to retry document processing');
+          }
+        }
+      );
     }
 
     // Replace document file (Universal endpoint - triggers re-vectorization)
@@ -6120,13 +6264,21 @@
         submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
         submitBtn.innerHTML = originalButtonHtml;
 
-        // Refresh matter data to get updated contacts
+        // Refresh matter data to get updated contacts and activity feed
         if (currentMatterData) {
           const result = await api.getMatter(matterId, { bustCache: true });
           if (result.success && result.matter) {
             const updatedContacts = result.matter.contacts || [];
             currentMatterData.contacts = updatedContacts;
             renderContactsTab(currentMatterData.matter, updatedContacts);
+
+            // Also refresh the activity feed to show the new contact creation activity
+            const activityResult = await api.getMatterActivity(matterId, 20, 0);
+            if (activityResult && activityResult.activities) {
+              currentMatterData.activities = activityResult.activities;
+              currentMatterData.activityPagination = activityResult.pagination;
+              renderActivityTab(currentMatterData.matter, activityResult.activities, activityResult.pagination);
+            }
           }
         }
       } catch (error) {
@@ -7332,12 +7484,14 @@
               </svg>
               <h3 class="mt-2 text-sm font-medium text-gray-900">No connected data</h3>
               <p class="mt-1 text-sm text-gray-500">When data is synced from integrations, it will appear here.</p>
+              <!-- Hidden for now - Manual linking button
               <button onclick="showManualConnectModal('${matter.matter_id}')" class="mt-4 inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                 <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
                 </svg>
                 Link Data Manually
               </button>
+              -->
             </div>
           `;
           return;
@@ -9742,7 +9896,467 @@
       div.textContent = text;
       return div.innerHTML;
     }
+
+    // ================================================================================
+    // CUSTOM FIELDS MODAL
+    // ================================================================================
+
+    let currentEditFieldsMatter = null;
+    let customFieldDefinitions = [];
+    let customFieldValues = [];
+
+    // Open edit custom fields modal
+    async function openEditCustomFieldsModal(matterId) {
+      currentEditFieldsMatter = matterId;
+
+      // Load current custom field definitions and values
+      const matter = window.currentViewedMatter;
+      customFieldDefinitions = [];
+      customFieldValues = [];
+
+      if (matter && matter.metadata?.custom_field_definitions && Array.isArray(matter.metadata.custom_field_definitions)) {
+        customFieldDefinitions = JSON.parse(JSON.stringify(matter.metadata.custom_field_definitions));
+      }
+
+      if (matter && matter.metadata?.custom_fields && Array.isArray(matter.metadata.custom_fields)) {
+        customFieldValues = JSON.parse(JSON.stringify(matter.metadata.custom_fields));
+      }
+
+      // Initialize values for fields that don't have them yet
+      customFieldDefinitions.forEach(def => {
+        const hasValue = customFieldValues.some(v => v.key === def.key);
+        if (!hasValue) {
+          customFieldValues.push({ key: def.key, value: def.default_value || '' });
+        }
+      });
+
+      renderCustomFieldsModal();
+
+      const modal = document.getElementById('editCustomFieldsModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    // Close custom fields modal
+    function closeEditCustomFieldsModal() {
+      const modal = document.getElementById('editCustomFieldsModal');
+      modal.classList.remove('flex');
+      modal.classList.add('hidden');
+      currentEditFieldsMatter = null;
+      customFieldDefinitions = [];
+      customFieldValues = [];
+    }
+
+    // Render custom fields modal content
+    function renderCustomFieldsModal() {
+      const container = document.getElementById('customFieldsContainer');
+
+      if (customFieldDefinitions.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-8 text-gray-500">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <p class="mt-2 text-sm">No custom fields yet. Click "Add Field" to create one.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="space-y-4">
+          ${customFieldDefinitions.map((def, index) => {
+            const valueObj = customFieldValues.find(v => v.key === def.key);
+            const currentValue = valueObj ? valueObj.value : (def.default_value || '');
+
+            return `
+              <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <!-- Field Definition Row -->
+                <div class="grid grid-cols-12 gap-3 mb-3">
+                  <!-- Key (identifier) -->
+                  <div class="col-span-3">
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Field Key</label>
+                    <input
+                      type="text"
+                      value="${escapeHtml(def.key || '')}"
+                      onchange="updateFieldDefinition(${index}, 'key', this.value)"
+                      placeholder="e.g., case_number"
+                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <!-- Display Name -->
+                  <div class="col-span-4">
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Display Name</label>
+                    <input
+                      type="text"
+                      value="${escapeHtml(def.display_name || '')}"
+                      onchange="updateFieldDefinition(${index}, 'display_name', this.value)"
+                      placeholder="e.g., Case Number"
+                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <!-- Type -->
+                  <div class="col-span-2">
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Type</label>
+                    <select
+                      onchange="updateFieldDefinition(${index}, 'type', this.value)"
+                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    >
+                      <option value="text" ${def.type === 'text' ? 'selected' : ''}>Text</option>
+                      <option value="textarea" ${def.type === 'textarea' ? 'selected' : ''}>Long Text</option>
+                      <option value="number" ${def.type === 'number' ? 'selected' : ''}>Number</option>
+                      <option value="currency" ${def.type === 'currency' ? 'selected' : ''}>Currency</option>
+                      <option value="date" ${def.type === 'date' ? 'selected' : ''}>Date</option>
+                      <option value="datetime" ${def.type === 'datetime' ? 'selected' : ''}>Date+Time</option>
+                      <option value="boolean" ${def.type === 'boolean' ? 'selected' : ''}>Yes/No</option>
+                      <option value="select" ${def.type === 'select' ? 'selected' : ''}>Dropdown</option>
+                    </select>
+                  </div>
+
+                  <!-- Required -->
+                  <div class="col-span-2">
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Required</label>
+                    <label class="flex items-center px-3 py-2">
+                      <input
+                        type="checkbox"
+                        ${def.required ? 'checked' : ''}
+                        onchange="updateFieldDefinition(${index}, 'required', this.checked)"
+                        class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span class="ml-2 text-sm text-gray-700">Yes</span>
+                    </label>
+                  </div>
+
+                  <!-- Delete Button -->
+                  <div class="col-span-1 flex items-end">
+                    <button
+                      onclick="removeCustomField(${index})"
+                      class="p-2 text-red-600 hover:text-red-800 hover:bg-red-100 rounded-md transition-colors"
+                      title="Remove field"
+                    >
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Options for Select Type -->
+                ${def.type === 'select' ? `
+                  <div class="mb-3">
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Dropdown Options (comma-separated)</label>
+                    <input
+                      type="text"
+                      value="${escapeHtml((def.options || []).join(', '))}"
+                      onchange="updateFieldDefinition(${index}, 'options', this.value.split(',').map(s => s.trim()).filter(s => s))"
+                      placeholder="e.g., Active, Pending, Closed"
+                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+                ` : ''}
+
+                <!-- Value Input -->
+                <div>
+                  <label class="block text-xs font-medium text-gray-700 mb-1">Value</label>
+                  ${renderValueInput(def, currentValue, index)}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    // Helper function to render the appropriate input based on field type
+    function renderValueInput(def, currentValue, index) {
+      const key = def.key;
+
+      switch (def.type) {
+        case 'textarea':
+          return `
+            <textarea
+              onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
+              placeholder="Enter ${escapeHtml(def.display_name || def.key)}"
+              rows="3"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            >${escapeHtml(currentValue || '')}</textarea>
+          `;
+
+        case 'number':
+          return `
+            <input
+              type="number"
+              value="${escapeHtml(currentValue || '')}"
+              onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
+              placeholder="Enter ${escapeHtml(def.display_name || def.key)}"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          `;
+
+        case 'currency':
+          return `
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <span class="text-gray-500 sm:text-sm">$</span>
+              </div>
+              <input
+                type="number"
+                step="0.01"
+                value="${escapeHtml(currentValue || '')}"
+                onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
+                placeholder="0.00"
+                class="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+          `;
+
+        case 'date':
+          return `
+            <input
+              type="date"
+              value="${escapeHtml(currentValue || '')}"
+              onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          `;
+
+        case 'datetime':
+          return `
+            <input
+              type="datetime-local"
+              value="${escapeHtml(currentValue || '')}"
+              onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          `;
+
+        case 'boolean':
+          return `
+            <label class="flex items-center px-3 py-2">
+              <input
+                type="checkbox"
+                ${currentValue === true || currentValue === 'true' ? 'checked' : ''}
+                onchange="updateFieldValue('${escapeHtml(key)}', this.checked)"
+                class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <span class="ml-2 text-sm text-gray-700">${escapeHtml(def.display_name || def.key)}</span>
+            </label>
+          `;
+
+        case 'select':
+          return `
+            <select
+              onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            >
+              <option value="">-- Select ${escapeHtml(def.display_name || def.key)} --</option>
+              ${(def.options || []).map(option => `
+                <option value="${escapeHtml(option)}" ${currentValue === option ? 'selected' : ''}>
+                  ${escapeHtml(option)}
+                </option>
+              `).join('')}
+            </select>
+          `;
+
+        case 'text':
+        default:
+          return `
+            <input
+              type="text"
+              value="${escapeHtml(currentValue || '')}"
+              onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
+              placeholder="Enter ${escapeHtml(def.display_name || def.key)}"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          `;
+      }
+    }
+
+    // Add new custom field
+    function addCustomField() {
+      const newKey = `field_${Date.now()}`;
+      customFieldDefinitions.push({
+        key: newKey,
+        display_name: '',
+        type: 'text',
+        required: false,
+        options: [],
+        default_value: ''
+      });
+      customFieldValues.push({
+        key: newKey,
+        value: ''
+      });
+      renderCustomFieldsModal();
+    }
+
+    // Update field definition (metadata)
+    function updateFieldDefinition(index, property, value) {
+      if (customFieldDefinitions[index]) {
+        const oldKey = customFieldDefinitions[index].key;
+        customFieldDefinitions[index][property] = value;
+
+        // If key changed, update the corresponding value entry
+        if (property === 'key' && oldKey !== value) {
+          const valueIndex = customFieldValues.findIndex(v => v.key === oldKey);
+          if (valueIndex !== -1) {
+            customFieldValues[valueIndex].key = value;
+          }
+        }
+
+        // Re-render if type changed (to show different input)
+        if (property === 'type') {
+          renderCustomFieldsModal();
+        }
+      }
+    }
+
+    // Update field value
+    function updateFieldValue(key, value) {
+      const existingIndex = customFieldValues.findIndex(v => v.key === key);
+      if (existingIndex !== -1) {
+        customFieldValues[existingIndex].value = value;
+      } else {
+        customFieldValues.push({ key, value });
+      }
+    }
+
+    // Remove custom field (removes both definition and value)
+    function removeCustomField(index) {
+      if (customFieldDefinitions[index]) {
+        const key = customFieldDefinitions[index].key;
+        customFieldDefinitions.splice(index, 1);
+
+        // Also remove the corresponding value
+        const valueIndex = customFieldValues.findIndex(v => v.key === key);
+        if (valueIndex !== -1) {
+          customFieldValues.splice(valueIndex, 1);
+        }
+
+        renderCustomFieldsModal();
+      }
+    }
+
+    // Save custom fields
+    async function saveCustomFields() {
+      try {
+        // Validate definitions
+        const validDefinitions = customFieldDefinitions.filter(def => {
+          return def.key && def.key.trim() !== '' && def.display_name && def.display_name.trim() !== '';
+        });
+
+        if (validDefinitions.length === 0 && customFieldDefinitions.length > 0) {
+          showToast('Please fill in Key and Display Name for all fields', 'error');
+          return;
+        }
+
+        // Validate no duplicate keys
+        const keys = validDefinitions.map(f => f.key.toLowerCase().trim());
+        const duplicates = keys.filter((key, index) => keys.indexOf(key) !== index);
+        if (duplicates.length > 0) {
+          showToast(`Duplicate field keys: ${duplicates.join(', ')}`, 'error');
+          return;
+        }
+
+        // Filter values to only include those with corresponding definitions
+        const definitionKeys = validDefinitions.map(d => d.key);
+        const validValues = customFieldValues.filter(v => definitionKeys.includes(v.key));
+
+        // Get current matter
+        const matter = window.currentViewedMatter;
+        if (!matter) {
+          showToast('Matter not found', 'error');
+          return;
+        }
+
+        // Update via settings endpoint
+        const response = await api.put(`/api/v1/matters/${currentEditFieldsMatter}/settings`, {
+          custom_field_definitions: validDefinitions,
+          custom_fields: validValues
+        });
+
+        showToast('Custom fields updated successfully!', 'success');
+        closeEditCustomFieldsModal();
+
+        // Reload matter details
+        const updatedMatter = await api.getMatter(currentEditFieldsMatter, { bustCache: true });
+        if (updatedMatter.success && updatedMatter.matter) {
+          window.currentViewedMatter = updatedMatter.matter;
+          await renderCustomFieldsSection(updatedMatter.matter);
+
+          // Also refresh the activity feed to show the changes
+          const activityResult = await api.getMatterActivity(currentEditFieldsMatter, 20, 0);
+          if (activityResult && activityResult.activities && window.currentMatterData) {
+            window.currentMatterData.activities = activityResult.activities;
+            window.currentMatterData.activityPagination = activityResult.pagination;
+            renderActivityTab(window.currentMatterData.matter, activityResult.activities, activityResult.pagination);
+          }
+        }
+      } catch (error) {
+        console.error('[saveCustomFields] Error:', error);
+        showToast(error.message || 'Failed to save custom fields', 'error');
+      }
+    }
   </script>
+
+  <!-- Edit Custom Fields Modal -->
+  <div id="editCustomFieldsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 10001;">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between p-6 border-b border-gray-200">
+        <div class="flex items-center gap-3">
+          <div class="flex-shrink-0 w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+            <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-xl font-semibold text-gray-900">Edit Custom Fields</h2>
+            <p class="text-sm text-gray-500">Add or modify custom field values for this matter</p>
+          </div>
+        </div>
+        <button onclick="closeEditCustomFieldsModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="flex-1 overflow-y-auto p-6">
+        <div id="customFieldsContainer"></div>
+
+        <!-- Add Field Button -->
+        <button
+          onclick="addCustomField()"
+          class="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed border-gray-300 rounded-lg text-sm font-medium text-gray-600 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+          </svg>
+          Add Field
+        </button>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+        <button
+          onclick="closeEditCustomFieldsModal()"
+          class="px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          onclick="saveCustomFields()"
+          class="px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+        >
+          Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
 
   </div>
 </body>

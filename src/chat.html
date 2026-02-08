@@ -19,6 +19,7 @@
     <script src="js/new-project-modal.js"></script>
     <script src="js/conversation-menu.js"></script>
   <script src="js/conversation-search-modal.js"></script>
+  <script src="js/agentic-ui.js"></script>
   <script src="js/chat.js"></script>
   <style>
     .chat-container {
@@ -402,7 +403,7 @@
         </button>
 
         <div class="flex-1 px-4 lg:px-0">
-          <h1 id="chatTitle" class="text-xl font-semibold text-gray-900">Chat with Lana</h1>
+          <h1 id="chatTitle" class="text-xl font-semibold text-gray-900">Initial Chat</h1>
         </div>
 
         <div class="flex items-center gap-4">
@@ -741,6 +742,16 @@
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
                         <span>Document Chat</span>
+                      </button>
+                      <button
+                        type="button"
+                        onclick="selectTool('agentic_mode')"
+                        class="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-white hover:bg-gray-700 transition"
+                      >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                        <span>Agentic Mode</span>
                       </button>
                     </div>
                   </div>
@@ -1514,7 +1525,7 @@
           // Update chat title and button visibility
           const conv = allConversations.find(c => c.thread_id === sessionId || c.id === sessionId);
           if (conv) {
-            const chatTitle = conv.title || conv.metadata?.title || 'Chat with Lana';
+            const chatTitle = conv.title || conv.metadata?.title || 'Initial Chat';
             document.getElementById('chatTitle').textContent = chatTitle;
 
             // Ensure currentMatterId is set from conversation if not from URL
@@ -1885,6 +1896,10 @@
         currentChatMode = 'document';
         localStorage.setItem('chatMode', 'document');
         console.log('[Tools] Activated Document Chat tool');
+      } else if (toolId === 'agentic_mode') {
+        currentChatMode = 'agentic';
+        localStorage.setItem('chatMode', 'agentic');
+        console.log('[Tools] Activated Agentic Mode tool');
       }
 
       updateToolsUI();
@@ -1913,6 +1928,11 @@
         toolPill.classList.remove('hidden');
         toolPill.classList.add('flex');
         toolLabel.textContent = 'Document Chat';
+      } else if (activeTool === 'agentic_mode') {
+        // Show pill for agentic mode
+        toolPill.classList.remove('hidden');
+        toolPill.classList.add('flex');
+        toolLabel.textContent = 'Agentic Mode';
       } else {
         // Hide pill
         toolPill.classList.add('hidden');
@@ -1953,6 +1973,24 @@
     let allMatters = [];
     
     window.openNewProjectModal = async function() {
+      // Reset chat title when opening new project modal (starting fresh conversation)
+      const chatTitleEl = document.getElementById('chatTitle');
+      if (chatTitleEl) {
+        chatTitleEl.textContent = 'New Chat';
+      }
+
+      // Hide Matter Details button since no conversation selected yet
+      const matterDetailsBtn = document.getElementById('viewMatterDetailsBtn');
+      if (matterDetailsBtn) {
+        matterDetailsBtn.classList.add('hidden');
+      }
+
+      // Clear message input
+      const messageInput = document.getElementById('messageInput');
+      if (messageInput) {
+        messageInput.innerHTML = '';
+      }
+
       const modal = document.getElementById('newProjectModal');
       modal.classList.remove('hidden');
       modal.classList.add('flex');
@@ -2435,6 +2473,28 @@
           yourChatsPage = 1;
           await loadConversations(false);
 
+          // IMPORTANT: Also refresh the ConversationMenu sidebar
+          if (typeof ConversationMenu !== 'undefined') {
+            console.log('[createProjectChat] Refreshing ConversationMenu sidebar with new conversation');
+            await ConversationMenu.loadConversations(true);
+            ConversationMenu.setActive(newThreadId);
+          }
+
+          // Update chat title
+          document.getElementById('chatTitle').textContent = matterName;
+
+          // Show Matter Details button since this is a matter conversation
+          const matterDetailsBtn = document.getElementById('viewMatterDetailsBtn');
+          if (matterDetailsBtn) {
+            matterDetailsBtn.classList.remove('hidden');
+          }
+
+          // Load file drawer documents for this matter
+          if (window.FileDrawer && matterIdString) {
+            console.log('[createProjectChat] Loading file drawer documents for matter conversation');
+            FileDrawer.loadDocuments(newThreadId);
+          }
+
           Toast.success(`Started chat for ${matterName}`);
         }
       } catch (error) {
@@ -2786,19 +2846,19 @@
       return text.replace(/'/g, '&apos;').replace(/"/g, '&quot;').replace(/`/g, '&#96;');
     }
 
-    // Helper function to escape for use in JavaScript string literals inside onclick attributes
-    // Uses HTML entities because HTML parser runs BEFORE JavaScript parser
+    // Helper function to escape for use in JavaScript string literals inside onclick attributes.
+    // Uses backslash escaping so that after the HTML attribute is parsed, the JS parser sees
+    // valid single-quoted strings. (HTML entities like &apos; are decoded in attributes before
+    // the onclick runs, which would break single-quoted JS strings.)
     function escapeJsString(text) {
       if (!text) return '';
       return String(text)
-        .replace(/&/g, '&amp;')     // Escape ampersands first
-        .replace(/'/g, '&apos;')    // Escape single quotes as HTML entity
-        .replace(/"/g, '&quot;')    // Escape double quotes as HTML entity
-        .replace(/</g, '&lt;')      // Escape less-than
-        .replace(/>/g, '&gt;')      // Escape greater-than
-        .replace(/\n/g, '&#10;')    // Escape newlines as HTML entity
-        .replace(/\r/g, '&#13;')    // Escape carriage returns as HTML entity
-        .replace(/\t/g, '&#9;');    // Escape tabs as HTML entity
+        .replace(/&/g, '&amp;')     // Escape ampersands so attribute parser doesn't treat & as entity
+        .replace(/\\/g, '\\\\')     // Backslash first so we don't double-escape
+        .replace(/'/g, "\\'")       // Single quote for JS single-quoted string
+        .replace(/\n/g, '\\n')      // Newline
+        .replace(/\r/g, '\\r')      // Carriage return
+        .replace(/\t/g, '\\t');     // Tab
     }
 
     // Create conversation item HTML
@@ -2990,14 +3050,18 @@
           document.getElementById('chatTitle').textContent = newTitle;
         }
 
-        // Reload conversations list
+        // Reload the conversation menu to get updated title from backend
+        if (typeof ConversationMenu !== 'undefined' && ConversationMenu) {
+          console.log('[confirmRename] Reloading ConversationMenu to get updated title');
+          await ConversationMenu.loadConversations(true); // Reload from backend
+          console.log('[confirmRename] ConversationMenu reloaded');
+        } else {
+          console.warn('[confirmRename] ConversationMenu not available');
+        }
+
+        // Also update in the main conversations list if visible
         yourChatsPage = 1;
         await loadConversations(false);
-
-        // Also refresh the conversation menu sidebar if available
-        if (typeof ConversationMenu !== 'undefined') {
-          await ConversationMenu.loadConversations(true);
-        }
       } catch (error) {
         console.error('Failed to rename conversation:', error);
         Toast.error('Failed to rename conversation');
@@ -3088,6 +3152,12 @@
 
       currentConversationId = threadId;
 
+      // Clear message input when switching conversations
+      const messageInput = document.getElementById('messageInput');
+      if (messageInput) {
+        messageInput.innerHTML = '';
+      }
+
       // Use provided matterId, or try to find it from conversation data as fallback
       if (matterId) {
         window.currentMatterId = matterId;
@@ -3098,7 +3168,7 @@
 
       // Update chat title in navigation bar
       const conv = allConversations.find(c => c.thread_id === threadId || c.id === threadId);
-      const chatTitle = conv?.title || conv?.metadata?.title || 'Chat with Lana';
+      const chatTitle = conv?.title || conv?.metadata?.title || 'Initial Chat';
       document.getElementById('chatTitle').textContent = chatTitle;
 
       // Show/hide Matter Details button based on matter association
@@ -3192,10 +3262,12 @@
           });
         }
 
-        // Fetch session info to get matter_id (if not already set and on initial load)
-        if (!loadMore && !window.currentMatterId) {
+        // Fetch session info to get matter_id and title (if on initial load)
+        if (!loadMore) {
           try {
             const sessionResponse = await api.get(`/api/v1/chat/sessions/${threadId}`);
+
+            // Update matter_id if available
             if (sessionResponse.session?.matter_id) {
               window.currentMatterId = sessionResponse.session.matter_id;
               console.log('Loaded matter_id from session:', window.currentMatterId);
@@ -3205,6 +3277,24 @@
               if (matterDetailsBtn && window.currentMatterId) {
                 matterDetailsBtn.classList.remove('hidden');
               }
+            }
+
+            // Update chat title from session metadata (always do this on initial load)
+            const chatTitle = sessionResponse.session?.metadata?.title || sessionResponse.session?.title || 'Initial Chat';
+            const chatTitleEl = document.getElementById('chatTitle');
+            if (chatTitleEl) {
+              chatTitleEl.textContent = chatTitle;
+              console.log('[loadConversationMessages] Updated chat title from session:', chatTitle);
+            }
+
+            // Update subtitle if matter_name is available
+            const chatSubtitle = document.getElementById('chatSubtitle');
+            const matterName = sessionResponse.session?.metadata?.matter_name || sessionResponse.session?.matter_name;
+            if (chatSubtitle && matterName) {
+              chatSubtitle.textContent = matterName;
+              chatSubtitle.classList.remove('hidden');
+            } else if (chatSubtitle) {
+              chatSubtitle.classList.add('hidden');
             }
           } catch (e) {
             console.warn('Could not fetch session info:', e);
@@ -4487,6 +4577,12 @@
                     setTimeout(() => {
                       yourChatsPage = 1;
                       loadConversations(false);
+
+                      // IMPORTANT: Also refresh the ConversationMenu sidebar
+                      if (typeof ConversationMenu !== 'undefined') {
+                        console.log('[SSE Connected] Refreshing ConversationMenu sidebar with new conversation');
+                        ConversationMenu.loadConversations(true);
+                      }
                     }, 500);
                   }
                 }
@@ -4510,11 +4606,23 @@
                 // Handle title event
                 if (currentEvent === 'title' && data.generated_title) {
                   console.log('AI generated title:', data.generated_title);
+
+                  // Update the chat page title immediately
+                  document.getElementById('chatTitle').textContent = data.generated_title;
+
                   // Refresh conversations list to show updated title
+                  // Use longer delay to ensure backend cache invalidation completes
                   setTimeout(() => {
                     yourChatsPage = 1;
                     loadConversations(false);
-                  }, 1000);
+
+                    // IMPORTANT: Also refresh the ConversationMenu sidebar with cache bypass
+                    if (typeof ConversationMenu !== 'undefined') {
+                      console.log('[Title Event] Refreshing ConversationMenu sidebar with updated title');
+                      // Force refresh with cache bypass
+                      ConversationMenu.loadConversations(true);
+                    }
+                  }, 2000);  // Increased delay to 2 seconds
                 }
                 
                 // Handle CDI retrieval metrics event
@@ -6644,6 +6752,12 @@
       currentSessionId = null;         // Reset session ID
       window.currentMatterId = null;  // Clear matter context
 
+      // Clear message input
+      const messageInput = document.getElementById('messageInput');
+      if (messageInput) {
+        messageInput.innerHTML = '';
+      }
+
       // Disable message input since no conversation is selected
       disableMessageInput();
 
@@ -6769,7 +6883,12 @@
       showDocumentTip();
 
       // Reset chat title to default
-      document.getElementById('chatTitle').textContent = 'Chat with Lana';
+      document.getElementById('chatTitle').textContent = 'Initial Chat';
+      // Hide subtitle for new chat
+      const subtitleEl = document.getElementById('chatSubtitle');
+      if (subtitleEl) {
+        subtitleEl.classList.add('hidden');
+      }
 
       // Hide Matter Details button since no conversation is selected
       const matterDetailsBtn = document.getElementById('viewMatterDetailsBtn');
@@ -7301,13 +7420,20 @@
           params.set('search', searchQuery);
         }
 
-        const data = await api.get(`/api/v1/chat/sessions/${currentConversationId}/drawer?${params.toString()}`);
+        const data = await api.get(`/api/v1/chat/sessions/${currentConversationId}/files?${params.toString()}`);
 
-        // Combine active and available documents
-        const allDocs = [
-          ...(data.documents?.active || []),
-          ...(data.documents?.available || [])
-        ];
+        // Handle new response format (files array) and legacy format (active/available arrays)
+        let allDocs = [];
+        if (data.files && Array.isArray(data.files)) {
+          // New format: all files in a single array
+          allDocs = data.files;
+        } else {
+          // Legacy format: separate active/available arrays
+          allDocs = [
+            ...(data.documents?.active || []),
+            ...(data.documents?.available || [])
+          ];
+        }
 
         // Filter to only show completed documents and remove duplicates
         const uniqueDocs = [];
@@ -7350,6 +7476,22 @@
         const fileIcon = getFileIcon(doc.content_type || 'application/pdf');
         const fileSize = formatFileSize(doc.file_size || 0);
 
+        const sourceBadge = doc.source === 'workspace'
+          ? `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded ml-2">
+               <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+               </svg>
+               Workspace
+             </span>`
+          : doc.source === 'inherited'
+          ? `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded ml-2">
+               <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+               </svg>
+               Shared
+             </span>`
+          : '';
+
         return `
           <div class="doc-picker-item hover:bg-gray-50 cursor-pointer p-3 border-b border-gray-100 ${index === 0 ? 'selected bg-gray-50' : ''}"
                data-doc-id="${doc.id}"
@@ -7358,7 +7500,10 @@
             <div class="flex items-start gap-3">
               <div class="text-2xl">${fileIcon}</div>
               <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-gray-900 truncate">${doc.filename}</p>
+                <div class="flex items-center gap-1">
+                  <p class="text-sm font-medium text-gray-900 truncate">${doc.filename}</p>
+                  ${sourceBadge}
+                </div>
                 <p class="text-xs text-gray-500 mt-1">${fileSize}${doc.chunk_count ? ` • ${doc.chunk_count} chunks` : ''}</p>
               </div>
             </div>
@@ -8201,12 +8346,47 @@
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Additional Information</label>
               <div class="bg-gray-50 rounded-lg p-4 space-y-2">
-                ${Object.entries(matter.custom_fields).map(([key, value]) => `
-                  <div>
-                    <span class="text-sm font-medium text-gray-600">${key}:</span>
-                    <span class="text-sm text-gray-900 ml-2">${value}</span>
-                  </div>
-                `).join('')}
+                ${Object.entries(matter.custom_fields).map(([key, value]) => {
+                  // Format value properly based on field structure
+                  let label = key;
+                  let displayValue = value;
+
+                  if (typeof value === 'object' && value !== null) {
+                    // Check if it has label/value/type structure
+                    if (value.label && value.value !== undefined) {
+                      label = value.label;
+
+                      // Format based on type
+                      if (value.type === 'text' || value.type === 'textarea' || value.type === 'select') {
+                        displayValue = value.value;
+                      } else if (value.type === 'number') {
+                        displayValue = value.value;
+                      } else if (value.type === 'date') {
+                        displayValue = new Date(value.value).toLocaleDateString();
+                      } else if (value.type === 'checkbox') {
+                        displayValue = value.value ? 'Yes' : 'No';
+                      } else {
+                        displayValue = value.value;
+                      }
+                    } else if (Array.isArray(value)) {
+                      // Handle arrays
+                      displayValue = value.join(', ');
+                    } else {
+                      // Handle nested objects - show key-value pairs
+                      displayValue = Object.entries(value)
+                        .filter(([k]) => k !== 'type' && k !== 'label')
+                        .map(([k, v]) => `${k}: ${v}`)
+                        .join(', ');
+                    }
+                  }
+
+                  return `
+                    <div>
+                      <span class="text-sm font-medium text-gray-600">${label}:</span>
+                      <span class="text-sm text-gray-900 ml-2">${displayValue}</span>
+                    </div>
+                  `;
+                }).join('')}
               </div>
             </div>
           ` : ''}

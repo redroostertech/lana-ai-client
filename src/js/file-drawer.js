@@ -98,14 +98,29 @@ const FileDrawer = {
         order: 'desc'
       });
 
-      const data = await api.get(`/api/v1/chat/sessions/${sessionId}/drawer?${params.toString()}`);
-      this.documents.active = data.documents.active || [];
-      this.documents.available = data.documents.available || [];
+      const data = await api.get(`/api/v1/chat/sessions/${sessionId}/files?${params.toString()}`);
+
+      console.log('[FileDrawer] Raw API response:', data);
+
+      // Handle new response format (files array) and legacy format (active/available arrays)
+      if (data.files && Array.isArray(data.files)) {
+        // New format: all files are returned, treat them as available
+        // In the future, we can track activation state separately
+        this.documents.active = [];
+        this.documents.available = data.files;
+        console.log('[FileDrawer] Using new format, files:', data.files);
+      } else {
+        // Legacy format: separate active/available arrays
+        this.documents.active = data.documents?.active || data.active || [];
+        this.documents.available = data.documents?.available || data.available || [];
+        console.log('[FileDrawer] Using legacy format');
+      }
 
       console.log('[FileDrawer] Loaded documents:', {
         active: this.documents.active.length,
         available: this.documents.available.length,
-        total: data.pagination?.total || 0
+        total: data.pagination?.total || 0,
+        availableDocs: this.documents.available
       });
 
       this.render();

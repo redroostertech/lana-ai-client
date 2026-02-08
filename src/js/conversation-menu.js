@@ -17,11 +17,23 @@ const ConversationMenu = {
    * Initialize the conversation menu
    */
   init(containerSelector = '#conversationListContainer') {
+    console.log('[ConversationMenu.init] Initializing with selector:', containerSelector);
     this.container = document.querySelector(containerSelector);
+
     if (!this.container) {
-      console.warn('Conversation list container not found:', containerSelector);
-      return false;
+      console.warn('[ConversationMenu.init] Container not found:', containerSelector);
+      // Try to find and clear any loading text manually
+      const fallbackContainer = document.getElementById('conversationListContainer');
+      if (fallbackContainer) {
+        console.log('[ConversationMenu.init] Found container via fallback, setting it');
+        this.container = fallbackContainer;
+      } else {
+        console.error('[ConversationMenu.init] Container does not exist in DOM');
+        return false;
+      }
     }
+
+    console.log('[ConversationMenu.init] Container found successfully');
 
     // Set up infinite scroll with throttling to prevent duplicate requests
     this.container.addEventListener('scroll', () => {
@@ -44,10 +56,31 @@ const ConversationMenu = {
    * Load conversations from API
    */
   async loadConversations(reset = false) {
-    if (this.isLoading) return;
+    console.log('[ConversationMenu.loadConversations] Called with reset:', reset, 'isLoading:', this.isLoading);
+
+    if (this.isLoading) {
+      console.log('[ConversationMenu.loadConversations] Already loading, skipping');
+      return;
+    }
+
+    if (!this.container) {
+      console.error('[ConversationMenu.loadConversations] Container not initialized');
+      return;
+    }
 
     try {
       this.isLoading = true;
+      console.log('[ConversationMenu.loadConversations] Starting load...');
+
+      // Show loading indicator during initial load
+      if (reset && this.container) {
+        console.log('[ConversationMenu.loadConversations] Showing loading spinner');
+        this.container.innerHTML = `
+          <div class="flex items-center justify-center py-3">
+            <div class="animate-spin rounded-full h-5 w-5 border-2 border-indigo-200 border-t-indigo-600"></div>
+          </div>
+        `;
+      }
 
       if (reset) {
         this.page = 1;
@@ -55,15 +88,23 @@ const ConversationMenu = {
         this.hasMore = true;
       }
 
-      const response = await api.get(`/api/v1/chat/sessions?page=${this.page}&limit=${this.limit}&sort=updated_at&order=desc`);
+      console.log('[ConversationMenu.loadConversations] Fetching from API...');
+      // Add cache-busting parameter when resetting to ensure fresh data after title updates
+      const cacheBuster = reset ? `&_=${Date.now()}` : '';
+      const response = await api.get(`/api/v1/chat/sessions?page=${this.page}&limit=${this.limit}&sort=updated_at&order=desc${cacheBuster}`);
       const newConversations = response.sessions || [];
+      console.log('[ConversationMenu.loadConversations] Received', newConversations.length, 'conversations');
 
       this.hasMore = response.hasMore || newConversations.length >= this.limit;
       this.conversations = reset ? newConversations : [...this.conversations, ...newConversations];
 
+      // Clear loading before render so we don't append the bottom spinner (only show it when loading more pages)
+      this.isLoading = false;
+      // Always render to clear loading state
+      console.log('[ConversationMenu.loadConversations] Calling render()');
       this.render();
     } catch (error) {
-      console.error('Failed to load conversations:', error);
+      console.error('[ConversationMenu.loadConversations] Error:', error);
 
       // Show error state with retry button instead of empty state
       if (this.container) {
@@ -85,6 +126,7 @@ const ConversationMenu = {
         `;
       }
     } finally {
+      console.log('[ConversationMenu.loadConversations] Finished, setting isLoading to false');
       this.isLoading = false;
     }
   },
@@ -102,17 +144,25 @@ const ConversationMenu = {
    * Render conversations in the menu
    */
   render() {
-    if (!this.container) return;
+    console.log('[ConversationMenu.render] Called with', this.conversations.length, 'conversations');
+
+    if (!this.container) {
+      console.error('[ConversationMenu.render] Container not found');
+      return;
+    }
 
     if (this.conversations.length === 0) {
+      console.log('[ConversationMenu.render] No conversations, showing empty state');
       this.renderEmpty();
       return;
     }
 
+    console.log('[ConversationMenu.render] Rendering', this.conversations.length, 'conversation items');
     const html = this.conversations.map(conv => this.renderConversationItem(conv)).join('');
     const loadingHtml = this.isLoading && this.hasMore ? this.renderLoading() : '';
 
     this.container.innerHTML = html + loadingHtml;
+    console.log('[ConversationMenu.render] Render complete');
   },
 
   /**

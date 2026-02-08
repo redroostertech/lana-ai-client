@@ -751,6 +751,13 @@ class LanaChat {
         body.conversation_id = this.currentConversationId;
       }
 
+      // Add force_agentic flag if Agentic Mode tool is active
+      const currentChatMode = localStorage.getItem('chatMode');
+      if (currentChatMode === 'agentic') {
+        body.force_agentic = true;
+        console.log('[Chat] Forcing agentic mode (tool selected)');
+      }
+
       const response = await fetch(`${baseUrl}/api/v1/streaming/chat/stream`, {
         method: 'POST',
         headers: {
@@ -830,6 +837,21 @@ class LanaChat {
                 this.handleAutoCompactStart(data);
               } else if (currentEvent === 'auto_compact_complete') {
                 this.handleAutoCompactComplete(data);
+              } else if (currentEvent === 'agentic_progress') {
+                console.log('[SSE] Agentic Progress:', data);
+                if (window.AgenticUI) {
+                  window.AgenticUI.handleAgenticProgress(data);
+                }
+              } else if (currentEvent === 'agentic_complete') {
+                console.log('[SSE] Agentic Complete:', data);
+                if (window.AgenticUI) {
+                  window.AgenticUI.handleAgenticComplete(data);
+                }
+              } else if (currentEvent === 'agentic_error') {
+                console.log('[SSE] Agentic Error:', data);
+                if (window.AgenticUI) {
+                  window.AgenticUI.handleAgenticError(data);
+                }
               } else if (data.content) {
                 // Regular message content
                 if (!responseStarted) {
