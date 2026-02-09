@@ -953,12 +953,13 @@
             <input
               type="text"
               id="linkMatterSearch"
+              onfocus="showLinkMatterDropdown()"
               oninput="searchMattersForLink(event)"
               placeholder="Type matter name or ID to search..."
               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               autocomplete="off"
             >
-            <div id="linkMatterSearchResults" class="hidden absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+            <div id="linkMatterSearchResults" class="hidden absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-96 overflow-y-auto">
               <!-- Search results populated dynamically -->
             </div>
           </div>
@@ -4869,7 +4870,7 @@
           <div class="bg-white rounded-lg border border-gray-200 p-4">
             <div class="flex items-start gap-3">
               <div class="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center flex-shrink-0 font-semibold">
-                ${window.currentUser?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U'}
+                ${api.user ? ((api.user.firstName?.[0] || '') + (api.user.lastName?.[0] || '')).toUpperCase() : 'U'}
               </div>
               <div class="flex-1 relative">
                 <div
@@ -5114,7 +5115,7 @@
     }
 
     function renderCommentThread(comment, matterId) {
-      const isAuthor = comment.author_id === window.currentUser?.id;
+      const isAuthor = comment.author_id === api.user?.id;
       const isPinned = comment.is_pinned;
 
       return `
@@ -5175,7 +5176,7 @@
     }
 
     function renderCommentReply(reply, matterId) {
-      const isAuthor = reply.author_id === window.currentUser?.id;
+      const isAuthor = reply.author_id === api.user?.id;
 
       return `
         <div class="p-4 pl-12" data-comment-id="${reply.id}">
@@ -5598,20 +5599,91 @@
         });
       });
 
+      // Edit comment
+      document.querySelectorAll('.edit-comment-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const commentId = e.target.dataset.commentId;
+          const commentElement = document.querySelector(`[data-comment-id="${commentId}"]`);
+          const contentElement = commentElement.querySelector('.text-sm.text-gray-700.leading-relaxed');
+
+          if (!contentElement) return;
+
+          // Get the current content (strip HTML and get raw text)
+          const currentContent = contentElement.textContent.trim();
+
+          // Replace content with textarea
+          const originalHTML = contentElement.innerHTML;
+          contentElement.innerHTML = `
+            <textarea class="edit-comment-textarea w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" rows="3">${currentContent}</textarea>
+            <div class="mt-2 flex justify-end gap-2">
+              <button class="cancel-edit-btn px-3 py-1 text-xs text-gray-600 hover:text-gray-800 border border-gray-300 rounded">Cancel</button>
+              <button class="save-edit-btn px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-medium">Save</button>
+            </div>
+          `;
+
+          const textarea = contentElement.querySelector('.edit-comment-textarea');
+          const saveBtn = contentElement.querySelector('.save-edit-btn');
+          const cancelBtn = contentElement.querySelector('.cancel-edit-btn');
+
+          // Focus textarea and move cursor to end
+          textarea.focus();
+          textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+
+          // Cancel edit
+          cancelBtn.addEventListener('click', () => {
+            contentElement.innerHTML = originalHTML;
+          });
+
+          // Save edit
+          saveBtn.addEventListener('click', async () => {
+            const newContent = textarea.value.trim();
+
+            if (!newContent) {
+              Toast.warning('Comment cannot be empty');
+              return;
+            }
+
+            if (newContent === currentContent) {
+              // No changes made
+              contentElement.innerHTML = originalHTML;
+              return;
+            }
+
+            try {
+              saveBtn.disabled = true;
+              saveBtn.textContent = 'Saving...';
+
+              await api.updateComment(commentId, { content: newContent });
+              Toast.success('Comment updated');
+              await loadComments(matterId);
+            } catch (error) {
+              console.error('Failed to update comment:', error);
+              Toast.error('Failed to update comment');
+              contentElement.innerHTML = originalHTML;
+            }
+          });
+        });
+      });
+
       // Delete comment
       document.querySelectorAll('.delete-comment-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
-          if (!confirm('Delete this comment?')) return;
-
           const commentId = e.target.dataset.commentId;
-          try {
-            await api.deleteComment(commentId);
-            Toast.success('Comment deleted');
-            await loadComments(matterId);
-          } catch (error) {
-            console.error('Failed to delete comment:', error);
-            Toast.error('Failed to delete comment');
-          }
+
+          Modal.confirm(
+            'Delete Comment',
+            'Are you sure you want to delete this comment? This action cannot be undone.',
+            async () => {
+              try {
+                await api.deleteComment(commentId);
+                Toast.success('Comment deleted');
+                await loadComments(matterId);
+              } catch (error) {
+                console.error('Failed to delete comment:', error);
+                Toast.error('Failed to delete comment');
+              }
+            }
+          );
         });
       });
 
@@ -6207,6 +6279,12 @@
     // Render Linked Matters Tab
     async function renderLinkedMattersTab(matter) {
       const content = document.getElementById('tabContentLinks');
+
+      // Check if the content element exists
+      if (!content) {
+        console.error('tabContentLinks element not found');
+        return;
+      }
 
       // Show loading state
       content.innerHTML = `
@@ -7126,6 +7204,13 @@
 
     function renderLinkedMattersContent(matter, links, totalLinks) {
       const content = document.getElementById('tabContentLinks');
+
+      // Check if the content element exists
+      if (!content) {
+        console.error('tabContentLinks element not found');
+        return;
+      }
+
       const isWorkspace = matter.matter_type === 'workspace';
       const isMatter = matter.matter_type === 'matter';
 
@@ -7957,7 +8042,7 @@
 
     async function approvePendingMatch(matchId, matterId) {
       try {
-        showToast('Approving match...', 'info');
+        Toast.info('Approving match...');
 
         await api.approvePendingMatch(matterId, matchId);
 
@@ -7968,7 +8053,7 @@
           setTimeout(() => matchCard.remove(), 300);
         }
 
-        showToast('Match approved successfully! The data will now appear in Connected Data.', 'success');
+        Toast.success('Match approved successfully! The data will now appear in Connected Data.');
 
         // Reload the tab after a short delay
         setTimeout(() => {
@@ -7978,13 +8063,13 @@
 
       } catch (error) {
         console.error('[approvePendingMatch] Error:', error);
-        showToast(error.message || 'Failed to approve match', 'error');
+        Toast.error(error.message || 'Failed to approve match');
       }
     }
 
     async function declinePendingMatch(matchId, matterId, reason) {
       try {
-        showToast('Declining match...', 'info');
+        Toast.info('Declining match...');
 
         await api.declinePendingMatch(matterId, matchId, reason);
 
@@ -7995,11 +8080,11 @@
           setTimeout(() => matchCard.remove(), 300);
         }
 
-        showToast('Match declined. This suggestion will not appear again.', 'success');
+        Toast.success('Match declined. This suggestion will not appear again.');
 
       } catch (error) {
         console.error('[declinePendingMatch] Error:', error);
-        showToast(error.message || 'Failed to decline match', 'error');
+        Toast.error(error.message || 'Failed to decline match');
       }
     }
 
@@ -8090,6 +8175,7 @@
     let linkSearchTimeout = null;
     let selectedLinkTargetMatter = null;
     let createMatterForWorkspaceId = null; // Store workspace ID when creating matter from workspace
+    let linkMattersCache = []; // Cache all matters for dropdown
 
     /**
      * Open the create link modal
@@ -8136,6 +8222,26 @@
       // Show modal
       modal.classList.remove('hidden');
       setTimeout(() => searchInput.focus(), 100);
+
+      // Setup click outside handler to close dropdown
+      setTimeout(() => {
+        document.addEventListener('click', handleLinkDropdownClickOutside);
+      }, 100);
+    }
+
+    /**
+     * Handle click outside to close dropdown
+     */
+    function handleLinkDropdownClickOutside(event) {
+      const searchInput = document.getElementById('linkMatterSearch');
+      const resultsDiv = document.getElementById('linkMatterSearchResults');
+
+      if (!searchInput || !resultsDiv) return;
+
+      // Check if click is outside both the search input and results dropdown
+      if (!searchInput.contains(event.target) && !resultsDiv.contains(event.target)) {
+        resultsDiv.classList.add('hidden');
+      }
     }
 
     /**
@@ -8151,6 +8257,182 @@
         clearTimeout(linkSearchTimeout);
         linkSearchTimeout = null;
       }
+
+      // Remove click outside event listener
+      document.removeEventListener('click', handleLinkDropdownClickOutside);
+
+      // Hide dropdown
+      const resultsDiv = document.getElementById('linkMatterSearchResults');
+      if (resultsDiv) {
+        resultsDiv.classList.add('hidden');
+      }
+    }
+
+    /**
+     * Load all matters for link dropdown
+     */
+    async function loadLinkMattersCache() {
+      try {
+        const response = await fetch(
+          `${api.baseUrl}/api/v1/matters?limit=100&status=active`,
+          {
+            headers: {
+              'Authorization': `Bearer ${api.token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to load matters');
+        }
+
+        const data = await response.json();
+        linkMattersCache = data.matters || [];
+      } catch (error) {
+        console.error('Failed to load matters cache:', error);
+        linkMattersCache = [];
+      }
+    }
+
+    /**
+     * Render a matter item for link dropdown
+     */
+    function renderLinkMatterItem(matter, isPinned = false) {
+      const clientName = matter.client_name || matter.client?.name || 'Unknown Client';
+      const matterName = matter.name || matter.matter_name || 'Untitled Matter';
+      const status = matter.status || 'Active';
+      const pinIcon = isPinned ? `
+        <svg class="w-4 h-4 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
+        </svg>
+      ` : '';
+
+      return `
+        <button
+          type="button"
+          onclick="selectLinkMatter('${matter.matter_id}', '${matterName.replace(/'/g, "&apos;")}', '${matter.matter_type}')"
+          class="w-full text-left px-4 py-3 hover:bg-indigo-50 border-b border-gray-100 last:border-b-0 transition-colors"
+        >
+          <div class="flex items-start gap-2">
+            ${pinIcon}
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="font-medium text-gray-900 text-sm truncate">${matterName}</span>
+                <span class="px-2 py-0.5 text-xs rounded-full ${status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}">${status}</span>
+              </div>
+              <p class="text-xs text-gray-600 truncate">${clientName}</p>
+              <p class="text-xs text-gray-500 font-mono mt-0.5">${matter.matter_id}</p>
+            </div>
+          </div>
+        </button>
+      `;
+    }
+
+    /**
+     * Show default view with pinned and recent matters
+     */
+    function showLinkDefaultView() {
+      const resultsDiv = document.getElementById('linkMatterSearchResults');
+      const sourceMatterId = document.getElementById('linkSourceMatterId').value;
+
+      if (linkMattersCache.length === 0) {
+        resultsDiv.innerHTML = `
+          <div class="p-4 text-center text-gray-400 text-sm">
+            No matters available
+          </div>
+        `;
+        resultsDiv.classList.remove('hidden');
+        return;
+      }
+
+      // Filter out source matter and workspaces
+      const availableMatters = linkMattersCache.filter(m =>
+        m.matter_id !== sourceMatterId && m.matter_type === 'matter'
+      );
+
+      if (availableMatters.length === 0) {
+        resultsDiv.innerHTML = `
+          <div class="p-4 text-center text-gray-400 text-sm">
+            No matters available to link
+          </div>
+        `;
+        resultsDiv.classList.remove('hidden');
+        return;
+      }
+
+      // Separate pinned and unpinned matters
+      const pinnedMatters = availableMatters.filter(m => m.is_pinned || m.pinned);
+      const unpinnedMatters = availableMatters.filter(m => !m.is_pinned && !m.pinned);
+
+      // Sort unpinned by creation date (most recent first)
+      const recentMatters = unpinnedMatters
+        .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+        .slice(0, 10);
+
+      let html = '';
+
+      // Section 1: Pinned Matters
+      if (pinnedMatters.length > 0) {
+        html += `
+          <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
+            <h4 class="text-xs font-semibold text-gray-700 uppercase tracking-wider flex items-center gap-2">
+              <svg class="w-3 h-3 text-yellow-600" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
+              </svg>
+              Pinned Matters
+            </h4>
+          </div>
+          ${pinnedMatters.map(m => renderLinkMatterItem(m, true)).join('')}
+        `;
+      }
+
+      // Section 2: Recent Matters
+      if (recentMatters.length > 0) {
+        html += `
+          <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
+            <h4 class="text-xs font-semibold text-gray-700 uppercase tracking-wider flex items-center gap-2">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              Recent Matters
+            </h4>
+          </div>
+          ${recentMatters.map(m => renderLinkMatterItem(m, false)).join('')}
+        `;
+      }
+
+      resultsDiv.innerHTML = html;
+      resultsDiv.classList.remove('hidden');
+    }
+
+    /**
+     * Show dropdown on focus
+     */
+    window.showLinkMatterDropdown = async function() {
+      const searchInput = document.getElementById('linkMatterSearch');
+
+      // If search input has text, don't show default view
+      if (searchInput.value.trim().length > 0) {
+        return;
+      }
+
+      // Load matters cache if not already loaded
+      if (linkMattersCache.length === 0) {
+        const resultsDiv = document.getElementById('linkMatterSearchResults');
+        resultsDiv.innerHTML = `
+          <div class="p-4 text-center text-gray-500">
+            <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto mb-2"></div>
+            Loading matters...
+          </div>
+        `;
+        resultsDiv.classList.remove('hidden');
+
+        await loadLinkMattersCache();
+      }
+
+      // Show default view
+      showLinkDefaultView();
     }
 
     /**
@@ -8164,6 +8446,12 @@
       // Clear previous timeout
       if (linkSearchTimeout) {
         clearTimeout(linkSearchTimeout);
+      }
+
+      // Show default view if query is empty
+      if (query.length === 0) {
+        showLinkDefaultView();
+        return;
       }
 
       // Hide results if query is too short
@@ -8184,7 +8472,35 @@
           `;
           resultsDiv.classList.remove('hidden');
 
-          // Search matters
+          // If we have cached matters, filter locally first for faster response
+          if (linkMattersCache.length > 0) {
+            const lowerQuery = query.toLowerCase();
+            const filtered = linkMattersCache.filter(m => {
+              const matterName = (m.name || m.matter_name || '').toLowerCase();
+              const clientName = (m.client_name || m.client?.name || '').toLowerCase();
+              const matterId = (m.matter_id || '').toLowerCase();
+
+              return m.matter_id !== sourceMatterId &&
+                     m.matter_type === 'matter' &&
+                     (matterName.includes(lowerQuery) ||
+                      clientName.includes(lowerQuery) ||
+                      matterId.includes(lowerQuery));
+            });
+
+            if (filtered.length > 0) {
+              // Show cached results
+              resultsDiv.innerHTML = `
+                <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
+                  <p class="text-xs text-gray-600">${filtered.length} result${filtered.length !== 1 ? 's' : ''} found</p>
+                </div>
+                ${filtered.slice(0, 10).map(m => renderLinkMatterItem(m, false)).join('')}
+              `;
+              resultsDiv.classList.remove('hidden');
+              return;
+            }
+          }
+
+          // Fallback to API search
           const response = await fetch(
             `${api.baseUrl}/api/v1/matters?search=${encodeURIComponent(query)}&limit=10`,
             {
@@ -8210,20 +8526,16 @@
           if (filteredMatters.length === 0) {
             resultsDiv.innerHTML = `
               <div class="p-4 text-center text-gray-500 text-sm">
-                No matters found
+                No matters found matching "${query}"
               </div>
             `;
           } else {
-            resultsDiv.innerHTML = filteredMatters.map(matter => `
-              <button
-                type="button"
-                onclick="selectLinkMatter('${matter.matter_id}', '${matter.name.replace(/'/g, "&apos;")}', '${matter.matter_type}')"
-                class="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition-colors"
-              >
-                <div class="font-medium text-gray-900 text-sm">${matter.name}</div>
-                <div class="text-xs text-gray-500 font-mono mt-1">${matter.matter_id}</div>
-              </button>
-            `).join('');
+            resultsDiv.innerHTML = `
+              <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
+                <p class="text-xs text-gray-600">${filteredMatters.length} result${filteredMatters.length !== 1 ? 's' : ''} found</p>
+              </div>
+              ${filteredMatters.map(m => renderLinkMatterItem(m, false)).join('')}
+            `;
           }
 
         } catch (error) {
@@ -8326,8 +8638,9 @@
         Toast.success('Link created successfully');
         closeCreateLinkModal();
 
-        // Refresh the linked matters tab if we're viewing it
-        if (currentMatterData && currentMatterData.matter && !document.getElementById('tabContentLinks').classList.contains('hidden')) {
+        // Always refresh the linked matters tab if we're viewing a matter
+        // This handles both the tab view and when viewing from the drawer
+        if (currentMatterData && currentMatterData.matter) {
           renderLinkedMattersTab(currentMatterData.matter);
         }
 
@@ -9016,8 +9329,8 @@
         // Store the matter ID
         window.currentManageShareMatterId = matterId;
 
-        // Get current matter details
-        const matterResponse = await fetch(`${api.baseUrl}/api/v1/matters/${matterId}`, {
+        // Get current matter details with full sharing information
+        const matterResponse = await fetch(`${api.baseUrl}/api/v1/matters/${matterId}?full_details=true`, {
           headers: {
             'Authorization': `Bearer ${api.token}`
           }
@@ -9028,6 +9341,11 @@
         }
 
         const matter = await matterResponse.json();
+
+        // Debug logging
+        console.log('[openManageShareModal] Matter data:', matter);
+        console.log('[openManageShareModal] Shared with users:', matter.shared_with_users);
+        console.log('[openManageShareModal] Permissions:', matter.permissions);
 
         // Get all organization users
         const usersResponse = await fetch(`${api.baseUrl}/api/v1/users`, {
@@ -9046,15 +9364,85 @@
         // Set current visibility
         document.getElementById('modalMatterVisibility').value = matter.visibility || 'private';
 
-        // Populate users dropdown
-        const shareWithSelect = document.getElementById('modalShareWith');
-        shareWithSelect.innerHTML = users
-          .filter(u => u.id !== api.user?.id) // Exclude current user
-          .map(u => `
-            <option value="${u.id}" ${matter.shared_with?.includes(u.id) ? 'selected' : ''}>
-              ${u.first_name || ''} ${u.last_name || ''} (${u.email})
-            </option>
-          `).join('');
+        // Populate users with checkboxes
+        const shareWithContainer = document.getElementById('modalShareWith');
+        const filteredUsers = users.filter(u => u.id !== api.user?.id); // Exclude current user
+
+        if (filteredUsers.length === 0) {
+          shareWithContainer.innerHTML = `
+            <div class="p-4 text-center text-gray-500 text-sm">
+              No other users available to share with
+            </div>
+          `;
+        } else {
+          // Get list of user IDs that have access to this matter
+          // Try multiple possible data structures
+          let sharedUserIds = [];
+
+          if (matter.shared_with_users && Array.isArray(matter.shared_with_users)) {
+            sharedUserIds = matter.shared_with_users.map(su => su.user_id || su.id);
+          } else if (matter.permissions && Array.isArray(matter.permissions)) {
+            sharedUserIds = matter.permissions.map(p => p.user_id || p.id);
+          } else if (matter.shared_with && Array.isArray(matter.shared_with)) {
+            sharedUserIds = matter.shared_with;
+          }
+
+          console.log('[openManageShareModal] Shared user IDs:', sharedUserIds);
+          console.log('[openManageShareModal] All users:', users.map(u => ({ id: u.id, email: u.email })));
+
+          // Sort users: selected users first, then alphabetically by name
+          const sortedUsers = filteredUsers.sort((a, b) => {
+            const aIsShared = sharedUserIds.includes(a.id);
+            const bIsShared = sharedUserIds.includes(b.id);
+
+            // Selected users come first
+            if (aIsShared && !bIsShared) return -1;
+            if (!aIsShared && bIsShared) return 1;
+
+            // Within each group, sort alphabetically by name
+            const aName = `${a.first_name || ''} ${a.last_name || ''}`.trim() || a.email;
+            const bName = `${b.first_name || ''} ${b.last_name || ''}`.trim() || b.email;
+            return aName.localeCompare(bName);
+          });
+
+          shareWithContainer.innerHTML = sortedUsers.map((u, index) => {
+            const isChecked = sharedUserIds.includes(u.id);
+            const fullName = `${u.first_name || ''} ${u.last_name || ''}`.trim();
+            const displayName = fullName || u.email;
+
+            // Check if this is the first unselected user (add divider before it)
+            const prevUser = sortedUsers[index - 1];
+            const showDivider = index > 0 &&
+                               sharedUserIds.includes(prevUser.id) &&
+                               !isChecked;
+
+            return `
+              ${showDivider ? '<div class="border-t-2 border-gray-200 my-1"><div class="px-4 py-2 bg-gray-50"><p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Other Team Members</p></div></div>' : ''}
+              <label class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0">
+                <input
+                  type="checkbox"
+                  name="shareUser"
+                  value="${u.id}"
+                  ${isChecked ? 'checked' : ''}
+                  class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 focus:ring-2"
+                />
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span class="text-xs font-medium text-indigo-600">
+                        ${(u.first_name?.[0] || '') + (u.last_name?.[0] || '') || u.email?.[0]?.toUpperCase() || 'U'}
+                      </span>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <p class="text-sm font-medium text-gray-900 truncate">${displayName}</p>
+                      <p class="text-xs text-gray-500 truncate">${u.email}</p>
+                    </div>
+                  </div>
+                </div>
+              </label>
+            `;
+          }).join('');
+        }
 
         // Handle visibility change
         const visibilitySelect = document.getElementById('modalMatterVisibility');
@@ -9064,7 +9452,8 @@
           if (this.value === 'organization') {
             shareSection.style.opacity = '0.5';
             shareSection.style.pointerEvents = 'none';
-            shareWithSelect.value = [];
+            // Uncheck all checkboxes when switching to organization
+            document.querySelectorAll('input[name="shareUser"]').forEach(cb => cb.checked = false);
           } else {
             shareSection.style.opacity = '1';
             shareSection.style.pointerEvents = 'auto';
@@ -9076,6 +9465,44 @@
           shareSection.style.opacity = '0.5';
           shareSection.style.pointerEvents = 'none';
         }
+
+        // Add search functionality
+        const searchInput = document.getElementById('modalShareSearch');
+        searchInput.addEventListener('input', function() {
+          const searchTerm = this.value.toLowerCase().trim();
+          const userLabels = shareWithContainer.querySelectorAll('label');
+
+          userLabels.forEach(label => {
+            const nameElement = label.querySelector('.text-gray-900');
+            const emailElement = label.querySelector('.text-gray-500');
+
+            const name = nameElement ? nameElement.textContent.toLowerCase() : '';
+            const email = emailElement ? emailElement.textContent.toLowerCase() : '';
+
+            // Show/hide based on search match
+            if (searchTerm === '' || name.includes(searchTerm) || email.includes(searchTerm)) {
+              label.style.display = 'flex';
+            } else {
+              label.style.display = 'none';
+            }
+          });
+
+          // Show "no results" message if all are hidden
+          const visibleLabels = Array.from(userLabels).filter(l => l.style.display !== 'none');
+          if (visibleLabels.length === 0 && searchTerm !== '') {
+            if (!shareWithContainer.querySelector('.no-results-message')) {
+              const noResultsDiv = document.createElement('div');
+              noResultsDiv.className = 'no-results-message p-4 text-center text-gray-500 text-sm';
+              noResultsDiv.textContent = 'No users found matching your search';
+              shareWithContainer.appendChild(noResultsDiv);
+            }
+          } else {
+            const noResultsMsg = shareWithContainer.querySelector('.no-results-message');
+            if (noResultsMsg) {
+              noResultsMsg.remove();
+            }
+          }
+        });
 
         // Show modal
         const modal = document.getElementById('manageShareModal');
@@ -9096,6 +9523,12 @@
       modal.classList.remove('flex');
       modal.classList.add('hidden');
       window.currentManageShareMatterId = null;
+
+      // Clear search input
+      const searchInput = document.getElementById('modalShareSearch');
+      if (searchInput) {
+        searchInput.value = '';
+      }
     }
 
     /**
@@ -9119,10 +9552,10 @@
         `;
 
         const visibility = document.getElementById('modalMatterVisibility').value;
-        const shareWithSelect = document.getElementById('modalShareWith');
-        const selectedUsers = Array.from(shareWithSelect.selectedOptions).map(opt => opt.value);
+        const selectedUsers = Array.from(document.querySelectorAll('input[name="shareUser"]:checked'))
+          .map(checkbox => checkbox.value);
 
-        // Update matter visibility and sharing
+        // Step 1: Update matter visibility
         const response = await fetch(`${api.baseUrl}/api/v1/matters/${matterId}`, {
           method: 'PUT',
           headers: {
@@ -9130,14 +9563,48 @@
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            visibility: visibility,
-            share_with: visibility === 'organization' ? [] : selectedUsers
+            visibility: visibility
           })
         });
 
         if (!response.ok) {
           const error = await response.json();
           throw new Error(error.error?.message || 'Failed to update sharing settings');
+        }
+
+        // Step 2: Get current matter permissions to compare
+        const permissionsResponse = await fetch(`${api.baseUrl}/api/v1/matters/${matterId}/permissions`, {
+          headers: {
+            'Authorization': `Bearer ${api.token}`
+          }
+        });
+
+        if (!permissionsResponse.ok) {
+          throw new Error('Failed to fetch current permissions');
+        }
+
+        const permissionsData = await permissionsResponse.json();
+        const currentUserIds = permissionsData.permissions?.map(p => p.user_id) || [];
+
+        // Step 3: Handle user sharing changes
+        const newUserIds = visibility === 'organization' ? [] : selectedUsers;
+
+        // Remove users no longer selected
+        for (const userId of currentUserIds) {
+          if (!newUserIds.includes(userId)) {
+            await api.removeMatterShare(matterId, userId).catch(err => {
+              console.warn('Failed to remove share for user', userId, err);
+            });
+          }
+        }
+
+        // Add new users
+        for (const userId of newUserIds) {
+          if (!currentUserIds.includes(userId)) {
+            await api.shareMatterWithUser(matterId, userId, ['read', 'write']).catch(err => {
+              console.warn('Failed to share with user', userId, err);
+            });
+          }
         }
 
         Toast.success('Sharing settings updated successfully');
@@ -9581,10 +10048,10 @@
         }
         loadMatters();
 
-        // Refresh linked matters tab if viewing the workspace
+        // Always refresh linked matters tab if viewing the workspace
+        // This handles both the tab view and when viewing from the drawer
         if (currentMatterData && currentMatterData.matter &&
-            currentMatterData.matter.matter_id === workspaceId &&
-            !document.getElementById('tabContentLinks').classList.contains('hidden')) {
+            currentMatterData.matter.matter_id === workspaceId) {
           renderLinkedMattersTab(currentMatterData.matter);
         }
 
@@ -9938,19 +10405,37 @@
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Visibility</label>
           <select id="modalMatterVisibility" class="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-            <option value="private">🔒 Private - Only shared users can access</option>
-            <option value="organization">🏢 Organization - All members can access</option>
+            <option value="private">Private - Only shared users can access</option>
+            <option value="organization">Organization - All members can access</option>
           </select>
           <p class="text-xs text-gray-500 mt-2">Organization visibility allows all team members to view this matter</p>
         </div>
 
         <!-- Share with Users -->
         <div id="modalShareSection">
-          <label class="block text-sm font-medium text-gray-700 mb-2">Share with Team Members</label>
-          <select id="modalShareWith" multiple class="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent min-h-[120px]">
-            <!-- Users will be populated here -->
-          </select>
-          <p class="text-xs text-gray-500 mt-2">Hold Ctrl/Cmd to select multiple users</p>
+          <label class="block text-sm font-medium text-gray-700 mb-3">Share with Team Members</label>
+
+          <!-- Search Input -->
+          <div class="relative mb-3">
+            <input
+              type="text"
+              id="modalShareSearch"
+              placeholder="Search users by name or email..."
+              class="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+            <svg class="absolute left-3 top-2.5 h-5 w-5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+          </div>
+
+          <!-- User List -->
+          <div id="modalShareWith" class="w-full max-h-[280px] overflow-y-auto border border-gray-300 rounded-lg bg-white">
+            <!-- User checkboxes will be populated here -->
+            <div class="p-4 text-center text-gray-500 text-sm">
+              Loading users...
+            </div>
+          </div>
+          <p class="text-xs text-gray-500 mt-2">Select team members to share this matter with</p>
         </div>
       </div>
 
@@ -10200,7 +10685,7 @@
       try {
         await api.linkConnectorDataToMatter(currentManualConnectMatter, connectorDataId);
 
-        showToast('Data linked successfully!', 'success');
+        Toast.success('Data linked successfully!');
         closeManualConnectModal();
 
         // Reload the connected data tab
@@ -10210,7 +10695,7 @@
         }
       } catch (error) {
         console.error('[linkConnectorData] Error:', error);
-        showToast(error.message || 'Failed to link data', 'error');
+        Toast.error(error.message || 'Failed to link data');
       }
     }
 
@@ -10573,7 +11058,7 @@
         });
 
         if (validDefinitions.length === 0 && customFieldDefinitions.length > 0) {
-          showToast('Please fill in Key and Display Name for all fields', 'error');
+          Toast.error('Please fill in Key and Display Name for all fields');
           return;
         }
 
@@ -10581,7 +11066,7 @@
         const keys = validDefinitions.map(f => f.key.toLowerCase().trim());
         const duplicates = keys.filter((key, index) => keys.indexOf(key) !== index);
         if (duplicates.length > 0) {
-          showToast(`Duplicate field keys: ${duplicates.join(', ')}`, 'error');
+          Toast.error(`Duplicate field keys: ${duplicates.join(', ')}`);
           return;
         }
 
@@ -10592,7 +11077,7 @@
         // Get current matter
         const matter = window.currentViewedMatter;
         if (!matter) {
-          showToast('Matter not found', 'error');
+          Toast.error('Matter not found');
           return;
         }
 
@@ -10602,7 +11087,7 @@
           custom_fields: validValues
         });
 
-        showToast('Custom fields updated successfully!', 'success');
+        Toast.success('Custom fields updated successfully!');
         closeEditCustomFieldsModal();
 
         // Reload matter details
@@ -10621,7 +11106,7 @@
         }
       } catch (error) {
         console.error('[saveCustomFields] Error:', error);
-        showToast(error.message || 'Failed to save custom fields', 'error');
+        Toast.error(error.message || 'Failed to save custom fields');
       }
     }
   </script>
