@@ -33,6 +33,22 @@
   <script src="js/vendor/marked.min.js"></script>
   <script src="js/components/document-metadata-viewer.js"></script>
 
+  <!-- Matter Notes - Tiptap Editor Integration -->
+  <link rel="stylesheet" href="../src/css/matter-notes.css">
+  <script src="../src/js/tiptap-bundle-built.js"></script>
+  <script src="../src/js/api/matter-notes-api.client.js"></script>
+  <script src="../src/js/components/note-list.component.js"></script>
+  <script src="../src/js/components/note-editor.component.js"></script>
+  <script src="../src/js/matter-notes.js"></script>
+
+  <!-- Matter Skills - Skills Plugin System -->
+  <script src="../src/js/matter-skills.js"></script>
+
+  <!-- Drawflow Library for Visual Workflow Builder -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/drawflow@0.0.60/dist/drawflow.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/drawflow@0.0.60/dist/drawflow.min.js"></script>
+  <script src="../src/js/workflow-builder.js"></script>
+
   <!-- Inline preloader styles - Pure CSS, no dependencies -->
   <style>
     /* Preloader shown immediately, before any JS/CSS loads */
@@ -623,6 +639,14 @@
         <button id="tabContacts" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('contacts')">
           Contacts
         </button>
+        <button id="tabNotes" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('notes')">
+          Notes
+          <span id="notesCount" class="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-full"></span>
+        </button>
+        <button id="tabSkills" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('skills')">
+          Skills
+          <span class="ml-1 px-1.5 py-0.5 text-xs bg-purple-100 text-purple-800 rounded-full">BETA</span>
+        </button>
         <button id="tabConnectedData" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('connectedData')">
           Connected Data
         </button>
@@ -637,6 +661,8 @@
         <div id="tabContentComments" class="hidden p-6"></div>
         <div id="tabContentTasks" class="hidden p-6"></div>
         <div id="tabContentContacts" class="hidden p-6"></div>
+        <div id="tabContentNotes" class="hidden p-6"></div>
+        <div id="tabContentSkills" class="hidden p-6"></div>
         <div id="tabContentConnectedData" class="hidden p-6"></div>
       </div>
 
@@ -2426,8 +2452,9 @@
 
               if (workspaceLink) {
                 // Set the workspace selector to the linked workspace
-                document.getElementById('workspaceSelector').value = workspaceLink.source_matter_id;
-                console.log('[Edit Matter] Loaded existing workspace link:', workspaceLink.source_matter_id);
+                // For incoming links (matter linked to workspace), workspace ID is in linked_entity_id
+                document.getElementById('workspaceSelector').value = workspaceLink.linked_entity_id;
+                console.log('[Edit Matter] Loaded existing workspace link:', workspaceLink.linked_entity_id);
               }
             }
           } catch (error) {
@@ -2602,6 +2629,13 @@
           commentBadge.classList.toggle('hidden', commentCount === 0);
         }
 
+        // Hide Skills tab for workspaces (skills only apply to client matters)
+        const skillsTab = document.getElementById('tabSkills');
+        if (skillsTab) {
+          const isWorkspace = matter.matter_type === 'workspace';
+          skillsTab.style.display = isWorkspace ? 'none' : 'block';
+        }
+
         // Set up footer actions
         document.getElementById('drawerEditBtn').onclick = () => { editMatter(matter.matter_id); closeDrawer(); };
         document.getElementById('drawerDeleteBtn').onclick = () => deleteMatter(matter.matter_id);
@@ -2623,7 +2657,7 @@
       const { matter, permissions, activities, activityPagination, chats, chatsPagination, documents, orphanedFiles, tasks, contacts, notes } = currentMatterData;
 
       // Update tab buttons
-      const tabs = ['Details', 'Documents', 'Conversations', 'Activity', 'Comments', 'Tasks', 'Contacts', 'ConnectedData'];
+      const tabs = ['Details', 'Documents', 'Conversations', 'Activity', 'Comments', 'Tasks', 'Contacts', 'Notes', 'Skills', 'ConnectedData'];
       tabs.forEach(tab => {
         const btn = document.getElementById(`tab${tab}`);
         const content = document.getElementById(`tabContent${tab}`);
@@ -2660,6 +2694,12 @@
           break;
         case 'contacts':
           renderContactsTab(matter, contacts || []);
+          break;
+        case 'notes':
+          renderNotesTab(matter);
+          break;
+        case 'skills':
+          renderSkillsTab(matter);
           break;
         case 'connecteddata':
           renderConnectedDataTab(matter);
@@ -3011,6 +3051,15 @@
           <div>
             <div class="flex items-center justify-between mb-3">
               <h5 class="text-sm font-medium text-gray-700">Shared With</h5>
+              <button
+                onclick="openManageShareModal('${matter.matter_id}')"
+                class="px-2 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+                title="Manage Sharing"
+              >
+                <svg class="w-3 h-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+              </button>
             </div>
             <div class="space-y-2">
               ${permissions.length > 0 ? permissions.map(p => `
@@ -7027,6 +7076,54 @@
       }
     };
 
+
+    // ==================== MATTER NOTES TAB ====================
+
+    // Render Notes Tab
+    function renderNotesTab(matter) {
+      const content = document.getElementById('tabContentNotes');
+
+      if (!content) {
+        console.error('[Notes] Tab content container not found');
+        return;
+      }
+
+      // Initialize Matter Notes controller
+      try {
+        // Clear existing content
+        content.innerHTML = '<div id="matterNotesContainer" class="w-full h-full"></div>';
+
+        // Initialize Matter Notes
+        if (window.initializeMatterNotes && window.MatterNotesAPIClient) {
+          window.initializeMatterNotes('matterNotesContainer', matter.matter_id);
+          console.log('[Notes] Matter Notes initialized for matter:', matter.matter_id);
+        } else {
+          // Fallback if components not loaded
+          content.innerHTML = `
+            <div class="text-center py-12">
+              <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              <h3 class="mt-2 text-sm font-medium text-gray-900">Notes feature not available</h3>
+              <p class="mt-1 text-sm text-gray-500">The notes feature is still loading. Please refresh the page.</p>
+            </div>
+          `;
+          console.error('[Notes] Matter Notes components not loaded');
+        }
+      } catch (error) {
+        console.error('[Notes] Failed to initialize Matter Notes:', error);
+        content.innerHTML = `
+          <div class="text-center py-12">
+            <svg class="mx-auto h-12 w-12 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">Failed to load notes</h3>
+            <p class="mt-1 text-sm text-gray-500">${error.message}</p>
+          </div>
+        `;
+      }
+    }
+
     function renderLinkedMattersContent(matter, links, totalLinks) {
       const content = document.getElementById('tabContentLinks');
       const isWorkspace = matter.matter_type === 'workspace';
@@ -7214,6 +7311,9 @@
       const createdAt = link.created_at ? new Date(link.created_at).toLocaleDateString() : '';
       const createdBy = link.created_by_name || link.created_by_email || '';
 
+      // If linkId is missing or invalid, treat as read-only (cannot delete)
+      const canDelete = !isReadOnly && linkId && linkId !== 'null' && linkId !== 'undefined';
+
       return `
         <div class="bg-white border border-gray-200 hover:border-indigo-300 rounded-lg p-3 flex items-center justify-between gap-3 transition-all">
           <div class="flex-1 min-w-0">
@@ -7234,8 +7334,8 @@
             ` : ''}
           </div>
           <div class="flex-shrink-0">
-            ${isReadOnly ? `
-              <span class="text-xs text-gray-400 px-2 py-1 rounded border border-gray-200" title="System-generated link cannot be deleted">
+            ${!canDelete ? `
+              <span class="text-xs text-gray-400 px-2 py-1 rounded border border-gray-200" title="${isReadOnly ? 'System-generated link cannot be deleted' : 'Link ID missing - cannot delete'}">
                 <svg class="w-3 h-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
                 </svg>
@@ -7439,6 +7539,11 @@
       html += '</div>';
       content.innerHTML = html;
     }
+
+    // =============================================================================
+    // SKILLS TAB
+    // =============================================================================
+    // Skills tab functionality is now in: ../src/js/matter-skills.js
 
     // =============================================================================
     // CONNECTED DATA TAB
@@ -8251,8 +8356,9 @@
       // Set up the confirm button click handler
       const confirmBtn = document.getElementById('confirmUnlinkButton');
       confirmBtn.onclick = function() {
+        const linkIdToDelete = window.pendingUnlinkId; // Save before closing modal
         closeUnlinkConfirmModal();
-        deleteLink(window.pendingUnlinkId);
+        deleteLink(linkIdToDelete);
       };
     }
 
@@ -8270,6 +8376,13 @@
      * Delete a link
      */
     window.deleteLink = async function(linkId) {
+      // Validate linkId before making API call
+      if (!linkId || linkId === 'null' || linkId === 'undefined') {
+        console.error('Invalid link ID:', linkId);
+        Toast.error('Cannot delete link: Invalid link ID');
+        return;
+      }
+
       try {
         const response = await fetch(`${api.baseUrl}/api/v1/entity-links/${linkId}`, {
           method: 'DELETE',
@@ -8895,6 +9008,159 @@
       }
     }
 
+    /**
+     * Open Manage Share Modal
+     */
+    window.openManageShareModal = async function(matterId) {
+      try {
+        // Store the matter ID
+        window.currentManageShareMatterId = matterId;
+
+        // Get current matter details
+        const matterResponse = await fetch(`${api.baseUrl}/api/v1/matters/${matterId}`, {
+          headers: {
+            'Authorization': `Bearer ${api.token}`
+          }
+        });
+
+        if (!matterResponse.ok) {
+          throw new Error('Failed to load matter details');
+        }
+
+        const matter = await matterResponse.json();
+
+        // Get all organization users
+        const usersResponse = await fetch(`${api.baseUrl}/api/v1/users`, {
+          headers: {
+            'Authorization': `Bearer ${api.token}`
+          }
+        });
+
+        if (!usersResponse.ok) {
+          throw new Error('Failed to load users');
+        }
+
+        const usersData = await usersResponse.json();
+        const users = Array.isArray(usersData) ? usersData : (usersData.users || []);
+
+        // Set current visibility
+        document.getElementById('modalMatterVisibility').value = matter.visibility || 'private';
+
+        // Populate users dropdown
+        const shareWithSelect = document.getElementById('modalShareWith');
+        shareWithSelect.innerHTML = users
+          .filter(u => u.id !== api.user?.id) // Exclude current user
+          .map(u => `
+            <option value="${u.id}" ${matter.shared_with?.includes(u.id) ? 'selected' : ''}>
+              ${u.first_name || ''} ${u.last_name || ''} (${u.email})
+            </option>
+          `).join('');
+
+        // Handle visibility change
+        const visibilitySelect = document.getElementById('modalMatterVisibility');
+        const shareSection = document.getElementById('modalShareSection');
+
+        visibilitySelect.addEventListener('change', function() {
+          if (this.value === 'organization') {
+            shareSection.style.opacity = '0.5';
+            shareSection.style.pointerEvents = 'none';
+            shareWithSelect.value = [];
+          } else {
+            shareSection.style.opacity = '1';
+            shareSection.style.pointerEvents = 'auto';
+          }
+        });
+
+        // Trigger initial state
+        if (matter.visibility === 'organization') {
+          shareSection.style.opacity = '0.5';
+          shareSection.style.pointerEvents = 'none';
+        }
+
+        // Show modal
+        const modal = document.getElementById('manageShareModal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+
+      } catch (error) {
+        console.error('Error opening share modal:', error);
+        Toast.error(error.message || 'Failed to open share modal');
+      }
+    }
+
+    /**
+     * Close Manage Share Modal
+     */
+    window.closeManageShareModal = function() {
+      const modal = document.getElementById('manageShareModal');
+      modal.classList.remove('flex');
+      modal.classList.add('hidden');
+      window.currentManageShareMatterId = null;
+    }
+
+    /**
+     * Save Share Settings
+     */
+    window.saveShareSettings = async function() {
+      try {
+        const matterId = window.currentManageShareMatterId;
+        if (!matterId) {
+          throw new Error('No matter selected');
+        }
+
+        const saveButton = document.getElementById('saveShareButton');
+        saveButton.disabled = true;
+        saveButton.innerHTML = `
+          <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Saving...
+        `;
+
+        const visibility = document.getElementById('modalMatterVisibility').value;
+        const shareWithSelect = document.getElementById('modalShareWith');
+        const selectedUsers = Array.from(shareWithSelect.selectedOptions).map(opt => opt.value);
+
+        // Update matter visibility and sharing
+        const response = await fetch(`${api.baseUrl}/api/v1/matters/${matterId}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${api.token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            visibility: visibility,
+            share_with: visibility === 'organization' ? [] : selectedUsers
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error?.message || 'Failed to update sharing settings');
+        }
+
+        Toast.success('Sharing settings updated successfully');
+        closeManageShareModal();
+
+        // Refresh the matter view to show updated sharing
+        await viewMatter(matterId, 'details', { bustCache: true });
+
+      } catch (error) {
+        console.error('Error saving share settings:', error);
+        Toast.error(error.message || 'Failed to save sharing settings');
+      } finally {
+        const saveButton = document.getElementById('saveShareButton');
+        saveButton.disabled = false;
+        saveButton.innerHTML = `
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+          Save Changes
+        `;
+      }
+    }
+
     // Form submission
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -8964,13 +9230,13 @@
                 currentWorkspaceLink = linksData.links?.workspace_matters?.[0];
               }
 
-              const currentWorkspaceId = currentWorkspaceLink?.source_matter_id;
+              const currentWorkspaceId = currentWorkspaceLink?.linked_entity_id;
 
               // If workspace selection changed, update the link
               if (currentWorkspaceId !== selectedWorkspaceId) {
                 // Delete old link if it exists
                 if (currentWorkspaceLink) {
-                  await fetch(`${api.baseUrl}/api/v1/entity-links/${currentWorkspaceLink.id}`, {
+                  await fetch(`${api.baseUrl}/api/v1/entity-links/${currentWorkspaceLink.link_id}`, {
                     method: 'DELETE',
                     headers: {
                       'Authorization': `Bearer ${api.token}`
@@ -9638,6 +9904,66 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
           </svg>
           Remove Link
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manage Share Modal -->
+  <div id="manageShareModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 10001;" onclick="if(event.target === this) closeManageShareModal()">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between p-6 border-b border-gray-200">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+            <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path>
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-xl font-semibold text-gray-900">Manage Sharing</h3>
+            <p class="text-sm text-gray-500 mt-0.5">Control matter visibility and access</p>
+          </div>
+        </div>
+        <button onclick="closeManageShareModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6 space-y-6">
+        <!-- Visibility Setting -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Visibility</label>
+          <select id="modalMatterVisibility" class="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option value="private">🔒 Private - Only shared users can access</option>
+            <option value="organization">🏢 Organization - All members can access</option>
+          </select>
+          <p class="text-xs text-gray-500 mt-2">Organization visibility allows all team members to view this matter</p>
+        </div>
+
+        <!-- Share with Users -->
+        <div id="modalShareSection">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Share with Team Members</label>
+          <select id="modalShareWith" multiple class="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent min-h-[120px]">
+            <!-- Users will be populated here -->
+          </select>
+          <p class="text-xs text-gray-500 mt-2">Hold Ctrl/Cmd to select multiple users</p>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+        <button onclick="closeManageShareModal()" class="px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          Cancel
+        </button>
+        <button id="saveShareButton" onclick="saveShareSettings()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+          Save Changes
         </button>
       </div>
     </div>
@@ -10352,6 +10678,413 @@
           class="px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
         >
           Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Skill Modal - Full Screen Skill Builder -->
+  <div id="createSkillModal" class="fixed inset-0 bg-white hidden flex-col" style="z-index: 10001;">
+    <!-- Modal Header -->
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white shadow-sm">
+      <div class="flex items-center gap-3">
+        <div class="flex-shrink-0 w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+          <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+          </svg>
+        </div>
+        <div>
+          <h2 class="text-xl font-semibold text-gray-900">Skill Builder</h2>
+          <p class="text-sm text-gray-500">Create a multi-step automated skill</p>
+        </div>
+      </div>
+      <button onclick="closeCreateSkillModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+
+      <!-- Modal Body -->
+      <div class="flex-1 overflow-hidden flex">
+
+        <!-- SIMPLE MODE -->
+        <div id="simple-workflow-mode" class="flex-1 flex">
+          <!-- Left Panel - Intent Sequencer -->
+          <div class="flex-1 p-6 bg-gray-50 overflow-y-auto">
+            <!-- Skill Header -->
+            <div class="mb-6 bg-white rounded-lg p-5 border border-gray-200 shadow-sm">
+              <div class="flex items-start gap-4">
+                <div class="flex-shrink-0 w-12 h-12 rounded-lg bg-purple-600 flex items-center justify-center">
+                  <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                  </svg>
+                </div>
+                <div class="flex-1">
+                  <label class="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Skill Intent</label>
+                  <input type="text" id="skill_name" placeholder="e.g., Auto-triage new litigation documents"
+                         class="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors font-medium">
+                  <textarea id="skill_description" rows="2" placeholder="Describe the business outcome this skill achieves..."
+                         class="w-full mt-3 px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors text-sm resize-none"></textarea>
+                </div>
+              </div>
+            </div>
+
+            <!-- Step Sequence Container -->
+            <div id="workflow-steps-container" class="relative space-y-4">
+              <!-- Connector Rail (Visual Flow Line) -->
+              <div class="absolute left-6 top-0 bottom-0 w-0.5 bg-purple-300"></div>
+
+              <!-- Steps will be added here dynamically -->
+            </div>
+
+            <!-- Add Step Button -->
+            <button type="button" onclick="addWorkflowStep()"
+                    class="w-full mt-6 ml-14 px-6 py-3 bg-white border-2 border-dashed border-gray-300 rounded-lg text-gray-700 hover:border-purple-400 hover:bg-purple-50 hover:text-purple-700 transition-colors flex items-center justify-center gap-2 group">
+              <div class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                </svg>
+              </div>
+              <span class="font-medium">Add Next Step</span>
+            </button>
+          </div>
+
+          <!-- Right Panel - MX Diagnostics & Step Palette -->
+          <div class="w-96 border-l border-gray-200 bg-white overflow-y-auto p-6">
+
+            <!-- MX Diagnostics Panel -->
+            <div class="mb-6 bg-emerald-50 rounded-lg p-5 border border-emerald-200">
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-bold text-emerald-900 uppercase tracking-wide">MX Health</h3>
+                <div class="flex items-center gap-1.5">
+                  <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                  <span class="text-xs font-mono text-emerald-700">Ready</span>
+                </div>
+              </div>
+
+              <div class="space-y-3">
+                <!-- Parseability Index -->
+                <div class="bg-white rounded-lg p-3 border border-gray-200">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs text-gray-700 font-medium">Parseability Index</span>
+                    <span class="text-lg font-bold text-emerald-600 font-mono" id="mx-parseability-score">0%</span>
+                  </div>
+                  <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div id="mx-parseability-bar" class="h-full bg-emerald-500 transition-all duration-500" style="width: 0%"></div>
+                  </div>
+                  <p class="text-xs text-gray-600 mt-2">How clearly the AI can understand this workflow</p>
+                </div>
+
+                <!-- Intent Clarity -->
+                <div class="bg-white rounded-lg p-3 border border-gray-200">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs text-gray-700 font-medium">Intent Clarity</span>
+                    <span class="text-sm font-bold text-gray-600 font-mono" id="mx-intent-score">Unknown</span>
+                  </div>
+                  <p class="text-xs text-gray-600">Add workflow description to improve</p>
+                </div>
+
+                <!-- Step Health -->
+                <div class="bg-white rounded-lg p-3 border border-gray-200">
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-xs text-gray-700 font-medium">Step Health</span>
+                    <span class="text-sm font-bold text-purple-600 font-mono" id="mx-step-count">0 steps</span>
+                  </div>
+                  <div class="flex gap-1 mt-2">
+                    <div class="flex-1 text-center">
+                      <div class="text-xs text-blue-600 font-mono" id="mx-trigger-count">0</div>
+                      <div class="text-xs text-gray-600">Triggers</div>
+                    </div>
+                    <div class="flex-1 text-center">
+                      <div class="text-xs text-amber-600 font-mono" id="mx-condition-count">0</div>
+                      <div class="text-xs text-gray-600">Logic</div>
+                    </div>
+                    <div class="flex-1 text-center">
+                      <div class="text-xs text-green-600 font-mono" id="mx-action-count">0</div>
+                      <div class="text-xs text-gray-600">Actions</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Step Types Palette -->
+            <div class="mb-6">
+              <h3 class="text-xs font-bold text-gray-700 uppercase tracking-wide mb-4 flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"></path>
+                </svg>
+                Step Components
+              </h3>
+
+              <div class="space-y-3">
+                <!-- Trigger Step -->
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 hover:border-blue-300 hover:bg-blue-100 transition-all cursor-pointer">
+                  <div class="flex items-center gap-3 mb-2">
+                    <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                      <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                      </svg>
+                    </div>
+                    <span class="text-sm font-bold text-blue-900">Trigger</span>
+                    <code class="ml-auto text-xs font-mono text-blue-700 bg-blue-100 px-2 py-0.5 rounded">trigger.*</code>
+                  </div>
+                  <p class="text-xs text-blue-800 leading-relaxed">Initiates workflow on system events</p>
+                  <div class="mt-2 flex flex-wrap gap-1">
+                    <span class="text-xs font-mono text-blue-700 bg-blue-100 px-2 py-0.5 rounded">document.created</span>
+                    <span class="text-xs font-mono text-blue-700 bg-blue-100 px-2 py-0.5 rounded">lead.created</span>
+                  </div>
+                </div>
+
+                <!-- Condition Step -->
+                <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 hover:border-amber-300 hover:bg-amber-100 transition-all cursor-pointer">
+                  <div class="flex items-center gap-3 mb-2">
+                    <div class="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
+                      <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                      </svg>
+                    </div>
+                    <span class="text-sm font-bold text-amber-900">Condition</span>
+                    <code class="ml-auto text-xs font-mono text-amber-700 bg-amber-100 px-2 py-0.5 rounded">if.*</code>
+                  </div>
+                  <p class="text-xs text-amber-800 leading-relaxed">Branches flow based on data evaluation</p>
+                  <div class="mt-2 flex flex-wrap gap-1">
+                    <span class="text-xs font-mono text-amber-700 bg-amber-100 px-2 py-0.5 rounded">equals</span>
+                    <span class="text-xs font-mono text-amber-700 bg-amber-100 px-2 py-0.5 rounded">contains</span>
+                  </div>
+                </div>
+
+                <!-- AI Action Step -->
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4 hover:border-green-300 hover:bg-green-100 transition-all cursor-pointer">
+                  <div class="flex items-center gap-3 mb-2">
+                    <div class="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+                      <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                      </svg>
+                    </div>
+                    <span class="text-sm font-bold text-green-900">AI Action</span>
+                    <code class="ml-auto text-xs font-mono text-green-700 bg-green-100 px-2 py-0.5 rounded">ai.*</code>
+                  </div>
+                  <p class="text-xs text-green-800 leading-relaxed">Processes data with LLM intelligence</p>
+                  <div class="mt-2 flex flex-wrap gap-1">
+                    <span class="text-xs font-mono text-green-700 bg-green-100 px-2 py-0.5 rounded">summarize</span>
+                    <span class="text-xs font-mono text-green-700 bg-green-100 px-2 py-0.5 rounded">extract</span>
+                  </div>
+                </div>
+
+                <!-- Integration Step -->
+                <div class="bg-purple-50 border border-purple-200 rounded-lg p-4 hover:border-purple-300 hover:bg-purple-100 transition-all cursor-pointer">
+                  <div class="flex items-center gap-3 mb-2">
+                    <div class="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                      <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                      </svg>
+                    </div>
+                    <span class="text-sm font-bold text-purple-900">Integration</span>
+                    <code class="ml-auto text-xs font-mono text-purple-700 bg-purple-100 px-2 py-0.5 rounded">ext.*</code>
+                  </div>
+                  <p class="text-xs text-purple-800 leading-relaxed">Connects to external systems</p>
+                  <div class="mt-2 flex flex-wrap gap-1">
+                    <span class="text-xs font-mono text-purple-700 bg-purple-100 px-2 py-0.5 rounded">email</span>
+                    <span class="text-xs font-mono text-purple-700 bg-purple-100 px-2 py-0.5 rounded">crm</span>
+                  </div>
+                </div>
+
+                <!-- Transform Step -->
+                <div class="bg-cyan-50 border border-cyan-200 rounded-lg p-4 hover:border-cyan-300 hover:bg-cyan-100 transition-all cursor-pointer">
+                  <div class="flex items-center gap-3 mb-2">
+                    <div class="w-8 h-8 rounded-lg bg-cyan-100 flex items-center justify-center">
+                      <svg class="w-4 h-4 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                      </svg>
+                    </div>
+                    <span class="text-sm font-bold text-cyan-900">Transform</span>
+                    <code class="ml-auto text-xs font-mono text-cyan-700 bg-cyan-100 px-2 py-0.5 rounded">data.*</code>
+                  </div>
+                  <p class="text-xs text-cyan-800 leading-relaxed">Modifies and extracts data fields</p>
+                  <div class="mt-2 flex flex-wrap gap-1">
+                    <span class="text-xs font-mono text-cyan-700 bg-cyan-100 px-2 py-0.5 rounded">map</span>
+                    <span class="text-xs font-mono text-cyan-700 bg-cyan-100 px-2 py-0.5 rounded">filter</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Semantic Tokens -->
+            <div class="bg-gray-50 rounded-lg p-5 border border-gray-200">
+              <h4 class="text-xs font-bold text-gray-700 uppercase tracking-wide mb-3 flex items-center gap-2">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+                </svg>
+                Smart Variables
+              </h4>
+              <div class="space-y-2">
+                <code class="block bg-white text-purple-700 px-3 py-2 rounded-lg text-xs font-mono border border-gray-200">{{trigger.data}}</code>
+                <code class="block bg-white text-purple-700 px-3 py-2 rounded-lg text-xs font-mono border border-gray-200">{{step_1.output}}</code>
+                <code class="block bg-white text-purple-700 px-3 py-2 rounded-lg text-xs font-mono border border-gray-200">{{matter.name}}</code>
+                <code class="block bg-white text-purple-700 px-3 py-2 rounded-lg text-xs font-mono border border-gray-200">{{user.email}}</code>
+              </div>
+              <p class="text-xs text-gray-600 mt-3">Reference data from previous steps in your workflow</p>
+            </div>
+
+          </div>
+        </div>
+      </div>
+      <!-- END SIMPLE MODE -->
+
+      <!-- VISUAL MODE (Drawflow) -->
+      <div id="visual-workflow-mode" class="hidden flex-1 flex-col">
+        <!-- Workflow Canvas -->
+        <div class="flex-1 relative bg-gray-50">
+          <div id="drawflow-canvas" class="absolute inset-0"></div>
+        </div>
+
+        <!-- Node Configuration Panel (Slides in from right when node is selected) -->
+        <div id="nodeConfigPanel" class="hidden absolute top-0 right-0 bottom-0 w-96 bg-white border-l border-gray-200 shadow-xl transform transition-transform duration-300">
+          <div class="h-full flex flex-col">
+            <!-- Panel Header -->
+            <div class="flex items-center justify-between p-4 border-b border-gray-200">
+              <h3 class="text-lg font-semibold text-gray-900" id="node-config-title">Node Configuration</h3>
+              <button onclick="closeNodeConfigPanel()" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+
+            <!-- Panel Content -->
+            <div id="node-config-content" class="flex-1 overflow-y-auto p-4">
+              <!-- Dynamic content based on node type -->
+            </div>
+
+            <!-- Panel Footer -->
+            <div class="p-4 border-t border-gray-200 flex gap-3">
+              <button onclick="deleteSelectedNode()" class="flex-1 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100">
+                Delete Node
+              </button>
+              <button onclick="saveNodeConfig()" class="flex-1 px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700">
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- END VISUAL MODE -->
+
+    <!-- Modal Footer -->
+    <div class="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
+      <div class="text-sm text-gray-600">
+        <span id="workflow-step-count">0</span> steps configured
+      </div>
+      <div class="flex gap-3">
+        <button onclick="closeCreateSkillModal()"
+                class="px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          Cancel
+        </button>
+        <button onclick="saveSkill()"
+                class="px-5 py-2.5 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+          Save Skill
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import Skill Modal -->
+  <div id="importSkillModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 10001;">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between p-6 border-b border-gray-200">
+        <div class="flex items-center gap-3">
+          <div class="flex-shrink-0 w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+            <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-xl font-semibold text-gray-900">Import Skill</h2>
+            <p class="text-sm text-gray-500">Import an existing skill from a JSON file</p>
+          </div>
+        </div>
+        <button onclick="closeImportSkillModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="flex-1 overflow-y-auto p-6">
+
+        <!-- File Drop Zone -->
+        <div id="skill-drop-zone" class="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center hover:border-purple-400 transition-colors cursor-pointer">
+          <input type="file" id="skill-file-input" accept=".json" class="hidden">
+
+          <div id="skill-upload-prompt">
+            <svg class="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+            </svg>
+            <p class="text-gray-600 mb-2">Drag and drop a skill JSON file here</p>
+            <p class="text-sm text-gray-500 mb-4">or</p>
+            <button type="button" onclick="document.getElementById('skill-file-input').click()"
+                    class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
+              Browse Files
+            </button>
+          </div>
+
+          <div id="skill-file-info" class="hidden">
+            <svg class="w-12 h-12 text-green-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <p class="text-gray-900 font-medium mb-1" id="skill-file-name"></p>
+            <p class="text-sm text-gray-500" id="skill-file-size"></p>
+            <button type="button" onclick="clearSkillFile()"
+                    class="mt-4 text-sm text-gray-600 hover:text-gray-900">
+              Choose a different file
+            </button>
+          </div>
+        </div>
+
+        <!-- Preview -->
+        <div id="skill-preview" class="hidden mt-6 p-6 bg-gray-50 rounded-lg border border-gray-200">
+          <h3 class="text-sm font-semibold text-gray-900 mb-3">Skill Preview</h3>
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between">
+              <span class="text-gray-500">Name:</span>
+              <span class="text-gray-900 font-medium" id="skill-preview-name"></span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-500">Category:</span>
+              <span class="text-gray-900" id="skill-preview-category"></span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-500">Type:</span>
+              <span class="text-gray-900" id="skill-preview-type"></span>
+            </div>
+            <div class="pt-2 border-t border-gray-200">
+              <span class="text-gray-500">Description:</span>
+              <p class="text-gray-900 mt-1" id="skill-preview-description"></p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+        <button onclick="closeImportSkillModal()"
+                class="px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          Cancel
+        </button>
+        <button id="import-skill-btn" onclick="submitImportSkill()" disabled
+                class="px-5 py-2.5 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
+          </svg>
+          Import Skill
         </button>
       </div>
     </div>

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Skills Marketplace - LanaAI</title>
+  <script src="js/tailwind-loader.js"></script>
+  <link rel="stylesheet" href="css/skills-marketplace.css">
+  <script src="js/error-reporter.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/components.js"></script>
+  <script src="js/version.js"></script>
+  <script src="js/menu.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/navigation-helpers.js"></script>
+  <script src="js/skills-marketplace.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <!-- Navigation Menu -->
+  <div id="menu-container"></div>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <!-- Header -->
+    <div class="bg-white border-b border-gray-200 sticky top-0 z-10">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 class="text-3xl font-bold text-gray-900">Skills Marketplace</h1>
+            <p class="mt-1 text-sm text-gray-500">Browse and install skills to automate your workflows</p>
+          </div>
+          <button id="create-skill-btn" class="btn-primary flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Create Custom Skill
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search and Filters -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div class="bg-white rounded-lg border border-gray-200 p-4 mb-6">
+        <div class="flex flex-col md:flex-row gap-4">
+          <!-- Search -->
+          <div class="flex-1">
+            <div class="relative">
+              <input
+                type="text"
+                id="search-input"
+                placeholder="Search skills by name, description, or tags..."
+                class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              />
+              <svg class="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+              </svg>
+            </div>
+          </div>
+
+          <!-- Category Filter -->
+          <div class="w-full md:w-64">
+            <select id="category-filter" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+              <option value="all">All Categories</option>
+              <option value="document-intelligence">Document Intelligence</option>
+              <option value="ai-assistance">AI Assistance</option>
+              <option value="automation">Automation</option>
+              <option value="workflow">Workflow</option>
+              <option value="integration">Integration</option>
+            </select>
+          </div>
+
+          <!-- View Toggle -->
+          <div class="flex gap-2">
+            <button id="grid-view-btn" class="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 active" title="Grid view">
+              <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+              </svg>
+            </button>
+            <button id="list-view-btn" class="p-2 border border-gray-300 rounded-lg hover:bg-gray-50" title="List view">
+              <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter Chips -->
+        <div id="filter-chips" class="flex flex-wrap gap-2 mt-4"></div>
+      </div>
+
+      <!-- Loading State -->
+      <div id="loading-state" class="text-center py-12">
+        <div class="inline-block w-12 h-12 border-4 border-gray-200 border-t-indigo-600 rounded-full animate-spin"></div>
+        <p class="mt-4 text-gray-600">Loading skills...</p>
+      </div>
+
+      <!-- Skills Grid/List -->
+      <div id="skills-container" class="hidden"></div>
+
+      <!-- Empty State -->
+      <div id="empty-state" class="hidden text-center py-12">
+        <svg class="w-16 h-16 mx-auto text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+        </svg>
+        <h3 class="mt-4 text-lg font-medium text-gray-900">No skills found</h3>
+        <p class="mt-2 text-sm text-gray-500">Try adjusting your search or filters</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Skill Details Modal -->
+  <div id="skill-details-modal" class="modal hidden">
+    <div class="modal-overlay"></div>
+    <div class="modal-content max-w-3xl">
+      <div class="modal-header">
+        <h3 class="text-xl font-semibold text-gray-900">Skill Details</h3>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div id="skill-details-body" class="modal-body">
+        <!-- Populated by JS -->
+      </div>
+      <div class="modal-footer">
+        <button id="modal-cancel-btn" class="btn-secondary">Close</button>
+        <button id="modal-install-btn" class="btn-primary">Install to Matter</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Matter Selector Modal -->
+  <div id="matter-selector-modal" class="modal hidden">
+    <div class="modal-overlay"></div>
+    <div class="modal-content max-w-2xl">
+      <div class="modal-header">
+        <h3 class="text-xl font-semibold text-gray-900">Install Skill to Matter</h3>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="text-sm text-gray-600 mb-4">Select one or more matters to install this skill:</p>
+        <div class="relative mb-4">
+          <input
+            type="text"
+            id="matter-search-input"
+            placeholder="Search matters..."
+            class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+          />
+          <svg class="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+        </div>
+        <div id="matters-list" class="max-h-96 overflow-y-auto border border-gray-200 rounded-lg divide-y">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="matter-modal-cancel-btn" class="btn-secondary">Cancel</button>
+        <button id="matter-modal-install-btn" class="btn-primary">Install</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
+
+</body>
+</html>

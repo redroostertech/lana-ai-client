@@ -923,10 +923,12 @@
     async function loadSessions() {
       const container = document.getElementById('sessionsList');
       const loading = document.getElementById('sessionsLoading');
-      
+
       try {
-        const result = await api.get('/api/v1/auth/session/list');
-        const sessions = result.sessions || [];
+        const result = await api.get('/api/v1/auth/session');
+        // Handle new standardized response format (backward compatible)
+        const data = result.data || result;
+        const sessions = data.sessions || [];
 
         container.innerHTML = sessions.map(session => `
           <div class="flex items-center justify-between bg-gray-50 rounded-lg p-3">

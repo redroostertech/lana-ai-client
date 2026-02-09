@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Matter Skills - LanaAI</title>
+  <script src="js/tailwind-loader.js"></script>
+  <link rel="stylesheet" href="css/matter-skills.css">
+  <script src="js/error-reporter.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/components.js"></script>
+  <script src="js/version.js"></script>
+  <script src="js/menu.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/navigation-helpers.js"></script>
+  <script src="js/matter-skills.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <!-- Navigation Menu -->
+  <div id="menu-container"></div>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <!-- Header -->
+    <div class="bg-white border-b border-gray-200 sticky top-0 z-10">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 class="text-3xl font-bold text-gray-900">Matter Skills</h1>
+            <p class="mt-1 text-sm text-gray-500" id="matter-name-subtitle">Loading matter...</p>
+          </div>
+          <div class="flex gap-3">
+            <button id="view-logs-btn" class="btn-secondary flex items-center gap-2">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+              </svg>
+              View Logs
+            </button>
+            <button id="add-skill-btn" class="btn-primary flex items-center gap-2">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+              </svg>
+              Add Skill
+            </button>
+          </div>
+        </div>
+
+        <!-- Statistics -->
+        <div id="stats-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Skills List -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <!-- Loading State -->
+      <div id="loading-state" class="text-center py-12">
+        <div class="inline-block w-12 h-12 border-4 border-gray-200 border-t-indigo-600 rounded-full animate-spin"></div>
+        <p class="mt-4 text-gray-600">Loading skills...</p>
+      </div>
+
+      <!-- Skills Container -->
+      <div id="skills-container" class="hidden space-y-4">
+        <!-- Populated by JS -->
+      </div>
+
+      <!-- Empty State -->
+      <div id="empty-state" class="hidden text-center py-12">
+        <svg class="w-16 h-16 mx-auto text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+        </svg>
+        <h3 class="mt-4 text-lg font-medium text-gray-900">No skills installed</h3>
+        <p class="mt-2 text-sm text-gray-500">Add skills to automate your workflows for this matter</p>
+        <button id="empty-add-skill-btn" class="mt-4 btn-primary inline-flex items-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+          </svg>
+          Add Skill
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Configure Skill Modal -->
+  <div id="configure-modal" class="modal hidden">
+    <div class="modal-overlay"></div>
+    <div class="modal-content max-w-3xl">
+      <div class="modal-header">
+        <h3 class="text-xl font-semibold text-gray-900">Configure Skill</h3>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div id="configure-modal-body" class="modal-body">
+        <!-- Populated by JS -->
+      </div>
+      <div class="modal-footer">
+        <button id="configure-cancel-btn" class="btn-secondary">Cancel</button>
+        <button id="configure-save-btn" class="btn-primary">Save Configuration</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Execute Skill Modal -->
+  <div id="execute-modal" class="modal hidden">
+    <div class="modal-overlay"></div>
+    <div class="modal-content max-w-2xl">
+      <div class="modal-header">
+        <h3 class="text-xl font-semibold text-gray-900">Execute Skill Manually</h3>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div id="execute-modal-body" class="modal-body">
+        <p class="text-sm text-gray-600 mb-4">Provide input data to execute this skill:</p>
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Input Data (JSON)</label>
+          <textarea
+            id="execute-input-data"
+            rows="8"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono text-sm"
+            placeholder='{"key": "value"}'
+          ></textarea>
+        </div>
+        <div id="execute-error" class="hidden text-sm text-red-600 mb-4"></div>
+      </div>
+      <div class="modal-footer">
+        <button id="execute-cancel-btn" class="btn-secondary">Cancel</button>
+        <button id="execute-run-btn" class="btn-primary">Execute</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Execution History Modal -->
+  <div id="history-modal" class="modal hidden">
+    <div class="modal-overlay"></div>
+    <div class="modal-content max-w-4xl">
+      <div class="modal-header">
+        <h3 class="text-xl font-semibold text-gray-900">Execution History</h3>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div id="history-modal-body" class="modal-body max-h-96 overflow-y-auto">
+        <!-- Populated by JS -->
+      </div>
+      <div class="modal-footer">
+        <button id="history-close-btn" class="btn-secondary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Skill Modal -->
+  <div id="add-skill-modal" class="modal hidden">
+    <div class="modal-overlay"></div>
+    <div class="modal-content max-w-3xl">
+      <div class="modal-header">
+        <h3 class="text-xl font-semibold text-gray-900">Add Skill to Matter</h3>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="text-sm text-gray-600 mb-4">Select a skill to add to this matter:</p>
+        <div class="relative mb-4">
+          <input
+            type="text"
+            id="skill-search-input"
+            placeholder="Search skills..."
+            class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+          />
+          <svg class="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+        </div>
+        <div id="available-skills-list" class="max-h-96 overflow-y-auto border border-gray-200 rounded-lg divide-y">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="add-skill-cancel-btn" class="btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
+
+</body>
+</html>

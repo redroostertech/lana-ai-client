@@ -1,0 +1,370 @@
+/* Matter Skills Styles */
+
+/* Main Layout */
+.main-content {
+  margin-left: 16rem;
+  min-height: 100vh;
+}
+
+@media (max-width: 1024px) {
+  .main-content {
+    margin-left: 0;
+  }
+}
+
+/* Buttons */
+.btn-primary {
+  @apply px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium;
+}
+
+.btn-secondary {
+  @apply px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium;
+}
+
+.btn-danger {
+  @apply px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium;
+}
+
+.btn-success {
+  @apply px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium;
+}
+
+/* Stats Cards */
+.stat-card {
+  @apply bg-white rounded-lg border border-gray-200 p-4;
+}
+
+.stat-value {
+  @apply text-3xl font-bold text-gray-900;
+}
+
+.stat-label {
+  @apply text-sm text-gray-500 mt-1;
+}
+
+.stat-icon {
+  @apply w-10 h-10 flex items-center justify-center rounded-lg;
+}
+
+/* Skill Card */
+.skill-card {
+  @apply bg-white rounded-lg border border-gray-200 p-6 transition-all duration-200;
+}
+
+.skill-card:hover {
+  @apply shadow-md border-indigo-300;
+}
+
+.skill-card-header {
+  @apply flex items-start justify-between mb-4;
+}
+
+.skill-card-title {
+  @apply flex-1;
+}
+
+.skill-name {
+  @apply text-xl font-semibold text-gray-900;
+}
+
+.skill-status-badge {
+  @apply px-3 py-1 rounded-full text-xs font-medium;
+}
+
+.skill-status-enabled {
+  @apply bg-green-100 text-green-700;
+}
+
+.skill-status-disabled {
+  @apply bg-gray-100 text-gray-600;
+}
+
+.skill-description {
+  @apply text-sm text-gray-600 mb-4;
+}
+
+.skill-meta {
+  @apply grid grid-cols-2 md:grid-cols-4 gap-4 py-4 border-t border-b border-gray-100 mb-4;
+}
+
+.skill-meta-item {
+  @apply text-center;
+}
+
+.skill-meta-value {
+  @apply text-lg font-semibold text-gray-900;
+}
+
+.skill-meta-label {
+  @apply text-xs text-gray-500 mt-1;
+}
+
+.skill-trigger {
+  @apply mb-4;
+}
+
+.skill-trigger-label {
+  @apply text-sm font-medium text-gray-700 mb-1;
+}
+
+.skill-trigger-value {
+  @apply text-sm text-gray-600 bg-gray-50 rounded px-2 py-1 font-mono;
+}
+
+.skill-actions {
+  @apply flex flex-wrap gap-2;
+}
+
+.skill-action-btn {
+  @apply px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm flex items-center gap-1.5;
+}
+
+.skill-action-btn:hover {
+  @apply border-indigo-300 text-indigo-600;
+}
+
+.skill-action-btn.danger:hover {
+  @apply border-red-300 text-red-600;
+}
+
+.skill-toggle {
+  @apply relative inline-flex items-center cursor-pointer;
+}
+
+.skill-toggle input {
+  @apply sr-only;
+}
+
+.skill-toggle-slider {
+  @apply w-11 h-6 bg-gray-200 rounded-full transition-colors;
+}
+
+.skill-toggle input:checked + .skill-toggle-slider {
+  @apply bg-green-500;
+}
+
+.skill-toggle-slider::after {
+  content: '';
+  @apply absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform;
+}
+
+.skill-toggle input:checked + .skill-toggle-slider::after {
+  transform: translateX(1.25rem);
+}
+
+/* Execution History */
+.execution-item {
+  @apply p-4 border-b border-gray-200 last:border-b-0;
+}
+
+.execution-item-header {
+  @apply flex items-center justify-between mb-2;
+}
+
+.execution-status {
+  @apply px-2 py-1 rounded text-xs font-medium;
+}
+
+.execution-status-success {
+  @apply bg-green-100 text-green-700;
+}
+
+.execution-status-failed {
+  @apply bg-red-100 text-red-700;
+}
+
+.execution-status-running {
+  @apply bg-blue-100 text-blue-700;
+}
+
+.execution-meta {
+  @apply text-sm text-gray-600;
+}
+
+.execution-actions-list {
+  @apply mt-2 space-y-1;
+}
+
+.execution-action {
+  @apply text-sm text-gray-700 pl-4 border-l-2 border-gray-200;
+}
+
+.execution-action-success {
+  @apply border-green-500;
+}
+
+.execution-action-failed {
+  @apply border-red-500;
+}
+
+.execution-error {
+  @apply mt-2 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700;
+}
+
+/* Configuration Form */
+.config-form {
+  @apply space-y-4;
+}
+
+.config-group {
+  @apply space-y-2;
+}
+
+.config-label {
+  @apply block text-sm font-medium text-gray-700;
+}
+
+.config-input {
+  @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent;
+}
+
+.config-textarea {
+  @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-mono text-sm;
+}
+
+.config-select {
+  @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent;
+}
+
+.config-checkbox {
+  @apply w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500;
+}
+
+.config-help {
+  @apply text-xs text-gray-500;
+}
+
+/* Available Skills List */
+.available-skill-item {
+  @apply p-4 hover:bg-gray-50 cursor-pointer transition-colors;
+}
+
+.available-skill-item:hover {
+  @apply bg-indigo-50;
+}
+
+.available-skill-content {
+  @apply flex items-start justify-between;
+}
+
+.available-skill-info {
+  @apply flex-1;
+}
+
+.available-skill-name {
+  @apply font-medium text-gray-900;
+}
+
+.available-skill-description {
+  @apply text-sm text-gray-600 mt-1;
+}
+
+.available-skill-meta {
+  @apply flex items-center gap-3 text-xs text-gray-500 mt-2;
+}
+
+.available-skill-add-btn {
+  @apply px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm;
+}
+
+/* Modal */
+.modal {
+  @apply fixed inset-0 z-50 overflow-y-auto;
+}
+
+.modal-overlay {
+  @apply fixed inset-0 bg-black bg-opacity-50 transition-opacity;
+}
+
+.modal-content {
+  @apply relative bg-white rounded-lg shadow-xl mx-auto my-8 max-w-2xl;
+}
+
+.modal-header {
+  @apply flex items-center justify-between p-6 border-b border-gray-200;
+}
+
+.modal-close {
+  @apply text-gray-400 hover:text-gray-600 text-2xl font-bold w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100;
+}
+
+.modal-body {
+  @apply p-6;
+}
+
+.modal-footer {
+  @apply flex items-center justify-end gap-3 p-6 border-t border-gray-200;
+}
+
+/* Toast Notifications */
+.toast {
+  @apply bg-white rounded-lg shadow-lg border border-gray-200 p-4 max-w-sm transform transition-all duration-300 ease-in-out;
+  animation: slideIn 0.3s ease-out;
+}
+
+.toast.success {
+  @apply border-green-500;
+}
+
+.toast.error {
+  @apply border-red-500;
+}
+
+.toast.warning {
+  @apply border-yellow-500;
+}
+
+.toast-content {
+  @apply flex items-start gap-3;
+}
+
+.toast-icon {
+  @apply flex-shrink-0 w-5 h-5;
+}
+
+.toast-icon.success {
+  @apply text-green-500;
+}
+
+.toast-icon.error {
+  @apply text-red-500;
+}
+
+.toast-icon.warning {
+  @apply text-yellow-500;
+}
+
+.toast-message {
+  @apply text-sm text-gray-700 flex-1;
+}
+
+.toast-close {
+  @apply text-gray-400 hover:text-gray-600 cursor-pointer flex-shrink-0;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .skill-meta {
+    grid-template-cols: 2;
+  }
+
+  .skill-actions {
+    flex-direction: column;
+  }
+
+  .skill-action-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
