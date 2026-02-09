@@ -6281,8 +6281,8 @@
       const content = document.getElementById('tabContentLinks');
 
       // Check if the content element exists
+      // This is normal when the matter detail view is not currently open
       if (!content) {
-        console.error('tabContentLinks element not found');
         return;
       }
 
@@ -7206,8 +7206,8 @@
       const content = document.getElementById('tabContentLinks');
 
       // Check if the content element exists
+      // This is normal when the matter detail view is not currently open
       if (!content) {
-        console.error('tabContentLinks element not found');
         return;
       }
 
@@ -8638,10 +8638,10 @@
         Toast.success('Link created successfully');
         closeCreateLinkModal();
 
-        // Always refresh the linked matters tab if we're viewing a matter
-        // This handles both the tab view and when viewing from the drawer
-        if (currentMatterData && currentMatterData.matter) {
-          renderLinkedMattersTab(currentMatterData.matter);
+        // Refresh the linked matters section if we're viewing a matter
+        // Linked matters are displayed in the Details tab, not as a separate tab
+        if (currentMatterData && currentMatterData.matter && document.getElementById('linkedMattersSection')) {
+          renderLinkedMattersInDetails(currentMatterData.matter);
         }
 
       } catch (error) {
@@ -8712,9 +8712,10 @@
 
         Toast.success('Link removed successfully');
 
-        // Refresh the linked matters tab
-        if (currentMatterData && currentMatterData.matter) {
-          renderLinkedMattersTab(currentMatterData.matter);
+        // Refresh the linked matters section if we're viewing a matter
+        // Linked matters are displayed in the Details tab, not as a separate tab
+        if (currentMatterData && currentMatterData.matter && document.getElementById('linkedMattersSection')) {
+          renderLinkedMattersInDetails(currentMatterData.matter);
         }
 
       } catch (error) {
@@ -9347,6 +9348,25 @@
         console.log('[openManageShareModal] Shared with users:', matter.shared_with_users);
         console.log('[openManageShareModal] Permissions:', matter.permissions);
 
+        // Fetch permissions separately if not included in matter details
+        let permissions = matter.permissions || [];
+        if (permissions.length === 0) {
+          try {
+            const permissionsResponse = await fetch(`${api.baseUrl}/api/v1/matters/${matterId}/permissions`, {
+              headers: {
+                'Authorization': `Bearer ${api.token}`
+              }
+            });
+            if (permissionsResponse.ok) {
+              const permissionsData = await permissionsResponse.json();
+              permissions = permissionsData.permissions || permissionsData || [];
+              console.log('[openManageShareModal] Fetched permissions separately:', permissions);
+            }
+          } catch (error) {
+            console.warn('[openManageShareModal] Could not fetch permissions:', error);
+          }
+        }
+
         // Get all organization users
         const usersResponse = await fetch(`${api.baseUrl}/api/v1/users`, {
           headers: {
@@ -9381,6 +9401,8 @@
 
           if (matter.shared_with_users && Array.isArray(matter.shared_with_users)) {
             sharedUserIds = matter.shared_with_users.map(su => su.user_id || su.id);
+          } else if (permissions && Array.isArray(permissions) && permissions.length > 0) {
+            sharedUserIds = permissions.map(p => p.user_id || p.id);
           } else if (matter.permissions && Array.isArray(matter.permissions)) {
             sharedUserIds = matter.permissions.map(p => p.user_id || p.id);
           } else if (matter.shared_with && Array.isArray(matter.shared_with)) {
@@ -10048,11 +10070,12 @@
         }
         loadMatters();
 
-        // Always refresh linked matters tab if viewing the workspace
-        // This handles both the tab view and when viewing from the drawer
+        // Refresh linked matters section if viewing the workspace
+        // Linked matters are displayed in the Details tab, not as a separate tab
         if (currentMatterData && currentMatterData.matter &&
-            currentMatterData.matter.matter_id === workspaceId) {
-          renderLinkedMattersTab(currentMatterData.matter);
+            currentMatterData.matter.matter_id === workspaceId &&
+            document.getElementById('linkedMattersSection')) {
+          renderLinkedMattersInDetails(currentMatterData.matter);
         }
 
       } catch (error) {
