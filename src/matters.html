@@ -11146,8 +11146,11 @@
           return;
         }
 
+        // Save the matter ID before closing modal (close sets currentEditFieldsMatter to null)
+        const matterId = currentEditFieldsMatter;
+
         // Update via settings endpoint
-        const response = await api.put(`/api/v1/matters/${currentEditFieldsMatter}/settings`, {
+        const response = await api.put(`/api/v1/matters/${matterId}/settings`, {
           custom_field_definitions: validDefinitions,
           custom_fields: validValues
         });
@@ -11156,13 +11159,13 @@
         closeEditCustomFieldsModal();
 
         // Reload matter details - backend returns { matter: {...} }
-        const updatedMatter = await api.getMatter(currentEditFieldsMatter, { bustCache: true });
+        const updatedMatter = await api.getMatter(matterId, { bustCache: true });
         if (updatedMatter && updatedMatter.matter) {
           window.currentViewedMatter = updatedMatter.matter;
           await renderCustomFieldsSection(updatedMatter.matter);
 
           // Also refresh the activity feed to show the changes
-          const activityResult = await api.getMatterActivity(currentEditFieldsMatter, 20, 0);
+          const activityResult = await api.getMatterActivity(matterId, 20, 0);
           if (activityResult && activityResult.activities && window.currentMatterData) {
             window.currentMatterData.activities = activityResult.activities;
             window.currentMatterData.activityPagination = activityResult.pagination;
