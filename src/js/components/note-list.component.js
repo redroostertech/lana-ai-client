@@ -99,9 +99,9 @@ class NoteListComponent {
    */
   render() {
     this.container.innerHTML = `
-      <div class="space-y-4">
-        <!-- Note Composer - Unified Component -->
-        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div class="flex flex-col h-full">
+        <!-- Note Composer - Fixed at top -->
+        <div class="flex-shrink-0 bg-white rounded-lg border border-gray-200 overflow-hidden mb-4">
           <!-- Header with Focus Mode Toggle -->
           <div class="px-4 pt-4 pb-3 border-b border-gray-100 flex items-center justify-between">
             <h3 class="text-sm font-medium text-gray-700">New Note</h3>
@@ -141,11 +141,13 @@ class NoteListComponent {
           </div>
         </div>
 
-        <!-- Notes List -->
-        <div id="notesList" class="space-y-4">
-          <div class="text-center py-8">
-            <div class="inline-block animate-spin w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full"></div>
-            <p class="mt-2 text-sm text-gray-500">Loading notes...</p>
+        <!-- Notes List - Scrollable -->
+        <div class="flex-1 overflow-y-auto">
+          <div id="notesList" class="space-y-4 pr-2">
+            <div class="text-center py-8">
+              <div class="inline-block animate-spin w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full"></div>
+              <p class="mt-2 text-sm text-gray-500">Loading notes...</p>
+            </div>
           </div>
         </div>
       </div>
@@ -496,17 +498,36 @@ class NoteListComponent {
     let content = '';
 
     // Get content from appropriate editor
-    if (fromFocusMode && this.focusModeEditor) {
-      // Get HTML from Tiptap editor
-      content = this.focusModeEditor.getHTML();
-      // Get text for validation
-      const textContent = this.focusModeEditor.getText().trim();
+    if (fromFocusMode) {
+      // Focus mode: try Tiptap first, fall back to contenteditable
+      if (this.focusModeEditor) {
+        // Get HTML from Tiptap editor
+        content = this.focusModeEditor.getHTML();
+        // Get text for validation
+        const textContent = this.focusModeEditor.getText().trim();
 
-      if (!title && !textContent) {
-        this.showError('Please enter a title or content');
-        return;
+        if (!title && !textContent) {
+          this.showError('Please enter a title or content');
+          return;
+        }
+      } else {
+        // Fall back to contenteditable div
+        const focusEditorContainer = document.getElementById('notesFocusEditorContainer');
+        if (!focusEditorContainer) {
+          this.showError('Focus mode editor not found');
+          return;
+        }
+
+        content = focusEditorContainer.innerHTML;
+        const textContent = focusEditorContainer.textContent.trim();
+
+        if (!title && !textContent) {
+          this.showError('Please enter a title or content');
+          return;
+        }
       }
     } else {
+      // Regular mode
       const editorContainer = document.getElementById('notesEditorContainer');
       if (!editorContainer) return;
 
@@ -570,9 +591,16 @@ class NoteListComponent {
 
       // Clear inputs
       titleInput.value = '';
-      if (fromFocusMode && this.focusModeEditor) {
-        this.focusModeEditor.commands.clearContent();
+      if (fromFocusMode) {
+        // Clear focus mode editor
+        if (this.focusModeEditor) {
+          this.focusModeEditor.commands.clearContent();
+        } else {
+          const focusEditorContainer = document.getElementById('notesFocusEditorContainer');
+          if (focusEditorContainer) focusEditorContainer.textContent = '';
+        }
       } else {
+        // Clear regular mode editor
         const editorContainer = document.getElementById('notesEditorContainer');
         if (editorContainer) editorContainer.textContent = '';
       }
@@ -597,9 +625,14 @@ class NoteListComponent {
 
     if (titleInput) titleInput.value = '';
 
-    if (fromFocusMode && this.focusModeEditor) {
-      // Clear Tiptap editor in focus mode
-      this.focusModeEditor.commands.clearContent();
+    if (fromFocusMode) {
+      // Clear focus mode editor
+      if (this.focusModeEditor) {
+        this.focusModeEditor.commands.clearContent();
+      } else {
+        const focusEditorContainer = document.getElementById('notesFocusEditorContainer');
+        if (focusEditorContainer) focusEditorContainer.textContent = '';
+      }
     } else {
       // Clear regular contenteditable
       const editorContainer = document.getElementById('notesEditorContainer');
@@ -669,11 +702,21 @@ class NoteListComponent {
       }
     }
 
-    // Copy content from regular editor to Tiptap
+    // Copy content from regular editor to focus mode editor
     const regularEditor = document.getElementById('notesEditorContainer');
-    if (regularEditor && this.focusModeEditor) {
+    if (regularEditor) {
       const content = regularEditor.innerHTML;
-      this.focusModeEditor.commands.setContent(content);
+
+      if (this.focusModeEditor) {
+        // Copy to Tiptap
+        this.focusModeEditor.commands.setContent(content);
+      } else {
+        // Copy to contenteditable
+        const focusEditorContainer = document.getElementById('notesFocusEditorContainer');
+        if (focusEditorContainer) {
+          focusEditorContainer.innerHTML = content;
+        }
+      }
     }
 
     // Show modal
@@ -714,11 +757,20 @@ class NoteListComponent {
       regularTitle.value = focusTitle.value;
     }
 
-    // Copy content from Tiptap back to regular editor
+    // Copy content from focus mode back to regular editor
     const regularEditor = document.getElementById('notesEditorContainer');
-    if (regularEditor && this.focusModeEditor) {
-      const content = this.focusModeEditor.getHTML();
-      regularEditor.innerHTML = content;
+    if (regularEditor) {
+      if (this.focusModeEditor) {
+        // Copy from Tiptap
+        const content = this.focusModeEditor.getHTML();
+        regularEditor.innerHTML = content;
+      } else {
+        // Copy from contenteditable
+        const focusEditorContainer = document.getElementById('notesFocusEditorContainer');
+        if (focusEditorContainer) {
+          regularEditor.innerHTML = focusEditorContainer.innerHTML;
+        }
+      }
     }
 
     // Hide modal

@@ -169,7 +169,21 @@ class MatterNotesAPIClient {
   async updateNote(matterId, noteId, updates) {
     return this.makeAuthenticatedRequest(async () => {
       const endpoint = `/api/v1/matters/${matterId}/notes/${noteId}`;
-      return this.requestWithTimeout(this.api.put(endpoint, updates), 30000);
+      const response = await this.requestWithTimeout(this.api.put(endpoint, updates), 30000);
+
+      // Handle API response format: { status: "success", data: { note: {...} } }
+      if (response.status === 'success' && response.data) {
+        const note = response.data.note || response.data;
+        return {
+          note: {
+            ...note,
+            note_id: note.id || note.note_id
+          }
+        };
+      }
+
+      // Fallback for direct format
+      return response;
     });
   }
 
@@ -202,7 +216,24 @@ class MatterNotesAPIClient {
       if (options.limit) params.append('limit', options.limit);
 
       const endpoint = `/api/v1/matters/${matterId}/notes/search?${params.toString()}`;
-      return this.requestWithTimeout(this.api.get(endpoint), 30000);
+      const response = await this.requestWithTimeout(this.api.get(endpoint), 30000);
+
+      // Handle API response format: { status: "success", data: { results: [...], total: N, query: "..." } }
+      if (response.status === 'success' && response.data) {
+        const results = (response.data.results || []).map(note => ({
+          ...note,
+          note_id: note.id || note.note_id
+        }));
+
+        return {
+          results: results,
+          total: response.data.total || 0,
+          query: response.data.query || query
+        };
+      }
+
+      // Fallback for direct format
+      return response;
     });
   }
 
