@@ -37,6 +37,7 @@ class NoteListComponent {
     this.statistics = null;
     this.isSearching = false;
     this.focusModeEditor = null; // Tiptap editor instance for focus mode
+    this.editingNoteId = null; // Track which note is being edited
 
     // Virtual scrolling state
     this.virtualScroll = {
@@ -236,6 +237,25 @@ class NoteListComponent {
     const notesList = document.getElementById('notesList');
     if (notesList) {
       notesList.addEventListener('click', (e) => {
+        // Handle edit button clicks
+        if (e.target.closest('.note-edit-btn')) {
+          e.stopPropagation();
+          const editBtn = e.target.closest('.note-edit-btn');
+          const noteId = editBtn.getAttribute('data-note-id');
+          this.handleEditNote(noteId);
+          return;
+        }
+
+        // Handle delete button clicks
+        if (e.target.closest('.note-delete-btn')) {
+          e.stopPropagation();
+          const deleteBtn = e.target.closest('.note-delete-btn');
+          const noteId = deleteBtn.getAttribute('data-note-id');
+          this.handleDeleteNote(noteId);
+          return;
+        }
+
+        // Handle note item clicks (for selection)
         const noteItem = e.target.closest('[data-note-id]');
         if (noteItem) {
           const noteId = noteItem.getAttribute('data-note-id');
@@ -386,10 +406,10 @@ class NoteListComponent {
             </div>
           </div>
           <div class="flex gap-1 flex-shrink-0">
-            <button class="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded" title="Edit note" onclick="event.stopPropagation()">
+            <button class="note-edit-btn p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded" title="Edit note" data-note-id="${note.note_id}">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
             </button>
-            <button class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded" title="Delete note" onclick="event.stopPropagation()">
+            <button class="note-delete-btn p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded" title="Delete note" data-note-id="${note.note_id}">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
             </button>
           </div>
@@ -506,12 +526,47 @@ class NoteListComponent {
         ai_generated: false
       };
 
-      const newNote = await this.options.apiClient.createNote(this.options.matterId, noteData);
+      // Check if we're editing an existing note
+      if (this.editingNoteId) {
+        // Update existing note
+        const response = await this.options.apiClient.updateNote(
+          this.options.matterId,
+          this.editingNoteId,
+          noteData
+        );
 
-      // Add to list
-      this.notes.unshift(newNote);
-      this.filteredNotes = [...this.notes];
-      this.renderNotesList();
+        // Extract note from response (API returns { note: Note })
+        const updatedNote = response.note || response;
+
+        // Update in list
+        this.updateNote(this.editingNoteId, updatedNote);
+
+        // Clear editing state
+        this.editingNoteId = null;
+
+        // Reset save button
+        const saveBtn = document.getElementById('notesSaveBtn');
+        if (saveBtn) {
+          saveBtn.textContent = 'Save Note';
+          saveBtn.classList.remove('bg-amber-600', 'hover:bg-amber-700');
+          saveBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+        }
+
+        this.showSuccess('Note updated successfully');
+      } else {
+        // Create new note
+        const response = await this.options.apiClient.createNote(this.options.matterId, noteData);
+
+        // Extract note from response (API returns { note: Note })
+        const newNote = response.note || response;
+
+        // Add to list
+        this.notes.unshift(newNote);
+        this.filteredNotes = [...this.notes];
+        this.renderNotesList();
+
+        this.showSuccess('Note saved successfully');
+      }
 
       // Clear inputs
       titleInput.value = '';
@@ -521,8 +576,6 @@ class NoteListComponent {
         const editorContainer = document.getElementById('notesEditorContainer');
         if (editorContainer) editorContainer.textContent = '';
       }
-
-      this.showSuccess('Note saved successfully');
 
       // Close focus mode if saving from there
       if (fromFocusMode) {
@@ -551,6 +604,19 @@ class NoteListComponent {
       // Clear regular contenteditable
       const editorContainer = document.getElementById('notesEditorContainer');
       if (editorContainer) editorContainer.textContent = '';
+    }
+
+    // Reset editing state if we were editing
+    if (this.editingNoteId) {
+      this.editingNoteId = null;
+
+      // Reset save button
+      const saveBtn = document.getElementById('notesSaveBtn');
+      if (saveBtn) {
+        saveBtn.textContent = 'Save Note';
+        saveBtn.classList.remove('bg-amber-600', 'hover:bg-amber-700');
+        saveBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+      }
     }
   }
 
@@ -765,6 +831,81 @@ class NoteListComponent {
     setTimeout(() => {
       toast.remove();
     }, 2000);
+  }
+
+  /**
+   * Handle edit note button click
+   */
+  async handleEditNote(noteId) {
+    const note = this.notes.find(n => n.note_id === noteId);
+    if (!note) {
+      this.showError('Note not found');
+      return;
+    }
+
+    // Populate the editor with the note content for editing
+    const titleInput = document.getElementById('notesTitleInput');
+    const editorContainer = document.getElementById('notesEditorContainer');
+
+    if (titleInput) {
+      titleInput.value = note.title || '';
+    }
+
+    if (editorContainer) {
+      editorContainer.innerHTML = note.content || '';
+    }
+
+    // Store the note being edited so we can update instead of create
+    this.editingNoteId = noteId;
+
+    // Update the save button to show "Update Note"
+    const saveBtn = document.getElementById('notesSaveBtn');
+    if (saveBtn) {
+      saveBtn.textContent = 'Update Note';
+      saveBtn.classList.add('bg-amber-600', 'hover:bg-amber-700');
+      saveBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+    }
+
+    // Scroll to top to show the editor
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Focus on title input
+    if (titleInput) {
+      setTimeout(() => titleInput.focus(), 300);
+    }
+
+    this.showSuccess('Note loaded for editing');
+  }
+
+  /**
+   * Handle delete note button click
+   */
+  async handleDeleteNote(noteId) {
+    const note = this.notes.find(n => n.note_id === noteId);
+    if (!note) {
+      this.showError('Note not found');
+      return;
+    }
+
+    const confirmed = window.confirm(`Are you sure you want to delete the note "${note.title || 'Untitled Note'}"?`);
+    if (!confirmed) return;
+
+    try {
+      await this.options.apiClient.deleteNote(this.options.matterId, noteId);
+
+      // Remove from list
+      this.removeNote(noteId);
+
+      this.showSuccess('Note deleted successfully');
+
+      // Notify parent if callback exists
+      if (this.options.onNoteDelete) {
+        this.options.onNoteDelete(noteId);
+      }
+    } catch (error) {
+      console.error('[NoteList] Failed to delete note:', error);
+      this.showError('Failed to delete note');
+    }
   }
 
   /**

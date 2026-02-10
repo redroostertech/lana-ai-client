@@ -76,7 +76,28 @@ class MatterNotesAPIClient {
       const queryString = params.toString();
       const endpoint = `/api/v1/matters/${matterId}/notes${queryString ? '?' + queryString : ''}`;
 
-      return this.requestWithTimeout(this.api.get(endpoint), 30000);
+      const response = await this.requestWithTimeout(this.api.get(endpoint), 30000);
+
+      // Handle API response format: { status: "success", data: { notes: [...], total: N, hasMore: false } }
+      if (response.status === 'success' && response.data) {
+        // Normalize field names: id -> note_id
+        const notes = (response.data.notes || []).map(note => ({
+          ...note,
+          note_id: note.id || note.note_id
+        }));
+
+        return {
+          notes: notes,
+          pagination: {
+            total: response.data.total || 0,
+            has_more: response.data.hasMore || false,
+            next_cursor: response.data.nextCursor || null
+          }
+        };
+      }
+
+      // Fallback for direct format
+      return response;
     });
   }
 
@@ -91,7 +112,21 @@ class MatterNotesAPIClient {
   async createNote(matterId, noteData) {
     return this.makeAuthenticatedRequest(async () => {
       const endpoint = `/api/v1/matters/${matterId}/notes`;
-      return this.requestWithTimeout(this.api.post(endpoint, noteData), 30000);
+      const response = await this.requestWithTimeout(this.api.post(endpoint, noteData), 30000);
+
+      // Handle API response format: { status: "success", data: { note: {...} } }
+      if (response.status === 'success' && response.data) {
+        const note = response.data.note || response.data;
+        return {
+          note: {
+            ...note,
+            note_id: note.id || note.note_id
+          }
+        };
+      }
+
+      // Fallback for direct format
+      return response;
     });
   }
 
@@ -104,7 +139,21 @@ class MatterNotesAPIClient {
   async getNote(matterId, noteId) {
     return this.makeAuthenticatedRequest(async () => {
       const endpoint = `/api/v1/matters/${matterId}/notes/${noteId}`;
-      return this.requestWithTimeout(this.api.get(endpoint), 30000);
+      const response = await this.requestWithTimeout(this.api.get(endpoint), 30000);
+
+      // Handle API response format: { status: "success", data: { note: {...} } }
+      if (response.status === 'success' && response.data) {
+        const note = response.data.note || response.data;
+        return {
+          note: {
+            ...note,
+            note_id: note.id || note.note_id
+          }
+        };
+      }
+
+      // Fallback for direct format
+      return response;
     });
   }
 
