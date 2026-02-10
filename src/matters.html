@@ -2716,6 +2716,13 @@
       const container = document.getElementById('customFieldsSection');
       if (!container) return;
 
+      // Validate matter object has required properties
+      if (!matter || !matter.matter_id) {
+        console.error('[renderCustomFieldsSection] Invalid matter object:', matter);
+        container.innerHTML = '<div class="bg-yellow-50 rounded-lg p-4 mt-6"><p class="text-sm text-yellow-700">Cannot display custom fields: Invalid matter data</p></div>';
+        return;
+      }
+
       // Extract custom field definitions and values
       const customFieldDefs = matter.metadata?.custom_field_definitions || [];
       const customFieldValues = matter.metadata?.custom_fields || [];
@@ -10740,6 +10747,13 @@
 
     // Open edit custom fields modal
     async function openEditCustomFieldsModal(matterId) {
+      // Validate matterId is provided
+      if (!matterId || matterId === 'null' || matterId === 'undefined') {
+        console.error('[openEditCustomFieldsModal] Invalid matter ID:', matterId);
+        Toast.error('Cannot open custom fields: Invalid matter ID');
+        return;
+      }
+
       currentEditFieldsMatter = matterId;
 
       // Load current custom field definitions and values
