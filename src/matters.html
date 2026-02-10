@@ -10749,16 +10749,26 @@
       if (!matter || matter.matter_id !== matterId) {
         try {
           const result = await api.getMatter(matterId, { bustCache: true });
-          if (result.success && result.matter) {
+
+          // Check for error response from backend: { error: { message: "...", code: "..." } }
+          if (result && result.error) {
+            console.error('[openEditCustomFieldsModal] API error:', result.error);
+            Toast.error(result.error.message || 'Failed to load matter details');
+            return;
+          }
+
+          // Backend returns { matter: {...} } on success
+          if (result && result.matter) {
             matter = result.matter;
             window.currentViewedMatter = matter;
           } else {
+            console.error('[openEditCustomFieldsModal] Invalid API response:', result);
             Toast.error('Failed to load matter details');
             return;
           }
         } catch (error) {
           console.error('[openEditCustomFieldsModal] Error loading matter:', error);
-          Toast.error('Failed to load matter details');
+          Toast.error(error.message || 'Failed to load matter details');
           return;
         }
       }
@@ -11131,9 +11141,9 @@
         Toast.success('Custom fields updated successfully!');
         closeEditCustomFieldsModal();
 
-        // Reload matter details
+        // Reload matter details - backend returns { matter: {...} }
         const updatedMatter = await api.getMatter(currentEditFieldsMatter, { bustCache: true });
-        if (updatedMatter.success && updatedMatter.matter) {
+        if (updatedMatter && updatedMatter.matter) {
           window.currentViewedMatter = updatedMatter.matter;
           await renderCustomFieldsSection(updatedMatter.matter);
 
