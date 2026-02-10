@@ -10,10 +10,10 @@
  */
 
 window.APP_VERSION = {
-  version: '3.2.0',
+  version: '4.0.0',
   buildNumber: '1',
   releaseType: 'stable',
-  displayVersion: '3.2.0',
+  displayVersion: '4.0.0',
   buildDate: '2026-01-30T03:23:38.872Z',
 
   /**
