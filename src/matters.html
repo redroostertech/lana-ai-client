@@ -600,12 +600,22 @@
             <p id="drawerClientName" class="text-sm text-gray-500"></p>
           </div>
           <div class="flex items-center gap-2 flex-shrink-0">
+            <button id="drawerEditBtn" class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Edit matter">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+              </svg>
+            </button>
+            <button id="drawerDeleteBtn" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete matter">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+              </svg>
+            </button>
             <button id="refreshMatterBtn" onclick="refreshCurrentMatter()" class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Refresh matter details">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
               </svg>
             </button>
-            <button id="closeDrawer" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+            <button id="closeDrawer" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="Close">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
           </div>
@@ -620,18 +630,15 @@
         </button>
         <button id="tabDocuments" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('documents')">
           Documents
-          <span id="documentCount" class="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-full"></span>
         </button>
         <button id="tabConversations" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('conversations')">
           Conversations
-          <span id="conversationCount" class="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-full"></span>
         </button>
         <button id="tabActivity" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('activity')">
           Activity
         </button>
         <button id="tabComments" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('comments')">
           Comments
-          <span id="commentCountBadge" class="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-full"></span>
         </button>
         <button id="tabTasks" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('tasks')">
           Tasks
@@ -641,7 +648,6 @@
         </button>
         <button id="tabNotes" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('notes')">
           Notes
-          <span id="notesCount" class="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-full"></span>
         </button>
         <!-- TODO: Re-enable Skills tab when ready for production
         <button id="tabSkills" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('skills')">
@@ -668,12 +674,6 @@
         <div id="tabContentSkills" class="hidden p-6"></div>
         -->
         <div id="tabContentConnectedData" class="hidden p-6"></div>
-      </div>
-
-      <!-- Footer Actions -->
-      <div id="drawerFooter" class="px-6 py-4 border-t border-gray-200 flex gap-2 flex-shrink-0">
-        <button id="drawerEditBtn" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium">Edit Matter</button>
-        <button id="drawerDeleteBtn" class="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg font-medium">Delete</button>
       </div>
     </div>
   </div>
@@ -2614,25 +2614,8 @@
 
         document.getElementById('drawerStatusBadge').innerHTML = matterTypeBadge + statusBadge(matter.status || 'active');
 
-        // Update conversation count and hide badge if 0
-        const conversationCountEl = document.getElementById('conversationCount');
-        const conversationCount = chats.length || 0;
-        conversationCountEl.textContent = conversationCount || '';
-        conversationCountEl.style.display = conversationCount > 0 ? 'inline' : 'none';
-
-        // Update document count and hide badge if 0
-        const documentCountEl = document.getElementById('documentCount');
-        const documentCount = documentsPagination.total_count || documents.length || 0;
-        documentCountEl.textContent = documentCount || '';
-        documentCountEl.style.display = documentCount > 0 ? 'inline' : 'none';
-        // Task count removed - no longer displayed in tab header
-
-        // Update comment count badge
-        const commentBadge = document.getElementById('commentCountBadge');
-        if (commentBadge) {
-          commentBadge.textContent = commentCount || '';
-          commentBadge.classList.toggle('hidden', commentCount === 0);
-        }
+        // Tab count badges removed from UI
+        // Counts are now only visible within the tab content itself
 
         // Hide Skills tab for workspaces (skills only apply to client matters)
         const skillsTab = document.getElementById('tabSkills');
@@ -3708,12 +3691,6 @@
           currentMatterData.documents = documents;
           currentMatterData.documentsPagination = pagination;
         }
-
-        // Update document count badge and hide if 0
-        const documentCountEl = document.getElementById('documentCount');
-        const documentCount = pagination.total_count || documents.length || 0;
-        documentCountEl.textContent = documentCount || '';
-        documentCountEl.style.display = documentCount > 0 ? 'inline' : 'none';
 
         // Re-render the documents tab
         renderDocumentsTab(currentMatterData.matter, documents);
@@ -5010,15 +4987,6 @@
 
         renderCommentsList(comments, matterId);
         updatePaginationUI();
-
-        // Update badge count (only for unread, not paginated)
-        const unreadBadgeResponse = await api.getComments(matterId, { limit: 0, sort: 'created_at:desc' });
-        const unreadPagination = unreadBadgeResponse.pagination || {};
-        const badge = document.getElementById('commentCountBadge');
-        if (badge) {
-          badge.textContent = unreadPagination.total || '';
-          badge.classList.toggle('hidden', !unreadPagination.total);
-        }
       } catch (error) {
         console.error('Failed to load comments:', error);
         document.getElementById('commentsList').innerHTML = `
