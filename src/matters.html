@@ -2711,8 +2711,8 @@
     // Global similar matters widget instance
     let similarMattersWidget = null;
 
-    // Render Custom Fields Section
-    async function renderCustomFieldsSection(matter) {
+    // Render Custom Fields Section (global so it can be called from other script tags)
+    window.renderCustomFieldsSection = async function(matter) {
       const container = document.getElementById('customFieldsSection');
       if (!container) return;
 
@@ -2824,7 +2824,7 @@
           `}
         </div>
       `;
-    }
+    }; // End of window.renderCustomFieldsSection
 
     // Render Matter Profile Section
     async function renderMatterProfileSection(matter) {
@@ -3109,7 +3109,7 @@
       renderLinkedMattersInDetails(matter);
 
       // Render Custom Fields (after linked matters)
-      renderCustomFieldsSection(matter);
+      window.renderCustomFieldsSection(matter);
 
       // Initialize Similar Matters Widget - TEMPORARILY DISABLED
       /*
@@ -11162,7 +11162,7 @@
         const updatedMatter = await api.getMatter(matterId, { bustCache: true });
         if (updatedMatter && updatedMatter.matter) {
           window.currentViewedMatter = updatedMatter.matter;
-          await renderCustomFieldsSection(updatedMatter.matter);
+          await window.renderCustomFieldsSection(updatedMatter.matter);
 
           // Also refresh the activity feed to show the changes
           const activityResult = await api.getMatterActivity(matterId, 20, 0);
