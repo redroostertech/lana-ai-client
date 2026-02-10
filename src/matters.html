@@ -643,10 +643,12 @@
           Notes
           <span id="notesCount" class="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-full"></span>
         </button>
+        <!-- TODO: Re-enable Skills tab when ready for production
         <button id="tabSkills" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('skills')">
           Skills
           <span class="ml-1 px-1.5 py-0.5 text-xs bg-purple-100 text-purple-800 rounded-full">BETA</span>
         </button>
+        -->
         <button id="tabConnectedData" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('connectedData')">
           Connected Data
         </button>
@@ -662,7 +664,9 @@
         <div id="tabContentTasks" class="hidden p-6"></div>
         <div id="tabContentContacts" class="hidden p-6"></div>
         <div id="tabContentNotes" class="hidden p-6"></div>
+        <!-- TODO: Re-enable Skills tab content when ready for production
         <div id="tabContentSkills" class="hidden p-6"></div>
+        -->
         <div id="tabContentConnectedData" class="hidden p-6"></div>
       </div>
 
@@ -2658,7 +2662,8 @@
       const { matter, permissions, activities, activityPagination, chats, chatsPagination, documents, orphanedFiles, tasks, contacts, notes } = currentMatterData;
 
       // Update tab buttons
-      const tabs = ['Details', 'Documents', 'Conversations', 'Activity', 'Comments', 'Tasks', 'Contacts', 'Notes', 'Skills', 'ConnectedData'];
+      // TODO: Re-enable 'Skills' in tabs array when ready for production
+      const tabs = ['Details', 'Documents', 'Conversations', 'Activity', 'Comments', 'Tasks', 'Contacts', 'Notes', /* 'Skills', */ 'ConnectedData'];
       tabs.forEach(tab => {
         const btn = document.getElementById(`tab${tab}`);
         const content = document.getElementById(`tabContent${tab}`);
@@ -2699,9 +2704,10 @@
         case 'notes':
           renderNotesTab(matter);
           break;
-        case 'skills':
-          renderSkillsTab(matter);
-          break;
+        // TODO: Re-enable Skills tab case when ready for production
+        // case 'skills':
+        //   renderSkillsTab(matter);
+        //   break;
         case 'connecteddata':
           renderConnectedDataTab(matter);
           break;
@@ -4628,7 +4634,13 @@
 
     // Render Activity Tab
     function renderActivityTab(matter, activities, pagination) {
+      console.log('[renderActivityTab] Called with', { matterId: matter?.matter_id, activitiesCount: activities?.length });
       const content = document.getElementById('tabContentActivity');
+
+      if (!content) {
+        console.warn('[renderActivityTab] Content element not found - tab may not be visible');
+        return;
+      }
 
       if (activities.length === 0) {
         content.innerHTML = `
@@ -6397,23 +6409,8 @@
         submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
         submitBtn.innerHTML = originalButtonHtml;
 
-        // Refresh matter data to get updated contacts and activity feed
-        if (currentMatterData) {
-          const result = await api.getMatter(matterId, { bustCache: true });
-          if (result.success && result.matter) {
-            const updatedContacts = result.matter.contacts || [];
-            currentMatterData.contacts = updatedContacts;
-            renderContactsTab(currentMatterData.matter, updatedContacts);
-
-            // Also refresh the activity feed to show the new contact creation activity
-            const activityResult = await api.getMatterActivity(matterId, 20, 0);
-            if (activityResult && activityResult.activities) {
-              currentMatterData.activities = activityResult.activities;
-              currentMatterData.activityPagination = activityResult.pagination;
-              renderActivityTab(currentMatterData.matter, activityResult.activities, activityResult.pagination);
-            }
-          }
-        }
+        // Use the same refresh functionality as the refresh button
+        await refreshCurrentMatter();
       } catch (error) {
         console.error('Save contact error:', error);
         Toast.error('Failed to create contact');
@@ -6430,6 +6427,8 @@
       const modal = document.getElementById('contactDetailModal');
       const content = document.getElementById('contactDetailContent');
 
+      console.log('[openContactDetail] Opening contact', { contactId });
+
       // Show loading state
       content.innerHTML = `
         <div class="flex items-center justify-center py-12">
@@ -6444,6 +6443,8 @@
         if (!matterId) {
           throw new Error('Matter ID not found');
         }
+
+        console.log('[openContactDetail] Fetching contact details', { matterId, contactId });
 
         // Fetch contact details
         const response = await fetch(`${api.baseUrl}/api/v1/matters/${matterId}/contacts/${contactId}`, {
@@ -6570,7 +6571,7 @@
             </div>
 
             <!-- Action Buttons -->
-            ${!isExternal ? `
+            ${!isConnectorContact ? `
               <div class="flex justify-end gap-3 pt-6 border-t border-gray-200">
                 <button
                   onclick="confirmDeleteContact('${contact.id}', '${displayName}')"
@@ -6722,15 +6723,13 @@
         Toast.success('Contact updated successfully');
         closeEditContactModal();
 
-        // Refresh matter data
-        if (currentMatterData) {
-          const result = await api.getMatter(matterId, { bustCache: true });
-          if (result.success && result.matter) {
-            const updatedContacts = result.matter.contacts || [];
-            currentMatterData.contacts = updatedContacts;
-            renderContactsTab(currentMatterData.matter, updatedContacts);
-          }
-        }
+        // Restore button state before refreshing data
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        submitBtn.innerHTML = originalButtonHtml;
+
+        // Use the same refresh functionality as the refresh button
+        await refreshCurrentMatter();
       } catch (error) {
         console.error('Update contact error:', error);
         Toast.error('Failed to update contact');
@@ -6743,9 +6742,15 @@
 
     // Confirm Delete Contact
     window.confirmDeleteContact = function(contactId, contactName) {
-      if (confirm(`Are you sure you want to delete the contact "${contactName}"? This action cannot be undone.`)) {
-        deleteContact(contactId);
-      }
+      Modal.confirm(
+        'Delete Contact',
+        `Are you sure you want to delete the contact "${contactName}"? This action cannot be undone.`,
+        () => {
+          deleteContact(contactId);
+        },
+        'Delete',
+        'danger'
+      );
     };
 
     // Delete Contact
@@ -6756,8 +6761,13 @@
         return;
       }
 
+      console.log('[deleteContact] Deleting contact', { matterId, contactId });
+
       try {
-        const response = await fetch(`${api.baseUrl}/api/v1/matters/${matterId}/contacts/${contactId}`, {
+        const url = `${api.baseUrl}/api/v1/matters/${matterId}/contacts/${contactId}`;
+        console.log('[deleteContact] DELETE URL:', url);
+
+        const response = await fetch(url, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${api.token}`,
@@ -6765,22 +6775,22 @@
           }
         });
 
+        console.log('[deleteContact] Response status:', response.status);
+
         if (!response.ok) {
-          throw new Error('Failed to delete contact');
+          const errorData = await response.json().catch(() => ({}));
+          console.error('[deleteContact] Failed to delete:', errorData);
+          throw new Error(errorData.message || 'Failed to delete contact');
         }
+
+        const result = await response.json();
+        console.log('[deleteContact] Success:', result);
 
         Toast.success('Contact deleted successfully');
         closeContactDetailModal();
 
-        // Refresh matter data
-        if (currentMatterData) {
-          const result = await api.getMatter(matterId, { bustCache: true });
-          if (result.success && result.matter) {
-            const updatedContacts = result.matter.contacts || [];
-            currentMatterData.contacts = updatedContacts;
-            renderContactsTab(currentMatterData.matter, updatedContacts);
-          }
-        }
+        // Use the same refresh functionality as the refresh button
+        await refreshCurrentMatter();
       } catch (error) {
         console.error('Delete contact error:', error);
         Toast.error('Failed to delete contact');
@@ -6796,7 +6806,13 @@
 
     // Render Contacts Tab
     function renderContactsTab(matter, contacts) {
+      console.log('[renderContactsTab] Called with', { matterId: matter?.matter_id, contactsCount: contacts?.length });
       const content = document.getElementById('tabContentContacts');
+
+      if (!content) {
+        console.warn('[renderContactsTab] Content element not found - tab may not be visible');
+        return;
+      }
 
       if (!contacts || contacts.length === 0) {
         content.innerHTML = `

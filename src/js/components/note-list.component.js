@@ -192,6 +192,54 @@ class NoteListComponent {
           </div>
         </div>
       </div>
+
+      <!-- Delete Confirmation Modal -->
+      <div id="notesDeleteModal" class="hidden fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden transform transition-all">
+          <!-- Modal Header -->
+          <div class="flex items-center gap-3 px-6 py-5 border-b border-gray-200">
+            <!-- Icon -->
+            <div class="flex items-center justify-center w-10 h-10 bg-red-100 rounded-lg flex-shrink-0">
+              <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+              </svg>
+            </div>
+
+            <!-- Title -->
+            <h3 class="text-lg font-semibold text-gray-900 flex-1">Delete Note</h3>
+
+            <!-- Close button -->
+            <button id="notesDeleteModalClose" class="text-gray-400 hover:text-gray-600 transition-colors">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Modal Body -->
+          <div class="px-6 py-5">
+            <p class="text-gray-700 text-base">
+              Are you sure you want to delete "<span id="notesDeleteModalTitle" class="font-semibold text-gray-900"></span>"?
+            </p>
+            <p class="text-sm text-gray-500 mt-2">
+              This action cannot be undone.
+            </p>
+          </div>
+
+          <!-- Modal Footer -->
+          <div class="px-6 py-4 bg-gray-50 flex justify-end gap-3">
+            <button id="notesDeleteModalCancel" class="px-4 py-2 text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg font-medium transition-colors">
+              Cancel
+            </button>
+            <button id="notesDeleteModalConfirm" class="px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-colors flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+              </svg>
+              Delete Note
+            </button>
+          </div>
+        </div>
+      </div>
     `;
   }
 
@@ -939,25 +987,85 @@ class NoteListComponent {
       return;
     }
 
-    const confirmed = window.confirm(`Are you sure you want to delete the note "${note.title || 'Untitled Note'}"?`);
-    if (!confirmed) return;
+    // Show custom delete confirmation modal
+    this.showDeleteModal(note.title || 'Untitled Note', async () => {
+      try {
+        await this.options.apiClient.deleteNote(this.options.matterId, noteId);
 
-    try {
-      await this.options.apiClient.deleteNote(this.options.matterId, noteId);
+        // Remove from list
+        this.removeNote(noteId);
 
-      // Remove from list
-      this.removeNote(noteId);
+        this.showSuccess('Note deleted successfully');
 
-      this.showSuccess('Note deleted successfully');
-
-      // Notify parent if callback exists
-      if (this.options.onNoteDelete) {
-        this.options.onNoteDelete(noteId);
+        // Notify parent if callback exists
+        if (this.options.onNoteDelete) {
+          this.options.onNoteDelete(noteId);
+        }
+      } catch (error) {
+        console.error('[NoteList] Failed to delete note:', error);
+        this.showError('Failed to delete note');
       }
-    } catch (error) {
-      console.error('[NoteList] Failed to delete note:', error);
-      this.showError('Failed to delete note');
+    });
+  }
+
+  /**
+   * Show delete confirmation modal
+   */
+  showDeleteModal(noteTitle, onConfirm) {
+    const modal = document.getElementById('notesDeleteModal');
+    const titleSpan = document.getElementById('notesDeleteModalTitle');
+    const closeBtn = document.getElementById('notesDeleteModalClose');
+    const cancelBtn = document.getElementById('notesDeleteModalCancel');
+    const confirmBtn = document.getElementById('notesDeleteModalConfirm');
+
+    if (!modal || !titleSpan || !closeBtn || !cancelBtn || !confirmBtn) {
+      console.error('[NoteList] Delete modal elements not found');
+      return;
     }
+
+    // Set the note title in the modal
+    titleSpan.textContent = noteTitle;
+
+    // Show the modal
+    modal.classList.remove('hidden');
+
+    // Handle cancel/close
+    const handleCancel = () => {
+      modal.classList.add('hidden');
+      closeBtn.removeEventListener('click', handleCancel);
+      cancelBtn.removeEventListener('click', handleCancel);
+      confirmBtn.removeEventListener('click', handleConfirm);
+    };
+
+    // Handle confirm
+    const handleConfirm = () => {
+      modal.classList.add('hidden');
+      closeBtn.removeEventListener('click', handleCancel);
+      cancelBtn.removeEventListener('click', handleCancel);
+      confirmBtn.removeEventListener('click', handleConfirm);
+      onConfirm();
+    };
+
+    // Attach event listeners
+    closeBtn.addEventListener('click', handleCancel);
+    cancelBtn.addEventListener('click', handleCancel);
+    confirmBtn.addEventListener('click', handleConfirm);
+
+    // Close modal on backdrop click
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        handleCancel();
+      }
+    });
+
+    // Close modal on ESC key
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+        handleCancel();
+        document.removeEventListener('keydown', handleEscape);
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
   }
 
   /**
