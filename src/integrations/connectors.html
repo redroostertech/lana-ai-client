@@ -700,18 +700,17 @@
       openConnectorManage(connectorId);
     }
 
-    // Open custom connector UI - navigate to full page
+    // Open custom connector UI - navigate to local wrapper page
     function openCustomConnectorUI(uiEntryPoint, connectorName) {
-      // Get base URL from config
-      const baseUrl = window.lanaAPI?.baseUrl || window.LanaConfig?.API_BASE_URL || '';
+      console.log('[Connector UI] Opening via wrapper:', uiEntryPoint);
 
-      // Construct full URL
-      const fullUrl = `${baseUrl}${uiEntryPoint}`;
+      // Navigate to local wrapper page with URL parameters
+      const params = new URLSearchParams({
+        ui: uiEntryPoint,
+        name: connectorName
+      });
 
-      console.log('[Connector UI] Navigating to:', fullUrl);
-
-      // Navigate to connector UI page
-      window.location.href = fullUrl;
+      window.location.href = `connector-viewer.html?${params.toString()}`;
     }
 
     // Close custom connector UI modal
