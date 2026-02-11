@@ -700,7 +700,7 @@
       openConnectorManage(connectorId);
     }
 
-    // Open custom connector UI in new tab
+    // Open custom connector UI - navigate to full page
     function openCustomConnectorUI(uiEntryPoint, connectorName) {
       // Get base URL from config
       const baseUrl = window.lanaAPI?.baseUrl || window.LanaConfig?.API_BASE_URL || '';
@@ -708,10 +708,10 @@
       // Construct full URL
       const fullUrl = `${baseUrl}${uiEntryPoint}`;
 
-      console.log('[Connector UI] Opening in new tab:', fullUrl);
+      console.log('[Connector UI] Navigating to:', fullUrl);
 
-      // Open in new tab
-      window.open(fullUrl, '_blank', 'noopener,noreferrer');
+      // Navigate to connector UI page
+      window.location.href = fullUrl;
     }
 
     // Close custom connector UI modal
