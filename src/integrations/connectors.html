@@ -1841,11 +1841,11 @@
         formData.append('file', selectedConnectorFile);
 
         // Get base URL from config or lanaAPI
-        const baseUrl = window.lanaAPI?.baseUrl || window.CONFIG?.API_BASE_URL || '';
+        const baseUrl = window.lanaAPI?.baseUrl || window.LanaConfig?.API_BASE_URL || '';
 
         console.log('[Connector Import] baseUrl:', baseUrl);
         console.log('[Connector Import] window.lanaAPI:', window.lanaAPI);
-        console.log('[Connector Import] window.CONFIG:', window.CONFIG);
+        console.log('[Connector Import] window.LanaConfig:', window.LanaConfig);
 
         if (!baseUrl) {
           Toast.error('API server not configured. Please set API_BASE_URL in config.js or connect to a server.');
