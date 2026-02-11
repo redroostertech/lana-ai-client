@@ -50,7 +50,7 @@ window.LanaConfig = {
    *   'http://api.company.local:3000' - Local DNS name
    *   'https://api.lana.company.com'  - Production server
    */
-  API_BASE_URL: '',
+  API_BASE_URL: 'http://localhost:8080',
 
   /**
    * Connector Registry URL
