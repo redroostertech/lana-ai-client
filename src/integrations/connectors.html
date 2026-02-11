@@ -1840,8 +1840,11 @@
         const formData = new FormData();
         formData.append('file', selectedConnectorFile);
 
+        // Get base URL from config or lanaAPI
+        const baseUrl = window.lanaAPI?.baseUrl || window.CONFIG?.API_BASE_URL || '';
+
         // Upload ZIP file to backend
-        const response = await fetch('/api/connectors/ui/import', {
+        const response = await fetch(`${baseUrl}/api/connectors/ui/import`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
