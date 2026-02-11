@@ -190,6 +190,14 @@
               Connectors bridge your existing business systems with LanaAI, automatically syncing data across CRMs, case management, financial tools, and more. Once connected, your team gets unified access to all your business data while LanaAI gains the context needed to provide intelligent assistance across your entire operation.
             </p>
           </div>
+          <div class="flex-shrink-0">
+            <button onclick="openImportConnectorModal()" class="px-6 py-3 bg-white hover:bg-indigo-50 text-indigo-600 font-semibold rounded-lg shadow-lg transition-all flex items-center gap-2 hover:shadow-xl">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+              </svg>
+              Import Connector
+            </button>
+          </div>
         </div>
       </div>
 
@@ -545,21 +553,28 @@
       // Apply defaults for system-level integrations
       connector = getConnectorWithDefaults(connector);
 
+      // Check if connector has custom UI from manifest
+      const hasCustomUI = !!(connector.ui_entry_point && connector.manifest);
+      const manifest = connector.manifest || {};
+
       // Normalize connector data - handle backend field variations
+      // Prefer manifest data if available (from custom UI upload)
       const normalizedConnector = {
         id: connector.id || connector.connector_id || 'unknown',
-        name: connector.name || connector.connector_name || 'Unknown Connector',
-        description: connector.description || connector.connector_description || 'No description available',
+        name: manifest.name || connector.name || connector.connector_name || 'Unknown Connector',
+        description: manifest.description || connector.description || connector.connector_description || 'No description available',
         status: connector.status || connector.auth_status || 'disconnected',
-        category: connector.category || connector.connector_category || 'unknown',
+        category: manifest.category || connector.category || connector.connector_category || 'unknown',
         records: connector.records || connector.total_records || 0,
         lastSync: connector.lastSync || connector.last_sync || connector.last_sync_at || null,
-        logo_url: connector.logo_url || connector.logo || connector.icon || null,
-        vendor: connector.vendor || null,
+        logo_url: manifest.icon || connector.logo_url || connector.logo || connector.icon || null,
+        vendor: manifest.vendor || connector.vendor || null,
         auth_type: connector.auth_type || 'unknown',
         capabilities: connector.capabilities || [],
         tags: connector.tags || [],
-        documentation_url: connector.documentation_url || null
+        documentation_url: connector.documentation_url || null,
+        ui_entry_point: connector.ui_entry_point || null,
+        ui_layout_id: connector.ui_layout_id || null
       };
 
       const statusColors = {
@@ -596,7 +611,7 @@
         : `<span class="text-lg font-bold text-gray-400">${normalizedConnector.name.charAt(0)}</span>`;
 
       return `
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 ${isComingSoon ? 'opacity-60' : 'hover:shadow-md'} transition-shadow ${isComingSoon ? '' : 'cursor-pointer'}" ${isComingSoon ? '' : `onclick="openConnector('${normalizedConnector.id}', '${normalizedConnector.category}')"`}>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 ${isComingSoon ? 'opacity-60' : 'hover:shadow-md'} transition-shadow ${isComingSoon ? '' : 'cursor-pointer'}" ${isComingSoon ? '' : hasCustomUI ? `onclick="openCustomConnectorUI('${normalizedConnector.ui_entry_point}', '${normalizedConnector.name}')"` : `onclick="openConnector('${normalizedConnector.id}', '${normalizedConnector.category}')"`}>
           <div class="flex items-start justify-between mb-4">
             <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
               ${logoHtml}
@@ -683,6 +698,66 @@
     // Backward compatibility - keep openConnector as alias
     function openConnector(connectorId, category) {
       openConnectorManage(connectorId);
+    }
+
+    // Open custom connector UI in modal iframe
+    function openCustomConnectorUI(uiEntryPoint, connectorName) {
+      // Create modal overlay
+      const modal = document.createElement('div');
+      modal.id = 'customConnectorModal';
+      modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+      modal.innerHTML = `
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-6xl h-[90vh] flex flex-col">
+          <!-- Modal Header -->
+          <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+            <h2 class="text-xl font-semibold text-gray-900">${connectorName}</h2>
+            <button onclick="closeCustomConnectorUI()" class="text-gray-400 hover:text-gray-600 transition-colors">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Modal Body - iframe -->
+          <div class="flex-1 overflow-hidden">
+            <iframe
+              id="customConnectorFrame"
+              src="${uiEntryPoint}"
+              class="w-full h-full border-0"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+              allow="clipboard-read; clipboard-write"
+            ></iframe>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+
+      // Close on backdrop click
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          closeCustomConnectorUI();
+        }
+      });
+
+      // Close on Escape key
+      document.addEventListener('keydown', handleEscapeKey);
+    }
+
+    // Close custom connector UI modal
+    function closeCustomConnectorUI() {
+      const modal = document.getElementById('customConnectorModal');
+      if (modal) {
+        modal.remove();
+        document.removeEventListener('keydown', handleEscapeKey);
+      }
+    }
+
+    // Handle Escape key to close modal
+    function handleEscapeKey(e) {
+      if (e.key === 'Escape') {
+        closeCustomConnectorUI();
+      }
     }
 
     // Render available connector card from registry
@@ -1519,7 +1594,470 @@
         Toast.error('Failed to delete conversation');
       }
     }
+
+    // ============================================================
+    // Import Connector Functionality
+    // ============================================================
+
+    let selectedConnectorFile = null;
+    let parsedConnectorConfig = null;
+
+    // Open import connector modal
+    window.openImportConnectorModal = function() {
+      const modal = document.getElementById('importConnectorModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+
+      // Reset state
+      clearConnectorFile();
+    }
+
+    // Close import connector modal
+    window.closeImportConnectorModal = function() {
+      const modal = document.getElementById('importConnectorModal');
+      modal.classList.remove('flex');
+      modal.classList.add('hidden');
+
+      // Reset state
+      clearConnectorFile();
+    }
+
+    // Handle file selection
+    window.handleConnectorFileSelect = function(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      // Validate ZIP file
+      if (file.type !== 'application/zip' &&
+          file.type !== 'application/x-zip-compressed' &&
+          !file.name.endsWith('.zip')) {
+        Toast.error('Please select a valid ZIP file');
+        return;
+      }
+
+      // Check file size (max 20MB)
+      const maxSize = 20 * 1024 * 1024; // 20MB
+      if (file.size > maxSize) {
+        Toast.error('File size exceeds 20MB limit');
+        return;
+      }
+
+      selectedConnectorFile = file;
+      displayFileInfo(file);
+
+      // Show success message for ZIP file selection
+      showValidationSuccess('ZIP file selected. Ready to upload to backend for validation.');
+
+      // Enable import button
+      document.getElementById('importConnectorBtn').disabled = false;
+    }
+
+    // Display file info
+    function displayFileInfo(file) {
+      const filePreviewSection = document.getElementById('filePreviewSection');
+      const fileName = document.getElementById('fileName');
+      const fileSize = document.getElementById('fileSize');
+
+      fileName.textContent = file.name;
+      fileSize.textContent = formatFileSize(file.size);
+
+      filePreviewSection.classList.remove('hidden');
+    }
+
+    // Display connector info
+    function displayConnectorInfo(config) {
+      document.getElementById('connectorName').textContent = config.name || 'N/A';
+      document.getElementById('connectorVersion').textContent = config.version || 'N/A';
+      document.getElementById('connectorCategory').textContent = formatText(config.category || 'unknown');
+      document.getElementById('connectorAuthType').textContent = formatAuthType(config.auth?.type || 'unknown');
+      document.getElementById('connectorDescription').textContent = config.description || 'No description provided';
+    }
+
+    // Format auth type for display
+    function formatAuthType(authType) {
+      const authTypeMap = {
+        'oauth2': 'OAuth 2.0',
+        'api_key': 'API Key',
+        'basic': 'Basic Auth'
+      };
+      return authTypeMap[authType] || formatText(authType);
+    }
+
+    // Validate connector config
+    function validateConnectorConfig(config) {
+      const validationStatus = document.getElementById('validationStatus');
+      const importBtn = document.getElementById('importConnectorBtn');
+
+      const errors = [];
+      const warnings = [];
+
+      // Required fields
+      if (!config.id) errors.push('Missing required field: id');
+      if (!config.name) errors.push('Missing required field: name');
+      if (!config.version) errors.push('Missing required field: version');
+      if (!config.category) errors.push('Missing required field: category');
+
+      // Auth configuration
+      if (!config.auth || !config.auth.type) {
+        errors.push('Missing required field: auth.type');
+      } else {
+        if (config.auth.type === 'oauth2') {
+          if (!config.auth.oauth2?.authorization_url) errors.push('OAuth2 requires authorization_url');
+          if (!config.auth.oauth2?.token_url) errors.push('OAuth2 requires token_url');
+          if (!config.auth.oauth2?.scopes) warnings.push('OAuth2 scopes not specified');
+        } else if (config.auth.type === 'api_key') {
+          if (!config.auth.api_key?.location) errors.push('API key requires location (header/query)');
+          if (!config.auth.api_key?.key_name) errors.push('API key requires key_name');
+        }
+      }
+
+      // API configuration
+      if (!config.api || !config.api.base_url) {
+        errors.push('Missing required field: api.base_url');
+      }
+      if (!config.api?.endpoints || Object.keys(config.api.endpoints).length === 0) {
+        warnings.push('No API endpoints defined');
+      }
+
+      // Transform configuration
+      if (!config.transform) {
+        warnings.push('No data transformation mapping defined');
+      }
+
+      // Sync configuration
+      if (!config.sync) {
+        warnings.push('No sync strategy defined');
+      }
+
+      // Display validation results
+      if (errors.length > 0) {
+        showValidationError('Validation failed:\n' + errors.join('\n'));
+        importBtn.disabled = true;
+      } else if (warnings.length > 0) {
+        showValidationWarning('Validation passed with warnings:\n' + warnings.join('\n'));
+        importBtn.disabled = false;
+      } else {
+        showValidationSuccess('Configuration is valid and ready to import');
+        importBtn.disabled = false;
+      }
+    }
+
+    // Show validation error
+    function showValidationError(message) {
+      const validationStatus = document.getElementById('validationStatus');
+      validationStatus.innerHTML = `
+        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div class="flex gap-3">
+            <svg class="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <div>
+              <h4 class="text-sm font-semibold text-red-900 mb-1">Validation Error</h4>
+              <p class="text-sm text-red-800 whitespace-pre-line">${message}</p>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Show validation warning
+    function showValidationWarning(message) {
+      const validationStatus = document.getElementById('validationStatus');
+      validationStatus.innerHTML = `
+        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div class="flex gap-3">
+            <svg class="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+            <div>
+              <h4 class="text-sm font-semibold text-yellow-900 mb-1">Validation Warning</h4>
+              <p class="text-sm text-yellow-800 whitespace-pre-line">${message}</p>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Show validation success
+    function showValidationSuccess(message) {
+      const validationStatus = document.getElementById('validationStatus');
+      validationStatus.innerHTML = `
+        <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div class="flex gap-3">
+            <svg class="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            <div>
+              <h4 class="text-sm font-semibold text-green-900 mb-1">Valid Configuration</h4>
+              <p class="text-sm text-green-800">${message}</p>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Clear selected file
+    window.clearConnectorFile = function() {
+      selectedConnectorFile = null;
+      parsedConnectorConfig = null;
+
+      document.getElementById('connectorFileInput').value = '';
+      document.getElementById('filePreviewSection').classList.add('hidden');
+      document.getElementById('validationStatus').innerHTML = '';
+      document.getElementById('importConnectorBtn').disabled = true;
+    }
+
+    // Format file size
+    function formatFileSize(bytes) {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    }
+
+    // Confirm import
+    window.confirmImportConnector = async function() {
+      if (!selectedConnectorFile) {
+        Toast.error('No connector ZIP file selected');
+        return;
+      }
+
+      const importBtn = document.getElementById('importConnectorBtn');
+      const originalBtnText = importBtn.innerHTML;
+
+      try {
+        // Disable button and show loading state
+        importBtn.disabled = true;
+        importBtn.innerHTML = `
+          <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+          </svg>
+          <span>Uploading...</span>
+        `;
+
+        // Create FormData to send ZIP file
+        const formData = new FormData();
+        formData.append('file', selectedConnectorFile);
+
+        // Upload ZIP file to backend
+        const response = await fetch('/api/connectors/ui/import', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: formData
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+          // Show success message with connector name if available
+          const connectorName = result.connector_name || selectedConnectorFile.name;
+          Toast.success(`Connector "${connectorName}" imported successfully!`);
+
+          // Show security scan results if any warnings
+          if (result.violations && result.violations.length > 0) {
+            setTimeout(() => {
+              Toast.warning(`Security scan found ${result.violations.length} warnings. Check logs for details.`);
+            }, 1500);
+          }
+
+          // Close modal
+          closeImportConnectorModal();
+
+          // Reload connectors to show the new one
+          setTimeout(() => {
+            loadConnectors();
+          }, 2000);
+        } else {
+          throw new Error(result.error || result.message || 'Failed to import connector');
+        }
+      } catch (error) {
+        console.error('Import error:', error);
+
+        // Better error messages
+        let errorMessage = error.message;
+        if (errorMessage.includes('404')) {
+          errorMessage = 'Import endpoint not available. Contact your administrator.';
+        } else if (errorMessage.includes('401') || errorMessage.includes('403')) {
+          errorMessage = 'You do not have permission to import connectors. Admin access required.';
+        } else if (errorMessage.includes('413')) {
+          errorMessage = 'File too large. Maximum size is 20MB.';
+        } else if (errorMessage.includes('400')) {
+          errorMessage = 'Invalid connector package. Please check the ZIP file structure.';
+        } else if (errorMessage.includes('security')) {
+          errorMessage = 'Security validation failed. ' + errorMessage;
+        } else if (errorMessage.includes('fetch')) {
+          errorMessage = 'Network error. Check your connection and try again.';
+        }
+
+        Toast.error(`Import failed: ${errorMessage}`);
+
+        // Re-enable button
+        importBtn.disabled = false;
+        importBtn.innerHTML = originalBtnText;
+      }
+    }
+
+    // Drag and drop support for file upload
+    const dropZone = document.getElementById('importDropZone');
+
+    if (dropZone) {
+      // Prevent default drag behaviors
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+      });
+
+      // Highlight drop zone when item is dragged over it
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+          dropZone.classList.add('border-indigo-400', 'bg-indigo-50');
+        }, false);
+      });
+
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+          dropZone.classList.remove('border-indigo-400', 'bg-indigo-50');
+        }, false);
+      });
+
+      // Handle dropped files
+      dropZone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+
+        if (files.length > 0) {
+          const file = files[0];
+
+          // Create a fake event object for handleConnectorFileSelect
+          const fakeEvent = {
+            target: {
+              files: [file]
+            }
+          };
+
+          handleConnectorFileSelect(fakeEvent);
+        }
+      }, false);
+    }
+
+    function preventDefaults(e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    // Close modal on escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const importModal = document.getElementById('importConnectorModal');
+        if (importModal && !importModal.classList.contains('hidden')) {
+          closeImportConnectorModal();
+        }
+      }
+    });
   </script>
+
+  <!-- Import Connector Modal -->
+  <div id="importConnectorModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4" onclick="if(event.target === this) closeImportConnectorModal()">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" onclick="event.stopPropagation()">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="flex-shrink-0 w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+            <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+            </svg>
+          </div>
+          <h2 class="text-xl font-semibold text-gray-900">Import Connector Configuration</h2>
+        </div>
+        <button onclick="closeImportConnectorModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6 overflow-y-auto flex-1">
+        <!-- Instructions -->
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div class="flex gap-3">
+            <svg class="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <div>
+              <h4 class="text-sm font-semibold text-blue-900 mb-1">Import Custom Connector</h4>
+              <p class="text-sm text-blue-800">
+                Upload a ZIP package containing your connector configuration (manifest.json, connector.json) and UI files (HTML/CSS/JS). The package must follow the connector schema with metadata, authentication, API endpoints, and UI assets.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- File Upload Area -->
+        <div id="importDropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-indigo-400 transition-colors cursor-pointer" onclick="document.getElementById('connectorFileInput').click()">
+          <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+          </svg>
+          <p class="text-gray-600 font-medium mb-1">Click to upload or drag and drop</p>
+          <p class="text-sm text-gray-500">Connector ZIP package (.zip)</p>
+          <input type="file" id="connectorFileInput" accept=".zip,application/zip" class="hidden" onchange="handleConnectorFileSelect(event)">
+        </div>
+
+        <!-- File Preview -->
+        <div id="filePreviewSection" class="hidden mt-6">
+          <h4 class="text-sm font-semibold text-gray-900 mb-3">Selected File</h4>
+          <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-3">
+                <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <div>
+                  <p id="fileName" class="text-sm font-medium text-gray-900"></p>
+                  <p id="fileSize" class="text-xs text-gray-500"></p>
+                </div>
+              </div>
+              <button onclick="clearConnectorFile()" class="text-red-600 hover:text-red-800 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+
+            <!-- ZIP Package Info -->
+            <div id="connectorInfo" class="space-y-2">
+              <div class="text-sm">
+                <span class="text-gray-500">Package Type:</span>
+                <span class="ml-2 font-medium text-gray-900">Connector ZIP Package</span>
+              </div>
+              <p class="text-sm text-gray-600">
+                The package will be validated on the backend. It should contain manifest.json, connector.json, and UI files (HTML/CSS/JS).
+              </p>
+            </div>
+          </div>
+
+          <!-- Validation Status -->
+          <div id="validationStatus" class="mt-4"></div>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50 flex-shrink-0">
+        <button onclick="closeImportConnectorModal()" class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          Cancel
+        </button>
+        <button id="importConnectorBtn" onclick="confirmImportConnector()" disabled class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+          </svg>
+          Import Connector
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- Delete Confirmation Modal -->
   <div id="deleteConfirmModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 10001;" onclick="if(event.target === this) closeDeleteConfirmModal()">
