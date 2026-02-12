@@ -1,0 +1,218 @@
+================================================================================
+MATTER DETAILS VIEW - VISUAL OUTLINE
+File: /Users/redroostertechnologies/Desktop/lana-client/src/matters.html
+================================================================================
+
+DETAILS TAB VISUAL HIERARCHY
+================================================================================
+
+┌─ renderDetailsTab (Lines 3002-3121)
+│  Container: #tabContentDetails
+│  Main Wrapper: space-y-6
+│
+├─┬─ 1. Matter Profile Notification (Lines 3006-3007)
+│ │  Location: Top of tab
+│ │  Container ID: #matterProfileNotification
+│ │  Content: Dynamic - populated by renderMatterProfileSection()
+│ │  Appears: When profile is generating
+│ │
+├─┬─ 2. Description Section (Lines 3009-3012) ╔════════════════════════╗
+│ │  Title: "Description" (INSIDE card)     ║ Title                  ║
+│ │  Card: bg-gray-50 rounded-lg p-4        ║ ────────────────────── ║
+│ │  Content: Matter description text        ║ Content (paragraph)    ║
+│ │                                          ╚════════════════════════╝
+│ │
+├─┬─ 3. Matter Profile Intelligence (Lines 3014-3015) 
+│ │  Container ID: #matterProfileSection    ╔════════════════════════╗
+│ │  Title: "Matter Profile Intelligence"   ║ 📋 Title               ║
+│ │  Title Position: INSIDE card             ║ ────────────────────── ║
+│ │  Card: gradient from indigo to purple    ║                        ║
+│ │  Sub-sections:                           ║ Brand Voice:           ║
+│ │    - Brand Voice (Line 2933)             ║   Key: Value           ║
+│ │    - Document Themes (Line 2947)         ║                        ║
+│ │                                          ║ Document Themes:       ║
+│ │                                          ║ [Badge] [Badge] [...]  ║
+│ │                                          ╚════════════════════════╝
+│ │
+├─┬─ 4. Matter Information (Lines 3017-3045)
+│ │  Title: "Matter Information" (INSIDE)   ╔════════════════════════╗
+│ │  Card: bg-gray-50 rounded-lg p-4        ║ Title                  ║
+│ │  Content: Definition list <dl>          ║ ────────────────────── ║
+│ │  Fields:                                 ║ Matter ID ..... xyz123 ║
+│ │    - Matter ID (3021)                    ║ Client ....... ACME Co ║
+│ │    - Client (3025)                       ║ Status ....... Active  ║
+│ │    - Status (3029)                       ║ Visibility ... Private ║
+│ │    - Visibility (3033)                   ║ Created ...... Jan 1   ║
+│ │    - Created (3037)                      ║ Last Updated . Now     ║
+│ │    - Last Updated (3041)                 ║                        ║
+│ │                                          ╚════════════════════════╝
+│ │
+├─┬─ 5. Shared With (Lines 3047-3079)
+│ │  Title: "Shared With" (OUTSIDE card)    ╔────────────────────────╗
+│ │  Header: Flex row with title + button   ║ Title      [Manage  +] ║
+│ │  Button: "Manage Sharing"                ║ ──────────────────────║
+│ │  Content Container: space-y-2            ║ [Avatar] John Doe  [✕]║
+│ │  Items: User list with avatars           ║ john@example.com       ║
+│ │  Per-item action: Remove button          ║                        ║
+│ │  Empty state: "Not shared" message       ║ [Avatar] Jane Smith[✕]║
+│ │                                          ║ jane@example.com       ║
+│ │                                          ║                        ║
+│ │                                          ║ All org members can... ║
+│ │                                          ╚────────────────────────╝
+│ │
+├─┬─ 6. Linked Matters (Lines 3081-3084)
+│ │  Container ID: #linkedMattersSection    ╔────────────────────────╗
+│ │  Title: "Linked Matters" (INSIDE)       ║ Title   [Link] [Create]║
+│ │  Header: Flex row with title + buttons  ║ ──────────────────────║
+│ │  Buttons (workspaces only):              ║ • Matter A (view) [✕] ║
+│ │    - "Link Existing Matter" (7523)       ║ • Matter B (view) [✕] ║
+│ │    - "Create New Matter" (7531)          ║                        ║
+│ │  Content: List of linked matters         ║ No linked matters      ║
+│ │  Empty state: Message + buttons          ║ [Link] [Create]        ║
+│ │  Functions: renderLinkedMattersInDetails ║                        ║
+│ │             renderLinkedMattersInlineContent
+│ │                                          ╚────────────────────────╝
+│ │
+└─┬─ 7. Custom Fields (Lines 3086-3087)
+  │  Container ID: #customFieldsSection     ╔────────────────────────╗
+  │  Title: "Custom Fields" (INSIDE)        ║ Title              [✎] ║
+  │  Card: bg-gray-50 rounded-lg p-4        ║ ──────────────────────║
+  │  Header: Flex row with title + button   ║ Field 1 ........ Value ║
+  │  Button: Edit button with pencil icon   ║ Field 2 ........ Value ║
+  │  Content: Definition list               ║ Field 3 ........ $1,00 ║
+  │  Field formatting:                      ║                        ║
+  │    - Currency: $ with 2 decimals        ║ No custom fields yet   ║
+  │    - Text: Uses formatFieldValue()      ║                        ║
+  │  Empty state: "No custom fields yet"    ║                        ║
+  │  Functions: window.renderCustomFieldsSection
+  │                                         ╚────────────────────────╝
+
+
+DOCUMENTS TAB VISUAL STRUCTURE
+================================================================================
+
+renderDocumentsTab (Lines 3179-3419)
+Container: #tabContentDocuments
+
+EMPTY STATE (Lines 3211-3237)
+┌────────────────────────────────────────┐
+│  ◉ (Large icon)                         │
+│  No documents yet                       │
+│  Upload documents to enable...          │
+│                                         │
+│  ┌─ [Upload dropzone] ──────────────┐  │
+│  │ 📤 Click to upload or drag & drop │  │
+│  │ PDF, Word, Excel up to 50MB      │  │
+│  └──────────────────────────────────┘  │
+└────────────────────────────────────────┘
+
+WITH DOCUMENTS STATE (Lines 3239-3416)
+┌────────────────────────────────────────────────────────────┐
+│ Upload Area (Lines 3241-3256)                              │
+│ ┌─ [Dashed border] ─────────────────────────────────────┐ │
+│ │ 📤 Upload files or drag and drop                      │ │
+│ │ (or progress: Uploading...)                           │ │
+│ └───────────────────────────────────────────────────────┘ │
+│                                                            │
+│ Document Count (Lines 3259-3262)                           │
+│ 3 documents                                                │
+│                                                            │
+│ Document List (Lines 3264-3363)                            │
+│ ┌─────────────────────────────────────────────────────┐  │
+│ │ [📄] Contract.pdf              100 KB | 2 days ago  │  │
+│ │      Status: Active            [Download] [View] [✕]│  │
+│ │                                                      │  │
+│ │      From Workspace                                 │  │
+│ └─────────────────────────────────────────────────────┘  │
+│                                                            │
+│ ┌─────────────────────────────────────────────────────┐  │
+│ │ [📊] Report.xlsx                50 KB | 1 week ago  │  │
+│ │      Status: Active            [Download] [View] [✕]│  │
+│ │                                                      │  │
+│ │      Shared                                          │  │
+│ └─────────────────────────────────────────────────────┘  │
+│                                                            │
+│ Unassigned Documents Section (Lines 3366-3415, if present) │
+│ ┌─────────────────────────────────────────────────────┐  │
+│ │ 📄 Unassigned Documents        [2 files found]      │  │
+│ │ ────────────────────────────────────────────────── │  │
+│ │ These files exist in storage but are not tracked... │  │
+│ │                                                      │  │
+│ │ [⚠] Lost_Document.pdf          25 KB                │  │
+│ │     [Link] [View] [Delete]                          │  │
+│ └─────────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────┘
+
+
+CONVERSATIONS TAB VISUAL STRUCTURE
+================================================================================
+
+renderConversationsTab (Lines 4514-4612)
+Container: #tabContentConversations
+
+EMPTY STATE (Lines 4518-4537)
+┌────────────────────────────────────────┐
+│  💬 (Large icon)                        │
+│  No conversations yet                   │
+│  Start a conversation to organize...    │
+│                                         │
+│  [🆕 Start First Conversation]         │
+└────────────────────────────────────────┘
+
+WITH CONVERSATIONS STATE (Lines 4546-4611)
+┌──────────────────────────────────────────────────────────────┐
+│ Header (Lines 4548-4556)                                      │
+│ 5 conversations         [🆕 New Chat]                         │
+│                                                               │
+│ List (Lines 4558-4580)                                        │
+│ ┌────────────────────────────────────────────────────────┐  │
+│ │ [💬] Discovery Call Discussion                        │ ▶ │
+│ │      Started 3 days ago • 12 messages                 │   │
+│ └────────────────────────────────────────────────────────┘  │
+│                                                               │
+│ ┌────────────────────────────────────────────────────────┐  │
+│ │ [💬] Contract Review                                  │ ▶ │
+│ │      Started 1 week ago • 8 messages                  │   │
+│ └────────────────────────────────────────────────────────┘  │
+│                                                               │
+│ Pagination (Lines 4582-4609, if total > 0)                   │
+│ ─────────────────────────────────────────────────────────   │
+│ Showing 1-2 of 5 conversations                               │
+│ [Previous] Page 1 of 3 [Next]                               │
+└──────────────────────────────────────────────────────────────┘
+
+
+KEY CHARACTERISTICS
+================================================================================
+
+TITLE POSITIONING:
+  Inside Card (Most Common):
+    Description (3010)
+    Matter Information (3018)
+    Matter Profile Intelligence (2927)
+    Custom Fields (2777)
+    Unassigned Documents (3370)
+    
+  Outside Card (Header Row):
+    Shared With (3050)
+    Linked Matters (7516)
+    Custom Fields Header (2777 - flex variant)
+
+CARD STYLING:
+  Standard: bg-gray-50 rounded-lg p-4
+  Gradient: bg-gradient-to-br from-indigo-50 to-purple-50 border-indigo-200
+  Warning: bg-yellow-50 border-yellow-200
+  Item: bg-white border-gray-200 hover:border-indigo-300
+
+BUTTONS:
+  Primary Header: px-3 py-1.5 text-xs bg-indigo-600 text-white
+  Secondary Icon: text-indigo-600 hover:text-indigo-800 p-1
+  Item Action: text-xs text-indigo-600 hover:text-indigo-800 font-medium
+  Pagination: px-3 py-1.5 text-sm border border-gray-300 rounded-md
+
+SPACING:
+  Section gaps: space-y-6 (Details) or space-y-4 (Docs/Convos)
+  Item gaps: space-y-2 (lists)
+  Internal padding: p-4 (cards) or p-3 (items)
+
+================================================================================

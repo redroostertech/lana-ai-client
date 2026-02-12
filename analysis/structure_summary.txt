@@ -1,0 +1,208 @@
+================================================================================
+MATTER DETAILS VIEW - COMPLETE STRUCTURE SUMMARY
+File: /Users/redroostertechnologies/Desktop/lana-client/src/matters.html
+================================================================================
+
+MAIN ENTRY POINT
+================================================================================
+viewMatter(matterId, tab)                              [Lines 2468-2650]
+  └─> renderDetailsTab() / renderDocumentsTab() / renderConversationsTab()
+
+
+DETAILS TAB STRUCTURE
+================================================================================
+renderDetailsTab(matter, permissions)                  [Lines 3002-3121]
+Container: #tabContentDetails                          [Line 3003]
+Wrapper: <div class="space-y-6">                       [Line 3005]
+
+  Section 1: Matter Profile Notification               [Lines 3006-3007]
+  ├─ Container ID: #matterProfileNotification
+  ├─ Type: Dynamic placeholder
+  └─ Render Function: renderMatterProfileSection()     [Lines 2818-2965]
+
+  Section 2: Description                               [Lines 3009-3012]
+  ├─ Title: "Description"
+  ├─ Title Position: INSIDE card
+  ├─ Card Classes: bg-gray-50 rounded-lg p-4
+  └─ Content: <p> with matter.description
+
+  Section 3: Matter Profile Intelligence               [Lines 3014-3015]
+  ├─ Container ID: #matterProfileSection
+  ├─ Title: "Matter Profile Intelligence"
+  ├─ Title Position: INSIDE card (line 2927)
+  ├─ Card Classes: bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-4
+  ├─ Sub-sections:
+  │  ├─ Brand Voice (line 2931-2943)
+  │  │  └─ Sub-title: "Brand Voice" (line 2933)
+  │  └─ Document Themes (line 2945-2956)
+  │     └─ Sub-title: "Document Themes" (line 2947)
+  └─ Render Function: renderMatterProfileSection()     [Lines 2818-2965]
+
+  Section 4: Matter Information                        [Lines 3017-3045]
+  ├─ Title: "Matter Information"
+  ├─ Title Position: INSIDE card (line 3018)
+  ├─ Card Classes: bg-gray-50 rounded-lg p-4
+  ├─ Content Structure: <dl> definition list
+  ├─ Fields:
+  │  ├─ Matter ID (line 3021-3022)
+  │  ├─ Client (line 3025-3026)
+  │  ├─ Status (line 3029-3030)
+  │  ├─ Visibility (line 3033-3034)
+  │  ├─ Created (line 3037-3038)
+  │  └─ Last Updated (line 3041-3042)
+  └─ Action Buttons: None
+
+  Section 5: Shared With                               [Lines 3047-3079]
+  ├─ Title: "Shared With"
+  ├─ Title Position: OUTSIDE card (in header, line 3050)
+  ├─ Header Structure: <div class="flex items-center justify-between mb-3">
+  │  ├─ Title: <h5> (line 3050)
+  │  └─ Button: "Manage Sharing" (lines 3051-3059)
+  │     └─ Classes: px-2 py-1 text-xs bg-indigo-600 text-white rounded
+  ├─ Content Wrapper: <div class="space-y-2"> (line 3061)
+  ├─ Item Classes: bg-gray-50 rounded-lg p-3
+  ├─ Item Actions: Remove button per user (line 3073)
+  └─ Empty State: Message (line 3077)
+
+  Section 6: Linked Matters                            [Lines 3081-3084]
+  ├─ Container ID: #linkedMattersSection
+  ├─ Title: "Linked Matters" (line 7516)
+  ├─ Title Position: INSIDE content section
+  ├─ Header Structure: <div class="flex items-center justify-between">
+  │  ├─ Title: <h5> (line 7516)
+  │  └─ Buttons (for workspaces):
+  │     ├─ "Link Existing Matter" (lines 7523-7530)
+  │     └─ "Create New Matter" (lines 7531-7539)
+  ├─ Render Function: renderLinkedMattersInDetails()   [Lines 7436-7479]
+  ├─ Content Function: renderLinkedMattersInlineContent() [Lines 7481-7600+]
+  ├─ Empty State: Message with action buttons         [Lines 7487-7510]
+  └─ Item Classes: (for linked matters list)
+
+  Section 7: Custom Fields                             [Lines 3086-3087]
+  ├─ Container ID: #customFieldsSection
+  ├─ Title: "Custom Fields"
+  ├─ Title Position: INSIDE card (line 2777)
+  ├─ Card Classes: bg-gray-50 rounded-lg p-4 mt-6
+  ├─ Header Structure: <div class="flex items-center justify-between mb-3">
+  │  ├─ Title: <h5> (line 2777)
+  │  └─ Button: Edit button with pencil icon (lines 2778-2786)
+  │     └─ Classes: text-indigo-600 hover:text-indigo-800 p-1 rounded
+  ├─ Content Structure: <dl> definition list
+  ├─ Field Formatting:
+  │  ├─ Currency: Formatted with $ and 2 decimals (lines 2796-2800)
+  │  └─ Other: Using formatFieldValue() (line 2802)
+  ├─ Render Function: window.renderCustomFieldsSection() [Lines 2704-2816]
+  └─ Empty State: "No custom fields yet" (line 2789)
+
+
+DOCUMENTS TAB STRUCTURE
+================================================================================
+renderDocumentsTab(matter, documents, orphanedFiles) [Lines 3179-3419]
+Container: #tabContentDocuments                        [Line 3181]
+
+  Empty State (No Documents)                           [Lines 3211-3237]
+  ├─ Centered icon, heading, description
+  ├─ Upload area: #drawerEmptyDropZone (line 3221)
+  └─ Setup: setupDrawerUpload()
+
+  With Documents State                                 [Lines 3239-3416]
+  └─ Main Container: <div class="space-y-4">
+
+     Upload Area                                       [Lines 3241-3256]
+     ├─ Container ID: #drawerDocDropZone
+     ├─ File Input ID: #drawerDocFileInput
+     ├─ Classes: border-2 border-dashed border-gray-300 rounded-lg p-4
+     ├─ Content Div: #drawerDocDropContent
+     └─ Progress Div: #drawerDocUploadProgress
+
+     Document Count Header                             [Lines 3259-3262]
+     └─ Simple text: "${documents.length} document(s)"
+
+     Document List                                     [Lines 3264-3363]
+     ├─ Container: <div class="space-y-2">
+     ├─ Item Wrapper Classes: bg-white border border-gray-200 rounded-lg p-3
+     ├─ Data Attr: data-doc-id="${doc.id}"
+     ├─ Item Structure:
+     │  ├─ Icon box (10x10, centered icon)
+     │  ├─ Filename & metadata
+     │  ├─ Source badge (if applicable)
+     │  │  ├─ "From Workspace" (line 3286)
+     │  │  └─ "Shared" (line 3294)
+     │  ├─ Status badge (element: [data-status-badge])
+     │  └─ Action buttons (element: [data-doc-actions])
+     └─ Actions: Download, View, Share, Delete
+        └─ Classes: text-xs text-indigo-600 hover:text-indigo-800
+
+     Unassigned Documents Section (Optional)           [Lines 3366-3415]
+     ├─ Title: "Unassigned Documents"
+     ├─ Title Position: INSIDE section (line 3370)
+     ├─ Title Row: Contains title and count badge
+     ├─ Container Classes: space-y-2
+     ├─ Item Classes: bg-yellow-50 border border-yellow-200 rounded-lg p-3
+     ├─ Data Attr: data-orphan-key="${file.storage_key}"
+     └─ Actions: Assign, View, Delete
+
+
+CONVERSATIONS TAB STRUCTURE
+================================================================================
+renderConversationsTab(matter, chats, pagination)     [Lines 4514-4612]
+Container: #tabContentConversations                    [Line 4516]
+
+  Empty State (No Conversations)                       [Lines 4518-4537]
+  ├─ Centered icon, heading, description
+  └─ Button: "Start First Conversation" (line 4528)
+
+  With Conversations State                             [Lines 4546-4611]
+  └─ Main Container: <div class="space-y-4">
+
+     Header Row                                        [Lines 4548-4556]
+     ├─ Left: Conversation count
+     ├─ Right: "New Chat" button
+     └─ Button Classes: inline-flex items-center gap-2 px-3 py-1.5
+                        bg-indigo-600 text-white rounded-lg
+
+     Conversation List                                 [Lines 4558-4580]
+     ├─ Container: <div class="space-y-2">
+     ├─ Item Wrapper: <div onclick="NavigationHelpers.navigateToConversation()">
+     ├─ Classes: block bg-white border border-gray-200 rounded-lg p-4
+     ├─ Item Structure:
+     │  ├─ Icon (gradient background, chat icon)
+     │  ├─ Title: metadata?.title || 'Untitled Conversation'
+     │  ├─ Timestamp: "Started {timeAgo}"
+     │  ├─ Message count: "{messageCount} messages"
+     │  └─ Right arrow icon (hover effect)
+     └─ Clickable: Navigates to conversation
+
+     Pagination Controls                               [Lines 4582-4609]
+     ├─ Only if total > 0
+     ├─ Container: <div class="border-t pt-4 mt-6">
+     ├─ Info: "Showing X-Y of Z conversations"
+     ├─ Page indicator: "Page X of Y"
+     ├─ Previous button (line 4589)
+     │  └─ Disabled when currentOffset === 0
+     ├─ Next button (line 4599)
+     │  └─ Disabled when !hasMore
+     └─ Classes: px-3 py-1.5 text-sm border rounded-md
+
+
+RENDER FUNCTIONS SUMMARY
+================================================================================
+Line 2468-2650    viewMatter(matterId, tab)
+Line 2704-2816    window.renderCustomFieldsSection(matter)
+Line 2818-2965    renderMatterProfileSection(matter)
+Line 3002-3121    renderDetailsTab(matter, permissions)
+Line 3179-3419    renderDocumentsTab(matter, documents, orphanedFiles)
+Line 4514-4612    renderConversationsTab(matter, chats, pagination)
+Line 7436-7479    renderLinkedMattersInDetails(matter)
+Line 7481-7600+   renderLinkedMattersInlineContent(matter, links, totalLinks)
+
+
+HELPER FUNCTIONS LOCATION
+================================================================================
+Line 2968         formatDate(dateString)
+Line 2985         formatFieldName(fieldName)
+Line 2993         formatFieldValue(value)
+Line 3203         formatSize(bytes)  [inside renderDocumentsTab]
+Line 3184         getFileIcon(contentType)  [inside renderDocumentsTab]
+
+================================================================================
