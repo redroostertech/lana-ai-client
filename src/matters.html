@@ -602,7 +602,7 @@
           <div class="flex items-center gap-2 flex-shrink-0">
             <button id="drawerEditBtn" class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Edit matter">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
               </svg>
             </button>
             <button id="drawerDeleteBtn" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete matter">
@@ -628,34 +628,34 @@
         <button id="tabDetails" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600" onclick="switchMatterTab('details')">
           Details
         </button>
-        <button id="tabDocuments" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('documents')">
+        <button id="tabDocuments" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent" onclick="switchMatterTab('documents')">
           Documents
         </button>
-        <button id="tabConversations" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('conversations')">
+        <button id="tabConversations" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent" onclick="switchMatterTab('conversations')">
           Conversations
         </button>
-        <button id="tabActivity" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('activity')">
+        <button id="tabActivity" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent" onclick="switchMatterTab('activity')">
           Activity
         </button>
-        <button id="tabComments" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('comments')">
+        <button id="tabComments" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent" onclick="switchMatterTab('comments')">
           Comments
         </button>
-        <button id="tabTasks" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('tasks')">
+        <button id="tabTasks" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent" onclick="switchMatterTab('tasks')">
           Tasks
         </button>
-        <button id="tabContacts" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('contacts')">
+        <button id="tabContacts" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent" onclick="switchMatterTab('contacts')">
           Contacts
         </button>
-        <button id="tabNotes" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('notes')">
+        <button id="tabNotes" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent" onclick="switchMatterTab('notes')">
           Notes
         </button>
         <!-- TODO: Re-enable Skills tab when ready for production
-        <button id="tabSkills" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('skills')">
+        <button id="tabSkills" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent" onclick="switchMatterTab('skills')">
           Skills
           <span class="ml-1 px-1.5 py-0.5 text-xs bg-purple-100 text-purple-800 rounded-full">BETA</span>
         </button>
         -->
-        <button id="tabConnectedData" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchMatterTab('connectedData')">
+        <button id="tabConnectedData" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent" onclick="switchMatterTab('connectedData')">
           Connected Data
         </button>
       </div>
@@ -1660,7 +1660,7 @@
             <!-- Matter Type and Status Badges -->
             <div class="flex items-center gap-2 mb-4">
               ${matter.matter_type === 'matter' ? `
-                <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800" title="Client Matter - Included in analytics">
+                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800" title="Client Matter - Included in analytics">
                   <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
                     <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
@@ -1668,7 +1668,7 @@
                   Matter
                 </span>
               ` : `
-                <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800" title="Workspace - Excluded from analytics">
+                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800" title="Workspace - Excluded from analytics">
                   <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                     <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/>
                   </svg>
@@ -2596,7 +2596,7 @@
 
         // Update status badge with matter type badge
         const matterTypeBadge = matter.matter_type === 'matter' ? `
-          <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800 mr-2" title="Client Matter - Included in analytics">
+          <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-2" title="Client Matter - Included in analytics">
             <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
               <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
               <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
@@ -2604,7 +2604,7 @@
             Matter
           </span>
         ` : `
-          <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800 mr-2" title="Workspace - Excluded from analytics">
+          <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 mr-2" title="Workspace - Excluded from analytics">
             <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
               <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/>
             </svg>
@@ -2771,48 +2771,54 @@
       // Always show container
       container.style.display = 'block';
 
-      container.innerHTML = `
-        <div class="bg-gray-50 rounded-lg p-4 mt-6">
-          <div class="flex items-center justify-between mb-3">
-            <h5 class="text-sm font-medium text-gray-700">Custom Fields</h5>
-            <button
-              onclick="openEditCustomFieldsModal('${matter.matter_id}')"
-              class="text-indigo-600 hover:text-indigo-800 p-1 rounded hover:bg-indigo-50 transition-colors"
-              title="Edit custom fields"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-              </svg>
-            </button>
-          </div>
-          ${fieldsToDisplay.length === 0 ? `
-            <p class="text-sm text-gray-500 text-center py-3">No custom fields yet</p>
-          ` : `
-            <dl class="space-y-2 text-sm">
-              ${fieldsToDisplay.map(field => {
-                let displayValue = field.value;
-
-                // Format currency values
-                if (field.type === 'currency' && field.value !== null && field.value !== undefined && field.value !== '') {
-                  const numValue = parseFloat(field.value);
-                  if (!isNaN(numValue)) {
-                    displayValue = '$' + numValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                  }
-                } else {
-                  displayValue = formatFieldValue(field.value);
-                }
-
-                return `
-                  <div class="flex justify-between">
-                    <dt class="text-gray-500">${escapeHtml(field.displayName)}</dt>
-                    <dd class="text-gray-900 text-right max-w-md truncate" title="${escapeHtml(String(field.value))}">${displayValue}</dd>
-                  </div>
-                `;
-              }).join('')}
-            </dl>
-          `}
-        </div>
+      // Build custom fields actions
+      const customFieldsActions = `
+        <button
+          onclick="openEditCustomFieldsModal('${matter.matter_id}')"
+          class="inline-flex items-center justify-center w-8 h-8 text-white rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors"
+          title="Edit custom fields"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+          </svg>
+        </button>
       `;
+
+      // Build custom fields content
+      const customFieldsContent = fieldsToDisplay.length === 0 ? `
+        <p class="text-sm text-gray-500 text-center py-3">No custom fields yet</p>
+      ` : `
+        <dl class="space-y-2 text-sm">
+          ${fieldsToDisplay.map(field => {
+            let displayValue = field.value;
+
+            // Format currency values
+            if (field.type === 'currency' && field.value !== null && field.value !== undefined && field.value !== '') {
+              const numValue = parseFloat(field.value);
+              if (!isNaN(numValue)) {
+                displayValue = '$' + numValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+              }
+            } else {
+              displayValue = formatFieldValue(field.value);
+            }
+
+            return `
+              <div class="flex justify-between">
+                <dt class="text-gray-500">${escapeHtml(field.displayName)}</dt>
+                <dd class="text-gray-900 text-right max-w-md truncate" title="${escapeHtml(String(field.value))}">${displayValue}</dd>
+              </div>
+            `;
+          }).join('')}
+        </dl>
+      `;
+
+      container.innerHTML = createCollapsibleSection(
+        'custom-fields',
+        'Custom Fields',
+        customFieldsContent,
+        customFieldsActions,
+        isSectionExpanded('custom-fields', true)
+      );
     }; // End of window.renderCustomFieldsSection
 
     // Render Matter Profile Section
@@ -2916,24 +2922,15 @@
           ? profile.document_themes.slice(0, 5)
           : [];
 
-        container.innerHTML = `
-          <div class="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-4">
-            <div class="mb-3">
-              <h5 class="text-sm font-medium text-gray-700 flex items-center">
-                <svg class="w-5 h-5 text-indigo-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
-                  <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm9.707 5.707a1 1 0 00-1.414-1.414L9 12.586l-1.293-1.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                </svg>
-                Matter Profile Intelligence
-              </h5>
-            </div>
-
+        // Build profile content using collapsible section
+        const profileContent = `
+          <div class="p-4">
             ${brandVoiceItems.length > 0 ? `
-              <div class="bg-white bg-opacity-60 rounded p-3 mb-3">
-                <h6 class="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Brand Voice</h6>
-                <div class="space-y-1">
+              <div class="mb-4">
+                <h6 class="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-2">Brand Voice</h6>
+                <div class="space-y-1.5">
                   ${brandVoiceItems.map(([key, value]) => `
-                    <div class="flex items-start text-xs">
+                    <div class="flex items-start text-sm">
                       <span class="text-gray-500 font-medium min-w-[80px]">${formatFieldName(key)}:</span>
                       <span class="text-gray-900 ml-2">${escapeHtml(String(value))}</span>
                     </div>
@@ -2943,11 +2940,11 @@
             ` : ''}
 
             ${themes.length > 0 ? `
-              <div class="bg-white bg-opacity-60 rounded p-3">
-                <h6 class="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Document Themes</h6>
+              <div>
+                <h6 class="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-2">Document Themes</h6>
                 <div class="flex flex-wrap gap-2">
                   ${themes.map(theme => `
-                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
                       ${escapeHtml(String(theme))}
                     </span>
                   `).join('')}
@@ -2956,6 +2953,16 @@
             ` : ''}
           </div>
         `;
+
+        const profileTitle = `Matter Profile Intelligence`;
+
+        container.innerHTML = createCollapsibleSection(
+          'matter-profile',
+          profileTitle,
+          profileContent,
+          '',
+          isSectionExpanded('matter-profile', true)
+        );
 
       } catch (error) {
         console.error('[renderMatterProfileSection] Error fetching profile:', error);
@@ -2998,85 +3005,177 @@
       return escapeHtml(String(value));
     }
 
+    // Helper function to create collapsible section
+    function createCollapsibleSection(id, title, content, actions = '', isExpanded = true, hasFooter = false, footerContent = '') {
+      return `
+        <div class="collapsible-section" data-section-id="${id}">
+          <!-- Section Header -->
+          <div class="flex items-center justify-between mb-3">
+            <button
+              onclick="toggleSection('${id}')"
+              class="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors group"
+            >
+              <svg
+                class="w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}"
+                id="${id}-chevron"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+              </svg>
+              <span>${title}</span>
+            </button>
+            ${actions ? `<div class="flex items-center gap-2">${actions}</div>` : ''}
+          </div>
+
+          <!-- Section Content -->
+          <div
+            id="${id}-content"
+            class="collapsible-content ${isExpanded ? '' : 'hidden'}"
+          >
+            <div class="bg-gray-50 rounded-lg ${hasFooter ? 'rounded-b-none' : ''}">
+              <div class="p-4">
+                ${content}
+              </div>
+              ${hasFooter ? `
+                <div class="border-t border-gray-200 bg-gray-100 px-4 py-3 rounded-b-lg">
+                  ${footerContent}
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Toggle section expand/collapse
+    window.toggleSection = function(sectionId) {
+      const content = document.getElementById(`${sectionId}-content`);
+      const chevron = document.getElementById(`${sectionId}-chevron`);
+
+      if (content && chevron) {
+        const isExpanded = !content.classList.contains('hidden');
+
+        if (isExpanded) {
+          content.classList.add('hidden');
+          chevron.classList.remove('rotate-90');
+        } else {
+          content.classList.remove('hidden');
+          chevron.classList.add('rotate-90');
+        }
+
+        // Save state to localStorage
+        const expandedSections = JSON.parse(localStorage.getItem('matterSectionsExpanded') || '{}');
+        expandedSections[sectionId] = !isExpanded;
+        localStorage.setItem('matterSectionsExpanded', JSON.stringify(expandedSections));
+      }
+    };
+
+    // Get saved section state
+    function isSectionExpanded(sectionId, defaultState = true) {
+      const expandedSections = JSON.parse(localStorage.getItem('matterSectionsExpanded') || '{}');
+      return expandedSections[sectionId] !== undefined ? expandedSections[sectionId] : defaultState;
+    }
+
     // Render Details Tab
     function renderDetailsTab(matter, permissions) {
       const content = document.getElementById('tabContentDetails');
+
+      // Build action buttons for sections
+      const sharedWithActions = `
+        <button
+          onclick="openManageShareModal('${matter.matter_id}')"
+          class="inline-flex items-center justify-center w-8 h-8 text-white rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors"
+          title="Manage Sharing"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+          </svg>
+        </button>
+      `;
+
+      const sharedWithContent = permissions.length > 0 ? permissions.map(p => `
+        <div class="flex items-center justify-between bg-white rounded-lg p-3 border border-gray-200">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+              <span class="text-xs font-medium text-indigo-600">${(p.first_name?.[0] || '') + (p.last_name?.[0] || '') || p.email?.[0]?.toUpperCase() || 'U'}</span>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-gray-900">${p.first_name || ''} ${p.last_name || ''}</p>
+              <p class="text-xs text-gray-500">${p.email}</p>
+            </div>
+          </div>
+          <button onclick="removeShare('${matter.matter_id}', '${p.user_id}')" class="text-red-600 hover:text-red-800">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+      `).join('') : `<p class="text-sm text-gray-500 text-center py-4">${matter.visibility === 'organization' ? 'All organization members can access this matter' : 'Not shared with any specific users'}</p>`;
+
+      const matterInfoContent = `
+        <dl class="space-y-2 text-sm">
+          <div class="flex justify-between">
+            <dt class="text-gray-500">Matter ID</dt>
+            <dd class="text-gray-900 font-mono">${matter.matter_id}</dd>
+          </div>
+          <div class="flex justify-between">
+            <dt class="text-gray-500">Client</dt>
+            <dd class="text-gray-900">${matter.client_name || 'N/A'}</dd>
+          </div>
+          <div class="flex justify-between">
+            <dt class="text-gray-500">Status</dt>
+            <dd class="text-gray-900">${statusBadge(matter.status || 'active')}</dd>
+          </div>
+          <div class="flex justify-between">
+            <dt class="text-gray-500">Visibility</dt>
+            <dd class="text-gray-900">${matter.visibility === 'organization' ? '🏢 Organization' : '🔒 Private'}</dd>
+          </div>
+          <div class="flex justify-between">
+            <dt class="text-gray-500">Created</dt>
+            <dd class="text-gray-900">${formatDate(matter.created_at)}</dd>
+          </div>
+          <div class="flex justify-between">
+            <dt class="text-gray-500">Last Updated</dt>
+            <dd class="text-gray-900">${formatDate(matter.updated_at)}</dd>
+          </div>
+        </dl>
+      `;
+
+      const descriptionContent = `
+        <p class="text-sm text-gray-600">${matter.description || 'No description provided.'}</p>
+      `;
+
       content.innerHTML = `
         <div class="space-y-6">
           <!-- Matter Profile Notification (at top) -->
           <div id="matterProfileNotification"></div>
 
-          <div class="bg-gray-50 rounded-lg p-4">
-            <h5 class="text-sm font-medium text-gray-700 mb-2">Description</h5>
-            <p class="text-sm text-gray-600">${matter.description || 'No description provided.'}</p>
-          </div>
+          ${createCollapsibleSection(
+            'description',
+            'Description',
+            descriptionContent,
+            '',
+            isSectionExpanded('description', true)
+          )}
 
           <!-- Matter Profile Section (below Description) -->
           <div id="matterProfileSection"></div>
 
-          <div class="bg-gray-50 rounded-lg p-4">
-            <h5 class="text-sm font-medium text-gray-700 mb-2">Matter Information</h5>
-            <dl class="space-y-2 text-sm">
-              <div class="flex justify-between">
-                <dt class="text-gray-500">Matter ID</dt>
-                <dd class="text-gray-900 font-mono">${matter.matter_id}</dd>
-              </div>
-              <div class="flex justify-between">
-                <dt class="text-gray-500">Client</dt>
-                <dd class="text-gray-900">${matter.client_name || 'N/A'}</dd>
-              </div>
-              <div class="flex justify-between">
-                <dt class="text-gray-500">Status</dt>
-                <dd class="text-gray-900">${statusBadge(matter.status || 'active')}</dd>
-              </div>
-              <div class="flex justify-between">
-                <dt class="text-gray-500">Visibility</dt>
-                <dd class="text-gray-900">${matter.visibility === 'organization' ? '🏢 Organization' : '🔒 Private'}</dd>
-              </div>
-              <div class="flex justify-between">
-                <dt class="text-gray-500">Created</dt>
-                <dd class="text-gray-900">${formatDate(matter.created_at)}</dd>
-              </div>
-              <div class="flex justify-between">
-                <dt class="text-gray-500">Last Updated</dt>
-                <dd class="text-gray-900">${formatDate(matter.updated_at)}</dd>
-              </div>
-            </dl>
-          </div>
+          ${createCollapsibleSection(
+            'matter-information',
+            'Matter Information',
+            matterInfoContent,
+            '',
+            isSectionExpanded('matter-information', true)
+          )}
 
-          <!-- Shared With Section -->
-          <div>
-            <div class="flex items-center justify-between mb-3">
-              <h5 class="text-sm font-medium text-gray-700">Shared With</h5>
-              <button
-                onclick="openManageShareModal('${matter.matter_id}')"
-                class="px-2 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
-                title="Manage Sharing"
-              >
-                <svg class="w-3 h-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                </svg>
-              </button>
-            </div>
-            <div class="space-y-2">
-              ${permissions.length > 0 ? permissions.map(p => `
-                <div class="flex items-center justify-between bg-gray-50 rounded-lg p-3">
-                  <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
-                      <span class="text-xs font-medium text-indigo-600">${(p.first_name?.[0] || '') + (p.last_name?.[0] || '') || p.email?.[0]?.toUpperCase() || 'U'}</span>
-                    </div>
-                    <div>
-                      <p class="text-sm font-medium text-gray-900">${p.first_name || ''} ${p.last_name || ''}</p>
-                      <p class="text-xs text-gray-500">${p.email}</p>
-                    </div>
-                  </div>
-                  <button onclick="removeShare('${matter.matter_id}', '${p.user_id}')" class="text-red-600 hover:text-red-800">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                  </button>
-                </div>
-              `).join('') : `<p class="text-sm text-gray-500 text-center py-4">${matter.visibility === 'organization' ? 'All organization members can access this matter' : 'Not shared with any specific users'}</p>`}
-            </div>
-          </div>
+          ${createCollapsibleSection(
+            'shared-with',
+            'Shared With',
+            sharedWithContent,
+            sharedWithActions,
+            isSectionExpanded('shared-with', true)
+          )}
 
           <!-- Linked Matters Section -->
           <div id="linkedMattersSection">
@@ -3211,11 +3310,9 @@
       if (documents.length === 0 && (!orphanedFiles || orphanedFiles.length === 0)) {
         content.innerHTML = `
           <div class="text-center py-12">
-            <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
-              </svg>
-            </div>
+            <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+            </svg>
             <h4 class="text-lg font-semibold text-gray-900 mb-2">No documents yet</h4>
             <p class="text-gray-500 mb-6">Upload documents to this matter to enable AI-powered search and analysis</p>
             <div id="drawerEmptyDropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-indigo-400 transition-colors cursor-pointer">
@@ -3722,7 +3819,7 @@
             Toast.info('Retriggering document ingestion...');
 
             // Call the retry endpoint
-            const result = await api.post(`/api/v1/documents/${fileId}/retry-ingestion`, {});
+            const result = await api.post(`/api/v1/storage/documents/${fileId}/retry-ingestion`, {});
 
             Toast.success('Document processing started. This may take a few minutes.');
 
@@ -3735,7 +3832,9 @@
             console.error('Failed to retry document ingestion:', error);
             Toast.error(error.message || 'Failed to retry document processing');
           }
-        }
+        },
+        'Retry', // Button text
+        'primary' // Use primary color instead of danger
       );
     }
 
@@ -4516,11 +4615,9 @@
       if (chats.length === 0) {
         content.innerHTML = `
           <div class="text-center py-12">
-            <div class="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
-              </svg>
-            </div>
+            <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
+            </svg>
             <h4 class="text-lg font-semibold text-gray-900 mb-2">No conversations yet</h4>
             <p class="text-gray-500 mb-6">Start a conversation in this matter to organize all related chats</p>
             <button onclick="createMatterConversation('${matter.matter_id}', '${(matter.name || matter.matter_name || '').replace(/'/g, "\\'")}')" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium">
@@ -5059,11 +5156,9 @@
       if (comments.length === 0) {
         container.innerHTML = `
           <div class="text-center py-12">
-            <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
-              </svg>
-            </div>
+            <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
+            </svg>
             <h4 class="text-lg font-semibold text-gray-900 mb-2">No comments yet</h4>
             <p class="text-gray-500">Be the first to comment on this matter</p>
           </div>
@@ -6238,11 +6333,9 @@
       if (tasks.length === 0) {
         content.innerHTML = `
           <div class="text-center py-12">
-            <div class="w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
-              </svg>
-            </div>
+            <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+            </svg>
             <h4 class="text-lg font-semibold text-gray-900 mb-2">No tasks yet</h4>
             <p class="text-gray-500 mb-4">Create a task or connect ActionStep to import tasks</p>
             <button
@@ -6785,12 +6878,12 @@
       if (!contacts || contacts.length === 0) {
         content.innerHTML = `
           <div class="text-center py-12">
-            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
             </svg>
-            <h3 class="mt-2 text-sm font-medium text-gray-900">No contacts</h3>
-            <p class="mt-1 text-sm text-gray-500">No contacts are associated with this matter yet.</p>
-            <button onclick="openAddContactModal('${matter.matter_id}')" class="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium transition-colors">
+            <h4 class="text-lg font-semibold text-gray-900 mb-2">No contacts</h4>
+            <p class="text-gray-500 mb-4">No contacts are associated with this matter yet.</p>
+            <button onclick="openAddContactModal('${matter.matter_id}')" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium transition-colors">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
               </svg>
@@ -7048,11 +7141,11 @@
             </div>
           ` : `
             <div class="text-center py-12 bg-gray-50 rounded-lg">
-              <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
               </svg>
-              <h3 class="mt-2 text-sm font-medium text-gray-900">No contacts found</h3>
-              <p class="mt-1 text-sm text-gray-500">Try adjusting your search or filters</p>
+              <h4 class="text-lg font-semibold text-gray-900 mb-2">No contacts found</h4>
+              <p class="text-gray-500">Try adjusting your search or filters</p>
             </div>
           `}
 
@@ -7215,35 +7308,28 @@
               </svg>
             </div>
             <h4 class="text-lg font-semibold text-gray-900 mb-2">No linked matters</h4>
-            <p class="text-gray-500 mb-4">${isWorkspace ? 'Link matters to this workspace to organize related work' : 'Link this matter to related matters or add it to a workspace'}</p>
-<div class="flex items-center justify-center gap-3">
+            <p class="text-gray-500 mb-4">${isWorkspace ? 'Link matters to this workspace to organize related work' : 'Add this matter to a workspace to organize related work'}</p>
+            <div class="flex items-center justify-center gap-3">
               ${isWorkspace ? `
                 <button
                   onclick="openCreateLinkModal('${matter.matter_id}', true)"
-                  class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
+                  class="inline-flex items-center justify-center w-10 h-10 text-white rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors"
+                  title="Link Existing Matter"
                 >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
                   </svg>
-                  Link Existing Matter
                 </button>
                 <button
                   onclick="openCreateMatterDrawer('${matter.matter_id}')"
-                  class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+                  class="inline-flex items-center justify-center w-10 h-10 text-white rounded-lg bg-purple-600 hover:bg-purple-700 transition-colors"
+                  title="Create New Matter"
                 >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                   </svg>
-                  Create New Matter
                 </button>
-              ` : `
-                <button
-                  onclick="openCreateLinkModal('${matter.matter_id}', false)"
-                  class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                >
-                  Link Related Matter
-                </button>
-              `}
+              ` : ``}
             </div>
           </div>
         `;
@@ -7259,25 +7345,27 @@
           <div class="flex justify-end gap-3">
             <button
               onclick="openCreateLinkModal('${matter.matter_id}', true)"
-              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
+              class="inline-flex items-center justify-center w-10 h-10 text-white rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors"
+              title="Link Existing Matter"
             >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
               </svg>
-              Link Existing Matter
             </button>
             <button
               onclick="openCreateMatterDrawer('${matter.matter_id}')"
-              class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+              class="inline-flex items-center justify-center w-10 h-10 text-white rounded-lg bg-purple-600 hover:bg-purple-700 transition-colors"
+              title="Create New Matter"
             >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
               </svg>
-              Create New Matter
             </button>
           </div>
         `;
-      } else if (isMatter) {
+      }
+      /* COMMENTED OUT: Link Related Matter functionality - only allow workspace linking
+      else if (isMatter) {
         html += `
           <div class="flex justify-end">
             <button
@@ -7292,6 +7380,7 @@
           </div>
         `;
       }
+      */
 
       // Workspace Matters
       if (links.workspace_matters && links.workspace_matters.length > 0) {
@@ -7303,7 +7392,8 @@
         );
       }
 
-      // Related Matters
+      // COMMENTED OUT: Related Matters section - only allow workspace linking
+      /*
       if (links.related_matters && links.related_matters.length > 0) {
         html += renderLinkSection(
           'Related Matters',
@@ -7312,6 +7402,7 @@
           'related_to'
         );
       }
+      */
 
       // Parent Matters
       if (links.parent_matters && links.parent_matters.length > 0) {
@@ -7483,87 +7574,80 @@
       const isWorkspace = matter.matter_type === 'workspace';
       const isMatter = matter.matter_type === 'matter';
 
-      // If no links, show minimal message or hide completely
-      if (totalLinks === 0) {
-        content.innerHTML = `
-          <div class="bg-gray-50 rounded-lg p-4 text-center">
-            <p class="text-sm text-gray-500 mb-2">No linked matters</p>
-            <div class="flex items-center justify-center gap-2">
-              ${isWorkspace ? `
-                <button
-                  onclick="openCreateLinkModal('${matter.matter_id}', true)"
-                  class="px-3 py-1.5 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
-                >
-                  Link Existing Matter
-                </button>
-                <button
-                  onclick="openCreateMatterDrawer('${matter.matter_id}')"
-                  class="px-3 py-1.5 text-xs bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
-                >
-                  Create New Matter
-                </button>
-              ` : `
-                <button
-                  onclick="openCreateLinkModal('${matter.matter_id}', false)"
-                  class="px-3 py-1.5 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
-                >
-                  Link Related Matter
-                </button>
-              `}
-            </div>
-          </div>
-        `;
-        return;
-      }
-
-      // Build HTML for linked matters - compact version for details tab
-      let html = '<div class="space-y-4">';
-
-      html += '<div class="flex items-center justify-between">';
-      html += '<h5 class="text-sm font-medium text-gray-700">Linked Matters</h5>';
-
-      // Action buttons
+      // Build action buttons
+      let linkedMattersActions = '';
       if (isWorkspace) {
-        html += `
-          <div class="flex gap-2">
+        linkedMattersActions = `
+          <div class="flex items-center gap-2">
             <button
               onclick="openCreateLinkModal('${matter.matter_id}', true)"
-              class="px-2 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+              class="inline-flex items-center justify-center w-8 h-8 text-white rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors"
               title="Link Existing Matter"
             >
-              <svg class="w-3 h-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
               </svg>
             </button>
             <button
               onclick="openCreateMatterDrawer('${matter.matter_id}')"
-              class="px-2 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
+              class="inline-flex items-center justify-center w-8 h-8 text-white rounded-lg bg-purple-600 hover:bg-purple-700 transition-colors"
               title="Create New Matter"
             >
-              <svg class="w-3 h-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
               </svg>
             </button>
           </div>
         `;
-      } else if (isMatter) {
-        html += `
-          <button
-            onclick="openCreateLinkModal('${matter.matter_id}', false)"
-            class="px-2 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
-            title="Link Related Matter"
-          >
-            <svg class="w-3 h-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-            </svg>
-          </button>
-        `;
       }
-      html += '</div>';
+
+      // If no links, show minimal message
+      if (totalLinks === 0) {
+        const emptyContent = `
+          <p class="text-sm text-gray-500 text-center py-4">No linked matters</p>
+        `;
+
+        const emptyFooter = isWorkspace ? `
+          <div class="flex items-center justify-center gap-3">
+            <button
+              onclick="openCreateLinkModal('${matter.matter_id}', true)"
+              class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+              </svg>
+              Link Existing Matter
+            </button>
+            <button
+              onclick="openCreateMatterDrawer('${matter.matter_id}')"
+              class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+              Create New Matter
+            </button>
+          </div>
+        ` : '';
+
+        content.innerHTML = createCollapsibleSection(
+          'linked-matters',
+          'Linked Matters',
+          emptyContent,
+          linkedMattersActions,
+          isSectionExpanded('linked-matters', true),
+          isWorkspace, // hasFooter
+          emptyFooter
+        );
+        return;
+      }
+
+      // Build HTML for linked matters content
+      let linksContent = '<div class="space-y-4">';
 
       // Workspace Matters
       if (links.workspace_matters && links.workspace_matters.length > 0) {
-        html += renderLinkSection(
+        linksContent += renderLinkSection(
           isWorkspace ? 'Matters in this Workspace' : 'Part of Workspace',
           links.workspace_matters,
           matter.matter_id,
@@ -7571,19 +7655,21 @@
         );
       }
 
-      // Related Matters
+      // COMMENTED OUT: Related Matters section - only allow workspace linking
+      /*
       if (links.related_matters && links.related_matters.length > 0) {
-        html += renderLinkSection(
+        linksContent += renderLinkSection(
           'Related Matters',
           links.related_matters,
           matter.matter_id,
           'related_to'
         );
       }
+      */
 
       // Parent Matters
       if (links.parent_matters && links.parent_matters.length > 0) {
-        html += renderLinkSection(
+        linksContent += renderLinkSection(
           'Parent Matters',
           links.parent_matters,
           matter.matter_id,
@@ -7593,7 +7679,7 @@
 
       // Child Matters
       if (links.child_matters && links.child_matters.length > 0) {
-        html += renderLinkSection(
+        linksContent += renderLinkSection(
           'Child Matters',
           links.child_matters,
           matter.matter_id,
@@ -7603,7 +7689,7 @@
 
       // Shadow Records (ActionStep)
       if (links.shadow_records && links.shadow_records.length > 0) {
-        html += renderLinkSection(
+        linksContent += renderLinkSection(
           'ActionStep Connector',
           links.shadow_records,
           matter.matter_id,
@@ -7612,8 +7698,16 @@
         );
       }
 
-      html += '</div>';
-      content.innerHTML = html;
+      linksContent += '</div>';
+
+      // Use collapsible section
+      content.innerHTML = createCollapsibleSection(
+        'linked-matters',
+        'Linked Matters',
+        linksContent,
+        linkedMattersActions,
+        isSectionExpanded('linked-matters', true)
+      );
     }
 
     // =============================================================================
@@ -7659,11 +7753,11 @@
         if (summary.total_records === 0) {
           content.innerHTML = `
             <div class="text-center py-12">
-              <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
               </svg>
-              <h3 class="mt-2 text-sm font-medium text-gray-900">No connected data</h3>
-              <p class="mt-1 text-sm text-gray-500">When data is synced from integrations, it will appear here.</p>
+              <h4 class="text-lg font-semibold text-gray-900 mb-2">No connected data</h4>
+              <p class="text-gray-500">When data is synced from integrations, it will appear here.</p>
               <!-- Hidden for now - Manual linking button
               <button onclick="showManualConnectModal('${matter.matter_id}')" class="mt-4 inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                 <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

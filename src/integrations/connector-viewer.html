@@ -4,124 +4,1776 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Connector - LanaAI</title>
-  <script src="../js/tailwind-loader.js"></script>
-  <script src="../js/config.js"></script>
+
+  <!-- Inline preloader styles - Pure CSS, no dependencies -->
   <style>
-    body, html {
-      margin: 0;
-      padding: 0;
-      height: 100vh;
-      overflow: hidden;
-      background: #f3f4f6;
-    }
-
-    #connector-frame {
-      width: 100%;
-      height: 100%;
-      border: 0;
-    }
-
-    #loading-screen {
+    /* Preloader shown immediately, before any JS/CSS loads */
+    #lana-preloader {
       position: fixed;
       inset: 0;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      z-index: 1000;
+      z-index: 99999;
       transition: opacity 0.3s ease-out;
     }
 
-    #loading-screen.hidden {
-      opacity: 0;
-      pointer-events: none;
+    .preloader-logo {
+      width: 80px;
+      height: 80px;
+      margin-bottom: 24px;
+      animation: pulse 2s ease-in-out infinite;
     }
 
-    .spinner {
-      width: 50px;
-      height: 50px;
+    .preloader-spinner {
+      width: 48px;
+      height: 48px;
       border: 4px solid rgba(255, 255, 255, 0.3);
       border-top-color: white;
       border-radius: 50%;
       animation: spin 1s linear infinite;
+      margin-bottom: 16px;
+    }
+
+    .preloader-text {
+      color: white;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 16px;
+      font-weight: 500;
+      letter-spacing: 0.5px;
     }
 
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
 
-    #back-button {
-      position: fixed;
-      top: 20px;
-      left: 20px;
-      z-index: 100;
-      background: rgba(255, 255, 255, 0.95);
-      backdrop-filter: blur(10px);
-      padding: 10px 20px;
-      border-radius: 8px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      transition: all 0.2s;
-      border: 1px solid rgba(0, 0, 0, 0.1);
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(0.96); }
     }
 
-    #back-button:hover {
-      background: white;
-      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-      transform: translateY(-1px);
-    }
-
-    #error-screen {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: white;
-      align-items: center;
-      justify-content: center;
-      padding: 40px;
-      text-align: center;
-    }
-
-    #error-screen.show {
-      display: flex;
-    }
   </style>
+
+  <script src="../js/tailwind-loader.js"></script>
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils/event-display-names.js"></script>
+  <script src="../js/services/feature-tracker.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/version.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/navigation-helpers.js"></script>
+  <script src="../js/new-project-modal.js"></script>
+  <script src="../js/conversation-menu.js"></script>
+  <script src="../js/conversation-search-modal.js"></script>
+  <script src="../js/notifications.js"></script>
+  <script src="../js/activity.js"></script>
+  <script src="../js/activity-heatmap.js"></script>
+
+  <!-- Session Tracking -->
+  <script src="../js/services/session-tracking-service.js"></script>
+  <!-- DISABLED: Using organization-wide activity heatmap instead -->
+  <!-- <script src="../js/widgets/user-productivity-widget.js"></script> -->
+  <link rel="stylesheet" href="../css/session-tracking.css">
 </head>
-<body>
-  <!-- Loading Screen -->
-  <div id="loading-screen">
-    <div class="spinner"></div>
+<body class="bg-gray-50 min-h-screen">
+
+  <!-- Pure HTML/CSS Preloader - Shows immediately, hidden by JS when ready -->
+  <div id="lana-preloader">
+    <svg class="preloader-logo" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="45" fill="white" opacity="0.15"/>
+      <circle cx="50" cy="50" r="35" fill="white" opacity="0.3"/>
+      <circle cx="50" cy="50" r="25" fill="white"/>
+      <text x="50" y="58" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#667eea" text-anchor="middle">L</text>
+    </svg>
+    <div class="preloader-spinner"></div>
+    <div class="preloader-text">Loading LanaAI...</div>
   </div>
 
-  <!-- Error Screen -->
-  <div id="error-screen">
-    <div class="max-w-md">
-      <svg class="w-16 h-16 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-      </svg>
-      <h1 class="text-2xl font-bold text-gray-900 mb-2">Failed to Load Connector</h1>
-      <p class="text-gray-600 mb-6" id="error-message">An error occurred while loading the connector UI.</p>
-      <button onclick="goBack()" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">
-        Back to Connectors
+  <!-- App content - wrapped for FOUC prevention -->
+  <div id="app-content">
+  <!-- Sidebar -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
+    <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
+      <a href="../index.html"><img src="../img/logo-light.png" alt="LanaAI" class="h-7"></a>
+      <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
       </button>
+    </div>
+
+    <nav id="mainNav" class="flex-1 mt-6 px-3 overflow-hidden">
+      <!-- Menu will be dynamically rendered by menu.js -->
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="lg:ml-64">
+    <!-- Top Bar -->
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
+      <div class="flex items-center justify-between h-16 px-4 lg:px-8">
+        <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+          </svg>
+        </button>
+
+        <div class="flex-1 px-4 lg:px-0 flex items-center gap-4">
+          <!-- Back button -->
+          <button onclick="goBack()" class="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+            </svg>
+            <span class="hidden sm:inline font-medium">Back to Connectors</span>
+          </button>
+
+          <div class="hidden sm:block h-6 w-px bg-gray-300"></div>
+
+          <h1 id="connector-title" class="text-lg font-semibold text-gray-900">Loading...</h1>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <!-- Notifications -->
+          <button id="notificationBtn" class="relative text-gray-500 hover:text-gray-700">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+            </svg>
+            <span id="notificationBadge" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">0</span>
+          </button>
+
+          <!-- User Menu -->
+          <div class="relative" id="userMenu">
+            <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900 p-1" title="Settings">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              </svg>
+            </button>
+            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1">
+              <a href="settings.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
+              <hr class="my-1">
+              <button id="logoutBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sign out</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Notification Panel Overlay -->
+    <div id="notificationOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
+
+    <!-- Notification Slide-out Panel -->
+    <div id="notificationPanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
+      <!-- Panel Header -->
+      <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
+        <h2 class="text-lg font-semibold text-gray-900">Notifications</h2>
+        <div class="flex items-center gap-3">
+          <button id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium hidden">Mark all read</button>
+          <button id="refreshNotificationsBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+          </button>
+          <button id="closeNotificationPanel" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Filter Tabs -->
+      <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
+        <button id="filterAll" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">All</button>
+        <button id="filterUnread" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Unread</button>
+      </div>
+
+      <!-- Notifications List -->
+      <div id="notificationList" class="flex-1 overflow-y-auto">
+        <!-- Loading State -->
+        <div id="notificationLoading" class="p-8 text-center">
+          <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+          <p class="text-gray-500 mt-3 text-sm">Loading notifications...</p>
+        </div>
+      </div>
+
+      <!-- Loading More Indicator -->
+      <div id="notificationLoadingMore" class="hidden p-4 border-t border-gray-100 text-center flex-shrink-0">
+        <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+      </div>
+    </div>
+
+    <!-- Activity Panel Overlay -->
+    <div id="activityOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
+
+    <!-- Activity Slide-out Panel -->
+    <div id="activityPanel" class="fixed inset-y-0 right-0 w-full sm:w-[28rem] bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
+      <!-- Panel Header -->
+      <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
+        <h2 class="text-lg font-semibold text-gray-900">Activity</h2>
+        <div class="flex items-center gap-3">
+          <button id="refreshActivityBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+          </button>
+          <button id="closeActivityPanel" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Activity List -->
+      <div id="activityList" class="flex-1 overflow-y-auto">
+        <!-- Loading State -->
+        <div id="activityLoading" class="p-8 text-center">
+          <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+          <p class="text-gray-500 mt-3 text-sm">Loading activity...</p>
+        </div>
+      </div>
+
+      <!-- Loading More Indicator -->
+      <div id="activityLoadingMore" class="hidden p-4 border-t border-gray-100 text-center">
+        <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+      </div>
+    </div>
+
+    <!-- Page Content -->
+    <!-- UPDATE CONTENT HERE: -->
+    <!-- Connector UI iframe container -->
+    <div id="iframe-container" class="fixed inset-0 lg:ml-64 flex flex-col" style="top: 64px;">
+      <!-- Loading Overlay -->
+      <div id="loading-overlay" class="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center z-10 transition-opacity">
+        <div class="text-center">
+          <div class="spinner w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
+          <p class="text-white text-lg font-medium">Loading connector...</p>
+        </div>
+      </div>
+
+      <!-- Error Screen -->
+      <div id="error-screen" class="hidden absolute inset-0 bg-white flex items-center justify-center z-10">
+        <div class="max-w-md text-center px-6">
+          <svg class="w-16 h-16 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <h2 class="text-2xl font-bold text-gray-900 mb-2">Failed to Load Connector</h2>
+          <p class="text-gray-600 mb-6" id="error-message">An error occurred while loading the connector UI.</p>
+          <button onclick="goBack()" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">
+            Back to Connectors
+          </button>
+        </div>
+      </div>
+
+      <!-- Connector UI iframe -->
+      <iframe
+        id="connector-frame"
+        class="w-full h-full border-0"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+        allow="clipboard-read; clipboard-write"
+      ></iframe>
+    </div>
+
+    <style>
+      #loading-overlay.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+      #error-screen.show {
+        display: flex !important;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      .animate-spin {
+        animation: spin 1s linear infinite;
+      }
+    </style>
+
+    <main class="hidden p-4 lg:p-8">
+      <!-- Original dashboard content hidden -->
+
+      <!-- Global Search Bar -->
+      <div id="globalSearchSection" class="mb-8 hidden">
+        <div class="relative max-w-3xl mx-auto">
+          <input
+            type="text"
+            id="globalSearchInput"
+            class="w-full px-6 py-4 text-lg border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-lg bg-white text-gray-900"
+            placeholder="Search across all your connected data sources..."
+            autocomplete="off"
+            onkeypress="if(event.key==='Enter'){const q=document.getElementById('globalSearchInput').value; if(q.trim()) window.location.href='search-results.html?q='+encodeURIComponent(q);}"
+          />
+          <button
+            type="button"
+            class="absolute right-2 top-1/2 transform -translate-y-1/2 bg-indigo-600 text-white px-6 py-2 rounded-full hover:bg-indigo-700 transition-colors"
+            onclick="const q=document.getElementById('globalSearchInput').value; if(q.trim()) window.location.href='search-results.html?q='+encodeURIComponent(q);"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+          </button>
+        </div>
+        <p class="text-center mt-3 text-sm text-gray-500">
+          Powered by AI semantic search • Search across ActionStep, SharePoint, Google Drive, and more
+        </p>
+      </div>
+
+      <!-- Stats Grid - Loading State -->
+      <div id="statsLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+          </div>
+          <div class="h-8 bg-gray-200 rounded w-16 mb-2"></div>
+          <div class="h-4 bg-gray-200 rounded w-24"></div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+          </div>
+          <div class="h-8 bg-gray-200 rounded w-12 mb-2"></div>
+          <div class="h-4 bg-gray-200 rounded w-20"></div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+          </div>
+          <div class="h-8 bg-gray-200 rounded w-14 mb-2"></div>
+          <div class="h-4 bg-gray-200 rounded w-20"></div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+          </div>
+          <div class="h-8 bg-gray-200 rounded w-20 mb-2"></div>
+          <div class="h-4 bg-gray-200 rounded w-24"></div>
+        </div>
+      </div>
+
+      <!-- Stats Grid - Content -->
+      <div id="statsContent" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
+              </svg>
+            </div>
+          </div>
+          <h3 class="text-2xl font-bold text-gray-900" id="statMatters">-</h3>
+          <p class="text-gray-500 text-sm" id="statMattersLabel">My Matters</p>
+          <div id="mattersBreakdown" class="mt-3 pt-3 border-t border-gray-200 text-xs text-gray-600 hidden">
+            <span id="mattersBreakdownText"></span>
+          </div>
+        </div>
+
+        <div id="statUsersCard" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 hidden">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+              </svg>
+            </div>
+          </div>
+          <h3 class="text-2xl font-bold text-gray-900" id="statUsers">-</h3>
+          <p class="text-gray-500 text-sm">Total Users</p>
+          <div id="userBreakdown" class="mt-3 pt-3 border-t border-gray-200 text-xs text-gray-600 space-y-1 hidden">
+            <div class="flex justify-between">
+              <span>Active:</span>
+              <span id="activeUsers" class="font-medium text-gray-900">-</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Other:</span>
+              <span id="otherUsers" class="font-medium text-gray-600">-</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+            </div>
+          </div>
+          <h3 class="text-2xl font-bold text-gray-900" id="statDocuments">-</h3>
+          <p class="text-gray-500 text-sm">Documents</p>
+          <div id="documentBreakdown" class="mt-3 pt-3 border-t border-gray-200 text-xs text-gray-600 space-y-1 hidden">
+            <div class="flex justify-between">
+              <span>Active:</span>
+              <span id="activeDocuments" class="font-medium text-gray-900">-</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Marked for deletion:</span>
+              <span id="deletedDocuments" class="font-medium text-orange-600">-</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="statStorageCard" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 hidden">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path>
+              </svg>
+            </div>
+          </div>
+          <h3 class="text-2xl font-bold text-gray-900" id="statStorage">-</h3>
+          <p class="text-gray-500 text-sm">Storage Used <span id="storageUsagePercent" class="font-semibold"></span></p>
+          <div id="storageBreakdown" class="mt-3 pt-3 border-t border-gray-200 text-xs text-gray-600 space-y-1 hidden">
+            <div class="flex justify-between">
+              <span>Database:</span>
+              <span id="databaseStorage" class="font-medium text-gray-900">-</span>
+            </div>
+            <div id="volumeStorageList" class="space-y-1">
+              <!-- Volume items will be added dynamically -->
+            </div>
+          </div>
+          <div class="mt-3 pt-3 border-t border-gray-200">
+            <a href="admin/health.html" class="inline-flex items-center justify-center w-full px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
+              View details
+            </a>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- User Productivity Widget (Full Width) -->
+      <div id="userProductivityWidget" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-8">
+        <div class="mb-4">
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex items-start gap-2">
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900">Activity Overview</h3>
+                <p class="text-sm text-gray-500 mt-1">Last 90 days of organization activity</p>
+              </div>
+              <div class="flex-shrink-0">
+                <button id="activityHeatmapInfoBtn" type="button" class="p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors" aria-label="How to read the heatmap" title="How to read the heatmap">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M12 16v-4M12 8h.01"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <!-- User Filter Dropdown (Admins Only) -->
+            <div id="activityUserFilterContainer" class="hidden">
+              <select id="activityUserFilter" class="block w-64 rounded-lg border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500">
+                <option value="me">My Activity</option>
+                <option value="all">All Users</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stats Summary - Simple GitHub-style -->
+        <div class="flex items-center gap-6 mb-6 text-sm text-gray-600">
+          <div>
+            <span id="totalActivities" class="font-semibold text-gray-900">-</span> activities in the last 90 days
+          </div>
+        </div>
+
+        <!-- Side-by-side Layout: Heatmap + Recent Activity -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+          <!-- Left: Activity Heatmap -->
+          <div class="flex flex-col">
+            <div id="activityHeatmapContainer" class="w-full min-w-0">
+              <!-- Heatmap will be rendered here -->
+            </div>
+          </div>
+
+          <!-- Right: Recent Activity -->
+          <div class="flex flex-col">
+            <div class="mb-4 flex items-center justify-between">
+              <h4 class="text-base font-semibold text-gray-900">Recent Activity</h4>
+              <div class="flex items-center gap-3">
+                <button id="refreshActivityFeedBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                  </svg>
+                </button>
+                <button id="viewAllActivityHeaderBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">View all</button>
+              </div>
+            </div>
+            <!-- Activity Loading Skeleton -->
+            <div id="activityFeedLoading" class="divide-y divide-gray-100">
+              <div class="p-4 animate-pulse">
+                <div class="flex items-start gap-3">
+                  <div class="w-10 h-10 bg-gray-200 rounded-full flex-shrink-0"></div>
+                  <div class="flex-1">
+                    <div class="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                    <div class="h-3 bg-gray-200 rounded w-1/2 mb-2"></div>
+                    <div class="h-3 bg-gray-200 rounded w-24"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="p-4 animate-pulse">
+                <div class="flex items-start gap-3">
+                  <div class="w-10 h-10 bg-gray-200 rounded-full flex-shrink-0"></div>
+                  <div class="flex-1">
+                    <div class="h-4 bg-gray-200 rounded w-2/3 mb-2"></div>
+                    <div class="h-3 bg-gray-200 rounded w-1/3 mb-2"></div>
+                    <div class="h-3 bg-gray-200 rounded w-20"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="p-4 animate-pulse">
+                <div class="flex items-start gap-3">
+                  <div class="w-10 h-10 bg-gray-200 rounded-full flex-shrink-0"></div>
+                  <div class="flex-1">
+                    <div class="h-4 bg-gray-200 rounded w-4/5 mb-2"></div>
+                    <div class="h-3 bg-gray-200 rounded w-2/5 mb-2"></div>
+                    <div class="h-3 bg-gray-200 rounded w-28"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="p-4 animate-pulse">
+                <div class="flex items-start gap-3">
+                  <div class="w-10 h-10 bg-gray-200 rounded-full flex-shrink-0"></div>
+                  <div class="flex-1">
+                    <div class="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
+                    <div class="h-3 bg-gray-200 rounded w-1/4 mb-2"></div>
+                    <div class="h-3 bg-gray-200 rounded w-16"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- Activity Content -->
+            <div id="activityFeed" class="hidden divide-y divide-gray-100 max-h-96 overflow-y-auto">
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Overlay for mobile sidebar -->
+  <div id="sidebarOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden lg:hidden"></div>
+
+  <!-- Activity Heatmap Info Modal -->
+  <div id="activityHeatmapInfoModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 9999;" onclick="if(event.target === this) closeActivityHeatmapInfoModal()">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between p-6 border-b border-gray-200">
+        <h2 class="text-xl font-semibold text-gray-900">Understanding the Activity Overview</h2>
+        <button type="button" onclick="closeActivityHeatmapInfoModal()" class="text-gray-400 hover:text-gray-600 transition-colors" aria-label="Close">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="p-6 space-y-6">
+        <div>
+          <h3 class="text-sm font-semibold text-gray-900 mb-2">What is this?</h3>
+          <p class="text-sm text-gray-600 leading-relaxed">The Activity Overview is a calendar-style chart that shows <strong>when your organization was active</strong> over the last 90 days. Each small square represents one day; the color shows how much activity happened that day.</p>
+        </div>
+        <div>
+          <h3 class="text-sm font-semibold text-gray-900 mb-2">Why does it matter?</h3>
+          <p class="text-sm text-gray-600 leading-relaxed">It helps you spot patterns at a glance: which days of the week are busiest, whether activity is steady or concentrated in certain weeks, and how engagement has changed over time. Use it to understand how your team uses the system and when activity peaks.</p>
+        </div>
+        <div>
+          <h3 class="text-sm font-semibold text-gray-900 mb-2">How we track activity</h3>
+          <p class="text-sm text-gray-600 leading-relaxed mb-2">Activity is counted from usage across your whole organization. Each time someone in your org uses Lana (for example, starting or replying to conversations, viewing or uploading documents, running searches, or other interactions), that counts as activity. The chart adds up all of these actions per day so you can see when your org is most engaged.</p>
+          <p class="text-sm text-gray-600 leading-relaxed">The numbers you see are <strong>total activity events</strong> for that day, not unique users. So a busy day might show a high count because many people used the system or because a few people were very active.</p>
+        </div>
+        <div>
+          <h3 class="text-sm font-semibold text-gray-900 mb-2">What am I looking at?</h3>
+          <ul class="text-sm text-gray-600 space-y-2 list-disc pl-5">
+            <li><strong class="text-gray-900">Rows.</strong> Each row is a day of the week (Sunday at the top through Saturday at the bottom).</li>
+            <li><strong class="text-gray-900">Columns.</strong> Each column is one week. Time runs left to right: older weeks on the left, recent weeks on the right.</li>
+            <li><strong class="text-gray-900">Colors.</strong> Each square’s color shows how much activity happened that day. See “Color scale” below for the exact ranges.</li>
+          </ul>
+        </div>
+        <div>
+          <h3 class="text-sm font-semibold text-gray-900 mb-2">Color scale</h3>
+          <p class="text-sm text-gray-600 leading-relaxed mb-2">The chart uses five levels based on the number of activity events that day:</p>
+          <ul class="text-sm text-gray-600 space-y-1.5 list-disc pl-5">
+            <li><strong class="text-gray-900">Light gray:</strong> No activity (0 events)</li>
+            <li><strong class="text-gray-900">Light green:</strong> Low activity (1 to 4 events)</li>
+            <li><strong class="text-gray-900">Medium green:</strong> Moderate activity (5 to 9 events)</li>
+            <li><strong class="text-gray-900">Dark green:</strong> High activity (10 to 14 events)</li>
+            <li><strong class="text-gray-900">Darkest green:</strong> Very high activity (15 or more events)</li>
+          </ul>
+          <p class="text-sm text-gray-600 leading-relaxed mt-2">The legend under the chart shows “Less” to “More” as a quick reference.</p>
+        </div>
+        <div>
+          <h3 class="text-sm font-semibold text-gray-900 mb-2">How do I use it?</h3>
+          <p class="text-sm text-gray-600 leading-relaxed mb-2"><strong class="text-gray-900">Interacting with the chart.</strong> Hover over any square to see the exact date and activity count for that day. No clicking required; just move your cursor over the chart to explore.</p>
+          <p class="text-sm text-gray-600 leading-relaxed mb-2"><strong class="text-gray-900">Using the data for your business.</strong> Use the heatmap to see when your organization is most engaged and spot trends over time. For example:</p>
+          <ul class="text-sm text-gray-600 space-y-1.5 list-disc pl-5 mb-2">
+            <li>Compare week to week: are recent weeks busier or quieter than earlier ones?</li>
+            <li>See which days of the week are busiest (e.g. midweek vs Monday/Friday) so you can plan capacity, support, or training.</li>
+            <li>Notice quiet stretches: low or gray activity for many days in a row may mean low adoption, seasonal lulls, or a need to encourage usage.</li>
+            <li>Use the pattern as a baseline: once you know your “normal” activity, you can tell when something changes (e.g. after a rollout or a process change).</li>
+          </ul>
+          <p class="text-sm text-gray-600 leading-relaxed">The chart doesn’t tell you why activity went up or down, but it shows you when it did so you can dig in elsewhere (e.g. reports or conversations) to understand the cause.</p>
+        </div>
+      </div>
+      <div class="p-6 pt-0">
+        <button type="button" onclick="closeActivityHeatmapInfoModal()" class="w-full px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
+          Got it
+        </button>
+      </div>
     </div>
   </div>
 
-  <!-- Back Button -->
-  <button id="back-button" onclick="goBack()">
-    <svg class="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
-    </svg>
-    <span class="text-gray-700 font-medium">Back</span>
-  </button>
+  <!-- Conversation Actions Modal -->
+  <div id="conversationActionsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 9999;" onclick="if(event.target === this) closeConversationActionsModal()">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md" onclick="event.stopPropagation()">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between p-6 border-b border-gray-200">
+        <h2 class="text-xl font-semibold text-gray-900">Conversation Options</h2>
+        <button onclick="closeConversationActionsModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
 
-  <!-- Connector UI iframe -->
-  <iframe id="connector-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox" allow="clipboard-read; clipboard-write"></iframe>
+      <!-- Modal Body -->
+      <div class="p-6">
+        <div class="mb-4 p-4 bg-gray-50 rounded-lg">
+          <p class="text-sm font-medium text-gray-700 mb-1">Current Name:</p>
+          <p id="modalConversationTitle" class="text-base text-gray-900"></p>
+        </div>
+
+        <div class="space-y-3">
+          <!-- Rename Button -->
+          <button onclick="editConversationFromModal()" class="w-full flex items-center gap-3 px-4 py-3 bg-white border-2 border-gray-200 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-all group">
+            <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
+              <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+              </svg>
+            </div>
+            <div class="flex-1 text-left">
+              <p class="font-medium text-gray-900 group-hover:text-indigo-600 transition-colors">Rename Conversation</p>
+              <p class="text-sm text-gray-500">Change the conversation title</p>
+            </div>
+          </button>
+
+          <!-- View Matter Details Button (only shown if conversation has a matter) -->
+          <button id="viewMatterDetailsBtn" onclick="viewMatterDetailsFromModal()" class="w-full hidden flex items-center gap-3 px-4 py-3 bg-white border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all group">
+            <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
+              <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+            </div>
+            <div class="flex-1 text-left">
+              <p class="font-medium text-gray-900 group-hover:text-blue-600 transition-colors">View Matter Details</p>
+              <p class="text-sm text-gray-500">Open the full matter information</p>
+            </div>
+          </button>
+
+          <!-- Delete Button -->
+          <button onclick="deleteConversationFromModal()" class="w-full flex items-center gap-3 px-4 py-3 bg-white border-2 border-gray-200 rounded-lg hover:border-red-500 hover:bg-red-50 transition-all group">
+            <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center group-hover:bg-red-200 transition-colors">
+              <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+              </svg>
+            </div>
+            <div class="flex-1 text-left">
+              <p class="font-medium text-gray-900 group-hover:text-red-600 transition-colors">Delete Conversation</p>
+              <p class="text-sm text-gray-500">Permanently remove this conversation</p>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rename Conversation Modal -->
+  <div id="renameConversationModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 10000;" onclick="if(event.target === this) closeRenameModal()">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md" onclick="event.stopPropagation()">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between p-6 border-b border-gray-200">
+        <h2 class="text-xl font-semibold text-gray-900">Rename Conversation</h2>
+        <button onclick="closeRenameModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6">
+        <div class="mb-4">
+          <label for="renameInput" class="block text-sm font-medium text-gray-700 mb-2">New conversation name</label>
+          <input
+            type="text"
+            id="renameInput"
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+            placeholder="Enter new name..."
+            onkeypress="if(event.key === 'Enter') confirmRename()"
+          />
+        </div>
+        <div class="flex gap-3">
+          <button onclick="closeRenameModal()" class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+          <button onclick="confirmRename()" class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+            Rename
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script>
+    // Feature flags
+    const isSearchEnabled = false;
+
+    // Auth check with retry for race condition on first login
+    function checkAuthWithRetry(retries = 3) {
+      // Re-read from localStorage in case it wasn't ready when api.js loaded
+      const token = localStorage.getItem('token');
+      if (token) {
+        api.token = token;
+        api.user = JSON.parse(localStorage.getItem('user') || 'null');
+      }
+      
+      if (!api.isAuthenticated()) {
+        if (retries > 0) {
+          // Small delay and retry - handles race condition on first login
+          setTimeout(() => checkAuthWithRetry(retries - 1), 100);
+          return;
+        }
+        window.location.href = 'login.html';
+        return;
+      }
+      
+      // Auth successful - initialize the page
+      initializePage();
+
+      // Show search if enabled
+      if (isSearchEnabled) {
+        document.getElementById('globalSearchSection')?.classList.remove('hidden');
+        // Wait for DOM to be fully ready before attaching search handler
+        setTimeout(() => {
+          initializeSearchForm();
+        }, 100);
+      }
+    }
+
+    // Start auth check
+    checkAuthWithRetry();
+
+    async function initializePage() {
+    // DEBUG: Check if elements exist at page load
+    console.log('[initializePage] Checking DOM elements...');
+    console.log('[initializePage] userProductivityWidget:', document.getElementById('userProductivityWidget'));
+    console.log('[initializePage] activityHeatmapContainer:', document.getElementById('activityHeatmapContainer'));
+    console.log('[initializePage] statsContent:', document.getElementById('statsContent'));
+
+    // Load full user profile with roles before rendering menu
+    try {
+      await api.loadUserProfile();
+    } catch (error) {
+      console.error('Failed to load user profile:', error);
+    }
+    
+    // Render dynamic menu (will now have access to roles)
+    renderMenu('#mainNav');
+
+    // Initialize conversation menu in sidebar
+    if (typeof ConversationMenu !== 'undefined' && ConversationMenu.init()) {
+      // Load conversations into the menu
+      ConversationMenu.loadConversations(true);
+    }
+
+    // Initialize conversation search modal
+    if (typeof ConversationSearchModal !== 'undefined') {
+      ConversationSearchModal.init();
+    }
+
+    // UI Elements
+    const sidebar = document.getElementById('sidebar');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+    const openSidebar = document.getElementById('openSidebar');
+    const closeSidebar = document.getElementById('closeSidebar');
+    const userMenu = document.getElementById('userMenu');
+    const userDropdown = document.getElementById('userDropdown');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    // Sidebar toggle
+    openSidebar.addEventListener('click', () => {
+      sidebar.classList.remove('-translate-x-full');
+      sidebarOverlay.classList.remove('hidden');
+    });
+
+    closeSidebar.addEventListener('click', () => {
+      sidebar.classList.add('-translate-x-full');
+      sidebarOverlay.classList.add('hidden');
+    });
+
+    sidebarOverlay.addEventListener('click', () => {
+      sidebar.classList.add('-translate-x-full');
+      sidebarOverlay.classList.add('hidden');
+    });
+
+    // User menu toggle
+    userMenu.addEventListener('click', () => {
+      userDropdown.classList.toggle('hidden');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!userMenu.contains(e.target)) {
+        userDropdown.classList.add('hidden');
+      }
+    });
+
+    // Logout
+    logoutBtn.addEventListener('click', async () => {
+      await api.logout();
+      window.location.href = 'login.html';
+    });
+
+    // Initialize notification panel
+    NotificationPanel.init();
+
+    // Initialize activity panel
+    ActivityPanel.init();
+
+    // Activity header buttons
+    const refreshActivityFeedBtn = document.getElementById('refreshActivityFeedBtn');
+    const viewAllActivityHeaderBtn = document.getElementById('viewAllActivityHeaderBtn');
+
+    if (refreshActivityFeedBtn) {
+      refreshActivityFeedBtn.addEventListener('click', async () => {
+        const activityLoading = document.getElementById('activityFeedLoading');
+        const activityFeed = document.getElementById('activityFeed');
+        
+        refreshActivityFeedBtn.classList.add('animate-spin');
+        // Show loading skeleton
+        activityLoading.classList.remove('hidden');
+        activityFeed.classList.add('hidden');
+        
+        try {
+          await ActivityPanel.loadDashboardFeed(10);
+          activityLoading.classList.add('hidden');
+          activityFeed.classList.remove('hidden');
+        } catch (error) {
+          activityLoading.classList.add('hidden');
+          activityFeed.classList.remove('hidden');
+        } finally {
+          setTimeout(() => refreshActivityFeedBtn.classList.remove('animate-spin'), 300);
+        }
+      });
+    }
+
+    if (viewAllActivityHeaderBtn) {
+      viewAllActivityHeaderBtn.addEventListener('click', () => {
+        ActivityPanel.open();
+      });
+    }
+
+    // Activity heatmap info modal
+    const activityHeatmapInfoBtn = document.getElementById('activityHeatmapInfoBtn');
+    const activityHeatmapInfoModal = document.getElementById('activityHeatmapInfoModal');
+    if (activityHeatmapInfoBtn && activityHeatmapInfoModal) {
+      activityHeatmapInfoBtn.addEventListener('click', () => {
+        activityHeatmapInfoModal.classList.remove('hidden');
+        activityHeatmapInfoModal.classList.add('flex');
+      });
+    }
+
+    // Check if user is system admin
+    function isSystemAdmin() {
+      const user = api.user;
+      if (!user) return false;
+      const roles = user.roles || [];
+      return roles.includes('system_admin') || roles.some(r => r?.name === 'system_admin');
+    }
+
+    // Check if user is org admin or system admin (can view system status)
+    function canViewSystemStatus() {
+      const user = api.user;
+      if (!user) return false;
+      const roles = user.roles || [];
+      return roles.includes('system_admin') || 
+             roles.includes('org_admin') || 
+             roles.some(r => r?.name === 'system_admin' || r?.name === 'org_admin');
+    }
+
+    // Load user info
+    function loadUserInfo() {
+      const user = api.user;
+      if (user) {
+        const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+        const initials = (user.firstName?.[0] || '') + (user.lastName?.[0] || '') || user.email[0].toUpperCase();
+
+        const uNameEl = document.getElementById('userName');
+        const uInitEl = document.getElementById('userInitials');
+        if (uNameEl) uNameEl.textContent = name;
+        if (uInitEl) uInitEl.textContent = initials;
+        const welcomeEl = document.getElementById('welcomeName');
+        if (welcomeEl) welcomeEl.textContent = user.firstName || 'User';
+
+      }
+    }
+
+    // Load dashboard stats
+    async function loadStats() {
+      const statsLoading = document.getElementById('statsLoading');
+      const statsContent = document.getElementById('statsContent');
+      const isAdmin = canViewSystemStatus(); // org_admin or system_admin
+
+      console.log('[loadStats] Starting...', { isAdmin, user: api.user });
+
+      try {
+        if (isAdmin) {
+          // Admins see org-wide stats
+          const orgId = api.user?.organizationId;
+          console.log('[loadStats] Admin detected, orgId:', orgId);
+          if (orgId) {
+            console.log('[loadStats] Calling api.getOrganizationStats with orgId:', orgId);
+            const result = await api.getOrganizationStats(orgId);
+            console.log('[loadStats] API response:', result);
+            const stats = result.statistics || result;
+
+            // Display total unified matters count
+            const totalMatters = stats.total_matters || 0;
+            document.getElementById('statMatters').textContent = totalMatters.toLocaleString();
+
+            // Show breakdown if available (LANA + connector matters)
+            const lanaMatters = stats.lana_matters;
+            const connectorMatters = stats.connector_matters;
+
+            document.getElementById('statMattersLabel').textContent = 'Total Matters';
+            if (lanaMatters !== undefined && connectorMatters !== undefined && connectorMatters > 0) {
+              const breakdownEl = document.getElementById('mattersBreakdown');
+              const textEl = document.getElementById('mattersBreakdownText');
+              if (breakdownEl && textEl) {
+                textEl.textContent = `${lanaMatters.toLocaleString()} LANA, ${connectorMatters.toLocaleString()} Connector`;
+                breakdownEl.classList.remove('hidden');
+              }
+            } else {
+              document.getElementById('mattersBreakdown')?.classList.add('hidden');
+            }
+
+            document.getElementById('statUsers').textContent = (stats.total_users || 0).toLocaleString();
+            document.getElementById('statUsersCard').classList.remove('hidden');
+
+            // Show user breakdown if available
+            if (stats.active_users !== undefined || stats.other_users !== undefined) {
+              const activeUsers = parseInt(stats.active_users || 0);
+              const otherUsers = parseInt(stats.other_users || 0);
+
+              document.getElementById('activeUsers').textContent = activeUsers.toLocaleString();
+              document.getElementById('otherUsers').textContent = otherUsers.toLocaleString();
+
+              // Always show breakdown for admins (even if 0/0)
+              document.getElementById('userBreakdown').classList.remove('hidden');
+            }
+
+            // Fetch enhanced storage stats for document breakdown
+            try {
+              const storageStats = await api.get('/api/v1/storage/stats');
+              const totalFiles = parseInt(storageStats.total_files || 0);
+              const deletedFiles = parseInt(storageStats.deleted_files || 0);
+              const totalDocs = totalFiles + deletedFiles;
+              const totalSizeBytes = parseInt(storageStats.total_size_bytes || 0);
+              const deletedSizeBytes = parseInt(storageStats.deleted_size_bytes || 0);
+              const totalSize = totalSizeBytes + deletedSizeBytes;
+
+              document.getElementById('statDocuments').textContent = totalDocs.toLocaleString();
+              // Note: statStorage is set from /api/v1/admin/health/storage below (system storage, not document storage)
+
+              // Always show document breakdown for admins (even if 0/0)
+              document.getElementById('activeDocuments').textContent = totalFiles.toLocaleString();
+              document.getElementById('deletedDocuments').textContent = deletedFiles.toLocaleString();
+              document.getElementById('documentBreakdown').classList.remove('hidden');
+            } catch (storageError) {
+              // Fallback to basic stats if enhanced endpoint fails
+              console.error('Failed to load enhanced storage stats:', storageError);
+              document.getElementById('statDocuments').textContent = (stats.total_documents || 0).toLocaleString();
+              // Note: statStorage is set from /api/v1/admin/health/storage below (system storage, not document storage)
+            }
+
+            // Load system storage information for storage card breakdown
+            try {
+              const storageInfo = await api.get('/api/v1/admin/health/storage');
+
+              // Set main storage stat from system storage (same endpoint as health.html)
+              // Show used bytes and percentage, not total
+              if (storageInfo.storage && storageInfo.storage.used_bytes) {
+                document.getElementById('statStorage').textContent = formatBytes(storageInfo.storage.used_bytes);
+                document.getElementById('storageUsagePercent').textContent = `(${storageInfo.storage.usage_percent || 0}%)`;
+              }
+
+              // Show storage card
+              document.getElementById('statStorageCard').classList.remove('hidden');
+
+              // Display database size in breakdown
+              if (storageInfo.database && !storageInfo.database.error) {
+                const dbSizeGB = parseFloat(storageInfo.database.size_gb);
+                document.getElementById('databaseStorage').textContent = dbSizeGB.toFixed(2) + ' GB';
+              }
+
+              // Display volumes in breakdown and calculate total remaining
+              const volumeList = document.getElementById('volumeStorageList');
+              volumeList.innerHTML = ''; // Clear existing content
+
+              let totalUsedBytes = 0;
+              let totalCapacityBytes = 0;
+
+              if (storageInfo.volumes && storageInfo.volumes.length > 0) {
+                storageInfo.volumes.forEach(volume => {
+                  if (volume.status !== 'not_available') {
+                    const usedGB = parseFloat(volume.used_gb || 0);
+                    const totalGB = parseFloat(volume.total_gb || 0);
+                    const usagePercent = volume.usage_percent || 0;
+
+                    // Accumulate totals
+                    totalUsedBytes += parseFloat(volume.used_bytes || 0);
+                    totalCapacityBytes += parseFloat(volume.total_bytes || 0);
+
+                    // Color based on usage
+                    let textColor = 'text-gray-900';
+                    if (usagePercent > 80) textColor = 'text-red-600';
+                    else if (usagePercent > 60) textColor = 'text-yellow-600';
+
+                    volumeList.innerHTML += `
+                      <div class="flex justify-between">
+                        <span>${volume.name || volume.mount_point}:</span>
+                        <span class="font-medium ${textColor}">${usedGB.toFixed(1)}/${totalGB.toFixed(1)} GB (${usagePercent}%)</span>
+                      </div>
+                    `;
+                  }
+                });
+              }
+
+              // If no volumes available, show root filesystem
+              if (volumeList.innerHTML === '' && storageInfo.root_filesystem && !storageInfo.root_filesystem.error) {
+                const root = storageInfo.root_filesystem;
+                const usedGB = parseFloat(root.used_gb || 0);
+                const totalGB = parseFloat(root.total_gb || 0);
+                const usagePercent = root.usage_percent || 0;
+
+                // Use root filesystem for totals
+                totalUsedBytes = parseFloat(root.used_bytes || 0);
+                totalCapacityBytes = parseFloat(root.total_bytes || 0);
+
+                let textColor = 'text-gray-900';
+                if (usagePercent > 80) textColor = 'text-red-600';
+                else if (usagePercent > 60) textColor = 'text-yellow-600';
+
+                volumeList.innerHTML = `
+                  <div class="flex justify-between">
+                    <span>Root:</span>
+                    <span class="font-medium ${textColor}">${usedGB.toFixed(1)}/${totalGB.toFixed(1)} GB (${usagePercent}%)</span>
+                  </div>
+                `;
+              }
+
+              // Calculate and display overall remaining percentage
+              if (totalCapacityBytes > 0) {
+                const remainingBytes = totalCapacityBytes - totalUsedBytes;
+                const remainingPercent = (remainingBytes / totalCapacityBytes) * 100;
+
+                // Color code based on remaining space
+                let remainingColor = 'text-green-600';
+                if (remainingPercent < 20) remainingColor = 'text-red-600';
+                else if (remainingPercent < 40) remainingColor = 'text-yellow-600';
+
+                document.getElementById('storageRemaining').innerHTML = `
+                  <span class="${remainingColor}">(${remainingPercent.toFixed(1)}% remaining)</span>
+                `;
+              }
+
+              // Show breakdown if we have data
+              if (storageInfo.database || volumeList.innerHTML !== '') {
+                document.getElementById('storageBreakdown').classList.remove('hidden');
+              }
+            } catch (storageInfoError) {
+              console.error('Failed to load system storage:', storageInfoError);
+              // Don't show storage card if we can't load the data
+            }
+
+            // Load productivity stats - ORGANIZATION-WIDE for admins
+            try {
+              const productivityData = stats.productivity_stats;
+              console.log('[loadStats] Productivity data (org-wide for admin):', productivityData);
+
+              if (productivityData) {
+                // Admins see organization-wide stats in a separate section if needed
+                // For now, we'll skip this and show user-specific below
+              }
+            } catch (productivityError) {
+              console.error('Failed to display organization productivity stats:', productivityError);
+            }
+          }
+        } else {
+          // Regular users see their own matters count
+          const mattersResult = await api.getMatters(1, 10); // Get first page to verify count
+          // Use actual returned matters length if pagination total seems wrong
+          const returnedCount = mattersResult.matters?.length || 0;
+          const paginationTotal = mattersResult.pagination?.total || 0;
+          // If pagination says there are matters but none returned, trust the returned count
+          const myMattersCount = returnedCount === 0 ? 0 : paginationTotal;
+          document.getElementById('statMatters').textContent = myMattersCount.toLocaleString();
+          document.getElementById('statMattersLabel').textContent = 'My Matters';
+          // Hide users card for non-admins
+          document.getElementById('statUsersCard').classList.add('hidden');
+          // Documents and storage can still show (will be user's own documents via API)
+          document.getElementById('statDocuments').textContent = '-';
+          document.getElementById('statStorage').textContent = '-';
+        }
+        // Hide loading, show content
+        statsLoading.classList.add('hidden');
+        statsContent.classList.remove('hidden');
+
+        // Load user productivity (for ALL users - shows their own activity)
+        await loadUserProductivity();
+      } catch (error) {
+        console.error('Failed to load stats:', error);
+        // Show dashes on error
+        document.getElementById('statMatters').textContent = '-';
+        document.getElementById('statUsers').textContent = '-';
+        document.getElementById('statDocuments').textContent = '-';
+        document.getElementById('statStorage').textContent = '-';
+        // Still show content with error values
+        statsLoading.classList.add('hidden');
+        statsContent.classList.remove('hidden');
+
+        // Still try to load user productivity even if stats fail
+        await loadUserProductivity();
+      }
+    }
+
+    // Load current user's productivity stats for heatmap (ALL users see their own data)
+    async function loadUserProductivity(userId = null) {
+      console.log('[loadUserProductivity] Loading productivity for userId:', userId || 'current user');
+
+      try {
+        // If userId provided, we're filtering (admin feature), otherwise load current user
+        const result = userId
+          ? await api.get(`/api/v1/activity/user/${userId}/productivity`)
+          : await api.getMyProductivity();
+
+        const productivityData = result.productivity;
+        console.log('[loadUserProductivity] Productivity data:', productivityData);
+
+        if (productivityData) {
+          // Update summary stats
+          const totalActivitiesElem = document.getElementById('totalActivities');
+          if (totalActivitiesElem) {
+            totalActivitiesElem.textContent = (productivityData.total_activities || 0).toLocaleString('en-US');
+          }
+
+          // Render activity heatmap
+          const heatmapContainer = document.getElementById('activityHeatmapContainer');
+          if (heatmapContainer && productivityData.daily_activity && productivityData.daily_activity.length > 0) {
+            console.log('[loadUserProductivity] Rendering heatmap with', productivityData.daily_activity.length, 'days');
+            ActivityHeatmap.render('activityHeatmapContainer', productivityData.daily_activity);
+          } else if (heatmapContainer) {
+            // Show placeholder
+            heatmapContainer.innerHTML = `
+              <div class="text-center py-8 text-gray-400">
+                <svg class="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                </svg>
+                <p class="text-sm">No activity data yet</p>
+                <p class="text-xs mt-1">Activity will appear here as you interact with the system</p>
+              </div>
+            `;
+          }
+        }
+      } catch (error) {
+        console.error('[loadUserProductivity] Failed to load:', error);
+        // Show placeholder on error
+        const totalActivitiesElem = document.getElementById('totalActivities');
+        if (totalActivitiesElem) totalActivitiesElem.textContent = '0';
+      }
+    }
+
+    // Initialize user filter dropdown for admins
+    async function initializeActivityUserFilter() {
+      const filterContainer = document.getElementById('activityUserFilterContainer');
+      const filterSelect = document.getElementById('activityUserFilter');
+
+      if (!filterContainer || !filterSelect) return;
+
+      try {
+        // Check if user is admin - fetch fresh profile to get accurate role
+        let isAdmin = false;
+
+        try {
+          const profileResult = await api.get('/api/v1/users/me/profile');
+          const profile = profileResult.profile || {};
+
+          // Check the roles array for the actual role name (not display_name)
+          if (profile.roles && Array.isArray(profile.roles)) {
+            isAdmin = profile.roles.some(role =>
+              role.name === 'system_admin' || role.name === 'org_admin'
+            );
+            console.log('[initializeActivityUserFilter] Profile roles:', profile.roles.map(r => r.name), 'isAdmin:', isAdmin);
+          } else {
+            console.log('[initializeActivityUserFilter] No roles array in profile:', profile);
+          }
+        } catch (error) {
+          console.error('[initializeActivityUserFilter] Failed to fetch profile:', error);
+          // Fallback to localStorage if API fails
+          const user = JSON.parse(localStorage.getItem('user') || '{}');
+          const roleName = user.role_name || user.role || '';
+          isAdmin = roleName === 'system_admin' || roleName === 'org_admin';
+
+          console.log('[initializeActivityUserFilter] Fallback to localStorage role:', roleName, 'isAdmin:', isAdmin);
+        }
+
+        if (!isAdmin) {
+          console.log('[initializeActivityUserFilter] User is not admin, hiding filter');
+          filterContainer.classList.add('hidden');
+          return;
+        }
+
+        console.log('[initializeActivityUserFilter] User is admin, showing filter');
+
+        // Show dropdown for admins
+        filterContainer.classList.remove('hidden');
+
+        // Load organization users
+        const result = await api.getOrganizationUsers();
+        const users = result.users || [];
+
+        // Clear existing options except "My Activity" and "All Users"
+        while (filterSelect.options.length > 2) {
+          filterSelect.remove(2);
+        }
+
+        // Add divider
+        const divider = document.createElement('option');
+        divider.disabled = true;
+        divider.textContent = '────────────────';
+        filterSelect.add(divider);
+
+        // Add each user
+        users.forEach(user => {
+          const option = document.createElement('option');
+          option.value = user.id;
+          option.textContent = `${user.full_name} (${user.email})`;
+          filterSelect.add(option);
+        });
+
+        // Handle filter change
+        filterSelect.addEventListener('change', async (e) => {
+          const selectedValue = e.target.value;
+
+          if (selectedValue === 'me') {
+            // Load current user's productivity and activity
+            await loadUserProductivity();
+            await loadActivityForUser(null); // null = current user
+          } else if (selectedValue === 'all') {
+            // Load organization-wide aggregate data
+            await loadOrganizationProductivity();
+            await loadOrganizationActivity();
+          } else {
+            // Load specific user's productivity and activity
+            await loadUserProductivity(selectedValue);
+            await loadActivityForUser(selectedValue);
+          }
+        });
+
+      } catch (error) {
+        console.error('[initializeActivityUserFilter] Failed:', error);
+        filterContainer.classList.add('hidden');
+      }
+    }
+
+    // Load activity feed for specific user or current user
+    async function loadActivityForUser(userId = null) {
+      const activityLoading = document.getElementById('activityFeedLoading');
+      const activityFeed = document.getElementById('activityFeed');
+
+      try {
+        // Show loading
+        activityLoading.classList.remove('hidden');
+        activityFeed.classList.add('hidden');
+
+        if (userId) {
+          // Load specific user's activity
+          const result = await api.get(`/api/v1/activity/user/${userId}?limit=10`);
+          const activities = result.activities || [];
+
+          // Render activities
+          if (activities.length > 0) {
+            activityFeed.innerHTML = activities.map(activity => {
+              const time = new Date(activity.activity_timestamp || activity.timestamp).toLocaleString();
+              const displayMessage = (typeof EventDisplayNames !== 'undefined')
+                ? EventDisplayNames.getEventDisplayName(activity.event_type, activity.display_message)
+                : (activity.display_message || activity.event_type);
+              return `
+                <div class="p-4 hover:bg-gray-50 transition-colors">
+                  <div class="flex items-start gap-3">
+                    <div class="flex-shrink-0 w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
+                      <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                      </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm text-gray-900">${displayMessage}</p>
+                      <p class="text-xs text-gray-500 mt-1">${time}</p>
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join('');
+          } else {
+            activityFeed.innerHTML = '<div class="p-6 text-center text-gray-500">No recent activity</div>';
+          }
+        } else {
+          // Load current user's activity
+          const result = await api.get(`/api/v1/activity/my?limit=10`);
+          const activities = result.activities || [];
+
+          // Render activities
+          if (activities.length > 0) {
+            activityFeed.innerHTML = activities.map(activity => {
+              const time = new Date(activity.activity_timestamp || activity.timestamp).toLocaleString();
+              const displayMessage = (typeof EventDisplayNames !== 'undefined')
+                ? EventDisplayNames.getEventDisplayName(activity.event_type, activity.display_message)
+                : (activity.display_message || activity.event_type);
+              return `
+                <div class="p-4 hover:bg-gray-50 transition-colors">
+                  <div class="flex items-start gap-3">
+                    <div class="flex-shrink-0 w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
+                      <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                      </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm text-gray-900">${displayMessage}</p>
+                      <p class="text-xs text-gray-500 mt-1">${time}</p>
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join('');
+          } else {
+            activityFeed.innerHTML = '<div class="p-6 text-center text-gray-500">No recent activity</div>';
+          }
+        }
+
+        // Hide loading, show content
+        activityLoading.classList.add('hidden');
+        activityFeed.classList.remove('hidden');
+      } catch (error) {
+        console.error('[loadActivityForUser] Failed to load activity:', error);
+        activityLoading.classList.add('hidden');
+        activityFeed.classList.remove('hidden');
+        activityFeed.innerHTML = '<div class="p-6 text-center text-gray-500">Failed to load activity</div>';
+      }
+    }
+
+    // Load activity feed using ActivityPanel (default - current user)
+    async function loadActivity() {
+      await loadActivityForUser(null);
+    }
+
+    // Load organization-wide productivity (admins only)
+    async function loadOrganizationProductivity() {
+      console.log('[loadOrganizationProductivity] Loading organization-wide productivity');
+
+      try {
+        const result = await api.get('/api/v1/activity/organization/productivity');
+        const productivityData = result.productivity;
+        console.log('[loadOrganizationProductivity] Productivity data:', productivityData);
+
+        if (productivityData) {
+          // Update summary stats
+          const totalActivitiesElem = document.getElementById('totalActivities');
+          if (totalActivitiesElem) {
+            totalActivitiesElem.textContent = (productivityData.total_activities || 0).toLocaleString('en-US');
+          }
+
+          // Render activity heatmap with aggregated data
+          const heatmapContainer = document.getElementById('activityHeatmapContainer');
+          if (heatmapContainer && productivityData.daily_activity && productivityData.daily_activity.length > 0) {
+            console.log('[loadOrganizationProductivity] Rendering heatmap with', productivityData.daily_activity.length, 'days');
+            ActivityHeatmap.render('activityHeatmapContainer', productivityData.daily_activity);
+          } else if (heatmapContainer) {
+            // Show placeholder
+            heatmapContainer.innerHTML = `
+              <div class="text-center py-8 text-gray-400">
+                <svg class="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                </svg>
+                <p class="text-sm">No activity data yet</p>
+                <p class="text-xs mt-1">Activity will appear here as users interact with the system</p>
+              </div>
+            `;
+          }
+        }
+      } catch (error) {
+        console.error('[loadOrganizationProductivity] Failed to load:', error);
+        // Show placeholder on error
+        const totalActivitiesElem = document.getElementById('totalActivities');
+        if (totalActivitiesElem) totalActivitiesElem.textContent = '0';
+      }
+    }
+
+    // Load organization-wide recent activity (admins only)
+    async function loadOrganizationActivity() {
+      const activityLoading = document.getElementById('activityFeedLoading');
+      const activityFeed = document.getElementById('activityFeed');
+
+      try {
+        // Show loading
+        activityLoading.classList.remove('hidden');
+        activityFeed.classList.add('hidden');
+
+        // Load organization-wide activity
+        const result = await api.get('/api/v1/activity/organization/recent?limit=10');
+        const activities = result.activities || [];
+
+        // Render activities
+        if (activities.length > 0) {
+          activityFeed.innerHTML = activities.map(activity => {
+            const time = new Date(activity.activity_timestamp || activity.timestamp).toLocaleString();
+            const userName = activity.user ? `${activity.user.first_name} ${activity.user.last_name}` : 'Unknown User';
+            const displayMessage = (typeof EventDisplayNames !== 'undefined')
+              ? EventDisplayNames.getEventDisplayName(activity.event_type, activity.display_message)
+              : (activity.display_message || activity.event_type);
+            return `
+              <div class="p-4 hover:bg-gray-50 transition-colors">
+                <div class="flex items-start gap-3">
+                  <div class="flex-shrink-0 w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
+                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm text-gray-900">${displayMessage}</p>
+                    <p class="text-xs text-gray-500 mt-1">${userName} • ${time}</p>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('');
+        } else {
+          activityFeed.innerHTML = '<div class="p-6 text-center text-gray-500">No recent activity</div>';
+        }
+
+        // Hide loading, show content
+        activityLoading.classList.add('hidden');
+        activityFeed.classList.remove('hidden');
+      } catch (error) {
+        console.error('[loadOrganizationActivity] Failed to load activity:', error);
+        activityLoading.classList.add('hidden');
+        activityFeed.classList.remove('hidden');
+        activityFeed.innerHTML = '<div class="p-6 text-center text-gray-500">Failed to load activity</div>';
+      }
+    }
+
+    // Format bytes helper
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    // Initialize
+    loadUserInfo();
+    loadStats();
+    loadActivity();
+    initializeActivityUserFilter(); // Initialize admin user filter dropdown
+    } // End initializePage function
+
+    /**
+     * Navigate to orphaned documents management page (e.g. from admin or other links)
+     */
+    window.navigateToOrphans = function() {
+      // Check if user has admin access
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const hasAdminAccess = user.role === 'system_admin' || user.role === 'org_admin' || user.permissions?.includes('admin:access');
+
+      if (hasAdminAccess) {
+        // Admin users go to dedicated orphan management page
+        window.location.href = 'admin/orphaned-documents.html';
+      } else {
+        // Regular users can view their own orphans in storage (future enhancement)
+        window.location.href = 'storage.html?tab=orphaned';
+      }
+    }
+
+    // Global search form handler
+    function initializeSearchForm() {
+      if (!isSearchEnabled) {
+        console.log('[Search] Search is disabled');
+        return;
+      }
+
+      console.log('[Search] initializeSearchForm called');
+      const searchForm = document.getElementById('globalSearchForm');
+      console.log('[Search] Form element:', searchForm);
+
+      if (searchForm) {
+        searchForm.addEventListener('submit', (e) => {
+          console.log('[Search] Form submitted, preventing default');
+          e.preventDefault();
+          e.stopPropagation();
+
+          const query = document.getElementById('globalSearchInput').value;
+          console.log('[Search] Query:', query);
+
+          if (query.trim()) {
+            const url = `search-results.html?q=${encodeURIComponent(query)}`;
+            console.log('[Search] Navigating to:', url);
+            window.location.href = url;
+          } else {
+            console.log('[Search] Query is empty');
+          }
+
+          return false;
+        });
+        console.log('[Search] Form handler attached successfully');
+      } else {
+        console.error('[Search] Form element not found - DOM might not be ready');
+      }
+    }
+
+    // =================================================================
+    // CONVERSATION ACTIONS MODAL
+    // =================================================================
+
+    // Conversation actions modal state
+    let selectedConversationId = null;
+    let selectedConversationTitle = null;
+    let selectedConversationIsProject = false;
+    let selectedConversationMatterId = null;
+
+    // Open conversation actions modal
+    window.openConversationActionsModal = function(threadId, title, matterId) {
+      selectedConversationId = threadId;
+      selectedConversationTitle = title;
+      selectedConversationMatterId = matterId;
+      selectedConversationIsProject = matterId !== null;
+
+      // Update modal content
+      document.getElementById('modalConversationTitle').textContent = title.replace(/&apos;/g, "'").replace(/&quot;/g, '"').replace(/&#96;/g, '`');
+
+      // Show/hide matter details button
+      const matterBtn = document.getElementById('viewMatterDetailsBtn');
+      if (matterId && matterId !== 'null') {
+        matterBtn.classList.remove('hidden');
+      } else {
+        matterBtn.classList.add('hidden');
+      }
+
+      // Show modal
+      const modal = document.getElementById('conversationActionsModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    // Close conversation actions modal
+    window.closeConversationActionsModal = function() {
+      const modal = document.getElementById('conversationActionsModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+
+      selectedConversationId = null;
+      selectedConversationTitle = null;
+      selectedConversationIsProject = false;
+    }
+
+    // Close activity heatmap info modal (called from onclick)
+    window.closeActivityHeatmapInfoModal = function() {
+      const modal = document.getElementById('activityHeatmapInfoModal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    };
+
+    // Edit conversation from modal - opens rename modal
+    window.editConversationFromModal = function() {
+      // Validate we have a conversation selected
+      if (!selectedConversationId || !selectedConversationTitle) {
+        Toast.error('No conversation selected');
+        console.error('[Rename] No conversation selected', {
+          selectedConversationId,
+          selectedConversationTitle
+        });
+        return;
+      }
+
+      // Save values BEFORE closing modal (closeConversationActionsModal clears these)
+      const conversationId = selectedConversationId;
+      const conversationTitle = selectedConversationTitle;
+
+      // Close the actions modal
+      closeConversationActionsModal();
+
+      // Restore the values we need for rename
+      selectedConversationId = conversationId;
+      selectedConversationTitle = conversationTitle;
+
+      // Open rename modal
+      const renameModal = document.getElementById('renameConversationModal');
+      const renameInput = document.getElementById('renameInput');
+
+      // Set current title as default value (decode HTML entities)
+      const currentTitle = conversationTitle
+        .replace(/&apos;/g, "'")
+        .replace(/&quot;/g, '"')
+        .replace(/&#96;/g, '`')
+        .replace(/&amp;/g, '&');
+
+      renameInput.value = currentTitle;
+      renameModal.classList.remove('hidden');
+      renameModal.classList.add('flex');
+
+      // Focus input and select all text
+      setTimeout(() => {
+        renameInput.focus();
+        renameInput.select();
+      }, 100);
+    }
+
+    // Close rename modal
+    window.closeRenameModal = function() {
+      const renameModal = document.getElementById('renameConversationModal');
+      renameModal.classList.add('hidden');
+      renameModal.classList.remove('flex');
+    }
+
+    // Confirm rename
+    window.confirmRename = async function() {
+      // Validate conversation is still selected
+      if (!selectedConversationId) {
+        Toast.error('No conversation selected');
+        closeRenameModal();
+        return;
+      }
+
+      const renameInput = document.getElementById('renameInput');
+      const newTitle = renameInput.value.trim();
+
+      if (!newTitle) {
+        Toast.error('Conversation name cannot be empty');
+        return;
+      }
+
+      // Only compare if we have a current title
+      if (selectedConversationTitle) {
+        const currentTitle = selectedConversationTitle
+          .replace(/&apos;/g, "'")
+          .replace(/&quot;/g, '"')
+          .replace(/&#96;/g, '`')
+          .replace(/&amp;/g, '&');
+
+        if (newTitle === currentTitle) {
+          closeRenameModal();
+          return;
+        }
+      }
+
+      try {
+        await api.put(`/api/v1/chat/sessions/${selectedConversationId}`, { title: newTitle });
+        Toast.success('Conversation renamed');
+        closeRenameModal();
+
+        // Refresh the conversation menu sidebar if available
+        if (typeof ConversationMenu !== 'undefined') {
+          await ConversationMenu.loadConversations(true);
+        }
+      } catch (error) {
+        console.error('Failed to rename conversation:', error);
+        Toast.error('Failed to rename conversation');
+      }
+    }
+
+    // View matter details from modal
+    window.viewMatterDetailsFromModal = function() {
+      if (!selectedConversationMatterId) {
+        Toast.error('No matter associated with this conversation');
+        return;
+      }
+
+      // Navigate to matters.html
+      window.location.href = `matters.html?matter_id=${selectedConversationMatterId}`;
+    }
+
+    // Delete conversation from modal
+    window.deleteConversationFromModal = function() {
+      // Show custom confirmation modal
+      const confirmTitle = selectedConversationIsProject
+        ? 'Delete Project Conversation?'
+        : 'Delete Conversation?';
+
+      const confirmMessage = selectedConversationIsProject
+        ? 'This will only delete the chat messages. The matter/project itself will NOT be deleted and you can create new conversations for it later.'
+        : 'This action cannot be undone. All messages in this conversation will be permanently deleted.';
+
+      openDeleteConfirmModal(confirmTitle, confirmMessage);
+    }
+
+    // Open custom delete confirmation modal
+    window.openDeleteConfirmModal = function(title, message) {
+      document.getElementById('deleteConfirmTitle').textContent = title;
+      document.getElementById('deleteConfirmMessage').textContent = message;
+
+      const modal = document.getElementById('deleteConfirmModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    // Close custom delete confirmation modal
+    window.closeDeleteConfirmModal = function() {
+      const modal = document.getElementById('deleteConfirmModal');
+      modal.classList.remove('flex');
+      modal.classList.add('hidden');
+    }
+
+    // Confirm delete action
+    window.confirmDeleteConversation = async function() {
+      // Store values BEFORE closing modal
+      const conversationIdToDelete = selectedConversationId;
+
+      // Validate we have an ID to delete
+      if (!conversationIdToDelete) {
+        Toast.error('No conversation selected');
+        closeDeleteConfirmModal();
+        closeConversationActionsModal();
+        return;
+      }
+
+      try {
+        // Close both modals
+        closeDeleteConfirmModal();
+        closeConversationActionsModal();
+
+        // Delete from backend
+        await api.delete(`/api/v1/chat/sessions/${conversationIdToDelete}`);
+
+        Toast.success('Conversation deleted');
+
+        // Refresh the conversation menu sidebar if available
+        if (typeof ConversationMenu !== 'undefined') {
+          await ConversationMenu.loadConversations(true);
+        }
+      } catch (error) {
+        console.error('Failed to delete conversation:', error);
+        Toast.error('Failed to delete conversation');
+      }
+    }
+
+    // ============================================================================
+    // CONNECTOR VIEWER SPECIFIC CODE
+    // ============================================================================
+
     // Get URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     const uiEntryPoint = urlParams.get('ui');
@@ -129,6 +1781,7 @@
 
     // Update page title
     document.title = `${connectorName} - LanaAI`;
+    document.getElementById('connector-title').textContent = connectorName;
 
     // Go back to connectors page
     function goBack() {
@@ -139,8 +1792,7 @@
     function showError(message) {
       document.getElementById('error-message').textContent = message;
       document.getElementById('error-screen').classList.add('show');
-      document.getElementById('loading-screen').classList.add('hidden');
-      document.getElementById('back-button').style.display = 'none';
+      document.getElementById('loading-overlay').classList.add('hidden');
     }
 
     // Load connector UI
@@ -152,47 +1804,100 @@
           return;
         }
 
-        // Get base URL from config
-        const baseUrl = window.LanaConfig?.API_BASE_URL || 'http://localhost:8080';
+        console.log('[Connector Viewer] Loading UI:', uiEntryPoint);
 
-        // Construct full URL
-        const fullUrl = `${baseUrl}${uiEntryPoint}`;
+        // Support both file:// URLs and HTTP URLs (MinIO S3-compatible serving)
+        if (uiEntryPoint.startsWith('file://') || uiEntryPoint.startsWith('http://') || uiEntryPoint.startsWith('https://')) {
+          const iframe = document.getElementById('connector-frame');
 
-        console.log('[Connector Viewer] Loading UI from:', fullUrl);
+          // Fetch the HTML, inject config BEFORE loading, then load modified HTML
+          fetch(uiEntryPoint)
+            .then(response => response.text())
+            .then(html => {
+              console.log('[Connector Viewer] Fetched connector HTML, injecting config...');
 
-        // Get auth token
-        const token = localStorage.getItem('token');
-        if (!token) {
-          showError('Authentication required. Please log in and try again.');
-          return;
+              // Build config injection script
+              // Get token from global api instance (created by api.js)
+              const token = (typeof api !== 'undefined' && api.token) || localStorage.getItem('token') || '';
+              console.log('[Connector Viewer] Injecting token:', token ? token.substring(0, 20) + '...' : 'NO TOKEN');
+
+              const configScript = `
+                <script>
+                  // Injected by connector-viewer - available before any other scripts run
+                  window.LanaConfig = ${JSON.stringify(window.LanaConfig || {})};
+                  window.api = { token: "${token}" };
+                  localStorage.setItem('lana_token', "${token}");
+                  localStorage.setItem('token', "${token}");
+                  console.log('[Connector UI] Config injected - API URL:', window.LanaConfig.API_BASE_URL);
+                  console.log('[Connector UI] Token injected:', "${token}" ? "${token}".substring(0, 20) + "..." : "NO TOKEN");
+                <\/script>
+              `;
+
+              // Remove broken CSS links
+              html = html.replace(/<link[^>]*href=["']\/css\/tailwind\.css["'][^>]*>/gi, '');
+
+              // Fix relative asset URLs to use absolute MinIO URLs
+              // Extract base URL from uiEntryPoint (e.g., http://localhost:9000/lana-connectors/.../v2/ui/)
+              const baseUrl = uiEntryPoint.substring(0, uiEntryPoint.lastIndexOf('/') + 1);
+              // Replace relative asset paths with absolute URLs
+              html = html.replace(/src=["']assets\//gi, `src="${baseUrl}assets/`);
+              html = html.replace(/href=["']assets\//gi, `href="${baseUrl}assets/`);
+
+              // Inject config script, Tailwind, and tab styles at the beginning of <head>
+              const tailwindScript = '<script src="https://cdn.tailwindcss.com"><\/script>';
+              const tabStyles = `
+                <style>
+                  /* Ensure tabs display correctly */
+                  .tab-button {
+                    background: none;
+                    border: none;
+                    cursor: pointer;
+                    position: relative;
+                  }
+                  .tab-button.active {
+                    border-bottom: 2px solid #2563eb !important;
+                  }
+                </style>
+              `;
+              html = html.replace('<head>', '<head>' + configScript + tailwindScript + tabStyles);
+
+              // Create blob URL and load modified HTML
+              const blob = new Blob([html], { type: 'text/html' });
+              const blobUrl = URL.createObjectURL(blob);
+
+              iframe.onload = function() {
+                console.log('[Connector Viewer] UI loaded successfully');
+                document.getElementById('loading-overlay').classList.add('hidden');
+                // Clean up blob URL after load
+                URL.revokeObjectURL(blobUrl);
+              };
+
+              iframe.onerror = function(error) {
+                console.error('[Connector Viewer] Failed to load UI:', error);
+                showError('Failed to load connector UI.');
+                URL.revokeObjectURL(blobUrl);
+              };
+
+              iframe.src = blobUrl;
+            })
+            .catch(error => {
+              console.error('[Connector Viewer] Failed to fetch UI:', error);
+              showError('Failed to load connector UI: ' + error.message);
+            });
+
+          // Timeout after 30 seconds
+          setTimeout(() => {
+            const loadingOverlay = document.getElementById('loading-overlay');
+            if (!loadingOverlay.classList.contains('hidden')) {
+              console.error('[Connector Viewer] Timeout loading UI');
+              showError('Loading timeout. The connector UI took too long to load.');
+            }
+          }, 30000);
+
+        } else {
+          // Invalid URL format
+          showError('Invalid connector URL format. URL must start with file://, http://, or https://');
         }
-
-        // Set iframe src with auth token (we'll inject it via postMessage for security)
-        const iframe = document.getElementById('connector-frame');
-
-        // Load the iframe
-        iframe.src = fullUrl;
-
-        // Hide loading screen when iframe loads
-        iframe.onload = function() {
-          console.log('[Connector Viewer] UI loaded successfully');
-          document.getElementById('loading-screen').classList.add('hidden');
-        };
-
-        // Show error if iframe fails to load
-        iframe.onerror = function(error) {
-          console.error('[Connector Viewer] Failed to load UI:', error);
-          showError('Failed to load connector UI. Please check your connection and try again.');
-        };
-
-        // Timeout after 30 seconds
-        setTimeout(() => {
-          const loadingScreen = document.getElementById('loading-screen');
-          if (!loadingScreen.classList.contains('hidden')) {
-            console.error('[Connector Viewer] Timeout loading UI');
-            showError('Loading timeout. The connector UI took too long to respond.');
-          }
-        }, 30000);
 
       } catch (error) {
         console.error('[Connector Viewer] Error:', error);
@@ -205,12 +1910,54 @@
 
     // Handle keyboard shortcuts
     document.addEventListener('keydown', (e) => {
-      // ESC or Backspace to go back
-      if (e.key === 'Escape' || (e.key === 'Backspace' && e.target === document.body)) {
+      // ESC to go back
+      if (e.key === 'Escape') {
         e.preventDefault();
         goBack();
       }
     });
   </script>
+
+  <!-- Delete Confirmation Modal -->
+  <div id="deleteConfirmModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 10001;" onclick="if(event.target === this) closeDeleteConfirmModal()">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md" onclick="event.stopPropagation()">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between p-6 border-b border-gray-200">
+        <div class="flex items-center gap-3">
+          <div class="flex-shrink-0 w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+            <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+          </div>
+          <h2 id="deleteConfirmTitle" class="text-xl font-semibold text-gray-900">Delete Conversation?</h2>
+        </div>
+        <button onclick="closeDeleteConfirmModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6">
+        <p id="deleteConfirmMessage" class="text-gray-600 leading-relaxed"></p>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+        <button onclick="closeDeleteConfirmModal()" class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          Cancel
+        </button>
+        <button onclick="confirmDeleteConversation()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+          </svg>
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+
+  </div> <!-- End #app-content -->
 </body>
 </html>

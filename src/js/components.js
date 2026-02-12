@@ -720,7 +720,7 @@ const ConversationActionsModal = {
 
       // Reload conversation menu
       if (typeof window.conversationMenu !== 'undefined' && window.conversationMenu.loadConversations) {
-        window.conversationMenu.loadConversations();
+        window.conversationMenu.loadConversations(true);
       } else {
         window.location.reload();
       }
@@ -762,7 +762,7 @@ const ConversationActionsModal = {
 
           // Reload conversation menu
           if (typeof window.conversationMenu !== 'undefined' && window.conversationMenu.loadConversations) {
-            window.conversationMenu.loadConversations();
+            window.conversationMenu.loadConversations(true);
           } else {
             window.location.reload();
           }

@@ -456,6 +456,198 @@
     </div>
   </div>
 
+  <!-- Connector Actions Modal -->
+  <div id="connectorActionsModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden" onclick="event.stopPropagation()">
+      <!-- Header with Icon -->
+      <div class="p-6 text-center border-b border-gray-100">
+        <div class="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center">
+          <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+          </svg>
+        </div>
+        <h3 id="actionsConnectorName" class="text-xl font-semibold text-gray-900">Connector Actions</h3>
+        <p class="text-sm text-gray-500 mt-1">Choose an action to perform</p>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="p-6 space-y-3">
+        <!-- Navigate to Dashboard -->
+        <button id="actionNavigateDashboard" onclick="navigateToConnectorDashboard()" class="w-full group flex items-center gap-4 px-5 py-4 bg-white hover:bg-indigo-50 border-2 border-gray-200 hover:border-indigo-300 text-gray-700 hover:text-indigo-700 rounded-xl transition-all duration-200">
+          <div class="w-10 h-10 bg-indigo-100 group-hover:bg-indigo-200 rounded-lg flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+            </svg>
+          </div>
+          <div class="text-left flex-1">
+            <div class="font-semibold text-base">Open Dashboard</div>
+            <div class="text-xs text-gray-500 group-hover:text-indigo-600">Manage connector settings</div>
+          </div>
+          <svg class="w-5 h-5 text-gray-400 group-hover:text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+          </svg>
+        </button>
+
+        <!-- Uninstall -->
+        <button id="actionUninstall" onclick="uninstallConnector()" class="w-full group flex items-center gap-4 px-5 py-4 bg-white hover:bg-yellow-50 border-2 border-gray-200 hover:border-yellow-300 text-gray-700 hover:text-yellow-700 rounded-xl transition-all duration-200">
+          <div class="w-10 h-10 bg-yellow-100 group-hover:bg-yellow-200 rounded-lg flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
+            </svg>
+          </div>
+          <div class="text-left flex-1">
+            <div class="font-semibold text-base">Uninstall</div>
+            <div class="text-xs text-gray-500 group-hover:text-yellow-600">Disconnect but keep configuration</div>
+          </div>
+          <svg class="w-5 h-5 text-gray-400 group-hover:text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+          </svg>
+        </button>
+
+        <!-- Delete (only for non-system connectors) -->
+        <button id="actionDelete" onclick="deleteConnector()" class="w-full group flex items-center gap-4 px-5 py-4 bg-white hover:bg-red-50 border-2 border-gray-200 hover:border-red-300 text-gray-700 hover:text-red-700 rounded-xl transition-all duration-200">
+          <div class="w-10 h-10 bg-red-100 group-hover:bg-red-200 rounded-lg flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+            </svg>
+          </div>
+          <div class="text-left flex-1">
+            <div class="font-semibold text-base">Delete</div>
+            <div class="text-xs text-gray-500 group-hover:text-red-600">Permanently remove all data</div>
+          </div>
+          <svg class="w-5 h-5 text-gray-400 group-hover:text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Footer -->
+      <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end">
+        <button onclick="closeConnectorActionsModal()" class="px-6 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Uninstall Confirmation Modal -->
+  <div id="uninstallConfirmModal" class="fixed inset-0 bg-black bg-opacity-50 z-[60] hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden" onclick="event.stopPropagation()">
+      <!-- Header with Icon -->
+      <div class="p-6 text-center border-b border-gray-100">
+        <div class="w-20 h-20 mx-auto mb-4 bg-yellow-100 rounded-2xl flex items-center justify-center">
+          <svg class="w-10 h-10 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+          </svg>
+        </div>
+        <h3 class="text-xl font-semibold text-gray-900">Uninstall Connector</h3>
+        <p class="text-sm text-gray-500 mt-1">Are you sure you want to proceed?</p>
+      </div>
+
+      <!-- Content -->
+      <div class="p-6">
+        <p id="uninstallConfirmMessage" class="text-gray-700 text-center mb-4">
+          This will disconnect the connector but keep its configuration data.
+        </p>
+        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <h4 class="font-semibold text-yellow-900 text-sm mb-2">What will happen:</h4>
+          <ul class="text-sm text-yellow-800 space-y-1">
+            <li class="flex items-start gap-2">
+              <svg class="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+              </svg>
+              Configuration data will be preserved
+            </li>
+            <li class="flex items-start gap-2">
+              <svg class="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+              </svg>
+              Synced data will remain available
+            </li>
+            <li class="flex items-start gap-2">
+              <svg class="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+              </svg>
+              Connection will be disconnected
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex gap-3">
+        <button onclick="closeUninstallConfirmModal()" class="flex-1 px-6 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          Cancel
+        </button>
+        <button onclick="confirmUninstallConnector()" class="flex-1 px-6 py-2.5 text-sm font-medium text-white bg-yellow-600 hover:bg-yellow-700 rounded-lg transition-colors">
+          Uninstall
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div id="deleteConfirmModal" class="fixed inset-0 bg-black bg-opacity-50 z-[60] hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden" onclick="event.stopPropagation()">
+      <!-- Header with Icon -->
+      <div class="p-6 text-center border-b border-gray-100">
+        <div class="w-20 h-20 mx-auto mb-4 bg-red-100 rounded-2xl flex items-center justify-center">
+          <svg class="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+          </svg>
+        </div>
+        <h3 class="text-xl font-semibold text-gray-900">Delete Connector</h3>
+        <p class="text-sm text-red-600 mt-1 font-medium">⚠️ WARNING: This action cannot be undone!</p>
+      </div>
+
+      <!-- Content -->
+      <div class="p-6">
+        <p id="deleteConfirmMessage" class="text-gray-700 text-center mb-4 font-medium">
+          Are you sure you want to permanently delete this connector?
+        </p>
+        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+          <h4 class="font-semibold text-red-900 text-sm mb-2">This will remove:</h4>
+          <ul class="text-sm text-red-800 space-y-1">
+            <li class="flex items-start gap-2">
+              <svg class="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+              </svg>
+              All connector configuration
+            </li>
+            <li class="flex items-start gap-2">
+              <svg class="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+              </svg>
+              All synced data
+            </li>
+            <li class="flex items-start gap-2">
+              <svg class="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+              </svg>
+              All custom UI files
+            </li>
+            <li class="flex items-start gap-2">
+              <svg class="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+              </svg>
+              All integration history
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex gap-3">
+        <button onclick="closeDeleteConfirmModal()" class="flex-1 px-6 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          Cancel
+        </button>
+        <button onclick="confirmDeleteConnector()" class="flex-1 px-6 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors">
+          Delete Permanently
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Connector Details Modal -->
   <div id="connectorDetailsModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
@@ -638,7 +830,7 @@
           ` : isActive ? `
             <!-- Active Connector - Manage + Info -->
             <div class="flex gap-2">
-              <button onclick="openConnectorManage('${normalizedConnector.id}'); event.stopPropagation();" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
+              <button onclick="showConnectorActionsModal('${normalizedConnector.id}'); event.stopPropagation();" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
                 Manage
               </button>
               <button onclick="showConnectorDetails('${normalizedConnector.id}', event)" class="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors">
@@ -648,7 +840,7 @@
           ` : isInstalled ? `
             <!-- Installed Connector - Configure + Info -->
             <div class="flex gap-2">
-              <button onclick="openConnectorManage('${normalizedConnector.id}'); event.stopPropagation();" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
+              <button onclick="showConnectorActionsModal('${normalizedConnector.id}'); event.stopPropagation();" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
                 Configure
               </button>
               <button onclick="showConnectorDetails('${normalizedConnector.id}', event)" class="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors">
@@ -658,7 +850,7 @@
           ` : `
             <!-- Disconnected Connector - Connect + Info -->
             <div class="flex gap-2">
-              <button onclick="openConnectorManage('${normalizedConnector.id}'); event.stopPropagation();" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
+              <button onclick="showConnectorActionsModal('${normalizedConnector.id}'); event.stopPropagation();" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
                 Connect
               </button>
               <button onclick="showConnectorDetails('${normalizedConnector.id}', event)" class="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors">
@@ -1113,6 +1305,9 @@
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         closeDetailsModal();
+        closeConnectorActionsModal();
+        closeUninstallConfirmModal();
+        closeDeleteConfirmModal();
       }
     });
 
@@ -1122,6 +1317,291 @@
         closeDetailsModal();
       }
     });
+
+    // ============================================================================
+    // Connector Actions Modal
+    // ============================================================================
+
+    let selectedConnectorForActions = null;
+
+    // Show connector actions modal
+    function showConnectorActionsModal(connectorId) {
+      const connector = findConnectorById(connectorId);
+      if (!connector) {
+        console.error('Connector not found:', connectorId);
+        return;
+      }
+
+      selectedConnectorForActions = connector;
+
+      // Update modal title
+      const connectorName = connector.manifest?.name || connector.name || connector.connector_name || 'Connector';
+      document.getElementById('actionsConnectorName').textContent = connectorName;
+
+      // Update modal icon with connector logo
+      const modalIcon = document.querySelector('#connectorActionsModal .w-20.h-20');
+      const logoUrl = connector.manifest?.icon || connector.logo_url || connector.logo || connector.icon;
+
+      if (logoUrl) {
+        // Show connector logo
+        modalIcon.className = 'w-20 h-20 mx-auto mb-4 bg-white border-2 border-gray-200 rounded-2xl flex items-center justify-center p-3';
+        modalIcon.innerHTML = `<img src="${logoUrl}" alt="${connectorName}" class="w-full h-full object-contain" onerror="this.parentElement.innerHTML='<span class=\\'text-3xl font-bold text-gray-400\\'>${connectorName.charAt(0)}</span>'">`;
+      } else {
+        // Show default icon with first letter
+        modalIcon.className = 'w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center';
+        modalIcon.innerHTML = `<span class="text-3xl font-bold text-white">${connectorName.charAt(0).toUpperCase()}</span>`;
+      }
+
+      // Check if this is a system connector (leadly, actionstep)
+      const systemConnectors = ['case-actionstep', 'crm-leadly', 'crm-gohighlevel'];
+      const connectorType = connector.connector_type || connector.connector_id || connectorId;
+      const isSystemConnector = systemConnectors.includes(connectorType);
+
+      // Show/hide delete button based on connector type
+      const deleteButton = document.getElementById('actionDelete');
+      if (isSystemConnector) {
+        deleteButton.style.display = 'none';
+      } else {
+        deleteButton.style.display = 'flex';
+      }
+
+      // Show modal
+      const modal = document.getElementById('connectorActionsModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    // Close connector actions modal
+    function closeConnectorActionsModal(clearSelection = true) {
+      const modal = document.getElementById('connectorActionsModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+
+      // Only clear selection if requested (don't clear when transitioning to confirmation modals)
+      if (clearSelection) {
+        selectedConnectorForActions = null;
+      }
+    }
+
+    // Close actions modal on background click
+    document.getElementById('connectorActionsModal').addEventListener('click', (e) => {
+      if (e.target.id === 'connectorActionsModal') {
+        closeConnectorActionsModal();
+      }
+    });
+
+    // Navigate to connector dashboard
+    function navigateToConnectorDashboard() {
+      if (!selectedConnectorForActions) return;
+
+      const connector = selectedConnectorForActions;
+      const hasCustomUI = !!(connector.ui_entry_point && connector.manifest);
+
+      closeConnectorActionsModal();
+
+      if (hasCustomUI) {
+        // Navigate to custom connector UI
+        openCustomConnectorUI(connector.ui_entry_point, connector.manifest?.name || connector.name);
+      } else {
+        // Navigate to standard connector management page
+        openConnectorManage(connector.id);
+      }
+    }
+
+    // Uninstall connector - show confirmation modal
+    function uninstallConnector() {
+      if (!selectedConnectorForActions) return;
+
+      const connector = selectedConnectorForActions;
+      const connectorName = connector.manifest?.name || connector.name || connector.connector_name || 'this connector';
+
+      // Update modal message with connector name
+      document.getElementById('uninstallConfirmMessage').innerHTML = `
+        Are you sure you want to uninstall <strong>"${connectorName}"</strong>?
+      `;
+
+      // Close actions modal and show confirmation modal (preserve selection)
+      closeConnectorActionsModal(false);
+      showUninstallConfirmModal();
+    }
+
+    // Show uninstall confirmation modal
+    function showUninstallConfirmModal() {
+      const modal = document.getElementById('uninstallConfirmModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    // Close uninstall confirmation modal
+    function closeUninstallConfirmModal() {
+      const modal = document.getElementById('uninstallConfirmModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      // Clear selection when modal is closed
+      selectedConnectorForActions = null;
+    }
+
+    // Close modal on background click
+    document.getElementById('uninstallConfirmModal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'uninstallConfirmModal') {
+        closeUninstallConfirmModal();
+      }
+    });
+
+    // Confirm uninstall - actual API call
+    async function confirmUninstallConnector() {
+      if (!selectedConnectorForActions) return;
+
+      const connector = selectedConnectorForActions;
+      const connectorName = connector.manifest?.name || connector.name || connector.connector_name || 'this connector';
+
+      try {
+        // Close modal
+        closeUninstallConfirmModal();
+
+        // Call API to uninstall (mark as inactive - soft delete)
+        const response = await fetch(`${window.LanaConfig.API_BASE_URL}/api/v1/integrations/connectors/${connector.id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${api.token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to uninstall connector');
+        }
+
+        Toast.success(`${connectorName} has been uninstalled successfully`);
+
+        // Clear selection and reload connectors list
+        selectedConnectorForActions = null;
+        await loadConnectors();
+
+      } catch (error) {
+        console.error('Uninstall error:', error);
+        Toast.error(`Failed to uninstall connector: ${error.message}`);
+        // Clear selection even on error
+        selectedConnectorForActions = null;
+      }
+    }
+
+    // Delete connector - show confirmation modal
+    function deleteConnector() {
+      console.log('[Delete Connector] Function called');
+
+      if (!selectedConnectorForActions) {
+        console.error('[Delete Connector] No connector selected');
+        return;
+      }
+
+      const connector = selectedConnectorForActions;
+      const connectorName = connector.manifest?.name || connector.name || connector.connector_name || 'this connector';
+
+      console.log('[Delete Connector] Connector:', connectorName, 'ID:', connector.id);
+
+      // Update modal message with connector name
+      const messageEl = document.getElementById('deleteConfirmMessage');
+      if (!messageEl) {
+        console.error('[Delete Connector] deleteConfirmMessage element not found');
+        return;
+      }
+
+      messageEl.innerHTML = `
+        Are you sure you want to permanently delete <strong>"${connectorName}"</strong>?
+      `;
+
+      // Close actions modal and show confirmation modal (preserve selection)
+      closeConnectorActionsModal(false);
+      showDeleteConfirmModal();
+    }
+
+    // Show delete confirmation modal
+    function showDeleteConfirmModal() {
+      console.log('[Delete Modal] Showing modal');
+      const modal = document.getElementById('deleteConfirmModal');
+      if (!modal) {
+        console.error('[Delete Modal] Modal element not found');
+        return;
+      }
+      console.log('[Delete Modal] Modal element found, displaying...');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      console.log('[Delete Modal] Modal should now be visible');
+    }
+
+    // Close delete confirmation modal
+    function closeDeleteConfirmModal() {
+      console.log('[Delete Modal] Closing modal');
+      const modal = document.getElementById('deleteConfirmModal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+      // Clear selection when modal is closed
+      selectedConnectorForActions = null;
+    }
+
+    // Close modal on background click
+    document.getElementById('deleteConfirmModal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'deleteConfirmModal') {
+        closeDeleteConfirmModal();
+      }
+    });
+
+    // Confirm delete - actual API call
+    async function confirmDeleteConnector() {
+      console.log('[Confirm Delete] Starting deletion process');
+
+      if (!selectedConnectorForActions) {
+        console.error('[Confirm Delete] No connector selected');
+        return;
+      }
+
+      const connector = selectedConnectorForActions;
+      const connectorName = connector.manifest?.name || connector.name || connector.connector_name || 'this connector';
+
+      console.log('[Confirm Delete] Deleting connector:', connectorName, 'ID:', connector.id);
+
+      try {
+        // Close modal
+        closeDeleteConfirmModal();
+
+        // Call API to delete (currently soft delete - hard delete endpoint to be added)
+        console.log('[Confirm Delete] Calling API DELETE endpoint');
+        const response = await fetch(`${window.LanaConfig.API_BASE_URL}/api/v1/integrations/connectors/${connector.id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${api.token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        console.log('[Confirm Delete] API response status:', response.status);
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('[Confirm Delete] API error:', errorData);
+          throw new Error(errorData.message || 'Failed to delete connector');
+        }
+
+        const result = await response.json();
+        console.log('[Confirm Delete] API success:', result);
+
+        Toast.success(`${connectorName} has been permanently deleted`);
+
+        // Clear selection and reload connectors list
+        console.log('[Confirm Delete] Reloading connectors list');
+        selectedConnectorForActions = null;
+        await loadConnectors();
+
+      } catch (error) {
+        console.error('[Confirm Delete] Error:', error);
+        Toast.error(`Failed to delete connector: ${error.message}`);
+        // Clear selection even on error
+        selectedConnectorForActions = null;
+      }
+    }
 
     // Search and filter available connectors
     function filterAvailableConnectors() {

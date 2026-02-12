@@ -440,14 +440,14 @@
           </div>
 
           <!-- Empty State -->
-          <div id="contentEmpty" class="hidden text-center py-16">
-            <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div id="contentEmpty" class="hidden text-center py-12">
+            <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
             </svg>
-            <h3 class="text-lg font-medium text-gray-900 mb-1">This folder is empty</h3>
-            <p class="text-sm text-gray-500 mb-4">Upload files or create a new folder to get started</p>
-            <button id="emptyStateNewFolderBtn" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
-              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <h4 class="text-lg font-semibold text-gray-900 mb-2">This folder is empty</h4>
+            <p class="text-gray-500 mb-4">Upload files or create a new folder to get started</p>
+            <button id="emptyStateNewFolderBtn" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
               </svg>
               Create Folder
@@ -620,6 +620,11 @@
 
             <!-- Metadata Content (Scrollable) -->
             <div class="flex-1 overflow-y-auto p-4 space-y-4">
+              <!-- AI-Generated Metadata (DocumentMetadataViewer Component) -->
+              <div id="viewerMetadataContainer" class="mb-4">
+                <!-- DocumentMetadataViewer will be initialized here -->
+              </div>
+
               <!-- File Info (Always Read-only) -->
               <div class="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-lg p-4 border border-indigo-100 shadow-sm">
                 <div class="space-y-3 text-sm">

@@ -195,7 +195,7 @@ const ConversationMenu = {
     // Get conversation title
     const title = conv.title || conv.metadata?.title || 'Untitled Chat';
     const safeTitle = this.escapeHtml(title);
-    const safeTitleForAttr = this.escapeHtml(title).replace(/'/g, '&#39;');
+    const safeTitleForJs = this.escapeJs(title);  // For JavaScript strings in onclick
 
     // Get last message preview
     const lastMessage = conv.last_message || conv.lastMessage || '';
@@ -230,7 +230,7 @@ const ConversationMenu = {
           </div>
           <div class="flex items-center gap-1 flex-shrink-0">
             <span class="text-xs text-gray-500">${timestamp}</span>
-            <div class="opacity-0 group-hover:opacity-100 transition-opacity" onclick="event.stopPropagation(); if (typeof window.openConversationActionsModal === 'function') { window.openConversationActionsModal('${threadId}', '${safeTitleForAttr}', ${matterId ? `'${matterId}'` : 'null'}); }">
+            <div class="opacity-0 group-hover:opacity-100 transition-opacity" onclick="event.stopPropagation(); if (typeof window.openConversationActionsModal === 'function') { window.openConversationActionsModal('${threadId}', '${safeTitleForJs}', ${matterId ? `'${matterId}'` : 'null'}); }">
               <button class="p-1 hover:bg-gray-700 rounded transition-colors">
                 <svg class="w-4 h-4 text-gray-400 hover:text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
@@ -343,6 +343,21 @@ const ConversationMenu = {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  },
+
+  /**
+   * Escape string for use in JavaScript string literals
+   * This is needed when embedding strings in onclick handlers
+   */
+  escapeJs(text) {
+    if (!text) return '';
+    return text
+      .replace(/\\/g, '\\\\')   // Escape backslashes first
+      .replace(/'/g, "\\'")      // Escape single quotes
+      .replace(/"/g, '\\"')      // Escape double quotes
+      .replace(/\n/g, '\\n')     // Escape newlines
+      .replace(/\r/g, '\\r')     // Escape carriage returns
+      .replace(/\t/g, '\\t');    // Escape tabs
   }
 };
 

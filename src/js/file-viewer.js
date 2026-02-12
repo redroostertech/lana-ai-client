@@ -11,7 +11,8 @@ const viewerState = {
   currentFile: null,
   originalMetadata: {},
   metadataChanged: false,
-  metadataMode: 'view' // 'view' or 'edit'
+  metadataMode: 'view', // 'view' or 'edit'
+  documentMetadataViewer: null // DocumentMetadataViewer component instance
 };
 
 // ============================================================
@@ -80,6 +81,9 @@ async function openFileViewer(fileId) {
 
     // Load metadata
     loadMetadata(response);
+
+    // Initialize and load AI-generated metadata (summary, entities, etc.)
+    initializeDocumentMetadataViewer(fileId);
 
   } catch (error) {
     console.error('[FileViewer] Failed to load file:', error);
@@ -489,6 +493,49 @@ function cancelMetadataChanges() {
 }
 
 // ============================================================
+// DOCUMENT METADATA VIEWER (AI SUMMARY)
+// ============================================================
+function initializeDocumentMetadataViewer(fileId) {
+  try {
+    // Check if DocumentMetadataViewer is available
+    if (typeof DocumentMetadataViewer === 'undefined') {
+      console.warn('[FileViewer] DocumentMetadataViewer not available');
+      return;
+    }
+
+    // Initialize viewer if not already done
+    if (!viewerState.documentMetadataViewer) {
+      viewerState.documentMetadataViewer = new DocumentMetadataViewer('viewerMetadataContainer', {
+        showLayoutToggle: false,
+        defaultLayout: 'split',
+        collapseSections: true,
+        showEmptySections: false,
+        truncateSummary: true,
+        summaryMaxLength: 300,
+        entitiesMaxItems: 10,
+        autoRefreshInterval: null,
+        onMetadataLoaded: (metadata) => {
+          console.log('[FileViewer] AI metadata loaded:', metadata);
+        },
+        onError: (error) => {
+          console.error('[FileViewer] AI metadata error:', error);
+        }
+      });
+    }
+
+    // Load metadata for this document
+    viewerState.documentMetadataViewer.loadMetadata(fileId).catch(err => {
+      console.error('[FileViewer] Failed to load AI metadata:', err);
+      // Don't show error to user - AI metadata is optional enhancement
+    });
+
+  } catch (error) {
+    console.error('[FileViewer] Error initializing DocumentMetadataViewer:', error);
+    // Don't break the viewer if AI metadata fails
+  }
+}
+
+// ============================================================
 // UI HELPERS
 // ============================================================
 function showViewerLoading() {
@@ -535,6 +582,12 @@ function closeFileViewer() {
 
   const modal = document.getElementById('documentViewerModal');
   modal.classList.add('hidden');
+
+  // Destroy DocumentMetadataViewer instance
+  if (viewerState.documentMetadataViewer) {
+    viewerState.documentMetadataViewer.destroy();
+    viewerState.documentMetadataViewer = null;
+  }
 
   // Reset state
   viewerState.currentFile = null;

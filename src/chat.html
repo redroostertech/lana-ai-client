@@ -4386,7 +4386,7 @@
 
         // ===== SMART CONTEXT TYPE DETECTION =====
         // Determine context_type based on:
-        // 1. User's manual toggle selection (if they explicitly chose document mode)
+        // 1. User's manual toggle selection (agentic mode, document mode)
         // 2. Auto-detect if message contains document references (mentions or uploaded files)
         // 3. Default to full_chat otherwise
         let contextType = 'full_chat';
@@ -4412,8 +4412,13 @@
           allAttachments.push(...documentMentions.attachedDocs);
         }
 
+        // Check if user manually enabled agentic mode (highest priority)
+        if (currentChatMode === 'agentic') {
+          contextType = 'agentic_mode';
+          console.log('[Chat Mode] Using agentic_mode (user selected Agentic Mode)');
+        }
         // Check if user manually enabled document mode
-        if (currentChatMode === 'document') {
+        else if (currentChatMode === 'document') {
           contextType = 'document_chat';
           console.log('[Chat Mode] Using document_chat mode (user selected Document Chat)');
         }

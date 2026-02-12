@@ -17,7 +17,7 @@ class DocumentMetadataViewer {
       collapseSections: options.collapseSections !== false, // Default: true
       showEmptySections: options.showEmptySections === true, // Default: false
       truncateSummary: options.truncateSummary !== false, // Default: true
-      summaryMaxLength: options.summaryMaxLength || 300,
+      summaryMaxLength: options.summaryMaxLength || 1000, // Increased from 300 to 1000 characters
       entitiesMaxItems: options.entitiesMaxItems || 10,
       autoRefreshInterval: options.autoRefreshInterval || null, // Default: no auto-refresh
       onMetadataLoaded: options.onMetadataLoaded || null, // Callback when metadata loads
