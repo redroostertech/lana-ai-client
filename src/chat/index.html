@@ -287,9 +287,14 @@
             }
         }
 
+        // Track when typing indicator was shown for minimum display time
+        let typingIndicatorStartTime = null;
+        const MIN_TYPING_INDICATOR_DURATION = 500; // milliseconds
+
         function handleWebSocketMessage(data) {
             switch (data.type) {
                 case 'message_start':
+                    typingIndicatorStartTime = Date.now();
                     document.getElementById('typingIndicator').classList.remove('hidden');
                     break;
 
@@ -299,7 +304,28 @@
                     break;
 
                 case 'message_complete':
-                    document.getElementById('typingIndicator').classList.add('hidden');
+                    // Ensure typing indicator shows for minimum duration
+                    const hideIndicator = () => {
+                        document.getElementById('typingIndicator').classList.add('hidden');
+                        typingIndicatorStartTime = null;
+                    };
+
+                    if (typingIndicatorStartTime) {
+                        const elapsed = Date.now() - typingIndicatorStartTime;
+                        const remaining = MIN_TYPING_INDICATOR_DURATION - elapsed;
+
+                        if (remaining > 0) {
+                            // Wait for remaining time before hiding
+                            setTimeout(hideIndicator, remaining);
+                        } else {
+                            // Already shown long enough, hide immediately
+                            hideIndicator();
+                        }
+                    } else {
+                        // No start time tracked, hide immediately
+                        hideIndicator();
+                    }
+
                     const msg = data.message;
                     if (msg) {
                         messages.push(msg);
@@ -505,6 +531,7 @@
             } else {
                 // Fallback to REST API
                 try {
+                    typingIndicatorStartTime = Date.now();
                     document.getElementById('typingIndicator').classList.remove('hidden');
 
                     const res = await api.request('/api/chat/message', {
@@ -516,18 +543,33 @@
                         })
                     });
 
-                    document.getElementById('typingIndicator').classList.add('hidden');
+                    // Ensure typing indicator shows for minimum duration
+                    const hideAndContinue = () => {
+                        document.getElementById('typingIndicator').classList.add('hidden');
+                        typingIndicatorStartTime = null;
 
-                    if (!currentConversationId && res.conversation_id) {
-                        currentConversationId = res.conversation_id;
+                        if (!currentConversationId && res.conversation_id) {
+                            currentConversationId = res.conversation_id;
+                        }
+
+                        container.innerHTML += renderMessage(res.message || { role: 'assistant', content: res.response });
+                        container.scrollTop = container.scrollHeight;
+
+                        loadConversations();
+                    };
+
+                    const elapsed = Date.now() - typingIndicatorStartTime;
+                    const remaining = MIN_TYPING_INDICATOR_DURATION - elapsed;
+
+                    if (remaining > 0) {
+                        setTimeout(hideAndContinue, remaining);
+                    } else {
+                        hideAndContinue();
                     }
-
-                    container.innerHTML += renderMessage(res.message || { role: 'assistant', content: res.response });
-                    container.scrollTop = container.scrollHeight;
-
-                    loadConversations();
                 } catch (error) {
+                    // On error, hide immediately
                     document.getElementById('typingIndicator').classList.add('hidden');
+                    typingIndicatorStartTime = null;
                     Toast.error('Failed to send message');
                 }
             }

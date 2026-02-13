@@ -5640,7 +5640,16 @@
       chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
+    // Track typing indicator display time for minimum visibility
+    let typingIndicatorStartTime = null;
+    const MIN_TYPING_INDICATOR_DURATION = 500; // milliseconds
+
     function showTyping(customMessage = null) {
+      // Record when indicator is shown
+      if (!typingIndicatorStartTime) {
+        typingIndicatorStartTime = Date.now();
+      }
+
       // Only show typing indicator if we're viewing the conversation that's generating
       if (generatingConversationId && generatingConversationId !== currentConversationId) {
         console.log('[showTyping] Skipped - different conversation is generating:', {
@@ -5673,18 +5682,38 @@
     }
 
     function hideTyping() {
-      activityIndicator.classList.add('hidden');
-      activityMessage.textContent = 'Thinking......';
-      activityDetail.classList.add('hidden');
-      activityDetail.textContent = '';
+      // Ensure typing indicator shows for minimum duration
+      const doHide = () => {
+        activityIndicator.classList.add('hidden');
+        activityMessage.textContent = 'Thinking......';
+        activityDetail.classList.add('hidden');
+        activityDetail.textContent = '';
+        typingIndicatorStartTime = null;
 
-      // Clear activity reasoning panel
-      const activityPanel = document.getElementById('activity-reasoning-panel');
-      if (activityPanel) {
-        activityPanel.innerHTML = '';
-        delete activityPanel.dataset.reasoning;
-        delete activityPanel.dataset.panelId;
-        delete activityPanel.dataset.iterations;
+        // Clear activity reasoning panel
+        const activityPanel = document.getElementById('activity-reasoning-panel');
+        if (activityPanel) {
+          activityPanel.innerHTML = '';
+          delete activityPanel.dataset.reasoning;
+          delete activityPanel.dataset.panelId;
+          delete activityPanel.dataset.iterations;
+        }
+      };
+
+      if (typingIndicatorStartTime) {
+        const elapsed = Date.now() - typingIndicatorStartTime;
+        const remaining = MIN_TYPING_INDICATOR_DURATION - elapsed;
+
+        if (remaining > 0) {
+          // Wait for remaining time before hiding
+          setTimeout(doHide, remaining);
+        } else {
+          // Already shown long enough, hide immediately
+          doHide();
+        }
+      } else {
+        // No start time tracked, hide immediately
+        doHide();
       }
     }
     
