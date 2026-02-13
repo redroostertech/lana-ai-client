@@ -9,7 +9,7 @@ var require_package = __commonJS({
     module2.exports = {
       name: "lana-ai",
       productName: "Lana AI",
-      version: "3.2.0",
+      version: "4.0.0",
       buildNumber: "1",
       releaseType: "stable",
       description: "Lana AI - Enterprise AI Platform",
@@ -30312,11 +30312,11 @@ var require_session_tracker = __commonJS({
 var require_version = __commonJS({
   "src/version.js"(exports2, module2) {
     module2.exports = {
-      version: "3.2.0",
+      version: "4.0.0",
       buildNumber: "1",
       releaseType: "stable",
-      displayVersion: "3.2.0",
-      buildDate: "2026-01-30T03:23:38.872Z",
+      displayVersion: "4.0.0",
+      buildDate: "2026-02-10T04:07:02.389Z",
       /**
        * Get full version string
        * @returns {string} e.g., "v3.0.0b1"

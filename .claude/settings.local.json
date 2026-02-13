@@ -61,7 +61,8 @@
       "Bash(python3:*)",
       "Bash(chmod:*)",
       "Bash(git check-ignore:*)",
-      "Bash(pm2 logs:*)"
+      "Bash(pm2 logs:*)",
+      "Bash(ls:*)"
     ],
     "deny": [],
     "ask": []
