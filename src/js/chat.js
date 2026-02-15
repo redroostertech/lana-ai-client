@@ -685,6 +685,11 @@ class LanaChat {
   async sendViaSSE(content) {
     this.showTypingIndicator();
 
+    // Guard: prevent page navigation (session expired redirect) during streaming
+    if (window.api && typeof window.api.setStreamingActive === 'function') {
+      window.api.setStreamingActive();
+    }
+
     try {
       const token = localStorage.getItem('token');
 
@@ -746,7 +751,11 @@ class LanaChat {
         throw new Error('Server not connected. Please wait for server discovery or check your connection.');
       }
 
-      const body = { message: content };
+      const body = {
+        message: content,
+        client_time: new Date().toISOString(),
+        client_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      };
       if (this.currentConversationId) {
         body.conversation_id = this.currentConversationId;
       }
@@ -839,8 +848,16 @@ class LanaChat {
                 this.handleAutoCompactComplete(data);
               } else if (currentEvent === 'agentic_progress') {
                 console.log('[SSE] Agentic Progress:', data);
+
+                // Always hide typing indicator when any agentic progress event arrives
+                this.hideTypingIndicator();
+
                 if (window.AgenticUI) {
                   window.AgenticUI.handleAgenticProgress(data);
+                } else {
+                  console.warn('[SSE] AgenticUI not available, falling back to typing indicator');
+                  // Fallback: show progress in typing indicator
+                  this.updateTypingIndicator(data.message || `${data.phase}: ${data.status}`);
                 }
               } else if (currentEvent === 'agentic_complete') {
                 console.log('[SSE] Agentic Complete:', data);
@@ -900,12 +917,20 @@ class LanaChat {
       this.hideTypingIndicator();
       this.addSystemMessage('Failed to send message. Please try again.');
       console.error('SSE Chat error:', error);
+    } finally {
+      // Release streaming guard — allow deferred session expiry redirects
+      if (window.api && typeof window.api.setStreamingInactive === 'function') {
+        window.api.setStreamingInactive();
+      }
     }
   }
 
   addMessage(role, content) {
     const messagesContainer = this.container.querySelector('#chatMessages');
     if (!messagesContainer) return;
+
+    // Check if user was near bottom before update (within 100px)
+    const wasNearBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight < 100;
 
     const messageEl = document.createElement('div');
 
@@ -940,7 +965,11 @@ class LanaChat {
     }
 
     messagesContainer.appendChild(messageEl);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+    // User messages always scroll, assistant messages use smart scroll
+    if (role === 'user' || wasNearBottom) {
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
 
     this.messages.push({ role, content });
   }
@@ -970,6 +999,9 @@ class LanaChat {
       return;
     }
 
+    // Check if user was near bottom before update (within 100px)
+    const wasNearBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight < 100;
+
     // Create temporary container for formatted content
     const formatted = this.formatContent(content);
     const tempDiv = document.createElement('div');
@@ -981,7 +1013,10 @@ class LanaChat {
       lastAiMessage.appendChild(tempDiv.firstChild);
     }
 
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    // Only auto-scroll if user was already near the bottom
+    if (wasNearBottom) {
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
   }
 
   showTypingIndicator(message = 'Thinking...') {
@@ -1024,6 +1059,9 @@ class LanaChat {
   showToolThinking(data) {
     const messagesContainer = this.container.querySelector('#chatMessages');
     if (!messagesContainer) return;
+
+    // Check if user was near bottom before update (within 100px)
+    const wasNearBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight < 100;
 
     // Check if we already have an AI message bubble started
     let lastMessage = messagesContainer.querySelector('.ai-message:last-child');
@@ -1077,12 +1115,18 @@ class LanaChat {
       }
     }
 
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    // Only auto-scroll if user was already near the bottom
+    if (wasNearBottom) {
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
   }
 
   showReasoning(data) {
     const messagesContainer = this.container.querySelector('#chatMessages');
     if (!messagesContainer) return;
+
+    // Check if user was near bottom before update (within 100px)
+    const wasNearBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight < 100;
 
     // Create reasoning display
     const reasoningEl = document.createElement('div');
@@ -1120,12 +1164,19 @@ class LanaChat {
     `;
 
     messagesContainer.appendChild(reasoningEl);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+    // Only auto-scroll if user was already near the bottom
+    if (wasNearBottom) {
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
   }
 
   showIterationSummary(data) {
     const messagesContainer = this.container.querySelector('#chatMessages');
     if (!messagesContainer) return;
+
+    // Check if user was near bottom before update (within 100px)
+    const wasNearBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight < 100;
 
     // Check if we already have a progress container
     let progressContainer = messagesContainer.querySelector('#iteration-progress');
@@ -1174,7 +1225,10 @@ class LanaChat {
       ${warningHtml}
     `;
 
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    // Only auto-scroll if user was already near the bottom
+    if (wasNearBottom) {
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
 
     // Remove progress container when complete (after 2 seconds)
     if (data.iteration === data.maxIterations) {

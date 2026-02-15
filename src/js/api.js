@@ -53,6 +53,7 @@ class ApiClient {
     // For browser: empty string means use current origin
     this.baseUrl = this.config.API_BASE_URL || '';
     this._ready = false;
+    this._streamingActive = false; // Guard: prevents page navigation during SSE streaming
 
     // Check if running in Electron and get server URL from saved connection
     // This overrides config.js API_BASE_URL for auto-discovery mode
@@ -305,9 +306,10 @@ class ApiClient {
         this.log('Token refresh returned no token');
       }
     } catch (error) {
-      console.error('[LanaAPI] Token refresh failed:', error);
-      // If refresh fails, show session expired modal and redirect to login
-      this.showSessionExpiredModal();
+      console.warn('[LanaAPI] Token refresh failed (will retry on next user action):', error.message);
+      // Don't redirect to login here — let the next user-initiated API request
+      // handle the 401 naturally. Redirecting during background token refresh
+      // can abort in-flight SSE streaming and other active requests.
     } finally {
       this.isRefreshing = false;
     }
@@ -355,6 +357,14 @@ class ApiClient {
   }
 
   showSessionExpiredModal() {
+    // If SSE streaming is active, defer the redirect to avoid aborting the stream.
+    // The stream's own error handling will detect the expired token on next request.
+    if (this._streamingActive) {
+      console.warn('[LanaAPI] Session expired but streaming is active — deferring redirect');
+      this._pendingSessionExpired = true;
+      return;
+    }
+
     // Check if DOM is ready
     if (!document.body) {
       console.warn('[LanaAPI] DOM not ready, redirecting immediately');
@@ -390,15 +400,15 @@ class ApiClient {
     `;
 
     document.body.appendChild(overlay);
-    
+
     // Countdown and redirect
     let countdown = 3;
     const countdownEl = document.getElementById('sessionCountdown');
-    
+
     const interval = setInterval(() => {
       countdown--;
       if (countdownEl) countdownEl.textContent = countdown;
-      
+
       if (countdown <= 0) {
         clearInterval(interval);
         window.location.href = getLoginPath();
@@ -460,17 +470,12 @@ class ApiClient {
         }
       }
 
-      // If still no valid URL, redirect to login page
+      // If still no valid URL, throw error instead of redirecting.
+      // Redirecting from within request() can abort in-flight SSE streams
+      // and other concurrent requests. Let the caller handle the navigation.
       if (this.isInvalidUrl(baseUrl)) {
-        console.error('[LanaAPI] No server URL available - redirecting to login');
-        // Don't redirect if we're already on login page
-        if (!window.location.pathname.includes('login.html')) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          localStorage.removeItem('lana_saved_server');
-          window.location.href = getLoginPath();
-        }
-        throw new Error('No server connection. Redirecting to login...');
+        console.error('[LanaAPI] No server URL available for request:', endpoint);
+        throw new ApiError('No server connection available', 0, null);
       }
     }
 
@@ -2293,6 +2298,26 @@ class ApiClient {
       return false;
     }
     return true;
+  }
+
+  /**
+   * Mark SSE streaming as active to prevent page navigation.
+   * Call this before starting an SSE fetch and setStreamingInactive() when done.
+   */
+  setStreamingActive() {
+    this._streamingActive = true;
+  }
+
+  /**
+   * Mark SSE streaming as inactive. If a session expiry was deferred
+   * while streaming was active, show the modal now.
+   */
+  setStreamingInactive() {
+    this._streamingActive = false;
+    if (this._pendingSessionExpired) {
+      this._pendingSessionExpired = false;
+      this.showSessionExpiredModal();
+    }
   }
 }
 

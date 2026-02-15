@@ -6,6 +6,7 @@
   <title>Chat - LanaAI</title>
   <script src="js/tailwind-loader.js"></script>
   <script src="js/error-reporter.js"></script>
+  <script>console.log('%c[CHAT.HTML] VERSION LOADED: 2026-02-15 03:40 UTC - TRACE VIEWER WITH MESSAGE IDS', 'background: #22c55e; color: white; padding: 4px 8px; font-weight: bold; font-size: 14px;');</script>
   <script src="js/config.js"></script>
   <script src="js/mock-data.js"></script>
   <script src="js/api.js"></script>
@@ -349,6 +350,88 @@
     .json-view .null {
       color: #808080;
       font-style: italic;
+    }
+
+    /* Trace Viewer Styles */
+    .trace-viewer-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 9998;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      pointer-events: none;
+    }
+
+    .trace-viewer-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .trace-viewer-panel {
+      position: fixed;
+      top: 0;
+      right: -600px;
+      bottom: 0;
+      width: 600px;
+      max-width: 90vw;
+      background: white;
+      box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15);
+      z-index: 9999;
+      transition: right 0.3s ease;
+      overflow-y: auto;
+    }
+
+    .trace-viewer-panel.active {
+      right: 0;
+    }
+
+    .message-options-btn {
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .ai-message-container:hover .message-options-btn {
+      opacity: 1;
+    }
+
+    .message-options-menu {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      margin-top: 0.25rem;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 0.5rem;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      z-index: 1000;
+      min-width: 160px;
+    }
+
+    .message-options-menu button {
+      width: 100%;
+      text-align: left;
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      color: #374151;
+      transition: background-color 0.2s;
+    }
+
+    .message-options-menu button:hover {
+      background-color: #f3f4f6;
+    }
+
+    .message-options-menu button:first-child {
+      border-top-left-radius: 0.5rem;
+      border-top-right-radius: 0.5rem;
+    }
+
+    .message-options-menu button:last-child {
+      border-bottom-left-radius: 0.5rem;
+      border-bottom-right-radius: 0.5rem;
     }
 
   </style>
@@ -782,8 +865,8 @@
                   class="hidden p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition flex-shrink-0"
                   title="Stop generation"
                 >
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                  <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <rect x="6" y="6" width="12" height="12" rx="2" />
                   </svg>
                 </button>
               </div>
@@ -1820,14 +1903,16 @@
 
     // ===== TOOLS DROPDOWN =====
     // Manages tool selection and activation (only 1 tool at a time)
-    let currentChatMode = localStorage.getItem('chatMode') || 'full';
-    let activeTool = null; // Current active tool ('document_chat' or null)
+    let currentChatMode = 'full'; // Always default to full chat on page load
+    let activeTool = null; // Current active tool ('document_chat', 'agentic_mode', or null)
 
     function initChatMode() {
-      // Initialize from localStorage
-      if (currentChatMode === 'document') {
-        activeTool = 'document_chat';
-      }
+      // ALWAYS reset to full_chat mode on page load/refresh
+      // Tools (document chat, agentic mode) must be explicitly selected each session
+      currentChatMode = 'full';
+      activeTool = null;
+      localStorage.setItem('chatMode', 'full');
+      console.log('[Tools] Reset to full_chat mode on page load');
       updateToolsUI();
 
       // Documents dropdown toggle
@@ -3330,7 +3415,8 @@
           const firstMessageElement = chatMessages.querySelector('.ai-message, .justify-end');
 
           reversedMessages.forEach(msg => {
-            const messageEl = createMessageElement(msg.role, msg.content, msg.metadata, msg.created_at);
+            const metadataWithId = { ...(msg.metadata || {}), message_id: msg.id, id: msg.id };
+            const messageEl = createMessageElement(msg.role, msg.content, metadataWithId, msg.created_at);
             if (firstMessageElement) {
               chatMessages.insertBefore(messageEl, firstMessageElement);
             } else {
@@ -3346,7 +3432,8 @@
           // Initial load - messages come in desc order (newest first), reverse for display
           const reversedMessages = [...conversationMessages].reverse();
           reversedMessages.forEach(msg => {
-            addMessage(msg.role, msg.content, null, msg.metadata, msg.created_at);
+            const metadataWithId = { ...(msg.metadata || {}), message_id: msg.id, id: msg.id };
+            addMessage(msg.role, msg.content, null, metadataWithId, msg.created_at);
           });
 
           // Scroll to bottom for initial load
@@ -3620,8 +3707,10 @@
         }
 
         messageEl.className = 'ai-message-container';
+        const messageId = metadata?.message_id || metadata?.id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const hasValidMessageIdForTrace = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(messageId);
         messageEl.innerHTML = `
-          <div class="flex items-start space-x-3">
+          <div class="flex items-start space-x-3 relative">
             <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
               <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
@@ -3634,6 +3723,27 @@
               </div>
               ${reasoningPanelHtml}
               ${citationsHtml}
+            </div>
+            <div class="relative">
+              <button onclick="toggleMessageOptions(event, '${messageId}')" class="message-options-btn p-1 rounded hover:bg-gray-100 transition-colors">
+                <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/>
+                </svg>
+              </button>
+              <div id="message-options-${messageId}" class="hidden message-options-menu">
+                ${hasValidMessageIdForTrace ? `<button onclick="viewTrace('${messageId}'); event.stopPropagation();" class="flex items-center gap-2">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                  </svg>
+                  View Trace
+                </button>` : ''}
+                <button onclick="deleteMessage('${messageId}'); event.stopPropagation();" class="flex items-center gap-2 text-red-600 hover:bg-red-50">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                  Delete Message
+                </button>
+              </div>
             </div>
           </div>
         `;
@@ -4435,7 +4545,9 @@
           message: cleanedMessage,  // Chat endpoint uses 'message'
           conversation_id: currentConversationId,
           session_id: currentConversationId,  // Use conversation_id as session_id for document activation
-          context_type: contextType  // Smart context detection: document_chat or full_chat
+          context_type: contextType,  // Smart context detection: document_chat or full_chat
+          client_time: new Date().toISOString(),
+          client_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
         };
 
         // Always include matter_id when available (for project conversations)
@@ -4483,9 +4595,17 @@
         // Create AbortController for this request
         currentAbortController = new AbortController();
 
+        // Guard: prevent page navigation (session expired redirect) during streaming
+        if (window.api && typeof window.api.setStreamingActive === 'function') {
+          window.api.setStreamingActive();
+        }
+
         // Show stop button, hide send button
         sendBtn.classList.add('hidden');
         stopBtn.classList.remove('hidden');
+
+        const fetchStartTime = performance.now();
+        console.log('[DIAG] SSE fetch starting', { baseUrl, abortSignalAborted: currentAbortController.signal.aborted });
 
         const response = await fetch(`${baseUrl}/api/v1/streaming/chat/stream`, {
           method: 'POST',
@@ -4496,6 +4616,8 @@
           body: JSON.stringify(body),
           signal: currentAbortController.signal
         });
+
+        console.log('[DIAG] SSE fetch response received', { status: response.status, ok: response.ok, elapsedMs: (performance.now() - fetchStartTime).toFixed(1), headers: Object.fromEntries([...response.headers.entries()].slice(0, 5)) });
 
         if (!response.ok) {
           // Check for authentication errors (401) - redirect to login
@@ -4523,9 +4645,15 @@
         let responseStarted = false;
         let currentEvent = null;
         let streamingContent = ''; // Accumulate raw content for proper markdown parsing
+        let agenticFellBackToSimple = false; // Set when agentic_error received; show notice when content follows
+        let chunkCount = 0;
+
+        console.log('[DIAG] SSE reader created, starting read loop');
 
         while (true) {
           const { done, value } = await reader.read();
+          if (chunkCount === 0) console.log('[DIAG] First chunk received', { done, valueLength: value?.length, elapsedMs: (performance.now() - fetchStartTime).toFixed(1) });
+          chunkCount++;
           if (done) break;
 
           buffer += decoder.decode(value, { stream: true });
@@ -4601,7 +4729,39 @@
                     updateThinkingMessage(data.message + '...', 'tool');
                   }
                 }
-                
+
+                // Handle agentic_progress event - show in "View Reasoning" dropdown and current step in thinking line
+                if (currentEvent === 'agentic_progress') {
+                  console.log('[SSE] Agentic progress:', data);
+                  const displayMessage = data.message || (data.phase ? `${data.phase.charAt(0).toUpperCase() + data.phase.slice(1)}...` : 'Processing...');
+                  updateThinkingMessage(displayMessage, data.phase || 'thinking');
+                  showReasoning({
+                    type: 'agentic_step',
+                    phase: data.phase,
+                    message: data.message || displayMessage,
+                    status: data.status || 'in_progress'
+                  }, responseStarted);
+                }
+
+                // Handle agentic_error - dismiss progress widget; no toast so we don't confuse when fallback response follows
+                if (currentEvent === 'agentic_error') {
+                  console.error('[SSE] Agentic error:', data);
+                  agenticFellBackToSimple = true; // Backend may send content next; show fallback notice
+                  hideTyping();
+                  if (window.AgenticUI && typeof window.AgenticUI.handleAgenticError === 'function') {
+                    window.AgenticUI.handleAgenticError(data);
+                  }
+                }
+
+                // Handle agentic_complete - dismiss progress widget on success
+                if (currentEvent === 'agentic_complete') {
+                  console.log('[SSE] Agentic complete:', data);
+                  hideTyping();
+                  if (window.AgenticUI && typeof window.AgenticUI.handleAgenticComplete === 'function') {
+                    window.AgenticUI.handleAgenticComplete(data);
+                  }
+                }
+
                 // Handle tool_result event - just log it
                 if (currentEvent === 'tool_result') {
                   console.log('Tool result:', data.tool, data.success ? 'success' : 'failed');
@@ -4822,6 +4982,22 @@
                   if (!responseStarted) {
                     console.log('[SSE Debug] Starting new response, hiding typing indicator');
                     hideTyping();
+                    if (agenticFellBackToSimple) {
+                      const notice = document.createElement('div');
+                      notice.className = 'flex items-start space-x-3 mb-3';
+                      notice.innerHTML = `
+                        <div class="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                          <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                          </svg>
+                        </div>
+                        <div class="flex-1 max-w-2xl bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 text-sm text-amber-800">
+                          <strong>Agentic task encountered an error.</strong> The response below is from standard chat.
+                        </div>
+                      `;
+                      chatMessages.appendChild(notice);
+                      agenticFellBackToSimple = false;
+                    }
                     addStreamingMessage(streamingContent);
                     responseStarted = true;
                   } else {
@@ -4854,7 +5030,12 @@
                 // Handle done event - hide all activity indicators and finalize message
                 if (currentEvent === 'done') {
                   console.log('Stream completed:', data);
+                  console.log('[DEBUG] Done event message_id:', data.message_id, 'user_message_id:', data.user_message_id);
                   hideTyping();
+                  // Dismiss agentic progress widget when stream ends (e.g. after error or normal end)
+                  if (window.AgenticUI && typeof window.AgenticUI.hideProgressIndicator === 'function') {
+                    window.AgenticUI.hideProgressIndicator();
+                  }
                   // Save the final streamed content to messages array
                   if (streamingContent) {
                     messages.push({ role: 'assistant', content: streamingContent });
@@ -4875,6 +5056,7 @@
           addMessage('assistant', 'No response received.', null, null, new Date().toISOString());
         }
       } catch (error) {
+        console.error('[DIAG] SSE catch block', { name: error.name, message: error.message, type: error.constructor.name, abortSignalAborted: currentAbortController?.signal?.aborted });
         hideTyping();
 
         // Check if this was an abort (user clicked stop)
@@ -4882,10 +5064,71 @@
           console.log('AI generation cancelled by user');
           Toast.info('Generation stopped');
 
-          // Remove the incomplete assistant message if it exists
+          // Save the partial response instead of deleting it
           const lastMessage = chatMessages.lastElementChild;
           if (lastMessage && lastMessage.classList.contains('assistant-message')) {
-            lastMessage.remove();
+            // Extract the partial content from the message
+            const contentElement = lastMessage.querySelector('.message-content');
+            const partialContent = contentElement ? contentElement.textContent.trim() : '';
+
+            // Truncate content to prevent excessive DB storage
+            const truncatedContent = partialContent.substring(0, 50000);
+
+            // Only save if there's actual content and we have a conversation ID
+            if (truncatedContent.length > 0 && currentConversationId) {
+              // Add visual indicator that generation was stopped
+              const stoppedBadge = document.createElement('div');
+              stoppedBadge.className = 'text-xs text-gray-500 italic mt-2';
+              stoppedBadge.textContent = 'Generation stopped';
+              lastMessage.appendChild(stoppedBadge);
+
+              // Save to database (fire-and-forget, graceful degradation)
+              try {
+                const token = localStorage.getItem('token');
+                const baseUrl = api?.baseUrl || window.LanaConfig?.API_BASE_URL || '';
+
+                fetch(`${baseUrl}/api/v1/conversations/save-stopped-message`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                  },
+                  body: JSON.stringify({
+                    conversation_id: currentConversationId,
+                    matter_id: currentMatterId,
+                    content: truncatedContent,
+                    metadata: {
+                      stopped: true,
+                      stoppedAt: Date.now(),
+                      stoppedBy: 'user',
+                      excludeFromContext: true,
+                      excludeFromSummary: true
+                    }
+                  })
+                }).then(response => {
+                  if (response.ok) {
+                    console.log('[Stop] Stopped message saved to database');
+                  } else {
+                    console.warn('[Stop] Failed to save stopped message (non-critical)');
+                  }
+                }).catch(err => {
+                  console.warn('[Stop] Failed to save stopped message (non-critical):', err);
+                });
+              } catch (saveError) {
+                console.warn('[Stop] Failed to save stopped message (non-critical):', saveError);
+                // Don't throw - graceful degradation
+              }
+            } else if (truncatedContent.length > 0 && !currentConversationId) {
+              // Content exists but no conversation ID yet (new conversation)
+              console.log('[Stop] Cannot save stopped message - no conversation ID yet');
+              const stoppedBadge = document.createElement('div');
+              stoppedBadge.className = 'text-xs text-gray-500 italic mt-2';
+              stoppedBadge.textContent = 'Generation stopped';
+              lastMessage.appendChild(stoppedBadge);
+            } else {
+              // No content generated yet, just remove the empty message element
+              lastMessage.remove();
+            }
           }
         } else {
           Toast.error('Failed to send message. Please try again.');
@@ -4922,6 +5165,11 @@
         messageInput.classList.remove('opacity-50', 'cursor-not-allowed');
         sendBtn.classList.remove('opacity-50', 'cursor-not-allowed');
         messageInput.focus(); // Focus back to input for next message
+
+        // Release streaming guard — allow deferred session expiry redirects
+        if (window.api && typeof window.api.setStreamingInactive === 'function') {
+          window.api.setStreamingInactive();
+        }
       }
     }
 
@@ -5247,8 +5495,10 @@
         }
 
         messageEl.className = 'ai-message-container';
+        const messageId = metadata?.message_id || metadata?.id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const hasValidMessageIdForTrace = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(messageId);
         messageEl.innerHTML = `
-          <div class="flex items-start space-x-3">
+          <div class="flex items-start space-x-3 relative">
             <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
               <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
@@ -5263,6 +5513,27 @@
               ${citationsHtml}
               ${generatedDocCardHtml}
               ${followUpActionsHtml}
+            </div>
+            <div class="relative">
+              <button onclick="toggleMessageOptions(event, '${messageId}')" class="message-options-btn p-1 rounded hover:bg-gray-100 transition-colors">
+                <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/>
+                </svg>
+              </button>
+              <div id="message-options-${messageId}" class="hidden message-options-menu">
+                ${hasValidMessageIdForTrace ? `<button onclick="viewTrace('${messageId}'); event.stopPropagation();" class="flex items-center gap-2">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                  </svg>
+                  View Trace
+                </button>` : ''}
+                <button onclick="deleteMessage('${messageId}'); event.stopPropagation();" class="flex items-center gap-2 text-red-600 hover:bg-red-50">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                  Delete Message
+                </button>
+              </div>
             </div>
           </div>
         `;
@@ -5354,7 +5625,7 @@
     // Add a streaming message (stores raw content for re-rendering)
     function addStreamingMessage(content) {
       const messageEl = document.createElement('div');
-      messageEl.className = 'flex items-start space-x-3 ai-message';
+      messageEl.className = 'flex items-start space-x-3 relative ai-message ai-message-container';
       messageEl.innerHTML = `
         <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
           <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -5367,6 +5638,7 @@
           </div>
           <div id="streaming-reasoning-panel"></div>
         </div>
+        <div id="streaming-message-options" class="relative"></div>
       `;
 
       // Store raw content for re-rendering
@@ -5627,6 +5899,42 @@
         messageContainer.insertAdjacentHTML('beforeend', citationsHtml);
       }
 
+      // Add message options button with real message ID from backend
+      const optionsContainer = lastAiMessage.querySelector('#streaming-message-options');
+      if (optionsContainer && metadata && metadata.message_id) {
+        const messageId = metadata.message_id;
+        const hasValidMessageIdForTrace = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(messageId);
+        optionsContainer.innerHTML = `
+          <button onclick="toggleMessageOptions(event, '${messageId}')" class="message-options-btn p-1 rounded hover:bg-gray-100 transition-colors">
+            <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/>
+            </svg>
+          </button>
+          <div id="message-options-${messageId}" class="hidden message-options-menu">
+            ${hasValidMessageIdForTrace ? `<button onclick="viewTrace('${messageId}'); event.stopPropagation();" class="flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+              </svg>
+              View Trace
+            </button>` : ''}
+            <button onclick="deleteMessage('${messageId}'); event.stopPropagation();" class="flex items-center gap-2 text-red-600 hover:bg-red-50">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
+              Delete Message
+            </button>
+          </div>
+        `;
+        console.log('%c[finalizeStreamingMessage] ✅ Added options button with REAL message ID from backend:', 'color: green; font-weight: bold', messageId);
+      } else {
+        console.error('%c[finalizeStreamingMessage] ❌ Could not add options button - NO MESSAGE ID FROM BACKEND', 'color: red; font-weight: bold', {
+          hasContainer: !!optionsContainer,
+          hasMetadata: !!metadata,
+          hasMessageId: !!(metadata && metadata.message_id),
+          metadata: metadata
+        });
+      }
+
       chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
@@ -5820,6 +6128,27 @@
             if (progressPercent >= 100 || data.stage === 'complete') {
               progressContainer.querySelector('.bg-blue-500').style.width = '100%';
             }
+          } else if (data.type === 'agentic_step') {
+            // Agentic steps: append in order (1, 2, 3...) in a dedicated container
+            let stepsContainer = reasoningContent.querySelector('#agentic-steps-container');
+            if (!stepsContainer) {
+              stepsContainer = document.createElement('div');
+              stepsContainer.id = 'agentic-steps-container';
+              stepsContainer.className = 'space-y-2';
+              reasoningContent.insertBefore(stepsContainer, reasoningContent.firstChild);
+            }
+            const stepIndex = stepsContainer.children.length + 1;
+            const phaseLabel = (data.phase || 'Step').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+            const stepEl = document.createElement('div');
+            stepEl.className = 'flex items-start gap-2 text-[11px] text-gray-700 animate-fade-in-up';
+            stepEl.innerHTML = `
+              <span class="flex-shrink-0 w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-semibold">${stepIndex}</span>
+              <div>
+                <span class="font-medium text-gray-800">${escapeHtml(phaseLabel)}</span>
+                <span class="text-gray-600">${escapeHtml(data.message || '')}</span>
+              </div>
+            `;
+            stepsContainer.appendChild(stepEl);
           } else {
             // Regular reasoning event - add as text
             const newReasoning = document.createElement('p');
@@ -5850,6 +6179,21 @@
         panel.dataset.reasoning = JSON.stringify([data]);
         panel.dataset.panelId = uniquePanelId;
 
+        const phaseLabel = data.type === 'agentic_step' && (data.phase || 'Step')
+          ? String(data.phase).replace(/\b\w/g, function(c) { return c.toUpperCase(); })
+          : '';
+        const initialReasoningContent = data.type === 'agentic_step'
+          ? `<div id="agentic-steps-container" class="space-y-2">
+               <div class="flex items-start gap-2 text-[11px] text-gray-700">
+                 <span class="flex-shrink-0 w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-semibold">1</span>
+                 <div>
+                   <span class="font-medium text-gray-800">${escapeHtml(phaseLabel)}</span>
+                   <span class="text-gray-600">${escapeHtml(data.message || '')}</span>
+                 </div>
+               </div>
+             </div>`
+          : `<p class="text-[11px] text-gray-700">${escapeHtml(data.message)}</p>`;
+
         // Build the panel HTML
         panel.innerHTML = `
           <div class="mt-1 animate-fade-in-up">
@@ -5871,7 +6215,7 @@
                 </div>
                 <div class="p-4">
                   <div id="${uniquePanelId}-reasoning">
-                    <p class="text-[11px] text-gray-700">${escapeHtml(data.message)}</p>
+                    ${initialReasoningContent}
                   </div>
                   <div id="${uniquePanelId}-iterations" class="hidden space-y-2"></div>
                 </div>
@@ -8418,6 +8762,299 @@
         </div>
       `;
     }
+
+    // ===== TRACE VIEWER FUNCTIONS =====
+
+    // Toggle message options dropdown
+    function toggleMessageOptions(event, messageId) {
+      event.stopPropagation();
+      const menu = document.getElementById(`message-options-${messageId}`);
+
+      // Close all other open menus first
+      document.querySelectorAll('.message-options-menu').forEach(m => {
+        if (m.id !== `message-options-${messageId}`) {
+          m.classList.add('hidden');
+        }
+      });
+
+      // Toggle current menu
+      menu.classList.toggle('hidden');
+    }
+
+    // Close options menus when clicking outside
+    document.addEventListener('click', function(event) {
+      if (!event.target.closest('.message-options-btn') && !event.target.closest('.message-options-menu')) {
+        document.querySelectorAll('.message-options-menu').forEach(menu => {
+          menu.classList.add('hidden');
+        });
+      }
+    });
+
+    // View trace for a message
+    async function viewTrace(messageId) {
+      const overlay = document.getElementById('traceViewerOverlay');
+      const panel = document.getElementById('traceViewerPanel');
+      const content = document.getElementById('traceViewerContent');
+
+      // Show panel with loading state
+      content.innerHTML = '<div class="flex items-center justify-center py-8"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div><span class="ml-3 text-gray-600">Loading trace...</span></div>';
+      overlay.classList.add('active');
+      panel.classList.add('active');
+
+      // Close options menu
+      const menu = document.getElementById(`message-options-${messageId}`);
+      if (menu) menu.classList.add('hidden');
+
+      try {
+        const token = localStorage.getItem('token');
+        const baseUrl = api?.baseUrl || window.LanaConfig?.API_BASE_URL || '';
+        const response = await fetch(`${baseUrl}/api/v1/messages/${messageId}/trace`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          if (response.status === 404) {
+            renderTraceEmptyState('No trace for this message', 'Trace data is not available for this response.');
+            return;
+          } else if (response.status === 403) {
+            renderTraceEmptyState('Access restricted', 'You do not have permission to view this trace.');
+            return;
+          } else {
+            renderTraceEmptyState('Unable to load trace', 'Could not fetch trace data. Please try again later.');
+            return;
+          }
+        }
+
+        const data = await response.json();
+
+        if (data.status === 'success' && data.data) {
+          displayTraceDetails(data.data);
+        } else {
+          renderTraceEmptyState('No trace data', data.message || 'Trace data is not available.');
+        }
+      } catch (error) {
+        renderTraceEmptyState('Unable to load trace', 'Could not fetch trace data. Please try again later.');
+      }
+    }
+
+    // Empty state for trace viewer (matches matters.html empty states)
+    function renderTraceEmptyState(title, description) {
+      const content = document.getElementById('traceViewerContent');
+      if (!content) return;
+      content.innerHTML = `
+        <div class="text-center py-12">
+          <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+          </svg>
+          <h4 class="text-lg font-semibold text-gray-900 mb-2">${escapeHtml(title)}</h4>
+          <p class="text-gray-500">${escapeHtml(description)}</p>
+        </div>
+      `;
+    }
+
+    // Display trace details in the side panel
+    function displayTraceDetails(traceData) {
+      const { trace, llmCalls = [], ragRetrievals = [], sseEvents = [] } = traceData;
+      const content = document.getElementById('traceViewerContent');
+
+      if (!trace) {
+        renderTraceEmptyState('No trace data', 'Trace data is not available for this response.');
+        return;
+      }
+
+      // Format duration
+      const formatDuration = (ms) => {
+        if (ms === null || ms === undefined) return 'N/A';
+        if (ms < 1000) return `${ms}ms`;
+        return `${(ms / 1000).toFixed(2)}s`;
+      };
+
+      // Format timestamp
+      const formatDateTime = (timestamp) => {
+        if (!timestamp) return 'N/A';
+        const date = new Date(timestamp);
+        return date.toLocaleString();
+      };
+
+      // Build HTML
+      let html = `
+        <!-- Trace Overview -->
+        <details open class="mb-4 bg-white border border-gray-200 rounded-lg">
+          <summary class="px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors font-medium text-gray-900 flex items-center gap-2">
+            <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+            </svg>
+            Trace Overview
+          </summary>
+          <div class="px-4 py-3 border-t border-gray-200 space-y-2 text-sm">
+            <div class="grid grid-cols-2 gap-2">
+              <div><span class="font-medium text-gray-600">Trace ID:</span></div>
+              <div class="text-gray-900 font-mono text-xs break-all">${escapeHtml(trace.trace_id || 'N/A')}</div>
+
+              <div><span class="font-medium text-gray-600">Status:</span></div>
+              <div>
+                <span class="px-2 py-0.5 rounded text-xs font-medium ${trace.status === 'completed' ? 'bg-green-100 text-green-800' : trace.status === 'failed' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}">
+                  ${escapeHtml(trace.status || 'unknown')}
+                </span>
+              </div>
+
+              <div><span class="font-medium text-gray-600">Duration:</span></div>
+              <div class="text-gray-900">${formatDuration(trace.total_duration_ms)}</div>
+
+              <div><span class="font-medium text-gray-600">Chat Mode:</span></div>
+              <div class="text-gray-900">${escapeHtml(trace.chat_mode || 'N/A')}</div>
+
+              <div><span class="font-medium text-gray-600">Started:</span></div>
+              <div class="text-gray-900">${formatDateTime(trace.created_at)}</div>
+            </div>
+          </div>
+        </details>
+
+        <!-- LLM Calls -->
+        <details ${llmCalls.length > 0 ? 'open' : ''} class="mb-4 bg-white border border-gray-200 rounded-lg">
+          <summary class="px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors font-medium text-gray-900 flex items-center gap-2">
+            <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+            </svg>
+            LLM Calls (${llmCalls.length})
+          </summary>
+          <div class="px-4 py-3 border-t border-gray-200">
+            ${llmCalls.length === 0 ? '<p class="text-sm text-gray-500 italic">No LLM calls recorded</p>' : ''}
+            ${llmCalls.map((call, idx) => `
+              <details class="mb-2 last:mb-0">
+                <summary class="cursor-pointer hover:bg-gray-50 px-3 py-2 rounded text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                  </svg>
+                  Call #${call.call_sequence || idx + 1} - ${escapeHtml(call.function_name || 'Unknown')}
+                </summary>
+                <div class="px-3 py-2 mt-1 bg-gray-50 rounded text-xs space-y-1">
+                  <div><span class="font-medium text-gray-600">Model:</span> <span class="text-gray-900">${escapeHtml(call.model_name || 'N/A')}</span></div>
+                  <div><span class="font-medium text-gray-600">Tokens:</span> <span class="text-gray-900">${call.total_tokens || 'N/A'} (prompt: ${call.prompt_tokens || 'N/A'}, completion: ${call.completion_tokens || 'N/A'})</span></div>
+                  <div><span class="font-medium text-gray-600">Duration:</span> <span class="text-gray-900">${formatDuration(call.total_duration_ms)}</span></div>
+                  ${call.error_message ? `<div class="text-red-600"><span class="font-medium">Error:</span> ${escapeHtml(call.error_message)}</div>` : ''}
+                  ${call.prompt_text ? `
+                    <details class="mt-2">
+                      <summary class="cursor-pointer text-indigo-600 hover:text-indigo-800">View Prompt</summary>
+                      <pre class="mt-1 p-2 bg-white border border-gray-200 rounded text-xs overflow-x-auto">${escapeHtml(call.prompt_text.substring(0, 500))}${call.prompt_text.length > 500 ? '...' : ''}</pre>
+                    </details>
+                  ` : ''}
+                  ${call.response_text ? `
+                    <details class="mt-2">
+                      <summary class="cursor-pointer text-indigo-600 hover:text-indigo-800">View Response</summary>
+                      <pre class="mt-1 p-2 bg-white border border-gray-200 rounded text-xs overflow-x-auto">${escapeHtml(call.response_text.substring(0, 500))}${call.response_text.length > 500 ? '...' : ''}</pre>
+                    </details>
+                  ` : ''}
+                </div>
+              </details>
+            `).join('')}
+          </div>
+        </details>
+
+        <!-- RAG Retrievals -->
+        <details ${ragRetrievals.length > 0 ? 'open' : ''} class="mb-4 bg-white border border-gray-200 rounded-lg">
+          <summary class="px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors font-medium text-gray-900 flex items-center gap-2">
+            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            RAG Retrievals (${ragRetrievals.length})
+          </summary>
+          <div class="px-4 py-3 border-t border-gray-200">
+            ${ragRetrievals.length === 0 ? '<p class="text-sm text-gray-500 italic">No RAG retrievals recorded</p>' : ''}
+            ${ragRetrievals.map((retrieval, idx) => `
+              <details class="mb-2 last:mb-0">
+                <summary class="cursor-pointer hover:bg-gray-50 px-3 py-2 rounded text-sm font-medium text-gray-700">
+                  Retrieval #${retrieval.retrieval_sequence || idx + 1} - ${retrieval.documents_retrieved || 0} documents
+                </summary>
+                <div class="px-3 py-2 mt-1 bg-gray-50 rounded text-xs space-y-1">
+                  <div><span class="font-medium text-gray-600">Query:</span> <span class="text-gray-900">${escapeHtml(retrieval.query_text?.substring(0, 100) || 'N/A')}${retrieval.query_text?.length > 100 ? '...' : ''}</span></div>
+                  <div><span class="font-medium text-gray-600">Documents Retrieved:</span> <span class="text-gray-900">${retrieval.documents_retrieved || 0}</span></div>
+                  <div><span class="font-medium text-gray-600">Top Score:</span> <span class="text-gray-900">${retrieval.top_score !== null ? retrieval.top_score.toFixed(4) : 'N/A'}</span></div>
+                  <div><span class="font-medium text-gray-600">Duration:</span> <span class="text-gray-900">${formatDuration(retrieval.duration_ms)}</span></div>
+                </div>
+              </details>
+            `).join('')}
+          </div>
+        </details>
+
+        <!-- SSE Events -->
+        <details ${sseEvents.length > 0 ? '' : ''} class="mb-4 bg-white border border-gray-200 rounded-lg">
+          <summary class="px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors font-medium text-gray-900 flex items-center gap-2">
+            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+            SSE Events (${sseEvents.length})
+          </summary>
+          <div class="px-4 py-3 border-t border-gray-200 max-h-96 overflow-y-auto">
+            ${sseEvents.length === 0 ? '<p class="text-sm text-gray-500 italic">No SSE events recorded</p>' : ''}
+            ${sseEvents.map((event, idx) => `
+              <div class="mb-2 last:mb-0 pb-2 border-b border-gray-100 last:border-0">
+                <div class="text-xs">
+                  <span class="font-medium text-gray-600">Event #${event.event_sequence || idx + 1}:</span>
+                  <span class="px-1.5 py-0.5 ml-1 rounded text-xs font-medium bg-gray-100 text-gray-700">${escapeHtml(event.event_type || 'unknown')}</span>
+                </div>
+                ${event.event_data ? `
+                  <div class="mt-1 text-xs text-gray-600">
+                    <pre class="p-2 bg-gray-50 border border-gray-200 rounded overflow-x-auto">${escapeHtml(JSON.stringify(event.event_data, null, 2).substring(0, 200))}${JSON.stringify(event.event_data).length > 200 ? '...' : ''}</pre>
+                  </div>
+                ` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </details>
+      `;
+
+      content.innerHTML = html;
+    }
+
+    // Close trace viewer
+    function closeTraceViewer() {
+      const overlay = document.getElementById('traceViewerOverlay');
+      const panel = document.getElementById('traceViewerPanel');
+      overlay.classList.remove('active');
+      panel.classList.remove('active');
+    }
+
+    // Delete message (placeholder - implement as needed)
+    async function deleteMessage(messageId) {
+      // Close options menu
+      const menu = document.getElementById(`message-options-${messageId}`);
+      if (menu) menu.classList.add('hidden');
+
+      if (!confirm('Are you sure you want to delete this message?')) {
+        return;
+      }
+
+      try {
+        const token = localStorage.getItem('token');
+        const baseUrl = api?.baseUrl || window.LanaConfig?.API_BASE_URL || '';
+        const response = await fetch(`${baseUrl}/api/v1/messages/${messageId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to delete message (${response.status})`);
+        }
+
+        Toast.success('Message deleted successfully');
+
+        // Reload conversation to reflect deletion
+        if (currentConversationId) {
+          await loadConversationHistory(currentConversationId);
+        }
+      } catch (error) {
+        console.error('[Delete Message] Error:', error);
+        Toast.error('Failed to delete message: ' + error.message);
+      }
+    }
+
   </script>
 
   <!-- Matter Details Drawer -->
@@ -8461,6 +9098,22 @@
     </div>
   </div>
   <div id="matterDrawerOverlay" class="hidden fixed inset-0 bg-black bg-opacity-50 z-40" onclick="closeMatterDrawer()"></div>
+
+  <!-- Trace Viewer Panel -->
+  <div id="traceViewerOverlay" class="trace-viewer-overlay" onclick="closeTraceViewer()"></div>
+  <div id="traceViewerPanel" class="trace-viewer-panel">
+    <div class="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between z-10">
+      <h2 class="text-lg font-semibold text-gray-900">Trace Details</h2>
+      <button onclick="closeTraceViewer()" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+        <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div id="traceViewerContent" class="px-6 py-4">
+      <!-- Trace content will be dynamically inserted here -->
+    </div>
+  </div>
 
   </div>
 </body>

@@ -54,6 +54,11 @@ class DocumentChat extends LanaChat {
   async sendViaSSE(content) {
     this.showTypingIndicator();
 
+    // Guard: prevent page navigation (session expired redirect) during streaming
+    if (window.api && typeof window.api.setStreamingActive === 'function') {
+      window.api.setStreamingActive();
+    }
+
     try {
       const token = localStorage.getItem('token');
 
@@ -145,6 +150,8 @@ class DocumentChat extends LanaChat {
       // Build request body with document context AND selection metadata
       const body = {
         message: finalMessage,
+        client_time: new Date().toISOString(),
+        client_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         context: {
           documentContent: documentContent,
           documentLength: documentContent.length,
@@ -265,6 +272,11 @@ class DocumentChat extends LanaChat {
       this.hideTypingIndicator();
       this.addSystemMessage('Failed to send message. Please try again.');
       console.error('[DocumentChat] Error:', error);
+    } finally {
+      // Release streaming guard — allow deferred session expiry redirects
+      if (window.api && typeof window.api.setStreamingInactive === 'function') {
+        window.api.setStreamingInactive();
+      }
     }
   }
 

@@ -40,20 +40,51 @@ class AgenticUI {
    * }
    */
   handleAgenticProgress(data) {
-    console.log('[AgenticUI] Progress event:', data);
+    console.log('[AgenticUI] Progress event received:', JSON.stringify(data));
 
-    // Show progress indicator if first step
-    if (data.step === 1) {
-      this.showProgressIndicator(data.totalSteps);
+    // Map backend event structure to frontend expected structure
+    // Backend sends: { phase, status, message, currentStep, totalSteps, stepDescription, progress, error }
+    // Frontend expects: { step, totalSteps, stepType, description, status }
+
+    // Map phase names to step numbers for display
+    const phaseToStep = {
+      'classification': 1,
+      'planning': 2,
+      'execution': 3
+    };
+
+    const mappedData = {
+      step: data.currentStep || data.step || phaseToStep[data.phase] || 1,
+      totalSteps: data.totalSteps || 3, // Default to 3 phases
+      stepType: data.phase || data.stepType || 'processing',
+      description: data.stepDescription || data.message || data.description || 'Processing...',
+      status: data.status || 'in_progress'
+    };
+
+    console.log('[AgenticUI] Mapped data:', JSON.stringify(mappedData));
+
+    // Show progress indicator if this is the first event OR if no indicator is shown yet
+    const progressContainer = document.getElementById('agentic-progress-container');
+    if (!progressContainer || data.phase === 'classification' || mappedData.step === 1) {
+      console.log('[AgenticUI] Showing progress indicator');
+      this.showProgressIndicator(mappedData.totalSteps);
       this.progressStartTime = Date.now();
       this.startElapsedTimeCounter();
     }
 
     // Update step status
-    this.updateStep(data);
+    this.updateStep(mappedData);
 
     // Update progress bar
-    this.updateProgressBar(data.step, data.totalSteps);
+    if (mappedData.step && mappedData.totalSteps) {
+      this.updateProgressBar(mappedData.step, mappedData.totalSteps);
+    } else if (data.progress !== undefined) {
+      // Use progress percentage if available
+      const progressBar = document.getElementById('agentic-progress-bar');
+      if (progressBar) {
+        progressBar.style.width = `${data.progress * 100}%`;
+      }
+    }
   }
 
   /**
@@ -152,8 +183,7 @@ class AgenticUI {
       this.hideProgressIndicator();
     }, 2000);
 
-    // Display error message
-    this.displayError(data);
+    // Do not show error card; fallback response + inline notice in chat handle communication
   }
 
   // ========================================================================
@@ -228,21 +258,27 @@ class AgenticUI {
 
   updateStep(stepData) {
     const { step, totalSteps, stepType, description, status } = stepData;
+    console.log('[AgenticUI] updateStep called:', { step, totalSteps, stepType, description, status });
+
     const stepList = document.getElementById('agentic-step-list');
-    if (!stepList) return;
+    if (!stepList) {
+      console.warn('[AgenticUI] Step list element not found');
+      return;
+    }
 
     const stepId = `agentic-step-${step}`;
     let stepElement = document.getElementById(stepId);
 
     if (!stepElement) {
       // Create new step element
+      console.log('[AgenticUI] Creating new step element:', stepId);
       const stepHtml = `
         <div id="${stepId}" class="flex items-start space-x-2 p-2 rounded bg-gray-50">
           <div class="flex-shrink-0 mt-0.5 step-icon">
             ${this.getStatusIcon(status)}
           </div>
           <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium step-description ${this.getStatusColor(status)}">${description}</p>
+            <p class="text-sm font-medium step-description ${this.getStatusColor(status)}">${this.escapeHtml(description)}</p>
             <p class="text-xs text-gray-500 step-type">${this.formatStepType(stepType)}</p>
           </div>
         </div>
@@ -251,6 +287,7 @@ class AgenticUI {
       stepElement = document.getElementById(stepId);
     } else {
       // Update existing step
+      console.log('[AgenticUI] Updating existing step:', stepId);
       stepElement.querySelector('.step-icon').innerHTML = this.getStatusIcon(status);
       stepElement.querySelector('.step-description').textContent = description;
       stepElement.querySelector('.step-description').className = `text-sm font-medium step-description ${this.getStatusColor(status)}`;

@@ -2624,6 +2624,13 @@
           skillsTab.style.display = isWorkspace ? 'none' : 'block';
         }
 
+        // Hide Contacts tab for workspaces
+        const contactsTab = document.getElementById('tabContacts');
+        if (contactsTab) {
+          const isWorkspace = matter.matter_type === 'workspace';
+          contactsTab.style.display = isWorkspace ? 'none' : 'block';
+        }
+
         // Set up footer actions
         document.getElementById('drawerEditBtn').onclick = () => { editMatter(matter.matter_id); closeDrawer(); };
         document.getElementById('drawerDeleteBtn').onclick = () => deleteMatter(matter.matter_id);
