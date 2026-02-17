@@ -127,11 +127,19 @@ class AgenticUI {
     }, 3000);
 
     // Render artifacts if present
+    // Only render DOCUMENT artifacts (with content) as panels.
+    // Entity artifacts (matters, contacts, etc.) are already rendered as
+    // clickable buttons via the agentic_artifacts SSE event.
     if (data.artifacts && data.artifacts.length > 0) {
-      data.artifacts.forEach(artifact => {
+      const documentArtifacts = data.artifacts.filter(a => !a.entity_type && a.content);
+      documentArtifacts.forEach(artifact => {
         this.renderArtifact(artifact);
       });
-    } else {
+    }
+
+    // Show completion message if no document artifacts were rendered
+    const hasDocumentArtifacts = data.artifacts && data.artifacts.some(a => !a.entity_type && a.content);
+    if (!hasDocumentArtifacts) {
       // If no artifacts, show completion message
       const chatMessages = document.getElementById('chatMessages');
       if (chatMessages) {
@@ -581,6 +589,217 @@ class AgenticUI {
     // TODO: Implement retry logic
     console.log('[AgenticUI] Retry task requested');
     this.showToast('Retry not yet implemented', 'info');
+  }
+
+  // ========================================================================
+  // FOLLOW-UP SUGGESTIONS
+  // ========================================================================
+
+  /**
+   * Handle agentic_followup SSE event
+   * Renders interactive follow-up suggestion card with Yes/No/Custom options
+   * @param {Object} data - Follow-up data from backend
+   * {
+   *   followups: [{ entity_type, description, data }],
+   *   message: 'I also found...',
+   *   matterId: 'MATT-00006',
+   *   options: [{ id, label, description }]
+   * }
+   */
+  handleAgenticFollowup(data) {
+    console.log('[AgenticUI] Follow-up event:', data);
+
+    const chatMessages = document.getElementById('chatMessages');
+    if (!chatMessages || !data.followups || data.followups.length === 0) return;
+
+    // Store follow-up data for later use
+    this.pendingFollowups = data;
+
+    // Build follow-up items HTML
+    const entityTypeLabels = {
+      'task': 'Task',
+      'contact': 'Contact',
+      'note': 'Note',
+      'matter': 'Matter',
+      'document': 'Document'
+    };
+
+    const entityTypeIcons = {
+      'task': '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>',
+      'contact': '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>',
+      'note': '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>'
+    };
+
+    const followupItemsHtml = data.followups.map((f, idx) => {
+      const label = entityTypeLabels[f.entity_type] || f.entity_type;
+      const icon = entityTypeIcons[f.entity_type] || entityTypeIcons['note'];
+      return `
+        <div class="flex items-start space-x-2 p-2 rounded bg-white border border-indigo-100">
+          <div class="flex-shrink-0 mt-0.5 text-indigo-500">${icon}</div>
+          <div class="flex-1 min-w-0">
+            <span class="text-xs font-medium text-indigo-600 uppercase">${this.escapeHtml(label)}</span>
+            <p class="text-sm text-gray-800">${this.escapeHtml(f.description)}</p>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Build options buttons HTML
+    const optionsHtml = (data.options || []).map(opt => {
+      let btnClass = '';
+      if (opt.id === 'yes') {
+        btnClass = 'bg-indigo-600 hover:bg-indigo-700 text-white';
+      } else if (opt.id === 'no') {
+        btnClass = 'bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300';
+      } else {
+        btnClass = 'bg-white hover:bg-gray-50 text-indigo-600 border border-indigo-300';
+      }
+      return `
+        <button onclick="window.AgenticUI.respondToFollowup('${opt.id}')"
+                class="px-4 py-2 rounded-lg text-sm font-medium transition ${btnClass}"
+                title="${this.escapeHtml(opt.description || '')}">
+          ${this.escapeHtml(opt.label)}
+        </button>
+      `;
+    }).join('');
+
+    const followupHtml = `
+      <div id="agentic-followup-card" class="bg-indigo-50 border border-indigo-200 rounded-lg p-4 my-4">
+        <div class="flex items-center space-x-2 mb-3">
+          <svg class="w-5 h-5 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <h4 class="font-semibold text-indigo-900 text-sm">${this.escapeHtml(data.message || 'Additional items found')}</h4>
+        </div>
+        <div class="space-y-2 mb-4">
+          ${followupItemsHtml}
+        </div>
+        <div class="flex items-center space-x-3">
+          ${optionsHtml}
+        </div>
+      </div>
+    `;
+
+    chatMessages.insertAdjacentHTML('beforeend', followupHtml);
+    this.scrollToBottom();
+  }
+
+  /**
+   * Handle user response to follow-up suggestions
+   * @param {string} choice - 'yes' | 'no' | 'custom'
+   */
+  respondToFollowup(choice) {
+    const followupCard = document.getElementById('agentic-followup-card');
+    const data = this.pendingFollowups;
+
+    if (!data) {
+      console.warn('[AgenticUI] No pending follow-ups to respond to');
+      return;
+    }
+
+    // Disable buttons to prevent double-clicks
+    if (followupCard) {
+      followupCard.querySelectorAll('button').forEach(btn => {
+        btn.disabled = true;
+        btn.classList.add('opacity-50', 'cursor-not-allowed');
+      });
+    }
+
+    if (choice === 'yes') {
+      // Build a message that lists all follow-up entities to create
+      const entityDescriptions = data.followups.map(f => {
+        const dataJson = f.data ? JSON.stringify(f.data) : '';
+        return `- ${f.entity_type}: ${f.description}${dataJson ? ' ' + dataJson : ''}`;
+      }).join('\n');
+
+      const followupMessage = `Yes, please create the following for this matter:\n${entityDescriptions}`;
+
+      // Send as a new agentic mode message
+      this.sendFollowupMessage(followupMessage, data.matterId);
+
+      // Update card to show confirmation
+      if (followupCard) {
+        followupCard.innerHTML = `
+          <div class="flex items-center space-x-2 text-indigo-800">
+            <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span class="text-sm font-medium">Creating ${data.followups.length} additional record${data.followups.length > 1 ? 's' : ''}...</span>
+          </div>
+        `;
+      }
+
+    } else if (choice === 'no') {
+      // Send a simple decline
+      this.sendFollowupMessage('No thanks, that is all for now.', data.matterId);
+
+      // Update card to show acknowledged
+      if (followupCard) {
+        followupCard.innerHTML = `
+          <div class="flex items-center space-x-2 text-gray-600">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+            </svg>
+            <span class="text-sm">Got it. Let me know if you need anything else.</span>
+          </div>
+        `;
+      }
+
+    } else if (choice === 'custom') {
+      // Focus the text input for the user to type their own instructions
+      const chatInput = document.getElementById('chatInput') || document.getElementById('messageInput');
+      if (chatInput) {
+        chatInput.focus();
+        chatInput.placeholder = 'Type your instructions for what to create...';
+      }
+
+      // Update card to show custom mode
+      if (followupCard) {
+        followupCard.querySelector('.flex.items-center.space-x-3').innerHTML = `
+          <span class="text-sm text-indigo-600 italic">Type your instructions in the chat input below...</span>
+        `;
+      }
+    }
+
+    // Clear pending follow-ups
+    this.pendingFollowups = null;
+  }
+
+  /**
+   * Send a follow-up message through the chat system
+   * @param {string} message - Message to send
+   * @param {string} matterId - Matter ID for context
+   */
+  sendFollowupMessage(message, matterId) {
+    // Use the global chat instance to send a message
+    // The chat.js exposes sendMessage or similar on the window/chat instance
+    if (window.chat && typeof window.chat.sendMessage === 'function') {
+      window.chat.sendMessage(message);
+    } else if (window.chatInstance && typeof window.chatInstance.sendMessage === 'function') {
+      window.chatInstance.sendMessage(message);
+    } else {
+      // Fallback: programmatically set input and trigger send
+      const chatInput = document.getElementById('chatInput') || document.getElementById('messageInput');
+      const sendButton = document.getElementById('sendButton') || document.getElementById('sendBtn');
+
+      if (chatInput) {
+        chatInput.value = message;
+        // Trigger input event for any listeners
+        chatInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+        // Click send button if available
+        if (sendButton) {
+          sendButton.click();
+        } else {
+          // Dispatch Enter key event
+          chatInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+        }
+      } else {
+        console.error('[AgenticUI] Could not find chat input to send follow-up message');
+        this.showToast('Could not send message. Please type your response manually.', 'warning');
+      }
+    }
   }
 
   // ========================================================================

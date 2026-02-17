@@ -396,7 +396,11 @@ function attachFieldHandlers(schema, currentConfig) {
     btn.addEventListener('click', async () => {
       const fieldName = btn.dataset.field;
       const provider = btn.dataset.provider;
-      const authResult = await initiateOAuthFlow(provider);
+      const connectorId = schema.connector_id;
+      const matterId = currentConfig.matter_id || null; // Get from config if available
+
+      // Initiate OAuth flow with provider, connectorId, and matterId
+      const authResult = await initiateOAuthFlow(provider, connectorId, matterId);
 
       if (authResult) {
         document.getElementById(fieldName).value = authResult.access_token;
@@ -441,12 +445,143 @@ async function openDirectoryBrowser(config) {
 }
 
 /**
- * Initiate OAuth flow
+ * Initiate OAuth flow using centralized OAuth bridge
+ *
+ * Flow:
+ * 1. Create state token via backend (POST /api/v1/integrations/oauth/states)
+ * 2. Build auth URL with redirect_uri=https://lanaai.io/lana-ai/oauth/callback
+ * 3. Open system browser to provider auth URL
+ * 4. User authenticates with provider
+ * 5. Provider redirects to lanaai.io bridge
+ * 6. Bridge redirects to lana-ai://oauth/callback (deep link)
+ * 7. Electron receives deep link, validates state, sends IPC to renderer
+ * 8. Renderer receives callback, exchanges code via backend (POST /api/v1/integrations/oauth/exchange)
+ * 9. Backend returns tokens, updates integration_sources
+ *
+ * @param {string} provider - OAuth provider identifier (e.g., 'google', 'microsoft')
+ * @param {string} connectorId - Connector ID for state tracking
+ * @param {string} matterId - Matter ID for scoped integration (optional)
+ * @returns {Promise<Object|null>} OAuth tokens or null if failed
  */
-async function initiateOAuthFlow(provider) {
-  // This will be implemented to handle OAuth flows for different providers
-  console.log('OAuth flow for provider:', provider);
-  return null;
+async function initiateOAuthFlow(provider, connectorId = null, matterId = null) {
+  console.log(`Initiating OAuth flow for provider: ${provider}`);
+
+  try {
+    // Step 1: Create state token in backend database
+    const stateResult = await window.electronAPI.createOAuthState(provider, connectorId, matterId);
+
+    if (!stateResult.success) {
+      console.error('Failed to create OAuth state:', stateResult.error);
+      alert(`Failed to initiate OAuth: ${stateResult.error}`);
+      return null;
+    }
+
+    const state = stateResult.state;
+    console.log('OAuth state created:', state.substring(0, 8) + '...');
+
+    // Step 2: Get connector configuration to build auth URL
+    const config = window.config || {};
+    const backendUrl = config.apiBaseUrl || 'http://localhost:8080';
+
+    // For demo mode, return fake tokens
+    if (window.api && window.api.isDemoMode && window.api.isDemoMode()) {
+      console.log('Demo mode: Returning fake OAuth tokens');
+      return {
+        access_token: 'demo_token_' + Math.random().toString(36).substring(7),
+        refresh_token: 'demo_refresh_' + Math.random().toString(36).substring(7),
+        expires_in: 3600
+      };
+    }
+
+    // Step 3: Build authorization URL with centralized redirect_uri
+    // The backend will construct the full OAuth URL with provider-specific params
+    const authUrl = `${backendUrl}/api/v1/integrations/oauth/authorize?` +
+      `provider=${encodeURIComponent(provider)}&` +
+      `state=${encodeURIComponent(state)}&` +
+      `connector_id=${encodeURIComponent(connectorId || '')}&` +
+      `redirect_uri=${encodeURIComponent('https://lanaai.io/lana-ai/oauth/callback')}`;
+
+    console.log('Opening OAuth authorization URL...');
+
+    // Step 4: Open system browser to auth URL
+    // Use window.open for web, electronAPI for Electron
+    if (window.electronAPI && window.electronAPI.invoke) {
+      await window.electronAPI.invoke('open-external-url', authUrl);
+    } else {
+      window.open(authUrl, '_blank');
+    }
+
+    // Step 5: Listen for OAuth callback via deep link
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error('OAuth flow timed out after 5 minutes'));
+      }, 5 * 60 * 1000); // 5 minute timeout
+
+      const handleOAuthCallback = async (data) => {
+        console.log('Received OAuth callback:', data);
+
+        // Validate callback data
+        if (!data || !data.code || !data.state) {
+          cleanup();
+          reject(new Error('Invalid OAuth callback data'));
+          return;
+        }
+
+        // Validate state matches
+        if (data.state !== state) {
+          cleanup();
+          reject(new Error('OAuth state mismatch - possible CSRF attack'));
+          return;
+        }
+
+        // Step 6: Exchange code for tokens via backend
+        const exchangeResult = await window.electronAPI.exchangeOAuthCode(
+          data.code,
+          data.state,
+          data.provider || provider
+        );
+
+        cleanup();
+
+        if (exchangeResult.success) {
+          console.log('OAuth flow completed successfully');
+          resolve(exchangeResult.data);
+        } else {
+          console.error('OAuth code exchange failed:', exchangeResult.error);
+          reject(new Error(exchangeResult.error || 'Token exchange failed'));
+        }
+      };
+
+      const cleanup = () => {
+        clearTimeout(timeout);
+        // Remove callback listener
+        if (window.electronAPI && window.electronAPI.onOAuthCallback) {
+          // Note: IPC doesn't provide removeListener, but we can track and ignore
+          window._oauthCallbackActive = false;
+        }
+      };
+
+      // Set up OAuth callback listener
+      window._oauthCallbackActive = true;
+      if (window.electronAPI && window.electronAPI.onOAuthCallback) {
+        window.electronAPI.onOAuthCallback((data) => {
+          if (window._oauthCallbackActive) {
+            handleOAuthCallback(data);
+          }
+        });
+      } else {
+        // Fallback for non-Electron environment
+        cleanup();
+        reject(new Error('OAuth callbacks not supported in this environment'));
+      }
+    });
+
+  } catch (error) {
+    console.error('OAuth flow error:', error);
+    alert(`OAuth authentication failed: ${error.message}`);
+    return null;
+  }
 }
 
 /**

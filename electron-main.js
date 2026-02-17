@@ -613,6 +613,100 @@ ipcMain.handle('generate-oauth-state', async () => {
   return generateOAuthState();
 });
 
+/**
+ * OAuth State Management - Backend-based
+ * Creates state token in backend database for CSRF protection
+ */
+ipcMain.handle('create-oauth-state', async (event, { provider, connectorId, matterId }) => {
+  try {
+    const savedServer = getSavedServer();
+    if (!savedServer || !savedServer.serverUrl) {
+      throw new Error('No server connection found');
+    }
+
+    const baseUrl = savedServer.serverUrl;
+    const authToken = savedServer.authToken;
+
+    if (!authToken) {
+      throw new Error('No authentication token found');
+    }
+
+    // Call backend to create state token
+    const response = await fetch(`${baseUrl}/api/v1/integrations/oauth/states`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({
+        provider,
+        connector_id: connectorId,
+        matter_id: matterId
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(errorData.error || `HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    logInfo(`OAuth state created for provider: ${provider}, state: ${data.state.substring(0, 8)}...`);
+
+    return { success: true, state: data.state };
+  } catch (error) {
+    logError('Failed to create OAuth state', error);
+    return { success: false, error: error.message };
+  }
+});
+
+/**
+ * OAuth Code Exchange - Backend-based
+ * Exchanges authorization code for tokens via backend
+ */
+ipcMain.handle('exchange-oauth-code', async (event, { code, state, provider }) => {
+  try {
+    const savedServer = getSavedServer();
+    if (!savedServer || !savedServer.serverUrl) {
+      throw new Error('No server connection found');
+    }
+
+    const baseUrl = savedServer.serverUrl;
+    const authToken = savedServer.authToken;
+
+    if (!authToken) {
+      throw new Error('No authentication token found');
+    }
+
+    // Call backend to exchange code for tokens
+    const response = await fetch(`${baseUrl}/api/v1/integrations/oauth/exchange`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({
+        code,
+        state,
+        provider
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(errorData.error || `HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    logInfo(`OAuth code exchanged successfully for provider: ${provider}`);
+
+    return { success: true, data };
+  } catch (error) {
+    logError('Failed to exchange OAuth code', error);
+    return { success: false, error: error.message };
+  }
+});
+
 ipcMain.handle('check-updates', async (event, serverUrl) => {
   try {
     // Get saved server to retrieve orgId

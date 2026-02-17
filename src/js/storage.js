@@ -1383,11 +1383,11 @@ function showMatterActionsModal(event) {
   const pinLabel = document.getElementById('pinBtnLabel');
   const pinDesc = document.getElementById('pinBtnDesc');
   if (isPinned) {
-    pinLabel.textContent = 'Unpin Matter';
-    pinDesc.textContent = 'Remove from pinned matters';
+    pinLabel.textContent = 'Unpin Folder';
+    pinDesc.textContent = 'Remove from pinned folders';
   } else {
-    pinLabel.textContent = 'Pin Matter';
-    pinDesc.textContent = 'Add to pinned matters';
+    pinLabel.textContent = 'Pin Folder';
+    pinDesc.textContent = 'Add to pinned folders';
   }
 
   // Show modal
@@ -1433,6 +1433,79 @@ async function togglePinFromModal() {
   
   closeMatterActionsModal();
   await togglePin(matterId, source, isPinned);
+}
+
+/**
+ * Delete matter from modal - shows confirmation dialog
+ */
+function deleteMatterFromModal() {
+  if (!selectedMatter) return;
+
+  // Populate confirmation modal
+  document.getElementById('deleteConfirmMatterName').textContent = selectedMatter.matterName;
+
+  // Reset the confirm button state
+  const btn = document.getElementById('confirmDeleteMatterBtn');
+  btn.disabled = false;
+  btn.textContent = 'Delete Folder';
+  btn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+  // Close the options modal
+  const optionsModal = document.getElementById('matterActionsModal');
+  optionsModal.classList.add('hidden');
+  optionsModal.classList.remove('flex');
+
+  // Show confirmation modal
+  const confirmModal = document.getElementById('deleteMatterConfirmModal');
+  confirmModal.classList.remove('hidden');
+  confirmModal.classList.add('flex');
+}
+
+/**
+ * Close delete matter confirmation modal
+ */
+function closeDeleteMatterConfirmModal() {
+  const modal = document.getElementById('deleteMatterConfirmModal');
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+  selectedMatter = null;
+}
+
+/**
+ * Confirm and execute matter deletion
+ */
+async function confirmDeleteMatter() {
+  if (!selectedMatter) return;
+
+  const matterId = selectedMatter.matterId;
+  const matterName = selectedMatter.matterName;
+
+  // Disable button to prevent double-click
+  const btn = document.getElementById('confirmDeleteMatterBtn');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Deleting...';
+  btn.classList.add('opacity-50', 'cursor-not-allowed');
+
+  try {
+    await api.deleteMatter(matterId);
+    closeDeleteMatterConfirmModal();
+    showSuccessNotification(`Folder "${matterName}" deleted successfully`);
+
+    // Reload all sections
+    await Promise.all([
+      loadPinnedMatters(),
+      loadRecentMatters(),
+      loadFolderContents()
+    ]);
+  } catch (error) {
+    console.error('[Storage] Failed to delete matter:', error);
+    showErrorNotification(error.message || 'Failed to delete folder');
+    // Re-enable button on error
+    btn.disabled = false;
+    btn.textContent = originalText;
+    btn.classList.remove('opacity-50', 'cursor-not-allowed');
+  }
 }
 
 // ============================================================

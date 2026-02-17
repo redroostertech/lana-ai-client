@@ -1661,6 +1661,53 @@ class ApiClient {
     return this.post(`/api/v1/matters/${matterId}/contacts`, contactData);
   }
 
+  /**
+   * Search contacts across the organization
+   * @param {string} query - Search query (min 2 chars)
+   * @param {string} excludeMatterId - Optional matter ID to exclude already-linked contacts
+   * @param {number} limit - Max results (default 20)
+   * @returns {Promise<Object>} { contacts: [...], total: N }
+   */
+  async searchContacts(query, excludeMatterId = null, limit = 20) {
+    let url = `/api/v1/contacts/search?q=${encodeURIComponent(query)}&limit=${limit}`;
+    if (excludeMatterId) {
+      url += `&exclude_matter_id=${encodeURIComponent(excludeMatterId)}`;
+    }
+    return this.get(url);
+  }
+
+  /**
+   * Link an existing contact to a matter
+   * @param {string} matterId - The matter ID
+   * @param {string} contactId - The contact UUID to link
+   * @param {string} role - Role in this matter (e.g., 'client', 'participant')
+   * @returns {Promise<Object>} Link record
+   */
+  async linkContactToMatter(matterId, contactId, role = 'participant') {
+    return this.post(`/api/v1/matters/${matterId}/contacts/link`, {
+      contact_id: contactId,
+      role
+    });
+  }
+
+  /**
+   * Unlink a contact from a matter (removes association, not the contact)
+   * @param {string} matterId - The matter ID
+   * @param {string} contactId - The contact UUID to unlink
+   * @returns {Promise<Object>} Success response
+   */
+  async unlinkContactFromMatter(matterId, contactId) {
+    return this.delete(`/api/v1/matters/${matterId}/contacts/${contactId}/unlink`);
+  }
+
+  /**
+   * Get available contact roles
+   * @returns {Promise<Object>} { roles: [...] }
+   */
+  async getContactRoles() {
+    return this.get('/api/v1/contacts/roles');
+  }
+
   // ============================================================================
   // Matter Comments API (Collaboration Feed)
   // ============================================================================

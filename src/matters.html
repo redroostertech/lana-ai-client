@@ -19,6 +19,7 @@
     <script src="js/new-project-modal.js"></script>
     <script src="js/conversation-menu.js"></script>
   <script src="js/conversation-search-modal.js"></script>
+  <script src="js/contact-search-modal.js"></script>
   <script src="js/notifications.js"></script>
   <script src="js/activity.js"></script>
   <script src="js/vendor/mammoth.min.js"></script>
@@ -600,16 +601,17 @@
             <p id="drawerClientName" class="text-sm text-gray-500"></p>
           </div>
           <div class="flex items-center gap-2 flex-shrink-0">
-            <button id="drawerEditBtn" class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Edit matter">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-              </svg>
-            </button>
-            <button id="drawerDeleteBtn" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete matter">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-              </svg>
-            </button>
+            <div class="relative">
+              <button id="drawerMoreOptionsBtn" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="More options">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
+                </svg>
+              </button>
+              <div id="drawerOptionsDropdown" class="hidden absolute right-0 mt-1 w-36 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                <button id="drawerOptionsEdit" class="w-full px-4 py-2 text-left text-sm text-indigo-600 hover:bg-indigo-50 transition-colors">Edit</button>
+                <button id="drawerOptionsDelete" class="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors">Delete</button>
+              </div>
+            </div>
             <button id="refreshMatterBtn" onclick="refreshCurrentMatter()" class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Refresh matter details">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
@@ -1679,9 +1681,16 @@
             </div>
             <div class="flex items-center justify-between text-xs text-gray-400">
               <span>Created ${formatDate(matter.created_at)}</span>
-              <div class="flex gap-2">
-                <button onclick="event.stopPropagation(); editMatter('${escapedMatterId}')" class="text-indigo-600 hover:text-indigo-800">Edit</button>
-                <button onclick="event.stopPropagation(); deleteMatter('${escapedMatterId}')" class="text-red-600 hover:text-red-800">Delete</button>
+              <div class="relative">
+                <button onclick="event.stopPropagation(); toggleMatterCardOptions('${escapedMatterId}')" class="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors" title="More options">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
+                  </svg>
+                </button>
+                <div id="matter-card-options-${escapedMatterId}" class="hidden absolute right-0 top-full mt-1 w-32 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                  <button onclick="event.stopPropagation(); editMatter('${escapedMatterId}'); closeMatterCardOptions('${escapedMatterId}')" class="w-full px-4 py-2 text-left text-sm text-indigo-600 hover:bg-indigo-50 transition-colors">Edit</button>
+                  <button onclick="event.stopPropagation(); deleteMatter('${escapedMatterId}'); closeMatterCardOptions('${escapedMatterId}')" class="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors">Delete</button>
+                </div>
               </div>
             </div>
           </div>
@@ -2631,9 +2640,38 @@
           contactsTab.style.display = isWorkspace ? 'none' : 'block';
         }
 
-        // Set up footer actions
-        document.getElementById('drawerEditBtn').onclick = () => { editMatter(matter.matter_id); closeDrawer(); };
-        document.getElementById('drawerDeleteBtn').onclick = () => deleteMatter(matter.matter_id);
+        // Set up more options dropdown actions
+        const moreOptionsBtn = document.getElementById('drawerMoreOptionsBtn');
+        const optionsDropdown = document.getElementById('drawerOptionsDropdown');
+        const optionsEditBtn = document.getElementById('drawerOptionsEdit');
+        const optionsDeleteBtn = document.getElementById('drawerOptionsDelete');
+
+        const closeMatterOptionsDropdown = () => { if (optionsDropdown) optionsDropdown.classList.add('hidden'); };
+
+        if (moreOptionsBtn && optionsDropdown) {
+          moreOptionsBtn.onclick = (e) => {
+            e.stopPropagation();
+            const isOpening = optionsDropdown.classList.contains('hidden');
+            optionsDropdown.classList.toggle('hidden');
+            if (isOpening) {
+              setTimeout(() => {
+                const closeOnClickOutside = (ev) => {
+                  if (!optionsDropdown.contains(ev.target) && !moreOptionsBtn.contains(ev.target)) {
+                    closeMatterOptionsDropdown();
+                    document.removeEventListener('click', closeOnClickOutside);
+                  }
+                };
+                document.addEventListener('click', closeOnClickOutside);
+              }, 0);
+            }
+          };
+        }
+        if (optionsEditBtn) {
+          optionsEditBtn.onclick = () => { editMatter(matter.matter_id); closeDrawer(); closeMatterOptionsDropdown(); };
+        }
+        if (optionsDeleteBtn) {
+          optionsDeleteBtn.onclick = () => { deleteMatter(matter.matter_id); closeMatterOptionsDropdown(); };
+        }
 
         // Render the specified tab (default is 'details')
         switchMatterTab(defaultTab);
@@ -2893,8 +2931,33 @@
         }
 
         if (!profile) {
-          // No profile available yet - this is normal for new matters
-          container.innerHTML = '';
+          // No profile available yet - show generate button
+          container.innerHTML = `
+            <div class="bg-gradient-to-r from-gray-50 to-indigo-50 border border-gray-200 rounded-lg p-5">
+              <div class="flex items-center justify-between">
+                <div class="flex items-start gap-3">
+                  <div class="w-9 h-9 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                    </svg>
+                  </div>
+                  <div>
+                    <h5 class="text-sm font-semibold text-gray-900">Matter Profile Intelligence</h5>
+                    <p class="text-xs text-gray-500 mt-0.5">Analyze this matter's documents and data to generate insights, key entities, and themes.</p>
+                  </div>
+                </div>
+                <button
+                  onclick="generateMatterIntelligence('${matter.matter_id}')"
+                  class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium transition-colors shadow-sm flex-shrink-0 ml-4"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                  </svg>
+                  Generate
+                </button>
+              </div>
+            </div>
+          `;
           return;
         }
 
@@ -2928,6 +2991,37 @@
         const themes = Array.isArray(profile.document_themes)
           ? profile.document_themes.slice(0, 5)
           : [];
+
+        // If profile has no meaningful content, show generate button
+        if (brandVoiceItems.length === 0 && keyEntitiesItems.length === 0 && themes.length === 0) {
+          container.innerHTML = `
+            <div class="bg-gradient-to-r from-gray-50 to-indigo-50 border border-gray-200 rounded-lg p-5">
+              <div class="flex items-center justify-between">
+                <div class="flex items-start gap-3">
+                  <div class="w-9 h-9 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                    </svg>
+                  </div>
+                  <div>
+                    <h5 class="text-sm font-semibold text-gray-900">Matter Profile Intelligence</h5>
+                    <p class="text-xs text-gray-500 mt-0.5">Not enough data to generate insights yet. Add documents or notes, then regenerate.</p>
+                  </div>
+                </div>
+                <button
+                  onclick="generateMatterIntelligence('${matter.matter_id}')"
+                  class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium transition-colors shadow-sm flex-shrink-0 ml-4"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                  </svg>
+                  Regenerate
+                </button>
+              </div>
+            </div>
+          `;
+          return;
+        }
 
         // Build profile content using collapsible section
         const profileContent = `
@@ -2978,6 +3072,101 @@
       }
     }
 
+    /**
+     * Trigger matter profile intelligence generation
+     * @param {string} matterId - The matter ID
+     */
+    window.generateMatterIntelligence = async function(matterId) {
+      const container = document.getElementById('matterProfileSection');
+      const notificationContainer = document.getElementById('matterProfileNotification');
+
+      try {
+        // Show loading state in the button area
+        if (container) {
+          container.innerHTML = `
+            <div class="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-5">
+              <div class="flex items-center gap-3">
+                <div class="animate-spin rounded-full h-8 w-8 border-3 border-indigo-200 border-t-indigo-600 flex-shrink-0"></div>
+                <div>
+                  <h5 class="text-sm font-semibold text-indigo-900">Generating Matter Intelligence...</h5>
+                  <p class="text-xs text-indigo-700 mt-0.5">Analyzing documents, notes, and matter data. This may take a moment.</p>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        await api.post('/api/v1/matters/' + matterId + '/profile/initialize');
+
+        // Show success notification
+        if (notificationContainer) {
+          const userName = window.currentUser?.name?.split(' ')[0] || 'there';
+          notificationContainer.innerHTML = `
+            <div class="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-5 mb-4">
+              <div class="flex items-start gap-4">
+                <div class="flex-shrink-0">
+                  <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center shadow-sm">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                    </svg>
+                  </div>
+                </div>
+                <div class="flex-1">
+                  <p class="text-sm font-medium text-indigo-900 mb-1">Analysis Started</p>
+                  <p class="text-sm text-indigo-700 leading-relaxed">
+                    I'm running an analysis on this matter to generate a profile. This helps me understand the context, key entities, and themes so I can assist you better. I'll be done soon!
+                  </p>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        // Clear the profile section while processing
+        if (container) container.innerHTML = '';
+
+        if (typeof Toast !== 'undefined' && Toast.success) {
+          Toast.success('Matter intelligence generation started');
+        }
+      } catch (error) {
+        console.error('[generateMatterIntelligence] Failed:', error);
+
+        // Restore the generate button
+        if (container) {
+          container.innerHTML = `
+            <div class="bg-gradient-to-r from-gray-50 to-red-50 border border-red-200 rounded-lg p-5">
+              <div class="flex items-center justify-between">
+                <div class="flex items-start gap-3">
+                  <div class="w-9 h-9 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                  </div>
+                  <div>
+                    <h5 class="text-sm font-semibold text-gray-900">Generation Failed</h5>
+                    <p class="text-xs text-gray-500 mt-0.5">Could not generate matter intelligence. Please try again.</p>
+                  </div>
+                </div>
+                <button
+                  onclick="generateMatterIntelligence('${matterId}')"
+                  class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium transition-colors shadow-sm flex-shrink-0 ml-4"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                  </svg>
+                  Retry
+                </button>
+              </div>
+            </div>
+          `;
+        }
+
+        if (typeof Toast !== 'undefined' && Toast.error) {
+          Toast.error('Failed to generate matter intelligence');
+        }
+      }
+    };
+
     // Helper function to format dates consistently
     function formatDate(dateString) {
       if (!dateString) return 'N/A';
@@ -3015,15 +3204,15 @@
     // Helper function to create collapsible section
     function createCollapsibleSection(id, title, content, actions = '', isExpanded = true, hasFooter = false, footerContent = '') {
       return `
-        <div class="collapsible-section" data-section-id="${id}">
+        <div class="collapsible-section border-t border-gray-200 pt-5" data-section-id="${id}">
           <!-- Section Header -->
-          <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center justify-between mb-3 py-1 -mx-1">
             <button
               onclick="toggleSection('${id}')"
-              class="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors group"
+              class="flex items-center gap-2 text-base font-semibold text-gray-900 hover:text-indigo-600 border-l-2 border-indigo-200 hover:border-indigo-500 pl-3 -ml-1 transition-colors group"
             >
               <svg
-                class="w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}"
+                class="w-4 h-4 text-gray-500 group-hover:text-indigo-600 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}"
                 id="${id}-chevron"
                 fill="none"
                 stroke="currentColor"
@@ -6529,25 +6718,35 @@
         const data = await response.json();
         const contact = data.contact;
 
-        // Determine if contact is from a connector
-        const isConnectorContact = contact.source && contact.source !== 'manual';
+        // Known external connector sources (synced from third-party systems)
+        const connectorNames = {
+          'actionstep': 'ActionStep',
+          'google_contacts': 'Google Contacts',
+          'gohighlevel': 'GoHighLevel',
+          'hubspot': 'HubSpot',
+          'salesforce': 'Salesforce',
+          'microsoft_contacts': 'Microsoft Contacts',
+          'outlook': 'Outlook'
+        };
+
+        // Only treat as a connector contact if the source is a known external connector
+        const isConnectorContact = contact.source && connectorNames[contact.source] !== undefined;
 
         // Get connector display name
         let connectorDisplayName = '';
         if (isConnectorContact) {
-          const connectorNames = {
-            'actionstep': 'ActionStep',
-            'google_contacts': 'Google Contacts',
-            'gohighlevel': 'GoHighLevel',
-            'hubspot': 'HubSpot',
-            'salesforce': 'Salesforce',
-            'microsoft_contacts': 'Microsoft Contacts',
-            'outlook': 'Outlook'
-          };
-          connectorDisplayName = connectorNames[contact.source] ||
-                                 contact.connector_id ||
-                                 contact.source.charAt(0).toUpperCase() + contact.source.slice(1);
+          connectorDisplayName = connectorNames[contact.source];
         }
+
+        // Determine source label for non-manual, non-connector sources (e.g., 'agentic', 'ai_extracted', 'imported')
+        const internalSourceLabels = {
+          'manual': 'Manual',
+          'agentic': 'AI Created',
+          'ai_extracted': 'AI Extracted',
+          'imported': 'Imported'
+        };
+        const sourceLabel = internalSourceLabels[contact.source] || (contact.source ? contact.source.charAt(0).toUpperCase() + contact.source.slice(1) : 'Manual');
+        const isInternalNonManual = contact.source && !isConnectorContact && contact.source !== 'manual';
 
         // Contact type badge styling
         const typeLabels = {
@@ -6573,6 +6772,13 @@
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                     </svg>
                     ${connectorDisplayName}
+                  </span>
+                ` : isInternalNonManual ? `
+                  <span class="inline-flex items-center text-sm bg-sky-100 text-sky-700 px-2 py-1 rounded" title="${sourceLabel}">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                    </svg>
+                    ${sourceLabel}
                   </span>
                 ` : `
                   <span class="inline-flex items-center text-sm bg-gray-100 text-gray-600 px-2 py-1 rounded" title="Manually created">
@@ -6638,35 +6844,36 @@
               ` : ''}
             </div>
 
-            <!-- Action Buttons -->
-            ${!isConnectorContact ? `
-              <div class="flex justify-end gap-3 pt-6 border-t border-gray-200">
-                <button
-                  onclick="confirmDeleteContact('${contact.id}', '${displayName}')"
-                  class="px-4 py-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg font-medium transition-colors flex items-center gap-2"
-                >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                  </svg>
-                  Delete Contact
-                </button>
-                <button
-                  onclick="openEditContactModal('${contact.id}')"
-                  class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
-                >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                  </svg>
-                  Edit Contact
-                </button>
-              </div>
-            ` : `
+            <!-- Source info for connector contacts -->
+            ${isConnectorContact ? `
               <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
                 <p class="text-sm text-purple-800">
-                  <strong>Note:</strong> This contact is synced from ActionStep and cannot be edited or deleted from LANA.
+                  <strong>Note:</strong> This contact was originally synced from ${connectorDisplayName}. You can edit the local copy below.
                 </p>
               </div>
-            `}
+            ` : ''}
+
+            <!-- Action Buttons (always show - contacts are editable) -->
+            <div class="flex justify-end gap-3 pt-6 border-t border-gray-200">
+              <button
+                onclick="confirmDeleteContact('${contact.id}', '${displayName}')"
+                class="px-4 py-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg font-medium transition-colors flex items-center gap-2"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                </svg>
+                Delete Contact
+              </button>
+              <button
+                onclick="openEditContactModal('${contact.id}')"
+                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                </svg>
+                Edit Contact
+              </button>
+            </div>
           </div>
         `;
       } catch (error) {
@@ -6890,12 +7097,20 @@
             </svg>
             <h4 class="text-lg font-semibold text-gray-900 mb-2">No contacts</h4>
             <p class="text-gray-500 mb-4">No contacts are associated with this matter yet.</p>
-            <button onclick="openAddContactModal('${matter.matter_id}')" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium transition-colors">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-              </svg>
-              Add First Contact
-            </button>
+            <div class="flex items-center justify-center gap-3">
+              <button onclick="ContactSearchModal.open('${matter.matter_id}')" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm rounded-lg font-medium transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                Link Existing
+              </button>
+              <button onclick="openAddContactModal('${matter.matter_id}')" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Add New Contact
+              </button>
+            </div>
           </div>
         `;
         return;
@@ -6961,26 +7176,37 @@
       function renderContactCard(contact) {
         const displayName = contact.display_name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unknown';
 
-        // Determine if contact is from a connector
-        const isConnectorContact = contact.source && contact.source !== 'manual';
+        // Known external connector sources
+        const connectorNamesMap = {
+          'actionstep': 'ActionStep',
+          'google_contacts': 'Google Contacts',
+          'gohighlevel': 'GoHighLevel',
+          'hubspot': 'HubSpot',
+          'salesforce': 'Salesforce',
+          'microsoft_contacts': 'Microsoft Contacts',
+          'outlook': 'Outlook'
+        };
+
+        // Only treat as a connector contact if the source is a known external connector
+        const isConnectorContact = contact.source && connectorNamesMap[contact.source] !== undefined;
+        const isLinkedContact = contact.link_type === 'linked';
 
         // Get connector display name
         let connectorDisplayName = '';
         if (isConnectorContact) {
-          // Map connector IDs to display names
-          const connectorNames = {
-            'actionstep': 'ActionStep',
-            'google_contacts': 'Google Contacts',
-            'gohighlevel': 'GoHighLevel',
-            'hubspot': 'HubSpot',
-            'salesforce': 'Salesforce',
-            'microsoft_contacts': 'Microsoft Contacts',
-            'outlook': 'Outlook'
-          };
-          connectorDisplayName = connectorNames[contact.source] ||
-                                 contact.connector_id ||
-                                 contact.source.charAt(0).toUpperCase() + contact.source.slice(1);
+          connectorDisplayName = connectorNamesMap[contact.source];
         }
+
+        // Internal non-manual source labels
+        const internalLabels = {
+          'agentic': 'AI Created',
+          'ai_extracted': 'AI Extracted',
+          'imported': 'Imported'
+        };
+        const isInternalSource = contact.source && !isConnectorContact && contact.source !== 'manual';
+        const internalSourceLabel = isInternalSource
+          ? (internalLabels[contact.source] || contact.source.charAt(0).toUpperCase() + contact.source.slice(1))
+          : '';
 
         // Contact type badge styling
         const typeLabels = {
@@ -6991,6 +7217,39 @@
         };
         const contactTypeInfo = typeLabels[contact.contact_type] || typeLabels['contact:other'];
 
+        // Role badge for linked contacts
+        const roleBadge = isLinkedContact && contact.role ? `
+          <span class="inline-flex items-center text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded" title="Role in this matter">
+            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+            </svg>
+            ${contact.role.charAt(0).toUpperCase() + contact.role.slice(1).split('_').join(' ')}
+          </span>
+        ` : '';
+
+        // Linked badge
+        const linkedBadge = isLinkedContact ? `
+          <span class="inline-flex items-center text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded" title="Linked from another matter">
+            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+            </svg>
+            Linked
+          </span>
+        ` : '';
+
+        // Unlink button for linked contacts
+        const unlinkButton = isLinkedContact ? `
+          <button
+            onclick="event.stopPropagation(); unlinkContactFromMatter('${contact.id}', '${matter.matter_id}')"
+            class="text-xs text-gray-400 hover:text-red-600 p-1 rounded transition-colors"
+            title="Unlink from this matter"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        ` : '';
+
         return `
           <div onclick="openContactDetail('${contact.id}')" class="bg-white border border-gray-200 hover:border-indigo-300 hover:shadow-sm rounded-lg p-4 transition-all cursor-pointer">
             <div class="flex items-start justify-between gap-4">
@@ -6998,6 +7257,8 @@
                 <div class="flex items-center gap-2 flex-wrap">
                   <h4 class="text-sm font-medium text-gray-900 truncate">${displayName}</h4>
                   <span class="text-xs ${contactTypeInfo.class} px-2 py-0.5 rounded">${contactTypeInfo.label}</span>
+                  ${roleBadge}
+                  ${linkedBadge}
                   ${isConnectorContact ? `
                     <span class="inline-flex items-center text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded" title="Synced from ${connectorDisplayName}">
                       <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -7005,14 +7266,21 @@
                       </svg>
                       ${connectorDisplayName}
                     </span>
-                  ` : `
+                  ` : isInternalSource ? `
+                    <span class="inline-flex items-center text-xs bg-sky-100 text-sky-700 px-2 py-0.5 rounded" title="${internalSourceLabel}">
+                      <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                      </svg>
+                      ${internalSourceLabel}
+                    </span>
+                  ` : !isLinkedContact ? `
                     <span class="inline-flex items-center text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded" title="Manually created">
                       <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                       </svg>
                       Manual
                     </span>
-                  `}
+                  ` : ''}
                 </div>
                 ${contact.title || contact.company_name ? `
                   <p class="text-xs text-gray-600 mt-0.5">
@@ -7036,6 +7304,7 @@
                   </div>
                 ` : ''}
               </div>
+              ${unlinkButton}
             </div>
           </div>
         `;
@@ -7061,15 +7330,23 @@
 
       content.innerHTML = `
         <div class="space-y-6">
-          <!-- Header with Add Button -->
+          <!-- Header with Link Existing + Add New Buttons -->
           <div class="flex items-center justify-between">
             <h2 class="text-lg font-semibold text-gray-900">Contacts</h2>
-            <button onclick="openAddContactModal('${matter.matter_id}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium flex items-center gap-1.5">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-              </svg>
-              Add Contact
-            </button>
+            <div class="flex items-center gap-2">
+              <button onclick="ContactSearchModal.open('${matter.matter_id}')" class="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm rounded-lg font-medium flex items-center gap-1.5 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                Link Existing
+              </button>
+              <button onclick="openAddContactModal('${matter.matter_id}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium flex items-center gap-1.5 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Add New
+              </button>
+            </div>
           </div>
 
           <!-- Search, Filter, Sort Controls -->
@@ -7242,6 +7519,29 @@
       contactsPage = 1;
       if (currentMatterData) {
         renderContactsTab(currentMatterData.matter, currentMatterData.contacts || []);
+      }
+    };
+
+    // Unlink a contact from the current matter
+    window.unlinkContactFromMatter = async function(contactId, matterId) {
+      if (!confirm('Unlink this contact from the matter? The contact will still exist in the system.')) {
+        return;
+      }
+
+      try {
+        await api.delete(`/api/v1/matters/${matterId}/contacts/${contactId}/unlink`);
+        if (typeof Toast !== 'undefined' && Toast.success) {
+          Toast.success('Contact unlinked from matter');
+        }
+        if (typeof refreshCurrentMatter === 'function') {
+          await refreshCurrentMatter();
+        }
+      } catch (error) {
+        console.error('Failed to unlink contact:', error);
+        const message = (error && error.message) ? error.message : 'Failed to unlink contact';
+        if (typeof Toast !== 'undefined' && Toast.error) {
+          Toast.error(message);
+        }
       }
     };
 
@@ -9087,6 +9387,8 @@
 
     // Close drawer function (must be defined before event listeners)
     window.closeDrawer = function() {
+      const optionsDropdown = document.getElementById('drawerOptionsDropdown');
+      if (optionsDropdown) optionsDropdown.classList.add('hidden');
       document.getElementById('matterDrawer').classList.add('translate-x-full');
       setTimeout(() => {
         document.getElementById('matterDrawer').classList.add('hidden');
@@ -9247,6 +9549,31 @@
       }
       updateSelectionUI();
     }
+
+    // Toggle matter card options dropdown (more options button on grid cards)
+    window.toggleMatterCardOptions = function(matterId) {
+      const dropdown = document.getElementById(`matter-card-options-${matterId}`);
+      if (!dropdown) return;
+      const isOpening = dropdown.classList.contains('hidden');
+      document.querySelectorAll('[id^="matter-card-options-"]').forEach(el => el.classList.add('hidden'));
+      dropdown.classList.toggle('hidden', !isOpening);
+      if (isOpening) {
+        setTimeout(() => {
+          const closeOnClickOutside = (ev) => {
+            if (!dropdown.contains(ev.target) && !ev.target.closest('[onclick*="toggleMatterCardOptions"]')) {
+              dropdown.classList.add('hidden');
+              document.removeEventListener('click', closeOnClickOutside);
+            }
+          };
+          document.addEventListener('click', closeOnClickOutside);
+        }, 0);
+      }
+    };
+
+    window.closeMatterCardOptions = function(matterId) {
+      const dropdown = document.getElementById(`matter-card-options-${matterId}`);
+      if (dropdown) dropdown.classList.add('hidden');
+    };
 
     // Update selection UI (checkboxes, count, bulk actions visibility)
     function updateSelectionUI() {

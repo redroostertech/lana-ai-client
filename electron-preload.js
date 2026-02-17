@@ -119,9 +119,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   /**
-   * Generate a CSRF-safe OAuth state parameter
+   * Generate a CSRF-safe OAuth state parameter (local, deprecated)
    */
-  generateOAuthState: () => ipcRenderer.invoke('generate-oauth-state')
+  generateOAuthState: () => ipcRenderer.invoke('generate-oauth-state'),
+
+  /**
+   * OAuth State Management (Backend-based)
+   * Creates a state token in the backend database for CSRF protection
+   */
+  createOAuthState: (provider, connectorId, matterId) =>
+    ipcRenderer.invoke('create-oauth-state', { provider, connectorId, matterId }),
+
+  /**
+   * OAuth Code Exchange (Backend-based)
+   * Exchanges authorization code for tokens via backend
+   */
+  exchangeOAuthCode: (code, state, provider) =>
+    ipcRenderer.invoke('exchange-oauth-code', { code, state, provider })
 });
 
 /**
