@@ -74,6 +74,19 @@
   <script src="js/activity.js"></script>
   <script src="js/activity-heatmap.js"></script>
 
+  <!-- Dashboard Command Center Widgets -->
+  <script src="js/vendor/chart.js"></script>
+  <script src="js/dashboard/widget-renderer.js"></script>
+  <script src="js/dashboard/widget-config-modal.js"></script>
+  <script src="js/dashboard/widgets/metric-card.widget.js"></script>
+  <script src="js/dashboard/widgets/data-table.widget.js"></script>
+  <script src="js/dashboard/widgets/chart.widget.js"></script>
+  <script src="js/dashboard/widgets/activity-feed.widget.js"></script>
+  <script src="js/dashboard/widgets/matter-summary.widget.js"></script>
+  <script src="js/dashboard/widgets/connector-status.widget.js"></script>
+  <script src="js/dashboard/widgets/module-metric.widget.js"></script>
+  <script src="js/dashboard/widgets/alert-list.widget.js"></script>
+
   <!-- Session Tracking -->
   <script src="js/services/session-tracking-service.js"></script>
   <!-- DISABLED: Using organization-wide activity heatmap instead -->
@@ -498,6 +511,29 @@
 
         </div>
       </div>
+
+      <!-- Command Center Widgets -->
+      <section id="commandCenterWidgets" class="mt-8">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900">Command Center</h3>
+            <p class="text-sm text-gray-500 mt-1">Monitor your connected data sources</p>
+          </div>
+          <button id="addWidgetBtn" class="inline-flex items-center px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
+            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+            </svg>
+            Add Widget
+          </button>
+        </div>
+        <div id="widgetGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <!-- Widgets rendered dynamically by widget-renderer.js -->
+          <div class="col-span-full text-center py-8">
+            <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+            <p class="text-gray-500 mt-3 text-sm">Loading widgets...</p>
+          </div>
+        </div>
+      </section>
 
     </main>
   </div>
@@ -1756,5 +1792,27 @@
   </div>
 
   </div> <!-- End #app-content -->
+
+  <script>
+    // Initialize Command Center widgets after auth and page load complete
+    document.addEventListener('DOMContentLoaded', function() {
+      // Wire up Add Widget button
+      var addWidgetBtn = document.getElementById('addWidgetBtn');
+      if (addWidgetBtn) {
+        addWidgetBtn.addEventListener('click', function() {
+          if (typeof WidgetConfigModal !== 'undefined') {
+            WidgetConfigModal.open();
+          }
+        });
+      }
+
+      // Initialize widgets after a short delay to allow auth/API setup to complete
+      setTimeout(function() {
+        if (typeof WidgetRenderer !== 'undefined') {
+          WidgetRenderer.init();
+        }
+      }, 1000);
+    });
+  </script>
 </body>
 </html>

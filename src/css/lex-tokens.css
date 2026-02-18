@@ -1,0 +1,672 @@
+/* ==========================================================================
+   Lex UI — Design Tokens
+   Zero-dependency design token system for the LANA AI platform.
+   Coexists with Tailwind CSS. Tailwind handles layout/spacing,
+   tokens handle brand-sensitive colors, typography, and component styling.
+
+   To rebrand: override the primitive tokens (brand palette + warm grays).
+   Everything else derives from them automatically.
+   ========================================================================== */
+
+
+/* ==========================================================================
+   @font-face — Inter (bundled locally, no CDN)
+   ========================================================================== */
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../fonts/inter/Inter-Regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('../fonts/inter/Inter-Medium.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../fonts/inter/Inter-SemiBold.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../fonts/inter/Inter-Bold.woff2') format('woff2');
+}
+
+
+:root {
+
+  /* ==========================================================================
+     PRIMITIVE TOKENS — Raw values. Override these to rebrand.
+     ========================================================================== */
+
+  /* ── Brand Palette (Warm Earth Tones) ───────────────────────── */
+
+  --lex-color-brand-50:  #F7F5F3;
+  --lex-color-brand-100: #F2EEEB;
+  --lex-color-brand-200: #E0DAD4;
+  --lex-color-brand-300: #C2B9AE;
+  --lex-color-brand-400: #9E9385;
+  --lex-color-brand-500: #736B5C;
+  --lex-color-brand-600: #595246;
+  --lex-color-brand-700: #44403A;
+  --lex-color-brand-800: #332F2A;
+  --lex-color-brand-900: #26211C;
+  --lex-color-brand-950: #0D0807;
+
+  /* ── Warm Neutral Palette (Gray) ────────────────────────────── */
+
+  --lex-color-gray-50:  #FAFAF8;
+  --lex-color-gray-100: #F5F3F0;
+  --lex-color-gray-200: #E8E5E1;
+  --lex-color-gray-300: #D5D2CC;
+  --lex-color-gray-400: #A9A49D;
+  --lex-color-gray-500: #7A756D;
+  --lex-color-gray-600: #5A5650;
+  --lex-color-gray-700: #423F3A;
+  --lex-color-gray-800: #2D2B27;
+  --lex-color-gray-900: #1D1B18;
+
+  /* ── Status Colors (Flat, AA-compliant contrast) ────────────── */
+
+  /* Success — warm green */
+  --lex-color-success-50:  #ECFDF3;
+  --lex-color-success-100: #D1FADF;
+  --lex-color-success-500: #17B26A;
+  --lex-color-success-600: #079455;
+  --lex-color-success-700: #067647;
+
+  /* Warning — amber/warm orange */
+  --lex-color-warning-50:  #FFFAEB;
+  --lex-color-warning-100: #FEF0C7;
+  --lex-color-warning-500: #F79009;
+  --lex-color-warning-600: #DC6803;
+  --lex-color-warning-700: #B54708;
+
+  /* Danger — warm red */
+  --lex-color-danger-50:  #FEF3F2;
+  --lex-color-danger-100: #FEE4E2;
+  --lex-color-danger-500: #F04438;
+  --lex-color-danger-600: #D92D20;
+  --lex-color-danger-700: #B42318;
+
+  /* Info — soft blue */
+  --lex-color-info-50:  #EFF4FF;
+  --lex-color-info-100: #D1E0FF;
+  --lex-color-info-500: #528BFF;
+  --lex-color-info-600: #2E6CE0;
+  --lex-color-info-700: #175CD3;
+
+  /* ── Fixed Colors ───────────────────────────────────────────── */
+
+  --lex-color-white: #FFFFFF;
+  --lex-color-black: #0D0807;
+
+
+  /* ==========================================================================
+     SEMANTIC TOKENS — Meaningful aliases mapping to primitives
+     ========================================================================== */
+
+  /* ── Backgrounds ────────────────────────────────────────────── */
+
+  --lex-bg-primary:       var(--lex-color-white);
+  --lex-bg-secondary:     var(--lex-color-gray-50);
+  --lex-bg-tertiary:      var(--lex-color-gray-100);
+  --lex-bg-accent:        var(--lex-color-brand-600);
+  --lex-bg-accent-hover:  var(--lex-color-brand-700);
+  --lex-bg-accent-soft:   var(--lex-color-brand-50);
+  --lex-bg-accent-muted:  var(--lex-color-brand-100);
+  --lex-bg-elevated:      var(--lex-color-white);
+
+  /* ── Text ───────────────────────────────────────────────────── */
+
+  --lex-text-primary:     var(--lex-color-brand-900);
+  --lex-text-secondary:   var(--lex-color-brand-500);
+  --lex-text-tertiary:    var(--lex-color-brand-400);
+  --lex-text-disabled:    var(--lex-color-brand-300);
+  --lex-text-accent:      var(--lex-color-brand-600);
+  --lex-text-accent-hover:var(--lex-color-brand-700);
+  --lex-text-on-accent:   var(--lex-color-white);
+  --lex-text-link:        var(--lex-color-brand-600);
+  --lex-text-link-hover:  var(--lex-color-brand-800);
+
+  /* ── Borders ────────────────────────────────────────────────── */
+
+  --lex-border-default:   var(--lex-color-gray-200);
+  --lex-border-strong:    var(--lex-color-gray-300);
+  --lex-border-accent:    var(--lex-color-brand-500);
+  --lex-border-focus:     var(--lex-color-brand-500);
+  --lex-border-subtle:    var(--lex-color-gray-100);
+
+  /* ── Status Semantic ────────────────────────────────────────── */
+
+  --lex-status-success-bg:   var(--lex-color-success-50);
+  --lex-status-success-text: var(--lex-color-success-700);
+  --lex-status-success:      var(--lex-color-success-500);
+
+  --lex-status-warning-bg:   var(--lex-color-warning-50);
+  --lex-status-warning-text: var(--lex-color-warning-700);
+  --lex-status-warning:      var(--lex-color-warning-500);
+
+  --lex-status-danger-bg:    var(--lex-color-danger-50);
+  --lex-status-danger-text:  var(--lex-color-danger-700);
+  --lex-status-danger:       var(--lex-color-danger-500);
+
+  --lex-status-info-bg:      var(--lex-color-info-50);
+  --lex-status-info-text:    var(--lex-color-info-700);
+  --lex-status-info:         var(--lex-color-info-500);
+
+  --lex-status-neutral-bg:   var(--lex-color-gray-100);
+  --lex-status-neutral-text: var(--lex-color-gray-700);
+
+
+  /* ==========================================================================
+     TYPOGRAPHY TOKENS
+     ========================================================================== */
+
+  /* ── Font Families ──────────────────────────────────────────── */
+
+  --lex-font-sans:  -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --lex-font-serif: 'Georgia', 'Times New Roman', 'Times', serif;
+  --lex-font-mono:  'JetBrains Mono', 'Fira Code', 'Monaco', 'Menlo', 'Consolas', monospace;
+
+  /* ── Font Weights ───────────────────────────────────────────── */
+
+  --lex-weight-light:    300;
+  --lex-weight-regular:  400;
+  --lex-weight-medium:   500;
+  --lex-weight-semibold: 600;
+  --lex-weight-bold:     700;
+
+  /* ── Display (hero / marketing) ─────────────────────────────── */
+
+  --lex-display-2xl-size:     4.5rem;
+  --lex-display-2xl-height:   1.1;
+  --lex-display-2xl-weight:   var(--lex-weight-bold);
+  --lex-display-2xl-tracking: -0.025em;
+
+  --lex-display-xl-size:      3.75rem;
+  --lex-display-xl-height:    1.1;
+  --lex-display-xl-weight:    var(--lex-weight-bold);
+  --lex-display-xl-tracking:  -0.025em;
+
+  --lex-display-lg-size:      3rem;
+  --lex-display-lg-height:    1.15;
+  --lex-display-lg-weight:    var(--lex-weight-bold);
+  --lex-display-lg-tracking:  -0.02em;
+
+  /* ── Headings ───────────────────────────────────────────────── */
+
+  --lex-h1-size:     2.25rem;
+  --lex-h1-height:   1.2;
+  --lex-h1-weight:   var(--lex-weight-bold);
+  --lex-h1-tracking: -0.02em;
+
+  --lex-h2-size:     1.875rem;
+  --lex-h2-height:   1.25;
+  --lex-h2-weight:   var(--lex-weight-semibold);
+  --lex-h2-tracking: -0.015em;
+
+  --lex-h3-size:     1.5rem;
+  --lex-h3-height:   1.3;
+  --lex-h3-weight:   var(--lex-weight-semibold);
+  --lex-h3-tracking: -0.01em;
+
+  --lex-h4-size:     1.25rem;
+  --lex-h4-height:   1.35;
+  --lex-h4-weight:   var(--lex-weight-semibold);
+  --lex-h4-tracking: 0;
+
+  --lex-h5-size:     1.125rem;
+  --lex-h5-height:   1.4;
+  --lex-h5-weight:   var(--lex-weight-semibold);
+  --lex-h5-tracking: 0;
+
+  --lex-h6-size:     1rem;
+  --lex-h6-height:   1.5;
+  --lex-h6-weight:   var(--lex-weight-semibold);
+  --lex-h6-tracking: 0;
+
+  /* ── Body ───────────────────────────────────────────────────── */
+
+  --lex-body-lg-size:    1.125rem;
+  --lex-body-lg-height:  1.6;
+  --lex-body-lg-weight:  var(--lex-weight-regular);
+
+  --lex-body-base-size:  1rem;
+  --lex-body-base-height:1.5;
+  --lex-body-base-weight:var(--lex-weight-regular);
+
+  --lex-body-sm-size:    0.875rem;
+  --lex-body-sm-height:  1.5;
+  --lex-body-sm-weight:  var(--lex-weight-regular);
+
+  --lex-body-xs-size:    0.75rem;
+  --lex-body-xs-height:  1.5;
+  --lex-body-xs-weight:  var(--lex-weight-regular);
+
+  /* ── Caption ────────────────────────────────────────────────── */
+
+  --lex-caption-size:     0.75rem;
+  --lex-caption-height:   1.4;
+  --lex-caption-weight:   var(--lex-weight-regular);
+  --lex-caption-tracking: 0.01em;
+
+  /* ── Overline ───────────────────────────────────────────────── */
+
+  --lex-overline-size:      0.6875rem;
+  --lex-overline-height:    1.45;
+  --lex-overline-weight:    var(--lex-weight-semibold);
+  --lex-overline-tracking:  0.08em;
+  --lex-overline-transform: uppercase;
+
+  /* ── Label ──────────────────────────────────────────────────── */
+
+  --lex-label-lg-size:    1rem;
+  --lex-label-lg-height:  1.4;
+  --lex-label-lg-weight:  var(--lex-weight-medium);
+
+  --lex-label-base-size:  0.875rem;
+  --lex-label-base-height:1.4;
+  --lex-label-base-weight:var(--lex-weight-medium);
+
+  --lex-label-sm-size:    0.75rem;
+  --lex-label-sm-height:  1.4;
+  --lex-label-sm-weight:  var(--lex-weight-medium);
+
+  /* ── Code ───────────────────────────────────────────────────── */
+
+  --lex-code-size:   0.875rem;
+  --lex-code-height: 1.6;
+  --lex-code-weight: var(--lex-weight-regular);
+
+
+  /* ==========================================================================
+     SCALE TOKENS — Spacing, radii, shadows, transitions
+     ========================================================================== */
+
+  /* ── Border Radius ──────────────────────────────────────────── */
+
+  --lex-radius-sm:   0.25rem;
+  --lex-radius-md:   0.375rem;
+  --lex-radius-lg:   0.5rem;
+  --lex-radius-xl:   0.75rem;
+  --lex-radius-2xl:  1rem;
+  --lex-radius-full: 9999px;
+
+  /* ── Shadows ────────────────────────────────────────────────── */
+
+  --lex-shadow-sm:  0 1px 2px 0 rgba(13, 8, 7, 0.06);
+  --lex-shadow-md:  0 4px 6px -1px rgba(13, 8, 7, 0.08), 0 2px 4px -2px rgba(13, 8, 7, 0.06);
+  --lex-shadow-lg:  0 10px 15px -3px rgba(13, 8, 7, 0.08), 0 4px 6px -4px rgba(13, 8, 7, 0.06);
+  --lex-shadow-xl:  0 20px 25px -5px rgba(13, 8, 7, 0.08), 0 8px 10px -6px rgba(13, 8, 7, 0.06);
+
+  /* ── Transitions ────────────────────────────────────────────── */
+
+  --lex-transition-fast:   150ms ease;
+  --lex-transition-normal: 200ms ease;
+  --lex-transition-slow:   300ms ease;
+
+  /* ── Z-Index Scale ──────────────────────────────────────────── */
+
+  --lex-z-dropdown: 10;
+  --lex-z-sticky:   20;
+  --lex-z-overlay:  30;
+  --lex-z-modal:    40;
+  --lex-z-toast:    50;
+  --lex-z-loader:   9999;
+
+
+  /* ==========================================================================
+     COMPONENT TOKENS — Per-component overrides
+     ========================================================================== */
+
+  /* Card */
+  --lex-card-bg:      var(--lex-bg-primary);
+  --lex-card-border:  var(--lex-border-default);
+  --lex-card-radius:  var(--lex-radius-xl);
+  --lex-card-shadow:  var(--lex-shadow-sm);
+  --lex-card-padding: 1.5rem;
+
+  /* Button — squircle-like radius proportional to height (~30%) */
+  --lex-btn-radius-sm:   9px;
+  --lex-btn-radius-md:   11px;
+  --lex-btn-radius-lg:   13px;
+  --lex-btn-font-weight: var(--lex-weight-medium);
+
+  /* Input */
+  --lex-input-radius:     var(--lex-radius-md);
+  --lex-input-border:     var(--lex-border-default);
+  --lex-input-focus-ring: var(--lex-color-brand-500);
+
+  /* ── Form Tokens ──────────────────────────────────────────── */
+
+  /* Input states */
+  --lex-input-bg:               var(--lex-bg-primary);
+  --lex-input-text:             var(--lex-text-primary);
+  --lex-input-placeholder:      var(--lex-text-tertiary);
+  --lex-input-border-hover:     var(--lex-border-strong);
+  --lex-input-border-focus:     var(--lex-color-brand-500);
+  --lex-input-border-error:     var(--lex-color-danger-500);
+  --lex-input-border-success:   var(--lex-color-success-500);
+  --lex-input-focus-ring-alpha: 0.2;
+  --lex-input-disabled-opacity: 0.5;
+
+  /* Input sizes (match lex-btn heights) */
+  --lex-input-height-sm:  32px;
+  --lex-input-height-md:  40px;
+  --lex-input-height-lg:  48px;
+
+  /* Checkbox / Toggle */
+  --lex-toggle-width:     44px;
+  --lex-toggle-height:    24px;
+  --lex-toggle-bg:        var(--lex-color-gray-300);
+  --lex-toggle-bg-active: var(--lex-bg-accent);
+  --lex-toggle-knob:      #fff;
+
+  /* Form typography */
+  --lex-form-font-size:         0.8125rem;  /* 13px — base form text */
+  --lex-form-font-size-sm:      var(--lex-body-xs-size);  /* 12px */
+  --lex-form-font-size-lg:      var(--lex-body-sm-size);  /* 14px */
+  --lex-form-label-size:        0.8125rem;  /* 13px — field labels */
+  --lex-form-help-size:         0.6875rem;  /* 11px — help/error text */
+  --lex-form-counter-size:      0.625rem;   /* 10px — character counters */
+
+  /* Select dropdown */
+  --lex-select-dropdown-bg:    var(--lex-bg-primary);
+  --lex-select-option-hover:   var(--lex-bg-secondary);
+
+  /* Badge */
+  --lex-badge-radius: var(--lex-radius-full);
+
+  /* Modal */
+  --lex-modal-radius:    var(--lex-radius-xl);
+  --lex-modal-shadow:    var(--lex-shadow-xl);
+  --lex-modal-overlay:   rgba(13, 8, 7, 0.5);
+
+  /* Toast */
+  --lex-toast-radius:  var(--lex-radius-lg);
+  --lex-toast-shadow:  var(--lex-shadow-lg);
+
+  /* Sidebar */
+  --lex-sidebar-width:        256px;
+  --lex-sidebar-bg:           var(--lex-color-gray-900);
+  --lex-sidebar-text:         var(--lex-color-gray-300);
+  --lex-sidebar-text-active:  var(--lex-color-white);
+  --lex-sidebar-text-muted:   var(--lex-color-gray-500);
+  --lex-sidebar-section-text: var(--lex-color-gray-400);
+  --lex-sidebar-hover-bg:     var(--lex-color-gray-800);
+  --lex-sidebar-active-bg:    var(--lex-color-gray-800);
+  --lex-sidebar-border:       var(--lex-color-gray-800);
+  --lex-sidebar-logo-height:  28px;
+  --lex-sidebar-avatar-bg:    var(--lex-color-brand-600);
+
+  /* Topbar */
+  --lex-topbar-height:        64px;
+  --lex-topbar-bg:            var(--lex-bg-primary);
+  --lex-topbar-border:        var(--lex-border-default);
+  --lex-topbar-shadow:        var(--lex-shadow-sm);
+  --lex-topbar-text:          var(--lex-text-primary);
+  --lex-topbar-icon-color:    var(--lex-text-secondary);
+  --lex-topbar-icon-hover:    var(--lex-text-primary);
+  --lex-topbar-badge-bg:      var(--lex-color-danger-500);
+  --lex-topbar-badge-text:    var(--lex-color-white);
+
+
+  /* ==========================================================================
+     ICON TOKENS — Sizes, semantic colors, stroke weights
+     ========================================================================== */
+
+  /* Icon Sizes */
+  --lex-icon-xxSmall: 12px;
+  --lex-icon-xSmall:  14px;
+  --lex-icon-small:   16px;
+  --lex-icon-normal:  20px;
+  --lex-icon-medium:  24px;
+  --lex-icon-large:   32px;
+  --lex-icon-xLarge:  40px;
+  --lex-icon-xxLarge: 48px;
+
+  /* Icon Colors */
+  --lex-icon-primary:   currentColor;
+  --lex-icon-secondary: var(--lex-text-secondary);
+  --lex-icon-tertiary:  var(--lex-text-tertiary);
+  --lex-icon-accent:    var(--lex-color-brand-600);
+  --lex-icon-success:   var(--lex-color-success-600);
+  --lex-icon-warning:   var(--lex-color-warning-600);
+  --lex-icon-danger:    var(--lex-color-danger-600);
+  --lex-icon-info:      var(--lex-color-info-600);
+  --lex-icon-inverse:   var(--lex-color-white);
+
+  /* Icon Stroke Weights */
+  --lex-icon-stroke-small:  1.5;
+  --lex-icon-stroke-normal: 2;
+  --lex-icon-stroke-thick:  2.5;
+}
+
+
+/* ==========================================================================
+   LEX UTILITY CLASSES
+   Brand-aware classes that replace hardcoded Tailwind color utilities.
+   Components use these instead of bg-indigo-600, text-gray-900, etc.
+   ========================================================================== */
+
+/* ── Background Utilities ─────────────────────────────────────── */
+
+.lex-bg-primary      { background-color: var(--lex-bg-primary); }
+.lex-bg-secondary    { background-color: var(--lex-bg-secondary); }
+.lex-bg-tertiary     { background-color: var(--lex-bg-tertiary); }
+.lex-bg-elevated     { background-color: var(--lex-bg-elevated); }
+.lex-bg-accent       { background-color: var(--lex-bg-accent); }
+.lex-bg-accent:hover { background-color: var(--lex-bg-accent-hover); }
+.lex-bg-accent-soft  { background-color: var(--lex-bg-accent-soft); }
+.lex-bg-accent-muted { background-color: var(--lex-bg-accent-muted); }
+
+.lex-bg-success      { background-color: var(--lex-status-success-bg); }
+.lex-bg-warning      { background-color: var(--lex-status-warning-bg); }
+.lex-bg-danger       { background-color: var(--lex-status-danger-bg); }
+.lex-bg-info         { background-color: var(--lex-status-info-bg); }
+.lex-bg-neutral      { background-color: var(--lex-status-neutral-bg); }
+
+/* ── Text Utilities ───────────────────────────────────────────── */
+
+.lex-text-primary    { color: var(--lex-text-primary); }
+.lex-text-secondary  { color: var(--lex-text-secondary); }
+.lex-text-tertiary   { color: var(--lex-text-tertiary); }
+.lex-text-disabled   { color: var(--lex-text-disabled); }
+.lex-text-accent     { color: var(--lex-text-accent); }
+.lex-text-accent:hover { color: var(--lex-text-accent-hover); }
+.lex-text-on-accent  { color: var(--lex-text-on-accent); }
+.lex-text-link       { color: var(--lex-text-link); }
+.lex-text-link:hover { color: var(--lex-text-link-hover); }
+
+.lex-text-success    { color: var(--lex-status-success-text); }
+.lex-text-warning    { color: var(--lex-status-warning-text); }
+.lex-text-danger     { color: var(--lex-status-danger-text); }
+.lex-text-info       { color: var(--lex-status-info-text); }
+.lex-text-neutral    { color: var(--lex-status-neutral-text); }
+
+/* ── Border Utilities ─────────────────────────────────────────── */
+
+.lex-border          { border-color: var(--lex-border-default); }
+.lex-border-strong   { border-color: var(--lex-border-strong); }
+.lex-border-subtle   { border-color: var(--lex-border-subtle); }
+.lex-border-accent   { border-color: var(--lex-border-accent); }
+.lex-border-focus    { border-color: var(--lex-border-focus); }
+.lex-divide          { border-color: var(--lex-border-subtle); }
+
+.lex-ring-focus { box-shadow: 0 0 0 3px rgba(89, 82, 70, 0.2); }
+
+.lex-border-success  { border-color: var(--lex-color-success-500); }
+.lex-border-warning  { border-color: var(--lex-color-warning-500); }
+.lex-border-danger   { border-color: var(--lex-color-danger-500); }
+.lex-border-info     { border-color: var(--lex-color-info-500); }
+
+/* ── Interactive Utilities ────────────────────────────────────── */
+
+.lex-hover-bg:hover        { background-color: var(--lex-color-gray-50); }
+.lex-hover-bg-accent:hover { background-color: var(--lex-bg-accent-soft); }
+
+/* ── Typography Utilities ─────────────────────────────────────── */
+
+.lex-display-2xl {
+  font-size: var(--lex-display-2xl-size);
+  line-height: var(--lex-display-2xl-height);
+  font-weight: var(--lex-display-2xl-weight);
+  letter-spacing: var(--lex-display-2xl-tracking);
+}
+.lex-display-xl {
+  font-size: var(--lex-display-xl-size);
+  line-height: var(--lex-display-xl-height);
+  font-weight: var(--lex-display-xl-weight);
+  letter-spacing: var(--lex-display-xl-tracking);
+}
+.lex-display-lg {
+  font-size: var(--lex-display-lg-size);
+  line-height: var(--lex-display-lg-height);
+  font-weight: var(--lex-display-lg-weight);
+  letter-spacing: var(--lex-display-lg-tracking);
+}
+
+.lex-h1 {
+  font-size: var(--lex-h1-size);
+  line-height: var(--lex-h1-height);
+  font-weight: var(--lex-h1-weight);
+  letter-spacing: var(--lex-h1-tracking);
+}
+.lex-h2 {
+  font-size: var(--lex-h2-size);
+  line-height: var(--lex-h2-height);
+  font-weight: var(--lex-h2-weight);
+  letter-spacing: var(--lex-h2-tracking);
+}
+.lex-h3 {
+  font-size: var(--lex-h3-size);
+  line-height: var(--lex-h3-height);
+  font-weight: var(--lex-h3-weight);
+  letter-spacing: var(--lex-h3-tracking);
+}
+.lex-h4 {
+  font-size: var(--lex-h4-size);
+  line-height: var(--lex-h4-height);
+  font-weight: var(--lex-h4-weight);
+  letter-spacing: var(--lex-h4-tracking);
+}
+.lex-h5 {
+  font-size: var(--lex-h5-size);
+  line-height: var(--lex-h5-height);
+  font-weight: var(--lex-h5-weight);
+  letter-spacing: var(--lex-h5-tracking);
+}
+.lex-h6 {
+  font-size: var(--lex-h6-size);
+  line-height: var(--lex-h6-height);
+  font-weight: var(--lex-h6-weight);
+  letter-spacing: var(--lex-h6-tracking);
+}
+
+.lex-body-lg {
+  font-size: var(--lex-body-lg-size);
+  line-height: var(--lex-body-lg-height);
+  font-weight: var(--lex-body-lg-weight);
+}
+.lex-body, .lex-body-base {
+  font-size: var(--lex-body-base-size);
+  line-height: var(--lex-body-base-height);
+  font-weight: var(--lex-body-base-weight);
+}
+.lex-body-sm {
+  font-size: var(--lex-body-sm-size);
+  line-height: var(--lex-body-sm-height);
+  font-weight: var(--lex-body-sm-weight);
+}
+.lex-body-xs {
+  font-size: var(--lex-body-xs-size);
+  line-height: var(--lex-body-xs-height);
+  font-weight: var(--lex-body-xs-weight);
+}
+
+.lex-caption {
+  font-size: var(--lex-caption-size);
+  line-height: var(--lex-caption-height);
+  font-weight: var(--lex-caption-weight);
+  letter-spacing: var(--lex-caption-tracking);
+}
+
+.lex-overline {
+  font-size: var(--lex-overline-size);
+  line-height: var(--lex-overline-height);
+  font-weight: var(--lex-overline-weight);
+  letter-spacing: var(--lex-overline-tracking);
+  text-transform: var(--lex-overline-transform);
+}
+
+.lex-label-lg {
+  font-size: var(--lex-label-lg-size);
+  line-height: var(--lex-label-lg-height);
+  font-weight: var(--lex-label-lg-weight);
+}
+.lex-label, .lex-label-base {
+  font-size: var(--lex-label-base-size);
+  line-height: var(--lex-label-base-height);
+  font-weight: var(--lex-label-base-weight);
+}
+.lex-label-sm {
+  font-size: var(--lex-label-sm-size);
+  line-height: var(--lex-label-sm-height);
+  font-weight: var(--lex-label-sm-weight);
+}
+
+.lex-code {
+  font-family: var(--lex-font-mono);
+  font-size: var(--lex-code-size);
+  line-height: var(--lex-code-height);
+  font-weight: var(--lex-code-weight);
+}
+
+/* ── Tailwind Form Reset Override ─────────────────────────────────
+   Tailwind (@tailwindcss/forms or preflight) uses:
+   [type='text'], input:where(:not([type])), [type='email'], [type='password'],
+   [type='search'], etc. with border-width:1px and border-color:#6b7280.
+   Override with higher specificity + !important so Lex inputs stay borderless
+   even when Tailwind loads after this file.
+   ──────────────────────────────────────────────────────────────── */
+
+lex-input input.lex-field-input,
+lex-input input[type='text'],
+lex-input input:where(:not([type])),
+lex-input input[type='email'],
+lex-input input[type='password'],
+lex-input input[type='search'],
+lex-input input[type='url'],
+lex-input input[type='number'],
+lex-textarea textarea.lex-field-input,
+lex-textarea textarea,
+lex-format-input input.lex-field-input,
+lex-select input.lex-field-input,
+lex-mention-input [contenteditable],
+lex-editor [contenteditable],
+lex-search input,
+lex-dropdown-btn input,
+.lex-field-input {
+  border: 0 none !important;
+  border-width: 0 !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  border-radius: var(--lex-input-radius, 6px);
+  background-color: var(--lex-color-gray-50, #FAFAF8);
+  font-family: inherit;
+  font-size: var(--lex-form-font-size, 0.8125rem);
+}

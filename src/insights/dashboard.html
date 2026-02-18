@@ -371,10 +371,222 @@
           <!-- Structure: Primary Section → Secondary Section → Trends Section -->
         </div>
       </div>
+
+      <!-- Active Alerts Section -->
+      <div id="activeAlertsSection" class="mt-8">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div class="flex items-center justify-between mb-6">
+            <div>
+              <h2 class="text-lg font-semibold text-gray-900">Active Alerts</h2>
+              <p class="text-sm text-gray-500 mt-1">Current alert states across all rules</p>
+            </div>
+            <a href="../admin/alerts.html" class="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-medium transition-colors">
+              Manage Rules
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+              </svg>
+            </a>
+          </div>
+
+          <!-- Severity Count Badges -->
+          <div id="alertSeverityBadges" class="flex flex-wrap gap-3 mb-6">
+            <div class="animate-pulse flex gap-3">
+              <div class="h-8 w-24 bg-gray-100 rounded-full"></div>
+              <div class="h-8 w-24 bg-gray-100 rounded-full"></div>
+              <div class="h-8 w-24 bg-gray-100 rounded-full"></div>
+              <div class="h-8 w-24 bg-gray-100 rounded-full"></div>
+            </div>
+          </div>
+
+          <!-- Recent Alert Instances -->
+          <div>
+            <h3 class="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Recent Alerts</h3>
+            <div id="alertInstancesList" class="space-y-2">
+              <!-- Loading skeleton -->
+              <div class="animate-pulse space-y-2">
+                <div class="h-16 bg-gray-50 rounded-lg border border-gray-100"></div>
+                <div class="h-16 bg-gray-50 rounded-lg border border-gray-100"></div>
+                <div class="h-16 bg-gray-50 rounded-lg border border-gray-100"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 
   <script>
+    // ---------------------------------------------------------------------------
+    // Active Alerts Panel
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Severity configuration — maps severity to Tailwind colour classes.
+     * Uses string methods only — no regex.
+     */
+    const ALERT_SEVERITY_CONFIG = {
+      critical: { bg: 'bg-red-100',    text: 'text-red-800',    border: 'border-red-200',    dot: 'bg-red-500'    },
+      high:     { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-200', dot: 'bg-orange-500' },
+      medium:   { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-200', dot: 'bg-yellow-500' },
+      low:      { bg: 'bg-blue-100',   text: 'text-blue-800',   border: 'border-blue-200',   dot: 'bg-blue-500'   },
+    };
+
+    /**
+     * Format a Date object as a relative time string.
+     * e.g. "3 minutes ago", "2 hours ago", "5 days ago"
+     *
+     * @param {string} isoString - ISO 8601 date string
+     * @returns {string} Human-readable relative time
+     */
+    function formatRelativeTime(isoString) {
+      if (!isoString) return 'Unknown';
+      const diffMs = Date.now() - new Date(isoString).getTime();
+      const diffMinutes = Math.floor(diffMs / 60000);
+      if (diffMinutes < 1) return 'Just now';
+      if (diffMinutes < 60) return diffMinutes + ' minute' + (diffMinutes !== 1 ? 's' : '') + ' ago';
+      const diffHours = Math.floor(diffMinutes / 60);
+      if (diffHours < 24) return diffHours + ' hour' + (diffHours !== 1 ? 's' : '') + ' ago';
+      const diffDays = Math.floor(diffHours / 24);
+      return diffDays + ' day' + (diffDays !== 1 ? 's' : '') + ' ago';
+    }
+
+    /**
+     * Render severity count badges from the summary response.
+     *
+     * @param {Object} summary - Response from GET /api/v1/alerts/summary
+     */
+    function renderAlertSeverityBadges(summary) {
+      const container = document.getElementById('alertSeverityBadges');
+      if (!container) return;
+
+      const severities = ['critical', 'high', 'medium', 'low'];
+      const counts = summary.active_by_severity || {};
+      const totalActive = summary.total_active_instances || 0;
+
+      let html = '';
+
+      // Total badge
+      html += '<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-100 text-gray-800 text-sm font-medium">';
+      html += '<span class="w-2 h-2 rounded-full bg-gray-500"></span>';
+      html += totalActive + ' Total Active';
+      html += '</span>';
+
+      severities.forEach(function(severity) {
+        const count = counts[severity] || 0;
+        if (count === 0) return;
+        const cfg = ALERT_SEVERITY_CONFIG[severity] || ALERT_SEVERITY_CONFIG.low;
+        const label = severity.charAt(0).toUpperCase() + severity.slice(1);
+        html += '<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full ' + cfg.bg + ' ' + cfg.text + ' text-sm font-medium">';
+        html += '<span class="w-2 h-2 rounded-full ' + cfg.dot + '"></span>';
+        html += count + ' ' + label;
+        html += '</span>';
+      });
+
+      if (totalActive === 0) {
+        html = '<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-800 text-sm font-medium">';
+        html += '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+        html += 'No active alerts';
+        html += '</span>';
+      }
+
+      container.innerHTML = html;
+    }
+
+    /**
+     * Render the recent alert instances list.
+     *
+     * @param {Array} instances - Array of alert instance objects
+     */
+    function renderAlertInstancesList(instances) {
+      const container = document.getElementById('alertInstancesList');
+      if (!container) return;
+
+      if (!instances || instances.length === 0) {
+        container.innerHTML = '<div class="text-center py-8 text-gray-500 text-sm">No recent alert instances found.</div>';
+        return;
+      }
+
+      let html = '';
+      instances.forEach(function(instance) {
+        const severity = instance.severity || 'low';
+        const cfg = ALERT_SEVERITY_CONFIG[severity] || ALERT_SEVERITY_CONFIG.low;
+        const label = severity.charAt(0).toUpperCase() + severity.slice(1);
+        const ruleName = instance.rule_name || instance.alert_rule_id || 'Unknown Rule';
+        const message = instance.message || instance.condition_details || '';
+        const triggeredAt = formatRelativeTime(instance.created_at || instance.triggered_at);
+        const status = instance.status || 'active';
+
+        html += '<div class="flex items-start gap-3 p-3 rounded-lg border ' + cfg.border + ' ' + cfg.bg + '">';
+        html += '<span class="mt-0.5 w-2.5 h-2.5 rounded-full flex-shrink-0 ' + cfg.dot + '"></span>';
+        html += '<div class="flex-1 min-w-0">';
+        html += '<div class="flex items-center justify-between gap-2">';
+        html += '<p class="text-sm font-medium text-gray-900 truncate">' + escapeHtml(ruleName) + '</p>';
+        html += '<div class="flex items-center gap-2 flex-shrink-0">';
+        html += '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ' + cfg.bg + ' ' + cfg.text + '">' + label + '</span>';
+        html += '<span class="text-xs text-gray-400">' + triggeredAt + '</span>';
+        html += '</div>';
+        html += '</div>';
+        if (message) {
+          html += '<p class="text-xs text-gray-600 mt-0.5 truncate">' + escapeHtml(message) + '</p>';
+        }
+        html += '</div>';
+        html += '</div>';
+      });
+
+      container.innerHTML = html;
+    }
+
+    /**
+     * Escape HTML special characters to prevent XSS.
+     * Uses string replace with indexOf — no regex.
+     *
+     * @param {string} str - Raw string
+     * @returns {string} HTML-escaped string
+     */
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .split('&').join('&amp;')
+        .split('<').join('&lt;')
+        .split('>').join('&gt;')
+        .split('"').join('&quot;')
+        .split("'").join('&#39;');
+    }
+
+    /**
+     * Load alert summary and recent instances from the backend API.
+     * Calls two endpoints in parallel for efficiency.
+     */
+    async function loadActiveAlerts() {
+      try {
+        const [summaryResponse, instancesResponse] = await Promise.all([
+          api.get('/api/v1/alerts/summary'),
+          api.get('/api/v1/alerts/instances?status=active&limit=10&sort_by=created_at&sort_order=desc'),
+        ]);
+
+        const summary = summaryResponse || {};
+        const instances = (instancesResponse && instancesResponse.data) ? instancesResponse.data : [];
+
+        renderAlertSeverityBadges(summary);
+        renderAlertInstancesList(instances);
+      } catch (error) {
+        console.error('[Alerts Panel] Failed to load active alerts:', error);
+
+        const badgesContainer = document.getElementById('alertSeverityBadges');
+        if (badgesContainer) {
+          badgesContainer.innerHTML = '<span class="text-sm text-gray-400">Unable to load alert summary.</span>';
+        }
+
+        const listContainer = document.getElementById('alertInstancesList');
+        if (listContainer) {
+          listContainer.innerHTML = '<div class="text-center py-4 text-sm text-red-600">Failed to load alerts. Check your connection.</div>';
+        }
+      }
+    }
+
+    // Load alerts on page init
+    loadActiveAlerts();
+
     if (!api.requireAuth()) throw new Error('Not authenticated');
 
     // Load full user profile with roles before rendering menu

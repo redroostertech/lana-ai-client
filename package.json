@@ -39,7 +39,9 @@
     "build:mac-x64": "electron-builder --mac --x64 -c electron-builder.client.json",
     "build:win": "electron-builder --win -c electron-builder.client.json",
     "build:linux": "electron-builder --linux -c electron-builder.client.json",
-    "build:all": "electron-builder --mac --x64 --arm64 --win --linux -c electron-builder.client.json"
+    "build:all": "electron-builder --mac --x64 --arm64 --win --linux -c electron-builder.client.json",
+    "generate:icons": "node scripts/generate-icons.js",
+    "generate:icons-all": "node scripts/generate-icons.js --all"
   },
   "keywords": [
     "ai",
@@ -102,6 +104,7 @@
     "esbuild": "^0.27.1",
     "jest": "^29.7.0",
     "jest-junit": "^16.0.0",
+    "lucide-static": "^0.574.0",
     "nodemon": "^3.0.0"
   }
 }

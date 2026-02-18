@@ -1,0 +1,474 @@
+/* ==========================================================================
+   Lex UI — <lex-chat-message>
+   Renders a single chat message (user, assistant, or system).
+   Supports streaming content via appendContent() and finalize().
+   Uses lex-chat.css tokens for styling.
+   ========================================================================== */
+
+(function (global) {
+  'use strict';
+
+  const { LexElement, defineLex, ChatFormat } = global.Lex;
+  if (!LexElement) { console.error('[lex-chat-message] LexElement not loaded'); return; }
+
+  // ---------------------------------------------------------------------------
+  // Timestamp formatting — smart relative dates
+  // ---------------------------------------------------------------------------
+
+  function formatTimestamp(iso) {
+    if (!iso) return '';
+    const date = (iso instanceof Date) ? iso : new Date(iso);
+    if (isNaN(date.getTime())) return '';
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const msgDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+    // Format time portion: "4:24 PM"
+    const timeStr = date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+
+    if (msgDay.getTime() === today.getTime()) {
+      return `Today ${timeStr}`;
+    }
+    if (msgDay.getTime() === yesterday.getTime()) {
+      return `Yesterday ${timeStr}`;
+    }
+
+    // Older: "Feb 12, 2025 3:30 AM"
+    const dateStr = date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+    return `${dateStr} ${timeStr}`;
+  }
+
+  // Style injection guard
+  let stylesInjected = false;
+
+  function injectStyles() {
+    if (stylesInjected) return;
+    stylesInjected = true;
+
+    const style = document.createElement('style');
+    style.id = 'lex-chat-message-styles';
+    style.textContent = `
+      lex-chat-message {
+        display: block;
+        animation: lex-chat-fade-in var(--lex-transition-slow, 0.3s) ease both;
+      }
+
+      /* Timestamp line */
+      .lex-chat-msg-timestamp {
+        font-family: var(--lex-font-mono);
+        font-size: 10px;
+        font-weight: 500;
+        color: var(--lex-chat-text-dim);
+        letter-spacing: 0.04em;
+        margin-bottom: 4px;
+        white-space: nowrap;
+      }
+
+      /* Citations section appended after assistant message body */
+      .lex-chat-citations-section {
+        margin-top: 8px;
+        border-top: 1px solid var(--lex-chat-border-soft);
+        padding-top: 8px;
+      }
+      .lex-chat-citations-section .lex-chat-citation-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 4px;
+        font-size: 10px;
+        color: var(--lex-chat-text-dim);
+        padding: 4px 0 4px 8px;
+        border-left: 2px solid var(--lex-chat-border-soft);
+        transition: border-color var(--lex-transition-fast, 0.15s);
+      }
+      .lex-chat-citations-section .lex-chat-citation-item:hover {
+        border-left-color: var(--lex-chat-accent);
+      }
+      .lex-chat-citation-item button {
+        text-align: left;
+        font-weight: 500;
+        cursor: pointer;
+        color: inherit;
+        background: none;
+        border: none;
+        padding: 0;
+        transition: color var(--lex-transition-fast, 0.15s);
+      }
+      .lex-chat-citation-item button:hover {
+        color: var(--lex-chat-accent);
+        text-decoration: underline;
+      }
+
+      /* Artifacts section */
+      .lex-chat-artifacts-section {
+        margin-top: 8px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .lex-chat-artifact-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: var(--lex-radius-md, 6px);
+        font-size: 12px;
+        font-weight: 500;
+        border: 1px solid var(--lex-chat-artifact-border);
+        background: var(--lex-chat-artifact-bg);
+        color: var(--lex-chat-artifact-text);
+        cursor: pointer;
+        transition: background var(--lex-transition-fast, 0.15s);
+      }
+      .lex-chat-artifact-btn:hover {
+        background: var(--lex-chat-artifact-hover);
+      }
+
+      /* Attachments inside user message */
+      .lex-chat-msg-attachments {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 8px;
+        border-top: 1px solid var(--lex-chat-border-soft);
+        padding-top: 8px;
+      }
+      .lex-chat-msg-attachment {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 10px;
+        border-radius: var(--lex-radius-md, 6px);
+        font-size: 11px;
+        font-weight: 500;
+        background: var(--lex-chat-bg-elevated);
+        color: var(--lex-chat-text-muted);
+        border: 1px solid var(--lex-chat-border-soft);
+      }
+      .lex-chat-msg-attachment svg {
+        width: 14px; height: 14px;
+        color: var(--lex-chat-accent);
+        flex-shrink: 0;
+      }
+      .lex-chat-msg-attachment-name {
+        max-width: 200px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      /* System message */
+      .lex-chat-msg-system {
+        display: flex;
+        justify-content: center;
+      }
+      .lex-chat-msg-system-bubble {
+        padding: 6px 16px;
+        border-radius: var(--lex-radius-lg, 8px);
+        font-size: 12px;
+        text-align: center;
+        max-width: 400px;
+        background: var(--lex-chat-bg-surface);
+        color: var(--lex-chat-text-muted);
+        border: 1px solid var(--lex-chat-border-soft);
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // -- Attachment file icon --
+  const ATTACH_FILE_ICON = `<svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+
+  // -- Breathing logo SVG --
+  const BREATHING_LOGO = `
+    <div class="lex-chat-indicator">
+      <svg class="lex-chat-indicator-corner lex-chat-indicator-corner--tl" width="8" height="8" viewBox="0 0 8 8" fill="none">
+        <path d="M0 0L8 0M0 0L0 8" stroke="currentColor" stroke-width="1.5"/>
+      </svg>
+      <svg class="lex-chat-indicator-corner lex-chat-indicator-corner--br" width="8" height="8" viewBox="0 0 8 8" fill="none">
+        <path d="M8 8L0 8M8 8L8 0" stroke="currentColor" stroke-width="1.5"/>
+      </svg>
+    </div>`;
+
+  const BREATHING_LOGO_STATIC = `
+    <div class="lex-chat-indicator lex-chat-indicator--static">
+      <svg class="lex-chat-indicator-corner lex-chat-indicator-corner--tl" width="8" height="8" viewBox="0 0 8 8" fill="none">
+        <path d="M0 0L8 0M0 0L0 8" stroke="currentColor" stroke-width="1.5"/>
+      </svg>
+      <svg class="lex-chat-indicator-corner lex-chat-indicator-corner--br" width="8" height="8" viewBox="0 0 8 8" fill="none">
+        <path d="M8 8L0 8M8 8L8 0" stroke="currentColor" stroke-width="1.5"/>
+      </svg>
+    </div>`;
+
+  class LexChatMessage extends LexElement {
+
+    static get properties() {
+      return {
+        role:       { type: String, default: 'assistant' },
+        content:    { type: String, default: '' },
+        messageId:  { type: String, default: null, attribute: 'message-id' },
+        timestamp:  { type: String, default: null },
+        duration:   { type: Number, default: null },
+        streaming:  { type: Boolean, default: false, reflect: true },
+        citations:  { type: Array, default: [] },
+        artifacts:  { type: Array, default: [] },
+        attachments: { type: Array, default: [] }
+      };
+    }
+
+    constructor() {
+      super();
+      this._rawContent = ''; // Accumulated raw content for streaming
+      this._contentEl = null;
+    }
+
+    connected() {
+      injectStyles();
+    }
+
+    _renderTimestamp() {
+      // Auto-stamp on first render if no timestamp was provided
+      if (!this.timestamp) {
+        this._props.timestamp = new Date().toISOString();
+      }
+      const ts = formatTimestamp(this.timestamp);
+      if (!ts) return '';
+      const durHtml = this._formatDuration();
+      return `<div class="lex-chat-msg-timestamp">${ChatFormat ? ChatFormat.escapeHtml(ts) : ts}${durHtml}</div>`;
+    }
+
+    _formatDuration() {
+      const ms = this.duration;
+      if (!ms && ms !== 0) return '';
+      if (ms < 1000) return ` · ${ms}ms`;
+      const sec = ms / 1000;
+      if (sec < 60) return ` · ${sec.toFixed(1)}s`;
+      const min = Math.floor(sec / 60);
+      const remSec = Math.round(sec % 60);
+      return ` · ${min}m ${remSec}s`;
+    }
+
+    render() {
+      const role = this.role;
+      const tsHtml = this._renderTimestamp();
+
+      if (role === 'system') {
+        return `
+          <div class="lex-chat-msg-system">
+            <div class="lex-chat-msg-system-bubble">${ChatFormat ? ChatFormat.escapeHtml(this.content) : this.content}</div>
+          </div>`;
+      }
+
+      if (role === 'user') {
+        const attachments = this.attachments || [];
+        const attachHtml = attachments.length > 0
+          ? `<div class="lex-chat-msg-attachments">${attachments.map(a => {
+              const name = ChatFormat ? ChatFormat.escapeHtml(a.filename || a.name || 'Document') : (a.filename || a.name || 'Document');
+              return `<div class="lex-chat-msg-attachment">${ATTACH_FILE_ICON}<span class="lex-chat-msg-attachment-name" title="${name}">${name}</span></div>`;
+            }).join('')}</div>`
+          : '';
+
+        return `
+          <div class="lex-chat-msg-user">
+            ${tsHtml}
+            <div class="lex-chat-msg-user-bubble">
+              ${ChatFormat ? ChatFormat.escapeHtml(this.content) : this.content}
+              ${attachHtml}
+            </div>
+          </div>`;
+      }
+
+      // assistant
+      const streamCls = this.streaming ? ' lex-chat-narrative--streaming' : '';
+      const logo = this.streaming ? BREATHING_LOGO : BREATHING_LOGO_STATIC;
+      const formatted = ChatFormat ? ChatFormat.format(this.content, this.citations) : this.content;
+
+      return `
+        <div class="lex-chat-msg-agent">
+          ${logo}
+          <div class="lex-chat-msg-agent-body">
+            ${tsHtml}
+            <div class="lex-chat-narrative${streamCls}" data-content-body>${formatted}</div>
+          </div>
+        </div>`;
+    }
+
+    updated() {
+      this._contentEl = this.querySelector('[data-content-body]');
+
+      // Bind citation clicks via delegation
+      this.delegate('click', '.lex-chat-citation-link', (e, target) => {
+        e.preventDefault();
+        this.emit('lex-citation-click', {
+          documentId: target.dataset.documentId,
+          filename: target.dataset.filename,
+          page: parseInt(target.dataset.page, 10) || 1,
+          citationNum: target.dataset.citationNum ? parseInt(target.dataset.citationNum, 10) : null
+        });
+      });
+
+      // Bind copy buttons
+      this.delegate('click', '.lex-chat-copy-btn', (e, target) => {
+        const uid = target.dataset.copyId;
+        const codeEl = this.querySelector(`code[data-raw]`);
+        if (codeEl) {
+          const text = codeEl.getAttribute('data-raw') || codeEl.textContent;
+          navigator.clipboard.writeText(text).catch(() => {});
+        }
+      });
+
+      // Bind artifact clicks
+      this.delegate('click', '.lex-chat-artifact-btn', (e, target) => {
+        this.emit('lex-artifact-click', {
+          artifactType: target.dataset.artifactType,
+          entityId: target.dataset.entityId,
+          entityType: target.dataset.entityType
+        });
+      });
+    }
+
+    /**
+     * Append streaming content chunk.
+     * @param {string} chunk - New text to add
+     */
+    appendContent(chunk) {
+      this._rawContent += chunk;
+      this._props.content = this._rawContent;
+      this._props.streaming = true;
+
+      // Direct DOM update (no re-render)
+      if (this._contentEl) {
+        const formatted = ChatFormat ? ChatFormat.format(this._rawContent, this.citations) : this._rawContent;
+        this._contentEl.innerHTML = formatted;
+        if (!this._contentEl.classList.contains('lex-chat-narrative--streaming')) {
+          this._contentEl.classList.add('lex-chat-narrative--streaming');
+        }
+
+        // Inject cursor into the last text-bearing element so it appears inline
+        const lastBlock = this._contentEl.querySelector('p:last-of-type, li:last-of-type, h1:last-of-type, h2:last-of-type, h3:last-of-type, h4:last-of-type, blockquote:last-of-type');
+        if (lastBlock) {
+          lastBlock.insertAdjacentHTML('beforeend', '<span class="lex-chat-cursor"></span>');
+        } else {
+          // Fallback: append to content root
+          this._contentEl.insertAdjacentHTML('beforeend', '<span class="lex-chat-cursor"></span>');
+        }
+      }
+    }
+
+    /**
+     * Finalize the message after streaming completes.
+     * @param {Object} metadata - { messageId, citations, artifacts, timestamp }
+     */
+    finalize(metadata = {}) {
+      this._props.streaming = false;
+      if (metadata.messageId) this._props.messageId = metadata.messageId;
+      if (metadata.timestamp) this._props.timestamp = metadata.timestamp;
+      if (metadata.citations) this._props.citations = metadata.citations;
+      if (metadata.artifacts) this._props.artifacts = metadata.artifacts;
+      if (metadata.duration != null) this._props.duration = metadata.duration;
+
+      // Update displayed timestamp (with duration if available)
+      const tsEl = this.querySelector('.lex-chat-msg-timestamp');
+      if (tsEl) {
+        tsEl.textContent = formatTimestamp(this.timestamp) + this._formatDuration();
+      }
+
+      // Remove streaming cursor
+      if (this._contentEl) {
+        this._contentEl.classList.remove('lex-chat-narrative--streaming');
+
+        // Re-format with final citations
+        if (this._rawContent && metadata.citations?.length > 0) {
+          this._contentEl.innerHTML = ChatFormat.format(this._rawContent, metadata.citations);
+        }
+
+        // Append citations section
+        if (metadata.citations?.length > 0) {
+          this._renderCitationsSection(metadata.citations);
+        }
+
+        // Append artifacts section
+        if (metadata.artifacts?.length > 0) {
+          this._renderArtifactsSection(metadata.artifacts);
+        }
+      }
+
+      // Switch logo to static after streaming completes
+      const logo = this.querySelector('.lex-chat-indicator');
+      if (logo) {
+        logo.classList.add('lex-chat-indicator--static');
+      }
+    }
+
+    _renderCitationsSection(citations) {
+      const body = this.querySelector('.lex-chat-msg-agent-body');
+      if (!body || body.querySelector('.lex-chat-citations-section')) return;
+
+      const max = 5;
+      const items = citations.slice(0, max).map((c, i) => {
+        const fn = ChatFormat.escapeHtml(c.filename || 'Unknown');
+        const pg = c.page_number || c.page || '?';
+        const docId = ChatFormat.escapeHtml(c.document_id || '');
+        const excerpt = c.chunk_text || c.excerpt || '';
+        const rel = c.relevance_score || c.relevance || 0;
+        const pct = Math.round(rel * 100);
+
+        return `
+          <div class="lex-chat-citation-item">
+            <span>${i + 1}.</span>
+            <div>
+              <button class="lex-chat-citation-link" data-document-id="${docId}" data-filename="${fn}" data-page="${pg}">${fn}</button>
+              ${pg !== '?' ? `<div>page ${pg}</div>` : ''}
+              ${pct > 0 ? `<div>Relevance: ${pct}%</div>` : ''}
+              ${excerpt ? `<div style="opacity:0.7;font-style:italic">${ChatFormat.escapeHtml(excerpt.substring(0, 100))}${excerpt.length > 100 ? '...' : ''}</div>` : ''}
+            </div>
+          </div>`;
+      }).join('');
+
+      const more = citations.length > max ? `<div style="font-size:10px;opacity:0.6;padding-left:8px">+ ${citations.length - max} more</div>` : '';
+
+      body.insertAdjacentHTML('beforeend', `
+        <div class="lex-chat-citations-section">
+          <div style="font-size:11px;font-weight:600;color:var(--lex-chat-text-dim);margin-bottom:4px">Sources (${citations.length})</div>
+          ${items}
+          ${more}
+        </div>`);
+    }
+
+    _renderArtifactsSection(artifacts) {
+      const body = this.querySelector('.lex-chat-msg-agent-body');
+      if (!body || body.querySelector('.lex-chat-artifacts-section')) return;
+
+      const buttons = artifacts.map(a => {
+        const type = a.entity_type || a.artifact_type || a.type || 'item';
+        const label = a.label || a.name || a.title || type;
+        return `<button class="lex-chat-artifact-btn" data-artifact-type="${ChatFormat.escapeHtml(type)}" data-entity-id="${ChatFormat.escapeHtml(a.entity_id || a.id || '')}" data-entity-type="${ChatFormat.escapeHtml(type)}">${ChatFormat.escapeHtml(label)}</button>`;
+      }).join('');
+
+      body.insertAdjacentHTML('beforeend', `<div class="lex-chat-artifacts-section">${buttons}</div>`);
+    }
+
+    /**
+     * Get the raw accumulated content (useful for saving to history).
+     */
+    getRawContent() {
+      return this._rawContent || this.content;
+    }
+  }
+
+  // Export (registration deferred to barrel file)
+  global.Lex.Chat = global.Lex.Chat || {};
+  global.Lex.Chat.LexChatMessage = LexChatMessage;
+  global.Lex.Chat.formatTimestamp = formatTimestamp;
+
+})(typeof window !== 'undefined' ? window : globalThis);

@@ -2366,6 +2366,82 @@ class ApiClient {
       this.showSessionExpiredModal();
     }
   }
+
+  // ============================================================
+  // Dashboard Widgets
+  // ============================================================
+
+  /**
+   * Get all dashboard widgets for the current organization.
+   * Supports filtering by widget_type and matter_id.
+   * @param {Object} params - Query parameters (limit, offset, widget_type, matter_id)
+   * @returns {Promise<Object>} Paginated widget list
+   */
+  async getDashboardWidgets(params = {}) {
+    let url = '/api/v1/dashboard-widgets';
+    const queryParts = [];
+    if (params.limit) queryParts.push('limit=' + params.limit);
+    if (params.offset) queryParts.push('offset=' + params.offset);
+    if (params.widget_type) queryParts.push('widget_type=' + encodeURIComponent(params.widget_type));
+    if (params.matter_id) queryParts.push('matter_id=' + encodeURIComponent(params.matter_id));
+    if (queryParts.length > 0) url += '?' + queryParts.join('&');
+    return this.get(url);
+  }
+
+  /**
+   * Create a new dashboard widget.
+   * @param {Object} widgetData - Widget configuration (widget_type, title, config, position, refresh_interval_seconds)
+   * @returns {Promise<Object>} Created widget
+   */
+  async createDashboardWidget(widgetData) {
+    return this.post('/api/v1/dashboard-widgets', widgetData);
+  }
+
+  /**
+   * Update an existing dashboard widget.
+   * @param {string} widgetId - The widget UUID
+   * @param {Object} widgetData - Updated widget data
+   * @returns {Promise<Object>} Updated widget
+   */
+  async updateDashboardWidget(widgetId, widgetData) {
+    return this.put('/api/v1/dashboard-widgets/' + widgetId, widgetData);
+  }
+
+  /**
+   * Delete a dashboard widget.
+   * @param {string} widgetId - The widget UUID to remove
+   * @returns {Promise<Object>} Deletion result
+   */
+  async deleteDashboardWidget(widgetId) {
+    return this.delete('/api/v1/dashboard-widgets/' + widgetId);
+  }
+
+  /**
+   * Fetch live data for a single dashboard widget.
+   * @param {string} widgetId - The widget UUID
+   * @returns {Promise<Object>} Widget data payload
+   */
+  async getDashboardWidgetData(widgetId) {
+    return this.post('/api/v1/dashboard-widgets/' + widgetId + '/data');
+  }
+
+  /**
+   * Fetch live data for multiple widgets in a single request.
+   * @param {string[]} widgetIds - Array of widget UUIDs
+   * @returns {Promise<Object>} Map of widgetId -> data payload
+   */
+  async getDashboardWidgetsBatchData(widgetIds) {
+    return this.post('/api/v1/dashboard-widgets/batch-data', { widget_ids: widgetIds });
+  }
+
+  /**
+   * Get available widget type definitions.
+   * Falls back to built-in defaults if the endpoint is unavailable.
+   * @returns {Promise<Object>} Array of widget type descriptors
+   */
+  async getDashboardWidgetTypes() {
+    return this.get('/api/v1/dashboard-widgets/types');
+  }
 }
 
 class ApiError extends Error {

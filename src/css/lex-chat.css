@@ -1,0 +1,434 @@
+/* ==========================================================================
+   Lex UI — Chat Stream Tokens & Layout
+   Dark-scoped theme for the LANA AI chat interface.
+   Apply data-lex-theme="dark" to the chat wrapper element.
+
+   All chat components reference --lex-chat-* tokens so colours,
+   typography, and sizing are centrally controlled.
+   ========================================================================== */
+
+
+/* ==========================================================================
+   1. DARK PALETTE PRIMITIVES
+   Raw dark-theme values. Override these to re-skin the chat.
+   ========================================================================== */
+
+:root {
+  --lex-chat-dark-900: #0a0a0f;
+  --lex-chat-dark-800: #111118;
+  --lex-chat-dark-700: #1a1a24;
+  --lex-chat-dark-600: rgba(255, 255, 255, 0.08);
+  --lex-chat-dark-500: rgba(255, 255, 255, 0.12);
+  --lex-chat-dark-400: #6B6B80;
+  --lex-chat-dark-300: #9ca3af;
+  --lex-chat-dark-200: #c9cdd5;
+  --lex-chat-dark-100: #e8e8f0;
+  --lex-chat-dark-50:  #ffffff;
+}
+
+
+/* ==========================================================================
+   2. SEMANTIC CHAT TOKENS
+   Light-theme defaults (inherit from Lex core tokens).
+   Dark overrides applied via [data-lex-theme="dark"].
+   ========================================================================== */
+
+:root {
+  /* ── Surfaces ─────────────────────────────────────────────── */
+  --lex-chat-bg:             var(--lex-bg-primary);
+  --lex-chat-bg-surface:     var(--lex-bg-secondary);
+  --lex-chat-bg-elevated:    var(--lex-bg-elevated);
+  --lex-chat-bg-code:        var(--lex-color-gray-800);
+
+  /* ── Text ─────────────────────────────────────────────────── */
+  --lex-chat-text:           var(--lex-color-gray-900);
+  --lex-chat-text-muted:     var(--lex-text-secondary);
+  --lex-chat-text-dim:       var(--lex-text-tertiary);
+
+  /* ── Borders ──────────────────────────────────────────────── */
+  --lex-chat-border:         var(--lex-border-default);
+  --lex-chat-border-soft:    var(--lex-border-subtle);
+
+  /* ── Accent ───────────────────────────────────────────────── */
+  --lex-chat-accent:         var(--lex-bg-accent);
+  --lex-chat-accent-soft:    var(--lex-bg-accent-soft);
+  --lex-chat-accent-text:    var(--lex-text-on-accent);
+}
+
+[data-lex-theme="dark"] {
+  --lex-chat-bg:             var(--lex-chat-dark-900);
+  --lex-chat-bg-surface:     var(--lex-chat-dark-800);
+  --lex-chat-bg-elevated:    var(--lex-chat-dark-700);
+  --lex-chat-bg-code:        var(--lex-chat-dark-700);
+
+  --lex-chat-text:           var(--lex-chat-dark-50);
+  --lex-chat-text-muted:     var(--lex-chat-dark-300);
+  --lex-chat-text-dim:       var(--lex-chat-dark-400);
+
+  --lex-chat-border:         var(--lex-chat-dark-600);
+  --lex-chat-border-soft:    var(--lex-chat-dark-600);
+
+  --lex-chat-accent:         var(--lex-bg-accent);
+  --lex-chat-accent-soft:    rgba(89, 82, 70, 0.25);
+  --lex-chat-accent-text:    var(--lex-text-on-accent);
+}
+
+
+/* ==========================================================================
+   3. COMPONENT-SPECIFIC TOKENS
+   Per-element overrides. Light defaults + dark overrides.
+   ========================================================================== */
+
+:root {
+  /* ── User Bubble ──────────────────────────────────────────── */
+  --lex-chat-user-bg:        var(--lex-chat-bg-surface);
+  --lex-chat-user-text:      var(--lex-chat-text);
+  --lex-chat-user-radius:    var(--lex-radius-2xl) var(--lex-radius-2xl) var(--lex-radius-sm) var(--lex-radius-2xl);
+
+  /* ── Agent Block ──────────────────────────────────────────── */
+  --lex-chat-agent-bg:       transparent;
+  --lex-chat-agent-text:     var(--lex-chat-text);
+
+  /* ── Reasoning Terminal ───────────────────────────────────── */
+  --lex-chat-terminal-bg:    var(--lex-chat-bg-surface);
+  --lex-chat-terminal-border:var(--lex-chat-border);
+  --lex-chat-terminal-text:  var(--lex-chat-text-dim);
+  --lex-chat-terminal-header:var(--lex-chat-text-muted);
+
+  /* ── Code Block ───────────────────────────────────────────── */
+  --lex-chat-code-bg:        var(--lex-chat-bg-code);
+  --lex-chat-code-header-bg: var(--lex-chat-bg-surface);
+  --lex-chat-code-text:      var(--lex-chat-dark-100);
+  --lex-chat-code-header-text: var(--lex-chat-text);
+  --lex-chat-code-border:    var(--lex-chat-border);
+
+  /* ── Progress Metric ──────────────────────────────────────── */
+  --lex-chat-progress-bg:    var(--lex-chat-border);
+  --lex-chat-progress-fill:  var(--lex-chat-accent);
+  --lex-chat-progress-text:  var(--lex-chat-text);
+
+  /* ── Diff / Redline ───────────────────────────────────────── */
+  --lex-chat-diff-add-bg:    rgba(16, 185, 129, 0.15);
+  --lex-chat-diff-add-text:  var(--lex-color-success-500);
+  --lex-chat-diff-del-bg:    rgba(239, 68, 68, 0.15);
+  --lex-chat-diff-del-text:  var(--lex-color-danger-500);
+
+  /* ── Compare Table ────────────────────────────────────────── */
+  --lex-chat-compare-bg:     var(--lex-chat-bg-surface);
+  --lex-chat-compare-header: var(--lex-chat-bg-elevated);
+  --lex-chat-compare-border: var(--lex-chat-border);
+
+  /* ── Decision Block ───────────────────────────────────────── */
+  --lex-chat-decision-bg:    var(--lex-chat-bg-surface);
+  --lex-chat-decision-border:var(--lex-chat-border);
+  --lex-chat-decision-hover: var(--lex-chat-bg-elevated);
+  --lex-chat-decision-active:var(--lex-chat-accent);
+
+  /* ── Step Badge ───────────────────────────────────────────── */
+  --lex-chat-step-bg:        var(--lex-chat-accent);
+  --lex-chat-step-text:      var(--lex-chat-accent-text);
+  --lex-chat-step-pending:   var(--lex-chat-text-dim);
+  --lex-chat-step-line:      var(--lex-chat-border);
+
+  /* ── Citation Badge ───────────────────────────────────────── */
+  --lex-chat-citation-bg:    var(--lex-chat-accent);
+  --lex-chat-citation-text:  var(--lex-chat-accent-text);
+
+  /* ── Artifact Buttons ─────────────────────────────────────── */
+  --lex-chat-artifact-bg:     var(--lex-color-info-50);
+  --lex-chat-artifact-text:   var(--lex-color-info-700);
+  --lex-chat-artifact-border: var(--lex-color-info-100);
+  --lex-chat-artifact-hover:  var(--lex-color-info-100);
+
+  /* ── Context Menu ─────────────────────────────────────────── */
+  --lex-chat-menu-bg:        var(--lex-chat-bg-elevated);
+  --lex-chat-menu-border:    var(--lex-chat-border);
+  --lex-chat-menu-hover:     var(--lex-chat-bg-surface);
+  --lex-chat-menu-text:      var(--lex-chat-text);
+
+  /* ── Indicator / Breathing ────────────────────────────────── */
+  --lex-chat-indicator-size: var(--lex-icon-large);
+  --lex-chat-indicator-bg:   transparent;
+  --lex-chat-indicator-border: var(--lex-color-gray-400);
+  --lex-chat-indicator-color: var(--lex-color-gray-600);
+
+  /* ── Step Badge (text label style) ──────────────────────── */
+  --lex-chat-step-badge-bg:   var(--lex-chat-bg-elevated);
+  --lex-chat-step-badge-text: var(--lex-chat-text-muted);
+  --lex-chat-step-badge-size: var(--lex-form-font-size-sm);
+
+  /* ── Progress Metric Header ─────────────────────────────── */
+  --lex-chat-progress-header: var(--lex-chat-text-muted);
+  --lex-chat-progress-value-size: 1.5rem;
+}
+
+
+/* ==========================================================================
+   4. KEYFRAME ANIMATIONS
+   ========================================================================== */
+
+/* Breathing logo — top-left corner (gentle inward pulse) */
+@keyframes lex-chat-breathe-tl {
+  0%, 100% { transform: translate(0, 0); opacity: 0.4; }
+  50%      { transform: translate(-1px, -1px); opacity: 1; }
+}
+
+/* Breathing logo — bottom-right corner (gentle inward pulse) */
+@keyframes lex-chat-breathe-br {
+  0%, 100% { transform: translate(0, 0); opacity: 0.4; }
+  50%      { transform: translate(1px, 1px); opacity: 1; }
+}
+
+/* Block entry fade-in + slide up */
+@keyframes lex-chat-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Progress bar fill */
+@keyframes lex-chat-progress-fill {
+  from { width: 0%; }
+}
+
+/* Cursor blink for streaming text */
+@keyframes lex-chat-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* Pulse for active step indicator */
+@keyframes lex-chat-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--lex-chat-accent); }
+  50%      { box-shadow: 0 0 0 4px transparent; }
+}
+
+
+/* ==========================================================================
+   5. LAYOUT & UTILITY CLASSES
+   ========================================================================== */
+
+/* ── Container ──────────────────────────────────────────────── */
+
+.lex-chat-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  padding: 24px 16px;
+  background: var(--lex-chat-bg);
+  color: var(--lex-chat-text);
+  font-family: var(--lex-font-sans);
+}
+
+
+/* ── User Message ───────────────────────────────────────────── */
+
+.lex-chat-msg-user {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  animation: lex-chat-fade-in var(--lex-transition-slow) ease both;
+}
+
+.lex-chat-msg-user-bubble {
+  max-width: 80%;
+  padding: 12px 20px;
+  background: var(--lex-chat-user-bg);
+  color: var(--lex-chat-user-text);
+  border: 1px solid var(--lex-chat-border);
+  border-radius: var(--lex-chat-user-radius);
+  font-size: var(--lex-body-sm-size);
+  font-weight: var(--lex-weight-regular);
+  line-height: 1.6;
+  letter-spacing: 0.01em;
+}
+
+
+/* ── Agent Message ──────────────────────────────────────────── */
+
+.lex-chat-msg-agent {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  animation: lex-chat-fade-in var(--lex-transition-slow) ease both;
+}
+
+.lex-chat-msg-agent-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+
+/* ── Breathing Logo Indicator ───────────────────────────────── */
+
+.lex-chat-indicator {
+  width: var(--lex-chat-indicator-size);
+  height: var(--lex-chat-indicator-size);
+  border-radius: var(--lex-radius-full);
+  background: var(--lex-chat-indicator-bg);
+  border: 1px solid var(--lex-chat-indicator-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+}
+
+/* SVG corner-bracket elements — positioned well inside the circle */
+.lex-chat-indicator-corner {
+  position: absolute;
+  color: var(--lex-chat-indicator-color);
+}
+
+.lex-chat-indicator-corner--tl {
+  top: 7px;
+  left: 7px;
+  animation: lex-chat-breathe-tl 3s ease-in-out infinite;
+}
+
+.lex-chat-indicator-corner--br {
+  bottom: 7px;
+  right: 7px;
+  animation: lex-chat-breathe-br 3s ease-in-out infinite;
+}
+
+/* Static variant (non-animated, for completed messages) */
+.lex-chat-indicator--static .lex-chat-indicator-corner {
+  animation: none;
+  opacity: 0.4;
+}
+
+
+/* ── Streaming Narrative Text ───────────────────────────────── */
+
+.lex-chat-narrative {
+  font-size: var(--lex-body-base-size);
+  font-weight: var(--lex-weight-regular);
+  line-height: 1.7;
+  letter-spacing: 0.01em;
+  color: var(--lex-chat-text);
+}
+
+.lex-chat-narrative p {
+  margin: 0 0 12px;
+}
+
+.lex-chat-narrative p:last-child {
+  margin-bottom: 0;
+}
+
+/* Streaming cursor — injected inline into last text element */
+.lex-chat-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: var(--lex-chat-text);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: lex-chat-blink 0.8s step-end infinite;
+}
+
+
+/* ── Metadata Line ──────────────────────────────────────────── */
+
+.lex-chat-meta {
+  font-family: var(--lex-font-mono);
+  font-size: var(--lex-form-counter-size);
+  font-weight: var(--lex-weight-medium);
+  color: var(--lex-chat-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  line-height: 1.4;
+}
+
+
+/* ── Inline Citation Badge ──────────────────────────────────── */
+
+.lex-chat-citation-sup {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--lex-radius-sm);
+  background: var(--lex-chat-citation-bg);
+  color: var(--lex-chat-citation-text);
+  font-family: var(--lex-font-mono);
+  font-size: 10px;
+  font-weight: var(--lex-weight-bold);
+  line-height: 1;
+  vertical-align: super;
+  cursor: pointer;
+  text-decoration: none;
+  transition: opacity var(--lex-transition-fast);
+}
+
+.lex-chat-citation-sup:hover {
+  opacity: 0.8;
+}
+
+
+/* ── Context Menu ───────────────────────────────────────────── */
+
+.lex-chat-context-menu {
+  position: absolute;
+  min-width: 160px;
+  background: var(--lex-chat-menu-bg);
+  border: 1px solid var(--lex-chat-menu-border);
+  border-radius: var(--lex-radius-lg);
+  box-shadow: var(--lex-shadow-lg);
+  z-index: var(--lex-z-dropdown);
+  padding: 4px 0;
+  display: none;
+}
+
+.lex-chat-context-menu--open {
+  display: block;
+}
+
+.lex-chat-context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: var(--lex-form-font-size);
+  font-weight: var(--lex-weight-regular);
+  color: var(--lex-chat-menu-text);
+  cursor: pointer;
+  transition: background var(--lex-transition-fast);
+}
+
+.lex-chat-context-menu-item:hover {
+  background: var(--lex-chat-menu-hover);
+}
+
+.lex-chat-context-menu-item svg {
+  width: var(--lex-icon-small);
+  height: var(--lex-icon-small);
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.lex-chat-context-menu-divider {
+  height: 1px;
+  background: var(--lex-chat-border-soft);
+  margin: 4px 0;
+}
+
+
+/* ── Block Entry Animation ──────────────────────────────────── */
+
+.lex-chat-block {
+  animation: lex-chat-fade-in 0.4s ease both;
+}
+
+
+/* ── Scroll Anchor ──────────────────────────────────────────── */
+
+.lex-chat-scroll-anchor {
+  height: 1px;
+  width: 100%;
+}
