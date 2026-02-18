@@ -1,15 +1,21 @@
 /* Lex UI — Topbar Component
    Top navigation bar with hamburger toggle, page title,
-   notification bell, and settings button.
+   notification bell, and settings dropdown menu.
 
    Usage:
      <lex-topbar heading="Dashboard" notification-count="3"></lex-topbar>
      <lex-topbar heading="Dashboard" sticky></lex-topbar>
 
+   Set menuItems programmatically:
+     topbar.menuItems = [
+       { id: 'settings', label: 'Settings', icon: 'settings' },
+       { id: 'logout', label: 'Sign out', variant: 'danger' }
+     ];
+
    Attributes:
      sticky  — pins the topbar to the top of the viewport (default: false)
 
-   Events: topbar-menu-toggle, topbar-notification-click, topbar-settings-click
+   Events: topbar-menu-toggle, topbar-notification-click, topbar-settings-click, topbar-menu-action
 */
 
 (function () {
@@ -28,12 +34,14 @@
     style.textContent = `
       lex-topbar {
         display: block;
+        position: relative;
+        z-index: 50;
       }
 
       lex-topbar[data-sticky="true"] {
         position: sticky;
         top: 0;
-        z-index: var(--lex-z-sticky);
+        z-index: var(--lex-z-sticky, 50);
       }
 
       .lex-topbar-root {
@@ -161,6 +169,76 @@
         border-radius: var(--lex-radius-full);
         line-height: 1;
       }
+
+      /* ── Settings dropdown ─────────────────────────────── */
+
+      .lex-topbar-dropdown-anchor {
+        position: relative;
+      }
+
+      .lex-topbar-dropdown {
+        position: absolute;
+        top: calc(100% + 6px);
+        right: 0;
+        min-width: 180px;
+        background: var(--lex-bg-primary, #FFFFFF);
+        border: 1px solid var(--lex-border-default, #E8E5E1);
+        border-radius: var(--lex-radius-lg, 8px);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08);
+        padding: 4px;
+        z-index: var(--lex-z-dropdown, 100);
+        opacity: 0;
+        transform: translateY(-4px);
+        pointer-events: none;
+        transition: opacity 0.15s ease, transform 0.15s ease;
+      }
+
+      .lex-topbar-dropdown--open {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+      }
+
+      .lex-topbar-dropdown-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        padding: 10px 12px;
+        border: none;
+        background: none;
+        cursor: pointer;
+        font-family: var(--lex-font-sans);
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--lex-text-primary, #26211C);
+        border-radius: var(--lex-radius-md, 6px);
+        transition: background 0.15s ease, color 0.15s ease;
+        text-align: left;
+      }
+
+      .lex-topbar-dropdown-item:hover {
+        background: var(--lex-bg-secondary, #F5F3F0);
+      }
+
+      .lex-topbar-dropdown-item--danger {
+        color: var(--lex-color-danger-500, #F04438);
+      }
+
+      .lex-topbar-dropdown-item--danger:hover {
+        background: var(--lex-color-danger-50, #FEF3F2);
+      }
+
+      .lex-topbar-dropdown-item svg {
+        flex-shrink: 0;
+        opacity: 0.7;
+      }
+
+      .lex-topbar-dropdown-divider {
+        height: 1px;
+        background: var(--lex-border-subtle, #E8E5E1);
+        margin: 4px 8px;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -191,7 +269,18 @@
         showMenuToggle:    { type: Boolean, default: true },
         notificationCount: { type: Number,  default: 0 },
         showNotifications: { type: Boolean, default: true },
-        showSettings:      { type: Boolean, default: true }
+        showSettings:      { type: Boolean, default: true },
+        menuItems:         { type: Array,   default: [] }
+      };
+    }
+
+    constructor() {
+      super();
+      this._dropdownOpen = false;
+      this._onOutsideClick = (e) => {
+        if (this._dropdownOpen && !e.target.closest('.lex-topbar-dropdown-anchor')) {
+          this._closeDropdown();
+        }
       };
     }
 
@@ -264,9 +353,12 @@
       }
 
       if (this.showSettings) {
+        html += `<div class="lex-topbar-dropdown-anchor">`;
         html += `<button type="button" class="lex-topbar-action" data-action="settings">
           ${icon('settings', 'normal')}
         </button>`;
+        html += `<div class="lex-topbar-dropdown" data-dropdown></div>`;
+        html += `</div>`;
       }
 
       html += `</div>`;
@@ -285,8 +377,72 @@
       });
 
       this.delegate('click', '[data-action="settings"]', () => {
-        this.emit('topbar-settings-click');
+        const items = this.menuItems || [];
+        if (items.length > 0) {
+          this._toggleDropdown();
+        } else {
+          this.emit('topbar-settings-click');
+        }
       });
+
+      this.delegate('click', '[data-menu-action]', (e, target) => {
+        const actionId = target.dataset.menuAction;
+        const item = (this.menuItems || []).find(m => m.id === actionId);
+        this._closeDropdown();
+        this.emit('topbar-menu-action', { actionId, label: item ? item.label : '' });
+      });
+
+      // Render dropdown items
+      this._renderDropdownItems();
+    }
+
+    _renderDropdownItems() {
+      const dropdown = this.querySelector('[data-dropdown]');
+      if (!dropdown) return;
+
+      const items = this.menuItems || [];
+      if (items.length === 0) {
+        dropdown.innerHTML = '';
+        return;
+      }
+
+      dropdown.innerHTML = items.map((item, i) => {
+        if (item.divider) return '<div class="lex-topbar-dropdown-divider"></div>';
+        const variant = item.variant === 'danger' ? ' lex-topbar-dropdown-item--danger' : '';
+        const iconHtml = item.icon ? icon(item.icon, 'small') : '';
+        return `<button type="button" class="lex-topbar-dropdown-item${variant}" data-menu-action="${this.escapeHtml(item.id)}">${iconHtml}${this.escapeHtml(item.label)}</button>`;
+      }).join('');
+    }
+
+    _toggleDropdown() {
+      if (this._dropdownOpen) {
+        this._closeDropdown();
+      } else {
+        this._openDropdown();
+      }
+    }
+
+    _openDropdown() {
+      const dropdown = this.querySelector('[data-dropdown]');
+      if (!dropdown) return;
+      this._dropdownOpen = true;
+      dropdown.classList.add('lex-topbar-dropdown--open');
+      // Defer so the opening click doesn't immediately close it
+      requestAnimationFrame(() => {
+        document.addEventListener('click', this._onOutsideClick);
+      });
+    }
+
+    _closeDropdown() {
+      const dropdown = this.querySelector('[data-dropdown]');
+      if (!dropdown) return;
+      this._dropdownOpen = false;
+      dropdown.classList.remove('lex-topbar-dropdown--open');
+      document.removeEventListener('click', this._onOutsideClick);
+    }
+
+    disconnected() {
+      document.removeEventListener('click', this._onOutsideClick);
     }
   }
 

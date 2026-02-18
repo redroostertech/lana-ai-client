@@ -77,7 +77,7 @@
         flex-direction: column;
         z-index: var(--lex-z-overlay);
         transform: translateX(-100%);
-        transition: transform var(--lex-transition-slow);
+        transition: transform var(--lex-transition-slow), width 0.45s cubic-bezier(0.4, 0, 0.2, 1);
         font-family: var(--lex-font-sans);
       }
 
@@ -89,6 +89,76 @@
 
       .lex-sidebar-root[data-open="true"] {
         transform: translateX(0);
+      }
+
+      /* ── Collapsed state ─────────────────────────────────── */
+
+      @media (min-width: 1024px) {
+        .lex-sidebar-root[data-collapsed="true"] {
+          width: var(--lex-sidebar-collapsed-width, 64px);
+        }
+
+        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-header {
+          justify-content: center;
+          padding: 0 0.5rem;
+        }
+
+        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-logo {
+          display: none;
+        }
+
+        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-collapse-btn {
+          margin: 0;
+        }
+
+        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-section-title,
+        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-nav-label,
+        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-nav-badge,
+        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-user-name,
+        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-user-chevron,
+        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-conversation-list {
+          display: none;
+        }
+
+        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-nav-item {
+          justify-content: center;
+          padding: 0.625rem;
+        }
+
+        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-user {
+          justify-content: center;
+          padding: 0.5rem;
+        }
+
+        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-section {
+          padding: 0.5rem;
+        }
+
+        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-footer {
+          padding: 0.5rem;
+        }
+
+        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-nav-item {
+          position: relative;
+        }
+
+        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-nav-item:hover::after {
+          content: attr(data-tooltip);
+          position: absolute;
+          left: calc(100% + 8px);
+          top: 50%;
+          transform: translateY(-50%);
+          background: var(--lex-sidebar-bg, #1C1A17);
+          color: var(--lex-sidebar-text-active, #fff);
+          font-size: 12px;
+          font-weight: 500;
+          padding: 4px 10px;
+          border-radius: var(--lex-radius-md, 6px);
+          white-space: nowrap;
+          z-index: 999;
+          pointer-events: none;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
       }
 
       /* ── Header (logo area) ─────────────────────────────── */
@@ -127,6 +197,33 @@
 
       @media (max-width: 1023px) {
         .lex-sidebar-close {
+          display: flex;
+        }
+      }
+
+      .lex-sidebar-collapse-btn {
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 0.25rem;
+        border: none;
+        background: none;
+        color: var(--_sb-text-muted);
+        cursor: pointer;
+        border-radius: var(--lex-radius-sm);
+        transition: color var(--lex-transition-fast), transform 0.2s ease;
+      }
+
+      .lex-sidebar-collapse-btn:hover {
+        color: var(--_sb-text-active);
+      }
+
+      .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-collapse-btn svg {
+        transform: rotate(180deg);
+      }
+
+      @media (min-width: 1024px) {
+        .lex-sidebar-collapse-btn {
           display: flex;
         }
       }
@@ -489,6 +586,7 @@
         userMenuItems: { type: Array,   default: [] },
         version:       { type: String,  default: '' },
         open:          { type: Boolean, default: false, reflect: true },
+        collapsed:     { type: Boolean, default: false, reflect: true },
         userMenuOpen:  { type: Boolean, default: false }
       };
     }
@@ -502,6 +600,8 @@
       const root = this.querySelector('.lex-sidebar-root');
       if (root) {
         root.dataset.open = String(this.open);
+        root.dataset.collapsed = String(this.collapsed);
+        this._emitCollapsedState();
         const overlay = this.querySelector('.lex-sidebar-user-overlay');
         if (overlay) overlay.dataset.open = String(this.userMenuOpen);
 
@@ -532,13 +632,14 @@
       const staticSections = sections.filter(s => !s.isFooter && s.isStaticTop);
       const scrollSections = sections.filter(s => !s.isFooter && !s.isStaticTop);
 
-      let html = `<div class="lex-sidebar-root" data-open="${this.open}">`;
+      let html = `<div class="lex-sidebar-root" data-open="${this.open}" data-collapsed="${this.collapsed}">`;
 
       // ── Header ──
       html += `<div class="lex-sidebar-header">`;
       if (this.logoSrc) {
         html += `<a href="${this.escapeHtml(this.logoHref)}"><img class="lex-sidebar-logo" src="${this.escapeHtml(this.logoSrc)}" alt="${this.escapeHtml(this.logoAlt)}"></a>`;
       }
+      html += `<button class="lex-sidebar-collapse-btn" data-action="collapse">${icon('chevrons-left', 'small')}</button>`;
       html += `<button class="lex-sidebar-close" data-action="close">${icon('x', 'normal')}</button>`;
       html += `</div>`;
 
@@ -582,6 +683,15 @@
     }
 
 
+    _emitCollapsedState() {
+      // Update the CSS variable so lex-shell-main can adjust its margin
+      document.documentElement.style.setProperty(
+        '--lex-sidebar-current-width',
+        this.collapsed ? 'var(--lex-sidebar-collapsed-width, 64px)' : 'var(--lex-sidebar-width, 256px)'
+      );
+      this.emit('sidebar-collapse', { collapsed: this.collapsed });
+    }
+
     // -----------------------------------------------------------------------
     // Section rendering
     // -----------------------------------------------------------------------
@@ -619,7 +729,7 @@
         ? `<span class="lex-sidebar-nav-badge">${this.escapeHtml(item.badge)}</span>`
         : '';
 
-      return `<${tag} class="lex-sidebar-nav-item"${hrefAttr}${typeAttr} data-active="${isActive}" data-id="${this.escapeHtml(item.id || '')}"${onClickAttr}>
+      return `<${tag} class="lex-sidebar-nav-item"${hrefAttr}${typeAttr} data-active="${isActive}" data-id="${this.escapeHtml(item.id || '')}" data-tooltip="${this.escapeHtml(item.label || '')}"${onClickAttr}>
         ${iconHtml}
         <span class="lex-sidebar-nav-label">${this.escapeHtml(item.label || '')}</span>
         ${badgeHtml}
@@ -708,6 +818,11 @@
         this.emit('sidebar-close');
       });
 
+      // Collapse toggle (desktop)
+      this.delegate('click', '[data-action="collapse"]', () => {
+        this.collapsed = !this.collapsed;
+      });
+
       // Nav item click
       this.delegate('click', '.lex-sidebar-nav-item', (e, target) => {
         const id = target.dataset.id;
@@ -767,6 +882,9 @@
         this.userMenuOpen = false;
         this.emit('sidebar-user-action', { action: action });
       });
+
+      // Ensure collapsed CSS variable is set on every render
+      this._emitCollapsedState();
     }
   }
 

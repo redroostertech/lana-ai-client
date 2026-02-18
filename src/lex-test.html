@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="css/lex-chat.css">
 
   <style>
+    html { scroll-behavior: smooth; }
     body { font-family: var(--lex-font-sans); background: var(--lex-bg-secondary); margin: 0; padding: 0; min-height: 100vh; }
 
     /* App shell layout */
@@ -30,7 +31,10 @@
       box-sizing: border-box;
     }
     @media (min-width: 1024px) {
-      .lex-shell-main { margin-left: var(--lex-sidebar-width, 256px); }
+      .lex-shell-main {
+        margin-left: var(--lex-sidebar-current-width, var(--lex-sidebar-width, 256px));
+        transition: margin-left 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+      }
     }
     .lex-shell-overlay {
       position: fixed;
@@ -53,6 +57,54 @@
     .tier-1 { background: var(--lex-status-info-bg); color: var(--lex-status-info-text); }
     .tier-2 { background: var(--lex-status-success-bg); color: var(--lex-status-success-text); }
     .tier-3 { background: #fae8ff; color: #a21caf; }
+
+    /* Section sub-nav */
+    .lex-subnav {
+      position: relative;
+      top: 0;
+      z-index: 40;
+      background: var(--lex-bg-primary);
+      border-bottom: 1px solid var(--lex-border-subtle);
+      padding: 0 2rem;
+      transition: box-shadow 0.2s ease;
+    }
+    .lex-subnav--shadow {
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .lex-subnav-scroll {
+      display: flex;
+      gap: 2px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      -webkit-overflow-scrolling: touch;
+    }
+    .lex-subnav-scroll::-webkit-scrollbar { display: none; }
+    .lex-subnav-link {
+      display: inline-flex;
+      align-items: center;
+      white-space: nowrap;
+      padding: 10px 14px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--lex-text-tertiary);
+      text-decoration: none;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s ease, border-color 0.15s ease;
+      cursor: pointer;
+    }
+    .lex-subnav-link:hover {
+      color: var(--lex-text-primary);
+    }
+    .lex-subnav-link--active {
+      color: var(--lex-text-accent, #736B5C);
+      border-bottom-color: var(--lex-text-accent, #736B5C);
+    }
+
+    /* Offset scroll target for sticky header */
+    .section[id] {
+      scroll-margin-top: 96px;
+    }
 
     /* Code snippet styling */
     .code-toggle {
@@ -129,6 +181,23 @@
   <div class="lex-shell-main">
     <lex-topbar heading="Lex UI — Component Library" notification-count="3"></lex-topbar>
 
+    <!-- Section sub-navigation -->
+    <nav class="lex-subnav" id="sectionSubnav">
+      <div class="lex-subnav-scroll">
+        <a class="lex-subnav-link" data-target="sec-brand-palette">Brand Palette</a>
+        <a class="lex-subnav-link" data-target="sec-typography">Typography</a>
+        <a class="lex-subnav-link" data-target="sec-icons">Icons</a>
+        <a class="lex-subnav-link" data-target="sec-foundation">Foundation</a>
+        <a class="lex-subnav-link" data-target="sec-data">Data</a>
+        <a class="lex-subnav-link" data-target="sec-ai-blocks">AI Blocks</a>
+        <a class="lex-subnav-link" data-target="sec-mixed-mode">Mixed Mode</a>
+        <a class="lex-subnav-link" data-target="sec-forms">Forms</a>
+        <a class="lex-subnav-link" data-target="sec-chat-stream">Chat Stream</a>
+        <a class="lex-subnav-link" data-target="sec-chat-components">Chat Components</a>
+        <a class="lex-subnav-link" data-target="sec-side-menu">Side Menu</a>
+      </div>
+    </nav>
+
     <div class="lex-shell-content">
 
   <!-- Header -->
@@ -147,7 +216,7 @@
        BRAND PALETTE
        ==================================================================== -->
 
-  <div class="section">
+  <div class="section" id="sec-brand-palette">
     <h2 class="section-title">Brand Palette</h2>
     <p class="section-desc">Warm earth-tone brand colors, warm grays, and flat status colors. Override primitives in <lex-text size="code" background="tertiary">lex-tokens.css</lex-text> to rebrand.</p>
 
@@ -429,7 +498,7 @@ document.documentElement.style
        TYPOGRAPHY
        ==================================================================== -->
 
-  <div class="section">
+  <div class="section" id="sec-typography">
     <h2 class="section-title">Typography</h2>
     <p class="section-desc">Inter font (bundled locally) with a full tokenized type scale. Apply via utility classes: <lex-text size="code" background="tertiary">.lex-h1</lex-text>, <lex-text size="code" background="tertiary">.lex-body</lex-text>, etc.</p>
 
@@ -698,7 +767,7 @@ document.documentElement.style
        ICONS — LUCIDE (LOCAL)
        ==================================================================== -->
 
-  <div class="section">
+  <div class="section" id="sec-icons">
     <h2 class="section-title">Icons <span style="font-size:12px;font-weight:400;color:var(--lex-text-tertiary);margin-left:8px">Lucide (compiled locally)</span></h2>
     <p class="section-desc">
       <span id="icon-count"></span> Lucide icons compiled at build time — zero CDN, zero runtime dependency.
@@ -913,7 +982,7 @@ document.documentElement.style
        TIER 1: STATIC COMPONENTS
        ==================================================================== -->
 
-  <div class="section">
+  <div class="section" id="sec-foundation">
     <h2 class="section-title">Foundation Components <span class="tier-badge tier-1">Tier 1</span></h2>
     <p class="section-desc">Plain HTML tags with attributes. No JavaScript required by page authors.</p>
 
@@ -1927,7 +1996,7 @@ Lex.Loader.<span class="fn">hide</span>();
        TIER 2: DATA-BOUND COMPONENTS
        ==================================================================== -->
 
-  <div class="section">
+  <div class="section" id="sec-data">
     <h2 class="section-title">Data Components <span class="tier-badge tier-2">Tier 2</span></h2>
     <p class="section-desc">Components bound to API endpoints or inline data. Standard data-driven web development.</p>
 
@@ -2588,7 +2657,7 @@ bar.<span class="fn">clearAll</span>();</pre>
        TIER 3: AI-NATIVE BLOCKS
        ==================================================================== -->
 
-  <div class="section">
+  <div class="section" id="sec-ai-blocks">
     <h2 class="section-title">AI-Native Blocks <span class="tier-badge tier-3">Tier 3</span></h2>
     <p class="section-desc">Structured JSON from the LLM renders these components automatically via the block renderer.</p>
 
@@ -2612,7 +2681,7 @@ bar.<span class="fn">clearAll</span>();</pre>
        MIXED MODE
        ==================================================================== -->
 
-  <div class="section">
+  <div class="section" id="sec-mixed-mode">
     <h2 class="section-title">Mixed Mode</h2>
     <p class="section-desc">Authored layout with AI-Native content rendered inside it. Both tiers on the same page.</p>
 
@@ -2660,7 +2729,7 @@ bar.<span class="fn">clearAll</span>();</pre>
        FORM ELEMENTS
        ==================================================================== -->
 
-  <div class="section">
+  <div class="section" id="sec-forms">
     <h2 class="section-title">Form Elements</h2>
     <p class="section-desc">Consistent form components with label, help text, error states, tooltips, and validation. All use the <lex-text size="code" background="tertiary">withFormField</lex-text> mixin.</p>
 
@@ -3243,7 +3312,7 @@ form.<span class="fn">reset</span>();     <span class="comment">// clear all fie
        CHAT STREAM DEMO
        ==================================================================== -->
 
-  <div class="section" style="margin: 0 auto 3rem;">
+  <div class="section" id="sec-chat-stream" style="margin: 0 auto 3rem;">
     <h2 class="section-title">Chat Stream</h2>
     <p class="section-desc">Full chat experience with breathing indicators, reasoning blocks, and interactive elements.</p>
 
@@ -3382,7 +3451,7 @@ Lex.Orchestrator.<span class="fn">handleSSEBlock</span>(data, container);
        CHAT COMPONENTS
        ==================================================================== -->
 
-  <div class="section">
+  <div class="section" id="sec-chat-components">
     <h2 class="section-title">Chat Components <span class="tier-badge tier-3">Chat</span></h2>
     <p class="section-desc">Modular chat system: source protocol, message rendering, activity indicator, composer, and full orchestrator.</p>
 
@@ -3468,6 +3537,150 @@ Lex.Orchestrator.<span class="fn">handleSSEBlock</span>(data, container);
     </div>
   </div>
 
+    <!-- ================================================================
+         SIDE MENU COMPONENTS
+         ================================================================ -->
+
+  <div class="section" id="sec-side-menu">
+    <h2 class="section-title">Side Menu Components <span class="tier-badge tier-1">Layout</span></h2>
+    <p class="section-desc">Sidebar conversation items and reusable action menus for modals. Dark-themed list items with LANA accent bar pattern, and variant-colored action rows.</p>
+
+    <div class="demo-grid" style="grid-template-columns: 1fr 1fr;">
+
+      <!-- Dark panel — Conversation Items -->
+      <div class="demo-box" style="background: var(--lex-sidebar-bg, #1C1A17); border-radius: var(--lex-radius-xl, 12px); padding: 16px;">
+        <div class="demo-label" style="color: var(--lex-sidebar-section-text, #A9A49D);">Conversation Items (Dark Sidebar)</div>
+
+        <lex-conversation-item
+          thread-id="t-001"
+          title="Law Firm Product Overview"
+          subtitle="Brian Moore Injury Law"
+          timestamp="1d"
+          active
+        ></lex-conversation-item>
+
+        <lex-conversation-item
+          thread-id="t-002"
+          title="Client Intake Form Analysis"
+          subtitle="Greenfield & Associates"
+          timestamp="3d"
+        ></lex-conversation-item>
+
+        <lex-conversation-item
+          thread-id="t-003"
+          title="Contract Review — SLA v2"
+          timestamp="1w"
+          unread
+        ></lex-conversation-item>
+
+        <lex-conversation-item
+          thread-id="t-004"
+          title="Document Comparison Notes"
+          subtitle="Internal"
+          timestamp="2w"
+        ></lex-conversation-item>
+
+        <script>
+          document.querySelectorAll('lex-conversation-item').forEach(el => {
+            el.addEventListener('conversation-select', (e) => {
+              console.log('[conversation-select]', e.detail);
+              // Toggle active state
+              document.querySelectorAll('lex-conversation-item').forEach(c => c.active = false);
+              el.active = true;
+            });
+            el.addEventListener('conversation-menu', (e) => {
+              console.log('[conversation-menu]', e.detail);
+              // Open action menu in modal
+              Lex.Modal.open({
+                heading: 'Conversation Options',
+                size: 'sm',
+                hideActions: true,
+                content: '<lex-action-menu id="conv-modal-menu"></lex-action-menu>'
+              });
+              requestAnimationFrame(() => {
+                const menu = document.getElementById('conv-modal-menu');
+                if (menu) {
+                  menu.heading = 'Current Name:';
+                  menu.description = e.detail.title;
+                  menu.actions = [
+                    { id: 'rename', icon: 'pencil', label: 'Rename Conversation', description: 'Change the conversation title' },
+                    { id: 'matter', icon: 'folder', label: 'View Matter Details', description: 'Open the full matter information', variant: 'info' },
+                    { id: 'share', icon: 'share', label: 'Share Conversation', description: 'Share with team members', variant: 'success' },
+                    { id: 'delete', icon: 'trash-2', label: 'Delete Conversation', description: 'Permanently remove this conversation', variant: 'danger' }
+                  ];
+                  menu.addEventListener('action-select', (ev) => {
+                    console.log('[modal action-select]', ev.detail);
+                    Lex.Modal.close();
+                    Lex.Toast.show({ message: 'Action: ' + ev.detail.label, variant: 'info' });
+                  });
+                }
+              });
+            });
+          });
+        </script>
+      </div>
+
+      <!-- Light panel — Action Menu -->
+      <div class="demo-box">
+        <div class="demo-label">Action Menu (Light)
+          <button onclick="openActionMenuModal()" style="font-size:10px;color:var(--lex-text-accent);cursor:pointer;margin-left:8px">Open in Modal</button>
+        </div>
+
+        <lex-action-menu
+          id="demo-action-menu"
+          heading="Current Name:"
+          description="Law Firm Product Overview"
+        ></lex-action-menu>
+
+        <script>
+          window.addEventListener('DOMContentLoaded', () => {
+            const menu = document.getElementById('demo-action-menu');
+            if (menu) {
+              menu.actions = [
+                { id: 'rename', icon: 'pencil', label: 'Rename Conversation', description: 'Change the conversation title' },
+                { id: 'matter', icon: 'folder', label: 'View Matter Details', description: 'Open the full matter information', variant: 'info' },
+                { id: 'share', icon: 'share', label: 'Share Conversation', description: 'Share with team members', variant: 'success' },
+                { id: 'delete', icon: 'trash-2', label: 'Delete Conversation', description: 'Permanently remove this conversation', variant: 'danger' }
+              ];
+              menu.addEventListener('action-select', (e) => {
+                console.log('[action-select]', e.detail);
+                Lex.Toast.show({ message: 'Selected: ' + e.detail.label, variant: 'info' });
+              });
+            }
+          });
+
+          function openActionMenuModal() {
+            Lex.Modal.open({
+              heading: 'Conversation Options',
+              size: 'sm',
+              hideActions: true,
+              content: '<lex-action-menu id="modal-action-menu"></lex-action-menu>'
+            });
+            requestAnimationFrame(() => {
+              const m = document.getElementById('modal-action-menu');
+              if (m) {
+                m.heading = 'Current Name:';
+                m.description = 'Law Firm Product Overview';
+                m.actions = [
+                  { id: 'rename', icon: 'pencil', label: 'Rename Conversation', description: 'Change the conversation title' },
+                  { id: 'matter', icon: 'folder', label: 'View Matter Details', description: 'Open the full matter information', variant: 'info' },
+                  { id: 'share', icon: 'share', label: 'Share Conversation', description: 'Share with team members', variant: 'success' },
+                  { id: 'delete', icon: 'trash-2', label: 'Delete Conversation', description: 'Permanently remove this conversation', variant: 'danger' }
+                ];
+                m.addEventListener('action-select', (ev) => {
+                  console.log('[modal action-select]', ev.detail);
+                  Lex.Modal.close();
+                  Lex.Toast.show({ message: 'Action: ' + ev.detail.label, variant: 'info' });
+                });
+              }
+            });
+          }
+        </script>
+      </div>
+
+    </div>
+  </div>
+
     </div><!-- /.lex-shell-content -->
   </div><!-- /.lex-shell-main -->
 
@@ -3539,6 +3752,8 @@ Lex.Orchestrator.<span class="fn">handleSSEBlock</span>(data, container);
   <!-- Layout Components -->
   <script src="js/lex/components/layout/lex-sidebar.js"></script>
   <script src="js/lex/components/layout/lex-topbar.js"></script>
+  <script src="js/lex/components/layout/lex-conversation-item.js"></script>
+  <script src="js/lex/components/foundation/lex-action-menu.js"></script>
 
   <!-- AI Blocks -->
   <script src="js/lex/blocks/text.block.js"></script>
@@ -3695,9 +3910,25 @@ Lex.Orchestrator.<span class="fn">handleSSEBlock</span>(data, container);
         }
       }
 
-      // -- Topbar sticky toggle --
+      // -- Topbar sticky toggle + menu items --
       const topbar = document.querySelector('lex-topbar');
       if (topbar) {
+        // Settings dropdown menu items
+        topbar.menuItems = [
+          { id: 'settings', label: 'Settings', icon: 'settings' },
+          { divider: true },
+          { id: 'logout', label: 'Sign out', variant: 'danger' }
+        ];
+
+        topbar.addEventListener('topbar-menu-action', (e) => {
+          console.log('[topbar-menu-action]', e.detail);
+          if (e.detail.actionId === 'settings') {
+            Lex.Toast.show({ message: 'Settings clicked', variant: 'info' });
+          } else if (e.detail.actionId === 'logout') {
+            Lex.Toast.show({ message: 'Sign out clicked', variant: 'danger' });
+          }
+        });
+
         requestAnimationFrame(() => {
           const right = topbar.querySelector('.lex-topbar-right');
           if (right) {
@@ -3737,6 +3968,95 @@ Lex.Orchestrator.<span class="fn">handleSSEBlock</span>(data, container);
           overlay.classList.remove('visible');
         });
       }
+    })();
+
+    // =====================================================================
+    // Section sub-nav — scroll spy + click navigation
+    // =====================================================================
+    (function () {
+      const subnav = document.getElementById('sectionSubnav');
+      if (!subnav) return;
+
+      const links = subnav.querySelectorAll('.lex-subnav-link[data-target]');
+      const sectionIds = Array.from(links).map(l => l.dataset.target);
+
+      // Click handler — smooth scroll to section
+      links.forEach(link => {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          const target = document.getElementById(link.dataset.target);
+          if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        });
+      });
+
+      // Scroll spy — highlight active section
+      let ticking = false;
+      function updateActiveLink() {
+        const offset = 120; // account for sticky header height
+        let activeId = sectionIds[0];
+
+        for (const id of sectionIds) {
+          const el = document.getElementById(id);
+          if (el && el.getBoundingClientRect().top <= offset) {
+            activeId = id;
+          }
+        }
+
+        links.forEach(l => {
+          l.classList.toggle('lex-subnav-link--active', l.dataset.target === activeId);
+        });
+
+        // Scroll active link into view within the nav
+        const activeLink = subnav.querySelector('.lex-subnav-link--active');
+        if (activeLink) {
+          const scroll = subnav.querySelector('.lex-subnav-scroll');
+          const linkRect = activeLink.getBoundingClientRect();
+          const scrollRect = scroll.getBoundingClientRect();
+          if (linkRect.left < scrollRect.left || linkRect.right > scrollRect.right) {
+            activeLink.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+          }
+        }
+
+        ticking = false;
+      }
+
+      window.addEventListener('scroll', () => {
+        if (!ticking) {
+          requestAnimationFrame(updateActiveLink);
+          ticking = true;
+        }
+      });
+
+      // Shadow when scrolled
+      window.addEventListener('scroll', () => {
+        subnav.classList.toggle('lex-subnav--shadow', window.scrollY > 10);
+      });
+
+      // Sync sticky with topbar
+      function syncSticky() {
+        const topbar = document.querySelector('lex-topbar');
+        const isSticky = topbar && topbar.dataset.sticky === 'true';
+        if (isSticky) {
+          subnav.style.position = 'sticky';
+          subnav.style.top = 'var(--lex-topbar-height, 56px)';
+        } else {
+          subnav.style.position = 'relative';
+          subnav.style.top = '0';
+        }
+      }
+
+      // Observe topbar sticky changes
+      const topbar = document.querySelector('lex-topbar');
+      if (topbar) {
+        const observer = new MutationObserver(syncSticky);
+        observer.observe(topbar, { attributes: true, attributeFilter: ['data-sticky'] });
+      }
+      syncSticky();
+
+      // Initial highlight
+      updateActiveLink();
     })();
 
     // =====================================================================

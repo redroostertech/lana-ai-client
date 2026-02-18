@@ -70,31 +70,19 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        justify-content: center;
-        padding: 48px 24px;
+        justify-content: flex-end;
+        flex: 1;
+        padding: 24px;
+        padding-bottom: 12px;
         text-align: center;
-        gap: 16px;
-      }
-
-      .lex-chat-welcome-logo {
-        width: 48px; height: 48px;
-        border-radius: 50%;
-        background: var(--lex-chat-bg-surface);
-        border: 1px solid var(--lex-chat-border);
-        display: flex; align-items: center; justify-content: center;
-      }
-
-      .lex-chat-welcome-title {
-        font-size: var(--lex-body-lg-size, 1.125rem);
-        font-weight: 600;
-        color: var(--lex-chat-text);
       }
 
       .lex-chat-welcome-subtitle {
-        font-size: var(--lex-body-sm-size, 0.875rem);
-        color: var(--lex-chat-text-muted);
-        max-width: 400px;
-        line-height: 1.6;
+        font-size: var(--lex-heading-h2-size, 1.5rem);
+        font-weight: 600;
+        color: var(--lex-chat-text);
+        max-width: 500px;
+        line-height: 1.4;
       }
 
       /* Load more trigger */
@@ -311,9 +299,7 @@
       const welcome = document.createElement('div');
       welcome.className = 'lex-chat-welcome';
       welcome.innerHTML = `
-        <div class="lex-chat-welcome-logo">${WELCOME_LOGO}</div>
-        <div class="lex-chat-welcome-title">Lana AI</div>
-        <div class="lex-chat-welcome-subtitle">${msg || 'Hello! I\'m your AI legal assistant. How can I help you today?'}</div>`;
+        <div class="lex-chat-welcome-subtitle">${msg || 'I\'m Lana, your AI assistant. How can I help you today?'}</div>`;
       this._container.appendChild(welcome);
     }
 
