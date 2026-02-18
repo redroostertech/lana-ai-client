@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="css/lex-chat.css">
 
   <style>
-    html { scroll-behavior: smooth; }
+    html { scroll-behavior: auto; }
     body { font-family: var(--lex-font-sans); background: var(--lex-bg-secondary); margin: 0; padding: 0; min-height: 100vh; }
 
     /* App shell layout */
@@ -33,7 +33,7 @@
     @media (min-width: 1024px) {
       .lex-shell-main {
         margin-left: var(--lex-sidebar-current-width, var(--lex-sidebar-width, 256px));
-        transition: margin-left 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+        transition: margin-left 0.7s cubic-bezier(0.22, 0.84, 0, 0.99);
       }
     }
     .lex-shell-overlay {
@@ -3980,13 +3980,61 @@ Lex.Orchestrator.<span class="fn">handleSSEBlock</span>(data, container);
       const links = subnav.querySelectorAll('.lex-subnav-link[data-target]');
       const sectionIds = Array.from(links).map(l => l.dataset.target);
 
-      // Click handler — smooth scroll to section
+      // ── Soft-close scroll ──
+      // Mimics a hydraulic-damped Italian drawer:
+      //   Fast initial push → catch/brake at ~40% → gentle spring pull to rest
+      // Uses easeOutQuint for the final 60% of travel for that "last inch" feel.
+      let scrollRAF = null;
+
+      function softScrollTo(targetY, duration) {
+        if (scrollRAF) cancelAnimationFrame(scrollRAF);
+
+        const startY = window.scrollY;
+        const distance = targetY - startY;
+        const startTime = performance.now();
+        duration = duration || Math.min(1100, 500 + Math.abs(distance) * 0.2);
+
+        // Soft-close easing — Italian drawer mechanics:
+        //   t=0→0.3:  Push phase — quick momentum (smoothstep)
+        //   t=0.3→1:  Damper catch + spring pull — heavy brake, long gentle settle
+        //   Uses ease-out ^7 for an exaggerated deceleration tail
+        function ease(t) {
+          if (t < 0.3) {
+            // Push: fast initial movement
+            const p = t / 0.3;
+            return 0.45 * (p * p * (3 - 2 * p));
+          } else {
+            // Catch + pull: hydraulic damper brakes hard, spring settles
+            const p = (t - 0.3) / 0.7;
+            const inv = 1 - p;
+            return 0.45 + 0.55 * (1 - inv * inv * inv * inv * inv * inv * inv);
+          }
+        }
+
+        function step(now) {
+          const elapsed = now - startTime;
+          const t = Math.min(elapsed / duration, 1);
+          window.scrollTo(0, startY + distance * ease(t));
+
+          if (t < 1) {
+            scrollRAF = requestAnimationFrame(step);
+          } else {
+            scrollRAF = null;
+          }
+        }
+
+        scrollRAF = requestAnimationFrame(step);
+      }
+
+      // Click handler — soft-close scroll to section
       links.forEach(link => {
         link.addEventListener('click', (e) => {
           e.preventDefault();
           const target = document.getElementById(link.dataset.target);
           if (target) {
-            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            const scrollMargin = parseInt(getComputedStyle(target).scrollMarginTop) || 96;
+            const targetY = target.getBoundingClientRect().top + window.scrollY - scrollMargin;
+            softScrollTo(targetY);
           }
         });
       });
@@ -3994,7 +4042,7 @@ Lex.Orchestrator.<span class="fn">handleSSEBlock</span>(data, container);
       // Scroll spy — highlight active section
       let ticking = false;
       function updateActiveLink() {
-        const offset = 120; // account for sticky header height
+        const offset = 120;
         let activeId = sectionIds[0];
 
         for (const id of sectionIds) {
@@ -4008,7 +4056,7 @@ Lex.Orchestrator.<span class="fn">handleSSEBlock</span>(data, container);
           l.classList.toggle('lex-subnav-link--active', l.dataset.target === activeId);
         });
 
-        // Scroll active link into view within the nav
+        // Scroll active tab into view in the nav bar
         const activeLink = subnav.querySelector('.lex-subnav-link--active');
         if (activeLink) {
           const scroll = subnav.querySelector('.lex-subnav-scroll');

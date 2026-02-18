@@ -77,7 +77,7 @@
         flex-direction: column;
         z-index: var(--lex-z-overlay);
         transform: translateX(-100%);
-        transition: transform var(--lex-transition-slow), width 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+        transition: transform var(--lex-transition-slow), width 0.7s cubic-bezier(0.22, 0.84, 0, 0.99);
         font-family: var(--lex-font-sans);
       }
 
@@ -92,52 +92,60 @@
       }
 
       /* ── Collapsed state ─────────────────────────────────── */
+      /* Strategy: overflow:hidden on root clips content uniformly.
+         Text elements fade out via opacity (transitionable).
+         Layout stays the same — no justify-content or display:none snaps. */
 
       @media (min-width: 1024px) {
+        .lex-sidebar-root {
+          overflow: hidden;
+        }
+
         .lex-sidebar-root[data-collapsed="true"] {
           width: var(--lex-sidebar-collapsed-width, 64px);
         }
 
-        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-header {
-          justify-content: center;
-          padding: 0 0.5rem;
+        /* Keep header layout — just let overflow clip the logo */
+        .lex-sidebar-root .lex-sidebar-logo {
+          transition: opacity 0.3s ease 0.05s;
         }
-
         .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-logo {
-          display: none;
+          opacity: 0;
+          pointer-events: none;
         }
 
-        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-collapse-btn {
-          margin: 0;
+        /* Fade out all text elements together */
+        .lex-sidebar-root .lex-sidebar-section-title,
+        .lex-sidebar-root .lex-sidebar-nav-label,
+        .lex-sidebar-root .lex-sidebar-nav-badge,
+        .lex-sidebar-root .lex-sidebar-user-name,
+        .lex-sidebar-root .lex-sidebar-user-chevron {
+          transition: opacity 0.25s ease;
+          white-space: nowrap;
         }
 
         .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-section-title,
         .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-nav-label,
         .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-nav-badge,
         .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-user-name,
-        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-user-chevron,
+        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-user-chevron {
+          opacity: 0;
+          pointer-events: none;
+        }
+
+        /* Conversation list fades + collapses height */
+        .lex-sidebar-root .lex-sidebar-conversation-list {
+          transition: opacity 0.25s ease, max-height 0.7s cubic-bezier(0.22, 0.84, 0, 0.99);
+          max-height: 2000px;
+          overflow: hidden;
+        }
         .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-conversation-list {
-          display: none;
+          opacity: 0;
+          max-height: 0;
+          pointer-events: none;
         }
 
-        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-nav-item {
-          justify-content: center;
-          padding: 0.625rem;
-        }
-
-        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-user {
-          justify-content: center;
-          padding: 0.5rem;
-        }
-
-        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-section {
-          padding: 0.5rem;
-        }
-
-        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-footer {
-          padding: 0.5rem;
-        }
-
+        /* Tooltips on collapsed nav items */
         .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-nav-item {
           position: relative;
         }
