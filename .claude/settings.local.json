@@ -61,7 +61,15 @@
       "Bash(python3:*)",
       "Bash(chmod:*)",
       "Bash(git check-ignore:*)",
-      "Bash(pm2 logs:*)"
+      "Bash(pm2 logs:*)",
+      "Bash(ls:*)",
+      "Bash(psql:*)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:lucide.dev)",
+      "WebFetch(domain:github.com)",
+      "Bash(npm info:*)",
+      "Bash(npm install:*)",
+      "Bash(ollama list:*)"
     ],
     "deny": [],
     "ask": []
