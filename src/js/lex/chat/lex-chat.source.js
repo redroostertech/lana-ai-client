@@ -412,6 +412,13 @@
             threadId: data.thread_id
           };
 
+        case 'block_hints':
+          return {
+            type: 'block_hints',
+            intent: data.intent || null,
+            blocks: data.blocks || data.suggested_blocks || []
+          };
+
         case 'sources':
         case 'retrieval_metrics':
         case 'tool_result':

@@ -112,6 +112,57 @@
       prompt += `\nYou can mix structured blocks with regular text. Place each block in its own \`\`\`json code fence. The UI will render them automatically.\n`;
 
       return prompt;
+    },
+
+    /**
+     * Generate a compact system prompt for a subset of block types.
+     * One line per block, ~8 tokens each vs ~72 in verbose format.
+     * Inspired by the backend's LlmSchemaSerializerService compact notation.
+     *
+     * @param {string[]} [blockTypes] - Block type names to include. If omitted, includes all.
+     * @returns {string} Compact prompt text
+     */
+    toCompactPrompt(blockTypes) {
+      const schemas = this.getAll();
+      if (schemas.length === 0) return '';
+
+      // Filter to requested types (if specified)
+      const filtered = blockTypes
+        ? schemas.filter(s => blockTypes.includes(s.type))
+        : schemas;
+
+      if (filtered.length === 0) return '';
+
+      let prompt = `\n## UI Blocks\nOutput as \`\`\`json code fence with "type" field. Mix with text freely.\n`;
+
+      for (const { type, schema } of filtered) {
+        const fields = schema.fields || {};
+        const fieldParts = [];
+
+        for (const [name, config] of Object.entries(fields)) {
+          if (name === 'type') continue; // Skip the type field itself
+
+          let part = name;
+
+          // Type abbreviation
+          const t = config.type || 'str';
+          const typeAbbr = t === 'string' ? 'str' :
+                           t === 'boolean' ? 'bool' :
+                           t === 'number' ? 'num' :
+                           t === 'array' ? 'arr' :
+                           t === 'object' ? 'obj' : t;
+
+          part += '(' + typeAbbr;
+          if (config.required) part += ',req';
+          part += ')';
+
+          fieldParts.push(part);
+        }
+
+        prompt += `- ${type}: ${fieldParts.join(', ')}\n`;
+      }
+
+      return prompt;
     }
   };
 
@@ -119,16 +170,27 @@
   // LexBlockRenderer — Renders structured blocks into DOM containers
   // =========================================================================
 
+  /** Maximum recursion depth for compound blocks (section, layout). */
+  const MAX_RENDER_DEPTH = 3;
+
   const LexBlockRenderer = {
 
     /**
      * Render an array of structured blocks into a container.
+     * Supports recursive rendering for compound blocks (section, layout).
+     *
      * @param {HTMLElement} container - Target DOM element
      * @param {Array} blocks - Array of block objects with { type, ... }
-     * @param {Object} options - { append: false } to replace vs append
+     * @param {Object} options - { append: false, _depth: 0 }
      */
     render(container, blocks, options = {}) {
       if (!container || !Array.isArray(blocks)) return;
+
+      const depth = options._depth || 0;
+      if (depth > MAX_RENDER_DEPTH) {
+        console.warn('[Lex AI] Max render depth exceeded, skipping nested blocks');
+        return;
+      }
 
       const fragment = document.createDocumentFragment();
 
@@ -153,9 +215,9 @@
         wrapper.className = 'lex-block mb-4';
         wrapper.dataset.blockType = block.type;
 
-        // Call the registered renderer
+        // Call the registered renderer, passing depth for compound blocks
         try {
-          registration.renderer(wrapper, block);
+          registration.renderer(wrapper, block, { _depth: depth + 1 });
         } catch (err) {
           console.error(`[Lex AI] Render error for "${block.type}":`, err);
           wrapper.innerHTML = `<div class="lex-text-danger text-xs p-2 lex-bg-danger rounded">Failed to render ${block.type}</div>`;

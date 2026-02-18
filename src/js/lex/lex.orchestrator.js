@@ -20,12 +20,56 @@
 
   const LexOrchestrator = {
 
+    // -- Intent state (set by block_hints SSE events) --
+    _lastIntent: null,
+    _lastBlocks: null,
+
     /**
      * Get the system prompt fragment that describes available UI blocks.
      * Append this to the LLM's system prompt.
+     * @deprecated Use getCompactPromptForIntent() for token-efficient prompts.
      */
     getSystemPromptAddendum() {
       return SchemaRegistry.toSystemPrompt();
+    },
+
+    /**
+     * Get a compact, token-efficient system prompt for a specific intent.
+     * Uses TokenBudget to select relevant blocks, then generates compact schema.
+     *
+     * @param {string} [intent] - Backend intent label. Falls back to last stored intent.
+     * @returns {string} Compact schema prompt (typically 50-200 tokens)
+     */
+    getCompactPromptForIntent(intent) {
+      const TokenBudget = global.Lex.TokenBudget;
+      const targetIntent = intent || this._lastIntent;
+
+      let blockTypes;
+      if (targetIntent && TokenBudget) {
+        blockTypes = TokenBudget.getBlocksForIntent(targetIntent);
+      }
+
+      return SchemaRegistry.toCompactPrompt(blockTypes);
+    },
+
+    /**
+     * Store intent hints from a block_hints SSE event.
+     * Called by lex-chat when it receives block_hints from the backend.
+     *
+     * @param {string} intent - The classified intent
+     * @param {string[]} [blocks] - Suggested block types (overrides local mapping)
+     */
+    setIntentHints(intent, blocks) {
+      this._lastIntent = intent || null;
+      this._lastBlocks = blocks || null;
+    },
+
+    /**
+     * Get the last received intent hints.
+     * @returns {{ intent: string|null, blocks: string[]|null }}
+     */
+    getIntentHints() {
+      return { intent: this._lastIntent, blocks: this._lastBlocks };
     },
 
     /**

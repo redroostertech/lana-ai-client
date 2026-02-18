@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lex UI — Bidirectional Intent-Driven Demo</title>
+
+  <!-- Tailwind -->
+  <script src="js/tailwind-loader.js"></script>
+
+  <!-- Design Tokens -->
+  <link rel="stylesheet" href="css/lex-tokens.css">
+  <link rel="stylesheet" href="css/lex-chat.css">
+
+  <style>
+    html { scroll-behavior: auto; }
+    body {
+      font-family: var(--lex-font-sans);
+      background: var(--lex-bg-secondary);
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+    }
+
+    /* App shell layout */
+    .lex-shell-main {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    @media (min-width: 1024px) {
+      .lex-shell-main {
+        margin-left: var(--lex-sidebar-current-width, var(--lex-sidebar-width, 256px));
+        transition: margin-left 0.7s cubic-bezier(0.22, 0.84, 0, 0.99);
+      }
+    }
+    .lex-shell-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: calc(var(--lex-z-overlay, 30) - 1);
+      display: none;
+    }
+    .lex-shell-overlay.visible { display: block; }
+    @media (min-width: 1024px) {
+      .lex-shell-overlay { display: none !important; }
+    }
+
+    /* Section sub-nav */
+    .lex-subnav {
+      position: relative;
+      top: 0;
+      z-index: 40;
+      background: var(--lex-bg-primary);
+      border-bottom: 1px solid var(--lex-border-subtle);
+      padding: 0 2rem;
+    }
+    .lex-subnav-scroll {
+      display: flex;
+      gap: 2px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      -webkit-overflow-scrolling: touch;
+    }
+    .lex-subnav-scroll::-webkit-scrollbar { display: none; }
+    .lex-subnav-link {
+      display: inline-flex;
+      align-items: center;
+      white-space: nowrap;
+      padding: 10px 14px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--lex-text-tertiary);
+      text-decoration: none;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s ease, border-color 0.15s ease;
+      cursor: pointer;
+    }
+    .lex-subnav-link:hover {
+      color: var(--lex-text-primary);
+    }
+    .lex-subnav-link--active {
+      color: var(--lex-text-accent, #736B5C);
+      border-bottom-color: var(--lex-text-accent, #736B5C);
+    }
+
+    .intent-shell {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+      .intent-shell {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .intent-main {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .intent-panel {
+      background: var(--lex-bg-primary);
+      border-radius: var(--lex-radius-xl);
+      padding: 1.5rem;
+      border: 1px solid var(--lex-border-subtle, rgba(0,0,0,0.06));
+    }
+
+    .intent-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--lex-text-primary);
+      margin-bottom: 0.25rem;
+    }
+
+    .intent-subtitle {
+      font-size: 0.875rem;
+      color: var(--lex-text-secondary);
+      margin-bottom: 1.5rem;
+    }
+
+    .intent-section-label {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--lex-text-tertiary);
+      margin-bottom: 0.75rem;
+    }
+
+    /* Block rendering area */
+    .block-stage {
+      min-height: 200px;
+      border: 1px dashed var(--lex-border-default);
+      border-radius: var(--lex-radius-lg);
+      padding: 1rem;
+    }
+
+    .block-stage:empty::before {
+      content: 'Blocks will render here when you trigger a demo scenario...';
+      color: var(--lex-text-placeholder);
+      font-size: 0.8125rem;
+      font-style: italic;
+    }
+
+    /* Sidebar panels */
+    .sidebar-panel {
+      background: var(--lex-bg-primary);
+      border-radius: var(--lex-radius-xl);
+      padding: 1rem;
+      border: 1px solid var(--lex-border-subtle, rgba(0,0,0,0.06));
+      margin-bottom: 1rem;
+    }
+
+    /* Event log */
+    .event-log {
+      max-height: 300px;
+      overflow-y: auto;
+      font-family: var(--lex-font-mono);
+      font-size: 0.6875rem;
+      line-height: 1.6;
+    }
+
+    .event-log-entry {
+      padding: 4px 8px;
+      border-bottom: 1px solid var(--lex-border-subtle, rgba(0,0,0,0.04));
+    }
+
+    .event-log-entry:last-child {
+      border-bottom: none;
+    }
+
+    .event-type {
+      font-weight: 600;
+      color: var(--lex-text-accent);
+    }
+
+    .event-time {
+      color: var(--lex-text-tertiary);
+      margin-right: 8px;
+    }
+
+    .event-data {
+      color: var(--lex-text-secondary);
+      word-break: break-all;
+    }
+
+    /* Token budget meter */
+    .budget-meter {
+      height: 6px;
+      background: var(--lex-bg-tertiary);
+      border-radius: 3px;
+      overflow: hidden;
+      margin: 8px 0;
+    }
+
+    .budget-meter-fill {
+      height: 100%;
+      background: var(--lex-color-brand-600, #595246);
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+
+    .budget-meter-fill.over-budget {
+      background: var(--lex-color-danger-500, #DC2626);
+    }
+
+    .budget-stats {
+      font-size: 0.6875rem;
+      color: var(--lex-text-tertiary);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* Scenario buttons */
+    .scenario-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .scenario-btn {
+      padding: 10px 12px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-align: left;
+      background: var(--lex-bg-secondary);
+      border: 1px solid var(--lex-border-default);
+      border-radius: var(--lex-radius-md);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      color: var(--lex-text-primary);
+      line-height: 1.4;
+    }
+
+    .scenario-btn:hover {
+      border-color: var(--lex-border-strong);
+      background: var(--lex-bg-primary);
+      transform: translateX(2px);
+    }
+
+    .scenario-btn .scenario-label {
+      font-weight: 600;
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .scenario-btn .scenario-desc {
+      color: var(--lex-text-tertiary);
+      font-size: 0.6875rem;
+    }
+
+    /* Intent selector uses <lex-select> — no custom CSS needed */
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <lex-sidebar
+    logo-src="img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="index.html"
+    active-id="lex-ui"
+  ></lex-sidebar>
+
+  <!-- Mobile overlay -->
+  <div class="lex-shell-overlay" id="shellOverlay"></div>
+
+  <!-- Main content area -->
+  <div class="lex-shell-main">
+    <lex-topbar heading="Lex UI — Intent-Driven Demo"></lex-topbar>
+
+    <!-- Section sub-navigation -->
+    <nav class="lex-subnav">
+      <div class="lex-subnav-scroll">
+        <a class="lex-subnav-link" href="lex-test.html">Component Library</a>
+        <a class="lex-subnav-link lex-subnav-link--active" href="lex-intent.html">Intent Demo</a>
+      </div>
+    </nav>
+
+    <div class="intent-shell">
+
+    <!-- ══════════ Main Column ══════════ -->
+    <div class="intent-main">
+
+      <div class="intent-panel">
+        <div class="intent-title">Bidirectional Intent-Driven UI</div>
+        <div class="intent-subtitle">
+          Blocks are selected per intent. User interactions flow back to AI. Feedback corrects the system.
+        </div>
+
+        <!-- Scenario triggers -->
+        <div class="intent-section-label">Demo Scenarios</div>
+        <div class="scenario-grid" id="scenarioGrid">
+          <button class="scenario-btn" data-scenario="suggestion">
+            <span class="scenario-label">Suggestion Flow</span>
+            <span class="scenario-desc">AI suggests → user picks → AI continues</span>
+          </button>
+          <button class="scenario-btn" data-scenario="decision">
+            <span class="scenario-label">Decision Flow</span>
+            <span class="scenario-desc">AI asks → user decides → AI acts</span>
+          </button>
+          <button class="scenario-btn" data-scenario="input">
+            <span class="scenario-label">Input Request</span>
+            <span class="scenario-desc">AI needs info → user types → AI proceeds</span>
+          </button>
+          <button class="scenario-btn" data-scenario="form">
+            <span class="scenario-label">Form Collection</span>
+            <span class="scenario-desc">AI needs data → user fills form → AI creates</span>
+          </button>
+          <button class="scenario-btn" data-scenario="compound">
+            <span class="scenario-label">Compound Blocks</span>
+            <span class="scenario-desc">Section + layout with nested children</span>
+          </button>
+          <button class="scenario-btn" data-scenario="full_chain">
+            <span class="scenario-label">Full Chain</span>
+            <span class="scenario-desc">Suggestion → Decision → Input → Complete</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Block rendering stage -->
+      <div class="intent-panel">
+        <div class="intent-section-label">Rendered Blocks</div>
+        <div class="block-stage" id="blockStage"></div>
+      </div>
+
+    </div>
+
+    <!-- ══════════ Sidebar ══════════ -->
+    <div>
+
+      <!-- Token Budget Panel -->
+      <div class="sidebar-panel">
+        <div class="intent-section-label">Token Budget</div>
+
+        <div style="margin-bottom: 12px;">
+          <label class="intent-section-label" style="margin-bottom: 4px;">Select Intent</label>
+          <lex-select id="intentSelect" placeholder="All blocks (verbose)" clearable size="sm"></lex-select>
+        </div>
+
+        <div id="budgetDisplay">
+          <div class="budget-meter"><div class="budget-meter-fill" id="budgetFill" style="width: 0%"></div></div>
+          <div class="budget-stats">
+            <span id="budgetTokens">0 tokens</span>
+            <span id="budgetLimit">/ 250 max</span>
+          </div>
+        </div>
+
+        <div style="margin-top: 12px;">
+          <div class="intent-section-label">Compact Prompt Preview</div>
+          <pre id="promptPreview" style="font-size: 0.6875rem; color: var(--lex-text-secondary); white-space: pre-wrap; word-break: break-all; max-height: 200px; overflow-y: auto; background: var(--lex-bg-secondary); padding: 8px; border-radius: var(--lex-radius-md); margin: 0;"></pre>
+        </div>
+
+        <div style="margin-top: 8px;">
+          <div class="intent-section-label">Verbose Prompt (for comparison)</div>
+          <div class="budget-stats" style="margin-bottom: 4px;">
+            <span id="verboseTokens">~0 tokens</span>
+            <span>full verbose format</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Event Log Panel -->
+      <div class="sidebar-panel">
+        <div class="intent-section-label" style="display: flex; justify-content: space-between; align-items: center;">
+          Bridge Event Log
+          <lex-btn id="clearLog" variant="ghost" size="sm">Clear</lex-btn>
+        </div>
+        <div class="event-log" id="eventLog">
+          <div class="event-log-entry">
+            <span class="event-data">Waiting for block interactions...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Block Count Panel -->
+      <div class="sidebar-panel">
+        <div class="intent-section-label">Registered Blocks</div>
+        <div id="blockCount" style="font-size: 0.8125rem; color: var(--lex-text-primary); font-weight: 600;"></div>
+        <div id="blockList" style="font-size: 0.6875rem; color: var(--lex-text-secondary); margin-top: 4px; line-height: 1.8;"></div>
+      </div>
+
+    </div>
+
+  </div>
+
+  </div><!-- /.lex-shell-main -->
+
+  <!-- ══════════ Scripts ══════════ -->
+
+  <!-- Core framework -->
+  <script src="js/lex/lex.core.js?v=5"></script>
+  <script src="js/lex/lex.icons.js?v=5"></script>
+  <script src="js/lex/lex.data.js?v=5"></script>
+  <script src="js/lex/lex.forms.js?v=5"></script>
+  <script src="js/lex/lex.ai.js?v=5"></script>
+  <script src="js/lex/lex.ai.budget.js?v=5"></script>
+  <script src="js/lex/lex.ai.context.js?v=5"></script>
+  <script src="js/lex/lex.ai.bridge.js?v=5"></script>
+  <script src="js/lex/lex.orchestrator.js?v=5"></script>
+  <script src="js/lex/index.js?v=5"></script>
+
+  <!-- Block types -->
+  <script src="js/lex/blocks/text.block.js?v=5"></script>
+  <script src="js/lex/blocks/metric-card.block.js?v=5"></script>
+  <script src="js/lex/blocks/metric-grid.block.js?v=5"></script>
+  <script src="js/lex/blocks/table.block.js?v=5"></script>
+  <script src="js/lex/blocks/action-list.block.js?v=5"></script>
+  <script src="js/lex/blocks/document-ref.block.js?v=5"></script>
+  <script src="js/lex/blocks/citation.block.js?v=5"></script>
+  <script src="js/lex/blocks/timeline.block.js?v=5"></script>
+  <script src="js/lex/blocks/suggestion.block.js?v=5"></script>
+  <script src="js/lex/blocks/decision.block.js?v=5"></script>
+  <script src="js/lex/blocks/input-request.block.js?v=5"></script>
+  <script src="js/lex/blocks/form-collect.block.js?v=5"></script>
+  <script src="js/lex/blocks/section.block.js?v=5"></script>
+  <script src="js/lex/blocks/layout.block.js?v=5"></script>
+  <script src="js/lex/blocks/reasoning-terminal.block.js?v=5"></script>
+  <script src="js/lex/blocks/reasoning-steps.block.js?v=5"></script>
+  <script src="js/lex/blocks/code-block.block.js?v=5"></script>
+  <script src="js/lex/blocks/compare.block.js?v=5"></script>
+  <script src="js/lex/blocks/redline.block.js?v=5"></script>
+  <script src="js/lex/blocks/progress-metric.block.js?v=5"></script>
+
+  <!-- Foundation + Form components (used by block renderers) -->
+  <script src="js/lex/components/foundation/lex-btn.js?v=5"></script>
+  <script src="js/lex/components/form/lex-input.js?v=5"></script>
+  <script src="js/lex/components/form/lex-textarea.js?v=5"></script>
+  <script src="js/lex/components/form/lex-select.js?v=5"></script>
+
+  <!-- Layout components (sidebar + topbar) -->
+  <script src="js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="js/lex/components/layout/lex-topbar.js"></script>
+
+  <script>
+  (function () {
+    'use strict';
+
+    const { SchemaRegistry, BlockRenderer, TokenBudget, Orchestrator } = window.Lex;
+    const stage = document.getElementById('blockStage');
+    const eventLog = document.getElementById('eventLog');
+    const intentSelect = document.getElementById('intentSelect');
+    const promptPreview = document.getElementById('promptPreview');
+    const budgetFill = document.getElementById('budgetFill');
+    const budgetTokensEl = document.getElementById('budgetTokens');
+    const verboseTokensEl = document.getElementById('verboseTokens');
+
+    // ── Populate intent selector (lex-select component) ─────────────────
+    if (TokenBudget) {
+      var intents = TokenBudget.getAllIntents();
+      intentSelect.options = intents.map(function (intent) {
+        return { value: intent, label: intent.replace(/_/g, ' ') };
+      });
+    }
+
+    // ── Populate block count ────────────────────────────────────────────
+    const allSchemas = SchemaRegistry.getAll();
+    document.getElementById('blockCount').textContent = allSchemas.length + ' block types registered';
+    document.getElementById('blockList').innerHTML = allSchemas
+      .map(function (s) { return '<span style="display:inline-block; padding:2px 6px; margin:2px; background:var(--lex-bg-tertiary); border-radius:var(--lex-radius-sm);">' + s.type + '</span>'; })
+      .join('');
+
+    // ── Token budget visualization ──────────────────────────────────────
+    function updateBudgetDisplay() {
+      const intent = intentSelect.value || '';
+      var compactPrompt;
+
+      if (intent && TokenBudget) {
+        var blockTypes = TokenBudget.getBlocksForIntent(intent);
+        compactPrompt = SchemaRegistry.toCompactPrompt(blockTypes);
+      } else {
+        compactPrompt = SchemaRegistry.toCompactPrompt();
+      }
+
+      promptPreview.textContent = compactPrompt || '(empty)';
+
+      var tokens = TokenBudget ? TokenBudget.estimateTokens(compactPrompt) : 0;
+      var max = TokenBudget ? TokenBudget.MAX_SCHEMA_TOKENS : 250;
+      var pct = Math.min(100, (tokens / max) * 100);
+
+      budgetFill.style.width = pct + '%';
+      budgetFill.className = 'budget-meter-fill' + (pct > 100 ? ' over-budget' : '');
+      budgetTokensEl.textContent = '~' + tokens + ' tokens';
+
+      // Verbose comparison
+      var verbosePrompt = SchemaRegistry.toSystemPrompt();
+      var verboseTokens = TokenBudget ? TokenBudget.estimateTokens(verbosePrompt) : 0;
+      verboseTokensEl.textContent = '~' + verboseTokens + ' tokens';
+    }
+
+    intentSelect.addEventListener('lex-change', updateBudgetDisplay);
+    updateBudgetDisplay();
+
+    // ── Event logging ───────────────────────────────────────────────────
+    function logEvent(type, data) {
+      var now = new Date();
+      var time = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+      var entry = document.createElement('div');
+      entry.className = 'event-log-entry';
+      entry.innerHTML = '<span class="event-time">' + time + '</span>' +
+        '<span class="event-type">' + type + '</span> ' +
+        '<span class="event-data">' + escapeHtml(JSON.stringify(data)) + '</span>';
+
+      // Prepend (newest first)
+      if (eventLog.firstChild) {
+        eventLog.insertBefore(entry, eventLog.firstChild);
+      } else {
+        eventLog.appendChild(entry);
+      }
+    }
+
+    document.getElementById('clearLog').addEventListener('click', function () {
+      eventLog.innerHTML = '';
+    });
+
+    // Listen for block events on the stage
+    ['lex-suggestion', 'lex-action', 'lex-decision', 'lex-input-response', 'lex-form-submit', 'lex-block-reject'].forEach(function (evt) {
+      stage.addEventListener(evt, function (e) {
+        logEvent(evt, e.detail);
+      });
+    });
+
+    // ── Demo Scenarios ──────────────────────────────────────────────────
+    var scenarios = {
+
+      suggestion: [
+        { type: 'text', content: 'I found several relevant documents related to the Thompson case. Here are some things I can help with:' },
+        {
+          type: 'suggestion',
+          title: 'What would you like to do?',
+          items: [
+            { label: 'Summarize key findings', value: 'summarize the key findings from Thompson case documents', icon: 'document' },
+            { label: 'Search for precedents', value: 'search for legal precedents related to Thompson case', icon: 'search' },
+            { label: 'Draft a memo', value: 'draft a memo summarizing the Thompson case status', icon: 'action' },
+            { label: 'Show timeline', value: 'show me the timeline of events in Thompson case', icon: 'question' }
+          ]
+        }
+      ],
+
+      decision: [
+        { type: 'text', content: 'I\'ve identified two approaches for structuring the settlement agreement:' },
+        {
+          type: 'decision',
+          prompt: 'Which approach would you prefer?',
+          options: [
+            { label: 'Standard Settlement v4', value: 'standard_v4', description: 'Uses the firm\'s standard template with standard notice periods' },
+            { label: 'Custom Negotiated Terms', value: 'custom', description: 'Tailored terms based on the specific circumstances of this case' },
+            { label: 'Hybrid Approach', value: 'hybrid', description: 'Standard framework with custom liability and indemnification clauses' }
+          ],
+          allow_custom: true,
+          custom_placeholder: 'Describe a different approach...'
+        }
+      ],
+
+      input: [
+        { type: 'text', content: 'I can search for relevant case law. I need a few details to narrow the search:' },
+        {
+          type: 'input_request',
+          prompt: 'What jurisdiction should I search in?',
+          field: 'jurisdiction',
+          input_type: 'text',
+          placeholder: 'e.g. California, Federal 9th Circuit, New York',
+          submit_label: 'Search',
+          hint: 'I\'ll search case law databases for the specified jurisdiction'
+        }
+      ],
+
+      form: [
+        { type: 'text', content: 'I\'ll create a new matter for you. Please provide the details:' },
+        {
+          type: 'form_collect',
+          title: 'New Matter Details',
+          fields: [
+            { name: 'matter_name', label: 'Matter Name', type: 'text', required: true, placeholder: 'e.g. Acme Corp v. Jones' },
+            { name: 'client', label: 'Client', type: 'text', required: true, placeholder: 'Client name' },
+            { name: 'matter_type', label: 'Matter Type', type: 'select', options: ['Litigation', 'Corporate', 'Real Estate', 'Employment', 'IP', 'Other'] },
+            { name: 'priority', label: 'Priority', type: 'select', required: true, options: ['High', 'Medium', 'Low'] },
+            { name: 'notes', label: 'Notes', type: 'textarea', placeholder: 'Any additional details...' }
+          ],
+          submit_label: 'Create Matter'
+        }
+      ],
+
+      compound: [
+        {
+          type: 'section',
+          title: 'Contract Analysis Summary',
+          subtitle: 'Review completed on February 18, 2026',
+          children: [
+            {
+              type: 'layout',
+              columns: 3,
+              children: [
+                { type: 'metric_card', title: 'Total Clauses', value: '24', trend: 'flat' },
+                { type: 'metric_card', title: 'Risk Items', value: '3', trend: 'down' },
+                { type: 'metric_card', title: 'Score', value: '87%', trend: 'up' }
+              ]
+            },
+            { type: 'text', content: '**Key Findings:** The contract contains standard terms with three notable risk items in sections 4.2, 7.1, and 12.3. The indemnification clause needs review.' },
+            {
+              type: 'action_list',
+              title: 'Recommended Actions',
+              items: [
+                { label: 'Review Section 4.2', description: 'Liability cap is below market standard', priority: 'high', action: 'review_clause' },
+                { label: 'Negotiate Section 7.1', description: 'Non-compete is overly broad', priority: 'medium', action: 'negotiate_clause' },
+                { label: 'Accept Section 12.3', description: 'Termination clause is reasonable', priority: 'low', action: 'accept_clause' }
+              ]
+            }
+          ]
+        }
+      ],
+
+      full_chain: [
+        { type: 'text', content: 'Let\'s set up a new client engagement. I\'ll walk you through the process step by step.' },
+        {
+          type: 'suggestion',
+          title: 'First, what type of engagement is this?',
+          items: [
+            { label: 'New litigation matter', value: 'I need to set up a new litigation matter', icon: 'action' },
+            { label: 'Corporate transaction', value: 'I need to set up a corporate transaction', icon: 'document' },
+            { label: 'Regulatory compliance', value: 'I need regulatory compliance review', icon: 'search' }
+          ]
+        }
+      ]
+    };
+
+    // ── Render scenarios ─────────────────────────────────────────────────
+    document.getElementById('scenarioGrid').addEventListener('click', function (e) {
+      var btn = e.target.closest('.scenario-btn');
+      if (!btn) return;
+
+      var scenario = btn.dataset.scenario;
+      var blocks = scenarios[scenario];
+      if (!blocks) return;
+
+      // Clear stage and render
+      stage.innerHTML = '';
+      BlockRenderer.render(stage, blocks);
+
+      logEvent('scenario', { name: scenario, blocks: blocks.length });
+    });
+
+    // ── Utility ──────────────────────────────────────────────────────────
+    function escapeHtml(text) {
+      var div = document.createElement('div');
+      div.textContent = text || '';
+      return div.innerHTML;
+    }
+  })();
+  </script>
+
+  <!-- Sidebar initialization -->
+  <script>
+  (function () {
+    'use strict';
+
+    const sidebar = document.querySelector('lex-sidebar');
+    const overlay = document.getElementById('shellOverlay');
+
+    if (sidebar) {
+      // Read user from localStorage
+      let user = null;
+      try {
+        const userJson = localStorage.getItem('user');
+        if (userJson) user = JSON.parse(userJson);
+      } catch (e) { /* ignore */ }
+
+      const fullName = user
+        ? `${user.firstName || user.first_name || ''} ${user.lastName || user.last_name || ''}`.trim() || user.email || 'User'
+        : 'User';
+      const firstName = user
+        ? (user.firstName || user.first_name || fullName.split(/\s+/)[0] || 'User')
+        : 'User';
+      const initials = user
+        ? ((user.firstName || user.first_name || '')[0] || '') + ((user.lastName || user.last_name || '')[0] || '') || (user.email || 'U')[0].toUpperCase()
+        : 'U';
+      const handle = user ? (user.username ? '@' + user.username : (user.email || '')) : '';
+
+      const adminRoles = ['system_admin', 'org_admin', 'admin'];
+      const userRoles = user ? (user.roles || user.role_names || []) : [];
+      const userRoleName = user ? (user.role_name || user.role || '') : '';
+      const allRoles = new Set([
+        ...userRoles.map(r => (typeof r === 'string' ? r : (r && r.name || '')).toLowerCase()),
+        ...(userRoleName ? [userRoleName.toLowerCase()] : [])
+      ]);
+      const showAdmin = adminRoles.some(r => allRoles.has(r));
+
+      sidebar.sections = [
+        {
+          id: 'main',
+          isStaticTop: true,
+          items: [
+            { id: 'dashboard', label: 'Dashboard', icon: 'home', href: 'index.html' },
+            { id: 'lex-ui', label: 'Lex UI', icon: 'flask-conical', href: 'lex-test.html' },
+            { id: 'matters', label: 'Matters', icon: 'archive', href: 'matters.html' },
+            { id: 'storage', label: 'My Drive', icon: 'folder', href: 'storage.html' }
+          ]
+        },
+        {
+          id: 'tools',
+          items: [
+            { id: 'connectors', label: 'Data Connectors', icon: 'plug', href: 'integrations/connectors.html' },
+            { id: 'reports', label: 'Reports', icon: 'bar-chart-2', href: 'insights/module-execution.html' }
+          ]
+        }
+      ];
+
+      sidebar.userName = firstName;
+      sidebar.userInitials = initials;
+      sidebar.userEmail = handle;
+      sidebar.version = (window.APP_VERSION && window.APP_VERSION.getVersion) ? window.APP_VERSION.getVersion() : '';
+
+      const menuItems = [];
+      if (showAdmin) {
+        menuItems.push({ id: 'admin', label: 'Administration', icon: 'users', href: 'admin/index.html' });
+      }
+      menuItems.push({ id: 'settings', label: 'Settings', icon: 'settings', href: 'settings.html' });
+      menuItems.push({ id: 'help', label: 'Help & Support', icon: 'help-circle', href: 'help.html' });
+      menuItems.push({ id: 'signout', label: 'Sign Out', icon: 'log-out', action: 'signout', danger: true });
+      sidebar.userMenuItems = menuItems;
+
+      sidebar.addEventListener('sidebar-user-action', (e) => {
+        const action = e.detail && e.detail.action;
+        if (action === 'signout') {
+          if (window.api && typeof window.api.logout === 'function') {
+            window.api.logout()
+              .then(() => { window.location.href = 'login.html'; })
+              .catch(() => { window.location.href = 'login.html'; });
+          } else {
+            window.location.href = 'login.html';
+          }
+        }
+      });
+
+      if (!sidebar.version && window.electronAPI && window.electronAPI.getVersion) {
+        window.electronAPI.getVersion().then((v) => {
+          sidebar.version = 'v' + v;
+        }).catch(() => {});
+      }
+    }
+
+    // Mobile overlay toggle
+    if (overlay) {
+      overlay.addEventListener('click', function () {
+        overlay.classList.remove('visible');
+        const sb = document.querySelector('lex-sidebar');
+        if (sb && typeof sb.close === 'function') sb.close();
+      });
+    }
+  })();
+  </script>
+
+</body>
+</html>

@@ -115,6 +115,19 @@
     }
 
     _bindChildEvents() {
+      // ── Action Bridge — bidirectional block↔AI communication ──
+      if (global.Lex.ActionBridge) {
+        this._bridge = new global.Lex.ActionBridge();
+        this._bridge.attach(this, {
+          feedbackEndpoint: '/api/v1/feedback/',
+          getToken: () => localStorage.getItem('token') || '',
+          getBaseUrl: () => {
+            const api = global.api;
+            return api?.baseUrl || '';
+          }
+        });
+      }
+
       // Composer send
       this.addEventListener('lex-composer-send', (e) => {
         this.send(e.detail.content);
@@ -125,9 +138,9 @@
         this.stop();
       });
 
-      // Composer suggestion
+      // Composer suggestion (fallback if bridge isn't loaded)
       this.addEventListener('lex-composer-suggestion', (e) => {
-        this.send(e.detail.value);
+        if (!this._bridge) this.send(e.detail.value);
       });
 
       // Document remove
@@ -553,6 +566,14 @@
           this._showSystemMessage('Generation stopped');
           break;
 
+        case 'block_hints':
+          // Store intent hints for schema selection on next turn
+          if (global.Lex.Orchestrator) {
+            global.Lex.Orchestrator.setIntentHints(event.intent, event.blocks);
+          }
+          this.emit('lex-chat-block-hints', { intent: event.intent, blocks: event.blocks });
+          break;
+
         case 'error':
           if (this._activityEl) this._activityEl.hide();
           if (event.status === 401) {
@@ -592,6 +613,10 @@
     }
 
     disconnected() {
+      if (this._bridge) {
+        this._bridge.detach();
+        this._bridge = null;
+      }
       if (this._source) {
         this._source.disconnect();
       }

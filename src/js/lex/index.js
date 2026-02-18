@@ -19,7 +19,10 @@
   if (global.Lex.LexDataSource) parts.push('data');
   if (global.Lex.LexDataPipeline) parts.push('pipeline');
   if (global.Lex.SchemaRegistry) parts.push('ai');
+  if (global.Lex.TokenBudget) parts.push('budget');
   if (global.Lex.Orchestrator) parts.push('orchestrator');
+  if (global.Lex.ActionBridge) parts.push('bridge');
+  if (global.Lex.ActivityContext) parts.push('context');
   console.log('[Lex UI] v' + global.Lex.version + ' — ' + parts.join(', '));
 
 })(typeof window !== 'undefined' ? window : globalThis);
