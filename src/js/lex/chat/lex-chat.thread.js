@@ -49,8 +49,6 @@
       .lex-chat-thread-scroller {
         flex: 1;
         overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
-        scroll-behavior: smooth;
       }
 
       .lex-chat-thread-container {

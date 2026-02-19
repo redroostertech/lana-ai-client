@@ -1,0 +1,9865 @@
+/* workspace.js — Workspaces page script (SPA lifecycle).
+   Extracted from matters.html inline scripts.
+   Uses LexRouter.registerView() for onEnter/onLeave lifecycle.
+
+   Dependencies (loaded via page descriptor before this file):
+     - feature-tracker, mammoth, conflict-detection, similar-matters-widget
+     - analytics, metadata-formatter/service, marked, document-metadata-viewer
+     - tiptap-bundle, matter-notes (api client + components), matter-skills
+     - drawflow, workflow-builder
+*/
+(function () {
+  'use strict';
+
+  // ── Lifecycle tracking ──────────────────────────────────────────────
+  var _windowKeys = [];
+
+  // Track window globals for onLeave cleanup
+  function _trackGlobal(name) {
+    if (_windowKeys.indexOf(name) === -1) _windowKeys.push(name);
+  }
+
+  // ── Utility bridges (no regex) ──────────────────────────────────────
+
+  // formatNumber: replaces the regex-based original with toLocaleString
+  function formatNumber(num) {
+    if (num === null || num === undefined) return '0';
+    return Number(num).toLocaleString('en-US');
+  }
+
+  // isOrgAdmin: bridge to Lex.Auth singleton
+  function isOrgAdmin() {
+    return Lex.Auth.isAdmin();
+  }
+
+  // ── Page code ───────────────────────────────────────────────────────
+
+    function initializePage() {
+
+    // State
+    let currentPage = 1;
+    const pageSize = 12;
+    let selectedMatters = new Set(); // Track selected matter IDs
+    let currentMatters = []; // Track currently displayed matters for "Select All"
+    let matters = [];
+
+    // Pinned matters pagination
+    let pinnedPage = 1;
+    const pinnedPageSize = 20;
+    let allPinnedMatters = [];
+    let totalPinnedCount = 0;
+
+    // Analytics: Track page view only once on initial load
+    let hasTrackedPageView = false;
+
+    // Security: HTML escaping to prevent XSS attacks
+    // Using explicit string replacement for better performance and security
+    function escapeHtml(unsafe) {
+      if (unsafe === null || unsafe === undefined) return '';
+      return String(unsafe)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    // Helper function to render a single matter card
+    function renderMatterCard(matter) {
+      // Escape all user-controlled data to prevent XSS
+      const escapedMatterId = escapeHtml(matter.matter_id);
+      const escapedMatterName = escapeHtml(matter.name || matter.matter_name || 'Untitled');
+      const escapedClientName = escapeHtml(matter.client_name || '');
+      const escapedDescription = escapeHtml(matter.description || 'No description');
+      const escapedMatterNumber = escapeHtml(matter.matter_number || '');
+      const escapedSource = escapeHtml(matter.source || 'lana');  // Use 'source' not 'source_type' for pin API
+
+      return `
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow relative matter-card ${selectedMatters.has(matter.matter_id) ? 'ring-2 ring-indigo-500' : ''}" data-matter-id="${escapedMatterId}">
+          <!-- Selection Checkbox -->
+          <div class="absolute top-4 left-4 z-10">
+            <input type="checkbox"
+                   class="matter-checkbox w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                   data-matter-id="${escapedMatterId}"
+                   ${selectedMatters.has(matter.matter_id) ? 'checked' : ''}
+                   onclick="event.stopPropagation(); toggleMatterSelection('${escapedMatterId}')">
+          </div>
+
+          <div class="cursor-pointer pl-8" onclick="viewMatter('${escapedMatterId}')">
+            <div class="flex items-start justify-between mb-4">
+              <div class="flex-1 min-w-0">
+                <span class="text-xs text-gray-400 font-mono block truncate" title="${escapedMatterId}">${escapedMatterId}</span>
+                <h3 class="text-lg font-semibold text-gray-900 mt-1">${escapedMatterName}</h3>
+                <p class="text-sm text-gray-500">${escapedClientName}</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <!-- Pin Button -->
+                <button
+                  onclick="event.stopPropagation(); togglePin('${escapedMatterId}', '${escapedSource}', ${matter.is_pinned || false})"
+                  class="pin-button ${matter.is_pinned ? 'text-yellow-500' : 'text-gray-400'} hover:text-yellow-600 transition-colors"
+                  title="${matter.is_pinned ? 'Unpin matter' : 'Pin matter'}"
+                  data-matter-id="${escapedMatterId}"
+                  aria-label="${matter.is_pinned ? 'Unpin matter' : 'Pin matter'}">
+                  ${matter.is_pinned ? `
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/>
+                    </svg>
+                  ` : `
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
+                    </svg>
+                  `}
+                </button>
+              </div>
+            </div>
+            <p class="text-sm text-gray-600 line-clamp-2 mb-4">${escapedDescription}</p>
+            <!-- Matter Type and Status Badges -->
+            <div class="flex items-center gap-2 mb-4">
+              ${matter.matter_type === 'matter' ? `
+                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800" title="Client Matter - Included in analytics">
+                  <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+                    <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
+                  </svg>
+                  Matter
+                </span>
+              ` : `
+                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800" title="Workspace - Excluded from analytics">
+                  <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/>
+                  </svg>
+                  Workspace
+                </span>
+              `}
+              ${statusBadge(matter.status || 'active')}
+            </div>
+            <div class="flex items-center justify-between text-xs text-gray-400">
+              <span>Created ${formatDate(matter.created_at)}</span>
+              <div class="relative">
+                <button onclick="event.stopPropagation(); toggleMatterCardOptions('${escapedMatterId}')" class="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors" title="More options">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
+                  </svg>
+                </button>
+                <div id="matter-card-options-${escapedMatterId}" class="hidden absolute right-0 top-full mt-1 w-32 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                  <button onclick="event.stopPropagation(); editMatter('${escapedMatterId}'); closeMatterCardOptions('${escapedMatterId}')" class="w-full px-4 py-2 text-left text-sm text-indigo-600 hover:bg-indigo-50 transition-colors">Edit</button>
+                  <button onclick="event.stopPropagation(); deleteMatter('${escapedMatterId}'); closeMatterCardOptions('${escapedMatterId}')" class="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors">Delete</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Debounce utility function
+    function debounce(func, wait) {
+      let timeout;
+      return function executedFunction(...args) {
+        const later = () => {
+          clearTimeout(timeout);
+          func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+      };
+    }
+
+    // Load matters
+    async function loadMatters() {
+      const grid = document.getElementById('mattersGrid');
+      const loading = document.getElementById('mattersLoading');
+      const pagination = document.getElementById('pagination');
+
+      // Track page view on initial load (use one-time flag to prevent race conditions)
+      if (!hasTrackedPageView && window.analytics) {
+        window.analytics.trackPageView('matters', null);
+        hasTrackedPageView = true;
+      }
+
+      // Show loading state
+      loading.classList.remove('hidden');
+      grid.classList.add('hidden');
+      pagination.innerHTML = '';
+      
+      try {
+        const search = document.getElementById('searchInput').value;
+        const statusFilterValue = document.getElementById('statusFilter').value;
+        const matterTypeFilterValue = document.getElementById('matterTypeFilter').value;
+
+        // Handle "shared" filter separately
+        let filters = { search };
+        if (statusFilterValue === 'shared') {
+          filters.shared_only = true;
+        } else if (statusFilterValue) {
+          filters.status = statusFilterValue;
+        }
+
+        // Add matter type filter if selected
+        if (matterTypeFilterValue) {
+          filters.matter_type = matterTypeFilterValue;
+        }
+
+        // org_admin sees all matters, others see only their own (unless filtering for shared)
+        const includeAll = isOrgAdmin() && statusFilterValue !== 'shared';
+        filters.include_all = includeAll;
+
+        // Fetch pinned and unpinned matters separately in parallel
+        const [pinnedResult, unpinnedResult] = await Promise.all([
+          // Fetch pinned matters with pagination (only on page 1 of unpinned matters)
+          currentPage === 1 ? api.getPinnedMatters(pinnedPage, pinnedPageSize, filters) : Promise.resolve({ matters: allPinnedMatters, total: totalPinnedCount }),
+          // Fetch unpinned matters with pagination and exclude_pinned flag
+          api.getMatters(currentPage, pageSize, { ...filters, exclude_pinned: true })
+        ]);
+
+        const pinnedMatters = pinnedResult.matters || [];
+        const unpinnedMatters = unpinnedResult.matters || [];
+
+        // Store pinned matters info for "Show More" functionality
+        if (currentPage === 1) {
+          if (pinnedPage === 1) {
+            allPinnedMatters = pinnedMatters;
+          } else {
+            allPinnedMatters = [...allPinnedMatters, ...pinnedMatters];
+          }
+          totalPinnedCount = pinnedResult.total || pinnedMatters.length;
+        }
+
+        // Combine for currentMatters (for select all functionality)
+        matters = [...allPinnedMatters, ...unpinnedMatters];
+        currentMatters = matters;
+
+        console.log('[Matters] Pinned matters loaded:', pinnedMatters.length);
+        console.log('[Matters] Total pinned matters:', totalPinnedCount);
+        console.log('[Matters] Currently showing pinned:', allPinnedMatters.length);
+        console.log('[Matters] Unpinned matters:', unpinnedMatters.length);
+        console.log('[Matters] Total on page:', matters.length);
+
+        // Hide loading, show grid
+        loading.classList.add('hidden');
+        grid.classList.remove('hidden');
+
+        // Check if there are NO matters at all (both pinned and unpinned)
+        if (allPinnedMatters.length === 0 && unpinnedMatters.length === 0 && currentPage === 1) {
+          grid.innerHTML = `
+            <div class="col-span-full py-16">
+              <div class="max-w-md mx-auto text-center">
+                <div class="w-24 h-24 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <svg class="w-12 h-12 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
+                  </svg>
+                </div>
+                <h3 class="text-xl font-semibold text-gray-900 mb-2">No matters yet</h3>
+                <p class="text-gray-500 mb-6">Get started by creating your first matter to organize your documents and collaborate with your team.</p>
+                <button onclick="document.getElementById('createMatterBtn').click()" class="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors shadow-lg shadow-indigo-200">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                  </svg>
+                  Create your first matter
+                </button>
+              </div>
+            </div>
+          `;
+          return;
+        }
+
+        // Sort pinned matters by pinned_at (most recent first)
+        // Security: Handle null/undefined pinned_at to prevent crashes
+        pinnedMatters.sort((a, b) => {
+          const aTime = a.pinned_at ? new Date(a.pinned_at).getTime() : 0;
+          const bTime = b.pinned_at ? new Date(b.pinned_at).getTime() : 0;
+          return bTime - aTime; // Most recent first
+        });
+
+        // Render matters with grouping
+        let html = '';
+
+        // Pinned Matters Section (only show on page 1)
+        if (allPinnedMatters.length > 0 && currentPage === 1) {
+          console.log('[Matters] Rendering pinned matters section');
+          // Dynamic heading based on filter
+          let pinnedHeading = 'Pinned Matters';
+          if (matterTypeFilterValue === 'matter') {
+            pinnedHeading = 'Pinned Client Matters';
+          } else if (matterTypeFilterValue === 'workspace') {
+            pinnedHeading = 'Pinned Workspaces';
+          }
+          html += `
+            <div class="col-span-full">
+              <div class="flex items-center gap-2 mb-4">
+                <svg class="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/>
+                </svg>
+                <h2 class="text-lg font-semibold text-gray-900">${pinnedHeading}</h2>
+                <span class="text-sm text-gray-500">(${totalPinnedCount > allPinnedMatters.length ? `Showing ${formatNumber(allPinnedMatters.length)} of ${formatNumber(totalPinnedCount)}` : formatNumber(allPinnedMatters.length)})</span>
+              </div>
+            </div>
+          `;
+          html += allPinnedMatters.map(matter => renderMatterCard(matter)).join('');
+
+          // Show "Show More" button if there are more pinned matters to load
+          if (allPinnedMatters.length < totalPinnedCount) {
+            html += `
+              <div class="col-span-full">
+                <button
+                  id="showMorePinnedBtn"
+                  class="w-full py-3 px-4 bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-400 transition-colors flex items-center justify-center gap-2"
+                  onclick="loadMorePinnedMatters()"
+                >
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                  </svg>
+                  Show More Pinned Matters
+                </button>
+              </div>
+            `;
+          }
+        }
+
+        // All Matters Section
+        if (unpinnedMatters.length > 0) {
+          const totalUnpinned = unpinnedResult.total || 0;
+          // Dynamic heading based on filter
+          let sectionHeading = 'All Matters';
+          if (matterTypeFilterValue === 'matter') {
+            sectionHeading = 'Client Matters';
+          } else if (matterTypeFilterValue === 'workspace') {
+            sectionHeading = 'Workspaces';
+          }
+          html += `
+            <div class="col-span-full ${allPinnedMatters.length > 0 && currentPage === 1 ? 'mt-8' : ''}">
+              <div class="flex items-center gap-2 mb-4">
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
+                </svg>
+                <h2 class="text-lg font-semibold text-gray-900">${sectionHeading}</h2>
+                <span class="text-sm text-gray-500">(${formatNumber(totalUnpinned)})</span>
+              </div>
+            </div>
+          `;
+          html += unpinnedMatters.map(matter => renderMatterCard(matter)).join('');
+        }
+
+        grid.innerHTML = html;
+
+        // Update pagination (based on unpinned matters only)
+        const total = unpinnedResult.total || 0;
+        const totalPages = Math.ceil(total / pageSize);
+        updatePagination(totalPages);
+      } catch (error) {
+        // Hide loading, show grid with error state
+        loading.classList.add('hidden');
+        grid.classList.remove('hidden');
+        grid.innerHTML = `
+          <div class="col-span-full py-16">
+            <div class="max-w-md mx-auto text-center">
+              <div class="w-24 h-24 bg-gradient-to-br from-red-100 to-red-200 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg class="w-12 h-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+              </div>
+              <h3 class="text-xl font-semibold text-gray-900 mb-2">Failed to load matters</h3>
+              <p class="text-gray-500 mb-6">There was a problem loading your matters. Please try again.</p>
+              <button onclick="loadMatters()" class="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                Try Again
+              </button>
+            </div>
+          </div>
+        `;
+        Toast.error('Failed to load matters');
+      }
+    }
+
+    async function loadMorePinnedMatters() {
+      console.log('[Matters] Loading more pinned matters');
+
+      try {
+        const btn = document.getElementById('showMorePinnedBtn');
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = `
+            <svg class="animate-spin h-5 w-5 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Loading...
+          `;
+        }
+
+        // Increment pinned page
+        pinnedPage++;
+
+        // Build filters
+        const filters = {};
+        const searchValue = searchInput.value.trim();
+        if (searchValue) filters.search = searchValue;
+        const statusValue = statusFilter.value;
+        if (statusValue) filters.status = statusValue;
+        const sourceValue = sourceFilter.value;
+        if (sourceValue) filters.source_filter = sourceValue;
+
+        // Fetch next batch of pinned matters by re-rendering
+        // loadMatters() will handle fetching the next page and accumulating
+        await loadMatters();
+
+      } catch (error) {
+        console.error('[Matters] Failed to load more pinned matters:', error);
+        Toast.error('Failed to load more pinned matters');
+
+        // Decrement page back if failed
+        pinnedPage--;
+
+        // Re-enable button
+        const btn = document.getElementById('showMorePinnedBtn');
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = `
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+            Show More Pinned Matters
+          `;
+        }
+      }
+    }
+
+    function updatePagination(totalPages) {
+      const pagination = document.getElementById('pagination');
+      if (totalPages <= 1) {
+        pagination.innerHTML = '';
+        return;
+      }
+
+      pagination.innerHTML = `
+        <div class="flex gap-2">
+          <button ${currentPage === 1 ? 'disabled' : ''} onclick="goToPage(${currentPage - 1})" class="px-3 py-1 border rounded ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'}">Previous</button>
+          <span class="px-3 py-1 text-gray-600">Page ${formatNumber(currentPage)} of ${formatNumber(totalPages)}</span>
+          <button ${currentPage === totalPages ? 'disabled' : ''} onclick="goToPage(${currentPage + 1})" class="px-3 py-1 border rounded ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'}">Next</button>
+        </div>
+      `;
+    }
+
+    window.goToPage = function(page) {
+      currentPage = page;
+      loadMatters();
+    }
+
+    // Search and filter
+    document.getElementById('searchInput').addEventListener('input', debounce(() => {
+      const searchQuery = document.getElementById('searchInput').value;
+
+      // Track matter searched event (truncate query to 200 chars for analytics)
+      if (searchQuery && window.analytics) {
+        const truncatedQuery = searchQuery.length > 200 ? searchQuery.substring(0, 200) : searchQuery;
+        window.analytics.trackEvent('matter.searched', 'matter', null, {
+          matter_id: null, // Search is global, not matter-specific
+          query: truncatedQuery,
+          query_length: searchQuery.length,
+          truncated: searchQuery.length > 200
+        });
+      }
+
+      currentPage = 1;
+      pinnedPage = 1;
+      allPinnedMatters = [];
+      totalPinnedCount = 0;
+      loadMatters();
+    }, 300));
+
+    document.getElementById('statusFilter').addEventListener('change', () => {
+      const filterValue = document.getElementById('statusFilter').value;
+
+      // Track matter filtered event
+      if (window.analytics) {
+        window.analytics.trackEvent('matter.filtered', 'matter', null, {
+          matter_id: null, // Filter is global, not matter-specific
+          filter_type: 'status',
+          filter_value: filterValue
+        });
+      }
+
+      currentPage = 1;
+      pinnedPage = 1;
+      allPinnedMatters = [];
+      totalPinnedCount = 0;
+      loadMatters();
+    });
+
+    document.getElementById('matterTypeFilter').addEventListener('change', () => {
+      const filterValue = document.getElementById('matterTypeFilter').value;
+
+      // Track matter type filtered event
+      if (window.analytics) {
+        window.analytics.trackEvent('matter.filtered', 'matter', null, {
+          matter_id: null,
+          filter_type: 'matter_type',
+          filter_value: filterValue
+        });
+      }
+
+      currentPage = 1;
+      pinnedPage = 1;
+      allPinnedMatters = [];
+      totalPinnedCount = 0;
+      loadMatters();
+    });
+
+    // Modal
+    const modal = document.getElementById('matterModal');
+    const form = document.getElementById('matterForm');
+    let allOrgUsers = [];
+    let selectedUsers = [];
+    let conflictDetection = null;
+    // Expose globally for inline onclick handlers in conflict-detection.js templates
+    Object.defineProperty(window, 'conflictDetection', {
+      get() { return conflictDetection; },
+      set(v) { conflictDetection = v; },
+      configurable: true
+    });
+
+    // Workspace matter modal variables
+    let workspaceSelectedUsers = [];
+    let workspaceConflictDetection = null;
+    Object.defineProperty(window, 'workspaceConflictDetection', {
+      get() { return workspaceConflictDetection; },
+      set(v) { workspaceConflictDetection = v; },
+      configurable: true
+    });
+
+    // Load workspaces for linking
+    let allWorkspaces = [];
+    async function loadWorkspaces() {
+      try {
+        const result = await api.getMatters(1, 500, 'workspace'); // Get all workspaces
+        allWorkspaces = result.matters || [];
+        console.log('[loadWorkspaces] Loaded workspaces:', allWorkspaces.length);
+      } catch (error) {
+        console.error('Failed to load workspaces:', error);
+        allWorkspaces = [];
+      }
+    }
+
+    // Populate workspace selector dropdown
+    function populateWorkspaceSelector() {
+      const workspaceSelector = document.getElementById('workspaceSelector');
+      if (!workspaceSelector) return;
+
+      // Keep the default "No workspace" option
+      const defaultOption = workspaceSelector.querySelector('option[value=""]');
+      workspaceSelector.innerHTML = '';
+      if (defaultOption) {
+        workspaceSelector.appendChild(defaultOption);
+      }
+
+      // Add workspace options
+      allWorkspaces.forEach(workspace => {
+        const option = document.createElement('option');
+        option.value = workspace.matter_id;
+        option.textContent = workspace.matter_name || workspace.matter_id;
+        workspaceSelector.appendChild(option);
+      });
+
+      console.log('[populateWorkspaceSelector] Added workspace options:', allWorkspaces.length);
+    }
+
+    // Show/hide workspace selector based on matter type
+    function updateWorkspaceSelectorVisibility() {
+      const matterTypeRadio = document.querySelector('input[name="matterType"]:checked');
+      const workspaceSelectorSection = document.getElementById('workspaceSelectorSection');
+
+      if (matterTypeRadio && matterTypeRadio.value === 'matter') {
+        // Show workspace selector for Client Matters
+        workspaceSelectorSection.classList.remove('hidden');
+      } else {
+        // Hide workspace selector for Workspaces
+        workspaceSelectorSection.classList.add('hidden');
+        // Reset selection
+        document.getElementById('workspaceSelector').value = '';
+      }
+    }
+
+    // Add event listeners for matter type radio buttons
+    document.querySelectorAll('input[name="matterType"]').forEach(radio => {
+      radio.addEventListener('change', updateWorkspaceSelectorVisibility);
+    });
+
+    // Load org users for sharing
+    async function loadOrgUsers() {
+      try {
+        const result = await api.getUsers(1, 200);
+        allOrgUsers = (result.users || []).filter(u => u.id !== api.user?.id); // Exclude current user
+      } catch (error) {
+        console.error('Failed to load org users:', error);
+      }
+    }
+
+    // Load both users and workspaces on page load
+    Promise.all([loadOrgUsers(), loadWorkspaces()]).then(() => {
+      populateWorkspaceSelector();
+    });
+
+    // User search functionality
+    const userSearchInput = document.getElementById('userSearchInput');
+    const userSearchResults = document.getElementById('userSearchResults');
+    const selectedUsersList = document.getElementById('selectedUsersList');
+    const noUsersSelected = document.getElementById('noUsersSelected');
+
+    userSearchInput.addEventListener('input', debounce(() => {
+      const query = userSearchInput.value.toLowerCase().trim();
+      if (query.length < 2) {
+        userSearchResults.classList.add('hidden');
+        return;
+      }
+
+      const filtered = allOrgUsers.filter(u => 
+        !selectedUsers.some(s => s.id === u.id) && (
+          (u.email || '').toLowerCase().includes(query) ||
+          (u.first_name || '').toLowerCase().includes(query) ||
+          (u.last_name || '').toLowerCase().includes(query)
+        )
+      ).slice(0, 8);
+
+      if (filtered.length === 0) {
+        userSearchResults.innerHTML = '<div class="p-3 text-sm text-gray-500">No users found</div>';
+      } else {
+        userSearchResults.innerHTML = filtered.map(u => `
+          <div class="p-2 hover:bg-gray-50 cursor-pointer flex items-center gap-2" onclick="addUserToShare('${u.id}')">
+            <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <span class="text-xs font-medium text-indigo-600">${(u.first_name?.[0] || '') + (u.last_name?.[0] || '') || u.email?.[0]?.toUpperCase() || 'U'}</span>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium text-gray-900 truncate">${u.first_name || ''} ${u.last_name || ''}</p>
+              <p class="text-xs text-gray-500 truncate">${u.email}</p>
+            </div>
+          </div>
+        `).join('');
+      }
+      userSearchResults.classList.remove('hidden');
+    }, 200));
+
+    // Hide search results when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!userSearchInput.contains(e.target) && !userSearchResults.contains(e.target)) {
+        userSearchResults.classList.add('hidden');
+      }
+    });
+
+    window.addUserToShare = function(userId) {
+      const user = allOrgUsers.find(u => u.id === userId);
+      if (!user || selectedUsers.some(u => u.id === userId)) return;
+      
+      selectedUsers.push(user);
+      renderSelectedUsers();
+      userSearchInput.value = '';
+      userSearchResults.classList.add('hidden');
+      
+      // Auto-set visibility to private when users are selected
+      document.getElementById('matterVisibility').value = 'private';
+      updateShareSectionVisibility();
+    }
+
+    window.removeUserFromShare = function(userId) {
+      selectedUsers = selectedUsers.filter(u => u.id !== userId);
+      renderSelectedUsers();
+    }
+
+    // Handle visibility change
+    const visibilitySelect = document.getElementById('matterVisibility');
+    visibilitySelect.addEventListener('change', () => {
+      if (visibilitySelect.value === 'organization') {
+        // Clear selected users when switching to organization visibility
+        selectedUsers = [];
+        renderSelectedUsers();
+      }
+      updateShareSectionVisibility();
+    });
+
+    // Show/hide share section based on visibility
+    function updateShareSectionVisibility() {
+      const shareSection = document.getElementById('shareWithSection');
+      const visibility = document.getElementById('matterVisibility').value;
+      
+      if (visibility === 'organization') {
+        shareSection.classList.add('opacity-50');
+        shareSection.querySelector('#userSearchInput').disabled = true;
+        shareSection.querySelector('label').innerHTML = 'Share with Team Members <span class="text-gray-400 text-xs font-normal">(Not needed for organization visibility)</span>';
+      } else {
+        shareSection.classList.remove('opacity-50');
+        shareSection.querySelector('#userSearchInput').disabled = false;
+        shareSection.querySelector('label').innerHTML = 'Share with Team Members';
+      }
+    }
+
+    function renderSelectedUsers() {
+      if (selectedUsers.length === 0) {
+        selectedUsersList.innerHTML = '<p class="text-sm text-gray-500 italic" id="noUsersSelected">No users selected. Start typing to search and add team members.</p>';
+        return;
+      }
+
+      selectedUsersList.innerHTML = selectedUsers.map(u => `
+        <div class="flex items-center justify-between bg-gray-50 rounded-lg p-2">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <span class="text-xs font-medium text-indigo-600">${(u.first_name?.[0] || '') + (u.last_name?.[0] || '') || u.email?.[0]?.toUpperCase() || 'U'}</span>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-gray-900">${u.first_name || ''} ${u.last_name || ''}</p>
+              <p class="text-xs text-gray-500">${u.email}</p>
+            </div>
+          </div>
+          <button type="button" onclick="removeUserFromShare('${u.id}')" class="text-gray-400 hover:text-red-600 p-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+      `).join('');
+    }
+
+    function resetShareForm() {
+      selectedUsers = [];
+      renderSelectedUsers();
+      userSearchInput.value = '';
+      userSearchResults.classList.add('hidden');
+      document.getElementById('matterVisibility').value = 'private';
+      updateShareSectionVisibility();
+    }
+
+    // ================== DOCUMENT UPLOAD HANDLING (Removed - use Documents tab in matter drawer) ==================
+
+    document.getElementById('createMatterBtn').addEventListener('click', () => {
+      document.getElementById('matterModalTitle').textContent = 'Create Matter';
+      document.getElementById('matterId').value = '';
+      document.getElementById('matterIdDisplay').classList.add('hidden');
+      document.getElementById('shareWithSection').classList.remove('hidden');
+      form.reset();
+      resetShareForm();
+
+      // Enable matter type selection and reset to workspace default
+      document.getElementById('matterTypeSection').classList.remove('hidden');
+      document.querySelectorAll('input[name="matterType"]').forEach(radio => {
+        radio.disabled = false;
+        if (radio.value === 'workspace') {
+          radio.checked = true;
+        }
+      });
+
+      // Update workspace selector visibility based on default selection (workspace)
+      updateWorkspaceSelectorVisibility();
+
+      // Initialize conflict detection
+      conflictDetection = new ConflictDetection(api);
+      conflictDetection.initialize('conflictDetectionContainer');
+
+      modal.classList.remove('hidden');
+    });
+
+    document.getElementById('closeMatterModal').addEventListener('click', () => {
+      modal.classList.add('hidden');
+      if (conflictDetection) {
+        conflictDetection.reset();
+      }
+    });
+    document.getElementById('cancelMatterBtn').addEventListener('click', () => {
+      modal.classList.add('hidden');
+      if (conflictDetection) {
+        conflictDetection.reset();
+      }
+    });
+
+    // Create conversation for a matter and navigate to chat
+    window.createMatterConversation = async function(matterId, matterName) {
+      console.log('[matters.html.createMatterConversation] Creating conversation for matter:', { matterId, matterName });
+
+      // Find the button that triggered this action
+      const buttons = document.querySelectorAll(`button[onclick*="createMatterConversation('${matterId}'"]`);
+
+      // Disable all matching buttons and show loading state
+      buttons.forEach(button => {
+        button.disabled = true;
+        button.classList.add('opacity-50', 'cursor-not-allowed');
+
+        // Store original HTML
+        if (!button.dataset.originalHtml) {
+          button.dataset.originalHtml = button.innerHTML;
+        }
+
+        // Replace with loading spinner
+        button.innerHTML = `
+          <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span>Creating...</span>
+        `;
+      });
+
+      try {
+        console.log('[matters.html.createMatterConversation] Calling API to create conversation...');
+
+        // Create conversation via API
+        const response = await api.post('/api/v1/chat/sessions', {
+          matter_id: matterId,
+          title: matterName || matterId,
+          context: {
+            matter_name: matterName,
+            matter_id: matterId
+          }
+        });
+
+        console.log('[matters.html.createMatterConversation] API response:', response);
+
+        const threadId = response.session?.thread_id || response.session?.id || response.thread_id;
+
+        if (!threadId) {
+          throw new Error('No thread ID returned from API');
+        }
+
+        console.log('[matters.html.createMatterConversation] ✅ Conversation created successfully!', {
+          threadId,
+          matterId,
+          matterName
+        });
+
+        // Navigate to chat.html with session and matter parameters
+        const params = new URLSearchParams();
+        params.set('session', threadId);
+        params.set('matter', matterId);
+
+        const chatPath = NavigationHelpers.resolveChatPath();
+        const fullUrl = `${chatPath}?${params.toString()}`;
+
+        console.log('[matters.html.createMatterConversation] ========================================');
+        console.log('[matters.html.createMatterConversation] READY TO NAVIGATE');
+        console.log('[matters.html.createMatterConversation] ========================================');
+        console.log('[matters.html.createMatterConversation] Thread ID:', threadId);
+        console.log('[matters.html.createMatterConversation] Matter ID:', matterId);
+        console.log('[matters.html.createMatterConversation] Matter Name:', matterName);
+        console.log('[matters.html.createMatterConversation] Chat Path:', chatPath);
+        console.log('[matters.html.createMatterConversation] URL Params:', params.toString());
+        console.log('[matters.html.createMatterConversation] Full URL:', fullUrl);
+        console.log('[matters.html.createMatterConversation] Current window.location.href:', window.location.href);
+        console.log('[matters.html.createMatterConversation] ========================================');
+        console.log('[matters.html.createMatterConversation] 🚀 WILL NAVIGATE TO:', fullUrl);
+        console.log('[matters.html.createMatterConversation] ⏱️  Waiting 2 seconds for log capture...');
+        console.log('[matters.html.createMatterConversation] ========================================');
+
+        // Wait 2 seconds before navigating so user can copy logs
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        console.log('[matters.html.createMatterConversation] 🚀 NAVIGATING NOW to:', fullUrl);
+        window.location.href = fullUrl;
+
+      } catch (error) {
+        console.error('[matters.html.createMatterConversation] Failed to create conversation:', error);
+
+        // Restore buttons on error
+        buttons.forEach(button => {
+          button.disabled = false;
+          button.classList.remove('opacity-50', 'cursor-not-allowed');
+          if (button.dataset.originalHtml) {
+            button.innerHTML = button.dataset.originalHtml;
+          }
+        });
+
+        // Show user-friendly error message
+        if (error.response?.data?.error?.code === 'MATTER_NOT_FOUND') {
+          Toast.error(`Matter not found. Please refresh the page and try again.`);
+        } else {
+          Toast.error(`Failed to create conversation: ${error.message || 'Unknown error'}`);
+        }
+      }
+    };
+
+    // Edit matter
+    window.editMatter = async function(matterId) {
+      // Remember if drawer was open for this matter when editing started
+      // So we can re-open it after the update
+      const wasDrawerOpen = currentMatterData?.matter?.matter_id === matterId;
+      window._editingMatterFromDrawer = wasDrawerOpen ? matterId : null;
+
+      try {
+        const [matterResult, permResult] = await Promise.all([
+          api.getMatter(matterId),
+          api.getMatterPermissions(matterId).catch(() => ({ permissions: [] }))
+        ]);
+        const matter = matterResult.matter;
+        const permissions = permResult.permissions || [];
+
+        document.getElementById('matterModalTitle').textContent = 'Edit Matter';
+        document.getElementById('matterId').value = matter.matter_id;
+        document.getElementById('matterIdDisplay').classList.remove('hidden');
+        const matterIdValueEl = document.getElementById('matterIdValue');
+        matterIdValueEl.textContent = matter.matter_id;
+        matterIdValueEl.title = matter.matter_id; // Show full ID on hover
+        document.getElementById('clientName').value = matter.client_name || '';
+        document.getElementById('matterName').value = matter.matter_name || '';
+        document.getElementById('matterDescription').value = matter.description || '';
+        document.getElementById('matterStatus').value = matter.status || 'active';
+        document.getElementById('matterVisibility').value = matter.visibility || 'private';
+
+        // Hide matter type section when editing (type is immutable)
+        document.getElementById('matterTypeSection').classList.add('hidden');
+
+        // Show workspace selector for editing if matter is a client matter
+        if (matter.matter_type === 'matter') {
+          document.getElementById('workspaceSelectorSection').classList.remove('hidden');
+
+          // Load current workspace link if any
+          try {
+            const linksResponse = await fetch(`${api.baseUrl}/api/v1/entity-links/matter/${matterId}`, {
+              headers: {
+                'Authorization': `Bearer ${api.token}`
+              }
+            });
+
+            if (linksResponse.ok) {
+              const linksData = await linksResponse.json();
+              const workspaceLink = linksData.links?.workspace_matters?.[0]; // Get first workspace link
+
+              if (workspaceLink) {
+                // Set the workspace selector to the linked workspace
+                // For incoming links (matter linked to workspace), workspace ID is in linked_entity_id
+                document.getElementById('workspaceSelector').value = workspaceLink.linked_entity_id;
+                console.log('[Edit Matter] Loaded existing workspace link:', workspaceLink.linked_entity_id);
+              }
+            }
+          } catch (error) {
+            console.error('[Edit Matter] Failed to load workspace links:', error);
+          }
+        } else {
+          // Hide workspace selector for workspaces
+          document.getElementById('workspaceSelectorSection').classList.add('hidden');
+        }
+
+        // Load existing shared users
+        selectedUsers = permissions.map(p => ({
+          id: p.user_id,
+          email: p.email,
+          first_name: p.first_name,
+          last_name: p.last_name
+        }));
+        renderSelectedUsers();
+
+        // Show share section in edit mode and update visibility state
+        document.getElementById('shareWithSection').classList.remove('hidden');
+        updateShareSectionVisibility();
+
+        modal.classList.remove('hidden');
+      } catch (error) {
+        Toast.error('Failed to load matter');
+      }
+    }
+
+    // View matter
+    // Store current matter data globally for tab switching
+    let currentMatterData = null;
+
+    window.viewMatter = async function(matterId, defaultTab = 'details', options = {}) {
+      const drawer = document.getElementById('matterDrawer');
+      const overlay = document.getElementById('drawerOverlay');
+
+      // Log the matter_id being used to fetch conversations
+      console.log('[viewMatter] Loading matter details:', {
+        matterId,
+        format: matterId.startsWith('MATT-') ? 'MATT-XXXXX' : 'other',
+        defaultTab,
+        bustCache: options.bustCache || false
+      });
+
+      try {
+        // Fetch all matter data in parallel
+        const [matterResult, permissionsResult, activityResult, chatsResult, docsResult, orphanedResult, tasksResult, commentsResult] = await Promise.all([
+          api.getMatter(matterId, { bustCache: options.bustCache }),
+          api.getMatterPermissions(matterId).catch(() => ({ permissions: [] })),
+          api.getMatterActivity(matterId, 20, 0).catch(() => ({ activities: [], pagination: { total: 0, limit: 20, offset: 0 } })), // Get first page for activity tab
+          api.getMatterConversations(matterId, 25, 0).catch((err) => {
+            console.error('[viewMatter] Failed to fetch conversations:', err);
+            return { sessions: [], pagination: { total: 0, limit: 25, offset: 0 } };
+          }), // Get first page of conversations
+          api.getMatterFiles(matterId).catch((err) => {
+            console.error('[viewMatter] Failed to fetch documents:', err);
+            return { files: [], pagination: { total_count: 0 } };
+          }), // Get documents
+          api.getOrphanedFiles(matterId).catch((err) => {
+            console.error('[viewMatter] Failed to fetch orphaned files:', err);
+            return { orphaned_files: [], total_count: 0 };
+          }), // Get orphaned files
+          api.getMatterTasks(matterId).catch((err) => {
+            console.error('[viewMatter] Failed to fetch tasks:', err);
+            return { tasks: [], total_count: 0 };
+          }), // Get tasks
+          api.getComments(matterId, { limit: 0 }).catch((err) => {
+            console.error('[viewMatter] Failed to fetch comment count:', err);
+            return { data: [], pagination: { total: 0 } };
+          }) // Get comment count only
+        ]);
+
+        const matter = matterResult.matter;
+        const permissions = permissionsResult.permissions || [];
+        const activities = activityResult.activities || [];
+        const activityPagination = activityResult.pagination || { total: 0, limit: 20, offset: 0 };
+        const chats = chatsResult.sessions || [];
+        const chatsPagination = chatsResult.pagination || { total: 0, limit: 25, offset: 0 };
+        const documents = docsResult.files || [];
+        const documentsPagination = docsResult.pagination || { total_count: 0 };
+        const orphanedFiles = orphanedResult.orphaned_files || [];
+        const tasks = tasksResult.tasks || [];
+        const commentCount = commentsResult.pagination?.total || 0;
+
+        // Extract shadow table data from matter object (when full_details=true)
+        const contacts = matter.contacts || [];
+        const notes = matter.notes || [];
+
+        // Log conversation results for debugging
+        console.log('[viewMatter] Conversations loaded:', {
+          matterId,
+          matterUUID: matter?.id,
+          conversationCount: chats.length,
+          conversations: chats.map(c => ({
+            thread_id: c.thread_id,
+            matter_id: c.matter_id,
+            title: c.title || c.metadata?.title
+          }))
+        });
+
+        console.log('[viewMatter] Documents loaded:', {
+          matterId,
+          documentCount: documents.length,
+          totalDocuments: documentsPagination.total_count,
+          orphanedCount: orphanedFiles.length
+        });
+
+        console.log('[viewMatter] Shadow tables loaded:', {
+          matterId,
+          tasksCount: tasks.length,
+          contactsCount: contacts.length,
+          notesCount: notes.length
+        });
+
+        // Store data globally for tab switching
+        currentMatterData = { matter, permissions, activities, activityPagination, chats, chatsPagination, documents, documentsPagination, orphanedFiles, tasks, contacts, notes };
+
+        // Track matter opened event (with defensive null checks)
+        if (window.analytics && matter) {
+          window.analytics.trackEvent('matter.opened', 'matter', matter.matter_id, {
+            resource_name: matter?.matter_name || 'Unknown',
+            status: matter?.status || 'unknown',
+            default_tab: defaultTab
+          });
+        }
+
+        // Update drawer header
+        const drawerMatterIdEl = document.getElementById('drawerMatterId');
+        drawerMatterIdEl.textContent = matter.matter_id;
+        drawerMatterIdEl.title = matter.matter_id; // Show full ID on hover
+        document.getElementById('drawerMatterName').textContent = matter.matter_name || 'Untitled';
+        document.getElementById('drawerClientName').textContent = matter.client_name || '';
+
+        // Update status badge with matter type badge
+        const matterTypeBadge = matter.matter_type === 'matter' ? `
+          <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-2" title="Client Matter - Included in analytics">
+            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+              <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
+            </svg>
+            Matter
+          </span>
+        ` : `
+          <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 mr-2" title="Workspace - Excluded from analytics">
+            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/>
+            </svg>
+            Workspace
+          </span>
+        `;
+
+        document.getElementById('drawerStatusBadge').innerHTML = matterTypeBadge + statusBadge(matter.status || 'active');
+
+        // Tab count badges removed from UI
+        // Counts are now only visible within the tab content itself
+
+        // Hide Skills tab for workspaces (skills only apply to client matters)
+        const skillsTab = document.getElementById('tabSkills');
+        if (skillsTab) {
+          const isWorkspace = matter.matter_type === 'workspace';
+          skillsTab.style.display = isWorkspace ? 'none' : 'block';
+        }
+
+        // Hide Contacts tab for workspaces
+        const contactsTab = document.getElementById('tabContacts');
+        if (contactsTab) {
+          const isWorkspace = matter.matter_type === 'workspace';
+          contactsTab.style.display = isWorkspace ? 'none' : 'block';
+        }
+
+        // Set up more options dropdown actions
+        const moreOptionsBtn = document.getElementById('drawerMoreOptionsBtn');
+        const optionsDropdown = document.getElementById('drawerOptionsDropdown');
+        const optionsEditBtn = document.getElementById('drawerOptionsEdit');
+        const optionsDeleteBtn = document.getElementById('drawerOptionsDelete');
+
+        const closeMatterOptionsDropdown = () => { if (optionsDropdown) optionsDropdown.classList.add('hidden'); };
+
+        if (moreOptionsBtn && optionsDropdown) {
+          moreOptionsBtn.onclick = (e) => {
+            e.stopPropagation();
+            const isOpening = optionsDropdown.classList.contains('hidden');
+            optionsDropdown.classList.toggle('hidden');
+            if (isOpening) {
+              setTimeout(() => {
+                const closeOnClickOutside = (ev) => {
+                  if (!optionsDropdown.contains(ev.target) && !moreOptionsBtn.contains(ev.target)) {
+                    closeMatterOptionsDropdown();
+                    document.removeEventListener('click', closeOnClickOutside);
+                  }
+                };
+                document.addEventListener('click', closeOnClickOutside);
+              }, 0);
+            }
+          };
+        }
+        if (optionsEditBtn) {
+          optionsEditBtn.onclick = () => { editMatter(matter.matter_id); closeDrawer(); closeMatterOptionsDropdown(); };
+        }
+        if (optionsDeleteBtn) {
+          optionsDeleteBtn.onclick = () => { deleteMatter(matter.matter_id); closeMatterOptionsDropdown(); };
+        }
+
+        // Render the specified tab (default is 'details')
+        switchMatterTab(defaultTab);
+
+        drawer.classList.remove('hidden', 'translate-x-full');
+        overlay.classList.remove('hidden');
+      } catch (error) {
+        Toast.error('Failed to load matter details');
+      }
+    }
+
+    // Switch between tabs in matter drawer
+    window.switchMatterTab = function(tabName) {
+      if (!currentMatterData) return;
+
+      const { matter, permissions, activities, activityPagination, chats, chatsPagination, documents, orphanedFiles, tasks, contacts, notes } = currentMatterData;
+
+      // Update tab buttons
+      // TODO: Re-enable 'Skills' in tabs array when ready for production
+      const tabs = ['Details', 'Documents', 'Conversations', 'Activity', 'Comments', 'Tasks', 'Contacts', 'Notes', /* 'Skills', */ 'ConnectedData'];
+      tabs.forEach(tab => {
+        const btn = document.getElementById(`tab${tab}`);
+        const content = document.getElementById(`tabContent${tab}`);
+        if (tab.toLowerCase() === tabName.toLowerCase()) {
+          btn.classList.add('text-indigo-600', 'border-indigo-600');
+          btn.classList.remove('text-gray-500', 'border-transparent');
+          content.classList.remove('hidden');
+        } else {
+          btn.classList.remove('text-indigo-600', 'border-indigo-600');
+          btn.classList.add('text-gray-500', 'border-transparent');
+          content.classList.add('hidden');
+        }
+      });
+
+      // Render the selected tab content
+      switch(tabName.toLowerCase()) {
+        case 'details':
+          renderDetailsTab(matter, permissions);
+          break;
+        case 'documents':
+          renderDocumentsTab(matter, documents, orphanedFiles || []);
+          break;
+        case 'conversations':
+          renderConversationsTab(matter, chats, chatsPagination);
+          break;
+        case 'activity':
+          renderActivityTab(matter, activities, activityPagination);
+          break;
+        case 'comments':
+          renderCommentsTab(matter);
+          break;
+        case 'tasks':
+          renderTasksTab(matter, tasks || []);
+          break;
+        case 'contacts':
+          renderContactsTab(matter, contacts || []);
+          break;
+        case 'notes':
+          renderNotesTab(matter);
+          break;
+        // TODO: Re-enable Skills tab case when ready for production
+        // case 'skills':
+        //   renderSkillsTab(matter);
+        //   break;
+        case 'connecteddata':
+          renderConnectedDataTab(matter);
+          break;
+      }
+    }
+
+    // Global similar matters widget instance
+    let similarMattersWidget = null;
+
+    // Render Custom Fields Section (global so it can be called from other script tags)
+    window.renderCustomFieldsSection = async function(matter) {
+      const container = document.getElementById('customFieldsSection');
+      if (!container) return;
+
+      // Validate matter object has required properties
+      if (!matter || !matter.matter_id) {
+        console.error('[renderCustomFieldsSection] Invalid matter object:', matter);
+        container.innerHTML = '<div class="bg-yellow-50 rounded-lg p-4 mt-6"><p class="text-sm text-yellow-700">Cannot display custom fields: Invalid matter data</p></div>';
+        return;
+      }
+
+      // Extract custom field definitions and values
+      const customFieldDefs = matter.metadata?.custom_field_definitions || [];
+      const customFieldValues = matter.metadata?.custom_fields || [];
+
+      // Build a map of definitions for quick lookup
+      const defsMap = {};
+      customFieldDefs.forEach(def => {
+        defsMap[def.key] = def;
+      });
+
+      // Build a map of values
+      const valuesMap = {};
+      customFieldValues.forEach(field => {
+        valuesMap[field.key] = field.value;
+      });
+
+      // Helper function to check if value is valid (not empty, not empty object/array)
+      const isValidValue = (value) => {
+        if (value === null || value === undefined || value === '') return false;
+        if (typeof value === 'object') {
+          if (Array.isArray(value)) return value.length > 0;
+          return Object.keys(value).length > 0;
+        }
+        return true;
+      };
+
+      // Build display array with definitions and values
+      const fieldsToDisplay = [];
+
+      // Add fields from definitions that have values
+      customFieldDefs.forEach(def => {
+        const value = valuesMap[def.key];
+        if (isValidValue(value)) {
+          fieldsToDisplay.push({
+            key: def.key,
+            displayName: def.display_name || def.key,
+            value: value,
+            type: def.type
+          });
+        }
+      });
+
+      // Also check for legacy shadow_table data
+      if (matter.shadow_table && typeof matter.shadow_table === 'object') {
+        Object.keys(matter.shadow_table).forEach(key => {
+          if (isValidValue(matter.shadow_table[key]) && !valuesMap[key]) {
+            fieldsToDisplay.push({
+              key: key,
+              displayName: defsMap[key]?.display_name || formatFieldName(key),
+              value: matter.shadow_table[key],
+              type: defsMap[key]?.type || 'text'
+            });
+          }
+        });
+      }
+
+      // Always show container
+      container.style.display = 'block';
+
+      // Build custom fields actions
+      const customFieldsActions = `
+        <button
+          onclick="openEditCustomFieldsModal('${matter.matter_id}')"
+          class="inline-flex items-center justify-center w-8 h-8 text-white rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors"
+          title="Edit custom fields"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+          </svg>
+        </button>
+      `;
+
+      // Build custom fields content
+      const customFieldsContent = fieldsToDisplay.length === 0 ? `
+        <p class="text-sm text-gray-500 text-center py-3">No custom fields yet</p>
+      ` : `
+        <dl class="space-y-2 text-sm">
+          ${fieldsToDisplay.map(field => {
+            let displayValue = field.value;
+
+            // Format currency values
+            if (field.type === 'currency' && field.value !== null && field.value !== undefined && field.value !== '') {
+              const numValue = parseFloat(field.value);
+              if (!isNaN(numValue)) {
+                displayValue = '$' + numValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+              }
+            } else {
+              displayValue = formatFieldValue(field.value);
+            }
+
+            return `
+              <div class="flex justify-between">
+                <dt class="text-gray-500">${escapeHtml(field.displayName)}</dt>
+                <dd class="text-gray-900 text-right max-w-md truncate" title="${escapeHtml(String(field.value))}">${displayValue}</dd>
+              </div>
+            `;
+          }).join('')}
+        </dl>
+      `;
+
+      container.innerHTML = createCollapsibleSection(
+        'custom-fields',
+        'Custom Fields',
+        customFieldsContent,
+        customFieldsActions,
+        isSectionExpanded('custom-fields', true)
+      );
+    }; // End of window.renderCustomFieldsSection
+
+    // Render Matter Profile Section
+    async function renderMatterProfileSection(matter) {
+      const container = document.getElementById('matterProfileSection');
+      const notificationContainer = document.getElementById('matterProfileNotification');
+      if (!container) return;
+
+      try {
+        // Try to fetch matter profile from API
+        let profile = null;
+
+        try {
+          const response = await api.get(`/api/v1/matters/${matter.matter_id}/profile`);
+          profile = response?.profile;
+        } catch (apiError) {
+          // If 404, profile doesn't exist yet - trigger lazy initialization
+          if (apiError.status === 404 || apiError.errorCode === 'NOT_FOUND') {
+            console.log('[renderMatterProfileSection] Profile not found - triggering lazy initialization');
+
+            // Trigger profile initialization for backward compatibility
+            try {
+              await api.post(`/api/v1/matters/${matter.matter_id}/profile/initialize`);
+              console.log('[renderMatterProfileSection] Profile initialization triggered');
+
+              // Show notification at the top
+              if (notificationContainer) {
+                const userName = window.currentUser?.name?.split(' ')[0] || 'there';
+                notificationContainer.innerHTML = `
+                  <div class="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-5">
+                    <div class="flex items-start gap-4">
+                      <div class="flex-shrink-0">
+                        <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center shadow-sm">
+                          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                          </svg>
+                        </div>
+                      </div>
+                      <div class="flex-1">
+                        <p class="text-sm font-medium text-indigo-900 mb-1">
+                          Hey ${userName}! 👋
+                        </p>
+                        <p class="text-sm text-indigo-700 leading-relaxed">
+                          I'm running an analysis on this matter to generate a profile on this matter. This helps me understand the context, key entities, and themes so I can assist you better. I'll be done soon!
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }
+              // Clear the profile section (it will be populated when ready)
+              container.innerHTML = '';
+            } catch (initError) {
+              console.error('[renderMatterProfileSection] Failed to initialize profile', initError);
+              // Silently fail - profile initialization is non-critical
+              if (notificationContainer) notificationContainer.innerHTML = '';
+              container.innerHTML = '';
+            }
+            return;
+          }
+
+          // Other errors - check if profile is in matter object
+          console.log('[renderMatterProfileSection] Profile API error, checking matter object');
+          profile = matter.profile || matter.matter_profile;
+        }
+
+        if (!profile) {
+          // No profile available yet - show generate button
+          container.innerHTML = `
+            <div class="bg-gradient-to-r from-gray-50 to-indigo-50 border border-gray-200 rounded-lg p-5">
+              <div class="flex items-center justify-between">
+                <div class="flex items-start gap-3">
+                  <div class="w-9 h-9 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                    </svg>
+                  </div>
+                  <div>
+                    <h5 class="text-sm font-semibold text-gray-900">Matter Profile Intelligence</h5>
+                    <p class="text-xs text-gray-500 mt-0.5">Analyze this matter's documents and data to generate insights, key entities, and themes.</p>
+                  </div>
+                </div>
+                <button
+                  onclick="generateMatterIntelligence('${matter.matter_id}')"
+                  class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium transition-colors shadow-sm flex-shrink-0 ml-4"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                  </svg>
+                  Generate
+                </button>
+              </div>
+            </div>
+          `;
+          return;
+        }
+
+        // TEMPORARILY DISABLED: Show profile regardless of confidence for testing
+        // if (!profile.overall_confidence || profile.overall_confidence < 0.5) {
+        //   container.innerHTML = `
+        //     <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        //       <div class="flex items-start">
+        //         <svg class="w-5 h-5 text-yellow-600 mr-3 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+        //           <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+        //         </svg>
+        //         <div>
+        //           <h5 class="text-sm font-medium text-yellow-800">Matter Profile Generating</h5>
+        //           <p class="text-sm text-yellow-700 mt-1">Upload more documents to generate a comprehensive matter profile (confidence: ${(profile.overall_confidence * 100).toFixed(1)}%)</p>
+        //         </div>
+        //       </div>
+        //     </div>
+        //   `;
+        //   return;
+        // }
+
+        // Format sections
+        const brandVoiceItems = profile.brand_voice && typeof profile.brand_voice === 'object'
+          ? Object.entries(profile.brand_voice).slice(0, 3)
+          : [];
+
+        const keyEntitiesItems = profile.key_entities && typeof profile.key_entities === 'object'
+          ? Object.entries(profile.key_entities).slice(0, 5)
+          : [];
+
+        const themes = Array.isArray(profile.document_themes)
+          ? profile.document_themes.slice(0, 5)
+          : [];
+
+        // If profile has no meaningful content, show generate button
+        if (brandVoiceItems.length === 0 && keyEntitiesItems.length === 0 && themes.length === 0) {
+          container.innerHTML = `
+            <div class="bg-gradient-to-r from-gray-50 to-indigo-50 border border-gray-200 rounded-lg p-5">
+              <div class="flex items-center justify-between">
+                <div class="flex items-start gap-3">
+                  <div class="w-9 h-9 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                    </svg>
+                  </div>
+                  <div>
+                    <h5 class="text-sm font-semibold text-gray-900">Matter Profile Intelligence</h5>
+                    <p class="text-xs text-gray-500 mt-0.5">Not enough data to generate insights yet. Add documents or notes, then regenerate.</p>
+                  </div>
+                </div>
+                <button
+                  onclick="generateMatterIntelligence('${matter.matter_id}')"
+                  class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium transition-colors shadow-sm flex-shrink-0 ml-4"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                  </svg>
+                  Regenerate
+                </button>
+              </div>
+            </div>
+          `;
+          return;
+        }
+
+        // Build profile content using collapsible section
+        const profileContent = `
+          <div class="p-4">
+            ${brandVoiceItems.length > 0 ? `
+              <div class="mb-4">
+                <h6 class="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-2">Brand Voice</h6>
+                <div class="space-y-1.5">
+                  ${brandVoiceItems.map(([key, value]) => `
+                    <div class="flex items-start text-sm">
+                      <span class="text-gray-500 font-medium min-w-[80px]">${formatFieldName(key)}:</span>
+                      <span class="text-gray-900 ml-2">${escapeHtml(String(value))}</span>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            ` : ''}
+
+            ${themes.length > 0 ? `
+              <div>
+                <h6 class="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-2">Document Themes</h6>
+                <div class="flex flex-wrap gap-2">
+                  ${themes.map(theme => `
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
+                      ${escapeHtml(String(theme))}
+                    </span>
+                  `).join('')}
+                </div>
+              </div>
+            ` : ''}
+          </div>
+        `;
+
+        const profileTitle = `Matter Profile Intelligence`;
+
+        container.innerHTML = createCollapsibleSection(
+          'matter-profile',
+          profileTitle,
+          profileContent,
+          '',
+          isSectionExpanded('matter-profile', true)
+        );
+
+      } catch (error) {
+        console.error('[renderMatterProfileSection] Error fetching profile:', error);
+        // Don't show error to user - profile is optional
+        container.innerHTML = '';
+      }
+    }
+
+    /**
+     * Trigger matter profile intelligence generation
+     * @param {string} matterId - The matter ID
+     */
+    window.generateMatterIntelligence = async function(matterId) {
+      const container = document.getElementById('matterProfileSection');
+      const notificationContainer = document.getElementById('matterProfileNotification');
+
+      try {
+        // Show loading state in the button area
+        if (container) {
+          container.innerHTML = `
+            <div class="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-5">
+              <div class="flex items-center gap-3">
+                <div class="animate-spin rounded-full h-8 w-8 border-3 border-indigo-200 border-t-indigo-600 flex-shrink-0"></div>
+                <div>
+                  <h5 class="text-sm font-semibold text-indigo-900">Generating Matter Intelligence...</h5>
+                  <p class="text-xs text-indigo-700 mt-0.5">Analyzing documents, notes, and matter data. This may take a moment.</p>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        await api.post('/api/v1/matters/' + matterId + '/profile/initialize');
+
+        // Show success notification
+        if (notificationContainer) {
+          const userName = window.currentUser?.name?.split(' ')[0] || 'there';
+          notificationContainer.innerHTML = `
+            <div class="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-5 mb-4">
+              <div class="flex items-start gap-4">
+                <div class="flex-shrink-0">
+                  <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center shadow-sm">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                    </svg>
+                  </div>
+                </div>
+                <div class="flex-1">
+                  <p class="text-sm font-medium text-indigo-900 mb-1">Analysis Started</p>
+                  <p class="text-sm text-indigo-700 leading-relaxed">
+                    I'm running an analysis on this matter to generate a profile. This helps me understand the context, key entities, and themes so I can assist you better. I'll be done soon!
+                  </p>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        // Clear the profile section while processing
+        if (container) container.innerHTML = '';
+
+        if (typeof Toast !== 'undefined' && Toast.success) {
+          Toast.success('Matter intelligence generation started');
+        }
+      } catch (error) {
+        console.error('[generateMatterIntelligence] Failed:', error);
+
+        // Restore the generate button
+        if (container) {
+          container.innerHTML = `
+            <div class="bg-gradient-to-r from-gray-50 to-red-50 border border-red-200 rounded-lg p-5">
+              <div class="flex items-center justify-between">
+                <div class="flex items-start gap-3">
+                  <div class="w-9 h-9 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                  </div>
+                  <div>
+                    <h5 class="text-sm font-semibold text-gray-900">Generation Failed</h5>
+                    <p class="text-xs text-gray-500 mt-0.5">Could not generate matter intelligence. Please try again.</p>
+                  </div>
+                </div>
+                <button
+                  onclick="generateMatterIntelligence('${matterId}')"
+                  class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium transition-colors shadow-sm flex-shrink-0 ml-4"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                  </svg>
+                  Retry
+                </button>
+              </div>
+            </div>
+          `;
+        }
+
+        if (typeof Toast !== 'undefined' && Toast.error) {
+          Toast.error('Failed to generate matter intelligence');
+        }
+      }
+    };
+
+    // Helper function to format dates consistently
+    function formatDate(dateString) {
+      if (!dateString) return 'N/A';
+      try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } catch (e) {
+        return 'Invalid Date';
+      }
+    }
+
+    // Helper function to format field names (convert snake_case to Title Case)
+    function formatFieldName(fieldName) {
+      return fieldName
+        .replace(/^custom_/, '')
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, l => l.toUpperCase());
+    }
+
+    // Helper function to format field values
+    function formatFieldValue(value) {
+      if (value === null || value === undefined) return 'N/A';
+      if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+      if (typeof value === 'object') return JSON.stringify(value);
+      if (typeof value === 'string' && value.length > 50) return value.substring(0, 50) + '...';
+      return escapeHtml(String(value));
+    }
+
+    // Helper function to create collapsible section
+    function createCollapsibleSection(id, title, content, actions = '', isExpanded = true, hasFooter = false, footerContent = '') {
+      return `
+        <div class="collapsible-section border-t border-gray-200 pt-5" data-section-id="${id}">
+          <!-- Section Header -->
+          <div class="flex items-center justify-between mb-3 py-1 -mx-1">
+            <button
+              onclick="toggleSection('${id}')"
+              class="flex items-center gap-2 text-base font-semibold text-gray-900 hover:text-indigo-600 border-l-2 border-indigo-200 hover:border-indigo-500 pl-3 -ml-1 transition-colors group"
+            >
+              <svg
+                class="w-4 h-4 text-gray-500 group-hover:text-indigo-600 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}"
+                id="${id}-chevron"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+              </svg>
+              <span>${title}</span>
+            </button>
+            ${actions ? `<div class="flex items-center gap-2">${actions}</div>` : ''}
+          </div>
+
+          <!-- Section Content -->
+          <div
+            id="${id}-content"
+            class="collapsible-content ${isExpanded ? '' : 'hidden'}"
+          >
+            <div class="bg-gray-50 rounded-lg ${hasFooter ? 'rounded-b-none' : ''}">
+              <div class="p-4">
+                ${content}
+              </div>
+              ${hasFooter ? `
+                <div class="border-t border-gray-200 bg-gray-100 px-4 py-3 rounded-b-lg">
+                  ${footerContent}
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Toggle section expand/collapse
+    window.toggleSection = function(sectionId) {
+      const content = document.getElementById(`${sectionId}-content`);
+      const chevron = document.getElementById(`${sectionId}-chevron`);
+
+      if (content && chevron) {
+        const isExpanded = !content.classList.contains('hidden');
+
+        if (isExpanded) {
+          content.classList.add('hidden');
+          chevron.classList.remove('rotate-90');
+        } else {
+          content.classList.remove('hidden');
+          chevron.classList.add('rotate-90');
+        }
+
+        // Save state to localStorage
+        const expandedSections = JSON.parse(localStorage.getItem('matterSectionsExpanded') || '{}');
+        expandedSections[sectionId] = !isExpanded;
+        localStorage.setItem('matterSectionsExpanded', JSON.stringify(expandedSections));
+      }
+    };
+
+    // Get saved section state
+    function isSectionExpanded(sectionId, defaultState = true) {
+      const expandedSections = JSON.parse(localStorage.getItem('matterSectionsExpanded') || '{}');
+      return expandedSections[sectionId] !== undefined ? expandedSections[sectionId] : defaultState;
+    }
+
+    // Render Details Tab
+    function renderDetailsTab(matter, permissions) {
+      const content = document.getElementById('tabContentDetails');
+
+      // Build action buttons for sections
+      const sharedWithActions = `
+        <button
+          onclick="openManageShareModal('${matter.matter_id}')"
+          class="inline-flex items-center justify-center w-8 h-8 text-white rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors"
+          title="Manage Sharing"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+          </svg>
+        </button>
+      `;
+
+      const sharedWithContent = permissions.length > 0 ? permissions.map(p => `
+        <div class="flex items-center justify-between bg-white rounded-lg p-3 border border-gray-200">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+              <span class="text-xs font-medium text-indigo-600">${(p.first_name?.[0] || '') + (p.last_name?.[0] || '') || p.email?.[0]?.toUpperCase() || 'U'}</span>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-gray-900">${p.first_name || ''} ${p.last_name || ''}</p>
+              <p class="text-xs text-gray-500">${p.email}</p>
+            </div>
+          </div>
+          <button onclick="removeShare('${matter.matter_id}', '${p.user_id}')" class="text-red-600 hover:text-red-800">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+      `).join('') : `<p class="text-sm text-gray-500 text-center py-4">${matter.visibility === 'organization' ? 'All organization members can access this matter' : 'Not shared with any specific users'}</p>`;
+
+      const matterInfoContent = `
+        <dl class="space-y-2 text-sm">
+          <div class="flex justify-between">
+            <dt class="text-gray-500">Matter ID</dt>
+            <dd class="text-gray-900 font-mono">${matter.matter_id}</dd>
+          </div>
+          <div class="flex justify-between">
+            <dt class="text-gray-500">Client</dt>
+            <dd class="text-gray-900">${matter.client_name || 'N/A'}</dd>
+          </div>
+          <div class="flex justify-between">
+            <dt class="text-gray-500">Status</dt>
+            <dd class="text-gray-900">${statusBadge(matter.status || 'active')}</dd>
+          </div>
+          <div class="flex justify-between">
+            <dt class="text-gray-500">Visibility</dt>
+            <dd class="text-gray-900">${matter.visibility === 'organization' ? '🏢 Organization' : '🔒 Private'}</dd>
+          </div>
+          <div class="flex justify-between">
+            <dt class="text-gray-500">Created</dt>
+            <dd class="text-gray-900">${formatDate(matter.created_at)}</dd>
+          </div>
+          <div class="flex justify-between">
+            <dt class="text-gray-500">Last Updated</dt>
+            <dd class="text-gray-900">${formatDate(matter.updated_at)}</dd>
+          </div>
+        </dl>
+      `;
+
+      const descriptionContent = `
+        <p class="text-sm text-gray-600">${matter.description || 'No description provided.'}</p>
+      `;
+
+      content.innerHTML = `
+        <div class="space-y-6">
+          <!-- Matter Profile Notification (at top) -->
+          <div id="matterProfileNotification"></div>
+
+          ${createCollapsibleSection(
+            'description',
+            'Description',
+            descriptionContent,
+            '',
+            isSectionExpanded('description', true)
+          )}
+
+          <!-- Matter Profile Section (below Description) -->
+          <div id="matterProfileSection"></div>
+
+          ${createCollapsibleSection(
+            'matter-information',
+            'Matter Information',
+            matterInfoContent,
+            '',
+            isSectionExpanded('matter-information', true)
+          )}
+
+          ${createCollapsibleSection(
+            'shared-with',
+            'Shared With',
+            sharedWithContent,
+            sharedWithActions,
+            isSectionExpanded('shared-with', true)
+          )}
+
+          <!-- Linked Matters Section -->
+          <div id="linkedMattersSection">
+            <!-- Linked matters content will be loaded here -->
+          </div>
+
+          <!-- Custom Fields Section -->
+          <div id="customFieldsSection"></div>
+
+          <!-- Similar Matters Widget - TEMPORARILY HIDDEN -->
+          <!-- <div id="similarMattersWidgetContainer" class="mt-6"></div> -->
+        </div>
+      `;
+
+      // Render Matter Profile
+      renderMatterProfileSection(matter);
+
+      // Load Linked Matters into the Details tab
+      renderLinkedMattersInDetails(matter);
+
+      // Render Custom Fields (after linked matters)
+      window.renderCustomFieldsSection(matter);
+
+      // Initialize Similar Matters Widget - TEMPORARILY DISABLED
+      /*
+      if (!similarMattersWidget) {
+        similarMattersWidget = new SimilarMattersWidget(api);
+      }
+      similarMattersWidget.initialize('similarMattersWidgetContainer');
+      similarMattersWidget.loadSimilarMatters(matter.id, {
+        limit: 10,
+        threshold: 0.8  // Only show 80%+ matches
+      });
+
+      // Listen for matter navigation events
+      document.addEventListener('similar-matter-selected', (event) => {
+        const { matterId } = event.detail;
+        // Navigate to the selected matter
+        viewMatter(matterId, 'details');
+      }, { once: true }); // Use once to prevent duplicate listeners
+      */
+    }
+
+    /**
+     * Refresh the currently open matter
+     * Re-fetches all data and refreshes the current tab
+     */
+    window.refreshCurrentMatter = async function() {
+      if (!currentMatterData || !currentMatterData.matter || !currentMatterData.matter.matter_id) {
+        console.warn('[refreshCurrentMatter] No matter currently open');
+        Toast.error('No matter is currently open');
+        return;
+      }
+
+      const refreshBtn = document.getElementById('refreshMatterBtn');
+      const currentTab = getCurrentActiveTab();
+
+      console.log('[refreshCurrentMatter] Refreshing matter:', {
+        matterId: currentMatterData.matter.matter_id,
+        currentTab
+      });
+
+      try {
+        // Add spinning animation
+        if (refreshBtn) {
+          refreshBtn.classList.add('animate-spin');
+        }
+
+        // Re-fetch matter with cache busting
+        await viewMatter(currentMatterData.matter.matter_id, currentTab, { bustCache: true });
+
+        Toast.success('Matter details refreshed');
+      } catch (error) {
+        console.error('[refreshCurrentMatter] Error refreshing matter:', error);
+        Toast.error('Failed to refresh matter details');
+      } finally {
+        // Remove spinning animation
+        if (refreshBtn) {
+          setTimeout(() => {
+            refreshBtn.classList.remove('animate-spin');
+          }, 300);
+        }
+      }
+    }
+
+    /**
+     * Get the currently active tab
+     */
+    function getCurrentActiveTab() {
+      const tabs = ['details', 'documents', 'conversations', 'activity', 'comments', 'tasks', 'contacts'];
+      for (const tab of tabs) {
+        const tabContent = document.getElementById(`tabContent${tab.charAt(0).toUpperCase() + tab.slice(1)}`);
+        if (tabContent && !tabContent.classList.contains('hidden')) {
+          return tab;
+        }
+      }
+      return 'details'; // Default to details tab
+    }
+
+    // Render Documents Tab
+    function renderDocumentsTab(matter, documents, orphanedFiles = []) {
+      const content = document.getElementById('tabContentDocuments');
+
+      // File type icon helper
+      function getFileIcon(contentType) {
+        if (!contentType) return '<svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>';
+
+        if (contentType.includes('pdf')) {
+          return '<svg class="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM8.5 13.5v3h1v-1h.5a1 1 0 0 0 1-1v-1a1 1 0 0 0-1-1h-1.5zm1 1h.5v1h-.5v-1zm2.5-1v3h1.5a1 1 0 0 0 1-1v-1a1 1 0 0 0-1-1H12zm1 1h.5v1H13v-1zm2.5-1v3h1v-1.5h.5v-1h-.5v-.5h1v-1h-2z"/></svg>';
+        }
+        if (contentType.includes('word') || contentType.includes('document')) {
+          return '<svg class="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM9 13l1.5 6 1.5-4 1.5 4 1.5-6h-1l-.75 3-1.25-3.5h-.5L10.25 16 9.5 13H9z"/></svg>';
+        }
+        if (contentType.includes('csv') || contentType.includes('sheet') || contentType.includes('excel')) {
+          return '<svg class="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM8 13h2v2H8v-2zm0 3h2v2H8v-2zm3-3h2v2h-2v-2zm0 3h2v2h-2v-2zm3-3h2v2h-2v-2zm0 3h2v2h-2v-2z"/></svg>';
+        }
+        if (contentType.includes('image')) {
+          return '<svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>';
+        }
+        return '<svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>';
+      }
+
+      // Format file size
+      function formatSize(bytes) {
+        if (!bytes) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+      }
+
+      if (documents.length === 0 && (!orphanedFiles || orphanedFiles.length === 0)) {
+        content.innerHTML = `
+          <div class="text-center py-12">
+            <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+            </svg>
+            <h4 class="text-lg font-semibold text-gray-900 mb-2">No documents yet</h4>
+            <p class="text-gray-500 mb-6">Upload documents to this matter to enable AI-powered search and analysis</p>
+            <div id="drawerEmptyDropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-indigo-400 transition-colors cursor-pointer">
+              <input type="file" id="drawerEmptyFileInput" multiple accept=".pdf,.doc,.docx,.txt,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.pptx,.ppt" class="hidden">
+              <div class="text-center">
+                <svg class="mx-auto h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                </svg>
+                <p class="mt-2 text-sm text-gray-600">
+                  <span class="text-indigo-600 hover:text-indigo-800 font-medium">Click to upload</span> or drag and drop
+                </p>
+                <p class="mt-1 text-xs text-gray-500">PDF, Word, Excel, Images up to 50MB</p>
+              </div>
+            </div>
+          </div>
+        `;
+        setupDrawerUpload(matter.matter_id, 'drawerEmptyDropZone', 'drawerEmptyFileInput');
+        return;
+      }
+
+      content.innerHTML = `
+        <div class="space-y-4">
+          <!-- Upload area -->
+          <div id="drawerDocDropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-indigo-400 transition-colors cursor-pointer">
+            <input type="file" id="drawerDocFileInput" multiple accept=".pdf,.doc,.docx,.txt,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.pptx,.ppt" class="hidden">
+            <div id="drawerDocDropContent" class="flex items-center justify-center gap-3">
+              <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+              </svg>
+              <span class="text-sm text-gray-600">
+                <span class="text-indigo-600 font-medium">Upload files</span> or drag and drop
+              </span>
+            </div>
+            <div id="drawerDocUploadProgress" class="hidden flex items-center justify-center gap-3">
+              <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full"></div>
+              <span id="drawerDocUploadText" class="text-sm text-gray-600">Uploading...</span>
+            </div>
+          </div>
+
+          ${documents.length > 0 ? `
+            <!-- Document count -->
+            <div class="flex items-center justify-between">
+              <p class="text-sm text-gray-500">${documents.length} document${documents.length !== 1 ? 's' : ''}</p>
+            </div>
+
+            <!-- Document list -->
+            <div class="space-y-2">
+              ${documents.map(doc => `
+              <div class="bg-white border border-gray-200 hover:border-indigo-300 rounded-lg p-3 transition-all group" data-doc-id="${doc.id}">
+                <div class="flex items-start gap-3">
+                  <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    ${getFileIcon(doc.content_type)}
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-start justify-between gap-2">
+                      <div class="min-w-0">
+                        <h6 class="text-sm font-medium text-gray-900 truncate" title="${doc.original_filename || doc.filename}">${doc.original_filename || doc.filename}</h6>
+                        <p class="text-xs text-gray-500 flex items-center gap-2 mt-0.5">
+                          <span>${formatSize(doc.file_size)}</span>
+                          <span class="text-gray-300">|</span>
+                          <span>${timeAgo(doc.created_at)}</span>
+                          ${doc.source === 'workspace' ? `
+                            <span class="text-gray-300">|</span>
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded">
+                              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                              </svg>
+                              From Workspace
+                            </span>
+                          ` : doc.source === 'inherited' ? `
+                            <span class="text-gray-300">|</span>
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                              </svg>
+                              Shared
+                            </span>
+                          ` : ''}
+                        </p>
+                      </div>
+                      <div class="flex items-center gap-2 flex-shrink-0">
+                        ${docStatusBadge(doc.status)}
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-2 mt-2" data-doc-actions>
+                      ${['active', 'completed'].includes(doc.status) ? `
+                        <button onclick="viewDocument('${doc.id}', '${matter.matter_id}', '${doc.filename}', '${doc.content_type}', '${doc.file_size}')" class="text-xs text-emerald-600 hover:text-emerald-800 font-medium flex items-center gap-1">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                          View
+                        </button>
+                        <button onclick="downloadDocument('${doc.id}', '${matter.matter_id}', '${doc.filename}')" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                          Download
+                        </button>
+                      ` : ['pending', 'processing', 'queued'].includes(doc.status) && doc.job_id ? `
+                        <span class="text-xs text-gray-500 italic flex items-center gap-1">
+                          <svg class="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Processing...
+                        </span>
+                        <button onclick="cancelDocumentProcessing('${doc.job_id}', '${doc.filename}')" class="text-xs text-orange-600 hover:text-orange-800 font-medium flex items-center gap-1">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                          Cancel
+                        </button>
+                      ` : ['failed', 'error'].includes(doc.status) ? `
+                        ${doc.error_message ? `
+                          <span class="text-xs text-red-600 italic flex items-center gap-1" title="${doc.error_message}">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                            </svg>
+                            ${doc.error_message.substring(0, 50)}${doc.error_message.length > 50 ? '...' : ''}
+                          </span>
+                        ` : ''}
+                        <button onclick="retryDocumentIngestion('${doc.id}', '${matter.matter_id}', '${doc.filename}')" class="text-xs text-amber-600 hover:text-amber-800 font-medium flex items-center gap-1">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                          </svg>
+                          Retry Ingestion
+                        </button>
+                      ` : ''}
+                      ${!doc.read_only ? `
+                        <button onclick="replaceDrawerDocument('${doc.id}', '${matter.matter_id}')" class="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1" title="Replace file and re-index" style="display: none;">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                          Replace
+                        </button>
+                        <button onclick="deleteDrawerDocument('${doc.id}', '${matter.matter_id}')" class="text-xs text-red-600 hover:text-red-800 font-medium flex items-center gap-1">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                          Delete
+                        </button>
+                      ` : `
+                        <span class="text-xs text-gray-400 italic flex items-center gap-1">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                          </svg>
+                          Read-only
+                        </span>
+                      `}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+          ` : ''}
+
+          <!-- Unassigned Documents Section -->
+          ${orphanedFiles && orphanedFiles.length > 0 ? `
+            <div class="mt-6">
+              <div class="flex items-center justify-between mb-3">
+                <h5 class="text-sm font-medium text-gray-700">Unassigned Documents</h5>
+                <span class="text-xs text-gray-500 bg-yellow-50 px-2 py-1 rounded">${orphanedFiles.length} file${orphanedFiles.length !== 1 ? 's' : ''} found in storage</span>
+              </div>
+              <p class="text-xs text-gray-500 mb-3">These files exist in storage but are not tracked in the database. Click "Assign to Matter" to add them.</p>
+              <div class="space-y-2">
+                ${orphanedFiles.map(file => `
+                  <div class="bg-yellow-50 border border-yellow-200 hover:border-yellow-300 rounded-lg p-3 transition-all" data-orphan-key="${file.storage_key}">
+                    <div class="flex items-start gap-3">
+                      <div class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        ${getFileIcon(file.content_type)}
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-start justify-between gap-2">
+                          <div class="min-w-0">
+                            <h6 class="text-sm font-medium text-gray-900 truncate" title="${file.filename}">${file.filename}</h6>
+                            <p class="text-xs text-gray-500 flex items-center gap-2 mt-0.5">
+                              <span>${formatSize(file.file_size)}</span>
+                              ${file.connector_id ? `
+                                <span class="text-gray-300">|</span>
+                                <span class="text-xs bg-gray-200 px-1.5 py-0.5 rounded">${file.connector_id}</span>
+                              ` : ''}
+                            </p>
+                            <p class="text-xs text-gray-400 mt-1 font-mono truncate" title="${file.storage_key}">${file.storage_key}</p>
+                          </div>
+                        </div>
+                        <div class="flex items-center gap-2 mt-2">
+                          <button onclick="assignOrphanedFile('${file.storage_key}', '${matter.matter_id}', '${file.filename.replace(/'/g, "\\'")}', '${file.content_type}', ${file.file_size}, '${file.id || ''}', '${file.source || 'minio'}')" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                            Assign to Matter
+                          </button>
+                          <button onclick="${file.id ? `viewDocument('${file.id}', '${matter.matter_id}', '${file.filename.replace(/'/g, "\\'")}', '${file.content_type}', ${file.file_size})` : `viewOrphanedDocument('${file.storage_key}', '${matter.matter_id}', '${file.filename.replace(/'/g, "\\'")}', '${file.content_type}', ${file.file_size})`}" class="text-xs text-emerald-600 hover:text-emerald-800 font-medium flex items-center gap-1">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                            View
+                          </button>
+                          <button onclick="deleteOrphanedFile('${file.storage_key}', '${matter.matter_id}', '${file.filename.replace(/'/g, "\\'")}' )" class="text-xs text-red-600 hover:text-red-800 font-medium flex items-center gap-1">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+      setupDrawerUpload(matter.matter_id, 'drawerDocDropZone', 'drawerDocFileInput');
+    }
+
+    // Track active SSE connections for document processing
+    const activeSSEConnections = new Map(); // jobId -> EventSource
+
+    // Start SSE stream to monitor document processing status
+    function startDocumentStatusStream(jobId, fileId, matterId, filename) {
+      // Don't create duplicate connections
+      if (activeSSEConnections.has(jobId)) {
+        console.log(`SSE connection already exists for job ${jobId}`);
+        return;
+      }
+
+      console.log(`Starting SSE stream for job ${jobId} (${filename})`);
+
+      // EventSource doesn't support custom headers, so we pass token as query param
+      const eventSource = new EventSource(`${api.baseUrl}/api/v1/storage/jobs/${jobId}/status/stream?token=${api.token}`);
+
+      activeSSEConnections.set(jobId, eventSource);
+
+      eventSource.addEventListener('status', (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log(`Status update for ${filename}:`, data.status);
+
+          // Update the UI with new status
+          updateDocumentStatus(fileId, data.status);
+
+          // Show toast for completed/failed
+          if (data.status === 'completed') {
+            Toast.success(`Document ready: ${filename}`);
+          } else if (data.status === 'failed') {
+            Toast.error(`Document processing failed: ${filename}`);
+          }
+        } catch (error) {
+          console.error('Failed to parse SSE status event:', error);
+        }
+      });
+
+      eventSource.addEventListener('complete', (event) => {
+        console.log(`Processing complete for ${filename}`);
+        eventSource.close();
+        activeSSEConnections.delete(jobId);
+
+        // Refresh documents to get final state
+        refreshDrawerDocuments(matterId);
+      });
+
+      eventSource.addEventListener('error', (event) => {
+        console.error(`SSE error for job ${jobId}:`, event);
+        eventSource.close();
+        activeSSEConnections.delete(jobId);
+      });
+
+      eventSource.onerror = () => {
+        console.log(`SSE connection closed for job ${jobId}`);
+        eventSource.close();
+        activeSSEConnections.delete(jobId);
+      };
+    }
+
+    // Update document status in UI without full refresh
+    function updateDocumentStatus(fileId, status) {
+      // Find the document element
+      const docElements = document.querySelectorAll(`[data-doc-id="${fileId}"]`);
+
+      docElements.forEach(docEl => {
+        // Update status badge
+        const statusBadge = docEl.querySelector('[data-status-badge]');
+        if (statusBadge) {
+          statusBadge.outerHTML = docStatusBadge(status);
+        }
+
+        // Show/hide action buttons based on status
+        const actions = docEl.querySelector('[data-doc-actions]');
+        if (actions) {
+          if (['active', 'completed'].includes(status)) {
+            actions.innerHTML = getDocumentActions(fileId, status);
+          } else if (['pending', 'processing'].includes(status)) {
+            actions.innerHTML = getProcessingActions(fileId);
+          }
+        }
+      });
+    }
+
+    // Get action buttons HTML based on status
+    function getDocumentActions(fileId, status) {
+      // This will be updated with actual matter ID when rendered
+      return `
+        <button onclick="downloadDocument('${fileId}', currentMatterData.matter.matter_id, '')" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+          Download
+        </button>
+      `;
+    }
+
+    function getProcessingActions(fileId) {
+      return `
+        <span class="text-xs text-gray-500 italic">Processing...</span>
+      `;
+    }
+
+    // Cancel document processing
+    window.cancelDocumentProcessing = async function(jobId, filename) {
+      try {
+        const response = await fetch(`${api.baseUrl}/api/v1/storage/jobs/${jobId}/cancel`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${api.token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to cancel processing');
+        }
+
+        // Close SSE connection
+        const eventSource = activeSSEConnections.get(jobId);
+        if (eventSource) {
+          eventSource.close();
+          activeSSEConnections.delete(jobId);
+        }
+
+        Toast.success(`Cancelled processing: ${filename}`);
+
+        // Refresh documents
+        if (currentMatterData) {
+          await refreshDrawerDocuments(currentMatterData.matter.matter_id);
+        }
+      } catch (error) {
+        console.error('Failed to cancel document processing:', error);
+        Toast.error(error.message || 'Failed to cancel processing');
+      }
+    };
+
+    // Helper function for status badge (moved outside render function for reuse)
+    function docStatusBadge(status) {
+      const badges = {
+        'completed': '<span data-status-badge class="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700">Ready</span>',
+        'active': '<span data-status-badge class="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700">Ready</span>',
+        'processing': '<span data-status-badge class="px-2 py-0.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-700">Processing</span>',
+        'queued': '<span data-status-badge class="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700">Queued</span>',
+        'pending': '<span data-status-badge class="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700">Pending</span>',
+        'cancelled': '<span data-status-badge class="px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-700">Cancelled</span>',
+        'failed': '<span data-status-badge class="px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-700">Failed</span>',
+        'error': '<span data-status-badge class="px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-700">Error</span>',
+        'deleted': '<span data-status-badge class="px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-700">Deleted</span>'
+      };
+      return badges[status] || badges['pending'];
+    }
+
+    // Setup upload handlers for drawer
+    function setupDrawerUpload(matterId, dropZoneId, fileInputId) {
+      const dropZone = document.getElementById(dropZoneId);
+      const fileInput = document.getElementById(fileInputId);
+
+      if (!dropZone || !fileInput) return;
+
+      // Click to open file picker
+      dropZone.addEventListener('click', (e) => {
+        if (e.target.tagName !== 'INPUT') {
+          fileInput.click();
+        }
+      });
+
+      // Drag and drop
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('border-indigo-400', 'bg-indigo-50');
+      });
+
+      dropZone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('border-indigo-400', 'bg-indigo-50');
+      });
+
+      dropZone.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('border-indigo-400', 'bg-indigo-50');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+          await handleDrawerFileUpload(files, matterId);
+        }
+      });
+
+      // File input change
+      fileInput.addEventListener('change', async (e) => {
+        if (e.target.files.length > 0) {
+          await handleDrawerFileUpload(e.target.files, matterId);
+        }
+      });
+    }
+
+    // Handle file upload from drawer
+    async function handleDrawerFileUpload(files, matterId) {
+      const fileArray = Array.from(files);
+
+      // For single file uploads, show metadata modal
+      if (fileArray.length === 1) {
+        showMetadataModal(fileArray[0], matterId);
+        return;
+      }
+
+      // For multiple files, upload directly without metadata modal
+      const dropContent = document.getElementById('drawerDocDropContent');
+      const uploadProgress = document.getElementById('drawerDocUploadProgress');
+      const uploadText = document.getElementById('drawerDocUploadText');
+
+      // Show progress
+      if (dropContent) dropContent.classList.add('hidden');
+      if (uploadProgress) uploadProgress.classList.remove('hidden');
+
+      let successCount = 0;
+      const CONCURRENT_UPLOADS = 3; // Upload 3 files in parallel
+
+      // Process files in batches of 3 for better performance
+      for (let i = 0; i < fileArray.length; i += CONCURRENT_UPLOADS) {
+        const batch = fileArray.slice(i, i + CONCURRENT_UPLOADS);
+
+        // Create promises for this batch
+        const batchPromises = batch.map(async (file, idx) => {
+          const fileIndex = i + idx;
+          if (uploadText) uploadText.textContent = `Uploading ${fileIndex + 1}/${fileArray.length}: ${file.name}`;
+
+          try {
+            const result = await api.uploadDocument(file, matterId);
+            successCount++;
+
+            // Start SSE stream to monitor processing status
+            if (result.job_id && result.file_id) {
+              console.log(`Starting SSE stream for ${file.name}`, {
+                jobId: result.job_id,
+                fileId: result.file_id
+              });
+              startDocumentStatusStream(result.job_id, result.file_id, matterId, file.name);
+            }
+          } catch (error) {
+            Toast.error(`Failed to upload ${file.name}: ${error.message}`);
+          }
+        });
+
+        // Wait for all uploads in this batch to complete
+        await Promise.all(batchPromises);
+      }
+
+      // Reset UI
+      if (dropContent) dropContent.classList.remove('hidden');
+      if (uploadProgress) uploadProgress.classList.add('hidden');
+
+      // Reset file inputs to allow re-selection of same files
+      const emptyFileInput = document.getElementById('drawerEmptyFileInput');
+      const docFileInput = document.getElementById('drawerDocFileInput');
+      if (emptyFileInput) emptyFileInput.value = '';
+      if (docFileInput) docFileInput.value = '';
+
+      if (successCount > 0) {
+        Toast.success(`Uploaded ${successCount} document(s) - processing started`);
+        // Refresh documents to show initial state
+        await refreshDrawerDocuments(matterId);
+      }
+    }
+
+    // Refresh documents in drawer
+    async function refreshDrawerDocuments(matterId) {
+      try {
+        const docsResult = await api.getMatterFiles(matterId);
+        const documents = docsResult.files || [];
+        const pagination = docsResult.pagination || { total_count: 0 };
+
+        // Update current matter data
+        if (currentMatterData) {
+          currentMatterData.documents = documents;
+          currentMatterData.documentsPagination = pagination;
+        }
+
+        // Re-render the documents tab
+        renderDocumentsTab(currentMatterData.matter, documents);
+      } catch (error) {
+        console.error('Failed to refresh documents:', error);
+      }
+    }
+
+    // Delete document from drawer (Universal endpoint)
+    window.deleteDrawerDocument = async function(fileId, matterId) {
+      Modal.confirm('Delete Document', 'Are you sure you want to delete this document? This action cannot be undone.', async () => {
+        try {
+          await api.deleteDocument(fileId); // Using universal endpoint - no matterId needed
+          Toast.success('Document deleted successfully');
+          await refreshDrawerDocuments(matterId);
+        } catch (error) {
+          Toast.error(error.message || 'Failed to delete document');
+        }
+      });
+    }
+
+    // Retry document ingestion for failed documents
+    window.retryDocumentIngestion = async function(fileId, matterId, filename) {
+      Modal.confirm(
+        'Retry Document Processing',
+        `Retry processing for "${filename}"? This will re-attempt to parse, chunk, and embed the document.`,
+        async () => {
+          try {
+            Toast.info('Retriggering document ingestion...');
+
+            // Call the retry endpoint
+            const result = await api.post(`/api/v1/storage/documents/${fileId}/retry-ingestion`, {});
+
+            Toast.success('Document processing started. This may take a few minutes.');
+
+            // Refresh the documents list after a short delay
+            setTimeout(async () => {
+              await refreshDrawerDocuments(matterId);
+            }, 2000);
+
+          } catch (error) {
+            console.error('Failed to retry document ingestion:', error);
+            Toast.error(error.message || 'Failed to retry document processing');
+          }
+        },
+        'Retry', // Button text
+        'primary' // Use primary color instead of danger
+      );
+    }
+
+    // Replace document file (Universal endpoint - triggers re-vectorization)
+    window.replaceDrawerDocument = async function(fileId, matterId) {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.pdf,.doc,.docx,.txt,.html,.rtf';
+
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        Modal.confirm(
+          'Replace Document',
+          `Replace document with "${file.name}"? This will re-process the document and update all embeddings for search.`,
+          async () => {
+            try {
+              Toast.info('Replacing document...');
+              const result = await api.replaceDocument(fileId, file, (progress) => {
+                console.log(`Upload progress: ${progress}%`);
+              });
+              Toast.success('Document replaced successfully. Re-processing for search...');
+              await refreshDrawerDocuments(matterId);
+            } catch (error) {
+              Toast.error(error.message || 'Failed to replace document');
+            }
+          }
+        );
+      };
+
+      input.click();
+    }
+
+    // Assign orphaned file to matter
+    window.assignOrphanedFile = async function(storageKey, matterId, filename, contentType, fileSize, documentId, source) {
+      const message = source === 'database'
+        ? `Link "${filename}" to this matter? The file is already in the database.`
+        : `Assign "${filename}" to this matter? This will create a database record and make it available for AI search.`;
+
+      Modal.confirm(
+        'Assign File to Matter',
+        message,
+        async () => {
+          try {
+            Toast.info('Assigning file...');
+            const result = await api.assignOrphanedFile({
+              storage_key: storageKey,
+              matter_id: matterId,
+              filename: filename,
+              content_type: contentType,
+              file_size: fileSize,
+              document_id: documentId || null,
+              source: source || 'minio'
+            });
+            Toast.success('Document assigned! Processing started - refresh page in a few moments to see the processed document', { duration: 8000 });
+
+            // Refresh the matter view to update documents list
+            await viewMatter(matterId, 'documents');
+          } catch (error) {
+            Toast.error(error.message || 'Failed to assign file');
+          }
+        },
+        'Assign',
+        'primary'
+      );
+    }
+
+    // View orphaned document in file viewer modal (using storage key)
+    window.viewOrphanedDocument = async function(storageKey, matterId, filename, contentType, fileSize) {
+      // Show modal with loading state
+      viewerModal.classList.remove('hidden');
+      viewerLoading.classList.remove('hidden');
+      viewerError.classList.add('hidden');
+      viewerIframe.classList.add('hidden');
+      viewerText.classList.add('hidden');
+      viewerTable.classList.add('hidden');
+      viewerImage.classList.add('hidden');
+      viewerDocx.classList.add('hidden');
+
+      // Set file info
+      document.getElementById('viewerFileName').textContent = filename;
+      document.getElementById('viewerFileInfo').textContent = `${contentType || 'Unknown type'} • ${formatFileSize(fileSize)}`;
+
+      // Set download button URL
+      document.getElementById('viewerDownloadBtn').onclick = () => downloadOrphanedDocument(storageKey, matterId, filename);
+      document.getElementById('viewerErrorDownload').onclick = () => downloadOrphanedDocument(storageKey, matterId, filename);
+
+      try {
+        // Fetch file using download-by-key endpoint
+        const url = `${api.baseUrl}/api/v1/storage/download-by-key?storage_key=${encodeURIComponent(storageKey)}&matter_id=${matterId}`;
+        const response = await fetch(url, {
+          headers: {
+            'Authorization': `Bearer ${api.token}`
+          }
+        });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            if (window.api && typeof window.api.showSessionExpiredModal === 'function') {
+              window.api.showSessionExpiredModal();
+            } else {
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              Toast.error('Session expired. Redirecting to login...');
+              setTimeout(() => { window.location.href = 'login.html'; }, 1500);
+            }
+            throw new Error('Session expired');
+          }
+          throw new Error(`Failed to load document: ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+
+        viewerLoading.classList.add('hidden');
+
+        // Display based on content type
+        const type = contentType?.toLowerCase() || '';
+
+        if (type.startsWith('image/')) {
+          // Image files
+          viewerImage.src = objectUrl;
+          viewerImage.classList.remove('hidden');
+        } else if (type === 'application/pdf') {
+          // PDF files - use iframe
+          viewerIframe.src = objectUrl;
+          viewerIframe.classList.remove('hidden');
+        } else if (filename.match(/\.csv$/i) || type.includes('csv')) {
+          // CSV files - render as spreadsheet table
+          const text = await blob.text();
+          renderCSVTable(text);
+          viewerTable.classList.remove('hidden');
+        } else if (type.startsWith('text/') || type === 'application/json' || type === 'application/xml' || filename.match(/\.(txt|md|json|xml|log|js|ts|py|html|css|yaml|yml)$/i)) {
+          // Text-based files
+          const text = await blob.text();
+          viewerText.textContent = text;
+          viewerText.classList.remove('hidden');
+        } else if (filename.match(/\.docx$/i) || type.includes('wordprocessingml')) {
+          // .docx files - convert to HTML using Mammoth.js
+          try {
+            const arrayBuffer = await blob.arrayBuffer();
+            const result = await mammoth.convertToHtml({
+              arrayBuffer: arrayBuffer,
+              convertImage: mammoth.images.imgElement(function(image) {
+                return image.read("base64").then(function(imageBuffer) {
+                  return {
+                    src: "data:" + image.contentType + ";base64," + imageBuffer
+                  };
+                });
+              }),
+              styleMap: [
+                "p[style-name='Heading 1'] => h1:fresh",
+                "p[style-name='Heading 2'] => h2:fresh",
+                "p[style-name='Heading 3'] => h3:fresh",
+                "p[style-name='Title'] => h1.document-title:fresh",
+                "r[style-name='Strong'] => strong",
+                "r[style-name='Emphasis'] => em",
+                "table => table.docx-table"
+              ]
+            });
+            viewerDocx.innerHTML = result.value;
+            viewerDocx.classList.remove('hidden');
+
+            // Log any messages/warnings from Mammoth
+            if (result.messages.length > 0) {
+              console.log('Mammoth conversion messages:', result.messages);
+            }
+          } catch (mammothError) {
+            console.error('Failed to convert .docx:', mammothError);
+            viewerError.classList.remove('hidden');
+            document.getElementById('viewerErrorMsg').textContent = 'Failed to preview .docx file';
+          }
+        } else {
+          // Unsupported file type (e.g., .xlsx) - show error with download option
+          viewerError.classList.remove('hidden');
+          document.getElementById('viewerErrorMsg').textContent = `Preview not available for ${contentType || 'this file type'}`;
+        }
+      } catch (error) {
+        console.error('Failed to load document:', error);
+        viewerLoading.classList.add('hidden');
+        viewerError.classList.remove('hidden');
+        document.getElementById('viewerErrorMsg').textContent = error.message || 'Failed to load document';
+      }
+    }
+
+    // Delete orphaned file from MinIO
+    window.deleteOrphanedFile = async function(storageKey, matterId, filename) {
+      Modal.confirm(
+        'Delete File',
+        `Permanently delete "${filename}" from storage? This action cannot be undone.`,
+        async () => {
+          try {
+            Toast.info('Deleting file...');
+            // We'll need to create a delete endpoint for orphaned files
+            await api.delete(`/api/v1/storage/orphaned?storage_key=${encodeURIComponent(storageKey)}`);
+            Toast.success('File deleted successfully');
+
+            // Refresh the matter view to update orphaned files list
+            await viewMatter(matterId, 'documents');
+          } catch (error) {
+            Toast.error(error.message || 'Failed to delete file');
+          }
+        }
+      );
+    }
+
+    // Document Metadata Modal Setup
+    const metadataModal = document.getElementById('documentMetadataModal');
+    const metadataFileName = document.getElementById('metadataFileName');
+    const metadataFileSize = document.getElementById('metadataFileSize');
+    const metadataDocType = document.getElementById('metadataDocType');
+    const metadataTags = document.getElementById('metadataTags');
+    const metadataNotes = document.getElementById('metadataNotes');
+    const confirmMetadataUpload = document.getElementById('confirmMetadataUpload');
+    const cancelMetadataUpload = document.getElementById('cancelMetadataUpload');
+    const closeMetadataModal = document.getElementById('closeMetadataModal');
+
+    let pendingFileUpload = null;
+    let pendingMatterId = null;
+
+    function formatFileSize(bytes) {
+      if (!bytes) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    function showMetadataModal(file, matterId) {
+      pendingFileUpload = file;
+      pendingMatterId = matterId;
+
+      // Populate file info
+      metadataFileName.textContent = file.name;
+      metadataFileSize.textContent = formatFileSize(file.size);
+
+      // Reset form fields
+      metadataDocType.value = '';
+      metadataTags.value = '';
+      metadataNotes.value = '';
+
+      // Reset character counter
+      const charCount = document.getElementById('notesCharCount');
+      if (charCount) charCount.textContent = '0';
+
+      // Show modal
+      metadataModal.classList.remove('hidden');
+    }
+
+    function closeMetadataModalFn() {
+      metadataModal.classList.add('hidden');
+      pendingFileUpload = null;
+      pendingMatterId = null;
+
+      // Reset file inputs to allow re-selection of same file
+      const fileInputs = ['drawerEmptyFileInput', 'drawerDocFileInput'];
+      fileInputs.forEach(id => {
+        const input = document.getElementById(id);
+        if (input) input.value = '';
+      });
+    }
+
+    async function confirmMetadataUploadFn() {
+      if (!pendingFileUpload || !pendingMatterId) {
+        Toast.error('No file selected for upload');
+        return;
+      }
+
+      // Disable button and show loading state
+      confirmMetadataUpload.disabled = true;
+      const originalContent = confirmMetadataUpload.innerHTML;
+      confirmMetadataUpload.innerHTML = `
+        <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span>Uploading...</span>
+      `;
+
+      const file = pendingFileUpload;
+      const matterId = pendingMatterId;
+
+      // Collect metadata
+      const options = {};
+
+      const docType = metadataDocType.value;
+      if (docType) {
+        options.document_type = docType;
+      }
+
+      const tags = metadataTags.value.trim();
+      if (tags) {
+        options.tags = tags;
+      }
+
+      const notes = metadataNotes.value.trim();
+      if (notes) {
+        options.notes = notes;
+      }
+
+      // Small delay to show loading state, then close modal
+      await new Promise(resolve => setTimeout(resolve, 300));
+      closeMetadataModalFn();
+
+      // Reset button state
+      confirmMetadataUpload.disabled = false;
+      confirmMetadataUpload.innerHTML = originalContent;
+
+      // Show upload progress
+      const dropContent = document.getElementById('drawerDocDropContent');
+      const uploadProgress = document.getElementById('drawerDocUploadProgress');
+      const uploadText = document.getElementById('drawerDocUploadText');
+
+      if (dropContent) dropContent.classList.add('hidden');
+      if (uploadProgress) uploadProgress.classList.remove('hidden');
+      if (uploadText) uploadText.textContent = `Uploading ${file.name}...`;
+
+      try {
+        const result = await api.uploadDocument(file, matterId, options);
+
+        // Start SSE stream to monitor processing status
+        if (result.job_id && result.file_id) {
+          console.log(`Starting SSE stream for ${file.name}`, {
+            jobId: result.job_id,
+            fileId: result.file_id
+          });
+          startDocumentStatusStream(result.job_id, result.file_id, matterId, file.name);
+        }
+
+        Toast.success(`Document uploaded - processing started`);
+        await refreshDrawerDocuments(matterId);
+      } catch (error) {
+        Toast.error(`Failed to upload ${file.name}: ${error.message}`);
+      } finally {
+        // Reset UI
+        if (dropContent) dropContent.classList.remove('hidden');
+        if (uploadProgress) uploadProgress.classList.add('hidden');
+      }
+    }
+
+    // Event listeners for metadata modal
+    closeMetadataModal.addEventListener('click', closeMetadataModalFn);
+    cancelMetadataUpload.addEventListener('click', closeMetadataModalFn);
+    confirmMetadataUpload.addEventListener('click', confirmMetadataUploadFn);
+
+    // Character counter for notes field
+    metadataNotes.addEventListener('input', (e) => {
+      const charCount = document.getElementById('notesCharCount');
+      if (charCount) {
+        charCount.textContent = e.target.value.length;
+      }
+    });
+
+    // Close modal when clicking outside
+    metadataModal.addEventListener('click', (e) => {
+      if (e.target === metadataModal) {
+        closeMetadataModalFn();
+      }
+    });
+
+    // Close modal with ESC key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !metadataModal.classList.contains('hidden')) {
+        closeMetadataModalFn();
+      }
+    });
+
+    // Document Viewer Modal Setup
+    const viewerModal = document.getElementById('documentViewerModal');
+    const viewerLoading = document.getElementById('viewerLoading');
+    const viewerError = document.getElementById('viewerError');
+    const viewerIframe = document.getElementById('viewerIframe');
+    const viewerText = document.getElementById('viewerText');
+    const viewerTable = document.getElementById('viewerTable');
+    const viewerImage = document.getElementById('viewerImage');
+    const viewerContent = document.getElementById('viewerContent');
+    const viewerMetadataSidebar = document.getElementById('viewerMetadataSidebar');
+
+    // Initialize Document Metadata Viewer component
+    let documentMetadataViewer = null;
+
+    // Layout toggle buttons
+    const layoutPreviewOnly = document.getElementById('layoutPreviewOnly');
+    const layoutSplit = document.getElementById('layoutSplit');
+    const layoutMetadataOnly = document.getElementById('layoutMetadataOnly');
+
+    // Layout toggle handlers
+    layoutPreviewOnly.addEventListener('click', () => setViewerLayout('preview-only'));
+    layoutSplit.addEventListener('click', () => setViewerLayout('split'));
+    layoutMetadataOnly.addEventListener('click', () => setViewerLayout('metadata-only'));
+
+    function setViewerLayout(layout) {
+      // Update button states
+      [layoutPreviewOnly, layoutSplit, layoutMetadataOnly].forEach(btn => btn.classList.remove('active'));
+      if (layout === 'preview-only') {
+        layoutPreviewOnly.classList.add('active');
+        viewerContent.classList.remove('hidden');
+        viewerMetadataSidebar.classList.add('hidden');
+      } else if (layout === 'split') {
+        layoutSplit.classList.add('active');
+        viewerContent.classList.remove('hidden');
+        viewerMetadataSidebar.classList.remove('hidden');
+      } else if (layout === 'metadata-only') {
+        layoutMetadataOnly.classList.add('active');
+        viewerContent.classList.add('hidden');
+        viewerMetadataSidebar.classList.remove('hidden');
+      }
+    }
+
+    document.getElementById('closeDocumentViewer').addEventListener('click', closeDocumentViewer);
+    viewerModal.addEventListener('click', (e) => {
+      if (e.target === viewerModal) closeDocumentViewer();
+    });
+
+    function closeDocumentViewer() {
+      viewerModal.classList.add('hidden');
+      // Clean up content
+      viewerIframe.src = '';
+      viewerIframe.classList.add('hidden');
+      viewerText.textContent = '';
+      viewerText.classList.add('hidden');
+      viewerImage.src = '';
+      viewerImage.classList.add('hidden');
+      viewerError.classList.add('hidden');
+
+      // Clean up metadata viewer
+      if (documentMetadataViewer) {
+        documentMetadataViewer.destroy();
+        documentMetadataViewer = null;
+      }
+    }
+
+    function formatFileSize(bytes) {
+      if (!bytes) return '0 B';
+      const units = ['B', 'KB', 'MB', 'GB'];
+      let i = 0;
+      let size = parseInt(bytes);
+      while (size >= 1024 && i < units.length - 1) {
+        size /= 1024;
+        i++;
+      }
+      return `${size.toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
+    }
+
+    // Render CSV as HTML table
+    function renderCSVTable(csvText) {
+      const viewerTable = document.getElementById('viewerTable');
+
+      // Parse CSV (simple parser - handles quoted fields with commas)
+      const rows = [];
+      let currentRow = [];
+      let currentField = '';
+      let insideQuotes = false;
+
+      for (let i = 0; i < csvText.length; i++) {
+        const char = csvText[i];
+        const nextChar = csvText[i + 1];
+
+        if (char === '"') {
+          if (insideQuotes && nextChar === '"') {
+            // Escaped quote
+            currentField += '"';
+            i++;
+          } else {
+            // Toggle quote mode
+            insideQuotes = !insideQuotes;
+          }
+        } else if (char === ',' && !insideQuotes) {
+          // End of field
+          currentRow.push(currentField.trim());
+          currentField = '';
+        } else if ((char === '\n' || char === '\r') && !insideQuotes) {
+          // End of row
+          if (char === '\r' && nextChar === '\n') {
+            i++; // Skip \r\n
+          }
+          if (currentField || currentRow.length > 0) {
+            currentRow.push(currentField.trim());
+            rows.push(currentRow);
+            currentRow = [];
+            currentField = '';
+          }
+        } else {
+          currentField += char;
+        }
+      }
+
+      // Add last field/row if exists
+      if (currentField || currentRow.length > 0) {
+        currentRow.push(currentField.trim());
+        rows.push(currentRow);
+      }
+
+      // Filter empty rows
+      const filteredRows = rows.filter(row => row.some(cell => cell !== ''));
+
+      if (filteredRows.length === 0) {
+        viewerTable.innerHTML = '<p class="p-6 text-gray-500">Empty CSV file</p>';
+        return;
+      }
+
+      // Build HTML table
+      const headers = filteredRows[0];
+      const dataRows = filteredRows.slice(1);
+
+      let html = `
+        <table class="min-w-full divide-y divide-gray-200 text-sm">
+          <thead class="bg-gray-50 sticky top-0">
+            <tr>
+              ${headers.map(header => `
+                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-200 whitespace-nowrap">
+                  ${escapeHtml(header)}
+                </th>
+              `).join('')}
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            ${dataRows.map((row, rowIndex) => `
+              <tr class="${rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-indigo-50">
+                ${row.map((cell, cellIndex) => `
+                  <td class="px-4 py-2 ${cellIndex === 0 ? 'font-medium text-gray-900' : 'text-gray-600'} border-r border-gray-100 whitespace-nowrap">
+                    ${escapeHtml(cell)}
+                  </td>
+                `).join('')}
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+
+      viewerTable.innerHTML = html;
+    }
+
+    // Helper: Escape HTML
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // View document in modal
+    window.viewDocument = async function(fileId, matterId, filename, contentType, fileSize) {
+      // Show modal with loading state
+      viewerModal.classList.remove('hidden');
+      viewerLoading.classList.remove('hidden');
+      viewerError.classList.add('hidden');
+      viewerIframe.classList.add('hidden');
+      viewerText.classList.add('hidden');
+      viewerTable.classList.add('hidden');
+      viewerImage.classList.add('hidden');
+      viewerDocx.classList.add('hidden');
+
+      // Set file info
+      document.getElementById('viewerFileName').textContent = filename;
+      document.getElementById('viewerFileInfo').textContent = `${contentType || 'Unknown type'} • ${formatFileSize(fileSize)}`;
+
+      // Set download button URL (will be handled by downloadDocument)
+      document.getElementById('viewerDownloadBtn').onclick = () => downloadDocument(fileId, matterId, filename);
+      document.getElementById('viewerErrorDownload').onclick = () => downloadDocument(fileId, matterId, filename);
+
+      try {
+        // Fetch file with authentication
+        const response = await fetch(api.getFileViewUrl(fileId, matterId), {
+          headers: {
+            'Authorization': `Bearer ${api.token}`
+          }
+        });
+
+        if (!response.ok) {
+          // Check for authentication errors (401) - redirect to login
+          if (response.status === 401) {
+            if (window.api && typeof window.api.showSessionExpiredModal === 'function') {
+              window.api.showSessionExpiredModal();
+            } else {
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              Toast.error('Session expired. Redirecting to login...');
+              setTimeout(() => { window.location.href = 'login.html'; }, 1500);
+            }
+            throw new Error('Session expired');
+          }
+          throw new Error(`Failed to load document: ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+
+        viewerLoading.classList.add('hidden');
+
+        // Display based on content type
+        const type = contentType?.toLowerCase() || '';
+
+        if (type.startsWith('image/')) {
+          // Image files
+          viewerImage.src = url;
+          viewerImage.classList.remove('hidden');
+        } else if (type === 'application/pdf') {
+          // PDF files - use iframe
+          viewerIframe.src = url;
+          viewerIframe.classList.remove('hidden');
+        } else if (filename.match(/\.csv$/i) || type.includes('csv')) {
+          // CSV files - render as spreadsheet table
+          const text = await blob.text();
+          renderCSVTable(text);
+          viewerTable.classList.remove('hidden');
+        } else if (type.startsWith('text/') || type === 'application/json' || type === 'application/xml' || filename.match(/\.(txt|md|json|xml|log|js|ts|py|html|css|yaml|yml)$/i)) {
+          // Text-based files
+          const text = await blob.text();
+          viewerText.textContent = text;
+          viewerText.classList.remove('hidden');
+        } else if (filename.match(/\.docx$/i) || type.includes('wordprocessingml')) {
+          // .docx files - convert to HTML using Mammoth.js
+          try {
+            const arrayBuffer = await blob.arrayBuffer();
+            const result = await mammoth.convertToHtml({
+              arrayBuffer: arrayBuffer,
+              convertImage: mammoth.images.imgElement(function(image) {
+                return image.read("base64").then(function(imageBuffer) {
+                  return {
+                    src: "data:" + image.contentType + ";base64," + imageBuffer
+                  };
+                });
+              }),
+              styleMap: [
+                "p[style-name='Heading 1'] => h1:fresh",
+                "p[style-name='Heading 2'] => h2:fresh",
+                "p[style-name='Heading 3'] => h3:fresh",
+                "p[style-name='Title'] => h1.document-title:fresh",
+                "r[style-name='Strong'] => strong",
+                "r[style-name='Emphasis'] => em",
+                "table => table.docx-table"
+              ]
+            });
+            viewerDocx.innerHTML = result.value;
+            viewerDocx.classList.remove('hidden');
+
+            // Log any messages/warnings from Mammoth
+            if (result.messages.length > 0) {
+              console.log('Mammoth conversion messages:', result.messages);
+            }
+          } catch (mammothError) {
+            console.error('Failed to convert .docx:', mammothError);
+            viewerError.classList.remove('hidden');
+            document.getElementById('viewerErrorMsg').textContent = 'Failed to preview .docx file';
+          }
+        } else {
+          // Unsupported file type - show error with download option
+          viewerError.classList.remove('hidden');
+          document.getElementById('viewerErrorMsg').textContent = `Preview not available for ${contentType || 'this file type'}`;
+        }
+
+        // Initialize and load document metadata
+        if (!documentMetadataViewer) {
+          documentMetadataViewer = new DocumentMetadataViewer('viewerMetadataSidebar', {
+            showLayoutToggle: false, // Layout toggle is in header
+            defaultLayout: 'split',
+            collapseSections: true,
+            showEmptySections: false,
+            truncateSummary: true,
+            summaryMaxLength: 300,
+            entitiesMaxItems: 10,
+            autoRefreshInterval: null,
+            onMetadataLoaded: (metadata) => {
+              console.log('[DocumentViewer] Metadata loaded:', metadata);
+            },
+            onError: (error) => {
+              console.error('[DocumentViewer] Metadata error:', error);
+            }
+          });
+        }
+
+        // Load metadata for this document
+        documentMetadataViewer.loadMetadata(fileId).catch(err => {
+          console.error('[DocumentViewer] Failed to load metadata:', err);
+        });
+
+      } catch (error) {
+        console.error('Failed to load document:', error);
+        viewerLoading.classList.add('hidden');
+        viewerError.classList.remove('hidden');
+        document.getElementById('viewerErrorMsg').textContent = error.message || 'Failed to load document';
+      }
+    }
+
+    // Download document with authentication
+    window.downloadDocument = async function(fileId, matterId, filename) {
+      try {
+        const response = await fetch(api.getFileDownloadUrl(fileId, matterId), {
+          headers: {
+            'Authorization': `Bearer ${api.token}`
+          }
+        });
+
+        if (!response.ok) {
+          // Check for authentication errors (401) - redirect to login
+          if (response.status === 401) {
+            if (window.api && typeof window.api.showSessionExpiredModal === 'function') {
+              window.api.showSessionExpiredModal();
+            } else {
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              Toast.error('Session expired. Redirecting to login...');
+              setTimeout(() => { window.location.href = 'login.html'; }, 1500);
+            }
+            throw new Error('Session expired');
+          }
+          throw new Error(`Failed to download: ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+
+        // Create download link
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        Toast.success('Download started');
+      } catch (error) {
+        console.error('Download failed:', error);
+        Toast.error(error.message || 'Failed to download file');
+      }
+    }
+
+    // Download orphaned document with authentication (using storage key)
+    window.downloadOrphanedDocument = async function(storageKey, matterId, filename) {
+      try {
+        const url = `${api.baseUrl}/api/v1/storage/download-by-key?storage_key=${encodeURIComponent(storageKey)}&matter_id=${matterId}`;
+        const response = await fetch(url, {
+          headers: {
+            'Authorization': `Bearer ${api.token}`
+          }
+        });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            if (window.api && typeof window.api.showSessionExpiredModal === 'function') {
+              window.api.showSessionExpiredModal();
+            } else {
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              Toast.error('Session expired. Redirecting to login...');
+              setTimeout(() => { window.location.href = 'login.html'; }, 1500);
+            }
+            throw new Error('Session expired');
+          }
+          throw new Error(`Failed to download: ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+
+        // Create download link
+        const a = document.createElement('a');
+        a.href = objectUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(objectUrl);
+
+        Toast.success('Download started');
+      } catch (error) {
+        console.error('Download failed:', error);
+        Toast.error(error.message || 'Failed to download file');
+      }
+    }
+
+    // Render Conversations Tab
+    function renderConversationsTab(matter, chats, pagination) {
+      const content = document.getElementById('tabContentConversations');
+
+      if (chats.length === 0) {
+        content.innerHTML = `
+          <div class="text-center py-12">
+            <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
+            </svg>
+            <h4 class="text-lg font-semibold text-gray-900 mb-2">No conversations yet</h4>
+            <p class="text-gray-500 mb-6">Start a conversation in this matter to organize all related chats</p>
+            <button onclick="createMatterConversation('${matter.matter_id}', '${(matter.name || matter.matter_name || '').replace(/'/g, "\\'")}')" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+              Start First Conversation
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      const currentOffset = pagination?.offset || 0;
+      const limit = pagination?.limit || 25;
+      const total = pagination?.total || 0;
+      const hasMore = (currentOffset + chats.length) < total;
+      const currentPage = Math.floor(currentOffset / limit) + 1;
+      const totalPages = Math.ceil(total / limit);
+
+      content.innerHTML = `
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <p class="text-sm text-gray-500">${total} conversation${total !== 1 ? 's' : ''}</p>
+            <button onclick="createMatterConversation('${matter.matter_id}', '${(matter.name || matter.matter_name || '').replace(/'/g, "\\'")}')" class="inline-flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+              New Chat
+            </button>
+          </div>
+
+          <div class="space-y-2">
+            ${chats.map(chat => `
+              <div onclick="NavigationHelpers.navigateToConversation('${chat.thread_id}', '${matter.matter_id}')" class="block bg-white border border-gray-200 hover:border-indigo-300 hover:shadow-sm rounded-lg p-4 transition-all group cursor-pointer">
+                <div class="flex items-start gap-3">
+                  <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
+                    </svg>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <h6 class="text-sm font-semibold text-gray-900 group-hover:text-indigo-600 mb-1 truncate">${chat.metadata?.title || 'Untitled Conversation'}</h6>
+                    <p class="text-xs text-gray-500 flex items-center gap-4">
+                      <span>Started ${timeAgo(chat.created_at)}</span>
+                      ${chat.metadata?.messageCount ? `<span>• ${chat.metadata.messageCount} messages</span>` : ''}
+                    </p>
+                  </div>
+                  <svg class="w-5 h-5 text-gray-400 group-hover:text-indigo-600 flex-shrink-0 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                  </svg>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+
+          ${total > 0 ? `
+            <div class="border-t pt-4 mt-6">
+              <div class="flex items-center justify-between">
+                <div class="text-sm text-gray-600">
+                  Showing ${formatNumber(currentOffset + 1)}-${formatNumber(currentOffset + chats.length)} of ${formatNumber(total)} conversations
+                </div>
+                <div class="flex items-center gap-2">
+                  <button
+                    onclick="loadConversationsPage('${matter.matter_id}', ${Math.max(0, currentOffset - limit)})"
+                    ${currentOffset === 0 ? 'disabled' : ''}
+                    class="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <span class="text-sm text-gray-600">
+                    Page ${formatNumber(currentPage)} of ${formatNumber(totalPages)}
+                  </span>
+                  <button
+                    onclick="loadConversationsPage('${matter.matter_id}', ${currentOffset + limit})"
+                    ${!hasMore ? 'disabled' : ''}
+                    class="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    // Render Activity Tab
+    function renderActivityTab(matter, activities, pagination) {
+      console.log('[renderActivityTab] Called with', { matterId: matter?.matter_id, activitiesCount: activities?.length });
+      const content = document.getElementById('tabContentActivity');
+
+      if (!content) {
+        console.warn('[renderActivityTab] Content element not found - tab may not be visible');
+        return;
+      }
+
+      if (activities.length === 0) {
+        content.innerHTML = `
+          <div class="text-center py-12">
+            <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <h4 class="text-lg font-semibold text-gray-900 mb-2">No activity yet</h4>
+            <p class="text-gray-500">Activity related to this matter will appear here</p>
+          </div>
+        `;
+        return;
+      }
+
+      // Group activities by date
+      const groupedActivities = {};
+      activities.forEach(activity => {
+        const date = new Date(activity.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        if (!groupedActivities[date]) {
+          groupedActivities[date] = [];
+        }
+        groupedActivities[date].push(activity);
+      });
+
+      const currentOffset = pagination?.offset || 0;
+      const limit = pagination?.limit || 20;
+      const total = pagination?.total || 0;
+      const hasMore = (currentOffset + activities.length) < total;
+      const currentPage = Math.floor(currentOffset / limit) + 1;
+      const totalPages = Math.ceil(total / limit);
+
+      content.innerHTML = `
+        <div class="space-y-6">
+          ${Object.entries(groupedActivities).map(([date, dayActivities]) => `
+            <div>
+              <h6 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 sticky top-0 bg-white py-2">${date}</h6>
+              <div class="space-y-3">
+                ${dayActivities.map(activity => `
+                  <div class="flex items-start gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                    <div class="w-8 h-8 ${getActivityBgColor(activity)} rounded-full flex items-center justify-center flex-shrink-0">
+                      ${getActivityIcon(activity)}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm text-gray-900 leading-relaxed">${getActivityDescription(activity)}</p>
+                      <p class="text-xs text-gray-500 mt-1">${timeAgo(activity.created_at)}</p>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `).join('')}
+
+          ${total > 0 ? `
+            <div class="border-t pt-4 mt-6">
+              <div class="flex items-center justify-between">
+                <div class="text-sm text-gray-600">
+                  Showing ${formatNumber(currentOffset + 1)}-${formatNumber(currentOffset + activities.length)} of ${formatNumber(total)}
+                </div>
+                <div class="flex items-center gap-2">
+                  <button
+                    onclick="loadActivityPage('${matter.matter_id}', ${Math.max(0, currentOffset - limit)})"
+                    ${currentOffset === 0 ? 'disabled' : ''}
+                    class="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <span class="text-sm text-gray-600">
+                    Page ${formatNumber(currentPage)} of ${formatNumber(totalPages)}
+                  </span>
+                  <button
+                    onclick="loadActivityPage('${matter.matter_id}', ${currentOffset + limit})"
+                    ${!hasMore ? 'disabled' : ''}
+                    class="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    // Activity helper functions
+    function getActivityIcon(activity) {
+      // Determine the activity type
+      let activityType = activity.action_type; // Old format (backward compatibility)
+
+      if (activity.type === 'comment') {
+        activityType = 'comment';
+      } else if (activity.type === 'system_event') {
+        activityType = activity.event_type;
+      }
+
+      const icons = {
+        'comment': '<svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>',
+        'document_uploaded': '<svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>',
+        'document_viewed': '<svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>',
+        'document_deleted': '<svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>',
+        'matter_created': '<svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>',
+        'matter_updated': '<svg class="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>',
+        'chat_message': '<svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>',
+        'conversation_created': '<svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>',
+        'task_created': '<svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>',
+        'task_updated': '<svg class="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>',
+        'user_shared': '<svg class="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>'
+      };
+      return icons[activityType] || '<svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+    }
+
+    function getActivityBgColor(activity) {
+      // Determine the activity type
+      let activityType = activity.action_type; // Old format (backward compatibility)
+
+      if (activity.type === 'comment') {
+        activityType = 'comment';
+      } else if (activity.type === 'system_event') {
+        activityType = activity.event_type;
+      }
+
+      const colors = {
+        'comment': 'bg-blue-100',
+        'document_uploaded': 'bg-blue-100',
+        'document_viewed': 'bg-green-100',
+        'document_deleted': 'bg-red-100',
+        'matter_created': 'bg-indigo-100',
+        'matter_updated': 'bg-yellow-100',
+        'chat_message': 'bg-purple-100',
+        'conversation_created': 'bg-purple-100',
+        'task_created': 'bg-green-100',
+        'task_updated': 'bg-yellow-100',
+        'user_shared': 'bg-teal-100'
+      };
+      return colors[activityType] || 'bg-gray-100';
+    }
+
+    function getActivityDescription(activity) {
+      // Get user name
+      const userName = activity.user ? `${activity.user.first_name} ${activity.user.last_name}` : 'Someone';
+
+      // Use display_message if provided
+      if (activity.display_message) {
+        return `<strong>${userName}</strong> ${activity.display_message.toLowerCase()}`;
+      }
+
+      // Handle comments (old format)
+      if (activity.type === 'comment' && activity.content) {
+        const actorName = activity.actor?.name || 'Someone';
+        return `<strong>${actorName}</strong> commented: ${activity.content}`;
+      }
+
+      // Handle system events (old format)
+      if (activity.type === 'system_event' && activity.event_type) {
+        const actorName = activity.actor?.name || 'System';
+        return `<strong>${actorName}</strong> ${activity.event_type.replace(/_/g, ' ')}`;
+      }
+
+      // Fallback for old action_type format (backward compatibility)
+      if (activity.action_type) {
+        const descriptions = {
+          'document_uploaded': `Document uploaded: ${activity.metadata?.filename || 'file'}`,
+          'document_viewed': `Document viewed: ${activity.metadata?.filename || 'file'}`,
+          'matter_created': 'Matter was created',
+          'matter_updated': `Matter was updated${activity.metadata?.field ? ': ' + activity.metadata.field : ''}`,
+          'chat_message': 'New chat message',
+          'user_shared': `Shared with ${activity.metadata?.user_email || 'user'}`
+        };
+        return descriptions[activity.action_type] || activity.action_type.replace(/_/g, ' ');
+      }
+
+      // Fallback to event_type if present
+      if (activity.event_type) {
+        return `<strong>${userName}</strong> ${activity.event_type.replace(/_/g, ' ').replace(/\./g, ' ')}`;
+      }
+
+      return activity.description || activity.content || 'Activity';
+    }
+
+    // Load Activity Page (for pagination)
+    window.loadActivityPage = async function(matterId, offset) {
+      try {
+        const limit = 20;
+        const result = await api.getMatterActivity(matterId, limit, offset);
+
+        // Update the current matter data with new activities and pagination
+        if (currentMatterData) {
+          currentMatterData.activities = result.activities || [];
+          currentMatterData.activityPagination = result.pagination || { total: 0, limit, offset };
+
+          // Re-render the activity tab with new data
+          renderActivityTab(currentMatterData.matter, currentMatterData.activities, currentMatterData.activityPagination);
+        }
+      } catch (error) {
+        console.error('[loadActivityPage] Failed to load activity page:', error);
+        Toast.error('Failed to load activity');
+      }
+    };
+
+    // Load Conversations Page (for pagination)
+    window.loadConversationsPage = async function(matterId, offset) {
+      try {
+        const limit = 25;
+        const result = await api.getMatterConversations(matterId, limit, offset);
+
+        // Update the current matter data with new conversations and pagination
+        if (currentMatterData) {
+          currentMatterData.chats = result.conversations || [];
+          currentMatterData.chatsPagination = result.pagination || { total: 0, limit, offset };
+
+          // Re-render the conversations tab with new data
+          renderConversationsTab(currentMatterData.matter, currentMatterData.chats, currentMatterData.chatsPagination);
+        }
+      } catch (error) {
+        console.error('[loadConversationsPage] Failed to load conversations page:', error);
+        Toast.error('Failed to load conversations');
+      }
+    };
+
+    // ============================================================================
+    // Render Comments Tab (Collaboration Feed)
+    // ============================================================================
+
+    let commentPollInterval = null;
+    let mentionableUsers = [];
+    let matterDocuments = [];
+    let currentMentionFilter = '';
+    let currentDocumentFilter = '';
+    let currentCommentsPage = 1;
+    let commentsPerPage = 25;
+    let totalComments = 0;
+    let currentMatterId = null;
+
+    async function renderCommentsTab(matter) {
+      const content = document.getElementById('tabContentComments');
+
+      // Reset pagination state
+      currentCommentsPage = 1;
+      currentMatterId = matter.matter_id;
+
+      content.innerHTML = `
+        <div class="space-y-4">
+          <!-- Comment Composer -->
+          <div class="bg-white rounded-lg border border-gray-200 p-4">
+            <div class="flex items-start gap-3">
+              <div class="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center flex-shrink-0 font-semibold">
+                ${api.user ? ((api.user.firstName?.[0] || '') + (api.user.lastName?.[0] || '')).toUpperCase() : 'U'}
+              </div>
+              <div class="flex-1 relative">
+                <div
+                  id="commentInput"
+                  contenteditable="true"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 min-h-[76px] text-sm outline-none"
+                  data-placeholder="Add a comment... (type @ to mention teammates, # to reference documents)"
+                ></div>
+
+                <!-- @Mention Autocomplete Dropdown -->
+                <div id="mentionDropdown" class="hidden absolute z-50 mt-1 w-64 bg-white rounded-lg shadow-lg border border-gray-200 max-h-48 overflow-y-auto">
+                  <div id="mentionList" class="py-1"></div>
+                </div>
+
+                <!-- #Document Reference Autocomplete Dropdown -->
+                <div id="documentDropdown" class="hidden absolute z-50 mt-1 w-80 bg-white rounded-lg shadow-lg border border-gray-200 max-h-64 overflow-y-auto">
+                  <div id="documentList" class="py-1"></div>
+                </div>
+
+                <div class="mt-3 flex justify-end gap-2">
+                  <button id="cancelComment" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
+                  <button id="postComment" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">Post Comment</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Comments List -->
+          <div id="commentsList" class="space-y-4">
+            <div class="text-center py-8">
+              <div class="inline-block animate-spin w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full"></div>
+              <p class="mt-2 text-sm text-gray-500">Loading comments...</p>
+            </div>
+          </div>
+
+          <!-- Pagination Controls -->
+          <div id="commentsPagination" class="hidden flex items-center justify-between px-4 py-3 bg-white border border-gray-200 rounded-lg">
+            <div class="text-sm text-gray-700">
+              Showing <span id="commentsRangeStart">0</span> to <span id="commentsRangeEnd">0</span> of <span id="commentsTotalCount">0</span> comments
+            </div>
+            <div class="flex gap-2">
+              <button
+                id="commentsPrevPage"
+                class="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled
+              >
+                Previous
+              </button>
+              <div id="commentsPageInfo" class="px-3 py-1 text-sm text-gray-700">
+                Page <span id="commentsCurrentPage">1</span> of <span id="commentsTotalPages">1</span>
+              </div>
+              <button
+                id="commentsNextPage"
+                class="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Load comments
+      await loadComments(matter.matter_id, 1);
+
+      // Load mentionable users for @mention autocomplete
+      await loadMentionableUsers(matter.matter_id);
+
+      // Load documents for #reference autocomplete
+      await loadMatterDocuments(matter.matter_id);
+
+      // Set up event listeners
+      setupCommentComposer(matter.matter_id);
+
+      // Start polling for new comments (every 30 seconds)
+      if (commentPollInterval) clearInterval(commentPollInterval);
+      commentPollInterval = setInterval(() => loadComments(matter.matter_id), 30000);
+    }
+
+    async function loadMentionableUsers(matterId) {
+      try {
+        const response = await api.getMentionableUsers(matterId);
+        mentionableUsers = response.data || [];
+      } catch (error) {
+        console.error('Failed to load mentionable users:', error);
+        mentionableUsers = [];
+      }
+    }
+
+    async function loadMatterDocuments(matterId) {
+      try {
+        console.log('[Comments] Loading documents for matter:', matterId);
+        const response = await api.getMatterDocuments(matterId, 1, 100);
+        console.log('[Comments] Documents response:', response);
+        matterDocuments = response.documents || [];
+        console.log('[Comments] Loaded documents:', matterDocuments.length);
+      } catch (error) {
+        console.error('Failed to load matter documents:', error);
+        matterDocuments = [];
+      }
+    }
+
+    async function loadComments(matterId, page = 1) {
+      try {
+        currentCommentsPage = page;
+        const offset = (page - 1) * commentsPerPage;
+
+        const response = await api.getComments(matterId, {
+          limit: commentsPerPage,
+          offset: offset,
+          sort: 'created_at:desc'
+        });
+
+        const comments = response.data || [];
+        const pagination = response.pagination || {};
+        totalComments = pagination.total || 0;
+
+        renderCommentsList(comments, matterId);
+        updatePaginationUI();
+      } catch (error) {
+        console.error('Failed to load comments:', error);
+        document.getElementById('commentsList').innerHTML = `
+          <div class="text-center py-8 text-gray-500">
+            <p>Failed to load comments</p>
+          </div>
+        `;
+      }
+    }
+
+    function updatePaginationUI() {
+      const totalPages = Math.ceil(totalComments / commentsPerPage);
+      const startRange = totalComments === 0 ? 0 : (currentCommentsPage - 1) * commentsPerPage + 1;
+      const endRange = Math.min(currentCommentsPage * commentsPerPage, totalComments);
+
+      // Update pagination info
+      document.getElementById('commentsRangeStart').textContent = formatNumber(startRange);
+      document.getElementById('commentsRangeEnd').textContent = formatNumber(endRange);
+      document.getElementById('commentsTotalCount').textContent = formatNumber(totalComments);
+      document.getElementById('commentsCurrentPage').textContent = formatNumber(currentCommentsPage);
+      document.getElementById('commentsTotalPages').textContent = formatNumber(totalPages || 1);
+
+      // Always show pagination controls
+      const paginationContainer = document.getElementById('commentsPagination');
+      if (paginationContainer) {
+        paginationContainer.classList.remove('hidden');
+      }
+
+      // Update button states
+      const prevButton = document.getElementById('commentsPrevPage');
+      const nextButton = document.getElementById('commentsNextPage');
+
+      if (prevButton) {
+        prevButton.disabled = currentCommentsPage <= 1;
+      }
+
+      if (nextButton) {
+        nextButton.disabled = currentCommentsPage >= totalPages;
+      }
+
+      // Attach event listeners to pagination buttons
+      setupPaginationListeners();
+    }
+
+    function setupPaginationListeners() {
+      const prevButton = document.getElementById('commentsPrevPage');
+      const nextButton = document.getElementById('commentsNextPage');
+
+      if (prevButton) {
+        prevButton.onclick = () => {
+          if (currentCommentsPage > 1 && currentMatterId) {
+            loadComments(currentMatterId, currentCommentsPage - 1);
+          }
+        };
+      }
+
+      if (nextButton) {
+        nextButton.onclick = () => {
+          const totalPages = Math.ceil(totalComments / commentsPerPage);
+          if (currentCommentsPage < totalPages && currentMatterId) {
+            loadComments(currentMatterId, currentCommentsPage + 1);
+          }
+        };
+      }
+    }
+
+    function renderCommentsList(comments, matterId) {
+      const container = document.getElementById('commentsList');
+
+      if (comments.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-12">
+            <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
+            </svg>
+            <h4 class="text-lg font-semibold text-gray-900 mb-2">No comments yet</h4>
+            <p class="text-gray-500">Be the first to comment on this matter</p>
+          </div>
+        `;
+        return;
+      }
+
+      // Organize comments into threads (top-level + replies)
+      const threads = buildCommentThreads(comments);
+
+      container.innerHTML = threads.map(thread => renderCommentThread(thread, matterId)).join('');
+
+      // Attach event listeners to reply/edit/delete buttons
+      attachCommentActions(matterId);
+    }
+
+    function buildCommentThreads(comments) {
+      // Backend already sends comments with replies nested, just sort them
+      const processedComments = comments
+        .map(comment => ({
+          ...comment,
+          // Ensure replies array exists and is sorted
+          replies: (comment.replies || []).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+        }));
+
+      // Separate pinned and unpinned comments
+      const pinnedComments = processedComments.filter(c => c.is_pinned);
+      const unpinnedComments = processedComments.filter(c => !c.is_pinned);
+
+      // Sort each group by creation date (newest first)
+      pinnedComments.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      unpinnedComments.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+      // Return pinned comments first, then unpinned
+      return [...pinnedComments, ...unpinnedComments];
+    }
+
+    function renderCommentThread(comment, matterId) {
+      const isAuthor = comment.author_id === api.user?.id;
+      const isPinned = comment.is_pinned;
+
+      return `
+        <div class="bg-white rounded-lg border border-gray-200 ${isPinned ? 'ring-2 ring-yellow-400' : ''}" data-comment-id="${comment.id}">
+          ${isPinned ? '<div class="bg-yellow-50 px-4 py-2 border-b border-yellow-200 text-xs text-yellow-800 flex items-center gap-1"><svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 2zM10 15a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 15zM10 7a3 3 0 100 6 3 3 0 000-6zM15.657 5.404a.75.75 0 10-1.06-1.06l-1.061 1.06a.75.75 0 001.06 1.06l1.06-1.06zM6.464 14.596a.75.75 0 10-1.06-1.06l-1.06 1.06a.75.75 0 001.06 1.06l1.06-1.06zM18 10a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 0118 10zM5 10a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 015 10zM14.596 15.657a.75.75 0 001.06-1.06l-1.06-1.061a.75.75 0 10-1.06 1.06l1.06 1.06zM5.404 6.464a.75.75 0 001.06-1.06l-1.06-1.06a.75.75 0 10-1.06 1.06l1.06 1.06z"></path></svg>Pinned</div>' : ''}
+
+          <div class="p-4">
+            <div class="flex items-start gap-3">
+              <div class="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0 font-semibold text-gray-600">
+                ${comment.author_name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U'}
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="font-semibold text-gray-900">${comment.author_name || 'Unknown User'}</span>
+                  <span class="text-xs text-gray-500">${timeAgo(comment.created_at)}</span>
+                  ${comment.is_edited ? '<span class="text-xs text-gray-400">(edited)</span>' : ''}
+                </div>
+                <div class="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">${renderCommentContent(comment.content)}</div>
+
+                ${comment.referenced_documents?.length ? `
+                  <div class="mt-2 flex flex-wrap gap-2">
+                    ${comment.referenced_documents.map(doc => `
+                      <a href="#" class="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs text-gray-700">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        ${doc.file_name}
+                      </a>
+                    `).join('')}
+                  </div>
+                ` : ''}
+
+                <div class="mt-2 flex items-center gap-3">
+                  <button class="reply-btn text-xs text-gray-600 hover:text-indigo-600 font-medium" data-comment-id="${comment.id}">Reply</button>
+                  ${isAuthor ? `<button class="edit-comment-btn text-xs text-gray-600 hover:text-indigo-600 font-medium" data-comment-id="${comment.id}">Edit</button>` : ''}
+                  ${isAuthor ? `<button class="delete-comment-btn text-xs text-red-600 hover:text-red-700 font-medium" data-comment-id="${comment.id}">Delete</button>` : ''}
+                  <button class="pin-comment-btn text-xs text-yellow-600 hover:text-yellow-700 font-medium" data-comment-id="${comment.id}">${isPinned ? 'Unpin' : 'Pin'}</button>
+                </div>
+
+                <!-- Reply Input (hidden by default) -->
+                <div class="reply-input-container hidden mt-3 pl-3 border-l-2 border-gray-200">
+                  <textarea class="reply-textarea w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" rows="2" placeholder="Write a reply..."></textarea>
+                  <div class="mt-2 flex justify-end gap-2">
+                    <button class="cancel-reply-btn px-3 py-1 text-xs text-gray-600 hover:text-gray-800">Cancel</button>
+                    <button class="post-reply-btn px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-medium">Reply</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Replies -->
+          ${comment.replies?.length ? `
+            <div class="border-t border-gray-100 bg-gray-50">
+              ${comment.replies.map(reply => renderCommentReply(reply, matterId)).join('')}
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    function renderCommentReply(reply, matterId) {
+      const isAuthor = reply.author_id === api.user?.id;
+
+      return `
+        <div class="p-4 pl-12" data-comment-id="${reply.id}">
+          <div class="flex items-start gap-3">
+            <div class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-semibold text-gray-600">
+              ${reply.author_name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U'}
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="font-semibold text-sm text-gray-900">${reply.author_name || 'Unknown User'}</span>
+                <span class="text-xs text-gray-500">${timeAgo(reply.created_at)}</span>
+                ${reply.is_edited ? '<span class="text-xs text-gray-400">(edited)</span>' : ''}
+              </div>
+              <div class="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">${renderCommentContent(reply.content)}</div>
+
+              <div class="mt-2 flex items-center gap-3">
+                ${isAuthor ? `<button class="edit-comment-btn text-xs text-gray-600 hover:text-indigo-600 font-medium" data-comment-id="${reply.id}">Edit</button>` : ''}
+                ${isAuthor ? `<button class="delete-comment-btn text-xs text-red-600 hover:text-red-700 font-medium" data-comment-id="${reply.id}">Delete</button>` : ''}
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderCommentContent(content) {
+      // Convert @[Name](uuid) to highlighted mentions
+      // Convert #[DocName](uuid) to highlighted document references
+      return content
+        .replace(/@\[([^\]]+)\]\(([^)]+)\)/g, '<span class="inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 text-sm font-medium">@$1</span>')
+        .replace(/#\[([^\]]+)\]\(([^)]+)\)/g, '<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-sm font-medium"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>$1</span>')
+        .replace(/\n/g, '<br>');
+    }
+
+    function setupCommentComposer(matterId) {
+      const input = document.getElementById('commentInput');
+      const mentionDropdown = document.getElementById('mentionDropdown');
+      const documentDropdown = document.getElementById('documentDropdown');
+      const postBtn = document.getElementById('postComment');
+      const cancelBtn = document.getElementById('cancelComment');
+
+      // Get text before cursor in contenteditable
+      function getTextBeforeCursor() {
+        const selection = window.getSelection();
+        if (!selection.rangeCount) return '';
+
+        const range = selection.getRangeAt(0).cloneRange();
+        range.selectNodeContents(input);
+        range.setEnd(selection.anchorNode, selection.anchorOffset);
+
+        // Get text content, excluding mention/doc tags
+        const tempDiv = document.createElement('div');
+        tempDiv.appendChild(range.cloneContents());
+        return tempDiv.textContent || '';
+      }
+
+      // @Mention and #Document autocomplete
+      input.addEventListener('input', (e) => {
+        const text = getTextBeforeCursor();
+
+        // Check for @mention
+        const mentionMatch = text.match(/@([\w\s]*)$/);
+        // Check for #document
+        const docMatch = text.match(/#([\w\s\-\.]*)$/);
+
+        console.log('[Comments] Input text:', text, 'docMatch:', docMatch, 'documents:', matterDocuments.length);
+
+        if (mentionMatch) {
+          currentMentionFilter = mentionMatch[1].toLowerCase();
+          const filtered = mentionableUsers.filter(u =>
+            u.name.toLowerCase().includes(currentMentionFilter) ||
+            u.email.toLowerCase().includes(currentMentionFilter)
+          );
+          showMentionDropdown(filtered);
+          documentDropdown.classList.add('hidden');
+        } else if (docMatch) {
+          currentDocumentFilter = docMatch[1].toLowerCase();
+          console.log('[Comments] Current document filter:', currentDocumentFilter);
+          console.log('[Comments] Sample document structure:', matterDocuments[0]);
+          const filtered = matterDocuments.filter(doc =>
+            doc.filename && doc.filename.toLowerCase().includes(currentDocumentFilter)
+          );
+          console.log('[Comments] Filtered documents:', filtered);
+          showDocumentDropdown(filtered);
+          mentionDropdown.classList.add('hidden');
+        } else {
+          mentionDropdown.classList.add('hidden');
+          documentDropdown.classList.add('hidden');
+        }
+      });
+
+      // Post comment
+      postBtn.addEventListener('click', () => postComment(matterId));
+
+      // Cancel
+      cancelBtn.addEventListener('click', () => {
+        input.innerHTML = '';
+        mentionDropdown.classList.add('hidden');
+        documentDropdown.classList.add('hidden');
+      });
+
+      // Enter key to submit (Shift+Enter for new line)
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          postComment(matterId);
+        }
+      });
+    }
+
+    function showMentionDropdown(users) {
+      const dropdown = document.getElementById('mentionDropdown');
+      const list = document.getElementById('mentionList');
+
+      if (users.length === 0) {
+        dropdown.classList.add('hidden');
+        return;
+      }
+
+      list.innerHTML = users.slice(0, 5).map(user => `
+        <button
+          class="mention-item w-full px-3 py-2 hover:bg-gray-100 flex items-center gap-2 text-left"
+          data-user-id="${user.id}"
+          data-user-name="${user.name}"
+        >
+          <div class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-semibold text-gray-600">
+            ${user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium text-gray-900">${user.name}</div>
+            <div class="text-xs text-gray-500 truncate">${user.email}</div>
+          </div>
+        </button>
+      `).join('');
+
+      dropdown.classList.remove('hidden');
+
+      // Add click handlers
+      list.querySelectorAll('.mention-item').forEach(item => {
+        item.addEventListener('click', () => {
+          insertMention(item.dataset.userId, item.dataset.userName);
+        });
+      });
+    }
+
+    function insertMention(userId, userName) {
+      const input = document.getElementById('commentInput');
+      const selection = window.getSelection();
+
+      if (!selection.rangeCount) {
+        input.focus();
+        return;
+      }
+
+      // Find and remove the @query text before cursor
+      const range = selection.getRangeAt(0);
+      let node = range.startContainer;
+      let offset = range.startOffset;
+
+      // If we're in a text node, search backwards for @
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent.substring(0, offset);
+        const atIndex = text.lastIndexOf('@');
+        if (atIndex !== -1) {
+          // Create range to delete @query
+          const deleteRange = document.createRange();
+          deleteRange.setStart(node, atIndex);
+          deleteRange.setEnd(node, offset);
+          deleteRange.deleteContents();
+        }
+      }
+
+      // Create styled mention span
+      const mentionSpan = document.createElement('span');
+      mentionSpan.contentEditable = 'false';
+      mentionSpan.className = 'mention-tag inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 text-sm font-medium mx-0.5';
+      mentionSpan.setAttribute('data-user-id', userId);
+      mentionSpan.setAttribute('data-user-name', userName);
+      mentionSpan.textContent = '@' + userName;
+
+      // Insert the mention span at cursor
+      const insertRange = selection.getRangeAt(0);
+      insertRange.insertNode(mentionSpan);
+
+      // Add a space after and move cursor
+      const space = document.createTextNode('\u00A0');
+      mentionSpan.parentNode.insertBefore(space, mentionSpan.nextSibling);
+
+      // Move cursor after the space
+      const newRange = document.createRange();
+      newRange.setStartAfter(space);
+      newRange.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(newRange);
+
+      input.focus();
+      document.getElementById('mentionDropdown').classList.add('hidden');
+    }
+
+    function showDocumentDropdown(documents) {
+      const dropdown = document.getElementById('documentDropdown');
+      const list = document.getElementById('documentList');
+
+      if (documents.length === 0) {
+        dropdown.classList.add('hidden');
+        return;
+      }
+
+      list.innerHTML = documents.slice(0, 10).map(doc => `
+        <button
+          class="document-item w-full px-3 py-2 hover:bg-gray-100 flex items-center gap-2 text-left"
+          data-doc-id="${doc.id}"
+          data-doc-name="${doc.filename}"
+        >
+          <svg class="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+          </svg>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium text-gray-900 truncate">${doc.filename}</div>
+            <div class="text-xs text-gray-500">${doc.file_size ? formatFileSize(doc.file_size) : ''}</div>
+          </div>
+        </button>
+      `).join('');
+
+      dropdown.classList.remove('hidden');
+
+      // Add click handlers
+      list.querySelectorAll('.document-item').forEach(item => {
+        item.addEventListener('click', () => {
+          insertDocument(item.dataset.docId, item.dataset.docName);
+        });
+      });
+    }
+
+    function insertDocument(docId, docName) {
+      const input = document.getElementById('commentInput');
+      const selection = window.getSelection();
+
+      if (!selection.rangeCount) {
+        input.focus();
+        return;
+      }
+
+      // Find and remove the #query text before cursor
+      const range = selection.getRangeAt(0);
+      let node = range.startContainer;
+      let offset = range.startOffset;
+
+      // If we're in a text node, search backwards for #
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent.substring(0, offset);
+        const hashIndex = text.lastIndexOf('#');
+        if (hashIndex !== -1) {
+          // Create range to delete #query
+          const deleteRange = document.createRange();
+          deleteRange.setStart(node, hashIndex);
+          deleteRange.setEnd(node, offset);
+          deleteRange.deleteContents();
+        }
+      }
+
+      // Create styled document span
+      const docSpan = document.createElement('span');
+      docSpan.contentEditable = 'false';
+      docSpan.className = 'doc-tag inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-sm font-medium mx-0.5';
+      docSpan.setAttribute('data-doc-id', docId);
+      docSpan.setAttribute('data-doc-name', docName);
+      docSpan.innerHTML = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>' + docName;
+
+      // Insert the document span at cursor
+      const insertRange = selection.getRangeAt(0);
+      insertRange.insertNode(docSpan);
+
+      // Add a space after and move cursor
+      const space = document.createTextNode('\u00A0');
+      docSpan.parentNode.insertBefore(space, docSpan.nextSibling);
+
+      // Move cursor after the space
+      const newRange = document.createRange();
+      newRange.setStartAfter(space);
+      newRange.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(newRange);
+
+      input.focus();
+      document.getElementById('documentDropdown').classList.add('hidden');
+    }
+
+    async function postComment(matterId) {
+      const input = document.getElementById('commentInput');
+      const postBtn = document.getElementById('postComment');
+
+      // Convert contenteditable HTML to raw text format for storage
+      const mentions = [];
+      const documentIds = [];
+
+      // Clone the input to manipulate without affecting display
+      const clone = input.cloneNode(true);
+
+      // Replace mention spans with raw format
+      clone.querySelectorAll('.mention-tag').forEach(span => {
+        const userId = span.getAttribute('data-user-id');
+        const userName = span.getAttribute('data-user-name');
+        if (userId && userName) {
+          mentions.push(userId);
+          const textNode = document.createTextNode(`@[${userName}](${userId})`);
+          span.replaceWith(textNode);
+        }
+      });
+
+      // Replace document spans with raw format
+      clone.querySelectorAll('.doc-tag').forEach(span => {
+        const docId = span.getAttribute('data-doc-id');
+        const docName = span.getAttribute('data-doc-name');
+        if (docId && docName) {
+          documentIds.push(docId);
+          const textNode = document.createTextNode(`#[${docName}](${docId})`);
+          span.replaceWith(textNode);
+        }
+      });
+
+      // Get text content, preserving line breaks
+      let content = clone.innerHTML
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<div>/gi, '\n')
+        .replace(/<\/div>/gi, '')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/<[^>]+>/g, '');
+
+      // Decode HTML entities
+      const tempEl = document.createElement('textarea');
+      tempEl.innerHTML = content;
+      content = tempEl.value.trim();
+
+      if (!content) {
+        Toast.warning('Please enter a comment');
+        return;
+      }
+
+      // Show loading state on button
+      const originalButtonHtml = postBtn.innerHTML;
+      postBtn.disabled = true;
+      postBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      postBtn.innerHTML = `
+        <svg class="animate-spin h-4 w-4 inline-block mr-2" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        Posting...
+      `;
+
+      try {
+        await api.createComment(matterId, {
+          content,
+          mentioned_user_ids: mentions.length > 0 ? mentions : [],
+          referenced_document_ids: documentIds.length > 0 ? documentIds : []
+        });
+
+        input.innerHTML = '';
+        Toast.success('Comment posted');
+        await loadComments(matterId);
+
+        // Restore button state
+        postBtn.disabled = false;
+        postBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        postBtn.innerHTML = originalButtonHtml;
+      } catch (error) {
+        console.error('Failed to post comment:', error);
+        Toast.error('Failed to post comment');
+
+        // Restore button state on error
+        postBtn.disabled = false;
+        postBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        postBtn.innerHTML = originalButtonHtml;
+      }
+    }
+
+    function attachCommentActions(matterId) {
+      // Reply buttons
+      document.querySelectorAll('.reply-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const commentId = e.target.dataset.commentId;
+          const container = document.querySelector(`[data-comment-id="${commentId}"] .reply-input-container`);
+          container.classList.toggle('hidden');
+        });
+      });
+
+      // Cancel reply
+      document.querySelectorAll('.cancel-reply-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const container = e.target.closest('.reply-input-container');
+          container.classList.add('hidden');
+          container.querySelector('.reply-textarea').value = '';
+        });
+      });
+
+      // Post reply
+      document.querySelectorAll('.post-reply-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const container = e.target.closest('.reply-input-container');
+          const commentId = container.closest('[data-comment-id]').dataset.commentId;
+          const textarea = container.querySelector('.reply-textarea');
+          const content = textarea.value.trim();
+
+          if (!content) {
+            Toast.warning('Please enter a reply');
+            return;
+          }
+
+          try {
+            await api.replyToComment(commentId, { content });
+            textarea.value = '';
+            container.classList.add('hidden');
+            Toast.success('Reply posted');
+            await loadComments(matterId);
+          } catch (error) {
+            console.error('Failed to post reply:', error);
+            Toast.error('Failed to post reply');
+          }
+        });
+      });
+
+      // Edit comment
+      document.querySelectorAll('.edit-comment-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const commentId = e.target.dataset.commentId;
+          const commentElement = document.querySelector(`[data-comment-id="${commentId}"]`);
+          const contentElement = commentElement.querySelector('.text-sm.text-gray-700.leading-relaxed');
+
+          if (!contentElement) return;
+
+          // Get the current content (strip HTML and get raw text)
+          const currentContent = contentElement.textContent.trim();
+
+          // Replace content with textarea
+          const originalHTML = contentElement.innerHTML;
+          contentElement.innerHTML = `
+            <textarea class="edit-comment-textarea w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" rows="3">${currentContent}</textarea>
+            <div class="mt-2 flex justify-end gap-2">
+              <button class="cancel-edit-btn px-3 py-1 text-xs text-gray-600 hover:text-gray-800 border border-gray-300 rounded">Cancel</button>
+              <button class="save-edit-btn px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-medium">Save</button>
+            </div>
+          `;
+
+          const textarea = contentElement.querySelector('.edit-comment-textarea');
+          const saveBtn = contentElement.querySelector('.save-edit-btn');
+          const cancelBtn = contentElement.querySelector('.cancel-edit-btn');
+
+          // Focus textarea and move cursor to end
+          textarea.focus();
+          textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+
+          // Cancel edit
+          cancelBtn.addEventListener('click', () => {
+            contentElement.innerHTML = originalHTML;
+          });
+
+          // Save edit
+          saveBtn.addEventListener('click', async () => {
+            const newContent = textarea.value.trim();
+
+            if (!newContent) {
+              Toast.warning('Comment cannot be empty');
+              return;
+            }
+
+            if (newContent === currentContent) {
+              // No changes made
+              contentElement.innerHTML = originalHTML;
+              return;
+            }
+
+            try {
+              saveBtn.disabled = true;
+              saveBtn.textContent = 'Saving...';
+
+              await api.updateComment(commentId, { content: newContent });
+              Toast.success('Comment updated');
+              await loadComments(matterId);
+            } catch (error) {
+              console.error('Failed to update comment:', error);
+              Toast.error('Failed to update comment');
+              contentElement.innerHTML = originalHTML;
+            }
+          });
+        });
+      });
+
+      // Delete comment
+      document.querySelectorAll('.delete-comment-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const commentId = e.target.dataset.commentId;
+
+          Modal.confirm(
+            'Delete Comment',
+            'Are you sure you want to delete this comment? This action cannot be undone.',
+            async () => {
+              try {
+                await api.deleteComment(commentId);
+                Toast.success('Comment deleted');
+                await loadComments(matterId);
+              } catch (error) {
+                console.error('Failed to delete comment:', error);
+                Toast.error('Failed to delete comment');
+              }
+            }
+          );
+        });
+      });
+
+      // Pin/Unpin comment
+      document.querySelectorAll('.pin-comment-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const commentId = e.target.dataset.commentId;
+          const isPinned = e.target.textContent.trim() === 'Unpin';
+
+          try {
+            if (isPinned) {
+              await api.unpinComment(commentId);
+              Toast.success('Comment unpinned');
+            } else {
+              await api.pinComment(commentId);
+              Toast.success('Comment pinned');
+            }
+            await loadComments(matterId);
+          } catch (error) {
+            console.error('Failed to pin/unpin comment:', error);
+            Toast.error('Failed to update comment');
+          }
+        });
+      });
+    }
+
+    // Clean up interval when switching tabs or closing drawer
+    window.addEventListener('beforeunload', () => {
+      if (commentPollInterval) clearInterval(commentPollInterval);
+    });
+
+    // =============================================================================
+    // TASK HELPER FUNCTIONS (Shared by Kanban and List Views)
+    // =============================================================================
+
+    // Helper function to get status badge (lowercase for LANA tasks, title case for connector)
+    function getStatusBadge(status, source) {
+      const statusMap = {
+        'pending': { class: 'bg-yellow-100 text-yellow-800', label: 'Pending' },
+        'in_progress': { class: 'bg-blue-100 text-blue-800', label: 'In Progress' },
+        'in_review': { class: 'bg-purple-100 text-purple-800', label: 'In Review' },
+        'complete': { class: 'bg-green-100 text-green-800', label: 'Complete' },
+        'cancelled': { class: 'bg-gray-100 text-gray-800', label: 'Cancelled' },
+        'Pending': { class: 'bg-yellow-100 text-yellow-800', label: 'Pending' },
+        'In Progress': { class: 'bg-blue-100 text-blue-800', label: 'In Progress' },
+        'In Review': { class: 'bg-purple-100 text-purple-800', label: 'In Review' },
+        'Complete': { class: 'bg-green-100 text-green-800', label: 'Complete' },
+        'Cancelled': { class: 'bg-gray-100 text-gray-800', label: 'Cancelled' }
+      };
+      const config = statusMap[status] || { class: 'bg-gray-100 text-gray-800', label: status };
+      return `<span class="px-2 py-1 text-xs font-medium rounded-full ${config.class}">${config.label}</span>`;
+    }
+
+    // Helper function to get priority badge (lowercase for LANA tasks, title case for connector)
+    function getPriorityBadge(priority) {
+      const priorityMap = {
+        'high': { class: 'bg-red-100 text-red-800', label: 'High' },
+        'normal': { class: 'bg-gray-100 text-gray-800', label: 'Normal' },
+        'low': { class: 'bg-blue-100 text-blue-800', label: 'Low' },
+        'High': { class: 'bg-red-100 text-red-800', label: 'High' },
+        'Normal': { class: 'bg-gray-100 text-gray-800', label: 'Normal' },
+        'Low': { class: 'bg-blue-100 text-blue-800', label: 'Low' }
+      };
+      const config = priorityMap[priority] || { class: 'bg-gray-100 text-gray-800', label: priority || 'Normal' };
+      return `<span class="px-2 py-1 text-xs font-medium rounded-full ${config.class}">${config.label}</span>`;
+    }
+
+    // Helper function to format date
+    function formatDueDate(dateString) {
+      if (!dateString) return 'No due date';
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffDays = Math.ceil((date - now) / (1000 * 60 * 60 * 24));
+
+      if (diffDays < 0) {
+        return `<span class="text-red-600">Overdue (${Math.abs(diffDays)} days)</span>`;
+      } else if (diffDays === 0) {
+        return `<span class="text-orange-600">Due today</span>`;
+      } else if (diffDays <= 7) {
+        return `<span class="text-yellow-600">Due in ${diffDays} days</span>`;
+      } else {
+        return date.toLocaleDateString();
+      }
+    }
+
+    // =============================================================================
+    // KANBAN BOARD FUNCTIONALITY
+    // =============================================================================
+
+    // Kanban state management
+    let kanbanPagination = {
+      pending: { page: 1, perPage: 10 },
+      in_progress: { page: 1, perPage: 10 },
+      in_review: { page: 1, perPage: 10 },
+      complete: { page: 1, perPage: 10 },
+      cancelled: { page: 1, perPage: 10 }
+    };
+
+    let draggedTask = null;
+
+    // Render Kanban Board
+    function renderKanbanBoard(matterId, allTasks) {
+      const content = document.getElementById('tabContentTasks');
+
+      // Group tasks by status
+      const tasksByStatus = {
+        pending: allTasks.filter(t => t.status === 'pending' || t.status === 'Pending'),
+        in_progress: allTasks.filter(t => t.status === 'in_progress' || t.status === 'In Progress'),
+        in_review: allTasks.filter(t => t.status === 'in_review' || t.status === 'In Review'),
+        complete: allTasks.filter(t => t.status === 'complete' || t.status === 'Complete'),
+        cancelled: allTasks.filter(t => t.status === 'cancelled' || t.status === 'Cancelled')
+      };
+
+      const totalTasks = allTasks.length;
+      const lanaCount = allTasks.filter(t => t.source === 'lana').length;
+      const externalCount = allTasks.filter(t => t.source !== 'lana').length;
+
+      content.innerHTML = `
+        <div class="space-y-4">
+          <!-- Header with Create Task button -->
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900">Task Board</h3>
+              <p class="text-sm text-gray-500">${lanaCount} LANA tasks, ${externalCount} external tasks</p>
+            </div>
+            <button
+              onclick="openCreateTaskModal('${matterId}')"
+              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium flex items-center gap-2"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+              Create Task
+            </button>
+          </div>
+
+          <!-- Kanban Board with horizontal scrolling -->
+          <div class="overflow-x-auto -mx-6 px-6">
+            <div class="inline-flex gap-4 min-w-full pb-4">
+              ${renderKanbanColumn('pending', 'Pending', tasksByStatus.pending, 'bg-yellow-50 border-yellow-200', 'text-yellow-800')}
+              ${renderKanbanColumn('in_progress', 'In Progress', tasksByStatus.in_progress, 'bg-blue-50 border-blue-200', 'text-blue-800')}
+              ${renderKanbanColumn('in_review', 'In Review', tasksByStatus.in_review, 'bg-purple-50 border-purple-200', 'text-purple-800')}
+              ${renderKanbanColumn('complete', 'Complete', tasksByStatus.complete, 'bg-green-50 border-green-200', 'text-green-800')}
+              ${renderKanbanColumn('cancelled', 'Cancelled', tasksByStatus.cancelled, 'bg-gray-50 border-gray-200', 'text-gray-800')}
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Attach event listeners after rendering
+      attachKanbanEventListeners();
+    }
+
+    // Render individual Kanban column
+    function renderKanbanColumn(status, label, tasks, bgClass, textClass) {
+      const pagination = kanbanPagination[status];
+      const startIdx = (pagination.page - 1) * pagination.perPage;
+      const endIdx = startIdx + pagination.perPage;
+      const paginatedTasks = tasks.slice(startIdx, endIdx);
+      const totalPages = Math.ceil(tasks.length / pagination.perPage);
+      const hasMore = endIdx < tasks.length;
+      const hasPrevious = pagination.page > 1;
+
+      return `
+        <div class="flex-shrink-0 w-80 flex flex-col" style="max-height: calc(100vh - 300px);">
+          <!-- Column Header -->
+          <div class="${bgClass} border-2 rounded-t-lg px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <h4 class="font-semibold ${textClass}">${label}</h4>
+              <span class="px-2 py-0.5 text-xs font-medium ${textClass} bg-white rounded-full">${tasks.length}</span>
+            </div>
+          </div>
+
+          <!-- Column Content (Scrollable) -->
+          <div
+            class="flex-1 bg-gray-50 border-x-2 border-b-2 ${bgClass.split(' ')[1]} rounded-b-lg overflow-y-auto p-3 space-y-3"
+            data-status="${status}"
+            ondrop="handleKanbanDrop(event, '${status}')"
+            ondragover="handleKanbanDragOver(event)"
+            ondragleave="handleKanbanDragLeave(event)"
+          >
+            ${paginatedTasks.length === 0 ? `
+              <div class="text-center py-8 text-gray-400">
+                <svg class="w-12 h-12 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                </svg>
+                <p class="text-sm">No tasks</p>
+              </div>
+            ` : paginatedTasks.map(task => renderKanbanCard(task)).join('')}
+          </div>
+
+          <!-- Pagination Controls -->
+          ${totalPages > 1 ? `
+            <div class="bg-white border-2 border-t-0 ${bgClass.split(' ')[1]} rounded-b-lg px-3 py-2 flex items-center justify-between text-xs">
+              <button
+                onclick="changeKanbanPage('${status}', ${pagination.page - 1})"
+                class="px-2 py-1 rounded ${hasPrevious ? 'text-indigo-600 hover:bg-indigo-50' : 'text-gray-300 cursor-not-allowed'}"
+                ${!hasPrevious ? 'disabled' : ''}
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+              </button>
+              <span class="text-gray-600">Page ${formatNumber(pagination.page)} of ${formatNumber(totalPages)}</span>
+              <button
+                onclick="changeKanbanPage('${status}', ${pagination.page + 1})"
+                class="px-2 py-1 rounded ${hasMore ? 'text-indigo-600 hover:bg-indigo-50' : 'text-gray-300 cursor-not-allowed'}"
+                ${!hasMore ? 'disabled' : ''}
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+              </button>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    // Render Kanban Card (Draggable Task Card)
+    function renderKanbanCard(task) {
+      const isLana = task.source === 'lana';
+      const title = task.title || task.task_name;
+
+      return `
+        <div
+          class="bg-white border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-all ${isLana ? 'cursor-move' : 'cursor-default'}"
+          draggable="${isLana}"
+          data-task-id="${task.id}"
+          data-task-status="${task.status}"
+          ondragstart="handleKanbanDragStart(event, ${JSON.stringify(task).replace(/"/g, '&quot;')})"
+          ondragend="handleKanbanDragEnd(event)"
+          onclick="openTaskQuickView('${task.id}')"
+        >
+          <!-- Task Title -->
+          <div class="flex items-start gap-2 mb-2">
+            <h5 class="text-sm font-medium text-gray-900 flex-1 line-clamp-2">${title}</h5>
+            ${!isLana ? `<span class="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded flex-shrink-0">External</span>` : ''}
+          </div>
+
+          <!-- Priority Badge -->
+          <div class="mb-2">
+            ${getPriorityBadge(task.priority)}
+          </div>
+
+          <!-- Assignee -->
+          ${task.assigned_to ? `
+            <div class="flex items-center gap-1 text-xs text-gray-600 mb-2">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+              </svg>
+              <span class="truncate">${task.assigned_to}</span>
+            </div>
+          ` : ''}
+
+          <!-- Due Date -->
+          ${task.due_date ? `
+            <div class="flex items-center gap-1 text-xs text-gray-500">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+              </svg>
+              ${formatDueDate(task.due_date)}
+            </div>
+          ` : ''}
+
+          <!-- Description Preview -->
+          ${task.description && task.description !== 'null' ? `
+            <p class="mt-2 text-xs text-gray-600 line-clamp-2">${task.description}</p>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    // Kanban Drag and Drop Handlers
+    window.handleKanbanDragStart = function(event, task) {
+      draggedTask = task;
+      event.dataTransfer.effectAllowed = 'move';
+      event.currentTarget.classList.add('opacity-50');
+    };
+
+    window.handleKanbanDragEnd = function(event) {
+      event.currentTarget.classList.remove('opacity-50');
+      draggedTask = null;
+    };
+
+    window.handleKanbanDragOver = function(event) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+      event.currentTarget.classList.add('ring-2', 'ring-indigo-400');
+    };
+
+    window.handleKanbanDragLeave = function(event) {
+      event.currentTarget.classList.remove('ring-2', 'ring-indigo-400');
+    };
+
+    window.handleKanbanDrop = async function(event, newStatus) {
+      event.preventDefault();
+      event.currentTarget.classList.remove('ring-2', 'ring-indigo-400');
+
+      if (!draggedTask) return;
+
+      const task = draggedTask;
+      const oldStatus = task.status;
+
+      // Normalize status values
+      const normalizedOldStatus = oldStatus.toLowerCase().replace(' ', '_');
+      const normalizedNewStatus = newStatus.toLowerCase().replace(' ', '_');
+
+      if (normalizedOldStatus === normalizedNewStatus) {
+        return; // No change needed
+      }
+
+      try {
+        // Update task status
+        await updateTaskStatus(task.id, newStatus);
+        Toast.success(`Task moved to ${newStatus.replace('_', ' ')}`);
+
+        // CRITICAL FIX: Refresh tasks immediately instead of full viewMatter() reload
+        const matterId = (currentMatterData && currentMatterData.matter_id) ||
+                        (currentMatterData && currentMatterData.matter && currentMatterData.matter.matter_id);
+
+        if (matterId) {
+          const response = await api.getMatterTasks(matterId);
+          const updatedTasks = response.tasks || [];
+
+          // Update currentMatterData if it exists
+          if (currentMatterData) {
+            currentMatterData.tasks = updatedTasks;
+            renderTasksTab(currentMatterData, updatedTasks);
+          } else {
+            // Fallback: Render Kanban board directly
+            currentTasksList = updatedTasks;
+            renderKanbanBoard(matterId, updatedTasks);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to update task status:', error);
+        Toast.error('Failed to move task');
+      }
+    };
+
+    // Update task status (API call)
+    async function updateTaskStatus(taskId, newStatus) {
+      try {
+        const task = currentTasksList.find(t => t.id === taskId);
+        if (!task) throw new Error('Task not found');
+
+        const updateData = {
+          title: task.title,
+          description: task.description,
+          notes: task.notes,
+          status: newStatus,
+          priority: task.priority,
+          due_date: task.due_date,
+          assigned_to_user_id: task.assigned_to_user_id
+        };
+
+        await api.updateTask(taskId, updateData);
+      } catch (error) {
+        console.error('Error updating task status:', error);
+        throw error;
+      }
+    }
+
+    // Change Kanban page
+    window.changeKanbanPage = async function(status, newPage) {
+      kanbanPagination[status].page = newPage;
+
+      // Re-render the kanban board
+      if (currentMatterData && currentMatterData.matter) {
+        renderKanbanBoard(currentMatterData.matter.matter_id, currentTasksList);
+      }
+    };
+
+    // Open Task Quick View Modal (for clicking on tasks)
+    window.openTaskQuickView = function(taskId) {
+      // Find task
+      const task = currentTasksList.find(t => t.id === taskId);
+      if (!task) {
+        Toast.error('Task not found');
+        return;
+      }
+
+      const isLana = task.source === 'lana';
+
+      if (isLana) {
+        // Open edit modal for LANA tasks
+        editTask(taskId);
+      } else {
+        // Show read-only view for external tasks
+        showTaskReadonlyModal(task);
+      }
+    };
+
+    // Show readonly modal for external tasks
+    function showTaskReadonlyModal(task) {
+      const title = task.title || task.task_name;
+
+      const modalHtml = `
+        <div id="taskReadonlyModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 class="text-lg font-semibold text-gray-900">${title}</h3>
+              <button onclick="closeTaskReadonlyModal()" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </button>
+            </div>
+            <div class="p-6 space-y-4">
+              <div class="flex items-center gap-2">
+                <span class="text-xs bg-purple-100 text-purple-800 px-3 py-1 rounded">ActionStep Task (Read-only)</span>
+                ${getStatusBadge(task.status, task.source)}
+                ${getPriorityBadge(task.priority)}
+              </div>
+
+              ${task.description && task.description !== 'null' ? `
+                <div>
+                  <h4 class="text-sm font-medium text-gray-700 mb-1">Description</h4>
+                  <p class="text-sm text-gray-600">${task.description}</p>
+                </div>
+              ` : ''}
+
+              ${task.assigned_to ? `
+                <div>
+                  <h4 class="text-sm font-medium text-gray-700 mb-1">Assigned To</h4>
+                  <p class="text-sm text-gray-600">${task.assigned_to}</p>
+                </div>
+              ` : ''}
+
+              ${task.due_date ? `
+                <div>
+                  <h4 class="text-sm font-medium text-gray-700 mb-1">Due Date</h4>
+                  <p class="text-sm text-gray-600">${formatDueDate(task.due_date)}</p>
+                </div>
+              ` : ''}
+
+              ${task.notes && task.notes !== 'null' ? `
+                <div>
+                  <h4 class="text-sm font-medium text-gray-700 mb-1">Notes</h4>
+                  <p class="text-sm text-gray-600 italic">${task.notes}</p>
+                </div>
+              ` : ''}
+            </div>
+            <div class="px-6 py-4 border-t border-gray-200 flex justify-end">
+              <button onclick="closeTaskReadonlyModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.body.insertAdjacentHTML('beforeend', modalHtml);
+    }
+
+    window.closeTaskReadonlyModal = function() {
+      const modal = document.getElementById('taskReadonlyModal');
+      if (modal) modal.remove();
+    };
+
+    // Attach event listeners for Kanban board
+    function attachKanbanEventListeners() {
+      // Event listeners are attached via inline onclick/ondrag handlers
+      // This function is a placeholder for future enhancements
+    }
+
+    // =============================================================================
+    // END KANBAN BOARD FUNCTIONALITY
+    // =============================================================================
+
+    // Render Tasks Tab
+    function renderTasksTab(matter, tasks) {
+      const content = document.getElementById('tabContentTasks');
+
+      // Store tasks globally for edit/delete operations
+      currentTasksList = tasks;
+      currentTaskMatterId = matter.matter_id;
+
+      // Separate LANA and connector tasks
+      const lanaTasks = tasks.filter(t => t.source === 'lana');
+      const connectorTasks = tasks.filter(t => t.source === 'connector');
+
+      // Note: Helper functions (getStatusBadge, getPriorityBadge, formatDueDate) are now in global scope above
+
+      // Render task card
+      function renderTaskCard(task) {
+        const isLana = task.source === 'lana';
+        const title = task.title || task.task_name;
+
+        return `
+          <div class="bg-white border border-gray-200 hover:border-indigo-300 rounded-lg p-4 transition-all">
+            <div class="flex items-start justify-between gap-4">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-2">
+                  <h4 class="text-sm font-medium text-gray-900">${title}</h4>
+                  ${!isLana ? `<span class="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">ActionStep</span>` : ''}
+                </div>
+                <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-2">
+                  ${getStatusBadge(task.status, task.source)}
+                  ${getPriorityBadge(task.priority)}
+                  ${task.assigned_to ? `
+                    <span class="flex items-center gap-1">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                      </svg>
+                      ${task.assigned_to}
+                    </span>
+                  ` : ''}
+                  ${task.due_date ? `
+                    <span class="flex items-center gap-1">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                      </svg>
+                      ${formatDueDate(task.due_date)}
+                    </span>
+                  ` : ''}
+                </div>
+                ${task.description && task.description !== 'null' ? `
+                  <p class="mt-2 text-sm text-gray-600">${task.description}</p>
+                ` : ''}
+                ${task.notes && task.notes !== 'null' ? `
+                  <p class="mt-2 text-sm text-gray-500 italic">${task.notes}</p>
+                ` : ''}
+              </div>
+              <div class="flex-shrink-0 flex flex-col gap-2">
+                ${isLana ? `
+                  <button
+                    onclick="editTask('${task.id}')"
+                    class="text-indigo-600 hover:text-indigo-800 p-1"
+                    title="Edit task"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                    </svg>
+                  </button>
+                  ${task.status !== 'complete' ? `
+                    <button
+                      onclick="quickCompleteTask('${task.id}')"
+                      class="text-green-600 hover:text-green-800 p-1"
+                      title="Mark complete"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                      </svg>
+                    </button>
+                  ` : ''}
+                  <button
+                    onclick="deleteTask('${task.id}')"
+                    class="text-red-600 hover:text-red-800 p-1"
+                    title="Delete task"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
+                  </button>
+                ` : `
+                  <span class="text-xs text-gray-400 px-2 py-1 rounded border border-gray-200">Read-only</span>
+                `}
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      // Empty state
+      if (tasks.length === 0) {
+        content.innerHTML = `
+          <div class="text-center py-12">
+            <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+            </svg>
+            <h4 class="text-lg font-semibold text-gray-900 mb-2">No tasks yet</h4>
+            <p class="text-gray-500 mb-4">Create a task or connect ActionStep to import tasks</p>
+            <button
+              onclick="openCreateTaskModal('${matter.matter_id}')"
+              class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium transition-colors"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+              Create Task
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      // Render Kanban Board
+      renderKanbanBoard(matter.matter_id, tasks);
+    }
+
+    // Render Linked Matters Tab
+    async function renderLinkedMattersTab(matter) {
+      const content = document.getElementById('tabContentLinks');
+
+      // Check if the content element exists
+      // This is normal when the matter detail view is not currently open
+      if (!content) {
+        return;
+      }
+
+      // Show loading state
+      content.innerHTML = `
+        <div class="flex items-center justify-center py-12">
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        </div>
+      `;
+
+      try {
+        // Load linked matters from API
+        const response = await fetch(`${api.baseUrl}/api/v1/entity-links/matter/${matter.matter_id}`, {
+          headers: {
+            'Authorization': `Bearer ${api.token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to load linked matters');
+        }
+
+        const data = await response.json();
+        const { links, total_links } = data;
+
+        // Render the links UI
+        renderLinkedMattersContent(matter, links, total_links);
+
+      } catch (error) {
+        console.error('Error loading linked matters:', error);
+        content.innerHTML = `
+          <div class="text-center py-12">
+            <div class="text-red-600 mb-4">
+              <svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <h4 class="text-lg font-semibold text-gray-900 mb-2">Failed to load linked matters</h4>
+            <p class="text-gray-500">${error.message}</p>
+          </div>
+        `;
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // CONTACT MODAL FUNCTIONS
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    // Open Add Contact Modal
+    window.openAddContactModal = function(matterId) {
+      const modal = document.getElementById('contactModal');
+      document.getElementById('contactForm').reset();
+      document.getElementById('contactMatterId').value = matterId;
+      modal.classList.remove('hidden');
+    };
+
+    // Close Contact Modal
+    window.closeContactModal = function() {
+      document.getElementById('contactModal').classList.add('hidden');
+      document.getElementById('contactForm').reset();
+    };
+
+    // Save Contact (Create)
+    window.saveContact = async function(event) {
+      event.preventDefault();
+
+      const matterId = document.getElementById('contactMatterId').value;
+      const contactData = {
+        first_name: document.getElementById('contactFirstName').value.trim(),
+        last_name: document.getElementById('contactLastName').value.trim(),
+        display_name: document.getElementById('contactDisplayName').value.trim() || null,
+        company_name: document.getElementById('contactCompanyName').value.trim() || null,
+        title: document.getElementById('contactTitle').value.trim() || null,
+        email: document.getElementById('contactEmail').value.trim() || null,
+        phone_mobile: document.getElementById('contactPhoneMobile').value.trim() || null,
+        phone_work: document.getElementById('contactPhoneWork').value.trim() || null,
+        contact_type: document.getElementById('contactType').value
+      };
+
+      // Get the submit button from the form
+      const submitBtn = event.target.querySelector('button[type="submit"]');
+      const originalButtonHtml = submitBtn.innerHTML;
+
+      // Show loading state on button
+      submitBtn.disabled = true;
+      submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      submitBtn.innerHTML = `
+        <svg class="animate-spin h-4 w-4 inline-block mr-2" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        Creating...
+      `;
+
+      try {
+        await api.createContact(matterId, contactData);
+        Toast.success('Contact created successfully');
+
+        // Close modal
+        document.getElementById('contactModal').classList.add('hidden');
+
+        // Restore button state
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        submitBtn.innerHTML = originalButtonHtml;
+
+        // Use the same refresh functionality as the refresh button
+        await refreshCurrentMatter();
+      } catch (error) {
+        console.error('Save contact error:', error);
+        Toast.error('Failed to create contact');
+
+        // Restore button state on error
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        submitBtn.innerHTML = originalButtonHtml;
+      }
+    };
+
+    // Open Contact Detail Modal
+    window.openContactDetail = async function(contactId) {
+      const modal = document.getElementById('contactDetailModal');
+      const content = document.getElementById('contactDetailContent');
+
+      console.log('[openContactDetail] Opening contact', { contactId });
+
+      // Show loading state
+      content.innerHTML = `
+        <div class="flex items-center justify-center py-12">
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        </div>
+      `;
+      modal.classList.remove('hidden');
+
+      try {
+        // Get current matter ID from drawer
+        const matterId = currentMatterData?.matter?.matter_id;
+        if (!matterId) {
+          throw new Error('Matter ID not found');
+        }
+
+        console.log('[openContactDetail] Fetching contact details', { matterId, contactId });
+
+        // Fetch contact details
+        const response = await fetch(`${api.baseUrl}/api/v1/matters/${matterId}/contacts/${contactId}`, {
+          headers: {
+            'Authorization': `Bearer ${api.token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to load contact details');
+        }
+
+        const data = await response.json();
+        const contact = data.contact;
+
+        // Known external connector sources (synced from third-party systems)
+        const connectorNames = {
+          'actionstep': 'ActionStep',
+          'google_contacts': 'Google Contacts',
+          'gohighlevel': 'GoHighLevel',
+          'hubspot': 'HubSpot',
+          'salesforce': 'Salesforce',
+          'microsoft_contacts': 'Microsoft Contacts',
+          'outlook': 'Outlook'
+        };
+
+        // Only treat as a connector contact if the source is a known external connector
+        const isConnectorContact = contact.source && connectorNames[contact.source] !== undefined;
+
+        // Get connector display name
+        let connectorDisplayName = '';
+        if (isConnectorContact) {
+          connectorDisplayName = connectorNames[contact.source];
+        }
+
+        // Determine source label for non-manual, non-connector sources (e.g., 'agentic', 'ai_extracted', 'imported')
+        const internalSourceLabels = {
+          'manual': 'Manual',
+          'agentic': 'AI Created',
+          'ai_extracted': 'AI Extracted',
+          'imported': 'Imported'
+        };
+        const sourceLabel = internalSourceLabels[contact.source] || (contact.source ? contact.source.charAt(0).toUpperCase() + contact.source.slice(1) : 'Manual');
+        const isInternalNonManual = contact.source && !isConnectorContact && contact.source !== 'manual';
+
+        // Contact type badge styling
+        const typeLabels = {
+          'contact:participant': { label: 'Participant', class: 'bg-blue-100 text-blue-800' },
+          'contact:opportunity': { label: 'Opportunity', class: 'bg-green-100 text-green-800' },
+          'contact:lead': { label: 'Lead', class: 'bg-yellow-100 text-yellow-800' },
+          'contact:other': { label: 'Other', class: 'bg-gray-100 text-gray-800' }
+        };
+        const contactTypeInfo = typeLabels[contact.contact_type] || typeLabels['contact:other'];
+        const displayName = contact.display_name || `${contact.first_name} ${contact.last_name}`;
+
+        // Render contact details
+        content.innerHTML = `
+          <div class="space-y-6">
+            <!-- Header with name and badges -->
+            <div>
+              <div class="flex items-center gap-2 flex-wrap mb-2">
+                <h3 class="text-2xl font-semibold text-gray-900">${displayName}</h3>
+                <span class="text-sm ${contactTypeInfo.class} px-2 py-1 rounded">${contactTypeInfo.label}</span>
+                ${isConnectorContact ? `
+                  <span class="inline-flex items-center text-sm bg-purple-100 text-purple-800 px-2 py-1 rounded" title="Synced from ${connectorDisplayName}">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    ${connectorDisplayName}
+                  </span>
+                ` : isInternalNonManual ? `
+                  <span class="inline-flex items-center text-sm bg-sky-100 text-sky-700 px-2 py-1 rounded" title="${sourceLabel}">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                    </svg>
+                    ${sourceLabel}
+                  </span>
+                ` : `
+                  <span class="inline-flex items-center text-sm bg-gray-100 text-gray-600 px-2 py-1 rounded" title="Manually created">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                    </svg>
+                    Manual
+                  </span>
+                `}
+              </div>
+              ${contact.title || contact.company_name ? `
+                <p class="text-gray-600">
+                  ${contact.title ? contact.title : ''}${contact.title && contact.company_name ? ' at ' : ''}${contact.company_name ? contact.company_name : ''}
+                </p>
+              ` : ''}
+            </div>
+
+            <!-- Contact Information Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label class="block text-sm font-medium text-gray-500 mb-1">First Name</label>
+                <p class="text-gray-900">${contact.first_name || '—'}</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-500 mb-1">Last Name</label>
+                <p class="text-gray-900">${contact.last_name || '—'}</p>
+              </div>
+              ${contact.display_name ? `
+                <div class="md:col-span-2">
+                  <label class="block text-sm font-medium text-gray-500 mb-1">Display Name</label>
+                  <p class="text-gray-900">${contact.display_name}</p>
+                </div>
+              ` : ''}
+              ${contact.company_name ? `
+                <div>
+                  <label class="block text-sm font-medium text-gray-500 mb-1">Company</label>
+                  <p class="text-gray-900">${contact.company_name}</p>
+                </div>
+              ` : ''}
+              ${contact.title ? `
+                <div>
+                  <label class="block text-sm font-medium text-gray-500 mb-1">Title/Position</label>
+                  <p class="text-gray-900">${contact.title}</p>
+                </div>
+              ` : ''}
+              ${contact.email ? `
+                <div class="md:col-span-2">
+                  <label class="block text-sm font-medium text-gray-500 mb-1">Email</label>
+                  <a href="mailto:${contact.email}" class="text-indigo-600 hover:text-indigo-800">${contact.email}</a>
+                </div>
+              ` : ''}
+              ${contact.phone_mobile ? `
+                <div>
+                  <label class="block text-sm font-medium text-gray-500 mb-1">Mobile Phone</label>
+                  <a href="tel:${contact.phone_mobile}" class="text-indigo-600 hover:text-indigo-800">${contact.phone_mobile}</a>
+                </div>
+              ` : ''}
+              ${contact.phone_work ? `
+                <div>
+                  <label class="block text-sm font-medium text-gray-500 mb-1">Work Phone</label>
+                  <a href="tel:${contact.phone_work}" class="text-indigo-600 hover:text-indigo-800">${contact.phone_work}</a>
+                </div>
+              ` : ''}
+            </div>
+
+            <!-- Source info for connector contacts -->
+            ${isConnectorContact ? `
+              <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <p class="text-sm text-purple-800">
+                  <strong>Note:</strong> This contact was originally synced from ${connectorDisplayName}. You can edit the local copy below.
+                </p>
+              </div>
+            ` : ''}
+
+            <!-- Action Buttons (always show - contacts are editable) -->
+            <div class="flex justify-end gap-3 pt-6 border-t border-gray-200">
+              <button
+                onclick="confirmDeleteContact('${contact.id}', '${displayName}')"
+                class="px-4 py-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg font-medium transition-colors flex items-center gap-2"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                </svg>
+                Delete Contact
+              </button>
+              <button
+                onclick="openEditContactModal('${contact.id}')"
+                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                </svg>
+                Edit Contact
+              </button>
+            </div>
+          </div>
+        `;
+      } catch (error) {
+        console.error('Error loading contact details:', error);
+        content.innerHTML = `
+          <div class="text-center py-12">
+            <div class="text-red-600 mb-4">
+              <svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <h4 class="text-lg font-semibold text-gray-900 mb-2">Failed to load contact</h4>
+            <p class="text-gray-500">${error.message}</p>
+          </div>
+        `;
+      }
+    };
+
+    // Close Contact Detail Modal
+    window.closeContactDetailModal = function() {
+      document.getElementById('contactDetailModal').classList.add('hidden');
+    };
+
+    // Open Edit Contact Modal
+    window.openEditContactModal = async function(contactId) {
+      try {
+        // Close detail modal
+        closeContactDetailModal();
+
+        const matterId = currentMatterData?.matter?.matter_id;
+        if (!matterId) {
+          throw new Error('Matter ID not found');
+        }
+
+        // Fetch contact data
+        const response = await fetch(`${api.baseUrl}/api/v1/matters/${matterId}/contacts/${contactId}`, {
+          headers: {
+            'Authorization': `Bearer ${api.token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to load contact');
+        }
+
+        const data = await response.json();
+        const contact = data.contact;
+
+        // Populate form
+        document.getElementById('editContactId').value = contact.id;
+        document.getElementById('editContactMatterId').value = matterId;
+        document.getElementById('editContactFirstName').value = contact.first_name || '';
+        document.getElementById('editContactLastName').value = contact.last_name || '';
+        document.getElementById('editContactDisplayName').value = contact.display_name || '';
+        document.getElementById('editContactCompanyName').value = contact.company_name || '';
+        document.getElementById('editContactTitle').value = contact.title || '';
+        document.getElementById('editContactEmail').value = contact.email || '';
+        document.getElementById('editContactPhoneMobile').value = contact.phone_mobile || '';
+        document.getElementById('editContactPhoneWork').value = contact.phone_work || '';
+        document.getElementById('editContactType').value = contact.contact_type || 'contact:other';
+
+        // Show modal
+        document.getElementById('editContactModal').classList.remove('hidden');
+      } catch (error) {
+        console.error('Error loading contact for editing:', error);
+        Toast.error('Failed to load contact');
+      }
+    };
+
+    // Close Edit Contact Modal
+    window.closeEditContactModal = function() {
+      document.getElementById('editContactModal').classList.add('hidden');
+      document.getElementById('editContactForm').reset();
+    };
+
+    // Update Contact
+    window.updateContact = async function(event) {
+      event.preventDefault();
+
+      const contactId = document.getElementById('editContactId').value;
+      const matterId = document.getElementById('editContactMatterId').value;
+      const contactData = {
+        first_name: document.getElementById('editContactFirstName').value.trim(),
+        last_name: document.getElementById('editContactLastName').value.trim(),
+        display_name: document.getElementById('editContactDisplayName').value.trim() || null,
+        company_name: document.getElementById('editContactCompanyName').value.trim() || null,
+        title: document.getElementById('editContactTitle').value.trim() || null,
+        email: document.getElementById('editContactEmail').value.trim() || null,
+        phone_mobile: document.getElementById('editContactPhoneMobile').value.trim() || null,
+        phone_work: document.getElementById('editContactPhoneWork').value.trim() || null,
+        contact_type: document.getElementById('editContactType').value
+      };
+
+      const submitBtn = event.target.querySelector('button[type="submit"]');
+      const originalButtonHtml = submitBtn.innerHTML;
+
+      submitBtn.disabled = true;
+      submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      submitBtn.innerHTML = `
+        <svg class="animate-spin h-4 w-4 inline-block mr-2" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        Updating...
+      `;
+
+      try {
+        const response = await fetch(`${api.baseUrl}/api/v1/matters/${matterId}/contacts/${contactId}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${api.token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(contactData)
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to update contact');
+        }
+
+        Toast.success('Contact updated successfully');
+        closeEditContactModal();
+
+        // Restore button state before refreshing data
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        submitBtn.innerHTML = originalButtonHtml;
+
+        // Use the same refresh functionality as the refresh button
+        await refreshCurrentMatter();
+      } catch (error) {
+        console.error('Update contact error:', error);
+        Toast.error('Failed to update contact');
+
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        submitBtn.innerHTML = originalButtonHtml;
+      }
+    };
+
+    // Confirm Delete Contact
+    window.confirmDeleteContact = function(contactId, contactName) {
+      Modal.confirm(
+        'Delete Contact',
+        `Are you sure you want to delete the contact "${contactName}"? This action cannot be undone.`,
+        () => {
+          deleteContact(contactId);
+        },
+        'Delete',
+        'danger'
+      );
+    };
+
+    // Delete Contact
+    window.deleteContact = async function(contactId) {
+      const matterId = currentMatterData?.matter?.matter_id;
+      if (!matterId) {
+        Toast.error('Matter ID not found');
+        return;
+      }
+
+      console.log('[deleteContact] Deleting contact', { matterId, contactId });
+
+      try {
+        const url = `${api.baseUrl}/api/v1/matters/${matterId}/contacts/${contactId}`;
+        console.log('[deleteContact] DELETE URL:', url);
+
+        const response = await fetch(url, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${api.token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        console.log('[deleteContact] Response status:', response.status);
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('[deleteContact] Failed to delete:', errorData);
+          throw new Error(errorData.message || 'Failed to delete contact');
+        }
+
+        const result = await response.json();
+        console.log('[deleteContact] Success:', result);
+
+        Toast.success('Contact deleted successfully');
+        closeContactDetailModal();
+
+        // Use the same refresh functionality as the refresh button
+        await refreshCurrentMatter();
+      } catch (error) {
+        console.error('Delete contact error:', error);
+        Toast.error('Failed to delete contact');
+      }
+    };
+
+    // Contacts tab state
+    let contactsSearchQuery = '';
+    let contactsFilterType = 'all';
+    let contactsSortBy = 'name';
+    let contactsPage = 1;
+    const contactsPerPage = 10;
+
+    // Render Contacts Tab
+    function renderContactsTab(matter, contacts) {
+      console.log('[renderContactsTab] Called with', { matterId: matter?.matter_id, contactsCount: contacts?.length });
+      const content = document.getElementById('tabContentContacts');
+
+      if (!content) {
+        console.warn('[renderContactsTab] Content element not found - tab may not be visible');
+        return;
+      }
+
+      if (!contacts || contacts.length === 0) {
+        content.innerHTML = `
+          <div class="text-center py-12">
+            <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+            </svg>
+            <h4 class="text-lg font-semibold text-gray-900 mb-2">No contacts</h4>
+            <p class="text-gray-500 mb-4">No contacts are associated with this matter yet.</p>
+            <div class="flex items-center justify-center gap-3">
+              <button onclick="ContactSearchModal.open('${matter.matter_id}')" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm rounded-lg font-medium transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                Link Existing
+              </button>
+              <button onclick="openAddContactModal('${matter.matter_id}')" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Add New Contact
+              </button>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      // Filter contacts
+      let filteredContacts = contacts.filter(contact => {
+        // Type filter
+        if (contactsFilterType !== 'all' && contact.contact_type !== contactsFilterType) {
+          return false;
+        }
+
+        // Search filter
+        if (contactsSearchQuery) {
+          const query = contactsSearchQuery.toLowerCase();
+          const displayName = (contact.display_name || `${contact.first_name || ''} ${contact.last_name || ''}`).toLowerCase();
+          const email = (contact.email || '').toLowerCase();
+          const company = (contact.company_name || '').toLowerCase();
+          const title = (contact.title || '').toLowerCase();
+
+          return displayName.includes(query) ||
+                 email.includes(query) ||
+                 company.includes(query) ||
+                 title.includes(query);
+        }
+
+        return true;
+      });
+
+      // Sort contacts
+      filteredContacts.sort((a, b) => {
+        const getDisplayName = (c) => c.display_name || `${c.first_name || ''} ${c.last_name || ''}`;
+
+        switch (contactsSortBy) {
+          case 'name':
+            return getDisplayName(a).localeCompare(getDisplayName(b));
+          case 'name-desc':
+            return getDisplayName(b).localeCompare(getDisplayName(a));
+          case 'company':
+            return (a.company_name || '').localeCompare(b.company_name || '');
+          case 'company-desc':
+            return (b.company_name || '').localeCompare(a.company_name || '');
+          case 'type':
+            return (a.contact_type || '').localeCompare(b.contact_type || '');
+          case 'type-desc':
+            return (b.contact_type || '').localeCompare(a.contact_type || '');
+          case 'date':
+            return new Date(a.created_at || 0) - new Date(b.created_at || 0);
+          case 'date-desc':
+            return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+          default:
+            return 0;
+        }
+      });
+
+      // Pagination
+      const totalContacts = filteredContacts.length;
+      const totalPages = Math.ceil(totalContacts / contactsPerPage);
+      const startIndex = (contactsPage - 1) * contactsPerPage;
+      const endIndex = startIndex + contactsPerPage;
+      const paginatedContacts = filteredContacts.slice(startIndex, endIndex);
+
+      function renderContactCard(contact) {
+        const displayName = contact.display_name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unknown';
+
+        // Known external connector sources
+        const connectorNamesMap = {
+          'actionstep': 'ActionStep',
+          'google_contacts': 'Google Contacts',
+          'gohighlevel': 'GoHighLevel',
+          'hubspot': 'HubSpot',
+          'salesforce': 'Salesforce',
+          'microsoft_contacts': 'Microsoft Contacts',
+          'outlook': 'Outlook'
+        };
+
+        // Only treat as a connector contact if the source is a known external connector
+        const isConnectorContact = contact.source && connectorNamesMap[contact.source] !== undefined;
+        const isLinkedContact = contact.link_type === 'linked';
+
+        // Get connector display name
+        let connectorDisplayName = '';
+        if (isConnectorContact) {
+          connectorDisplayName = connectorNamesMap[contact.source];
+        }
+
+        // Internal non-manual source labels
+        const internalLabels = {
+          'agentic': 'AI Created',
+          'ai_extracted': 'AI Extracted',
+          'imported': 'Imported'
+        };
+        const isInternalSource = contact.source && !isConnectorContact && contact.source !== 'manual';
+        const internalSourceLabel = isInternalSource
+          ? (internalLabels[contact.source] || contact.source.charAt(0).toUpperCase() + contact.source.slice(1))
+          : '';
+
+        // Contact type badge styling
+        const typeLabels = {
+          'contact:participant': { label: 'Participant', class: 'bg-blue-100 text-blue-800' },
+          'contact:opportunity': { label: 'Opportunity', class: 'bg-green-100 text-green-800' },
+          'contact:lead': { label: 'Lead', class: 'bg-yellow-100 text-yellow-800' },
+          'contact:other': { label: 'Other', class: 'bg-gray-100 text-gray-800' }
+        };
+        const contactTypeInfo = typeLabels[contact.contact_type] || typeLabels['contact:other'];
+
+        // Role badge for linked contacts
+        const roleBadge = isLinkedContact && contact.role ? `
+          <span class="inline-flex items-center text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded" title="Role in this matter">
+            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+            </svg>
+            ${contact.role.charAt(0).toUpperCase() + contact.role.slice(1).split('_').join(' ')}
+          </span>
+        ` : '';
+
+        // Linked badge
+        const linkedBadge = isLinkedContact ? `
+          <span class="inline-flex items-center text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded" title="Linked from another matter">
+            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+            </svg>
+            Linked
+          </span>
+        ` : '';
+
+        // Unlink button for linked contacts
+        const unlinkButton = isLinkedContact ? `
+          <button
+            onclick="event.stopPropagation(); unlinkContactFromMatter('${contact.id}', '${matter.matter_id}')"
+            class="text-xs text-gray-400 hover:text-red-600 p-1 rounded transition-colors"
+            title="Unlink from this matter"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        ` : '';
+
+        return `
+          <div onclick="openContactDetail('${contact.id}')" class="bg-white border border-gray-200 hover:border-indigo-300 hover:shadow-sm rounded-lg p-4 transition-all cursor-pointer">
+            <div class="flex items-start justify-between gap-4">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h4 class="text-sm font-medium text-gray-900 truncate">${displayName}</h4>
+                  <span class="text-xs ${contactTypeInfo.class} px-2 py-0.5 rounded">${contactTypeInfo.label}</span>
+                  ${roleBadge}
+                  ${linkedBadge}
+                  ${isConnectorContact ? `
+                    <span class="inline-flex items-center text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded" title="Synced from ${connectorDisplayName}">
+                      <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                      </svg>
+                      ${connectorDisplayName}
+                    </span>
+                  ` : isInternalSource ? `
+                    <span class="inline-flex items-center text-xs bg-sky-100 text-sky-700 px-2 py-0.5 rounded" title="${internalSourceLabel}">
+                      <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                      </svg>
+                      ${internalSourceLabel}
+                    </span>
+                  ` : !isLinkedContact ? `
+                    <span class="inline-flex items-center text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded" title="Manually created">
+                      <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                      </svg>
+                      Manual
+                    </span>
+                  ` : ''}
+                </div>
+                ${contact.title || contact.company_name ? `
+                  <p class="text-xs text-gray-600 mt-0.5">
+                    ${contact.title ? contact.title : ''}${contact.title && contact.company_name ? ' at ' : ''}${contact.company_name ? contact.company_name : ''}
+                  </p>
+                ` : ''}
+                ${contact.email ? `
+                  <div class="flex items-center gap-1 mt-1">
+                    <svg class="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                    </svg>
+                    <a href="mailto:${contact.email}" onclick="event.stopPropagation()" class="text-xs text-indigo-600 hover:text-indigo-800 truncate">${contact.email}</a>
+                  </div>
+                ` : ''}
+                ${contact.phone_mobile || contact.phone_work ? `
+                  <div class="flex items-center gap-1 mt-1">
+                    <svg class="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>
+                    </svg>
+                    <a href="tel:${contact.phone_mobile || contact.phone_work}" onclick="event.stopPropagation()" class="text-xs text-gray-600 hover:text-indigo-600 truncate">${contact.phone_mobile || contact.phone_work}</a>
+                  </div>
+                ` : ''}
+              </div>
+              ${unlinkButton}
+            </div>
+          </div>
+        `;
+      }
+
+      function renderContactSection(title, contactsList, iconColor = 'text-indigo-600') {
+        if (contactsList.length === 0) return '';
+
+        return `
+          <div class="mb-6">
+            <h3 class="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+              <svg class="w-4 h-4 ${iconColor}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+              </svg>
+              ${title} (${contactsList.length})
+            </h3>
+            <div class="space-y-2">
+              ${contactsList.map(contact => renderContactCard(contact)).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      content.innerHTML = `
+        <div class="space-y-6">
+          <!-- Header with Link Existing + Add New Buttons -->
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-gray-900">Contacts</h2>
+            <div class="flex items-center gap-2">
+              <button onclick="ContactSearchModal.open('${matter.matter_id}')" class="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm rounded-lg font-medium flex items-center gap-1.5 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                Link Existing
+              </button>
+              <button onclick="openAddContactModal('${matter.matter_id}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium flex items-center gap-1.5 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Add New
+              </button>
+            </div>
+          </div>
+
+          <!-- Search, Filter, Sort Controls -->
+          <div class="bg-gray-50 rounded-lg p-4 space-y-3">
+            <!-- Search Bar -->
+            <div class="relative">
+              <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+              </svg>
+              <input
+                type="text"
+                id="contactsSearchInput"
+                placeholder="Search by name, email, company, or title..."
+                value="${contactsSearchQuery}"
+                oninput="updateContactsSearch(this.value)"
+                class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+
+            <!-- Filter and Sort Row -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <!-- Filter by Type -->
+              <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Filter by Type</label>
+                <select
+                  id="contactsFilterSelect"
+                  onchange="updateContactsFilter(this.value)"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
+                >
+                  <option value="all" ${contactsFilterType === 'all' ? 'selected' : ''}>All Types</option>
+                  <option value="contact:participant" ${contactsFilterType === 'contact:participant' ? 'selected' : ''}>Participants</option>
+                  <option value="contact:opportunity" ${contactsFilterType === 'contact:opportunity' ? 'selected' : ''}>Opportunities</option>
+                  <option value="contact:lead" ${contactsFilterType === 'contact:lead' ? 'selected' : ''}>Leads</option>
+                  <option value="contact:other" ${contactsFilterType === 'contact:other' ? 'selected' : ''}>Other</option>
+                </select>
+              </div>
+
+              <!-- Sort By -->
+              <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Sort By</label>
+                <select
+                  id="contactsSortSelect"
+                  onchange="updateContactsSort(this.value)"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
+                >
+                  <option value="name" ${contactsSortBy === 'name' ? 'selected' : ''}>Name (A-Z)</option>
+                  <option value="name-desc" ${contactsSortBy === 'name-desc' ? 'selected' : ''}>Name (Z-A)</option>
+                  <option value="company" ${contactsSortBy === 'company' ? 'selected' : ''}>Company (A-Z)</option>
+                  <option value="company-desc" ${contactsSortBy === 'company-desc' ? 'selected' : ''}>Company (Z-A)</option>
+                  <option value="type" ${contactsSortBy === 'type' ? 'selected' : ''}>Type (A-Z)</option>
+                  <option value="type-desc" ${contactsSortBy === 'type-desc' ? 'selected' : ''}>Type (Z-A)</option>
+                  <option value="date" ${contactsSortBy === 'date' ? 'selected' : ''}>Date Added (Oldest)</option>
+                  <option value="date-desc" ${contactsSortBy === 'date-desc' ? 'selected' : ''}>Date Added (Newest)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Results Count -->
+            <div class="flex items-center justify-between text-sm text-gray-600">
+              <span>Showing ${startIndex + 1}-${Math.min(endIndex, totalContacts)} of ${totalContacts} contacts</span>
+              ${contactsSearchQuery || contactsFilterType !== 'all' ? `
+                <button
+                  onclick="clearContactsFilters()"
+                  class="text-indigo-600 hover:text-indigo-800 font-medium"
+                >
+                  Clear Filters
+                </button>
+              ` : ''}
+            </div>
+          </div>
+
+          <!-- Contacts List -->
+          ${paginatedContacts.length > 0 ? `
+            <div class="space-y-2">
+              ${paginatedContacts.map(contact => renderContactCard(contact)).join('')}
+            </div>
+          ` : `
+            <div class="text-center py-12 bg-gray-50 rounded-lg">
+              <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+              </svg>
+              <h4 class="text-lg font-semibold text-gray-900 mb-2">No contacts found</h4>
+              <p class="text-gray-500">Try adjusting your search or filters</p>
+            </div>
+          `}
+
+          <!-- Pagination -->
+          ${totalPages > 1 ? `
+            <div class="flex items-center justify-between pt-4 border-t border-gray-200">
+              <button
+                onclick="changeContactsPage(${contactsPage - 1})"
+                ${contactsPage === 1 ? 'disabled' : ''}
+                class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+                Previous
+              </button>
+
+              <div class="flex items-center gap-2">
+                ${Array.from({length: totalPages}, (_, i) => i + 1).map(page => `
+                  <button
+                    onclick="changeContactsPage(${page})"
+                    class="px-3 py-2 text-sm font-medium rounded-lg ${
+                      page === contactsPage
+                        ? 'bg-indigo-600 text-white'
+                        : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                    }"
+                  >
+                    ${page}
+                  </button>
+                `).join('')}
+              </div>
+
+              <button
+                onclick="changeContactsPage(${contactsPage + 1})"
+                ${contactsPage === totalPages ? 'disabled' : ''}
+                class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                Next
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+              </button>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    // Update contacts search
+    window.updateContactsSearch = function(query) {
+      contactsSearchQuery = query;
+      contactsPage = 1; // Reset to first page
+      if (currentMatterData) {
+        renderContactsTab(currentMatterData.matter, currentMatterData.contacts || []);
+      }
+    };
+
+    // Update contacts filter
+    window.updateContactsFilter = function(filterType) {
+      contactsFilterType = filterType;
+      contactsPage = 1; // Reset to first page
+      if (currentMatterData) {
+        renderContactsTab(currentMatterData.matter, currentMatterData.contacts || []);
+      }
+    };
+
+    // Update contacts sort
+    window.updateContactsSort = function(sortBy) {
+      contactsSortBy = sortBy;
+      if (currentMatterData) {
+        renderContactsTab(currentMatterData.matter, currentMatterData.contacts || []);
+      }
+    };
+
+    // Change contacts page
+    window.changeContactsPage = function(page) {
+      contactsPage = page;
+      if (currentMatterData) {
+        renderContactsTab(currentMatterData.matter, currentMatterData.contacts || []);
+      }
+    };
+
+    // Clear contacts filters
+    window.clearContactsFilters = function() {
+      contactsSearchQuery = '';
+      contactsFilterType = 'all';
+      contactsPage = 1;
+      if (currentMatterData) {
+        renderContactsTab(currentMatterData.matter, currentMatterData.contacts || []);
+      }
+    };
+
+    // Unlink a contact from the current matter
+    window.unlinkContactFromMatter = async function(contactId, matterId) {
+      if (!confirm('Unlink this contact from the matter? The contact will still exist in the system.')) {
+        return;
+      }
+
+      try {
+        await api.delete(`/api/v1/matters/${matterId}/contacts/${contactId}/unlink`);
+        if (typeof Toast !== 'undefined' && Toast.success) {
+          Toast.success('Contact unlinked from matter');
+        }
+        if (typeof refreshCurrentMatter === 'function') {
+          await refreshCurrentMatter();
+        }
+      } catch (error) {
+        console.error('Failed to unlink contact:', error);
+        const message = (error && error.message) ? error.message : 'Failed to unlink contact';
+        if (typeof Toast !== 'undefined' && Toast.error) {
+          Toast.error(message);
+        }
+      }
+    };
+
+
+    // ==================== MATTER NOTES TAB ====================
+
+    // Render Notes Tab
+    function renderNotesTab(matter) {
+      const content = document.getElementById('tabContentNotes');
+
+      if (!content) {
+        console.error('[Notes] Tab content container not found');
+        return;
+      }
+
+      // Initialize Matter Notes controller
+      try {
+        // Clear existing content
+        content.innerHTML = '<div id="matterNotesContainer" class="w-full h-full"></div>';
+
+        // Initialize Matter Notes
+        if (window.initializeMatterNotes && window.MatterNotesAPIClient) {
+          window.initializeMatterNotes('matterNotesContainer', matter.matter_id);
+          console.log('[Notes] Matter Notes initialized for matter:', matter.matter_id);
+        } else {
+          // Fallback if components not loaded
+          content.innerHTML = `
+            <div class="text-center py-12">
+              <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              <h3 class="mt-2 text-sm font-medium text-gray-900">Notes feature not available</h3>
+              <p class="mt-1 text-sm text-gray-500">The notes feature is still loading. Please refresh the page.</p>
+            </div>
+          `;
+          console.error('[Notes] Matter Notes components not loaded');
+        }
+      } catch (error) {
+        console.error('[Notes] Failed to initialize Matter Notes:', error);
+        content.innerHTML = `
+          <div class="text-center py-12">
+            <svg class="mx-auto h-12 w-12 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">Failed to load notes</h3>
+            <p class="mt-1 text-sm text-gray-500">${error.message}</p>
+          </div>
+        `;
+      }
+    }
+
+    function renderLinkedMattersContent(matter, links, totalLinks) {
+      const content = document.getElementById('tabContentLinks');
+
+      // Check if the content element exists
+      // This is normal when the matter detail view is not currently open
+      if (!content) {
+        return;
+      }
+
+      const isWorkspace = matter.matter_type === 'workspace';
+      const isMatter = matter.matter_type === 'matter';
+
+      // Empty state
+      if (totalLinks === 0) {
+        content.innerHTML = `
+          <div class="text-center py-12">
+            <div class="w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+              </svg>
+            </div>
+            <h4 class="text-lg font-semibold text-gray-900 mb-2">No linked matters</h4>
+            <p class="text-gray-500 mb-4">${isWorkspace ? 'Link matters to this workspace to organize related work' : 'Add this matter to a workspace to organize related work'}</p>
+            <div class="flex items-center justify-center gap-3">
+              ${isWorkspace ? `
+                <button
+                  onclick="openCreateLinkModal('${matter.matter_id}', true)"
+                  class="inline-flex items-center justify-center w-10 h-10 text-white rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors"
+                  title="Link Existing Matter"
+                >
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                  </svg>
+                </button>
+                <button
+                  onclick="openCreateMatterDrawer('${matter.matter_id}')"
+                  class="inline-flex items-center justify-center w-10 h-10 text-white rounded-lg bg-purple-600 hover:bg-purple-700 transition-colors"
+                  title="Create New Matter"
+                >
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                  </svg>
+                </button>
+              ` : ``}
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      // Build HTML for each link group
+      let html = '<div class="space-y-6">';
+
+      // Add action buttons at top
+      if (isWorkspace) {
+        html += `
+          <div class="flex justify-end gap-3">
+            <button
+              onclick="openCreateLinkModal('${matter.matter_id}', true)"
+              class="inline-flex items-center justify-center w-10 h-10 text-white rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors"
+              title="Link Existing Matter"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+              </svg>
+            </button>
+            <button
+              onclick="openCreateMatterDrawer('${matter.matter_id}')"
+              class="inline-flex items-center justify-center w-10 h-10 text-white rounded-lg bg-purple-600 hover:bg-purple-700 transition-colors"
+              title="Create New Matter"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+            </button>
+          </div>
+        `;
+      }
+      /* COMMENTED OUT: Link Related Matter functionality - only allow workspace linking
+      else if (isMatter) {
+        html += `
+          <div class="flex justify-end">
+            <button
+              onclick="openCreateLinkModal('${matter.matter_id}', false)"
+              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+              Link Related Matter
+            </button>
+          </div>
+        `;
+      }
+      */
+
+      // Workspace Matters
+      if (links.workspace_matters && links.workspace_matters.length > 0) {
+        html += renderLinkSection(
+          isWorkspace ? 'Matters in this Workspace' : 'Part of Workspace',
+          links.workspace_matters,
+          matter.matter_id,
+          'workspace_matter'
+        );
+      }
+
+      // COMMENTED OUT: Related Matters section - only allow workspace linking
+      /*
+      if (links.related_matters && links.related_matters.length > 0) {
+        html += renderLinkSection(
+          'Related Matters',
+          links.related_matters,
+          matter.matter_id,
+          'related_to'
+        );
+      }
+      */
+
+      // Parent Matters
+      if (links.parent_matters && links.parent_matters.length > 0) {
+        html += renderLinkSection(
+          'Parent Matters',
+          links.parent_matters,
+          matter.matter_id,
+          'parent'
+        );
+      }
+
+      // Child Matters
+      if (links.child_matters && links.child_matters.length > 0) {
+        html += renderLinkSection(
+          'Child Matters',
+          links.child_matters,
+          matter.matter_id,
+          'child'
+        );
+      }
+
+      // Shadow Records (ActionStep)
+      if (links.shadow_records && links.shadow_records.length > 0) {
+        html += renderLinkSection(
+          'ActionStep Connector',
+          links.shadow_records,
+          matter.matter_id,
+          'shadow_record',
+          true // read-only
+        );
+      }
+
+      html += '</div>';
+      content.innerHTML = html;
+    }
+
+    function renderLinkSection(title, linksList, currentMatterId, linkType, isReadOnly = false) {
+      return `
+        <div class="bg-gray-50 rounded-lg p-4">
+          <h5 class="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+            ${getLinkIcon(linkType)}
+            ${title}
+            <span class="ml-auto text-xs text-gray-500">${linksList.length} ${linksList.length === 1 ? 'link' : 'links'}</span>
+          </h5>
+          <div class="space-y-2">
+            ${linksList.map(link => renderLinkCard(link, currentMatterId, isReadOnly)).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function getLinkIcon(linkType) {
+      switch(linkType) {
+        case 'workspace_matter':
+          return '<svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>';
+        case 'related_to':
+          return '<svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>';
+        case 'parent':
+          return '<svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>';
+        case 'child':
+          return '<svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>';
+        case 'shadow_record':
+          return '<svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>';
+        default:
+          return '<svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>';
+      }
+    }
+
+    function renderLinkCard(link, currentMatterId, isReadOnly) {
+      const linkedName = link.linked_name || 'Unknown';
+      const linkedId = link.linked_entity_id;
+      const linkId = link.link_id;
+      const createdAt = link.created_at ? new Date(link.created_at).toLocaleDateString() : '';
+      const createdBy = link.created_by_name || link.created_by_email || '';
+
+      // If linkId is missing or invalid, treat as read-only (cannot delete)
+      const canDelete = !isReadOnly && linkId && linkId !== 'null' && linkId !== 'undefined';
+
+      return `
+        <div class="bg-white border border-gray-200 hover:border-indigo-300 rounded-lg p-3 flex items-center justify-between gap-3 transition-all">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2">
+              <button
+                onclick="viewMatter('${linkedId}')"
+                class="text-sm font-medium text-indigo-600 hover:text-indigo-800 truncate"
+              >
+                ${linkedName}
+              </button>
+              <span class="text-xs text-gray-400 font-mono">${linkedId}</span>
+            </div>
+            ${createdAt || createdBy ? `
+              <div class="text-xs text-gray-500 mt-1">
+                ${createdAt ? `Linked ${createdAt}` : ''}
+                ${createdBy ? ` by ${createdBy}` : ''}
+              </div>
+            ` : ''}
+          </div>
+          <div class="flex-shrink-0">
+            ${!canDelete ? `
+              <span class="text-xs text-gray-400 px-2 py-1 rounded border border-gray-200" title="${isReadOnly ? 'System-generated link cannot be deleted' : 'Link ID missing - cannot delete'}">
+                <svg class="w-3 h-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                </svg>
+              </span>
+            ` : `
+              <button
+                onclick="deleteLinkConfirm('${linkId}', '${linkedName}')"
+                class="text-red-600 hover:text-red-800 p-1"
+                title="Remove link"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            `}
+          </div>
+        </div>
+      `;
+    }
+
+    // Render Linked Matters in Details Tab (not as separate tab)
+    async function renderLinkedMattersInDetails(matter) {
+      const content = document.getElementById('linkedMattersSection');
+
+      // Show loading state
+      content.innerHTML = `
+        <div class="flex items-center justify-center py-6">
+          <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
+        </div>
+      `;
+
+      try {
+        // Load linked matters from API
+        const response = await fetch(`${api.baseUrl}/api/v1/entity-links/matter/${matter.matter_id}`, {
+          headers: {
+            'Authorization': `Bearer ${api.token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to load linked matters');
+        }
+
+        const data = await response.json();
+        const { links, total_links } = data;
+
+        // Render the links UI inline in details
+        renderLinkedMattersInlineContent(matter, links, total_links);
+
+      } catch (error) {
+        console.error('Error loading linked matters:', error);
+        content.innerHTML = `
+          <div class="text-center py-6">
+            <div class="text-red-600 mb-2">
+              <svg class="w-8 h-8 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <h5 class="text-sm font-semibold text-gray-900 mb-1">Failed to load linked matters</h5>
+            <p class="text-xs text-gray-500">${error.message}</p>
+          </div>
+        `;
+      }
+    }
+
+    function renderLinkedMattersInlineContent(matter, links, totalLinks) {
+      const content = document.getElementById('linkedMattersSection');
+      const isWorkspace = matter.matter_type === 'workspace';
+      const isMatter = matter.matter_type === 'matter';
+
+      // Build action buttons
+      let linkedMattersActions = '';
+      if (isWorkspace) {
+        linkedMattersActions = `
+          <div class="flex items-center gap-2">
+            <button
+              onclick="openCreateLinkModal('${matter.matter_id}', true)"
+              class="inline-flex items-center justify-center w-8 h-8 text-white rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors"
+              title="Link Existing Matter"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+              </svg>
+            </button>
+            <button
+              onclick="openCreateMatterDrawer('${matter.matter_id}')"
+              class="inline-flex items-center justify-center w-8 h-8 text-white rounded-lg bg-purple-600 hover:bg-purple-700 transition-colors"
+              title="Create New Matter"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+            </button>
+          </div>
+        `;
+      }
+
+      // If no links, show minimal message
+      if (totalLinks === 0) {
+        const emptyContent = `
+          <p class="text-sm text-gray-500 text-center py-4">No linked matters</p>
+        `;
+
+        const emptyFooter = isWorkspace ? `
+          <div class="flex items-center justify-center gap-3">
+            <button
+              onclick="openCreateLinkModal('${matter.matter_id}', true)"
+              class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+              </svg>
+              Link Existing Matter
+            </button>
+            <button
+              onclick="openCreateMatterDrawer('${matter.matter_id}')"
+              class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+              Create New Matter
+            </button>
+          </div>
+        ` : '';
+
+        content.innerHTML = createCollapsibleSection(
+          'linked-matters',
+          'Linked Matters',
+          emptyContent,
+          linkedMattersActions,
+          isSectionExpanded('linked-matters', true),
+          isWorkspace, // hasFooter
+          emptyFooter
+        );
+        return;
+      }
+
+      // Build HTML for linked matters content
+      let linksContent = '<div class="space-y-4">';
+
+      // Workspace Matters
+      if (links.workspace_matters && links.workspace_matters.length > 0) {
+        linksContent += renderLinkSection(
+          isWorkspace ? 'Matters in this Workspace' : 'Part of Workspace',
+          links.workspace_matters,
+          matter.matter_id,
+          'workspace_matter'
+        );
+      }
+
+      // COMMENTED OUT: Related Matters section - only allow workspace linking
+      /*
+      if (links.related_matters && links.related_matters.length > 0) {
+        linksContent += renderLinkSection(
+          'Related Matters',
+          links.related_matters,
+          matter.matter_id,
+          'related_to'
+        );
+      }
+      */
+
+      // Parent Matters
+      if (links.parent_matters && links.parent_matters.length > 0) {
+        linksContent += renderLinkSection(
+          'Parent Matters',
+          links.parent_matters,
+          matter.matter_id,
+          'parent'
+        );
+      }
+
+      // Child Matters
+      if (links.child_matters && links.child_matters.length > 0) {
+        linksContent += renderLinkSection(
+          'Child Matters',
+          links.child_matters,
+          matter.matter_id,
+          'child'
+        );
+      }
+
+      // Shadow Records (ActionStep)
+      if (links.shadow_records && links.shadow_records.length > 0) {
+        linksContent += renderLinkSection(
+          'ActionStep Connector',
+          links.shadow_records,
+          matter.matter_id,
+          'shadow_record',
+          true // read-only
+        );
+      }
+
+      linksContent += '</div>';
+
+      // Use collapsible section
+      content.innerHTML = createCollapsibleSection(
+        'linked-matters',
+        'Linked Matters',
+        linksContent,
+        linkedMattersActions,
+        isSectionExpanded('linked-matters', true)
+      );
+    }
+
+    // =============================================================================
+    // SKILLS TAB
+    // =============================================================================
+    // Skills tab functionality is now in: ../src/js/matter-skills.js
+
+    // =============================================================================
+    // CONNECTED DATA TAB
+    // =============================================================================
+
+    async function renderConnectedDataTab(matter) {
+      const content = document.getElementById('tabContentConnectedData');
+
+      // Show loading state
+      content.innerHTML = `
+        <div class="flex items-center justify-center py-12">
+          <div class="text-center">
+            <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto mb-4"></div>
+            <p class="text-gray-500">Loading connected data...</p>
+          </div>
+        </div>
+      `;
+
+      try {
+        // Fetch connector data AND pending matches in parallel
+        const [connectorResponse, pendingResponse] = await Promise.all([
+          api.getMatterConnectorData(matter.matter_id),
+          api.getMatterPendingMatches(matter.matter_id, { status: 'pending', limit: 50 })
+        ]);
+
+        const { summary, data } = connectorResponse;
+        const pendingMatches = pendingResponse.pending_matches || [];
+
+        // Update badge count
+        const badge = document.getElementById('connectedDataCount');
+        if (badge && summary.total_records > 0) {
+          badge.textContent = summary.total_records;
+          badge.classList.remove('hidden');
+        }
+
+        // If no data, show empty state
+        if (summary.total_records === 0) {
+          content.innerHTML = `
+            <div class="text-center py-12">
+              <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+              </svg>
+              <h4 class="text-lg font-semibold text-gray-900 mb-2">No connected data</h4>
+              <p class="text-gray-500">When data is synced from integrations, it will appear here.</p>
+              <!-- Hidden for now - Manual linking button
+              <button onclick="showManualConnectModal('${matter.matter_id}')" class="mt-4 inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                </svg>
+                Link Data Manually
+              </button>
+              -->
+            </div>
+          `;
+          return;
+        }
+
+        // Render grouped connector data
+        let html = `<div class="space-y-6">`;
+
+        // Render pending matches section if there are any
+        if (pendingMatches.length > 0) {
+          html += `
+            <!-- Pending Matches Section -->
+            <div class="bg-amber-50 border-2 border-amber-200 rounded-lg p-4">
+              <div class="flex items-start gap-3">
+                <svg class="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+                <div class="flex-1">
+                  <h3 class="text-sm font-semibold text-amber-900">Pending Matches Require Review</h3>
+                  <p class="text-xs text-amber-700 mt-1">
+                    ${pendingMatches.length} potential match${pendingMatches.length !== 1 ? 'es' : ''} found.
+                    Review and approve or decline below.
+                  </p>
+                </div>
+              </div>
+
+              <div class="mt-4 space-y-2">
+                ${pendingMatches.map(match => renderPendingMatchCard(match, matter.matter_id)).join('')}
+              </div>
+            </div>
+          `;
+        }
+
+        // Summary section
+        if (summary.total_records > 0) {
+          html += `
+            <!-- Summary -->
+            <div class="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-4 border border-indigo-100">
+              <div class="flex items-center justify-between">
+                <div class="flex-1">
+                  <h3 class="text-sm font-medium text-gray-900">Connected Data Summary</h3>
+                  <p class="text-xs text-gray-500 mt-1">${summary.total_records} record${summary.total_records !== 1 ? 's' : ''} from ${summary.connectors.length} connector${summary.connectors.length !== 1 ? 's' : ''}</p>
+                </div>
+                <div class="flex items-center gap-3">
+                  <div class="flex gap-2">
+                    ${summary.connectors.map(conn => `
+                      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-white border border-gray-200">
+                        ${conn.name}
+                      </span>
+                    `).join('')}
+                  </div>
+                  <button onclick="showManualConnectModal('${matter.matter_id}')" class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-indigo-700 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <svg class="-ml-0.5 mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                    Link Data
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        // Render each entity type group
+        for (const [entityType, records] of Object.entries(data)) {
+          const entityLabel = entityType.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+
+          html += `
+            <div class="space-y-3">
+              <div class="flex items-center justify-between">
+                <h4 class="text-lg font-semibold text-gray-900">${entityLabel} (${records.length})</h4>
+                <button onclick="toggleEntityGroup('${entityType}')" class="text-sm text-indigo-600 hover:text-indigo-800">
+                  <span id="toggle-${entityType}">Collapse All</span>
+                </button>
+              </div>
+
+              <div id="entity-group-${entityType}" class="space-y-2">
+                ${records.map((record, idx) => renderConnectorDataCard(record, entityType, idx)).join('')}
+              </div>
+            </div>
+          `;
+        }
+
+        html += '</div>';
+        content.innerHTML = html;
+
+      } catch (error) {
+        console.error('[renderConnectedDataTab] Error:', error);
+        content.innerHTML = `
+          <div class="text-center py-12">
+            <svg class="mx-auto h-12 w-12 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">Failed to load connected data</h3>
+            <p class="mt-1 text-sm text-gray-500">${error.message || 'An error occurred'}</p>
+          </div>
+        `;
+      }
+    }
+
+    function renderConnectorDataCard(record, entityType, index) {
+      const cardId = `connector-card-${entityType}-${index}`;
+      const detailsId = `connector-details-${entityType}-${index}`;
+
+      // Extract preview data based on entity type
+      let preview = getConnectorDataPreview(record);
+
+      // Match confidence badge color
+      let confidenceColor = 'gray';
+      if (record.match_confidence >= 90) confidenceColor = 'green';
+      else if (record.match_confidence >= 70) confidenceColor = 'yellow';
+      else if (record.match_confidence >= 50) confidenceColor = 'orange';
+      else confidenceColor = 'red';
+
+      return `
+        <div id="${cardId}" class="bg-white border border-gray-200 rounded-lg hover:border-indigo-300 transition-all">
+          <div class="p-4">
+            <div class="flex items-start justify-between gap-4">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                    ${record.connector_name}
+                  </span>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-${confidenceColor}-100 text-${confidenceColor}-800">
+                    ${Math.round(record.match_confidence)}% match
+                  </span>
+                  ${record.user_confirmed === true ? '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">✓ Verified</span>' : ''}
+                  ${record.user_confirmed === false ? '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">✗ Rejected</span>' : ''}
+                </div>
+
+                ${preview}
+
+                <div class="mt-2 text-xs text-gray-500">
+                  <span>ID: ${record.external_id}</span>
+                  <span class="mx-2">•</span>
+                  <span>Strategy: ${record.match_strategy.replace(/_/g, ' ')}</span>
+                  <span class="mx-2">•</span>
+                  <span>${timeAgo(record.created_at)}</span>
+                </div>
+              </div>
+
+              <button
+                onclick="toggleConnectorDetails('${detailsId}')"
+                class="text-indigo-600 hover:text-indigo-800 p-1"
+                title="Toggle details"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+              </button>
+            </div>
+
+            <!-- Expandable Details -->
+            <div id="${detailsId}" class="hidden mt-4 pt-4 border-t border-gray-200">
+              <h5 class="text-sm font-medium text-gray-900 mb-2">Raw Data:</h5>
+              <pre class="bg-gray-50 rounded p-3 text-xs overflow-x-auto max-h-96 overflow-y-auto"><code>${JSON.stringify(record.data, null, 2)}</code></pre>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // =============================================================================
+    // PENDING MATCHES FUNCTIONS
+    // =============================================================================
+
+    function renderPendingMatchCard(match, matterId) {
+      const { id, entity_type, external_id, connector_name, connector_category, match_confidence, match_strategy, match_details, connector_data } = match;
+
+      // Match confidence badge color
+      let confidenceColor = 'gray';
+      if (match_confidence >= 90) confidenceColor = 'green';
+      else if (match_confidence >= 70) confidenceColor = 'yellow';
+      else if (match_confidence >= 50) confidenceColor = 'orange';
+      else confidenceColor = 'red';
+
+      // Get preview based on entity type
+      const preview = getPendingMatchPreview(connector_data, entity_type);
+
+      // Get match reason from match_details
+      const matchReason = match_details?.confidence_reason || 'Similar data detected';
+
+      return `
+        <div id="pending-match-${id}" class="bg-white border-2 border-amber-300 rounded-lg p-4 hover:border-amber-400 transition-colors">
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex-1 min-w-0">
+              <!-- Badges -->
+              <div class="flex flex-wrap items-center gap-2 mb-2">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                  ${connector_name || 'Unknown Connector'}
+                </span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+                  ${entity_type.replace(/_/g, ' ')}
+                </span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-${confidenceColor}-100 text-${confidenceColor}-800">
+                  ${Math.round(match_confidence)}% match
+                </span>
+              </div>
+
+              <!-- Preview -->
+              ${preview}
+
+              <!-- Match reason -->
+              <div class="mt-2 flex items-start gap-2">
+                <svg class="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <p class="text-xs text-gray-600">
+                  <span class="font-medium">Why this matched:</span> ${matchReason}
+                </p>
+              </div>
+
+              <!-- Metadata -->
+              <div class="mt-2 text-xs text-gray-500">
+                <span>ID: ${external_id}</span>
+                <span class="mx-2">•</span>
+                <span>Strategy: ${match_strategy.replace(/_/g, ' ')}</span>
+              </div>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="flex flex-col gap-2 flex-shrink-0">
+              <button
+                onclick="showApprovePendingMatchModal('${id}', '${matterId}')"
+                class="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 transition-colors"
+                title="Approve this match"
+              >
+                ✓ Approve
+              </button>
+              <button
+                onclick="showDeclinePendingMatchModal('${id}', '${matterId}')"
+                class="px-3 py-1.5 bg-gray-200 text-gray-700 text-xs font-medium rounded hover:bg-gray-300 transition-colors"
+                title="Decline this match"
+              >
+                ✗ Decline
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function getPendingMatchPreview(data, entityType) {
+      if (!data) return '<p class="text-sm text-gray-500">No preview available</p>';
+
+      switch (entityType) {
+        case 'contact':
+        case 'participant':
+          return `
+            <h5 class="text-sm font-medium text-gray-900">
+              ${data.name?.display_name || (data.first_name + ' ' + data.last_name) || 'Unknown Contact'}
+            </h5>
+            <p class="text-sm text-gray-600">${data.contact?.email || data.email || 'No email'}</p>
+            ${data.contact?.phone_primary ? `<p class="text-sm text-gray-600">${data.contact.phone_primary}</p>` : ''}
+          `;
+
+        case 'opportunity':
+        case 'deal':
+          return `
+            <h5 class="text-sm font-medium text-gray-900">${data.name || data.title || 'Untitled Opportunity'}</h5>
+            <p class="text-sm text-gray-600">
+              ${data.status || data.pipeline_stage || 'No status'}
+              ${data.monetaryValue || data.value ? '• $' + (data.monetaryValue || data.value).toLocaleString() : ''}
+            </p>
+          `;
+
+        case 'activity':
+        case 'event':
+        case 'calendar_event':
+          return `
+            <h5 class="text-sm font-medium text-gray-900">${data.title || data.name || data.subject || 'Activity'}</h5>
+            <p class="text-sm text-gray-600">${data.description || data.notes || ''}</p>
+          `;
+
+        case 'note':
+          const noteText = data.content || data.text || data.description || '';
+          const preview = noteText.length > 100 ? noteText.substring(0, 100) + '...' : noteText;
+          return `
+            <h5 class="text-sm font-medium text-gray-900">${data.title || 'Note'}</h5>
+            <p class="text-sm text-gray-600">${preview}</p>
+          `;
+
+        default:
+          return `
+            <h5 class="text-sm font-medium text-gray-900">${data.name || data.title || entityType}</h5>
+            <p class="text-sm text-gray-600">${JSON.stringify(data).substring(0, 100)}...</p>
+          `;
+      }
+    }
+
+    async function showApprovePendingMatchModal(matchId, matterId) {
+      const confirmResult = await showConfirmDialog(
+        'Approve Match?',
+        'This will create a permanent link between this matter and the connector data. The data will appear in the Connected Data tab.',
+        'Approve',
+        'Cancel',
+        'green'
+      );
+
+      if (confirmResult) {
+        await approvePendingMatch(matchId, matterId);
+      }
+    }
+
+    async function showDeclinePendingMatchModal(matchId, matterId) {
+      // Show custom modal with optional reason
+      const modalHtml = `
+        <div id="declineMatchModal" class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+          <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div class="p-6">
+              <h3 class="text-lg font-semibold text-gray-900 mb-2">Decline Match</h3>
+              <p class="text-sm text-gray-600 mb-4">
+                This match will be permanently declined and never suggested again.
+                Optionally provide a reason to help improve future matching.
+              </p>
+
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Reason (optional)
+              </label>
+              <textarea
+                id="declineReason"
+                rows="3"
+                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="E.g., Wrong client, Different matter, Incorrect data..."
+              ></textarea>
+
+              <div class="mt-6 flex gap-3 justify-end">
+                <button
+                  onclick="closeDeclineMatchModal()"
+                  class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onclick="confirmDeclinePendingMatch('${matchId}', '${matterId}')"
+                  class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+                >
+                  Decline Match
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.body.insertAdjacentHTML('beforeend', modalHtml);
+    }
+
+    function closeDeclineMatchModal() {
+      const modal = document.getElementById('declineMatchModal');
+      if (modal) modal.remove();
+    }
+
+    async function confirmDeclinePendingMatch(matchId, matterId) {
+      const reason = document.getElementById('declineReason')?.value || null;
+      closeDeclineMatchModal();
+      await declinePendingMatch(matchId, matterId, reason);
+    }
+
+    async function approvePendingMatch(matchId, matterId) {
+      try {
+        Toast.info('Approving match...');
+
+        await api.approvePendingMatch(matterId, matchId);
+
+        // Remove from UI
+        const matchCard = document.getElementById(`pending-match-${matchId}`);
+        if (matchCard) {
+          matchCard.style.opacity = '0';
+          setTimeout(() => matchCard.remove(), 300);
+        }
+
+        Toast.success('Match approved successfully! The data will now appear in Connected Data.');
+
+        // Reload the tab after a short delay
+        setTimeout(() => {
+          const matter = window.currentMatter;
+          if (matter) renderConnectedDataTab(matter);
+        }, 1500);
+
+      } catch (error) {
+        console.error('[approvePendingMatch] Error:', error);
+        Toast.error(error.message || 'Failed to approve match');
+      }
+    }
+
+    async function declinePendingMatch(matchId, matterId, reason) {
+      try {
+        Toast.info('Declining match...');
+
+        await api.declinePendingMatch(matterId, matchId, reason);
+
+        // Remove from UI
+        const matchCard = document.getElementById(`pending-match-${matchId}`);
+        if (matchCard) {
+          matchCard.style.opacity = '0';
+          setTimeout(() => matchCard.remove(), 300);
+        }
+
+        Toast.success('Match declined. This suggestion will not appear again.');
+
+      } catch (error) {
+        console.error('[declinePendingMatch] Error:', error);
+        Toast.error(error.message || 'Failed to decline match');
+      }
+    }
+
+    function getConnectorDataPreview(record) {
+      const { entity_type, data } = record;
+
+      switch (entity_type) {
+        case 'contact':
+        case 'participant':
+          return `
+            <h5 class="text-sm font-medium text-gray-900">
+              ${data.name?.display_name || data.first_name + ' ' + data.last_name || 'Unknown Contact'}
+            </h5>
+            <p class="text-sm text-gray-600">${data.contact?.email || data.email || 'No email'}</p>
+            ${data.contact?.phone_primary ? `<p class="text-sm text-gray-600">${data.contact.phone_primary}</p>` : ''}
+          `;
+
+        case 'opportunity':
+        case 'deal':
+          return `
+            <h5 class="text-sm font-medium text-gray-900">${data.name || data.title || 'Untitled Opportunity'}</h5>
+            <p class="text-sm text-gray-600">
+              ${data.status || data.pipeline_stage || 'No status'}
+              ${data.monetaryValue || data.value ? '• $' + (data.monetaryValue || data.value).toLocaleString() : ''}
+            </p>
+          `;
+
+        case 'activity':
+        case 'event':
+        case 'calendar_event':
+          return `
+            <h5 class="text-sm font-medium text-gray-900">${data.title || data.name || data.subject || 'Activity'}</h5>
+            <p class="text-sm text-gray-600">${data.description || data.notes || ''}</p>
+          `;
+
+        case 'note':
+          const noteText = data.content || data.text || data.description || '';
+          const preview = noteText.length > 100 ? noteText.substring(0, 100) + '...' : noteText;
+          return `
+            <h5 class="text-sm font-medium text-gray-900">${data.title || 'Note'}</h5>
+            <p class="text-sm text-gray-600">${preview}</p>
+          `;
+
+        case 'message':
+          return `
+            <h5 class="text-sm font-medium text-gray-900">${data.subject || 'Message'}</h5>
+            <p class="text-sm text-gray-600">From: ${data.from || data.sender || 'Unknown'}</p>
+          `;
+
+        default:
+          return `
+            <h5 class="text-sm font-medium text-gray-900">${entity_type}</h5>
+            <p class="text-sm text-gray-600">${data.name || data.title || 'View details below'}</p>
+          `;
+      }
+    }
+
+    window.toggleConnectorDetails = function(detailsId) {
+      const details = document.getElementById(detailsId);
+      if (details) {
+        details.classList.toggle('hidden');
+      }
+    };
+
+    window.toggleEntityGroup = function(entityType) {
+      const group = document.getElementById(`entity-group-${entityType}`);
+      const toggle = document.getElementById(`toggle-${entityType}`);
+      if (group && toggle) {
+        const cards = group.querySelectorAll('[id^="connector-details-"]');
+        const isExpanded = toggle.textContent === 'Collapse All';
+
+        cards.forEach(card => {
+          if (isExpanded) {
+            card.classList.add('hidden');
+          } else {
+            card.classList.remove('hidden');
+          }
+        });
+
+        toggle.textContent = isExpanded ? 'Expand All' : 'Collapse All';
+      }
+    };
+
+    // =============================================================================
+    // LINK MANAGEMENT FUNCTIONS
+    // =============================================================================
+
+    let linkSearchTimeout = null;
+    let selectedLinkTargetMatter = null;
+    let createMatterForWorkspaceId = null; // Store workspace ID when creating matter from workspace
+    let linkMattersCache = []; // Cache all matters for dropdown
+
+    /**
+     * Open the create link modal
+     * @param {string} sourceMatterId - The source matter/workspace ID
+     * @param {boolean} isWorkspace - Whether the source is a workspace
+     */
+    window.openCreateLinkModal = function(sourceMatterId, isWorkspace = false) {
+      console.log('[openCreateLinkModal] Called with:', { sourceMatterId, isWorkspace, typeOfIsWorkspace: typeof isWorkspace });
+
+      const modal = document.getElementById('createLinkModal');
+      const sourceInput = document.getElementById('linkSourceMatterId');
+      const searchInput = document.getElementById('linkMatterSearch');
+      const submitBtn = document.getElementById('createLinkBtn');
+      const modalTitle = modal.querySelector('h3');
+      const modalSubtitle = modal.querySelector('p.text-sm.text-gray-500');
+      const linkTypeContainer = document.getElementById('linkTypeContainer');
+
+      // Set source matter ID
+      sourceInput.value = sourceMatterId;
+      sourceInput.dataset.isWorkspace = isWorkspace.toString();
+
+      console.log('[openCreateLinkModal] Dataset set to:', sourceInput.dataset.isWorkspace);
+
+      // Update modal text based on source type
+      if (isWorkspace) {
+        modalTitle.textContent = 'Add Matter to Workspace';
+        modalSubtitle.textContent = 'Link an existing matter to this workspace';
+        linkTypeContainer.style.display = 'none'; // Hide link type for workspaces
+        document.getElementById('linkType').value = 'workspace_matter';
+      } else {
+        modalTitle.textContent = 'Link Related Matter';
+        modalSubtitle.textContent = 'Connect this matter to another matter';
+        linkTypeContainer.style.display = 'block'; // Show link type for matters
+        document.getElementById('linkType').value = 'related_to';
+      }
+
+      // Reset form
+      searchInput.value = '';
+      document.getElementById('linkMatterSearchResults').classList.add('hidden');
+      document.getElementById('selectedLinkMatter').classList.add('hidden');
+      submitBtn.disabled = true;
+      selectedLinkTargetMatter = null;
+
+      // Show modal
+      modal.classList.remove('hidden');
+      setTimeout(() => searchInput.focus(), 100);
+
+      // Setup click outside handler to close dropdown
+      setTimeout(() => {
+        document.addEventListener('click', handleLinkDropdownClickOutside);
+      }, 100);
+    }
+
+    /**
+     * Handle click outside to close dropdown
+     */
+    function handleLinkDropdownClickOutside(event) {
+      const searchInput = document.getElementById('linkMatterSearch');
+      const resultsDiv = document.getElementById('linkMatterSearchResults');
+
+      if (!searchInput || !resultsDiv) return;
+
+      // Check if click is outside both the search input and results dropdown
+      if (!searchInput.contains(event.target) && !resultsDiv.contains(event.target)) {
+        resultsDiv.classList.add('hidden');
+      }
+    }
+
+    /**
+     * Close the create link modal
+     */
+    window.closeCreateLinkModal = function() {
+      const modal = document.getElementById('createLinkModal');
+      modal.classList.add('hidden');
+      selectedLinkTargetMatter = null;
+
+      // Clear any pending search
+      if (linkSearchTimeout) {
+        clearTimeout(linkSearchTimeout);
+        linkSearchTimeout = null;
+      }
+
+      // Remove click outside event listener
+      document.removeEventListener('click', handleLinkDropdownClickOutside);
+
+      // Hide dropdown
+      const resultsDiv = document.getElementById('linkMatterSearchResults');
+      if (resultsDiv) {
+        resultsDiv.classList.add('hidden');
+      }
+    }
+
+    /**
+     * Load all matters for link dropdown
+     */
+    async function loadLinkMattersCache() {
+      try {
+        const response = await fetch(
+          `${api.baseUrl}/api/v1/matters?limit=100&status=active`,
+          {
+            headers: {
+              'Authorization': `Bearer ${api.token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to load matters');
+        }
+
+        const data = await response.json();
+        linkMattersCache = data.matters || [];
+      } catch (error) {
+        console.error('Failed to load matters cache:', error);
+        linkMattersCache = [];
+      }
+    }
+
+    /**
+     * Render a matter item for link dropdown
+     */
+    function renderLinkMatterItem(matter, isPinned = false) {
+      const clientName = matter.client_name || matter.client?.name || 'Unknown Client';
+      const matterName = matter.name || matter.matter_name || 'Untitled Matter';
+      const status = matter.status || 'Active';
+      const pinIcon = isPinned ? `
+        <svg class="w-4 h-4 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
+        </svg>
+      ` : '';
+
+      return `
+        <button
+          type="button"
+          onclick="selectLinkMatter('${matter.matter_id}', '${matterName.replace(/'/g, "&apos;")}', '${matter.matter_type}')"
+          class="w-full text-left px-4 py-3 hover:bg-indigo-50 border-b border-gray-100 last:border-b-0 transition-colors"
+        >
+          <div class="flex items-start gap-2">
+            ${pinIcon}
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="font-medium text-gray-900 text-sm truncate">${matterName}</span>
+                <span class="px-2 py-0.5 text-xs rounded-full ${status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}">${status}</span>
+              </div>
+              <p class="text-xs text-gray-600 truncate">${clientName}</p>
+              <p class="text-xs text-gray-500 font-mono mt-0.5">${matter.matter_id}</p>
+            </div>
+          </div>
+        </button>
+      `;
+    }
+
+    /**
+     * Show default view with pinned and recent matters
+     */
+    function showLinkDefaultView() {
+      const resultsDiv = document.getElementById('linkMatterSearchResults');
+      const sourceMatterId = document.getElementById('linkSourceMatterId').value;
+
+      if (linkMattersCache.length === 0) {
+        resultsDiv.innerHTML = `
+          <div class="p-4 text-center text-gray-400 text-sm">
+            No matters available
+          </div>
+        `;
+        resultsDiv.classList.remove('hidden');
+        return;
+      }
+
+      // Filter out source matter and workspaces
+      const availableMatters = linkMattersCache.filter(m =>
+        m.matter_id !== sourceMatterId && m.matter_type === 'matter'
+      );
+
+      if (availableMatters.length === 0) {
+        resultsDiv.innerHTML = `
+          <div class="p-4 text-center text-gray-400 text-sm">
+            No matters available to link
+          </div>
+        `;
+        resultsDiv.classList.remove('hidden');
+        return;
+      }
+
+      // Separate pinned and unpinned matters
+      const pinnedMatters = availableMatters.filter(m => m.is_pinned || m.pinned);
+      const unpinnedMatters = availableMatters.filter(m => !m.is_pinned && !m.pinned);
+
+      // Sort unpinned by creation date (most recent first)
+      const recentMatters = unpinnedMatters
+        .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+        .slice(0, 10);
+
+      let html = '';
+
+      // Section 1: Pinned Matters
+      if (pinnedMatters.length > 0) {
+        html += `
+          <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
+            <h4 class="text-xs font-semibold text-gray-700 uppercase tracking-wider flex items-center gap-2">
+              <svg class="w-3 h-3 text-yellow-600" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
+              </svg>
+              Pinned Matters
+            </h4>
+          </div>
+          ${pinnedMatters.map(m => renderLinkMatterItem(m, true)).join('')}
+        `;
+      }
+
+      // Section 2: Recent Matters
+      if (recentMatters.length > 0) {
+        html += `
+          <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
+            <h4 class="text-xs font-semibold text-gray-700 uppercase tracking-wider flex items-center gap-2">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              Recent Matters
+            </h4>
+          </div>
+          ${recentMatters.map(m => renderLinkMatterItem(m, false)).join('')}
+        `;
+      }
+
+      resultsDiv.innerHTML = html;
+      resultsDiv.classList.remove('hidden');
+    }
+
+    /**
+     * Show dropdown on focus
+     */
+    window.showLinkMatterDropdown = async function() {
+      const searchInput = document.getElementById('linkMatterSearch');
+
+      // If search input has text, don't show default view
+      if (searchInput.value.trim().length > 0) {
+        return;
+      }
+
+      // Load matters cache if not already loaded
+      if (linkMattersCache.length === 0) {
+        const resultsDiv = document.getElementById('linkMatterSearchResults');
+        resultsDiv.innerHTML = `
+          <div class="p-4 text-center text-gray-500">
+            <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto mb-2"></div>
+            Loading matters...
+          </div>
+        `;
+        resultsDiv.classList.remove('hidden');
+
+        await loadLinkMattersCache();
+      }
+
+      // Show default view
+      showLinkDefaultView();
+    }
+
+    /**
+     * Search for matters to link (debounced)
+     */
+    window.searchMattersForLink = function(event) {
+      const query = event.target.value.trim();
+      const resultsDiv = document.getElementById('linkMatterSearchResults');
+      const sourceMatterId = document.getElementById('linkSourceMatterId').value;
+
+      // Clear previous timeout
+      if (linkSearchTimeout) {
+        clearTimeout(linkSearchTimeout);
+      }
+
+      // Show default view if query is empty
+      if (query.length === 0) {
+        showLinkDefaultView();
+        return;
+      }
+
+      // Hide results if query is too short
+      if (query.length < 2) {
+        resultsDiv.classList.add('hidden');
+        return;
+      }
+
+      // Debounce search
+      linkSearchTimeout = setTimeout(async () => {
+        try {
+          // Show loading state
+          resultsDiv.innerHTML = `
+            <div class="p-4 text-center text-gray-500">
+              <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto mb-2"></div>
+              Searching...
+            </div>
+          `;
+          resultsDiv.classList.remove('hidden');
+
+          // If we have cached matters, filter locally first for faster response
+          if (linkMattersCache.length > 0) {
+            const lowerQuery = query.toLowerCase();
+            const filtered = linkMattersCache.filter(m => {
+              const matterName = (m.name || m.matter_name || '').toLowerCase();
+              const clientName = (m.client_name || m.client?.name || '').toLowerCase();
+              const matterId = (m.matter_id || '').toLowerCase();
+
+              return m.matter_id !== sourceMatterId &&
+                     m.matter_type === 'matter' &&
+                     (matterName.includes(lowerQuery) ||
+                      clientName.includes(lowerQuery) ||
+                      matterId.includes(lowerQuery));
+            });
+
+            if (filtered.length > 0) {
+              // Show cached results
+              resultsDiv.innerHTML = `
+                <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
+                  <p class="text-xs text-gray-600">${filtered.length} result${filtered.length !== 1 ? 's' : ''} found</p>
+                </div>
+                ${filtered.slice(0, 10).map(m => renderLinkMatterItem(m, false)).join('')}
+              `;
+              resultsDiv.classList.remove('hidden');
+              return;
+            }
+          }
+
+          // Fallback to API search
+          const response = await fetch(
+            `${api.baseUrl}/api/v1/matters?search=${encodeURIComponent(query)}&limit=10`,
+            {
+              headers: {
+                'Authorization': `Bearer ${api.token}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error('Search failed');
+          }
+
+          const data = await response.json();
+          const matters = data.matters || [];
+
+          // Filter out source matter and workspaces
+          const filteredMatters = matters.filter(m =>
+            m.matter_id !== sourceMatterId && m.matter_type === 'matter'
+          );
+
+          if (filteredMatters.length === 0) {
+            resultsDiv.innerHTML = `
+              <div class="p-4 text-center text-gray-500 text-sm">
+                No matters found matching "${query}"
+              </div>
+            `;
+          } else {
+            resultsDiv.innerHTML = `
+              <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
+                <p class="text-xs text-gray-600">${filteredMatters.length} result${filteredMatters.length !== 1 ? 's' : ''} found</p>
+              </div>
+              ${filteredMatters.map(m => renderLinkMatterItem(m, false)).join('')}
+            `;
+          }
+
+        } catch (error) {
+          console.error('Matter search error:', error);
+          resultsDiv.innerHTML = `
+            <div class="p-4 text-center text-red-600 text-sm">
+              Search failed. Please try again.
+            </div>
+          `;
+        }
+      }, 300);
+    }
+
+    /**
+     * Select a matter from search results
+     */
+    window.selectLinkMatter = function(matterId, matterName, matterType) {
+      selectedLinkTargetMatter = { matter_id: matterId, name: matterName, matter_type: matterType };
+
+      // Hide search results
+      document.getElementById('linkMatterSearchResults').classList.add('hidden');
+      document.getElementById('linkMatterSearch').value = '';
+
+      // Show selected matter
+      document.getElementById('selectedLinkMatterName').textContent = matterName;
+      document.getElementById('selectedLinkMatterId').textContent = matterId;
+      document.getElementById('selectedLinkMatter').classList.remove('hidden');
+
+      // Enable submit button
+      document.getElementById('createLinkBtn').disabled = false;
+    }
+
+    /**
+     * Clear selected matter
+     */
+    window.clearLinkMatterSelection = function() {
+      selectedLinkTargetMatter = null;
+      document.getElementById('selectedLinkMatter').classList.add('hidden');
+      document.getElementById('linkMatterSearch').value = '';
+      document.getElementById('createLinkBtn').disabled = true;
+    }
+
+    /**
+     * Create a link between matters
+     */
+    window.createLink = async function(event) {
+      event.preventDefault();
+
+      const sourceInput = document.getElementById('linkSourceMatterId');
+      const sourceMatterId = sourceInput.value;
+      const isWorkspace = sourceInput.dataset.isWorkspace === 'true';
+
+      // Get link type - if workspace, force to workspace_matter, otherwise use selected value
+      let linkType = document.getElementById('linkType').value;
+      if (isWorkspace) {
+        linkType = 'workspace_matter';
+      }
+
+      const submitBtn = document.getElementById('createLinkBtn');
+
+      if (!selectedLinkTargetMatter) {
+        Toast.error('Please select a matter to link');
+        return;
+      }
+
+      console.log('[Create Link] Request data:', {
+        source_matter_id: sourceMatterId,
+        target_matter_id: selectedLinkTargetMatter.matter_id,
+        link_type: linkType,
+        isWorkspace,
+        isWorkspaceDataset: sourceInput.dataset.isWorkspace,
+        linkTypeSelectValue: document.getElementById('linkType').value
+      });
+
+      try {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Creating...';
+
+        const response = await fetch(`${api.baseUrl}/api/v1/entity-links`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${api.token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            source_matter_id: sourceMatterId,
+            target_matter_id: selectedLinkTargetMatter.matter_id,
+            link_type: linkType
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          console.error('[Create Link] API Error:', error);
+          throw new Error(error.error?.message || 'Failed to create link');
+        }
+
+        const data = await response.json();
+
+        Toast.success('Link created successfully');
+        closeCreateLinkModal();
+
+        // Refresh the linked matters section if we're viewing a matter
+        // Linked matters are displayed in the Details tab, not as a separate tab
+        if (currentMatterData && currentMatterData.matter && document.getElementById('linkedMattersSection')) {
+          renderLinkedMattersInDetails(currentMatterData.matter);
+        }
+
+      } catch (error) {
+        console.error('Create link error:', error);
+        Toast.error(error.message || 'Failed to create link');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Create Link';
+      }
+    }
+
+    /**
+     * Confirm link deletion
+     */
+    window.deleteLinkConfirm = function(linkId, linkedMatterName) {
+      // Store the link ID for later use
+      window.pendingUnlinkId = linkId;
+
+      // Show the custom unlink confirmation modal
+      document.getElementById('unlinkMatterName').textContent = `"${linkedMatterName}"`;
+
+      const modal = document.getElementById('unlinkConfirmModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+
+      // Set up the confirm button click handler
+      const confirmBtn = document.getElementById('confirmUnlinkButton');
+      confirmBtn.onclick = function() {
+        const linkIdToDelete = window.pendingUnlinkId; // Save before closing modal
+        closeUnlinkConfirmModal();
+        deleteLink(linkIdToDelete);
+      };
+    }
+
+    /**
+     * Close unlink confirmation modal
+     */
+    window.closeUnlinkConfirmModal = function() {
+      const modal = document.getElementById('unlinkConfirmModal');
+      modal.classList.remove('flex');
+      modal.classList.add('hidden');
+      window.pendingUnlinkId = null;
+    }
+
+    /**
+     * Delete a link
+     */
+    window.deleteLink = async function(linkId) {
+      // Validate linkId before making API call
+      if (!linkId || linkId === 'null' || linkId === 'undefined') {
+        console.error('Invalid link ID:', linkId);
+        Toast.error('Cannot delete link: Invalid link ID');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${api.baseUrl}/api/v1/entity-links/${linkId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${api.token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error?.message || 'Failed to delete link');
+        }
+
+        Toast.success('Link removed successfully');
+
+        // Refresh the linked matters section if we're viewing a matter
+        // Linked matters are displayed in the Details tab, not as a separate tab
+        if (currentMatterData && currentMatterData.matter && document.getElementById('linkedMattersSection')) {
+          renderLinkedMattersInDetails(currentMatterData.matter);
+        }
+
+      } catch (error) {
+        console.error('Delete link error:', error);
+        Toast.error(error.message || 'Failed to delete link');
+      }
+    }
+
+    /**
+     * Open the create matter modal from within a workspace
+     * After matter is created, it will be automatically linked to the workspace
+     */
+    window.openCreateMatterDrawer = function(workspaceId) {
+      const modal = document.getElementById('workspaceMatterModal');
+      const form = document.getElementById('workspaceMatterForm');
+
+      // Store workspace ID
+      document.getElementById('workspaceIdForMatter').value = workspaceId;
+
+      // Reset form
+      form.reset();
+      workspaceSelectedUsers = [];
+      document.getElementById('workspaceSelectedUsersList').innerHTML = '<p class="text-sm text-gray-500 italic" id="workspaceNoUsersSelected">No users selected. Start typing to search and add team members.</p>';
+
+      // Initialize conflict detection for workspace matter
+      if (workspaceConflictDetection) {
+        workspaceConflictDetection.reset();
+      }
+      workspaceConflictDetection = new ConflictDetection(api);
+      workspaceConflictDetection.initialize('workspaceConflictDetectionContainer');
+
+      // Show modal
+      modal.classList.remove('hidden');
+    }
+
+    // =============================================================================
+    // TASK MANAGEMENT FUNCTIONS
+    // =============================================================================
+
+    // Global variable to store current matter ID for modals
+    let currentTaskMatterId = null;
+    let currentEditingTask = null;
+    let currentTasksList = [];  // Store loaded tasks to avoid refetching
+
+    // Populate assignee dropdown with organization users
+    async function populateTaskAssignees(selectedUserId = null) {
+      try {
+        const result = await api.getUsers(1, 200);
+        const users = result.users || [];
+        const dropdown = document.getElementById('taskAssignedTo');
+        const currentUserId = api.user?.id;
+
+        // Build dropdown options
+        let options = '<option value="">Unassigned</option>';
+
+        // Add "Me" option for current user
+        if (currentUserId) {
+          const currentUser = users.find(u => u.id === currentUserId);
+          if (currentUser) {
+            options += `<option value="${currentUserId}">Me (${currentUser.first_name} ${currentUser.last_name})</option>`;
+          }
+        }
+
+        // Add other users
+        users
+          .filter(u => u.id !== currentUserId)
+          .forEach(user => {
+            options += `<option value="${user.id}">${user.first_name} ${user.last_name}</option>`;
+          });
+
+        dropdown.innerHTML = options;
+
+        // Set selected value (default to current user if no selection provided)
+        dropdown.value = selectedUserId || currentUserId || '';
+      } catch (error) {
+        console.error('Failed to load users for task assignment:', error);
+        Toast.error('Failed to load users');
+      }
+    }
+
+    // Open Create Task Modal
+    window.openCreateTaskModal = async function(matterId) {
+      currentTaskMatterId = matterId;
+      const modal = document.getElementById('taskModal');
+      document.getElementById('taskModalTitle').textContent = 'Create Task';
+      document.getElementById('taskForm').reset();
+      document.getElementById('taskId').value = '';
+
+      // Populate assignees with current user as default
+      await populateTaskAssignees();
+
+      modal.classList.remove('hidden');
+    };
+
+    // Edit Task
+    window.editTask = async function(taskId) {
+      try {
+        // Find task from cached list instead of refetching
+        const task = currentTasksList.find(t => t.id === taskId);
+
+        if (!task) {
+          Toast.error('Task not found');
+          return;
+        }
+
+        currentEditingTask = task;
+        const modal = document.getElementById('taskModal');
+        document.getElementById('taskModalTitle').textContent = 'Edit Task';
+        document.getElementById('taskId').value = task.id;
+        document.getElementById('taskTitle').value = task.title || '';
+        document.getElementById('taskDescription').value = task.description || '';
+        document.getElementById('taskNotes').value = task.notes || '';
+        document.getElementById('taskStatus').value = task.status || 'pending';
+        document.getElementById('taskPriority').value = task.priority || 'normal';
+
+        if (task.due_date) {
+          const date = new Date(task.due_date);
+          document.getElementById('taskDueDate').value = date.toISOString().slice(0, 16);
+        } else {
+          document.getElementById('taskDueDate').value = '';
+        }
+
+        // Populate assignees with task's assigned user selected
+        await populateTaskAssignees(task.assigned_to_user_id || null);
+
+        modal.classList.remove('hidden');
+      } catch (error) {
+        console.error('Edit task error:', error);
+        Toast.error('Failed to load task details');
+      }
+    };
+
+    // Quick Complete Task
+    window.quickCompleteTask = async function(taskId) {
+      try {
+        await api.completeTask(taskId);
+        Toast.success('Task completed');
+
+        // Refresh tasks - CRITICAL FIX: Always refresh UI regardless of currentMatterData state
+        const matterId = currentTaskMatterId || (currentMatterData && currentMatterData.matter_id);
+        if (matterId) {
+          const response = await api.getMatterTasks(matterId);
+          const updatedTasks = response.tasks || [];
+
+          // Update currentMatterData if it exists
+          if (currentMatterData) {
+            currentMatterData.tasks = updatedTasks;
+            renderTasksTab(currentMatterData, updatedTasks);
+          } else {
+            // Fallback: Render Kanban board directly even if currentMatterData is not set
+            currentTasksList = updatedTasks;
+            renderKanbanBoard(matterId, updatedTasks);
+          }
+        }
+      } catch (error) {
+        console.error('Complete task error:', error);
+        Toast.error('Failed to complete task');
+      }
+    };
+
+    // Delete Task
+    window.deleteTask = async function(taskId) {
+      if (!confirm('Are you sure you want to delete this task?')) {
+        return;
+      }
+
+      try {
+        await api.deleteTask(taskId);
+        Toast.success('Task deleted successfully');
+
+        // Refresh tasks - CRITICAL FIX: Always refresh UI regardless of currentMatterData state
+        const matterId = currentTaskMatterId || (currentMatterData && currentMatterData.matter_id);
+        if (matterId) {
+          const response = await api.getMatterTasks(matterId);
+          const updatedTasks = response.tasks || [];
+
+          // Update currentMatterData if it exists
+          if (currentMatterData) {
+            currentMatterData.tasks = updatedTasks;
+            renderTasksTab(currentMatterData, updatedTasks);
+          } else {
+            // Fallback: Render Kanban board directly even if currentMatterData is not set
+            currentTasksList = updatedTasks;
+            renderKanbanBoard(matterId, updatedTasks);
+          }
+        }
+      } catch (error) {
+        console.error('Delete task error:', error);
+        Toast.error('Failed to delete task');
+      }
+    };
+
+    // Save Task (Create or Update)
+    window.saveTask = async function(event) {
+      event.preventDefault();
+
+      const taskId = document.getElementById('taskId').value;
+      const isEdit = !!taskId;
+
+      const taskData = {
+        title: document.getElementById('taskTitle').value,
+        description: document.getElementById('taskDescription').value || null,
+        notes: document.getElementById('taskNotes').value || null,
+        status: document.getElementById('taskStatus').value,
+        priority: document.getElementById('taskPriority').value,
+        due_date: document.getElementById('taskDueDate').value || null,
+        assigned_to_user_id: document.getElementById('taskAssignedTo').value || null
+      };
+
+      // Get the submit button from the form
+      const submitBtn = event.target.querySelector('button[type="submit"]');
+      const originalButtonHtml = submitBtn.innerHTML;
+
+      // Show loading state on button
+      submitBtn.disabled = true;
+      submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      submitBtn.innerHTML = `
+        <svg class="animate-spin h-4 w-4 inline-block mr-2" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        ${isEdit ? 'Updating...' : 'Creating...'}
+      `;
+
+      try {
+        if (isEdit) {
+          await api.updateTask(taskId, taskData);
+          Toast.success('Task updated successfully');
+        } else {
+          await api.createTask(currentTaskMatterId, taskData);
+          Toast.success('Task created successfully');
+        }
+
+        // Close modal
+        document.getElementById('taskModal').classList.add('hidden');
+
+        // Restore button state (will be reset when modal reopens anyway)
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        submitBtn.innerHTML = originalButtonHtml;
+
+        // Refresh tasks - CRITICAL FIX: Always refresh UI regardless of currentMatterData state
+        const matterId = currentTaskMatterId || (currentMatterData && currentMatterData.matter_id);
+        if (matterId) {
+          const response = await api.getMatterTasks(matterId);
+          const updatedTasks = response.tasks || [];
+
+          // Update currentMatterData if it exists
+          if (currentMatterData) {
+            currentMatterData.tasks = updatedTasks;
+            renderTasksTab(currentMatterData, updatedTasks);
+          } else {
+            // Fallback: Render Kanban board directly even if currentMatterData is not set
+            // This ensures tasks appear immediately after creation
+            currentTasksList = updatedTasks;
+            renderKanbanBoard(matterId, updatedTasks);
+          }
+        }
+      } catch (error) {
+        console.error('Save task error:', error);
+        Toast.error(isEdit ? 'Failed to update task' : 'Failed to create task');
+
+        // Restore button state on error
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        submitBtn.innerHTML = originalButtonHtml;
+      }
+    };
+
+    // Close Task Modal
+    window.closeTaskModal = function() {
+      document.getElementById('taskModal').classList.add('hidden');
+      document.getElementById('taskForm').reset();
+      currentTaskMatterId = null;
+      currentEditingTask = null;
+    };
+
+    // Close drawer function (must be defined before event listeners)
+    window.closeDrawer = function() {
+      const optionsDropdown = document.getElementById('drawerOptionsDropdown');
+      if (optionsDropdown) optionsDropdown.classList.add('hidden');
+      document.getElementById('matterDrawer').classList.add('translate-x-full');
+      setTimeout(() => {
+        document.getElementById('matterDrawer').classList.add('hidden');
+        document.getElementById('drawerOverlay').classList.add('hidden');
+      }, 300);
+    }
+
+    // Close drawer event listeners
+    const closeDrawerBtn = document.getElementById('closeDrawer');
+    const drawerOverlay = document.getElementById('drawerOverlay');
+    if (closeDrawerBtn) {
+      closeDrawerBtn.addEventListener('click', closeDrawer);
+    }
+    if (drawerOverlay) {
+      drawerOverlay.addEventListener('click', closeDrawer);
+    }
+
+    // Security: Prevent concurrent pin/unpin requests (race condition fix)
+    const pinningInProgress = new Set();
+
+    // Pin/Unpin matter
+    window.togglePin = async function(matterId, source = 'lana', isPinned) {
+      const button = document.querySelector(`.pin-button[data-matter-id="${matterId}"]`);
+      if (!button) return;
+
+      // Prevent concurrent requests for same matter (race condition fix)
+      const key = `${matterId}-${source}`;
+      if (pinningInProgress.has(key)) {
+        console.warn('Pin operation already in progress for this matter');
+        return;
+      }
+
+      // Mark operation as in progress
+      pinningInProgress.add(key);
+
+      // Store original state for rollback on error
+      const originalHTML = button.innerHTML;
+      const originalClass = button.className;
+      const originalTitle = button.title;
+
+      try {
+        // Optimistic UI update
+        if (isPinned) {
+          button.innerHTML = `
+            <svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+          `;
+          button.className = 'pin-button text-gray-400';
+          button.title = 'Unpinning...';
+        } else {
+          button.innerHTML = `
+            <svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+          `;
+          button.className = 'pin-button text-yellow-500';
+          button.title = 'Pinning...';
+        }
+
+        // Call API
+        if (isPinned) {
+          await api.unpinMatter(matterId, source);
+
+          // Track matter unpinned event
+          if (window.analytics) {
+            window.analytics.trackEvent('matter.unpinned', 'matter', matterId, { source });
+          }
+
+          Toast.success('Matter unpinned');
+        } else {
+          await api.pinMatter(matterId, source);
+
+          // Track matter pinned event
+          if (window.analytics) {
+            window.analytics.trackEvent('matter.pinned', 'matter', matterId, { source });
+          }
+
+          Toast.success('Matter pinned');
+        }
+
+        // Clear pinned matters cache to force fresh load
+        currentPage = 1;
+        pinnedPage = 1;
+        allPinnedMatters = [];
+        totalPinnedCount = 0;
+
+        // Reload matters to reflect new order
+        await loadMatters();
+      } catch (error) {
+        // Rollback on error
+        button.innerHTML = originalHTML;
+        button.className = originalClass;
+        button.title = originalTitle;
+
+        // Show error message
+        if (error.message?.includes('404') || error.message?.includes('not found')) {
+          Toast.error('Matter not found or you do not have access');
+        } else if (error.message?.includes('429') || error.message?.includes('rate limit')) {
+          Toast.error('Too many requests. Please wait a moment and try again.');
+        } else {
+          Toast.error(error.message || 'Failed to update pin status');
+        }
+
+        // Track error for analytics
+        if (window.analytics) {
+          window.analytics.trackError(error, {
+            action: isPinned ? 'matter.unpin' : 'matter.pin',
+            matter_id: matterId,
+            source: source
+          });
+        }
+      } finally {
+        // Always remove from in-progress set (race condition fix)
+        pinningInProgress.delete(key);
+      }
+    }
+
+    // Delete matter
+    window.deleteMatter = async function(matterId) {
+      Modal.confirm('Delete Matter', 'Are you sure you want to delete this matter? This action cannot be undone.', async () => {
+        try {
+          // Get matter details before deletion for tracking
+          const matterData = currentMatterData?.matter || {};
+
+          await api.deleteMatter(matterId);
+
+          // Track matter deleted event (with defensive null checks)
+          if (window.analytics) {
+            window.analytics.trackEvent('matter.deleted', 'matter', matterId, {
+              resource_name: matterData?.matter_name || 'Unknown',
+              status: matterData?.status || 'unknown'
+            });
+          }
+
+          Toast.success('Matter deleted');
+          closeDrawer();
+          loadMatters();
+        } catch (error) {
+          if (window.analytics) {
+            window.analytics.trackError(error, { action: 'matter.delete', matter_id: matterId });
+          }
+          Toast.error(error.message);
+        }
+      });
+    }
+
+    // ==============================================================================
+    // Multi-Select and Bulk Delete Functions
+    // ==============================================================================
+
+    // Toggle individual matter selection
+    window.toggleMatterSelection = function(matterId) {
+      if (selectedMatters.has(matterId)) {
+        selectedMatters.delete(matterId);
+      } else {
+        selectedMatters.add(matterId);
+      }
+      updateSelectionUI();
+    }
+
+    // Toggle matter card options dropdown (more options button on grid cards)
+    window.toggleMatterCardOptions = function(matterId) {
+      const dropdown = document.getElementById(`matter-card-options-${matterId}`);
+      if (!dropdown) return;
+      const isOpening = dropdown.classList.contains('hidden');
+      document.querySelectorAll('[id^="matter-card-options-"]').forEach(el => el.classList.add('hidden'));
+      dropdown.classList.toggle('hidden', !isOpening);
+      if (isOpening) {
+        setTimeout(() => {
+          const closeOnClickOutside = (ev) => {
+            if (!dropdown.contains(ev.target) && !ev.target.closest('[onclick*="toggleMatterCardOptions"]')) {
+              dropdown.classList.add('hidden');
+              document.removeEventListener('click', closeOnClickOutside);
+            }
+          };
+          document.addEventListener('click', closeOnClickOutside);
+        }, 0);
+      }
+    };
+
+    window.closeMatterCardOptions = function(matterId) {
+      const dropdown = document.getElementById(`matter-card-options-${matterId}`);
+      if (dropdown) dropdown.classList.add('hidden');
+    };
+
+    // Update selection UI (checkboxes, count, bulk actions visibility)
+    function updateSelectionUI() {
+      const selectedCount = selectedMatters.size;
+      const selectAllCheckbox = document.getElementById('selectAllMatters');
+      const bulkActions = document.getElementById('bulkActions');
+      const selectedCountEl = document.getElementById('selectedCount');
+
+      // Update selected count text
+      selectedCountEl.textContent = `${selectedCount} selected`;
+
+      // Show/hide bulk actions
+      if (selectedCount > 0) {
+        bulkActions.classList.remove('hidden');
+      } else {
+        bulkActions.classList.add('hidden');
+      }
+
+      // Update select all checkbox state
+      if (selectedCount === 0) {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+      } else if (selectedCount === currentMatters.length) {
+        selectAllCheckbox.checked = true;
+        selectAllCheckbox.indeterminate = false;
+      } else {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = true;
+      }
+
+      // Update card highlighting and checkboxes
+      document.querySelectorAll('.matter-card').forEach(card => {
+        const matterId = card.dataset.matterId;
+        const checkbox = card.querySelector('.matter-checkbox');
+        if (selectedMatters.has(matterId)) {
+          card.classList.add('ring-2', 'ring-indigo-500');
+          if (checkbox) checkbox.checked = true;
+        } else {
+          card.classList.remove('ring-2', 'ring-indigo-500');
+          if (checkbox) checkbox.checked = false;
+        }
+      });
+    }
+
+    // Select all matters on current page
+    document.getElementById('selectAllMatters').addEventListener('change', (e) => {
+      if (e.target.checked) {
+        // Select all
+        currentMatters.forEach(matter => selectedMatters.add(matter.matter_id));
+      } else {
+        // Deselect all
+        selectedMatters.clear();
+      }
+      updateSelectionUI();
+    });
+
+    // Clear selection
+    document.getElementById('clearSelectionBtn').addEventListener('click', () => {
+      selectedMatters.clear();
+      updateSelectionUI();
+    });
+
+    // Bulk delete
+    document.getElementById('bulkDeleteBtn').addEventListener('click', async () => {
+      const count = selectedMatters.size;
+      const matterIds = Array.from(selectedMatters);
+
+      Modal.confirm(
+        'Delete Multiple Matters',
+        `Are you sure you want to delete ${count} matter(s)? This action cannot be undone.`,
+        async () => {
+          try {
+            const result = await api.bulkDeleteMatters(matterIds);
+
+            // Track matter bulk deleted event
+            if (window.analytics) {
+              window.analytics.trackEvent('matter.bulk_deleted', 'matter', null, {
+                matter_ids: matterIds,
+                count: matterIds.length,
+                soft_deleted: result.soft_deleted || 0,
+                hard_deleted: result.hard_deleted || 0,
+                failed: result.errors?.length || 0
+              });
+            }
+
+            if (result.errors && result.errors.length > 0) {
+              Toast.warning(`Deleted ${result.soft_deleted + result.hard_deleted} matters, ${result.errors.length} failed`);
+            } else {
+              Toast.success(`Successfully deleted ${result.soft_deleted + result.hard_deleted} matter(s)`);
+            }
+
+            // Clear selection and reload
+            selectedMatters.clear();
+            updateSelectionUI();
+            closeDrawer();
+            loadMatters();
+          } catch (error) {
+            if (window.analytics) {
+              window.analytics.trackError(error, {
+                action: 'matter.bulk_delete',
+                matter_ids: matterIds,
+                count: matterIds.length
+              });
+            }
+            Toast.error(error.message || 'Failed to delete matters');
+          }
+        }
+      );
+    });
+
+    // Share modal
+    async function showShareModal(matterId) {
+      const usersResult = await api.getUsers(1, 100);
+      const users = usersResult.users || [];
+
+      const content = document.createElement('div');
+      content.innerHTML = `
+        <select id="shareUserId" class="w-full px-3 py-2 border border-gray-300 rounded-lg mb-4">
+          <option value="">Select a user</option>
+          ${users.map(u => `<option value="${u.id}">${u.email} (${u.first_name || ''} ${u.last_name || ''})</option>`).join('')}
+        </select>
+        <div class="flex gap-2">
+          <label class="flex items-center gap-2">
+            <input type="checkbox" name="perm" value="read" checked class="w-4 h-4"> Read
+          </label>
+          <label class="flex items-center gap-2">
+            <input type="checkbox" name="perm" value="write" class="w-4 h-4"> Write
+          </label>
+          <label class="flex items-center gap-2">
+            <input type="checkbox" name="perm" value="delete" class="w-4 h-4"> Delete
+          </label>
+        </div>
+      `;
+
+      Modal.show({
+        title: 'Share Matter',
+        content,
+        confirmText: 'Share',
+        onConfirm: async () => {
+          const userId = document.getElementById('shareUserId').value;
+          if (!userId) {
+            Toast.error('Please select a user');
+            return;
+          }
+          const permissions = Array.from(document.querySelectorAll('input[name="perm"]:checked')).map(cb => cb.value);
+          try {
+            await api.shareMatterWithUser(matterId, userId, permissions);
+            Toast.success('Matter shared');
+            viewMatter(matterId);
+          } catch (error) {
+            Toast.error(error.message);
+          }
+        }
+      });
+    }
+
+    // Remove share
+    window.removeShare = async function(matterId, userId) {
+      try {
+        await api.removeMatterShare(matterId, userId);
+        Toast.success('Access removed');
+        viewMatter(matterId);
+      } catch (error) {
+        Toast.error(error.message);
+      }
+    }
+
+    /**
+     * Open Manage Share Modal
+     */
+    window.openManageShareModal = async function(matterId) {
+      try {
+        // Store the matter ID
+        window.currentManageShareMatterId = matterId;
+
+        // Get current matter details with full sharing information
+        const matterResponse = await fetch(`${api.baseUrl}/api/v1/matters/${matterId}?full_details=true`, {
+          headers: {
+            'Authorization': `Bearer ${api.token}`
+          }
+        });
+
+        if (!matterResponse.ok) {
+          throw new Error('Failed to load matter details');
+        }
+
+        const matter = await matterResponse.json();
+
+        // Debug logging
+        console.log('[openManageShareModal] Matter data:', matter);
+        console.log('[openManageShareModal] Shared with users:', matter.shared_with_users);
+        console.log('[openManageShareModal] Permissions:', matter.permissions);
+
+        // Fetch permissions separately if not included in matter details
+        let permissions = matter.permissions || [];
+        if (permissions.length === 0) {
+          try {
+            const permissionsResponse = await fetch(`${api.baseUrl}/api/v1/matters/${matterId}/permissions`, {
+              headers: {
+                'Authorization': `Bearer ${api.token}`
+              }
+            });
+            if (permissionsResponse.ok) {
+              const permissionsData = await permissionsResponse.json();
+              permissions = permissionsData.permissions || permissionsData || [];
+              console.log('[openManageShareModal] Fetched permissions separately:', permissions);
+            }
+          } catch (error) {
+            console.warn('[openManageShareModal] Could not fetch permissions:', error);
+          }
+        }
+
+        // Get all organization users
+        const usersResponse = await fetch(`${api.baseUrl}/api/v1/users`, {
+          headers: {
+            'Authorization': `Bearer ${api.token}`
+          }
+        });
+
+        if (!usersResponse.ok) {
+          throw new Error('Failed to load users');
+        }
+
+        const usersData = await usersResponse.json();
+        const users = Array.isArray(usersData) ? usersData : (usersData.users || []);
+
+        // Set current visibility
+        document.getElementById('modalMatterVisibility').value = matter.visibility || 'private';
+
+        // Populate users with checkboxes
+        const shareWithContainer = document.getElementById('modalShareWith');
+        const filteredUsers = users.filter(u => u.id !== api.user?.id); // Exclude current user
+
+        if (filteredUsers.length === 0) {
+          shareWithContainer.innerHTML = `
+            <div class="p-4 text-center text-gray-500 text-sm">
+              No other users available to share with
+            </div>
+          `;
+        } else {
+          // Get list of user IDs that have access to this matter
+          // Try multiple possible data structures
+          let sharedUserIds = [];
+
+          if (matter.shared_with_users && Array.isArray(matter.shared_with_users)) {
+            sharedUserIds = matter.shared_with_users.map(su => su.user_id || su.id);
+          } else if (permissions && Array.isArray(permissions) && permissions.length > 0) {
+            sharedUserIds = permissions.map(p => p.user_id || p.id);
+          } else if (matter.permissions && Array.isArray(matter.permissions)) {
+            sharedUserIds = matter.permissions.map(p => p.user_id || p.id);
+          } else if (matter.shared_with && Array.isArray(matter.shared_with)) {
+            sharedUserIds = matter.shared_with;
+          }
+
+          console.log('[openManageShareModal] Shared user IDs:', sharedUserIds);
+          console.log('[openManageShareModal] All users:', users.map(u => ({ id: u.id, email: u.email })));
+
+          // Sort users: selected users first, then alphabetically by name
+          const sortedUsers = filteredUsers.sort((a, b) => {
+            const aIsShared = sharedUserIds.includes(a.id);
+            const bIsShared = sharedUserIds.includes(b.id);
+
+            // Selected users come first
+            if (aIsShared && !bIsShared) return -1;
+            if (!aIsShared && bIsShared) return 1;
+
+            // Within each group, sort alphabetically by name
+            const aName = `${a.first_name || ''} ${a.last_name || ''}`.trim() || a.email;
+            const bName = `${b.first_name || ''} ${b.last_name || ''}`.trim() || b.email;
+            return aName.localeCompare(bName);
+          });
+
+          shareWithContainer.innerHTML = sortedUsers.map((u, index) => {
+            const isChecked = sharedUserIds.includes(u.id);
+            const fullName = `${u.first_name || ''} ${u.last_name || ''}`.trim();
+            const displayName = fullName || u.email;
+
+            // Check if this is the first unselected user (add divider before it)
+            const prevUser = sortedUsers[index - 1];
+            const showDivider = index > 0 &&
+                               sharedUserIds.includes(prevUser.id) &&
+                               !isChecked;
+
+            return `
+              ${showDivider ? '<div class="border-t-2 border-gray-200 my-1"><div class="px-4 py-2 bg-gray-50"><p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Other Team Members</p></div></div>' : ''}
+              <label class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0">
+                <input
+                  type="checkbox"
+                  name="shareUser"
+                  value="${u.id}"
+                  ${isChecked ? 'checked' : ''}
+                  class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 focus:ring-2"
+                />
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span class="text-xs font-medium text-indigo-600">
+                        ${(u.first_name?.[0] || '') + (u.last_name?.[0] || '') || u.email?.[0]?.toUpperCase() || 'U'}
+                      </span>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <p class="text-sm font-medium text-gray-900 truncate">${displayName}</p>
+                      <p class="text-xs text-gray-500 truncate">${u.email}</p>
+                    </div>
+                  </div>
+                </div>
+              </label>
+            `;
+          }).join('');
+        }
+
+        // Handle visibility change
+        const visibilitySelect = document.getElementById('modalMatterVisibility');
+        const shareSection = document.getElementById('modalShareSection');
+
+        visibilitySelect.addEventListener('change', function() {
+          if (this.value === 'organization') {
+            shareSection.style.opacity = '0.5';
+            shareSection.style.pointerEvents = 'none';
+            // Uncheck all checkboxes when switching to organization
+            document.querySelectorAll('input[name="shareUser"]').forEach(cb => cb.checked = false);
+          } else {
+            shareSection.style.opacity = '1';
+            shareSection.style.pointerEvents = 'auto';
+          }
+        });
+
+        // Trigger initial state
+        if (matter.visibility === 'organization') {
+          shareSection.style.opacity = '0.5';
+          shareSection.style.pointerEvents = 'none';
+        }
+
+        // Add search functionality
+        const searchInput = document.getElementById('modalShareSearch');
+        searchInput.addEventListener('input', function() {
+          const searchTerm = this.value.toLowerCase().trim();
+          const userLabels = shareWithContainer.querySelectorAll('label');
+
+          userLabels.forEach(label => {
+            const nameElement = label.querySelector('.text-gray-900');
+            const emailElement = label.querySelector('.text-gray-500');
+
+            const name = nameElement ? nameElement.textContent.toLowerCase() : '';
+            const email = emailElement ? emailElement.textContent.toLowerCase() : '';
+
+            // Show/hide based on search match
+            if (searchTerm === '' || name.includes(searchTerm) || email.includes(searchTerm)) {
+              label.style.display = 'flex';
+            } else {
+              label.style.display = 'none';
+            }
+          });
+
+          // Show "no results" message if all are hidden
+          const visibleLabels = Array.from(userLabels).filter(l => l.style.display !== 'none');
+          if (visibleLabels.length === 0 && searchTerm !== '') {
+            if (!shareWithContainer.querySelector('.no-results-message')) {
+              const noResultsDiv = document.createElement('div');
+              noResultsDiv.className = 'no-results-message p-4 text-center text-gray-500 text-sm';
+              noResultsDiv.textContent = 'No users found matching your search';
+              shareWithContainer.appendChild(noResultsDiv);
+            }
+          } else {
+            const noResultsMsg = shareWithContainer.querySelector('.no-results-message');
+            if (noResultsMsg) {
+              noResultsMsg.remove();
+            }
+          }
+        });
+
+        // Show modal
+        const modal = document.getElementById('manageShareModal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+
+      } catch (error) {
+        console.error('Error opening share modal:', error);
+        Toast.error(error.message || 'Failed to open share modal');
+      }
+    }
+
+    /**
+     * Close Manage Share Modal
+     */
+    window.closeManageShareModal = function() {
+      const modal = document.getElementById('manageShareModal');
+      modal.classList.remove('flex');
+      modal.classList.add('hidden');
+      window.currentManageShareMatterId = null;
+
+      // Clear search input
+      const searchInput = document.getElementById('modalShareSearch');
+      if (searchInput) {
+        searchInput.value = '';
+      }
+    }
+
+    /**
+     * Save Share Settings
+     */
+    window.saveShareSettings = async function() {
+      try {
+        const matterId = window.currentManageShareMatterId;
+        if (!matterId) {
+          throw new Error('No matter selected');
+        }
+
+        const saveButton = document.getElementById('saveShareButton');
+        saveButton.disabled = true;
+        saveButton.innerHTML = `
+          <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Saving...
+        `;
+
+        const visibility = document.getElementById('modalMatterVisibility').value;
+        const selectedUsers = Array.from(document.querySelectorAll('input[name="shareUser"]:checked'))
+          .map(checkbox => checkbox.value);
+
+        // Step 1: Update matter visibility
+        const response = await fetch(`${api.baseUrl}/api/v1/matters/${matterId}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${api.token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            visibility: visibility
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error?.message || 'Failed to update sharing settings');
+        }
+
+        // Step 2: Get current matter permissions to compare
+        const permissionsResponse = await fetch(`${api.baseUrl}/api/v1/matters/${matterId}/permissions`, {
+          headers: {
+            'Authorization': `Bearer ${api.token}`
+          }
+        });
+
+        if (!permissionsResponse.ok) {
+          throw new Error('Failed to fetch current permissions');
+        }
+
+        const permissionsData = await permissionsResponse.json();
+        const currentUserIds = permissionsData.permissions?.map(p => p.user_id) || [];
+
+        // Step 3: Handle user sharing changes
+        const newUserIds = visibility === 'organization' ? [] : selectedUsers;
+
+        // Remove users no longer selected
+        for (const userId of currentUserIds) {
+          if (!newUserIds.includes(userId)) {
+            await api.removeMatterShare(matterId, userId).catch(err => {
+              console.warn('Failed to remove share for user', userId, err);
+            });
+          }
+        }
+
+        // Add new users
+        for (const userId of newUserIds) {
+          if (!currentUserIds.includes(userId)) {
+            await api.shareMatterWithUser(matterId, userId, ['read', 'write']).catch(err => {
+              console.warn('Failed to share with user', userId, err);
+            });
+          }
+        }
+
+        Toast.success('Sharing settings updated successfully');
+        closeManageShareModal();
+
+        // Refresh the matter view to show updated sharing
+        await viewMatter(matterId, 'details', { bustCache: true });
+
+      } catch (error) {
+        console.error('Error saving share settings:', error);
+        Toast.error(error.message || 'Failed to save sharing settings');
+      } finally {
+        const saveButton = document.getElementById('saveShareButton');
+        saveButton.disabled = false;
+        saveButton.innerHTML = `
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+          Save Changes
+        `;
+      }
+    }
+
+    // Form submission
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      // Check if conflicts are acknowledged
+      if (conflictDetection && !conflictDetection.canProceed()) {
+        Toast.error('Please acknowledge the conflicts before proceeding');
+        return;
+      }
+
+      const matterId = document.getElementById('matterId').value;
+      const matterTypeRadio = document.querySelector('input[name="matterType"]:checked');
+      const data = {
+        client_name: document.getElementById('clientName').value,
+        name: document.getElementById('matterName').value,
+        description: document.getElementById('matterDescription').value,
+        status: document.getElementById('matterStatus').value,
+        visibility: document.getElementById('matterVisibility').value,
+        share_with: selectedUsers.map(u => u.id)
+      };
+
+      // Add matter_type only when creating (not when updating)
+      if (!matterId && matterTypeRadio) {
+        data.matter_type = matterTypeRadio.value;
+      }
+
+      try {
+        let createdMatterId;
+
+        if (matterId) {
+          await api.updateMatter(matterId, data);
+          // Update sharing - sync the selected users
+          const currentPerms = await api.getMatterPermissions(matterId).catch(() => ({ permissions: [] }));
+          const currentUserIds = (currentPerms.permissions || []).map(p => p.user_id);
+          const newUserIds = selectedUsers.map(u => u.id);
+
+          // Remove users no longer selected
+          for (const userId of currentUserIds) {
+            if (!newUserIds.includes(userId)) {
+              await api.removeMatterShare(matterId, userId).catch(() => {});
+            }
+          }
+
+          // Add new users
+          for (const userId of newUserIds) {
+            if (!currentUserIds.includes(userId)) {
+              await api.shareMatterWithUser(matterId, userId, ['read', 'write']).catch(() => {});
+            }
+          }
+
+          createdMatterId = matterId;
+
+          // Update workspace link if matter is a client matter
+          const selectedWorkspaceId = document.getElementById('workspaceSelector')?.value;
+          if (currentMatterData?.matter?.matter_type === 'matter') {
+            try {
+              // Get current workspace links
+              const linksResponse = await fetch(`${api.baseUrl}/api/v1/entity-links/matter/${matterId}`, {
+                headers: {
+                  'Authorization': `Bearer ${api.token}`
+                }
+              });
+
+              let currentWorkspaceLink = null;
+              if (linksResponse.ok) {
+                const linksData = await linksResponse.json();
+                currentWorkspaceLink = linksData.links?.workspace_matters?.[0];
+              }
+
+              const currentWorkspaceId = currentWorkspaceLink?.linked_entity_id;
+
+              // If workspace selection changed, update the link
+              if (currentWorkspaceId !== selectedWorkspaceId) {
+                // Delete old link if it exists
+                if (currentWorkspaceLink) {
+                  await fetch(`${api.baseUrl}/api/v1/entity-links/${currentWorkspaceLink.link_id}`, {
+                    method: 'DELETE',
+                    headers: {
+                      'Authorization': `Bearer ${api.token}`
+                    }
+                  });
+                  console.log('[Edit Matter] Removed old workspace link');
+                }
+
+                // Create new link if workspace is selected
+                if (selectedWorkspaceId) {
+                  const createLinkResponse = await fetch(`${api.baseUrl}/api/v1/entity-links`, {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${api.token}`,
+                      'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                      source_matter_id: selectedWorkspaceId,
+                      target_matter_id: matterId,
+                      link_type: 'workspace_matter'
+                    })
+                  });
+
+                  if (createLinkResponse.ok) {
+                    console.log('[Edit Matter] Created new workspace link:', selectedWorkspaceId);
+                    Toast.success('Workspace link updated');
+                  } else {
+                    const errorData = await createLinkResponse.json().catch(() => ({}));
+                    console.error('[Edit Matter] Failed to create workspace link:', errorData);
+                    Toast.error(`Failed to update workspace link: ${errorData.error || 'Unknown error'}`);
+                  }
+                }
+              }
+            } catch (error) {
+              console.error('[Edit Matter] Error updating workspace link:', error);
+              Toast.error('Failed to update workspace link');
+            }
+          }
+
+          // Track matter edited event - only track fields that actually changed
+          if (window.analytics && currentMatterData?.matter) {
+            const oldMatter = currentMatterData.matter;
+            const changedFields = [];
+
+            if (data.client_name !== oldMatter.client_name) changedFields.push('client_name');
+            if (data.name !== oldMatter.matter_name) changedFields.push('name');
+            if (data.description !== oldMatter.description) changedFields.push('description');
+            if (data.status !== oldMatter.status) changedFields.push('status');
+            if (data.visibility !== oldMatter.visibility) changedFields.push('visibility');
+
+            window.analytics.trackEvent('matter.edited', 'matter', matterId, {
+              resource_name: data.name,
+              status: data.status,
+              changed_fields: changedFields
+            });
+          }
+
+          Toast.success('Matter updated');
+        } else {
+          const result = await api.createMatter(data);
+          createdMatterId = result.matter?.id;
+
+          // Track matter created event
+          if (window.analytics) {
+            window.analytics.trackEvent('matter.created', 'matter', result.matter?.matter_id, {
+              resource_name: data.name,
+              client_name: data.client_name,
+              status: data.status
+            });
+          }
+
+          Toast.success(`Matter created: ${result.matter?.matter_id || 'Success'}`);
+
+          // Get selected workspace from dropdown
+          const selectedWorkspaceId = document.getElementById('workspaceSelector')?.value;
+
+          // Auto-link to workspace if selected from dropdown OR if created from workspace modal
+          const workspaceToLinkTo = selectedWorkspaceId || createMatterForWorkspaceId;
+
+          if (workspaceToLinkTo && result.matter?.matter_id) {
+            try {
+              const linkResponse = await fetch(`${api.baseUrl}/api/v1/entity-links`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${api.token}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  source_matter_id: workspaceToLinkTo,
+                  target_matter_id: result.matter.matter_id,
+                  link_type: 'workspace_matter'
+                })
+              });
+
+              if (linkResponse.ok) {
+                console.log('[Matter Creation] Auto-linked matter to workspace:', workspaceToLinkTo);
+                Toast.success('Matter linked to workspace successfully');
+              } else {
+                const errorData = await linkResponse.json().catch(() => ({}));
+                console.error('[Matter Creation] Failed to auto-link to workspace:', errorData);
+                Toast.error(`Failed to link to workspace: ${errorData.error || 'Unknown error'}`);
+              }
+            } catch (error) {
+              console.error('[Matter Creation] Error auto-linking to workspace:', error);
+              Toast.error('Failed to link to workspace');
+            } finally {
+              // Clear the workspace ID
+              createMatterForWorkspaceId = null;
+            }
+          }
+        }
+
+        // Save parties if any were added
+        if (conflictDetection && conflictDetection.getParties().length > 0) {
+          try {
+            const response = await fetch(`${api.baseURL}/api/v1/conflicts/parties`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${api.token}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                matter_id: createdMatterId,
+                parties: conflictDetection.getParties()
+              })
+            });
+
+            if (!response.ok) {
+              console.error('Failed to save parties');
+            } else {
+              const result = await response.json();
+              console.log(`Saved ${result.data.count} parties to matter`);
+            }
+          } catch (error) {
+            console.error('Error saving parties:', error);
+          }
+        }
+
+        modal.classList.add('hidden');
+        resetShareForm();
+        if (conflictDetection) {
+          conflictDetection.reset();
+        }
+        loadMatters();
+
+        // If the drawer was open when editing started, re-open it with refreshed data
+        // This ensures the drawer shows the updated matter name and refreshed conversation list
+        if (matterId && window._editingMatterFromDrawer === matterId) {
+          console.log('[Matter Edit] Re-opening drawer with updated matter data:', matterId);
+          // Bust browser cache to force fresh data after update
+          await viewMatter(matterId, 'details', { bustCache: true });
+          window._editingMatterFromDrawer = null; // Clear the flag
+        }
+      } catch (error) {
+        Toast.error(error.message);
+
+        // Track error for analytics
+        if (window.analytics) {
+          window.analytics.trackError(error, {
+            action: 'matter.create',
+            client_name: data?.client_name,
+            matter_type: data?.matter_type
+          });
+        }
+      }
+    });
+
+    // =============================================================================
+    // WORKSPACE MATTER MODAL HANDLERS
+    // =============================================================================
+
+    const workspaceMatterModal = document.getElementById('workspaceMatterModal');
+    const workspaceMatterForm = document.getElementById('workspaceMatterForm');
+
+    // Close modal handlers
+    document.getElementById('closeWorkspaceMatterModal').addEventListener('click', () => {
+      workspaceMatterModal.classList.add('hidden');
+      if (workspaceConflictDetection) {
+        workspaceConflictDetection.reset();
+      }
+    });
+
+    document.getElementById('cancelWorkspaceMatterBtn').addEventListener('click', () => {
+      workspaceMatterModal.classList.add('hidden');
+      if (workspaceConflictDetection) {
+        workspaceConflictDetection.reset();
+      }
+    });
+
+    // User search for workspace matter
+    document.getElementById('workspaceUserSearchInput').addEventListener('input', (e) => {
+      const query = e.target.value.toLowerCase().trim();
+      const resultsDiv = document.getElementById('workspaceUserSearchResults');
+
+      if (query.length < 2) {
+        resultsDiv.classList.add('hidden');
+        return;
+      }
+
+      const filtered = allOrgUsers.filter(u =>
+        (u.first_name?.toLowerCase() + ' ' + u.last_name?.toLowerCase()).includes(query) ||
+        u.email?.toLowerCase().includes(query)
+      );
+
+      if (filtered.length === 0) {
+        resultsDiv.innerHTML = '<p class="p-3 text-sm text-gray-500">No users found</p>';
+      } else {
+        resultsDiv.innerHTML = filtered.map(u => `
+          <button type="button" onclick="addWorkspaceUserToShare('${u.id}')"
+            class="w-full text-left px-3 py-2 hover:bg-gray-50 transition-colors">
+            <div class="font-medium text-sm">${u.first_name} ${u.last_name}</div>
+            <div class="text-xs text-gray-500">${u.email}</div>
+          </button>
+        `).join('');
+      }
+
+      resultsDiv.classList.remove('hidden');
+    });
+
+    window.addWorkspaceUserToShare = function(userId) {
+      const user = allOrgUsers.find(u => u.id === userId);
+      if (!user || workspaceSelectedUsers.find(u => u.id === userId)) return;
+
+      workspaceSelectedUsers.push(user);
+      renderWorkspaceSelectedUsers();
+
+      document.getElementById('workspaceUserSearchInput').value = '';
+      document.getElementById('workspaceUserSearchResults').classList.add('hidden');
+    };
+
+    window.removeWorkspaceUserFromShare = function(userId) {
+      workspaceSelectedUsers = workspaceSelectedUsers.filter(u => u.id !== userId);
+      renderWorkspaceSelectedUsers();
+    };
+
+    function renderWorkspaceSelectedUsers() {
+      const container = document.getElementById('workspaceSelectedUsersList');
+      const noUsersMsg = document.getElementById('workspaceNoUsersSelected');
+
+      if (workspaceSelectedUsers.length === 0) {
+        container.innerHTML = '<p class="text-sm text-gray-500 italic" id="workspaceNoUsersSelected">No users selected. Start typing to search and add team members.</p>';
+      } else {
+        container.innerHTML = workspaceSelectedUsers.map(u => `
+          <div class="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+            <div class="flex-1 min-w-0">
+              <div class="font-medium text-sm">${u.first_name} ${u.last_name}</div>
+              <div class="text-xs text-gray-500 truncate">${u.email}</div>
+            </div>
+            <button type="button" onclick="removeWorkspaceUserFromShare('${u.id}')"
+              class="ml-2 text-red-600 hover:text-red-800 p-1">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+        `).join('');
+      }
+    }
+
+    // Form submission for workspace matter
+    workspaceMatterForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      // Check if conflicts are acknowledged
+      if (workspaceConflictDetection && !workspaceConflictDetection.canProceed()) {
+        Toast.error('Please acknowledge the conflicts before proceeding');
+        return;
+      }
+
+      const workspaceId = document.getElementById('workspaceIdForMatter').value;
+      const data = {
+        client_name: document.getElementById('workspaceClientName').value,
+        name: document.getElementById('workspaceMatterName').value,
+        description: document.getElementById('workspaceMatterDescription').value,
+        status: document.getElementById('workspaceMatterStatus').value,
+        visibility: document.getElementById('workspaceMatterVisibility').value,
+        share_with: workspaceSelectedUsers.map(u => u.id),
+        matter_type: 'matter' // Always create as matter, not workspace
+      };
+
+      try {
+        const result = await api.createMatter(data);
+        const createdMatterId = result.matter?.matter_id;
+
+        Toast.success(`Matter created: ${createdMatterId || 'Success'}`);
+
+        // Save parties if any
+        if (workspaceConflictDetection && workspaceConflictDetection.getParties().length > 0) {
+          try {
+            const response = await fetch(`${api.baseURL}/api/v1/conflicts/parties`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${api.token}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                matter_id: result.matter?.id,
+                parties: workspaceConflictDetection.getParties()
+              })
+            });
+
+            if (response.ok) {
+              const partyResult = await response.json();
+              console.log(`Saved ${partyResult.data.count} parties to matter`);
+            }
+          } catch (error) {
+            console.error('Error saving parties:', error);
+          }
+        }
+
+        // Auto-link to workspace
+        if (workspaceId && createdMatterId) {
+          try {
+            const linkResponse = await fetch(`${api.baseUrl}/api/v1/entity-links`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${api.token}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                source_matter_id: workspaceId,
+                target_matter_id: createdMatterId,
+                link_type: 'workspace_matter'
+              })
+            });
+
+            if (linkResponse.ok) {
+              console.log('[Workspace Matter Creation] Auto-linked to workspace:', workspaceId);
+              Toast.success('Matter linked to workspace successfully');
+            } else {
+              console.error('[Workspace Matter Creation] Failed to auto-link');
+            }
+          } catch (error) {
+            console.error('[Workspace Matter Creation] Error auto-linking:', error);
+          }
+        }
+
+        workspaceMatterModal.classList.add('hidden');
+        workspaceSelectedUsers = [];
+        if (workspaceConflictDetection) {
+          workspaceConflictDetection.reset();
+        }
+        loadMatters();
+
+        // Refresh linked matters section if viewing the workspace
+        // Linked matters are displayed in the Details tab, not as a separate tab
+        if (currentMatterData && currentMatterData.matter &&
+            currentMatterData.matter.matter_id === workspaceId &&
+            document.getElementById('linkedMattersSection')) {
+          renderLinkedMattersInDetails(currentMatterData.matter);
+        }
+
+      } catch (error) {
+        Toast.error(error.message);
+        if (window.analytics) {
+          window.analytics.trackError(error, {
+            action: 'workspace_matter.create',
+            workspace_id: workspaceId
+          });
+        }
+      }
+    });
+
+      // Initialize - use async IIFE to handle promise-based flow
+      (async function init() {
+        // Load matters first
+        await loadMatters();
+
+        // Check for matter_id or open URL parameter and auto-open drawer
+        const urlParams = new URLSearchParams(window.location.search);
+        const matterId = urlParams.get('matter_id') || urlParams.get('open');
+        const defaultTab = urlParams.get('tab') || 'details';
+        if (matterId) {
+          // Matters are now loaded, open the drawer immediately
+          viewMatter(matterId, defaultTab);
+        }
+      })();
+    }
+
+    // Matters Info Modal Functions
+    window.openMattersInfoModal = function() {
+      const modal = document.getElementById('mattersInfoModal');
+      modal.classList.remove('hidden');
+    }
+
+    window.closeMattersInfoModal = function() {
+      const modal = document.getElementById('mattersInfoModal');
+      modal.classList.add('hidden');
+    }
+
+    // Conversation actions modal state
+    let selectedConversationId = null;
+    let selectedConversationTitle = null;
+    let selectedConversationIsProject = false;
+    let selectedConversationMatterId = null;
+
+    // Open conversation actions modal
+    window.openConversationActionsModal = function(threadId, title, matterId) {
+      selectedConversationId = threadId;
+      selectedConversationTitle = title;
+      selectedConversationMatterId = matterId;
+      selectedConversationIsProject = matterId !== null;
+
+      // Set the conversation title in the modal (decode HTML entities)
+      document.getElementById('modalConversationTitle').textContent = title
+        .replace(/&apos;/g, "'")
+        .replace(/&quot;/g, '"')
+        .replace(/&#96;/g, '`');
+
+      // Show or hide the "View Matter Details" button
+      const matterBtn = document.getElementById('viewMatterDetailsBtn');
+      if (matterId && matterId !== 'null') {
+        matterBtn.classList.remove('hidden');
+      } else {
+        matterBtn.classList.add('hidden');
+      }
+
+      // Show the modal
+      const modal = document.getElementById('conversationActionsModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    // Close conversation actions modal
+    window.closeConversationActionsModal = function() {
+      const modal = document.getElementById('conversationActionsModal');
+      modal.classList.remove('flex');
+      modal.classList.add('hidden');
+
+      // Reset state
+      selectedConversationId = null;
+      selectedConversationTitle = null;
+      selectedConversationIsProject = false;
+      selectedConversationMatterId = null;
+    }
+
+    // Open rename conversation modal
+    window.editConversationFromModal = function() {
+      if (!selectedConversationId || !selectedConversationTitle) {
+        Toast.error('No conversation selected');
+        closeConversationActionsModal();
+        return;
+      }
+
+      // Hide actions modal
+      const actionsModal = document.getElementById('conversationActionsModal');
+      actionsModal.classList.remove('flex');
+      actionsModal.classList.add('hidden');
+
+      // Show rename modal with current title
+      const renameModal = document.getElementById('renameConversationModal');
+      const renameInput = document.getElementById('renameInput');
+
+      // Decode HTML entities for editing
+      const decodedTitle = selectedConversationTitle
+        .replace(/&apos;/g, "'")
+        .replace(/&quot;/g, '"')
+        .replace(/&#96;/g, '`')
+        .replace(/&amp;/g, '&');
+
+      renameInput.value = decodedTitle;
+
+      renameModal.classList.remove('hidden');
+      renameModal.classList.add('flex');
+
+      // Focus the input
+      setTimeout(() => {
+        renameInput.focus();
+        renameInput.select();
+      }, 100);
+    }
+
+    // Close rename conversation modal
+    window.closeRenameModal = function() {
+      const modal = document.getElementById('renameConversationModal');
+      modal.classList.remove('flex');
+      modal.classList.add('hidden');
+    }
+
+    // Confirm rename
+    window.confirmRename = async function() {
+      if (!selectedConversationId) {
+        Toast.error('No conversation selected');
+        closeRenameModal();
+        return;
+      }
+
+      const renameInput = document.getElementById('renameInput');
+      const newTitle = renameInput.value.trim();
+
+      if (!newTitle) {
+        Toast.error('Conversation name cannot be empty');
+        return;
+      }
+
+      try {
+        // Call API to rename
+        await api.put(`/api/v1/chat/sessions/${selectedConversationId}`, {
+          title: newTitle
+        });
+
+        Toast.success('Conversation renamed');
+        closeRenameModal();
+
+        // Reload the conversation menu
+        if (typeof ConversationMenu !== 'undefined') {
+          await ConversationMenu.loadConversations(true);
+        }
+      } catch (error) {
+        console.error('Failed to rename conversation:', error);
+        Toast.error('Failed to rename conversation');
+      }
+    }
+
+    // View matter details from modal
+    window.viewMatterDetailsFromModal = function() {
+      if (!selectedConversationMatterId) {
+        Toast.error('No matter associated with this conversation');
+        return;
+      }
+
+      // Navigate to matters page with the matter ID
+      window.location.href = `matters.html?matter_id=${selectedConversationMatterId}`;
+    }
+
+    // Delete conversation from modal
+    window.deleteConversationFromModal = function() {
+      // Show custom confirmation modal
+      const confirmTitle = selectedConversationIsProject
+        ? 'Delete Project Conversation?'
+        : 'Delete Conversation?';
+
+      const confirmMessage = selectedConversationIsProject
+        ? 'This will only delete the chat messages. The matter/project itself will NOT be deleted and you can create new conversations for it later.'
+        : 'This action cannot be undone. All messages in this conversation will be permanently deleted.';
+
+      openDeleteConfirmModal(confirmTitle, confirmMessage);
+    }
+
+    // Open custom delete confirmation modal
+    window.openDeleteConfirmModal = function(title, message) {
+      document.getElementById('deleteConfirmTitle').textContent = title;
+      document.getElementById('deleteConfirmMessage').textContent = message;
+
+      const modal = document.getElementById('deleteConfirmModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    // Close custom delete confirmation modal
+    window.closeDeleteConfirmModal = function() {
+      const modal = document.getElementById('deleteConfirmModal');
+      modal.classList.remove('flex');
+      modal.classList.add('hidden');
+    }
+
+    // Confirm delete action
+    window.confirmDeleteConversation = async function() {
+      const conversationIdToDelete = selectedConversationId;
+      if (!conversationIdToDelete) {
+        Toast.error('No conversation selected');
+        closeDeleteConfirmModal();
+        closeConversationActionsModal();
+        return;
+      }
+
+      try {
+        // Close both modals
+        closeDeleteConfirmModal();
+        closeConversationActionsModal();
+
+        // Call API to delete
+        await api.delete(`/api/v1/chat/sessions/${conversationIdToDelete}`);
+        Toast.success('Conversation deleted');
+
+        // Reload the conversation menu
+        if (typeof ConversationMenu !== 'undefined') {
+          await ConversationMenu.loadConversations(true);
+        }
+      } catch (error) {
+        console.error('Failed to delete conversation:', error);
+        Toast.error('Failed to delete conversation');
+      }
+    }
+
+    // Global refresh page function (accessible from inline onclick handlers)
+    function refreshPage() {
+      console.log('[Matters] Refreshing page...');
+      window.location.reload();
+    }
+
+
+  // ── Manual Connect + Custom Fields (from second script block) ──
+
+    // Manual Connect Modal State
+    let currentManualConnectMatter = null;
+    let manualConnectSearchTimeout = null;
+
+    // Show manual connect modal
+    function showManualConnectModal(matterId) {
+      currentManualConnectMatter = matterId;
+      const modal = document.getElementById('manualConnectModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+
+      // Load available connectors for filter
+      loadAvailableConnectors();
+
+      // Set up search handlers
+      const searchInput = document.getElementById('manualConnectSearch');
+      const entityTypeSelect = document.getElementById('manualConnectEntityType');
+      const connectorSelect = document.getElementById('manualConnectConnector');
+
+      searchInput.addEventListener('input', () => {
+        clearTimeout(manualConnectSearchTimeout);
+        manualConnectSearchTimeout = setTimeout(() => performManualConnectSearch(), 300);
+      });
+
+      entityTypeSelect.addEventListener('change', performManualConnectSearch);
+      connectorSelect.addEventListener('change', performManualConnectSearch);
+
+      // Clear previous search
+      searchInput.value = '';
+      entityTypeSelect.value = '';
+      connectorSelect.value = '';
+    }
+
+    // Close manual connect modal
+    function closeManualConnectModal() {
+      const modal = document.getElementById('manualConnectModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      currentManualConnectMatter = null;
+    }
+
+    // Load available connectors
+    async function loadAvailableConnectors() {
+      try {
+        const response = await api.get('/api/v1/connectors/integration-sources?status=active');
+        const connectors = response.sources || [];
+
+        const select = document.getElementById('manualConnectConnector');
+        select.innerHTML = '<option value="">All Connectors</option>';
+
+        connectors.forEach(conn => {
+          const option = document.createElement('option');
+          option.value = conn.connector_id;
+          option.textContent = conn.connector_name || conn.connector_id;
+          select.appendChild(option);
+        });
+      } catch (error) {
+        console.error('[loadAvailableConnectors] Error:', error);
+      }
+    }
+
+    // Perform search
+    async function performManualConnectSearch() {
+      const searchInput = document.getElementById('manualConnectSearch');
+      const entityTypeSelect = document.getElementById('manualConnectEntityType');
+      const connectorSelect = document.getElementById('manualConnectConnector');
+      const resultsDiv = document.getElementById('manualConnectResults');
+
+      const search = searchInput.value.trim();
+      const entityType = entityTypeSelect.value;
+      const connectorId = connectorSelect.value;
+
+      // Show loading
+      resultsDiv.innerHTML = `
+        <div class="text-center py-8">
+          <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto mb-4"></div>
+          <p class="text-gray-500">Searching...</p>
+        </div>
+      `;
+
+      try {
+        const response = await api.searchConnectorDataForLinking(currentManualConnectMatter, {
+          search,
+          entity_type: entityType,
+          connector_id: connectorId,
+          limit: 20
+        });
+
+        const results = response.results || [];
+
+        if (results.length === 0) {
+          resultsDiv.innerHTML = `
+            <div class="text-center py-8 text-gray-500">
+              <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M12 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <p class="mt-2">No results found</p>
+            </div>
+          `;
+          return;
+        }
+
+        // Render results
+        resultsDiv.innerHTML = `
+          <div class="space-y-2">
+            ${results.map(item => renderSearchResultCard(item)).join('')}
+          </div>
+        `;
+
+      } catch (error) {
+        console.error('[performManualConnectSearch] Error:', error);
+        resultsDiv.innerHTML = `
+          <div class="text-center py-8 text-red-600">
+            <svg class="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <p class="mt-2">Error loading results</p>
+            <p class="text-sm text-gray-500">${error.message}</p>
+          </div>
+        `;
+      }
+    }
+
+    // Render search result card
+    function renderSearchResultCard(item) {
+      const data = item.data || {};
+      const title = data.name || data.title || item.external_id;
+      const subtitle = data.description || data.status || item.entity_type;
+
+      return `
+        <div class="border border-gray-200 rounded-lg p-4 hover:border-indigo-300 hover:bg-indigo-50 transition-colors">
+          <div class="flex items-start justify-between">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                  ${item.entity_type.replace('_', ' ')}
+                </span>
+                ${item.connector_name ? `
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                    ${item.connector_name}
+                  </span>
+                ` : ''}
+              </div>
+              <h4 class="text-sm font-medium text-gray-900 truncate">${escapeHtml(title)}</h4>
+              <p class="text-xs text-gray-500 mt-1">${escapeHtml(subtitle)}</p>
+              <p class="text-xs text-gray-400 mt-1">ID: ${escapeHtml(item.external_id)}</p>
+            </div>
+            <button onclick="linkConnectorData('${item.id}')" class="ml-4 flex-shrink-0 inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+              <svg class="-ml-0.5 mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+              </svg>
+              Link
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    // Link connector data
+    async function linkConnectorData(connectorDataId) {
+      try {
+        await api.linkConnectorDataToMatter(currentManualConnectMatter, connectorDataId);
+
+        Toast.success('Data linked successfully!');
+        closeManualConnectModal();
+
+        // Reload the connected data tab
+        const matter = window.currentViewedMatter;
+        if (matter) {
+          await renderConnectedDataTab(matter);
+        }
+      } catch (error) {
+        console.error('[linkConnectorData] Error:', error);
+        Toast.error(error.message || 'Failed to link data');
+      }
+    }
+
+    // Helper: Escape HTML
+
+    let currentEditFieldsMatter = null;
+    let customFieldDefinitions = [];
+    let customFieldValues = [];
+
+    // Open edit custom fields modal
+    async function openEditCustomFieldsModal(matterId) {
+      // Validate matterId is provided
+      if (!matterId || matterId === 'null' || matterId === 'undefined') {
+        console.error('[openEditCustomFieldsModal] Invalid matter ID:', matterId);
+        Toast.error('Cannot open custom fields: Invalid matter ID');
+        return;
+      }
+
+      currentEditFieldsMatter = matterId;
+
+      // Load current custom field definitions and values
+      let matter = window.currentViewedMatter;
+
+      // If matter is not loaded or doesn't match the requested matterId, fetch it
+      if (!matter || matter.matter_id !== matterId) {
+        try {
+          const result = await api.getMatter(matterId, { bustCache: true });
+
+          // Check for error response from backend: { error: { message: "...", code: "..." } }
+          if (result && result.error) {
+            console.error('[openEditCustomFieldsModal] API error:', result.error);
+            Toast.error(result.error.message || 'Failed to load matter details');
+            return;
+          }
+
+          // Backend returns { matter: {...} } on success
+          if (result && result.matter) {
+            matter = result.matter;
+            window.currentViewedMatter = matter;
+          } else {
+            console.error('[openEditCustomFieldsModal] Invalid API response:', result);
+            Toast.error('Failed to load matter details');
+            return;
+          }
+        } catch (error) {
+          console.error('[openEditCustomFieldsModal] Error loading matter:', error);
+          Toast.error(error.message || 'Failed to load matter details');
+          return;
+        }
+      }
+
+      customFieldDefinitions = [];
+      customFieldValues = [];
+
+      if (matter && matter.metadata?.custom_field_definitions && Array.isArray(matter.metadata.custom_field_definitions)) {
+        customFieldDefinitions = JSON.parse(JSON.stringify(matter.metadata.custom_field_definitions));
+      }
+
+      if (matter && matter.metadata?.custom_fields && Array.isArray(matter.metadata.custom_fields)) {
+        customFieldValues = JSON.parse(JSON.stringify(matter.metadata.custom_fields));
+      }
+
+      // Initialize values for fields that don't have them yet
+      customFieldDefinitions.forEach(def => {
+        const hasValue = customFieldValues.some(v => v.key === def.key);
+        if (!hasValue) {
+          customFieldValues.push({ key: def.key, value: def.default_value || '' });
+        }
+      });
+
+      renderCustomFieldsModal();
+
+      const modal = document.getElementById('editCustomFieldsModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    // Close custom fields modal
+    function closeEditCustomFieldsModal() {
+      const modal = document.getElementById('editCustomFieldsModal');
+      modal.classList.remove('flex');
+      modal.classList.add('hidden');
+      currentEditFieldsMatter = null;
+      customFieldDefinitions = [];
+      customFieldValues = [];
+    }
+
+    // Render custom fields modal content
+    function renderCustomFieldsModal() {
+      const container = document.getElementById('customFieldsContainer');
+
+      if (customFieldDefinitions.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-8 text-gray-500">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <p class="mt-2 text-sm">No custom fields yet. Click "Add Field" to create one.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="space-y-4">
+          ${customFieldDefinitions.map((def, index) => {
+            const valueObj = customFieldValues.find(v => v.key === def.key);
+            const currentValue = valueObj ? valueObj.value : (def.default_value || '');
+
+            return `
+              <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <!-- Field Definition Row -->
+                <div class="grid grid-cols-12 gap-3 mb-3">
+                  <!-- Key (identifier) -->
+                  <div class="col-span-3">
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Field Key</label>
+                    <input
+                      type="text"
+                      value="${escapeHtml(def.key || '')}"
+                      onchange="updateFieldDefinition(${index}, 'key', this.value)"
+                      placeholder="e.g., case_number"
+                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <!-- Display Name -->
+                  <div class="col-span-4">
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Display Name</label>
+                    <input
+                      type="text"
+                      value="${escapeHtml(def.display_name || '')}"
+                      onchange="updateFieldDefinition(${index}, 'display_name', this.value)"
+                      placeholder="e.g., Case Number"
+                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <!-- Type -->
+                  <div class="col-span-2">
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Type</label>
+                    <select
+                      onchange="updateFieldDefinition(${index}, 'type', this.value)"
+                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    >
+                      <option value="text" ${def.type === 'text' ? 'selected' : ''}>Text</option>
+                      <option value="textarea" ${def.type === 'textarea' ? 'selected' : ''}>Long Text</option>
+                      <option value="number" ${def.type === 'number' ? 'selected' : ''}>Number</option>
+                      <option value="currency" ${def.type === 'currency' ? 'selected' : ''}>Currency</option>
+                      <option value="date" ${def.type === 'date' ? 'selected' : ''}>Date</option>
+                      <option value="datetime" ${def.type === 'datetime' ? 'selected' : ''}>Date+Time</option>
+                      <option value="boolean" ${def.type === 'boolean' ? 'selected' : ''}>Yes/No</option>
+                      <option value="select" ${def.type === 'select' ? 'selected' : ''}>Dropdown</option>
+                    </select>
+                  </div>
+
+                  <!-- Required -->
+                  <div class="col-span-2">
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Required</label>
+                    <label class="flex items-center px-3 py-2">
+                      <input
+                        type="checkbox"
+                        ${def.required ? 'checked' : ''}
+                        onchange="updateFieldDefinition(${index}, 'required', this.checked)"
+                        class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span class="ml-2 text-sm text-gray-700">Yes</span>
+                    </label>
+                  </div>
+
+                  <!-- Delete Button -->
+                  <div class="col-span-1 flex items-end">
+                    <button
+                      onclick="removeCustomField(${index})"
+                      class="p-2 text-red-600 hover:text-red-800 hover:bg-red-100 rounded-md transition-colors"
+                      title="Remove field"
+                    >
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Options for Select Type -->
+                ${def.type === 'select' ? `
+                  <div class="mb-3">
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Dropdown Options (comma-separated)</label>
+                    <input
+                      type="text"
+                      value="${escapeHtml((def.options || []).join(', '))}"
+                      onchange="updateFieldDefinition(${index}, 'options', this.value.split(',').map(s => s.trim()).filter(s => s))"
+                      placeholder="e.g., Active, Pending, Closed"
+                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+                ` : ''}
+
+                <!-- Value Input -->
+                <div>
+                  <label class="block text-xs font-medium text-gray-700 mb-1">Value</label>
+                  ${renderValueInput(def, currentValue, index)}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    // Helper function to render the appropriate input based on field type
+    function renderValueInput(def, currentValue, index) {
+      const key = def.key;
+
+      switch (def.type) {
+        case 'textarea':
+          return `
+            <textarea
+              onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
+              placeholder="Enter ${escapeHtml(def.display_name || def.key)}"
+              rows="3"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            >${escapeHtml(currentValue || '')}</textarea>
+          `;
+
+        case 'number':
+          return `
+            <input
+              type="number"
+              value="${escapeHtml(currentValue || '')}"
+              onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
+              placeholder="Enter ${escapeHtml(def.display_name || def.key)}"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          `;
+
+        case 'currency':
+          return `
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <span class="text-gray-500 sm:text-sm">$</span>
+              </div>
+              <input
+                type="number"
+                step="0.01"
+                value="${escapeHtml(currentValue || '')}"
+                onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
+                placeholder="0.00"
+                class="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+          `;
+
+        case 'date':
+          return `
+            <input
+              type="date"
+              value="${escapeHtml(currentValue || '')}"
+              onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          `;
+
+        case 'datetime':
+          return `
+            <input
+              type="datetime-local"
+              value="${escapeHtml(currentValue || '')}"
+              onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          `;
+
+        case 'boolean':
+          return `
+            <label class="flex items-center px-3 py-2">
+              <input
+                type="checkbox"
+                ${currentValue === true || currentValue === 'true' ? 'checked' : ''}
+                onchange="updateFieldValue('${escapeHtml(key)}', this.checked)"
+                class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <span class="ml-2 text-sm text-gray-700">${escapeHtml(def.display_name || def.key)}</span>
+            </label>
+          `;
+
+        case 'select':
+          return `
+            <select
+              onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            >
+              <option value="">-- Select ${escapeHtml(def.display_name || def.key)} --</option>
+              ${(def.options || []).map(option => `
+                <option value="${escapeHtml(option)}" ${currentValue === option ? 'selected' : ''}>
+                  ${escapeHtml(option)}
+                </option>
+              `).join('')}
+            </select>
+          `;
+
+        case 'text':
+        default:
+          return `
+            <input
+              type="text"
+              value="${escapeHtml(currentValue || '')}"
+              onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
+              placeholder="Enter ${escapeHtml(def.display_name || def.key)}"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          `;
+      }
+    }
+
+    // Add new custom field
+    function addCustomField() {
+      const newKey = `field_${Date.now()}`;
+      customFieldDefinitions.push({
+        key: newKey,
+        display_name: '',
+        type: 'text',
+        required: false,
+        options: [],
+        default_value: ''
+      });
+      customFieldValues.push({
+        key: newKey,
+        value: ''
+      });
+      renderCustomFieldsModal();
+    }
+
+    // Update field definition (metadata)
+    function updateFieldDefinition(index, property, value) {
+      if (customFieldDefinitions[index]) {
+        const oldKey = customFieldDefinitions[index].key;
+        customFieldDefinitions[index][property] = value;
+
+        // If key changed, update the corresponding value entry
+        if (property === 'key' && oldKey !== value) {
+          const valueIndex = customFieldValues.findIndex(v => v.key === oldKey);
+          if (valueIndex !== -1) {
+            customFieldValues[valueIndex].key = value;
+          }
+        }
+
+        // Re-render if type changed (to show different input)
+        if (property === 'type') {
+          renderCustomFieldsModal();
+        }
+      }
+    }
+
+    // Update field value
+    function updateFieldValue(key, value) {
+      const existingIndex = customFieldValues.findIndex(v => v.key === key);
+      if (existingIndex !== -1) {
+        customFieldValues[existingIndex].value = value;
+      } else {
+        customFieldValues.push({ key, value });
+      }
+    }
+
+    // Remove custom field (removes both definition and value)
+    function removeCustomField(index) {
+      if (customFieldDefinitions[index]) {
+        const key = customFieldDefinitions[index].key;
+        customFieldDefinitions.splice(index, 1);
+
+        // Also remove the corresponding value
+        const valueIndex = customFieldValues.findIndex(v => v.key === key);
+        if (valueIndex !== -1) {
+          customFieldValues.splice(valueIndex, 1);
+        }
+
+        renderCustomFieldsModal();
+      }
+    }
+
+    // Save custom fields
+    async function saveCustomFields() {
+      try {
+        // Validate definitions
+        const validDefinitions = customFieldDefinitions.filter(def => {
+          return def.key && def.key.trim() !== '' && def.display_name && def.display_name.trim() !== '';
+        });
+
+        if (validDefinitions.length === 0 && customFieldDefinitions.length > 0) {
+          Toast.error('Please fill in Key and Display Name for all fields');
+          return;
+        }
+
+        // Validate no duplicate keys
+        const keys = validDefinitions.map(f => f.key.toLowerCase().trim());
+        const duplicates = keys.filter((key, index) => keys.indexOf(key) !== index);
+        if (duplicates.length > 0) {
+          Toast.error(`Duplicate field keys: ${duplicates.join(', ')}`);
+          return;
+        }
+
+        // Filter values to only include those with corresponding definitions
+        const definitionKeys = validDefinitions.map(d => d.key);
+        const validValues = customFieldValues.filter(v => definitionKeys.includes(v.key));
+
+        // Validate we have a matter ID
+        if (!currentEditFieldsMatter) {
+          Toast.error('Matter ID not found');
+          return;
+        }
+
+        // Save the matter ID before closing modal (close sets currentEditFieldsMatter to null)
+        const matterId = currentEditFieldsMatter;
+
+        // Update via settings endpoint
+        const response = await api.put(`/api/v1/matters/${matterId}/settings`, {
+          custom_field_definitions: validDefinitions,
+          custom_fields: validValues
+        });
+
+        Toast.success('Custom fields updated successfully!');
+        closeEditCustomFieldsModal();
+
+        // Reload matter details - backend returns { matter: {...} }
+        const updatedMatter = await api.getMatter(matterId, { bustCache: true });
+        if (updatedMatter && updatedMatter.matter) {
+          window.currentViewedMatter = updatedMatter.matter;
+          await window.renderCustomFieldsSection(updatedMatter.matter);
+
+          // Also refresh the activity feed to show the changes
+          const activityResult = await api.getMatterActivity(matterId, 20, 0);
+          if (activityResult && activityResult.activities && window.currentMatterData) {
+            window.currentMatterData.activities = activityResult.activities;
+            window.currentMatterData.activityPagination = activityResult.pagination;
+            renderActivityTab(window.currentMatterData.matter, activityResult.activities, activityResult.pagination);
+          }
+        }
+      } catch (error) {
+        console.error('[saveCustomFields] Error:', error);
+        Toast.error(error.message || 'Failed to save custom fields');
+      }
+    }
+
+
+  // ── Expose second-block functions for onclick handlers ──────────────
+  window.showManualConnectModal = showManualConnectModal;
+  window.closeManualConnectModal = closeManualConnectModal;
+  window.openEditCustomFieldsModal = openEditCustomFieldsModal;
+  window.closeEditCustomFieldsModal = closeEditCustomFieldsModal;
+  window.addCustomField = addCustomField;
+  window.saveCustomFields = saveCustomFields;
+  window.renderCustomFieldsModal = renderCustomFieldsModal;
+  ['showManualConnectModal','closeManualConnectModal','openEditCustomFieldsModal',
+   'closeEditCustomFieldsModal','addCustomField','saveCustomFields','renderCustomFieldsModal'
+  ].forEach(_trackGlobal);
+
+  // ── Lifecycle hooks ─────────────────────────────────────────────────
+
+  var _preInitKeys = null;
+
+  function onEnter() {
+    // Snapshot window keys BEFORE init so onLeave can clean up new ones
+    _preInitKeys = new Set(Object.keys(window));
+    initializePage();
+  }
+
+  function onLeave() {
+    // 1. Delete window globals added by initializePage (window.fn = function...)
+    if (_preInitKeys) {
+      var currentKeys = Object.keys(window);
+      for (var i = 0; i < currentKeys.length; i++) {
+        if (!_preInitKeys.has(currentKeys[i])) {
+          try { delete window[currentKeys[i]]; } catch (e) { /* non-configurable */ }
+        }
+      }
+      _preInitKeys = null;
+    }
+
+    // 2. Also clean tracked second-block globals
+    _windowKeys.forEach(function (name) { delete window[name]; });
+    _windowKeys = [];
+
+    // 3. Destroy external module instances
+    if (typeof destroyMatterNotes === 'function') {
+      try { destroyMatterNotes(); } catch (e) { /* ignore */ }
+    }
+  }
+
+  // Register lifecycle with router
+  if (window.LexRouter) {
+    LexRouter.registerView({ onEnter: onEnter, onLeave: onLeave });
+  }
+
+  // Auto-run on first load (router has already injected HTML and deps)
+  onEnter();
+
+})();

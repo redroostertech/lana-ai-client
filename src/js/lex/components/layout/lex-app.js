@@ -68,22 +68,23 @@
 
       /* ── Body (content + topbar beside sidebar) ── */
       /* NOTE: transition must match lex-sidebar.js line 80 exactly */
-      .lex-app-body {
+      lex-body {
         display: flex;
         flex-direction: column;
         min-height: 100vh;
         margin-left: var(--lex-sidebar-current-width, var(--lex-sidebar-width, 256px));
-        transition: margin-left var(--lex-sidebar-transition, 0.7s cubic-bezier(0.22, 0.84, 0, 0.99));
+        transition: margin-left var(--lex-transition-slide);
       }
       @media (max-width: 1023px) {
-        .lex-app-body {
+        lex-body {
           margin-left: 0;
           transition: none;
         }
       }
 
       /* ── Topbar sticky header wrapper ── */
-      .lex-app-header {
+      lex-header {
+        display: block;
         position: sticky;
         top: 0;
         z-index: var(--lex-z-sticky, 20);
@@ -95,14 +96,15 @@
       }
 
       /* ── Content area ── */
-      .lex-app-content {
+      lex-content {
+        display: block;
         flex: 1;
         overflow-y: auto;
         background: var(--lex-bg-secondary);
         min-height: calc(100vh - var(--lex-topbar-height, 64px));
         transition: opacity var(--lex-transition-normal);
       }
-      .lex-app-content[data-loading="true"] {
+      lex-content[data-loading="true"] {
         opacity: 0.4;
         pointer-events: none;
       }
@@ -125,11 +127,23 @@
         font-weight: var(--lex-weight-medium, 500);
         font-family: var(--lex-font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
         transform: translateY(-100%);
-        transition: transform 0.3s ease;
-        pointer-events: auto;
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        /* Dismiss: slide up + fade out, then flip visibility after animation */
+        transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+                    opacity 0.3s ease,
+                    visibility 0s 0.4s;
       }
       .lex-app-offline-banner.lex-app-offline-visible {
         transform: translateY(0);
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+        /* Show: slide down + fade in, visibility flips immediately */
+        transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+                    opacity 0.3s ease,
+                    visibility 0s;
       }
       .lex-app-offline-banner svg {
         flex-shrink: 0;
@@ -166,7 +180,7 @@
         activeNavId:  { type: String,  default: '' },
         logoSrc:      { type: String,  default: 'img/logo-light.png' },
         logoAlt:      { type: String,  default: 'LANA AI' },
-        logoHref:     { type: String,  default: 'index.html' },
+        logoHref:     { type: String,  default: 'dashboard.html' },
         loading:      { type: Boolean, default: false },
         sidebarOpen:  { type: Boolean, default: false, reflect: true }
       };
@@ -209,23 +223,105 @@
           active-id="${this.escapeHtml(this.activeNavId)}"
         ></lex-sidebar>
 
-        <div class="lex-app-body">
-          <header class="lex-app-header" role="banner">
+        <lex-body>
+          <lex-header role="banner">
             <lex-topbar
               heading="${this.escapeHtml(this.pageTitle)}"
               sticky
             ></lex-topbar>
-          </header>
+          </lex-header>
 
-          <main
+          <lex-content
             id="lex-main-content"
-            class="lex-app-content"
             tabindex="-1"
             role="main"
             aria-label="Page content"
             aria-live="polite"
             aria-atomic="false"
-          ></main>
+          ></lex-content>
+        </lex-body>
+
+        <lex-notification-panel></lex-notification-panel>
+
+        <div class="lex-app-offline-banner" id="lex-offline-banner" role="alert" aria-live="assertive">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z"/>
+          </svg>
+          <span>Unable to reach the server. Checking connection\u2026</span>
+          <button type="button" id="lex-offline-retry-btn">Retry Now</button>
+        </div>
+
+        <div id="conversationActionsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 9999;">
+          <div class="bg-white rounded-xl shadow-2xl w-full max-w-md" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 class="text-xl font-semibold text-gray-900">Conversation Options</h2>
+              <button onclick="ConversationActionsModal.close()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+            <div class="p-6">
+              <h3 id="modalConversationTitle" class="text-lg font-medium text-gray-900 mb-6"></h3>
+              <div class="space-y-3">
+                <button onclick="ConversationActionsModal.editConversation()" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-indigo-300 hover:bg-indigo-50 transition-all group">
+                  <div class="flex-shrink-0 w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
+                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                    </svg>
+                  </div>
+                  <div class="flex-1">
+                    <div class="font-medium text-gray-900">Rename Conversation</div>
+                    <div class="text-sm text-gray-500">Change the conversation name</div>
+                  </div>
+                </button>
+                <button id="viewMatterDetailsBtn" onclick="ConversationActionsModal.viewMatterDetails()" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-indigo-300 hover:bg-indigo-50 transition-all group hidden">
+                  <div class="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
+                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                  </div>
+                  <div class="flex-1">
+                    <div class="font-medium text-gray-900">View Matter Details</div>
+                    <div class="text-sm text-gray-500">Open the associated matter</div>
+                  </div>
+                </button>
+                <button onclick="ConversationActionsModal.deleteConversation()" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-red-300 hover:bg-red-50 transition-all group">
+                  <div class="flex-shrink-0 w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center group-hover:bg-red-200 transition-colors">
+                    <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
+                  </div>
+                  <div class="flex-1">
+                    <div class="font-medium text-gray-900">Delete Conversation</div>
+                    <div class="text-sm text-gray-500">Permanently remove this conversation</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="renameConversationModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 10000;">
+          <div class="bg-white rounded-xl shadow-2xl w-full max-w-md" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 class="text-xl font-semibold text-gray-900">Rename Conversation</h2>
+              <button onclick="ConversationActionsModal.closeRename()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+            <div class="p-6">
+              <label class="block text-sm font-medium text-gray-700 mb-2">New Conversation Name</label>
+              <input type="text" id="renameInput" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" placeholder="Enter new name">
+            </div>
+            <div class="flex justify-end gap-3 p-6 border-t border-gray-200">
+              <button onclick="ConversationActionsModal.closeRename()" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Cancel</button>
+              <button onclick="ConversationActionsModal.confirmRename()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">Rename</button>
+            </div>
+          </div>
         </div>
       `;
     }
@@ -238,6 +334,7 @@
       this._sidebar = this.$('lex-sidebar');
       this._topbar = this.$('lex-topbar');
       this._content = this.$('#lex-main-content');
+      this._notificationPanel = this.$('lex-notification-panel');
 
       // Populate sidebar with user data from localStorage
       this._hydrateUser();
@@ -269,6 +366,14 @@
         this._authChangeHandler = () => { this._hydrateUser(); };
         window.Lex.state.on('auth:changed', this._authChangeHandler);
       }
+
+      // Listen for notification count updates from the notification panel
+      this._notifCountHandler = (e) => {
+        var count = (e.detail && e.detail.count) || 0;
+        var topbar = this.$('lex-topbar');
+        if (topbar) topbar.notificationCount = count;
+      };
+      document.addEventListener('lex-notification-count', this._notifCountHandler);
 
       // Signal ready
       this.emit('lex-app-ready');
@@ -312,10 +417,16 @@
         this.sidebarOpen = false;
       });
 
-      // Sidebar nav click — forward to router
+      // Sidebar nav click — forward to Lex.Nav (single navigation entry point)
       this.delegate('sidebar-nav-click', 'lex-sidebar', (e) => {
         this.sidebarOpen = false; // close mobile sidebar on nav
-        this.emit('lex-app-navigate', e.detail);
+        var detail = e.detail || {};
+        if (detail.href && !detail.isButton && window.Lex && window.Lex.Nav) {
+          window.Lex.Nav.go(detail.href);
+        } else {
+          // Legacy fallback — router listens for lex-app-navigate
+          this.emit('lex-app-navigate', detail);
+        }
       });
 
       // Sidebar user action (sign out, etc.)
@@ -331,6 +442,11 @@
         if (typeof window.ConversationMenu !== 'undefined') {
           window.ConversationMenu.loadMore();
         }
+      });
+
+      // Notification bell → open notification panel
+      this.delegate('topbar-notification-click', 'lex-topbar', () => {
+        if (this._notificationPanel) this._notificationPanel.open();
       });
     }
 
@@ -349,6 +465,12 @@
       if (window.Lex && window.Lex.state && this._authChangeHandler) {
         window.Lex.state.off('auth:changed', this._authChangeHandler);
         this._authChangeHandler = null;
+      }
+
+      // Unsubscribe from notification count
+      if (this._notifCountHandler) {
+        document.removeEventListener('lex-notification-count', this._notifCountHandler);
+        this._notifCountHandler = null;
       }
     }
 
@@ -378,7 +500,7 @@
       const main = this.$('#lex-main-content');
       if (main) {
         requestAnimationFrame(() => {
-          main.focus({ preventScroll: false });
+          main.focus({ preventScroll: true });
         });
       }
     }
@@ -470,16 +592,16 @@
           id: 'main',
           isStaticTop: true,
           items: [
-            { id: 'dashboard', label: 'Dashboard', icon: 'home', href: 'index.html' },
+            { id: 'dashboard', label: 'Dashboard', icon: 'home', href: 'dashboard.html' },
             { id: 'search', label: 'Search Conversations', icon: 'search', isButton: true, onClick: 'openConversationSearchModal' },
-            { id: 'matters', label: 'Matters', icon: 'archive', href: 'matters.html' },
-            { id: 'storage', label: 'My Drive', icon: 'folder', href: 'storage.html' }
+            { id: 'workspaces', label: 'Workspaces', icon: 'briefcase', href: 'workspaces.html' },
+            { id: 'storage', label: 'My Drive', icon: 'folder', href: 'drive.html' }
           ]
         },
         {
           id: 'tools',
           items: [
-            { id: 'connectors', label: 'Data Connectors', icon: 'plug', href: 'integrations/connectors.html' },
+            { id: 'connectors', label: 'Data Connectors', icon: 'plug', href: 'integrations/data_connectors.html' },
             { id: 'reports', label: 'Reports', icon: 'bar-chart-2', href: 'insights/module-execution.html' }
           ]
         },
@@ -608,29 +730,15 @@
         clearInterval(this._reachabilityInterval);
         this._reachabilityInterval = null;
       }
-      if (this._reachabilityBanner && this._reachabilityBanner.parentNode) {
-        this._reachabilityBanner.remove();
-        this._reachabilityBanner = null;
-      }
+      this._reachabilityBanner = null;
     }
 
     /**
-     * Create the offline banner DOM element and append it to body.
+     * Wire up the offline banner that lives inside the shell template.
      */
     _buildOfflineBanner() {
-      var banner = document.createElement('div');
-      banner.className = 'lex-app-offline-banner';
-      banner.id = 'lex-offline-banner';
-      banner.setAttribute('role', 'alert');
-      banner.setAttribute('aria-live', 'assertive');
-      banner.innerHTML = [
-        '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">',
-        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" ',
-        'd="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z"/>',
-        '</svg>',
-        '<span>Unable to reach the server. Checking connection\u2026</span>',
-        '<button type="button" id="lex-offline-retry-btn">Retry Now</button>'
-      ].join('');
+      var banner = this.$('#lex-offline-banner');
+      if (!banner) return;
 
       // Wire retry button
       var self = this;
@@ -641,7 +749,6 @@
         });
       }
 
-      document.body.appendChild(banner);
       this._reachabilityBanner = banner;
     }
 

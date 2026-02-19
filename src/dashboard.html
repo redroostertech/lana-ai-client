@@ -1,0 +1,370 @@
+<!-- Dashboard — Command Center "Morning Briefing" layout.
+     SPA page fragment loaded by lex-router into lex-app content area.
+     Uses #lex-page-content for Strategy 1 extraction (see lex-router.js). -->
+
+<link rel="stylesheet" href="css/dashboard-command-center.css">
+
+<div id="lex-page-content">
+
+  <main class="cc-dashboard">
+
+    <!-- ================================================================
+         Zone A — Morning Orientation Bar (full width)
+         Populated by dashboard.js:renderZoneA()
+         ================================================================ -->
+    <lex-banner
+      id="ccZoneA"
+      variant="light"
+      corners
+      heading="Good morning, there"
+      subtitle=""
+    >
+      <lex-btn id="ccZoneAMatters" variant="secondary" size="sm">
+        <span id="ccZoneAMattersCount">-</span> active matters
+      </lex-btn>
+    </lex-banner>
+
+
+    <!-- ================================================================
+         Zone E — Pipeline Intelligence (3 equal columns)
+         Populated by dashboard.js:renderZoneE()
+         ================================================================ -->
+    <div class="cc-pipeline" id="ccZoneE">
+      <lex-metric label="Team Members" value="-" status="blue"></lex-metric>
+      <lex-metric label="Total Documents" value="-" status="blue"></lex-metric>
+      <lex-metric label="Storage Used" value="-" status="blue"></lex-metric>
+    </div>
+
+
+    <!-- ================================================================
+         Zones C + D row
+         Zone C (left 60%) — My Action Queue
+         Zone D (right 40%) — LANA Can Handle (Phase 3 placeholder)
+         ================================================================ -->
+    <div class="cc-action-row">
+
+      <!-- Zone C — My Action Queue -->
+      <div id="ccZoneC">
+        <lex-card padding="compact">
+          <div class="cc-section-header">
+            <div>
+              <div class="cc-section-title">My Action Queue</div>
+              <div class="cc-section-subtitle">Sorted by severity</div>
+            </div>
+            <lex-btn id="ccZoneCViewAll" variant="ghost" size="sm">View all</lex-btn>
+          </div>
+
+          <!-- Loading state -->
+          <div id="ccZoneCLoading">
+            <lex-action-card title="Loading..." description="..." priority="medium" aria-hidden="true"></lex-action-card>
+            <lex-action-card title="Loading..." description="..." priority="low" aria-hidden="true"></lex-action-card>
+            <lex-action-card title="Loading..." description="..." priority="low" aria-hidden="true"></lex-action-card>
+          </div>
+
+          <!-- Content (rendered by JS) -->
+          <div id="ccZoneCContent" class="hidden"></div>
+        </lex-card>
+      </div>
+
+      <!-- Zone D — LANA Can Handle (Phase 3 placeholder) -->
+      <div id="ccZoneD">
+        <lex-card padding="compact">
+          <div class="cc-section-header">
+            <div>
+              <div class="cc-section-title">LANA Can Handle</div>
+              <div class="cc-section-subtitle">AI-assisted actions</div>
+            </div>
+          </div>
+          <!-- TODO: Port to Lex framework — AI suggestions widget (Phase 3) -->
+          <lex-empty
+            icon="inbox"
+            message="AI-assisted actions coming soon"
+            description="LANA will suggest actions it can handle on your behalf">
+          </lex-empty>
+        </lex-card>
+      </div>
+
+    </div>
+
+
+    <!-- ================================================================
+         Zone F row
+         Left (60%) — Activity Overview: heatmap + recent activity feed
+         Right (40%) — Data Pulse: connector status
+         ================================================================ -->
+    <div class="cc-signals-row">
+
+      <!-- Zone F left — Activity Overview + Heatmap -->
+      <!-- TODO: Port to Lex framework — ActivityHeatmap custom renderer -->
+      <div id="userProductivityWidget">
+        <lex-card padding="compact">
+          <div class="cc-section-header">
+            <div class="flex items-start gap-2">
+              <div>
+                <div class="cc-section-title">Activity Overview</div>
+                <div class="cc-section-subtitle">Last 90 days of organization activity</div>
+              </div>
+              <lex-btn id="activityHeatmapInfoBtn" variant="ghost" size="sm" icon aria-label="How to read the heatmap" title="How to read the heatmap" style="flex-shrink:0;">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M12 16v-4M12 8h.01"/>
+                </svg>
+              </lex-btn>
+            </div>
+            <!-- User Filter Dropdown (Admins Only) -->
+            <div id="activityUserFilterContainer" class="hidden">
+              <lex-select
+                id="activityUserFilter"
+                placeholder="Filter by user"
+                options='[{"value":"me","label":"My Activity"},{"value":"all","label":"All Users"}]'
+                style="min-width:14rem;"
+              ></lex-select>
+            </div>
+          </div>
+
+          <!-- Stats summary -->
+          <div class="flex items-center gap-4 mb-4 text-sm lex-text-secondary">
+            <div>
+              <span id="totalActivities" class="font-semibold lex-text-primary">-</span>
+              activities in the last 90 days
+            </div>
+          </div>
+
+          <!-- Side-by-side: Heatmap + Divider + Recent Activity feed -->
+          <div class="cc-activity-split">
+
+            <!-- Heatmap container (rendered by ActivityHeatmap.render()) -->
+            <div class="cc-activity-split__heatmap">
+              <!-- Skeleton loading state — mimics heatmap grid -->
+              <div id="activityHeatmapSkeleton" class="cc-heatmap-skeleton">
+                <div class="cc-heatmap-skeleton__labels">
+                  <span class="cc-skeleton cc-skeleton--text-sm" style="width:1.75rem;"></span>
+                  <span class="cc-skeleton cc-skeleton--text-sm" style="width:1.75rem;"></span>
+                  <span class="cc-skeleton cc-skeleton--text-sm" style="width:1.75rem;"></span>
+                </div>
+                <div class="cc-heatmap-skeleton__grid" aria-hidden="true">
+                  <!-- 7 rows x 13 cols of dots rendered via CSS -->
+                </div>
+                <div class="cc-heatmap-skeleton__legend">
+                  <span class="cc-skeleton cc-skeleton--text-sm" style="width:2rem;"></span>
+                  <span class="cc-heatmap-skeleton__dot"></span>
+                  <span class="cc-heatmap-skeleton__dot"></span>
+                  <span class="cc-heatmap-skeleton__dot"></span>
+                  <span class="cc-heatmap-skeleton__dot"></span>
+                  <span class="cc-heatmap-skeleton__dot"></span>
+                  <span class="cc-skeleton cc-skeleton--text-sm" style="width:2rem;"></span>
+                </div>
+              </div>
+              <div id="activityHeatmapContainer" class="w-full min-w-0"></div>
+            </div>
+
+            <!-- Vertical divider (hidden on mobile, visible on lg) -->
+            <lex-divider direction="vertical" spacing="sm" class="cc-activity-split__divider"></lex-divider>
+
+            <!-- Recent Activity feed -->
+            <div class="cc-activity-split__feed flex flex-col">
+              <div class="mb-3 flex items-center justify-between">
+                <span class="text-sm font-semibold lex-text-primary">Recent Activity</span>
+                <div class="flex items-center gap-2">
+                  <lex-btn id="refreshActivityFeedBtn" variant="ghost" size="sm" aria-label="Refresh activity feed" title="Refresh">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                  </lex-btn>
+                  <lex-btn id="viewAllActivityHeaderBtn" variant="ghost" size="sm">View all</lex-btn>
+                </div>
+              </div>
+
+              <!-- Loading skeleton -->
+              <div id="activityFeedLoading" class="divide-y" style="border-color:var(--lex-border-subtle);">
+                <div class="py-3 animate-pulse">
+                  <div class="flex items-start gap-3">
+                    <div class="w-8 h-8 cc-skeleton rounded-full flex-shrink-0"></div>
+                    <div class="flex-1">
+                      <div class="cc-skeleton cc-skeleton--text-sm" style="width:75%;margin-bottom:0.25rem;"></div>
+                      <div class="cc-skeleton cc-skeleton--text-sm" style="width:50%;"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="py-3 animate-pulse">
+                  <div class="flex items-start gap-3">
+                    <div class="w-8 h-8 cc-skeleton rounded-full flex-shrink-0"></div>
+                    <div class="flex-1">
+                      <div class="cc-skeleton cc-skeleton--text-sm" style="width:60%;margin-bottom:0.25rem;"></div>
+                      <div class="cc-skeleton cc-skeleton--text-sm" style="width:40%;"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="py-3 animate-pulse">
+                  <div class="flex items-start gap-3">
+                    <div class="w-8 h-8 cc-skeleton rounded-full flex-shrink-0"></div>
+                    <div class="flex-1">
+                      <div class="cc-skeleton cc-skeleton--text-sm" style="width:80%;margin-bottom:0.25rem;"></div>
+                      <div class="cc-skeleton cc-skeleton--text-sm" style="width:45%;"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Activity content -->
+              <div
+                id="activityFeed"
+                class="hidden divide-y max-h-80 overflow-y-auto"
+                style="border-color:var(--lex-border-subtle);"
+              ></div>
+            </div>
+
+          </div>
+        </lex-card>
+      </div>
+
+      <!-- Zone F right — Data Pulse: connector status + widget grid -->
+      <div id="ccZoneFRight">
+        <lex-card padding="compact">
+          <div class="cc-section-header">
+            <div>
+              <div class="cc-section-title">Data Pulse</div>
+              <div class="cc-section-subtitle">Connected integrations</div>
+            </div>
+            <lex-btn id="addWidgetBtn" variant="ghost" size="sm">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 5v14M5 12h14"/>
+              </svg>
+              Add
+            </lex-btn>
+          </div>
+
+          <!-- Loading state -->
+          <div id="ccZoneFRightLoading">
+            <div class="cc-connector-row" aria-hidden="true">
+              <div class="cc-skeleton cc-skeleton--text-sm" style="width:40%;"></div>
+              <div class="cc-skeleton" style="width:0.5rem;height:0.5rem;border-radius:9999px;"></div>
+            </div>
+            <div class="cc-connector-row" aria-hidden="true">
+              <div class="cc-skeleton cc-skeleton--text-sm" style="width:55%;"></div>
+              <div class="cc-skeleton" style="width:0.5rem;height:0.5rem;border-radius:9999px;"></div>
+            </div>
+            <div class="cc-connector-row" aria-hidden="true">
+              <div class="cc-skeleton cc-skeleton--text-sm" style="width:45%;"></div>
+              <div class="cc-skeleton" style="width:0.5rem;height:0.5rem;border-radius:9999px;"></div>
+            </div>
+          </div>
+
+          <!-- Connector status content (rendered by JS) -->
+          <div id="ccZoneFRightContent" class="hidden"></div>
+
+          <!-- Legacy widget grid (kept for WidgetRenderer compatibility) -->
+          <div id="widgetGrid" class="hidden mt-4 grid grid-cols-1 gap-4">
+            <!-- Widgets rendered dynamically by widget-renderer.js -->
+          </div>
+        </lex-card>
+      </div>
+
+    </div>
+
+    <!-- ================================================================
+         Hidden elements — retained for backward-compat with existing JS
+         that references these DOM IDs from components.js / activity.js
+         ================================================================ -->
+
+    <!-- stats DOM IDs used by original dashboard.js loadStats() — kept hidden
+         so legacy code that queries them does not throw. New Command Center
+         uses ccZoneE pipeline cards instead. -->
+    <div id="statsLoading" class="hidden" aria-hidden="true"></div>
+    <div id="statsContent" class="hidden" aria-hidden="true">
+      <span id="statMatters"></span>
+      <span id="statMattersLabel"></span>
+      <div id="mattersBreakdown" class="hidden"><span id="mattersBreakdownText"></span></div>
+      <div id="statUsersCard" class="hidden">
+        <span id="statUsers"></span>
+        <div id="userBreakdown" class="hidden">
+          <span id="activeUsers"></span>
+          <span id="otherUsers"></span>
+        </div>
+      </div>
+      <span id="statDocuments"></span>
+      <div id="documentBreakdown" class="hidden">
+        <span id="activeDocuments"></span>
+        <span id="deletedDocuments"></span>
+      </div>
+      <div id="statStorageCard" class="hidden">
+        <span id="statStorage"></span>
+        <span id="storageUsagePercent"></span>
+        <span id="storageRemaining"></span>
+        <div id="storageBreakdown" class="hidden">
+          <span id="databaseStorage"></span>
+          <div id="volumeStorageList"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hidden search section (feature-flagged off) -->
+    <div id="globalSearchSection" class="hidden" aria-hidden="true">
+      <input type="text" id="globalSearchInput" autocomplete="off">
+      <button type="button" id="globalSearchBtn"></button>
+    </div>
+
+    <!-- Command Center Widgets section (hidden — replaced by Zone F right, but IDs kept) -->
+    <section id="commandCenterWidgets" class="hidden" aria-hidden="true">
+    </section>
+
+    <!-- Activity Heatmap tooltip (positioned absolutely by ActivityHeatmap.render()) -->
+    <div id="activity-heatmap-tooltip" style="position:absolute;display:none;background-color:rgba(0,0,0,0.9);color:white;padding:8px 12px;border-radius:6px;font-size:12px;pointer-events:none;z-index:1000;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.15);"></div>
+
+  </main>
+
+
+  <!-- Activity Slide-out Panel -->
+  <lex-drawer id="activityPanel" heading="Activity" width="md" side="right">
+    <!-- Activity List -->
+    <div id="activityList" class="flex-1 overflow-y-auto">
+      <div id="activityLoading" class="p-8 text-center">
+        <lex-spinner label="Loading activity..."></lex-spinner>
+      </div>
+    </div>
+    <!-- Loading More Indicator -->
+    <div id="activityLoadingMore" class="hidden p-4 border-t text-center" style="border-color:var(--lex-border-subtle);">
+      <lex-spinner size="sm"></lex-spinner>
+    </div>
+  </lex-drawer>
+
+  <!-- Activity Heatmap Info Modal -->
+  <lex-modal id="activityHeatmapInfoModal" heading="Understanding the Activity Overview" size="lg" hide-actions>
+    <div class="space-y-6">
+      <div>
+        <h3 class="text-sm font-semibold lex-text-primary mb-2">What is this?</h3>
+        <p class="text-sm lex-text-secondary leading-relaxed">The Activity Overview is a calendar-style chart that shows <strong>when your organization was active</strong> over the last 90 days. Each small square represents one day; the color shows how much activity happened that day.</p>
+      </div>
+      <div>
+        <h3 class="text-sm font-semibold lex-text-primary mb-2">Why does it matter?</h3>
+        <p class="text-sm lex-text-secondary leading-relaxed">It helps you spot patterns at a glance: which days of the week are busiest, whether activity is steady or concentrated in certain weeks, and how engagement has changed over time.</p>
+      </div>
+      <div>
+        <h3 class="text-sm font-semibold lex-text-primary mb-2">How we track activity</h3>
+        <p class="text-sm lex-text-secondary leading-relaxed mb-2">Activity is counted from usage across your whole organization. Each time someone in your org uses LANA (conversations, documents, searches, and other interactions), that counts as activity. The chart adds up all of these actions per day.</p>
+        <p class="text-sm lex-text-secondary leading-relaxed">The numbers you see are <strong>total activity events</strong> for that day, not unique users.</p>
+      </div>
+      <div>
+        <h3 class="text-sm font-semibold lex-text-primary mb-2">What am I looking at?</h3>
+        <ul class="text-sm lex-text-secondary space-y-2 list-disc pl-5">
+          <li><strong class="lex-text-primary">Rows.</strong> Each row is a day of the week (Sunday at the top through Saturday at the bottom).</li>
+          <li><strong class="lex-text-primary">Columns.</strong> Each column is one week. Time runs left to right.</li>
+          <li><strong class="lex-text-primary">Colors.</strong> Each square's color shows how much activity happened that day.</li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="text-sm font-semibold lex-text-primary mb-2">Color scale</h3>
+        <ul class="text-sm lex-text-secondary space-y-1.5 list-disc pl-5">
+          <li><strong class="lex-text-primary">Light gray:</strong> No activity (0 events)</li>
+          <li><strong class="lex-text-primary">Light green:</strong> Low activity (1 to 4 events)</li>
+          <li><strong class="lex-text-primary">Medium green:</strong> Moderate activity (5 to 9 events)</li>
+          <li><strong class="lex-text-primary">Dark green:</strong> High activity (10 to 14 events)</li>
+          <li><strong class="lex-text-primary">Darkest green:</strong> Very high activity (15 or more events)</li>
+        </ul>
+      </div>
+    </div>
+  </lex-modal>
+
+  <!-- Conversation modals created dynamically by ConversationActionsModal.init() -->
+
+</div>

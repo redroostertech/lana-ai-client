@@ -34,16 +34,23 @@
   <script src="js/lex/lex.data.js"></script>
   <script src="js/lex/lex.forms.js"></script>
   <script src="js/lex/lex.state.js"></script>
+  <script src="js/lex/lex.utils.js"></script>
+  <script src="js/lex/lex.auth.js"></script>
+  <script src="js/lex/lex-nav.js"></script>
 
   <!-- ── Lex UI foundation (loader used during startup) ── -->
   <script src="js/lex/components/foundation/lex-loader.js"></script>
   <script src="js/lex/components/foundation/lex-toast.js"></script>
   <script src="js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="js/lex/components/foundation/lex-btn.js"></script>
+  <script src="js/lex/components/foundation/lex-empty.js"></script>
+  <script src="js/lex/components/form/lex-segmented.js"></script>
 
   <!-- ── Lex UI layout (sidebar + topbar must precede lex-app) ── -->
   <script src="js/lex/components/layout/lex-sidebar.js"></script>
   <script src="js/lex/components/layout/lex-topbar.js"></script>
   <script src="js/lex/components/layout/lex-conversation-item.js"></script>
+  <script src="js/lex/components/layout/lex-notification-panel.js"></script>
 
   <!-- ── Shell + Router ── -->
   <script src="js/lex/components/layout/lex-app.js"></script>
@@ -52,7 +59,7 @@
 
   <style>
     /* Ensure body has no flash before shell renders */
-    html { scroll-behavior: auto; }
+    html { scroll-behavior: smooth; }
     body {
       font-family: var(--lex-font-sans);
       background: var(--lex-bg-secondary);
@@ -65,9 +72,9 @@
 <body>
 
   <!-- Branded loader — shows immediately, hidden after first route loads -->
-  <lex-loader theme="dark"></lex-loader>
+  <lex-loader theme="light"></lex-loader>
 
-  <!-- App shell — sidebar, topbar, content area -->
+  <!-- App shell — sidebar, topbar, content area, notification panel -->
   <lex-app
     logo-src="img/logo-light.png"
     logo-alt="LANA AI"
@@ -80,106 +87,7 @@
     </div>
   </noscript>
 
-  <script>
-    // Bootstrap: authenticate via Lex.state then start the router
-    (function () {
-      var app = document.querySelector('lex-app');
-      if (!app) return;
-
-      /**
-       * Auth guard — verify the user has a valid (non-expired) token before
-       * launching the SPA. Retries up to 3 times (300ms total) to handle the
-       * race where Electron storage hasn't flushed to localStorage yet.
-       *
-       * Uses Lex.state as centralized auth state. On failure → redirect to
-       * login.html (full reload, not routed).
-       */
-      function checkAuthWithRetry(retries) {
-        if (retries === undefined) retries = 3;
-
-        // Re-read from localStorage in case it wasn't ready when api.js loaded
-        var token = localStorage.getItem('token');
-        if (token && api) {
-          api.token = token;
-          api.user = JSON.parse(localStorage.getItem('user') || 'null');
-          // Sync into Lex.state so all consumers see updated auth
-          if (Lex.state) {
-            Lex.state.setAuth(token, api.user);
-          }
-        }
-
-        // Check 1: token must exist
-        if (!Lex.state || !Lex.state.isAuthenticated) {
-          if (retries > 0) {
-            setTimeout(function () { checkAuthWithRetry(retries - 1); }, 100);
-            return;
-          }
-          window.location.href = 'login.html';
-          return;
-        }
-
-        // Check 2: token must not be expired
-        if (Lex.state.isTokenExpired) {
-          Lex.state.clearAuth();
-          window.location.href = 'login.html';
-          return;
-        }
-
-        // Auth is valid — proceed to start the app
-        startApp();
-      }
-
-      function startApp() {
-        function onShellReady() {
-          // Determine initial page from URL or default to dashboard
-          var startPath = window.location.pathname || '/index.html';
-          if (startPath === '/' || startPath === '' || startPath.endsWith('/app.html')) {
-            startPath = '/index.html';
-          }
-
-          LexRouter.start(startPath);
-
-          // Hide the branded loader after the first page renders AND its
-          // initial data has loaded. We listen for lex-page-ready (content +
-          // scripts injected) then wait for either lex-data-loaded (from
-          // LexDataSource) or a 2-second timeout — whichever comes first.
-          document.addEventListener('lex-page-ready', function onFirstPage() {
-            document.removeEventListener('lex-page-ready', onFirstPage);
-
-            var dismissed = false;
-            function dismissLoader() {
-              if (dismissed) return;
-              dismissed = true;
-              if (window.Lex && window.Lex.Loader) {
-                window.Lex.Loader.hide();
-              }
-            }
-
-            // If the page fires lex-data-loaded (LexDataSource fetch complete),
-            // dismiss immediately — data is ready.
-            document.addEventListener('lex-data-loaded', function onData() {
-              document.removeEventListener('lex-data-loaded', onData);
-              dismissLoader();
-            });
-
-            // Fallback: dismiss after 2 seconds regardless. Handles pages
-            // with no LexDataSource, or if the API is slow.
-            setTimeout(dismissLoader, 2000);
-          });
-        }
-
-        // lex-app renders synchronously during HTML parsing, so lex-app-ready
-        // fires before this script runs. Check if the shell already rendered;
-        // if so, proceed immediately. Otherwise wait for the event.
-        if (app._shellRendered) {
-          onShellReady();
-        } else {
-          app.addEventListener('lex-app-ready', onShellReady);
-        }
-      }
-
-      checkAuthWithRetry();
-    })();
-  </script>
+  <!-- ── App bootstrap (auth guard + router start) ── -->
+  <script src="js/app.js"></script>
 </body>
 </html>

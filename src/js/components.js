@@ -303,93 +303,19 @@ const Form = {
   }
 };
 
-// Security: HTML escaping helper
-function escapeHtml(unsafe) {
-  if (unsafe === null || unsafe === undefined) return '';
-  return String(unsafe)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
+// ── Utility functions ──
+// Canonical implementations live in Lex.Utils (lex.utils.js).
+// These globals delegate there when the SPA shell is loaded, or provide
+// inline fallbacks for standalone pages that don't load lex.utils.js.
 
-// Status Badge Helper
-function statusBadge(status) {
-  const styles = {
-    active: 'bg-green-100 text-green-800',
-    inactive: 'bg-gray-100 text-gray-800',
-    pending: 'bg-yellow-100 text-yellow-800',
-    disabled: 'bg-red-100 text-red-800',
-    healthy: 'bg-green-100 text-green-800',
-    unhealthy: 'bg-red-100 text-red-800',
-    degraded: 'bg-yellow-100 text-yellow-800',
-    installed: 'bg-blue-100 text-blue-800',
-    running: 'bg-green-100 text-green-800',
-    stopped: 'bg-gray-100 text-gray-800'
-  };
-  // Security: Escape status value to prevent XSS
-  const escapedStatus = escapeHtml(status);
-  return `<span class="px-2 py-1 text-xs font-medium rounded-full ${styles[status] || 'bg-gray-100 text-gray-800'}">${escapedStatus}</span>`;
-}
-
-// Date Formatter
-function formatDate(dateString, options = {}) {
-  if (!dateString) return '-';
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    ...options
-  });
-}
-
-function formatDateTime(dateString) {
-  if (!dateString) return '-';
-  const date = new Date(dateString);
-  return date.toLocaleString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-}
-
-function timeAgo(dateString) {
-  if (!dateString) return '-';
-  const date = new Date(dateString);
-  const seconds = Math.floor((new Date() - date) / 1000);
-
-  const intervals = [
-    { label: 'year', seconds: 31536000 },
-    { label: 'month', seconds: 2592000 },
-    { label: 'day', seconds: 86400 },
-    { label: 'hour', seconds: 3600 },
-    { label: 'minute', seconds: 60 }
-  ];
-
-  for (const interval of intervals) {
-    const count = Math.floor(seconds / interval.seconds);
-    if (count >= 1) {
-      return `${count} ${interval.label}${count !== 1 ? 's' : ''} ago`;
-    }
-  }
-  return 'Just now';
-}
-
-// Debounce helper
-function debounce(func, wait) {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
+if (typeof Lex !== 'undefined' && Lex.Utils) {
+  // SPA shell — delegate to canonical Lex.Utils
+  var escapeHtml       = Lex.Utils.escapeHtml;
+  var statusBadge      = Lex.Utils.statusBadge;
+  var formatDate       = Lex.Utils.formatDate;
+  var formatDateTime   = Lex.Utils.formatDateTime;
+  var timeAgo          = Lex.Utils.timeAgo;
+  var debounce         = Lex.Utils.debounce;
 }
 
 // ============================================================
@@ -461,32 +387,13 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
   setTimeout(() => DemoBanner.show(), 0);
 }
 
-// ============================================================
-// FILE SIZE FORMATTER
-// ============================================================
-function formatFileSize(bytes) {
-  if (!bytes || bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
+// ── Additional utility delegates ──
+// Same pattern: use Lex.Utils when available (SPA shell).
 
-// ============================================================
-// PERCENTAGE FORMATTER
-// ============================================================
-function formatPercentage(value, decimals = 1) {
-  if (value === null || value === undefined) return '-';
-  return value.toFixed(decimals) + '%';
-}
-
-// ============================================================
-// TRUNCATE TEXT
-// ============================================================
-function truncateText(text, maxLength = 50) {
-  if (!text) return '';
-  if (text.length <= maxLength) return text;
-  return text.substring(0, maxLength) + '...';
+if (typeof Lex !== 'undefined' && Lex.Utils) {
+  var formatFileSize   = Lex.Utils.formatFileSize;
+  var formatPercentage = Lex.Utils.formatPercentage;
+  var truncateText     = Lex.Utils.truncateText;
 }
 
 // ============================================================
@@ -500,65 +407,14 @@ const ConversationActionsModal = {
   selectedConversationIsProject: false,
   modalInitialized: false,
 
-  // Initialize the modal HTML (called once on first use)
+  // Wire up modal elements rendered by <lex-app> (called once on first use)
   init() {
     if (this.modalInitialized) return;
 
-    // Create conversation actions modal
-    const actionsModal = document.createElement('div');
-    actionsModal.id = 'conversationActionsModal';
-    actionsModal.className = 'fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4';
-    actionsModal.style.zIndex = '9999';
-    actionsModal.innerHTML = `
-      <div class="bg-white rounded-xl shadow-2xl w-full max-w-md" onclick="event.stopPropagation()">
-        <div class="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 class="text-xl font-semibold text-gray-900">Conversation Options</h2>
-          <button onclick="ConversationActionsModal.close()" class="text-gray-400 hover:text-gray-600 transition-colors">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
-        </div>
-        <div class="p-6">
-          <h3 id="modalConversationTitle" class="text-lg font-medium text-gray-900 mb-6"></h3>
-          <div class="space-y-3">
-            <button onclick="ConversationActionsModal.editConversation()" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-indigo-300 hover:bg-indigo-50 transition-all group">
-              <div class="flex-shrink-0 w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
-                <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                </svg>
-              </div>
-              <div class="flex-1">
-                <div class="font-medium text-gray-900">Rename Conversation</div>
-                <div class="text-sm text-gray-500">Change the conversation name</div>
-              </div>
-            </button>
-            <button id="viewMatterDetailsBtn" onclick="ConversationActionsModal.viewMatterDetails()" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-indigo-300 hover:bg-indigo-50 transition-all group hidden">
-              <div class="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-              </div>
-              <div class="flex-1">
-                <div class="font-medium text-gray-900">View Matter Details</div>
-                <div class="text-sm text-gray-500">Open the associated matter</div>
-              </div>
-            </button>
-            <button onclick="ConversationActionsModal.deleteConversation()" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-red-300 hover:bg-red-50 transition-all group">
-              <div class="flex-shrink-0 w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center group-hover:bg-red-200 transition-colors">
-                <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                </svg>
-              </div>
-              <div class="flex-1">
-                <div class="font-medium text-gray-900">Delete Conversation</div>
-                <div class="text-sm text-gray-500">Permanently remove this conversation</div>
-              </div>
-            </button>
-          </div>
-        </div>
-      </div>
-    `;
+    // Find elements already rendered by <lex-app>
+    const actionsModal = document.getElementById('conversationActionsModal');
+    const renameModal = document.getElementById('renameConversationModal');
+    if (!actionsModal || !renameModal) return;
 
     // Close on background click
     actionsModal.onclick = (e) => {
@@ -567,42 +423,11 @@ const ConversationActionsModal = {
       }
     };
 
-    // Create rename conversation modal
-    const renameModal = document.createElement('div');
-    renameModal.id = 'renameConversationModal';
-    renameModal.className = 'fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4';
-    renameModal.style.zIndex = '10000';
-    renameModal.innerHTML = `
-      <div class="bg-white rounded-xl shadow-2xl w-full max-w-md" onclick="event.stopPropagation()">
-        <div class="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 class="text-xl font-semibold text-gray-900">Rename Conversation</h2>
-          <button onclick="ConversationActionsModal.closeRename()" class="text-gray-400 hover:text-gray-600 transition-colors">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
-        </div>
-        <div class="p-6">
-          <label class="block text-sm font-medium text-gray-700 mb-2">New Conversation Name</label>
-          <input type="text" id="renameInput" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" placeholder="Enter new name">
-        </div>
-        <div class="flex justify-end gap-3 p-6 border-t border-gray-200">
-          <button onclick="ConversationActionsModal.closeRename()" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Cancel</button>
-          <button onclick="ConversationActionsModal.confirmRename()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">Rename</button>
-        </div>
-      </div>
-    `;
-
-    // Close on background click
     renameModal.onclick = (e) => {
       if (e.target === renameModal) {
         this.closeRename();
       }
     };
-
-    // Append to body
-    document.body.appendChild(actionsModal);
-    document.body.appendChild(renameModal);
 
     this.modalInitialized = true;
   },

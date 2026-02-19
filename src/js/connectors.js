@@ -608,7 +608,13 @@ const ConnectorRegistry = {
   }
 };
 
-// Export for use in other modules
+// Export for use in other modules (legacy pages)
 window.Connectors = Connectors;
 window.ConnectorsMockData = ConnectorsMockData;
 window.ConnectorRegistry = ConnectorRegistry;
+
+// Register on Lex namespace for SPA access
+window.Lex = window.Lex || {};
+window.Lex.Connectors = Connectors;
+window.Lex.ConnectorRegistry = ConnectorRegistry;
+window.Lex.ConnectorsMockData = ConnectorsMockData;

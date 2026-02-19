@@ -2442,6 +2442,75 @@ class ApiClient {
   async getDashboardWidgetTypes() {
     return this.get('/api/v1/dashboard-widgets/types');
   }
+
+  // ---------------------------------------------------------------------------
+  // Command Center — Morning Briefing aggregated dashboard
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Fetch the full Command Center summary (aggregated, 60-second server-side cache).
+   *
+   * Zones returned:
+   *   matter_pulse     — total / active / stale matter counts
+   *   today_activity   — documents and conversations started today
+   *   focus_items      — top 4 critical/high alerts by focus_score
+   *   connector_health — connector status summary
+   *
+   * @param {Object} [params] - Optional query parameters
+   * @param {string} [params.matter_id] - UUID to narrow all zones to a single matter
+   * @returns {Promise<Object>}
+   */
+  async getCommandCenterSummary(params) {
+    var queryStr = '';
+    if (params && params.matter_id) {
+      queryStr = '?matter_id=' + encodeURIComponent(params.matter_id);
+    }
+    return this.get('/api/v1/command-center/summary' + queryStr);
+  }
+
+  /**
+   * Fetch Zone B critical items with pagination and filtering.
+   * Returns fresh data on every call (no server-side cache).
+   *
+   * @param {Object} [params] - Query parameters
+   * @param {number} [params.limit=4]       - Max items (1-20)
+   * @param {number} [params.offset=0]      - Page offset
+   * @param {string} [params.severity]      - critical|high|medium|low
+   * @param {string} [params.search]        - Free-text search on title
+   * @param {string} [params.sort_by]       - focus_score|created_at|severity|title
+   * @param {string} [params.sort_order]    - asc|desc
+   * @param {string} [params.status]        - active|acknowledged|resolved
+   * @returns {Promise<Object>}
+   */
+  async getCommandCenterCriticalItems(params) {
+    var p = params || {};
+    var parts = [];
+    if (p.limit !== undefined)      parts.push('limit='      + encodeURIComponent(p.limit));
+    if (p.offset !== undefined)     parts.push('offset='     + encodeURIComponent(p.offset));
+    if (p.severity !== undefined)   parts.push('severity='   + encodeURIComponent(p.severity));
+    if (p.search !== undefined)     parts.push('search='     + encodeURIComponent(p.search));
+    if (p.sort_by !== undefined)    parts.push('sort_by='    + encodeURIComponent(p.sort_by));
+    if (p.sort_order !== undefined) parts.push('sort_order=' + encodeURIComponent(p.sort_order));
+    if (p.status !== undefined)     parts.push('status='     + encodeURIComponent(p.status));
+    var queryStr = parts.length > 0 ? '?' + parts.join('&') : '';
+    return this.get('/api/v1/command-center/critical-items' + queryStr);
+  }
+
+  /**
+   * Fetch Zone E pipeline metrics (matter pulse + today's activity).
+   * Response is cached for 60 seconds server-side.
+   *
+   * @param {Object} [params] - Optional query parameters
+   * @param {string} [params.matter_id] - UUID to narrow counts to a single matter
+   * @returns {Promise<Object>}
+   */
+  async getCommandCenterPipelineMetrics(params) {
+    var queryStr = '';
+    if (params && params.matter_id) {
+      queryStr = '?matter_id=' + encodeURIComponent(params.matter_id);
+    }
+    return this.get('/api/v1/command-center/pipeline-metrics' + queryStr);
+  }
 }
 
 class ApiError extends Error {

@@ -34,9 +34,6 @@ window.ActivityPanel = (function() {
     // Cache DOM elements
     elements = {
       panel: document.getElementById('activityPanel'),
-      overlay: document.getElementById('activityOverlay'),
-      closeBtn: document.getElementById('closeActivityPanel'),
-      refreshBtn: document.getElementById('refreshActivityBtn'),
       list: document.getElementById('activityList'),
       loading: document.getElementById('activityLoading'),
       viewAllBtn: document.getElementById('viewAllActivityBtn'),
@@ -106,29 +103,9 @@ window.ActivityPanel = (function() {
    * Bind all event listeners
    */
   function bindEvents() {
-    // Close panel
-    if (elements.closeBtn) {
-      elements.closeBtn.addEventListener('click', close);
-    }
-    if (elements.overlay) {
-      elements.overlay.addEventListener('click', close);
-    }
-
-    // Escape key to close
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && isOpen()) {
-        close();
-      }
-    });
-
-    // Refresh button
-    if (elements.refreshBtn) {
-      elements.refreshBtn.addEventListener('click', () => {
-        elements.refreshBtn.classList.add('animate-spin');
-        loadActivities(true).finally(() => {
-          elements.refreshBtn.classList.remove('animate-spin');
-        });
-      });
+    // lex-drawer handles close button, overlay click, and Escape key internally
+    if (elements.panel) {
+      elements.panel.addEventListener('lex-close', close);
     }
 
     // View all button (on dashboard)
@@ -160,7 +137,7 @@ window.ActivityPanel = (function() {
    * Check if panel is open
    */
   function isOpen() {
-    return elements.panel && !elements.panel.classList.contains('translate-x-full');
+    return elements.panel && elements.panel.open;
   }
 
   /**
@@ -168,12 +145,7 @@ window.ActivityPanel = (function() {
    */
   function open() {
     if (!elements.panel) return;
-    
-    elements.panel.classList.remove('translate-x-full');
-    if (elements.overlay) {
-      elements.overlay.classList.remove('hidden');
-    }
-    document.body.classList.add('overflow-hidden');
+    elements.panel.open = true;
     loadActivities(true);
   }
 
@@ -182,12 +154,7 @@ window.ActivityPanel = (function() {
    */
   function close() {
     if (!elements.panel) return;
-    
-    elements.panel.classList.add('translate-x-full');
-    if (elements.overlay) {
-      elements.overlay.classList.add('hidden');
-    }
-    document.body.classList.remove('overflow-hidden');
+    elements.panel.open = false;
   }
 
   /**

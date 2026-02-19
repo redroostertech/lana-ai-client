@@ -29,7 +29,11 @@
     'demo.html',
     'update-dialog.html',
     'blank.html',
-    'app.html'
+    'app.html',
+    'index.html',
+    'matters.html',
+    'storage.html',
+    'connectors.html'
   ];
 
   // =========================================================================
@@ -40,12 +44,25 @@
   var PAGE_DESCRIPTORS = {
 
     // ── Dashboard ──
-    'index.html': {
+    'dashboard.html': {
       title: 'Dashboard',
       activeNav: 'dashboard',
       scripts: [
+        // Additional Lex components used only by the dashboard
+        'js/lex/components/foundation/lex-banner.js',
+        'js/lex/components/foundation/lex-metric.js',
+        'js/lex/components/foundation/lex-action-card.js',
+        'js/lex/components/foundation/lex-badge.js',
+        'js/lex/components/foundation/lex-stack.js',
+        'js/lex/components/foundation/lex-text.js',
+        'js/lex/components/foundation/lex-modal.js',
+        'js/lex/components/foundation/lex-drawer.js',
+        'js/lex/components/foundation/lex-card.js',
+        'js/lex/components/foundation/lex-divider.js',
+        'js/lex/components/form/lex-select.js',
         'js/utils/event-display-names.js',
         'js/services/feature-tracker.js',
+        'js/activity.js',
         'js/activity-heatmap.js',
         'js/vendor/chart.js',
         'js/dashboard/widget-renderer.js',
@@ -58,10 +75,12 @@
         'js/dashboard/widgets/connector-status.widget.js',
         'js/dashboard/widgets/module-metric.widget.js',
         'js/dashboard/widgets/alert-list.widget.js',
-        'js/services/session-tracking-service.js'
+        'js/services/session-tracking-service.js',
+        'js/dashboard/dashboard.js'
       ],
       stylesheets: [
-        'css/session-tracking.css'
+        'css/session-tracking.css',
+        'css/dashboard-command-center.css'
       ]
     },
 
@@ -78,10 +97,10 @@
       stylesheets: []
     },
 
-    // ── Matters ──
-    'matters.html': {
-      title: 'Matters',
-      activeNav: 'matters',
+    // ── Workspaces ──
+    'workspaces.html': {
+      title: 'Workspaces',
+      activeNav: 'workspaces',
       scripts: [
         'js/services/feature-tracker.js',
         'js/vendor/mammoth.min.js',
@@ -99,7 +118,8 @@
         'js/matter-notes.js',
         'js/matter-skills.js',
         'https://cdn.jsdelivr.net/npm/drawflow@0.0.60/dist/drawflow.min.js',
-        'js/workflow-builder.js'
+        'js/workflow-builder.js',
+        'js/workspace.js'
       ],
       stylesheets: [
         'css/components/document-metadata.css',
@@ -110,14 +130,14 @@
 
     'matters/timeline.html': {
       title: 'Matter Timeline',
-      activeNav: 'matters',
+      activeNav: 'workspaces',
       scripts: [],
       stylesheets: []
     },
 
     'matter-skills.html': {
       title: 'Matter Skills',
-      activeNav: 'matters',
+      activeNav: 'workspaces',
       scripts: [
         'js/matter-skills.js'
       ],
@@ -126,8 +146,8 @@
       ]
     },
 
-    // ── Storage ──
-    'storage.html': {
+    // ── My Drive ──
+    'drive.html': {
       title: 'My Drive',
       activeNav: 'storage',
       scripts: [
@@ -137,10 +157,11 @@
         'js/vendor/marked.min.js',
         'js/components/document-metadata-viewer.js',
         'js/file-viewer.js',
-        'js/storage.js'
+        'js/drive.js'
       ],
       stylesheets: [
-        'css/components/document-metadata.css'
+        'css/components/document-metadata.css',
+        'css/drive.css'
       ]
     },
 
@@ -398,11 +419,12 @@
     },
 
     // ── Integrations ──
-    'integrations/connectors.html': {
+    'integrations/data_connectors.html': {
       title: 'Data Connectors',
       activeNav: 'connectors',
       scripts: [
-        'js/connectors.js'
+        'js/connectors.js',
+        'js/data_connectors.js'
       ],
       stylesheets: []
     },

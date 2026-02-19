@@ -34,24 +34,6 @@
   padding: 1rem 1.5rem;
 }
 
-/* Custom scrollbar for metadata content */
-.metadata-viewer__content::-webkit-scrollbar {
-  width: 8px;
-}
-
-.metadata-viewer__content::-webkit-scrollbar-track {
-  background: #f3f4f6;
-}
-
-.metadata-viewer__content::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 4px;
-}
-
-.metadata-viewer__content::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
-}
-
 /* Loading state */
 .metadata-viewer__loading {
   display: flex;

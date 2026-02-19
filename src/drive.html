@@ -1,0 +1,809 @@
+<div id="lex-page-content">
+  <div class="p-6">
+    <!-- Breadcrumb Navigation -->
+    <nav id="breadcrumbs" class="mb-4 flex items-center text-sm text-gray-600">
+      <a href="#" class="hover:text-indigo-600" data-folder-id="root">Home</a>
+    </nav>
+
+    <!-- Toolbar -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-2">
+        <!-- New Folder Button -->
+        <button id="newFolderBtn" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+          </svg>
+          New Folder
+        </button>
+
+        <!-- Upload Button -->
+        <button id="uploadBtn" class="inline-flex items-center px-4 py-2 bg-white text-gray-700 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+          </svg>
+          Upload
+        </button>
+        <input type="file" id="fileUploadInput" class="hidden" multiple>
+      </div>
+
+      <!-- View Toggle -->
+      <div class="flex items-center gap-2">
+        <span class="text-sm text-gray-500 mr-2">View:</span>
+        <button id="gridViewBtn" class="p-2 rounded hover:bg-gray-100 transition-colors text-indigo-600" title="Grid View">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+          </svg>
+        </button>
+        <button id="listViewBtn" class="p-2 rounded hover:bg-gray-100 transition-colors text-gray-400" title="List View">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Search, Sort, and Filter Toolbar -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
+      <div class="flex items-center gap-4 flex-wrap">
+        <!-- Search Input -->
+        <div class="flex-1 min-w-[200px]">
+          <div class="relative">
+            <input
+              type="text"
+              id="searchInput"
+              placeholder="Search matters by name or ID..."
+              class="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+            >
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+            <button id="clearSearchBtn" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 hidden">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Sort By Dropdown -->
+        <div class="flex items-center gap-2">
+          <label for="sortSelect" class="text-sm text-gray-600 whitespace-nowrap">Sort by:</label>
+          <select id="sortSelect" class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="name">Name</option>
+            <option value="created_at">Created Date</option>
+            <option value="updated_at">Modified Date</option>
+            <option value="document_count">File Count</option>
+            <option value="folder_count">Folder Count</option>
+          </select>
+        </div>
+
+        <!-- Sort Order Toggle -->
+        <button id="sortOrderBtn" class="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors" title="Toggle sort order" data-order="asc">
+          <svg id="sortOrderIcon" class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+          </svg>
+        </button>
+
+        <!-- Source Filter -->
+        <div class="flex items-center gap-2">
+          <label for="sourceFilter" class="text-sm text-gray-600 whitespace-nowrap">Source:</label>
+          <select id="sourceFilter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="all">All Sources</option>
+            <option value="client_matters">My Matters</option>
+            <option value="connector">Connected Systems</option>
+          </select>
+        </div>
+
+        <!-- Results Count -->
+        <div id="resultsCount" class="text-sm text-gray-500 whitespace-nowrap ml-auto"></div>
+      </div>
+    </div>
+
+    <!-- Pinned Files Section -->
+    <div id="pinnedSection" class="hidden mb-6">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
+          <svg class="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/>
+          </svg>
+          Pinned
+        </h2>
+        <span id="pinnedCount" class="text-sm text-gray-500">0 items</span>
+      </div>
+      <div class="relative">
+        <div id="pinnedFiles" class="flex gap-4 overflow-x-auto pb-4 scrollbar-thin"></div>
+      </div>
+    </div>
+
+    <!-- Recent Files Section -->
+    <div id="recentsSection" class="hidden mb-6">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
+          <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          Recently Opened
+        </h2>
+        <span id="recentsCount" class="text-sm text-gray-500">0 items</span>
+      </div>
+      <div class="relative">
+        <div id="recentFiles" class="flex gap-4 overflow-x-auto pb-4 scrollbar-thin"></div>
+      </div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="contentLoading" class="text-center py-16">
+      <svg class="animate-spin h-12 w-12 text-indigo-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+      <p class="text-sm text-gray-500 mt-4">Loading...</p>
+    </div>
+
+    <!-- Grid View -->
+    <div id="gridView" class="hidden grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
+
+    <!-- List View -->
+    <div id="listView" class="hidden bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <th scope="col" class="w-10 px-6 py-3"></th>
+            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created By</th>
+            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created On</th>
+            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
+            <th scope="col" class="w-20 px-6 py-3"></th>
+          </tr>
+        </thead>
+        <tbody id="listViewBody" class="bg-white divide-y divide-gray-200"></tbody>
+      </table>
+    </div>
+
+    <!-- Empty State -->
+    <div id="contentEmpty" class="hidden text-center py-12">
+      <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+      </svg>
+      <h4 class="text-lg font-semibold text-gray-900 mb-2">This folder is empty</h4>
+      <p class="text-gray-500 mb-4">Upload files or create a new folder to get started</p>
+      <button id="emptyStateNewFolderBtn" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+        </svg>
+        Create Folder
+      </button>
+    </div>
+
+    <!-- Pagination Controls (only shown for root matters view) -->
+    <div id="paginationControls" class="hidden mt-6 flex items-center justify-between px-4 py-3 bg-white border border-gray-200 rounded-lg">
+      <div class="flex-1 flex justify-between sm:hidden">
+        <button id="prevPageMobile" onclick="goToPreviousPage()" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+          Previous
+        </button>
+        <button id="nextPageMobile" onclick="goToNextPage()" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+          Next
+        </button>
+      </div>
+      <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+        <div>
+          <p class="text-sm text-gray-700">
+            Showing <span class="font-medium" id="paginationStart">1</span> to <span class="font-medium" id="paginationEnd">100</span> of <span class="font-medium" id="paginationTotal">0</span> results
+          </p>
+        </div>
+        <div>
+          <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+            <button id="prevPage" onclick="goToPreviousPage()" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+              <span class="sr-only">Previous</span>
+              <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+              </svg>
+            </button>
+            <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+              Page <span id="currentPageNum" class="mx-1">1</span> of <span id="totalPagesNum" class="ml-1">1</span>
+            </span>
+            <button id="nextPage" onclick="goToNextPage()" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+              <span class="sr-only">Next</span>
+              <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+              </svg>
+            </button>
+          </nav>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       MODALS — fixed position, viewport-relative (work inside #lex-page-content)
+       ══════════════════════════════════════════════════════════════════ -->
+
+  <!-- New Folder Modal -->
+  <div id="newFolderModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+      <div class="p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Create New Folder</h3>
+        <form id="newFolderForm">
+          <div class="mb-4">
+            <label for="folderNameInput" class="block text-sm font-medium text-gray-700 mb-2">Folder Name</label>
+            <input type="text" id="folderNameInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Enter folder name" required>
+            <p class="mt-2 text-xs text-gray-500">
+              <svg class="inline-block w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              Creating a folder will also create a new matter. To edit matter details, visit the <a href="/matters.html" class="text-indigo-600 hover:text-indigo-800 underline">Matters page</a>.
+            </p>
+          </div>
+          <div class="flex items-center justify-end gap-3">
+            <button type="button" id="cancelNewFolderBtn" class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
+            <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">Create</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Document Viewer Modal with Metadata Sidebar -->
+  <div id="documentViewerModal" class="hidden fixed inset-0 bg-black bg-opacity-75 z-50">
+    <div class="bg-white w-full h-full flex flex-col">
+      <!-- Header -->
+      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-3">
+          <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+          </svg>
+          <div>
+            <h3 id="viewerFileName" class="text-lg font-semibold text-gray-900">Document</h3>
+            <p id="viewerFileInfo" class="text-sm text-gray-500"></p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="viewerDownloadBtn" class="px-4 py-2 text-indigo-600 hover:bg-indigo-50 rounded-lg font-medium flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            Download
+          </button>
+          <button id="closeDocumentViewer" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Split Panel Layout: Content on left, Metadata on right -->
+      <div class="flex-1 flex overflow-hidden">
+        <!-- File Content Area (Left - 65%) -->
+        <div id="viewerContent" class="flex-1 overflow-auto bg-gray-100 p-4 min-w-0">
+          <div id="viewerLoading" class="flex items-center justify-center h-full">
+            <div class="text-center">
+              <div class="animate-spin w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto mb-4"></div>
+              <p class="text-gray-500">Loading document...</p>
+            </div>
+          </div>
+          <div id="viewerError" class="hidden flex items-center justify-center h-full">
+            <div class="text-center">
+              <svg class="w-16 h-16 text-red-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+              </svg>
+              <p id="viewerErrorMsg" class="text-gray-600 mb-4">Unable to preview this file</p>
+              <button id="viewerErrorDownload" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium inline-flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                Download Instead
+              </button>
+            </div>
+          </div>
+          <iframe id="viewerIframe" class="hidden w-full h-full bg-white rounded-lg shadow-sm"></iframe>
+          <pre id="viewerText" class="hidden w-full h-full bg-white rounded-lg shadow-sm p-6 overflow-auto text-sm font-mono whitespace-pre-wrap"></pre>
+          <img id="viewerImage" class="hidden max-w-full max-h-full mx-auto rounded-lg shadow-sm object-contain">
+          <div id="viewerDocx" class="hidden w-full h-full bg-white rounded-lg shadow-sm p-6 overflow-auto prose prose-sm max-w-none">
+            <style>
+              #viewerDocx table.docx-table { width: 100%; border-collapse: collapse; margin: 1em 0; border: 1px solid #e5e7eb; }
+              #viewerDocx table.docx-table td, #viewerDocx table.docx-table th { border: 1px solid #e5e7eb; padding: 0.5em; text-align: left; }
+              #viewerDocx table.docx-table th { background-color: #f3f4f6; font-weight: 600; }
+              #viewerDocx table.docx-table tr:nth-child(even) { background-color: #f9fafb; }
+              #viewerDocx img { max-width: 100%; height: auto; margin: 1em 0; }
+            </style>
+          </div>
+        </div>
+
+        <!-- Metadata Sidebar (Right - 35%) -->
+        <div class="w-96 bg-white border-l border-gray-200 flex flex-col overflow-hidden">
+          <div class="px-4 py-3 border-b border-gray-200 bg-gray-50">
+            <div class="flex items-center justify-between">
+              <h4 class="text-sm font-semibold text-gray-900">Document Details</h4>
+              <div class="flex items-center gap-1 bg-white rounded-lg p-1 border border-gray-300">
+                <button id="viewModeBtn" class="px-3 py-1 text-xs font-medium rounded transition-colors bg-indigo-100 text-indigo-700">View</button>
+                <button id="editModeBtn" class="px-3 py-1 text-xs font-medium rounded transition-colors text-gray-600 hover:bg-gray-100">Edit</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex-1 overflow-y-auto p-4 space-y-4">
+            <!-- AI-Generated Metadata -->
+            <div id="viewerMetadataContainer" class="mb-4"></div>
+
+            <!-- File Info -->
+            <div class="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-lg p-4 border border-indigo-100 shadow-sm">
+              <div class="space-y-3 text-sm">
+                <div class="flex justify-between items-center">
+                  <span class="text-gray-600 font-medium flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path></svg>
+                    Size
+                  </span>
+                  <span id="metaFileSize" class="text-gray-900 font-semibold">--</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-gray-600 font-medium flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                    Type
+                  </span>
+                  <span id="metaFileType" class="text-gray-900 font-semibold">--</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-gray-600 font-medium flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    Uploaded
+                  </span>
+                  <span id="metaUploadedAt" class="text-gray-900 font-semibold">--</span>
+                </div>
+                <div class="flex justify-between items-center pt-2 border-t border-indigo-100">
+                  <span class="text-gray-600 font-medium flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                    Chunks
+                  </span>
+                  <span id="metaChunkCount" class="text-gray-900 font-semibold">--</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- View Mode -->
+            <div id="metaViewMode" class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Document Type</label>
+                <div id="metaDocTypeView" class="text-sm text-gray-900">--</div>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Tags</label>
+                <div id="metaTagsView" class="flex flex-wrap gap-1 text-sm text-gray-900">--</div>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <div id="metaNotesView" class="text-sm text-gray-900 whitespace-pre-wrap">--</div>
+              </div>
+            </div>
+
+            <!-- Edit Mode -->
+            <div id="metaEditMode" class="hidden space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Document Type</label>
+                <select id="metaDocType" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                  <option value="">Auto-detect</option>
+                  <option value="contract">Contract</option>
+                  <option value="pleading">Pleading</option>
+                  <option value="deposition">Deposition</option>
+                  <option value="medical_record">Medical Record</option>
+                  <option value="police_report">Police Report</option>
+                  <option value="email">Email</option>
+                  <option value="correspondence">Correspondence</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Tags</label>
+                <input type="text" id="metaTags" placeholder="e.g., important, draft" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                <p class="text-xs text-gray-500 mt-1">Separate with commas</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+                <textarea id="metaNotes" rows="4" placeholder="Add notes..." class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"></textarea>
+                <p class="text-xs text-gray-500 mt-1"><span id="metaNotesCount">0</span>/2000</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Metadata Actions Footer (Edit Mode Only) -->
+          <div id="metaActionsFooter" class="hidden px-4 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-end gap-2">
+            <button id="metaCancelBtn" class="px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 rounded-lg font-medium">Cancel</button>
+            <button id="metaSaveBtn" class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium">Save Changes</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Document Metadata Modal -->
+  <div id="documentMetadataModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg">
+      <div class="px-6 py-4 border-b border-gray-200">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900">Document Details</h3>
+              <p class="text-sm text-gray-500">Add optional metadata to help organize and find this document</p>
+            </div>
+          </div>
+          <button id="closeMetadataModal" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="p-6 space-y-4">
+        <div class="bg-gray-50 rounded-lg p-3 border border-gray-200">
+          <p class="text-sm text-gray-600">
+            <span class="font-medium text-gray-900" id="metadataFileName">filename.pdf</span>
+            <span class="text-gray-400 mx-1">&bull;</span>
+            <span id="metadataFileSize">1.2 MB</span>
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Document Type</label>
+          <select id="metadataDocType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+            <option value="">Auto-detect (recommended)</option>
+            <option value="contract">Contract</option>
+            <option value="pleading">Pleading</option>
+            <option value="deposition">Deposition</option>
+            <option value="medical_record">Medical Record</option>
+            <option value="police_report">Police Report</option>
+            <option value="email">Email</option>
+            <option value="expert_report">Expert Report</option>
+            <option value="correspondence">Correspondence</option>
+            <option value="document">Other Document</option>
+          </select>
+          <p class="text-xs text-gray-500 mt-1">Leave as "Auto-detect" to let AI classify the document</p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Document Contains (Optional)</label>
+          <div class="space-y-2">
+            <label class="flex items-center cursor-pointer hover:bg-gray-50 p-2 rounded">
+              <input type="checkbox" id="metadataHasSignatures" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+              <span class="ml-2 text-sm text-gray-700">Signatures (will use Vision OCR for detection)</span>
+            </label>
+            <label class="flex items-center cursor-pointer hover:bg-gray-50 p-2 rounded">
+              <input type="checkbox" id="metadataHasForms" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+              <span class="ml-2 text-sm text-gray-700">Fillable form fields (will extract values)</span>
+            </label>
+          </div>
+          <p class="text-xs text-gray-500 mt-1">These hints help optimize document processing. Leave unchecked for automatic detection.</p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Tags</label>
+          <input type="text" id="metadataTags" maxlength="500" placeholder="e.g., important, confidential, draft" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+          <p class="text-xs text-gray-500 mt-1">Separate multiple tags with commas (max 10 tags, 500 chars total)</p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+          <textarea id="metadataNotes" rows="3" maxlength="2000" placeholder="Add any notes about this document..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"></textarea>
+          <p class="text-xs text-gray-500 mt-1"><span id="notesCharCount">0</span>/2000 characters</p>
+        </div>
+      </div>
+
+      <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3 bg-gray-50 rounded-b-xl">
+        <button id="cancelMetadataUpload" class="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg font-medium transition-colors">Cancel</button>
+        <button id="confirmMetadataUpload" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+          </svg>
+          Upload Document
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Single File Upload Modal -->
+  <div id="uploadSingleFileModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md">
+      <div class="px-6 py-4 border-b border-gray-200">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900">Upload Document</h3>
+              <p class="text-sm text-gray-500">Configure document processing hints</p>
+            </div>
+          </div>
+          <button id="cancelSingleUploadBtn" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+      </div>
+      <div class="px-6 py-5">
+        <div class="mb-5 p-3 bg-gray-50 rounded-lg">
+          <div class="flex items-start gap-3">
+            <svg class="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <div class="flex-1 min-w-0">
+              <p id="singleFileName" class="text-sm font-medium text-gray-900 truncate"></p>
+              <p id="singleFileSize" class="text-xs text-gray-500 mt-0.5"></p>
+            </div>
+          </div>
+        </div>
+        <div class="space-y-4">
+          <div>
+            <h4 class="text-sm font-medium text-gray-900 mb-3">Processing Hints <span class="text-gray-500 font-normal">(optional)</span></h4>
+            <p class="text-xs text-gray-500 mb-3">Select document characteristics to optimize AI processing. Leave unchecked for automatic detection.</p>
+          </div>
+          <label class="flex items-start gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+            <input type="checkbox" id="singleHasSignatures" class="mt-0.5 w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 focus:ring-2">
+            <div class="flex-1">
+              <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                </svg>
+                <span class="text-sm font-medium text-gray-900">Contains Signatures</span>
+              </div>
+              <p class="text-xs text-gray-500 mt-1">Document includes handwritten or electronic signatures</p>
+            </div>
+          </label>
+          <label class="flex items-start gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+            <input type="checkbox" id="singleHasForms" class="mt-0.5 w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 focus:ring-2">
+            <div class="flex-1">
+              <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <span class="text-sm font-medium text-gray-900">Contains Forms</span>
+              </div>
+              <p class="text-xs text-gray-500 mt-1">Document includes fillable forms or checkboxes</p>
+            </div>
+          </label>
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3 bg-gray-50 rounded-b-xl">
+        <button id="cancelSingleUploadBtnFooter" class="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg font-medium transition-colors">Cancel</button>
+        <button id="confirmSingleUploadBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+          </svg>
+          Upload Document
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bulk Upload Grid Modal -->
+  <div id="bulkUploadModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col">
+      <div class="px-6 py-4 border-b border-gray-200 flex-shrink-0">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+              <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900">Bulk Upload Documents</h3>
+              <p class="text-sm text-gray-500"><span id="bulkFileCount">0</span> files selected - Configure hints for each file</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="px-6 py-3 bg-gray-50 border-b border-gray-200 flex-shrink-0">
+        <div class="flex items-center gap-4 flex-wrap">
+          <span class="text-sm font-medium text-gray-700">Apply to All:</span>
+          <div class="flex items-center gap-2">
+            <select id="bulkApplyDocType" class="text-sm px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+              <option value="">Select type...</option>
+              <option value="contract">Contract</option>
+              <option value="pleading">Pleading</option>
+              <option value="deposition">Deposition</option>
+              <option value="medical_record">Medical Record</option>
+              <option value="police_report">Police Report</option>
+              <option value="email">Email</option>
+              <option value="expert_report">Expert Report</option>
+              <option value="correspondence">Correspondence</option>
+              <option value="document">Other Document</option>
+            </select>
+            <button id="applyDocTypeBtn" class="px-3 py-1.5 text-sm bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-lg font-medium transition-colors">Apply Type</button>
+          </div>
+          <button id="applySignaturesBtn" class="px-3 py-1.5 text-sm bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg font-medium transition-colors flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            Check Signatures
+          </button>
+          <button id="applyFormsBtn" class="px-3 py-1.5 text-sm bg-green-100 hover:bg-green-200 text-green-700 rounded-lg font-medium transition-colors flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            Check Forms
+          </button>
+          <button id="clearAllHintsBtn" class="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            Clear All
+          </button>
+        </div>
+      </div>
+      <div class="flex-1 overflow-y-auto p-6">
+        <div class="overflow-x-auto">
+          <table class="w-full border-collapse">
+            <thead class="bg-gray-50 sticky top-0">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider border-b border-gray-200">File Name</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider border-b border-gray-200">Size</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider border-b border-gray-200">Document Type</th>
+                <th class="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider border-b border-gray-200">Signatures</th>
+                <th class="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider border-b border-gray-200">Forms</th>
+              </tr>
+            </thead>
+            <tbody id="bulkUploadGridBody" class="bg-white divide-y divide-gray-200"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3 bg-gray-50 rounded-b-xl flex-shrink-0">
+        <button id="cancelBulkUploadBtn" class="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg font-medium transition-colors">Cancel</button>
+        <button id="confirmBulkUploadBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+          </svg>
+          Upload Documents
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Matter Actions Modal -->
+  <div id="matterActionsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 9999;" onclick="if(event.target === this) closeMatterActionsModal()">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between p-6 border-b border-gray-200">
+        <h2 class="text-xl font-semibold text-gray-900">Folder Options</h2>
+        <button onclick="closeMatterActionsModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <div class="p-6">
+        <div class="mb-4 p-4 bg-gray-50 rounded-lg">
+          <p class="text-sm font-medium text-gray-700 mb-1">Folder:</p>
+          <p id="modalMatterName" class="text-base text-gray-900 font-medium"></p>
+          <p id="modalMatterId" class="text-sm text-gray-500"></p>
+        </div>
+        <div class="space-y-3">
+          <button onclick="openMatterFromModal()" class="w-full flex items-center gap-3 px-4 py-3 bg-white border-2 border-gray-200 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-all group">
+            <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
+              <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+            </div>
+            <div class="flex-1 text-left">
+              <p class="font-medium text-gray-900 group-hover:text-indigo-600 transition-colors">Open Folder</p>
+              <p class="text-sm text-gray-500">View files and folders</p>
+            </div>
+          </button>
+          <button id="togglePinBtn" onclick="togglePinFromModal()" class="w-full flex items-center gap-3 px-4 py-3 bg-white border-2 border-gray-200 rounded-lg hover:border-yellow-500 hover:bg-yellow-50 transition-all group">
+            <div class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center group-hover:bg-yellow-200 transition-colors">
+              <svg class="w-5 h-5 text-yellow-600" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg>
+            </div>
+            <div class="flex-1 text-left">
+              <p id="pinBtnLabel" class="font-medium text-gray-900 group-hover:text-yellow-600 transition-colors">Pin Folder</p>
+              <p id="pinBtnDesc" class="text-sm text-gray-500">Add to pinned folders</p>
+            </div>
+          </button>
+          <button onclick="deleteMatterFromModal()" class="w-full flex items-center gap-3 px-4 py-3 bg-white border-2 border-gray-200 rounded-lg hover:border-red-500 hover:bg-red-50 transition-all group">
+            <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center group-hover:bg-red-200 transition-colors">
+              <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            </div>
+            <div class="flex-1 text-left">
+              <p class="font-medium text-gray-900 group-hover:text-red-600 transition-colors">Delete Folder</p>
+              <p class="text-sm text-gray-500">Permanently delete this folder and all its contents</p>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Matter Confirmation Modal -->
+  <div id="deleteMatterConfirmModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 10000;" onclick="if(event.target === this) closeDeleteMatterConfirmModal()">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between p-6 border-b border-gray-200">
+        <h2 class="text-xl font-semibold text-red-600">Delete Folder</h2>
+        <button onclick="closeDeleteMatterConfirmModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <div class="p-6">
+        <div class="flex items-start gap-3 mb-4">
+          <div class="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+            <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.072 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+            </svg>
+          </div>
+          <div>
+            <p class="text-gray-900 font-medium">Are you sure you want to delete this folder?</p>
+            <p class="text-sm text-gray-500 mt-1">This will permanently delete the folder <strong id="deleteConfirmMatterName" class="text-gray-700"></strong> and all of its contents including:</p>
+            <ul class="text-sm text-gray-500 mt-2 space-y-1 list-disc list-inside">
+              <li>All files and documents</li>
+              <li>Document chunks and embeddings</li>
+              <li>Conversations and chat history</li>
+              <li>Notes, tasks, and references</li>
+            </ul>
+            <p class="text-sm text-red-600 font-medium mt-3">This action cannot be undone.</p>
+          </div>
+        </div>
+        <div class="flex gap-3 mt-6">
+          <button onclick="closeDeleteMatterConfirmModal()" class="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">Cancel</button>
+          <button id="confirmDeleteMatterBtn" onclick="confirmDeleteMatter()" class="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium">Delete Folder</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rename Conversation Modal -->
+  <div id="renameConversationModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 10000;" onclick="if(event.target === this) closeRenameModal()">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between p-6 border-b border-gray-200">
+        <h2 class="text-xl font-semibold text-gray-900">Rename Conversation</h2>
+        <button onclick="closeRenameModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <div class="p-6">
+        <div class="mb-4">
+          <label for="renameInput" class="block text-sm font-medium text-gray-700 mb-2">New conversation name</label>
+          <input type="text" id="renameInput" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all" placeholder="Enter new name..." onkeypress="if(event.key === 'Enter') confirmRename()">
+        </div>
+        <div class="flex gap-3">
+          <button onclick="closeRenameModal()" class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
+          <button onclick="confirmRename()" class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">Rename</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Conversation Actions Modal -->
+  <div id="conversationActionsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 9999;" onclick="if(event.target === this) closeConversationActionsModal()">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between p-6 border-b border-gray-200">
+        <h2 class="text-xl font-semibold text-gray-900">Conversation Options</h2>
+        <button onclick="closeConversationActionsModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <div class="p-6">
+        <div class="mb-4 p-4 bg-gray-50 rounded-lg">
+          <p class="text-sm font-medium text-gray-700 mb-1">Current Name:</p>
+          <p id="modalConversationTitle" class="text-base text-gray-900"></p>
+        </div>
+        <div class="space-y-3">
+          <button onclick="editConversationFromModal()" class="w-full flex items-center gap-3 px-4 py-3 bg-white border-2 border-gray-200 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-all group">
+            <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
+              <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+            </div>
+            <div class="flex-1 text-left">
+              <p class="font-medium text-gray-900 group-hover:text-indigo-600 transition-colors">Rename Conversation</p>
+              <p class="text-sm text-gray-500">Change the conversation title</p>
+            </div>
+          </button>
+          <button id="viewMatterDetailsBtn" onclick="viewMatterDetailsFromModal()" class="w-full hidden flex items-center gap-3 px-4 py-3 bg-white border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all group">
+            <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
+              <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            </div>
+            <div class="flex-1 text-left">
+              <p class="font-medium text-gray-900 group-hover:text-blue-600 transition-colors">View Matter Details</p>
+              <p class="text-sm text-gray-500">Open the full matter information</p>
+            </div>
+          </button>
+          <button onclick="deleteConversationFromModal()" class="w-full flex items-center gap-3 px-4 py-3 bg-white border-2 border-gray-200 rounded-lg hover:border-red-500 hover:bg-red-50 transition-all group">
+            <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center group-hover:bg-red-200 transition-colors">
+              <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            </div>
+            <div class="flex-1 text-left">
+              <p class="font-medium text-gray-900 group-hover:text-red-600 transition-colors">Delete Conversation</p>
+              <p class="text-sm text-gray-500">Permanently remove this conversation</p>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Context Menu Container -->
+  <div id="contextMenu" class="hidden fixed bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-50 min-w-[180px]"></div>
+</div>

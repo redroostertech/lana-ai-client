@@ -271,6 +271,87 @@
   }
 
   // =========================================================================
+  // Built-in Redacted State — skeleton shimmer on any Lex component
+  // =========================================================================
+  //
+  // Every LexElement subclass inherits a `redacted` boolean property.
+  // Setting it to true overlays the component with a uniform gray shimmer
+  // (minimum duration: 1.5 s). Designed for in-page data refreshes.
+  //
+  // Usage:
+  //   element.redacted = true;   // show skeleton shimmer
+  //   element.redacted = false;  // remove (respects minimum duration)
+  //
+  // For non-Lex elements, use the global API:
+  //   Lex.Redact.on(element);    // any DOM element
+  //   Lex.Redact.off(element);
+  //
+
+  Object.defineProperty(LexElement.prototype, 'redacted', {
+    get: function () { return this.hasAttribute('lex-redacted'); },
+    set: function (val) {
+      if (val) {
+        global.Lex.Redact.on(this);
+      } else {
+        global.Lex.Redact.off(this);
+      }
+    },
+    configurable: true
+  });
+
+  /** Inject redacted-state CSS once into document head. */
+  LexElement._redactedStylesInjected = false;
+  LexElement._ensureRedactedStyles = function () {
+    if (LexElement._redactedStylesInjected) return;
+    LexElement._redactedStylesInjected = true;
+
+    var s = document.createElement('style');
+    s.id = 'lex-redacted-styles';
+    s.textContent = [
+      '/* Lex UI — Redacted State (skeleton shimmer) */',
+      '',
+      '[lex-redacted] {',
+      '  position: relative;',
+      '  pointer-events: none;',
+      '  user-select: none;',
+      '  overflow: hidden;',
+      '}',
+      '',
+      '/* Sweep shimmer — translucent highlight band glides across */',
+      '[lex-redacted]::after {',
+      '  content: \'\';',
+      '  position: absolute;',
+      '  inset: 0;',
+      '  z-index: 2;',
+      '  pointer-events: none;',
+      '  border-radius: inherit;',
+      '  background: linear-gradient(',
+      '    110deg,',
+      '    transparent 40%,',
+      '    rgba(255, 255, 255, 0.4) 50%,',
+      '    transparent 60%',
+      '  );',
+      '  background-size: 250% 100%;',
+      '  animation: lex-redacted-sweep 2s ease-in-out infinite;',
+      '}',
+      '',
+      '/* Content fades to uniform gray skeleton tone.',
+      '   filter chain: desaturate > flatten contrast > lighten.',
+      '   Result: everything becomes ~#E0E0E0 while preserving its shape. */',
+      '[lex-redacted] > * {',
+      '  filter: saturate(0) contrast(0) brightness(1.8);',
+      '  transition: filter 0.3s ease;',
+      '}',
+      '',
+      '@keyframes lex-redacted-sweep {',
+      '  0%   { background-position: -100% 0; }',
+      '  100% { background-position: 200% 0; }',
+      '}'
+    ].join('\n');
+    document.head.appendChild(s);
+  };
+
+  // =========================================================================
   // Registration helper
   // =========================================================================
 
@@ -289,5 +370,61 @@
   global.Lex.LexElement = LexElement;
   global.Lex.defineLex = defineLex;
   global.Lex.version = LEX_VERSION;
+
+  // =========================================================================
+  // Lex.Redact — Global redacted-state API (works on any DOM element)
+  // =========================================================================
+
+  global.Lex.Redact = {
+    /** Minimum visible duration in milliseconds. */
+    MIN_DURATION: 1500,
+
+    /** @private WeakMap<Element, number> — pending setTimeout IDs */
+    _timers: new WeakMap(),
+
+    /** @private WeakMap<Element, number> — timestamp when redacted was turned on */
+    _starts: new WeakMap(),
+
+    /**
+     * Set an element to redacted (skeleton shimmer) state.
+     * Works on any DOM element, not just Lex components.
+     * @param {Element} element
+     */
+    on: function (element) {
+      if (!element) return;
+      LexElement._ensureRedactedStyles();
+      var t = this._timers.get(element);
+      if (t) clearTimeout(t);
+      this._starts.set(element, Date.now());
+      element.setAttribute('lex-redacted', '');
+    },
+
+    /**
+     * Remove redacted state from an element.
+     * Respects MIN_DURATION — if less than 1.5 s have passed since on(),
+     * the attribute removal is deferred until the minimum has elapsed.
+     * @param {Element} element
+     */
+    off: function (element) {
+      if (!element) return;
+      var t = this._timers.get(element);
+      if (t) clearTimeout(t);
+      var start   = this._starts.get(element) || 0;
+      var elapsed = Date.now() - start;
+      var remain  = Math.max(0, this.MIN_DURATION - elapsed);
+      var self    = this;
+      if (remain > 0) {
+        this._timers.set(element, setTimeout(function () {
+          element.removeAttribute('lex-redacted');
+          self._timers.delete(element);
+          self._starts.delete(element);
+        }, remain));
+      } else {
+        element.removeAttribute('lex-redacted');
+        this._timers.delete(element);
+        this._starts.delete(element);
+      }
+    }
+  };
 
 })(typeof window !== 'undefined' ? window : globalThis);

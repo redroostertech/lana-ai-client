@@ -318,6 +318,7 @@
   --lex-transition-fast:   150ms ease;
   --lex-transition-normal: 200ms ease;
   --lex-transition-slow:   300ms ease;
+  --lex-transition-slide:  0.7s cubic-bezier(0.22, 0.84, 0, 0.99);
 
   /* ── Z-Index Scale ──────────────────────────────────────────── */
 
@@ -411,6 +412,7 @@
   --lex-sidebar-active-bg:    var(--lex-color-gray-800);
   --lex-sidebar-border:       var(--lex-color-gray-800);
   --lex-sidebar-logo-height:  28px;
+  --lex-sidebar-item-gap:     4px;
   --lex-sidebar-avatar-bg:    var(--lex-color-brand-600);
 
   /* Topbar */
@@ -454,6 +456,13 @@
   --lex-icon-stroke-small:  1.5;
   --lex-icon-stroke-normal: 2;
   --lex-icon-stroke-thick:  2.5;
+
+  /* ── Scroll ──────────────────────────────────────────────────── */
+
+  --lex-scroll-thumb:       var(--lex-color-gray-300);
+  --lex-scroll-thumb-hover: var(--lex-color-gray-400);
+  --lex-scroll-track:       transparent;
+  --lex-scroll-size:        6px;
 }
 
 
@@ -669,4 +678,52 @@ lex-dropdown-btn input,
   background-color: var(--lex-color-gray-50, #FAFAF8);
   font-family: inherit;
   font-size: var(--lex-form-font-size, 0.8125rem);
+}
+
+
+/* ==========================================================================
+   GLOBAL SCROLL BEHAVIOR
+   Consistent scrollbar styling and smooth scrolling across the platform.
+   Applied globally — individual components inherit these automatically.
+   ========================================================================== */
+
+* {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--lex-scroll-thumb) var(--lex-scroll-track);
+}
+
+/* ── WebKit scrollbar (Chrome, Safari, Electron) ── */
+
+::-webkit-scrollbar {
+  width: var(--lex-scroll-size);
+  height: var(--lex-scroll-size);
+}
+
+::-webkit-scrollbar-track {
+  background: var(--lex-scroll-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--lex-scroll-thumb);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--lex-scroll-thumb-hover);
+}
+
+/* ── Dark theme scrollbar (chat, etc.) ── */
+
+[data-lex-theme="dark"] {
+  scrollbar-color: var(--lex-color-gray-600) transparent;
+}
+
+[data-lex-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: var(--lex-color-gray-600);
+}
+
+[data-lex-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: var(--lex-color-gray-500);
 }

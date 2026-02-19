@@ -1,15 +1,17 @@
 /* Lex UI — Button Component
-   Rounded button with variants, sizes, icon support, and ripple feedback.
+   Rounded button with variants, sizes, icon support, badge count, and ripple feedback.
 
    Usage:
      <lex-btn variant="primary">Save</lex-btn>
      <lex-btn variant="danger" loading="true">Deleting...</lex-btn>
      <lex-btn variant="success" icon="true"><svg>...</svg></lex-btn>
      <lex-btn variant="info"><svg>...</svg> Attach File</lex-btn>
+     <lex-btn variant="ghost" icon="true" badge="5"><svg>...</svg></lex-btn>
 
    Variants: primary | secondary | danger | success | warning | info | ghost
    Sizes: sm | md | lg
    icon="true" for icon-only buttons
+   badge="N" shows a red notification bubble (0 or empty hides it, >99 shows "99+")
 */
 
 (function () {
@@ -98,6 +100,53 @@
       @keyframes lex-btn-spin {
         to { transform: rotate(360deg); }
       }
+
+      /* ── Badge ─────────────────────────────────────────── */
+
+      lex-btn {
+        position: relative;
+        display: inline-block;
+      }
+
+      .lex-btn-badge {
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        z-index: 2;
+        min-width: 18px;
+        height: 18px;
+        padding: 0 5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--lex-color-danger-500, #F04438);
+        color: #fff;
+        font-size: 10px;
+        font-weight: var(--lex-weight-bold, 700);
+        border-radius: var(--lex-radius-full, 9999px);
+        line-height: 1;
+        pointer-events: none;
+        z-index: 1;
+        box-shadow: 0 0 0 2px var(--lex-bg-primary, #fff);
+      }
+
+      .lex-btn-badge--sm {
+        min-width: 16px;
+        height: 16px;
+        padding: 0 4px;
+        font-size: 9px;
+        top: -3px;
+        right: -3px;
+      }
+
+      .lex-btn-badge--lg {
+        min-width: 20px;
+        height: 20px;
+        padding: 0 6px;
+        font-size: 11px;
+        top: -5px;
+        right: -5px;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -110,7 +159,8 @@
         disabled: { type: Boolean, default: false, reflect: true },
         loading:  { type: Boolean, default: false },
         type:     { type: String, default: 'button' },
-        icon:     { type: Boolean, default: false }
+        icon:     { type: Boolean, default: false },
+        badge:    { type: Number, default: 0 }
       };
     }
 
@@ -193,14 +243,18 @@
         </svg>
       ` : '';
 
-      return `
-        <button
+      const badgeCount = this.badge || 0;
+      const badgeSizeCls = this.size === 'sm' ? ' lex-btn-badge--sm' : this.size === 'lg' ? ' lex-btn-badge--lg' : '';
+      const badgeHtml = badgeCount > 0
+        ? `<span class="lex-btn-badge${badgeSizeCls}">${badgeCount > 99 ? '99+' : badgeCount}</span>`
+        : '';
+
+      return `${badgeHtml}<button
           type="${this.type}"
           class="lex-btn-inner"
           style="${cssVars}${sizeStyle}"
           ${this.disabled || this.loading ? 'disabled' : ''}
-        >${spinner}<slot-content></slot-content></button>
-      `;
+        >${spinner}<slot-content></slot-content></button>`;
     }
 
     updated() {

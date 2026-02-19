@@ -183,10 +183,6 @@
   }
 }
 
-/* Smooth scrolling for session timeline */
-.session-timeline-container {
-  scroll-behavior: smooth;
-}
 
 /* Focus percentage color utility classes */
 .focus-high {

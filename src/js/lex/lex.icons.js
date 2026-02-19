@@ -410,7 +410,78 @@
     /** Exposed token maps for introspection */
     sizes: SIZE,
     colors: COLOR,
-    strokes: STROKE
+    strokes: STROKE,
+
+    // ── File Icons (custom, not Lucide — do not overwrite with generator) ──
+
+    /**
+     * Colored document icon based on file extension.
+     * @param {string} filename - e.g. "report.pdf"
+     * @param {string} [size='large'] - 'large' (w-12 h-12) or 'small' (w-5 h-5 mr-3)
+     * @returns {string} SVG markup
+     */
+    fileIcon: (function () {
+      var EXT_COLORS = {
+        'pdf': 'text-red-500',
+        'doc': 'text-blue-500', 'docx': 'text-blue-500',
+        'xls': 'text-green-500', 'xlsx': 'text-green-500',
+        'ppt': 'text-orange-500', 'pptx': 'text-orange-500',
+        'txt': 'text-gray-500',
+        'jpg': 'text-purple-500', 'jpeg': 'text-purple-500',
+        'png': 'text-purple-500', 'gif': 'text-purple-500'
+      };
+      var DOC_PATH = 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z';
+
+      return function fileIcon(filename, size) {
+        var parts = (filename || '').split('.');
+        var ext = parts.length > 1 ? parts[parts.length - 1].toLowerCase() : '';
+        var color = EXT_COLORS[ext] || 'text-gray-400';
+        var dim = (size === 'small') ? 'w-5 h-5 mr-3' : 'w-12 h-12';
+        return '<svg class="' + dim + ' ' + color + '" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="' + DOC_PATH + '"></path></svg>';
+      };
+    })(),
+
+    /**
+     * Rich document icon based on MIME content type (uses filled SVGs for recognized types).
+     * @param {string} contentType - e.g. "application/pdf"
+     * @param {string} [size] - optional size override class (default: 'w-10 h-10')
+     * @returns {string} SVG markup
+     */
+    fileIconByMime: function fileIconByMime(contentType, size) {
+      var dim = size || 'w-10 h-10';
+      if (!contentType) {
+        return '<svg class="' + dim + ' text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>';
+      }
+      if (contentType.indexOf('pdf') !== -1) {
+        return '<svg class="' + dim + ' text-red-500" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM8.5 13.5v3h1v-1h.5a1 1 0 0 0 1-1v-1a1 1 0 0 0-1-1h-1.5zm1 1h.5v1h-.5v-1zm2.5-1v3h1.5a1 1 0 0 0 1-1v-1a1 1 0 0 0-1-1H12zm1 1h.5v1H13v-1zm2.5-1v3h1v-1.5h.5v-1h-.5v-.5h1v-1h-2z"/></svg>';
+      }
+      if (contentType.indexOf('word') !== -1 || contentType.indexOf('document') !== -1) {
+        return '<svg class="' + dim + ' text-blue-600" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM9 13l1.5 6 1.5-4 1.5 4 1.5-6h-1l-.75 3-1.25-3.5h-.5L10.25 16 9.5 13H9z"/></svg>';
+      }
+      if (contentType.indexOf('csv') !== -1 || contentType.indexOf('sheet') !== -1 || contentType.indexOf('excel') !== -1) {
+        return '<svg class="' + dim + ' text-green-600" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM8 13h2v2H8v-2zm0 3h2v2H8v-2zm3-3h2v2h-2v-2zm0 3h2v2h-2v-2zm3-3h2v2h-2v-2zm0 3h2v2h-2v-2z"/></svg>';
+      }
+      if (contentType.indexOf('image') !== -1) {
+        return '<svg class="' + dim + ' text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>';
+      }
+      if (contentType.indexOf('presentation') !== -1 || contentType.indexOf('powerpoint') !== -1) {
+        return '<svg class="' + dim + ' text-orange-500" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM9 13v6h1.5v-2h1a1.5 1.5 0 0 0 1.5-1.5v-1a1.5 1.5 0 0 0-1.5-1.5H9zm1.5 1.5h1v1h-1v-1z"/></svg>';
+      }
+      if (contentType.indexOf('video') !== -1) {
+        return '<svg class="' + dim + ' text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>';
+      }
+      if (contentType.indexOf('audio') !== -1) {
+        return '<svg class="' + dim + ' text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path></svg>';
+      }
+      if (contentType.indexOf('zip') !== -1 || contentType.indexOf('archive') !== -1 || contentType.indexOf('compressed') !== -1) {
+        return '<svg class="' + dim + ' text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"></path></svg>';
+      }
+      if (contentType.indexOf('text') !== -1) {
+        return '<svg class="' + dim + ' text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>';
+      }
+      return '<svg class="' + dim + ' text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>';
+    }
   };
 
   var Icons = new Proxy(_api, {
@@ -432,4 +503,9 @@
   // ── Expose on Lex namespace ────────────────────────────────────
   if (!window.Lex) window.Lex = {};
   window.Lex.Icons = Icons;
+
+  // ── Backward-compat globals for file icon functions ──────────
+  window.getFileIcon = function (f) { return Icons.fileIcon(f, 'large'); };
+  window.getFileIconSmall = function (f) { return Icons.fileIcon(f, 'small'); };
+  window.getFileIconSVG = function (ct) { return Icons.fileIconByMime(ct); };
 })();

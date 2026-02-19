@@ -245,7 +245,7 @@
   class LexLoader extends LexElement {
     static get properties() {
       return {
-        theme: { type: String, default: 'dark' }
+        theme: { type: String, default: 'light' }
       };
     }
 
@@ -259,7 +259,7 @@
 
     // --- Static API ---
 
-    static show(theme = 'dark') {
+    static show(theme = 'light') {
       injectStyles();
 
       // Remove existing if present

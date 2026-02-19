@@ -77,7 +77,7 @@
         flex-direction: column;
         z-index: var(--lex-z-overlay);
         transform: translateX(-100%);
-        transition: transform var(--lex-transition-slow), width 0.7s cubic-bezier(0.22, 0.84, 0, 0.99);
+        transition: transform var(--lex-transition-slide), width var(--lex-transition-slide);
         font-family: var(--lex-font-sans);
       }
 
@@ -135,7 +135,7 @@
 
         /* Conversation list fades + collapses height */
         .lex-sidebar-root .lex-sidebar-conversation-list {
-          transition: opacity 0.25s ease, max-height 0.7s cubic-bezier(0.22, 0.84, 0, 0.99);
+          transition: opacity 0.25s ease, max-height var(--lex-transition-slide);
           max-height: 2000px;
           overflow: hidden;
         }
@@ -249,6 +249,9 @@
       .lex-sidebar-section {
         padding: 0.5rem 0.75rem;
         flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        gap: var(--lex-sidebar-item-gap);
       }
 
       .lex-sidebar-section-title {
@@ -269,19 +272,6 @@
         flex: 1;
         overflow-y: auto;
         min-height: 0;
-      }
-
-      .lex-sidebar-scrollable::-webkit-scrollbar {
-        width: 4px;
-      }
-
-      .lex-sidebar-scrollable::-webkit-scrollbar-track {
-        background: transparent;
-      }
-
-      .lex-sidebar-scrollable::-webkit-scrollbar-thumb {
-        background: var(--_sb-border);
-        border-radius: 2px;
       }
 
       /* ── Nav item ───────────────────────────────────────── */
@@ -586,7 +576,7 @@
         activeId:      { type: String,  default: '' },
         logoSrc:       { type: String,  default: '' },
         logoAlt:       { type: String,  default: 'LANA AI' },
-        logoHref:      { type: String,  default: 'index.html' },
+        logoHref:      { type: String,  default: 'dashboard.html' },
         userName:      { type: String,  default: '' },
         userInitials:  { type: String,  default: '' },
         userRole:      { type: String,  default: '' },
@@ -838,6 +828,11 @@
         const label = target.querySelector('.lex-sidebar-nav-label');
         const href = target.getAttribute('href') || '';
         const onClickFn = target.dataset.onclick;
+
+        // Prevent browser from following <a> tags — the router handles navigation
+        if (!isButton && href) {
+          e.preventDefault();
+        }
 
         this.emit('sidebar-nav-click', {
           id: id,

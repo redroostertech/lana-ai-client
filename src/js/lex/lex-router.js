@@ -45,6 +45,12 @@
   // to file:///index.html, breaking all relative URL resolution.
   var _appBaseUrl = window.location.href;
 
+  // Disable browser automatic scroll restoration on page refresh.
+  // The router handles scroll-to-top explicitly in navigate() Step 11.
+  if ('scrollRestoration' in history) {
+    history.scrollRestoration = 'manual';
+  }
+
   // ---------------------------------------------------------------------------
   // Path resolution
   // ---------------------------------------------------------------------------
@@ -80,8 +86,18 @@
 
     // Relative path — resolve against current location
     try {
-      var resolved = new URL(href, window.location.href);
-      return resolved.pathname;
+      var resolved = new URL(href, _appBaseUrl);
+      var pathname = resolved.pathname;
+      // Under file:// protocol, the resolved pathname includes the full filesystem
+      // path (e.g. /Users/.../src/workspaces.html). Strip down to the page-relative
+      // path so descriptor lookups work (e.g. /workspaces.html).
+      if (window.location.protocol === 'file:') {
+        var srcIdx = pathname.indexOf('/src/');
+        if (srcIdx !== -1) return pathname.substring(srcIdx + 4);
+        var pubIdx = pathname.indexOf('/public_html/');
+        if (pubIdx !== -1) return pathname.substring(pubIdx + 12);
+      }
+      return pathname;
     } catch (e) {
       return null;
     }
@@ -92,8 +108,11 @@
    */
   function pathKey(path) {
     if (!path) return '';
+    // Strip query string before descriptor lookup
+    var qIdx = path.indexOf('?');
+    var clean = qIdx !== -1 ? path.substring(0, qIdx) : path;
     // Strip leading slash for descriptor lookup
-    return path.indexOf('/') === 0 ? path.substring(1) : path;
+    return clean.indexOf('/') === 0 ? clean.substring(1) : clean;
   }
 
   // ---------------------------------------------------------------------------
@@ -218,11 +237,13 @@
     }
     _currentView = null;
 
-    // Remove page-specific script tags (does not undo execution)
+    // Remove page-specific script tags and clear their cache entries so they
+    // re-execute when the user navigates back to this page.
     var scripts = document.querySelectorAll('script[data-lex-page="' + pagePath + '"]');
     for (var i = 0; i < scripts.length; i++) {
-      // Keep CDN scripts in place — they are safe to leave
+      // Keep CDN scripts in place — they are safe to leave and should stay cached
       if (scripts[i].src.indexOf('cdn.') === -1 && scripts[i].src.indexOf('cdnjs.') === -1) {
+        _loadedScripts.delete(scripts[i].src);
         scripts[i].remove();
       }
     }
@@ -557,7 +578,13 @@
     if (!_pageDescriptors[key]) return;
 
     e.preventDefault();
-    navigate(path);
+
+    // Delegate to Lex.Nav if available (single entry point for all navigation)
+    if (global.Lex && global.Lex.Nav) {
+      global.Lex.Nav.go(href);
+    } else {
+      navigate(path);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -686,7 +713,10 @@
       if (_currentPath) {
         navigate(_currentPath, { force: true });
       }
-    }
+    },
+
+    /** Expose normalizePath for Lex.Nav integration */
+    _normalizePath: normalizePath
   };
 
   // ---------------------------------------------------------------------------

@@ -1,11 +1,17 @@
 /**
  * Navigation Helpers
- * Centralized path resolution and navigation utilities for LANA AI client
+ * Path resolution and navigation utilities for LANA AI client.
+ * Navigation methods delegate to Lex.Nav.go() when available, falling back
+ * to direct window.location.href for backward compatibility.
+ *
+ * Rules:
+ *   - NO regex anywhere — string methods only (includes, indexOf, split, etc.)
  */
 
 const NavigationHelpers = {
   /**
-   * Resolve path to a target file from current location
+   * Resolve path to a target file from current location.
+   * Handles file:// protocol depth calculation.
    * @param {string} targetPath - Target file path (e.g., 'chat.html', 'matters.html')
    * @returns {string} Resolved relative path
    */
@@ -13,10 +19,8 @@ const NavigationHelpers = {
     const currentPath = window.location.pathname;
 
     // For file:// protocol, extract only the relative path from app root
-    // Look for known app directories: 'src', 'public_html', or assume everything after last known root
     let relativePath = currentPath;
 
-    // Find the last occurrence of src/ or public_html/ to get relative path
     const srcIndex = currentPath.lastIndexOf('/src/');
     const publicHtmlIndex = currentPath.lastIndexOf('/public_html/');
 
@@ -25,27 +29,22 @@ const NavigationHelpers = {
     } else if (srcIndex !== -1) {
       relativePath = currentPath.substring(srcIndex + '/src/'.length);
     } else {
-      // Fallback: assume everything after last slash before filename
       const segments = currentPath.split('/');
       relativePath = segments[segments.length - 1];
     }
 
-    // Calculate directory depth from relative path
     const pathSegments = relativePath.split('/').filter(segment => segment);
-    const depth = pathSegments.length - 1; // -1 because last segment is the file name
+    const depth = pathSegments.length - 1;
 
     if (depth === 0) {
-      // We're at root level (e.g., /index.html or /chat.html)
       return targetPath;
     } else {
-      // We're in a subdirectory (e.g., /integrations/connectors.html)
-      // Need to go up 'depth' levels
       return '../'.repeat(depth) + targetPath;
     }
   },
 
   /**
-   * Resolve path to chat.html from current location
+   * Resolve path to chat.html from current location.
    * @returns {string} Resolved path to chat.html
    */
   resolveChatPath() {
@@ -53,7 +52,7 @@ const NavigationHelpers = {
   },
 
   /**
-   * Check if currently on chat page
+   * Check if currently on chat page.
    * @returns {boolean} True if on chat.html
    */
   isOnChatPage() {
@@ -61,119 +60,145 @@ const NavigationHelpers = {
   },
 
   /**
-   * Navigate to chat page with conversation
+   * Navigate to chat page with conversation.
+   * Delegates to Lex.Nav.go() when available.
    * @param {string} threadId - Conversation thread ID
    * @param {string} matterId - Optional matter ID
    */
-  navigateToConversation(threadId, matterId = '') {
-    console.log('[NavigationHelpers.navigateToConversation] Called with:', { threadId, matterId });
+  navigateToConversation(threadId, matterId) {
+    matterId = matterId || '';
+    var params = { session: threadId };
+    if (matterId) params.matter = matterId;
 
-    const params = new URLSearchParams();
-    params.set('session', threadId);
-    if (matterId) {
-      params.set('matter', matterId);
+    if (window.Lex && window.Lex.Nav) {
+      window.Lex.Nav.go('chat.html', { params: params });
+      return;
     }
 
-    const chatPath = this.resolveChatPath();
-    const fullUrl = `${chatPath}?${params.toString()}`;
-
-    console.log('[NavigationHelpers.navigateToConversation] Navigating to:', fullUrl);
-    console.log('[NavigationHelpers.navigateToConversation] Query params:', params.toString());
-    console.log('[NavigationHelpers.navigateToConversation] Current location:', window.location.href);
-
-    window.location.href = fullUrl;
+    // Fallback for pre-Nav loading
+    var search = new URLSearchParams();
+    search.set('session', threadId);
+    if (matterId) search.set('matter', matterId);
+    window.location.href = this.resolveChatPath() + '?' + search.toString();
   },
 
   /**
-   * Navigate to chat page with new project modal
+   * Navigate to chat page with new project modal.
+   * Delegates to Lex.Nav.go() when available.
    */
   navigateToNewProject() {
-    const chatPath = this.resolveChatPath();
-    window.location.href = `${chatPath}?openModal=newProject`;
+    if (window.Lex && window.Lex.Nav) {
+      window.Lex.Nav.go('chat.html', { params: { openModal: 'newProject' } });
+      return;
+    }
+
+    window.location.href = this.resolveChatPath() + '?openModal=newProject';
   },
 
   /**
-   * Navigate to chat page with matter context
+   * Navigate to chat page with matter context.
+   * Delegates to Lex.Nav.go() when available.
    * @param {string} matterId - Matter ID
    */
   navigateToMatterChat(matterId) {
-    console.log('[NavigationHelpers.navigateToMatterChat] Called with matterId:', matterId);
+    if (window.Lex && window.Lex.Nav) {
+      window.Lex.Nav.go('chat.html', { params: { matter: matterId } });
+      return;
+    }
 
-    const params = new URLSearchParams();
-    params.set('matter', matterId);
-
-    const chatPath = this.resolveChatPath();
-    const fullUrl = `${chatPath}?${params.toString()}`;
-
-    console.log('[NavigationHelpers.navigateToMatterChat] Navigating to:', fullUrl);
-    console.log('[NavigationHelpers.navigateToMatterChat] URL params:', params.toString());
-
-    window.location.href = fullUrl;
+    var search = new URLSearchParams();
+    search.set('matter', matterId);
+    window.location.href = this.resolveChatPath() + '?' + search.toString();
   },
 
   /**
-   * Get current URL parameters
+   * Get current URL parameters.
+   * Delegates to Lex.Nav.getParams() when available.
    * @returns {URLSearchParams} Current URL parameters
    */
   getParams() {
+    if (window.Lex && window.Lex.Nav) {
+      return window.Lex.Nav.getParams();
+    }
     return new URLSearchParams(window.location.search);
   },
 
   /**
-   * Validate session ID format
+   * Validate session ID format.
+   * Session IDs should be alphanumeric with hyphens and underscores.
+   * Uses string character checking — no regex.
    * @param {string} sessionId - Session ID to validate
    * @returns {boolean} True if valid format
    */
   validateSessionId(sessionId) {
     if (!sessionId) return false;
-    // Session IDs should be alphanumeric with hyphens and underscores
-    return /^[a-zA-Z0-9_-]+$/.test(sessionId);
+    var s = String(sessionId);
+    if (s.length === 0) return false;
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charAt(i);
+      var code = s.charCodeAt(i);
+      // a-z, A-Z, 0-9, _, -
+      var isAlpha = (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
+      var isDigit = (code >= 48 && code <= 57);
+      if (!isAlpha && !isDigit && c !== '_' && c !== '-') return false;
+    }
+    return true;
   },
 
   /**
-   * Validate matter ID format
-   * Accepts: MATT-XXXXX (native), AS-XXXXX (ActionStep), numeric (legacy)
+   * Validate matter ID format.
+   * Accepts: MATT-XXXXX (native), AS-XXXXX (ActionStep), numeric (legacy), matter_ prefix.
+   * Uses string methods — no regex.
    *
-   * TODO: In future, dynamically load prefixes from connector registry
-   * When adding new connectors, update the validPatterns array below
+   * TODO: In future, dynamically load prefixes from connector registry.
    *
    * @param {string} matterId - Matter ID to validate
    * @returns {boolean} True if valid format
    */
   validateMatterId(matterId) {
     if (!matterId) return false;
+    var s = String(matterId);
+    if (s.length === 0) return false;
 
-    const matterIdString = String(matterId);
+    // Known prefixes (case-insensitive)
+    var lower = s.toLowerCase();
+    if (lower.indexOf('matt-') === 0) return true;
+    if (lower.indexOf('as-') === 0) return true;
+    if (lower.indexOf('matter_') === 0) return true;
 
-    // TODO: Replace this static list with dynamic loading from connector registry
-    // Each connector should define its matter_id prefix format
-    const validPatterns = [
-      /^MATT-/i,      // Native LANA matters
-      /^AS-/i,        // ActionStep imported matters
-      /^matter_/i,    // Legacy matter_ prefix
-      /^\d+$/         // Legacy numeric IDs
-      // ADD NEW CONNECTOR PREFIXES HERE (e.g., /^CLIO-/i, /^MY-/i, etc.)
-    ];
-
-    return validPatterns.some(pattern => pattern.test(matterIdString));
+    // Legacy numeric IDs — check all digits
+    var allDigits = true;
+    for (var i = 0; i < s.length; i++) {
+      var code = s.charCodeAt(i);
+      if (code < 48 || code > 57) { allDigits = false; break; }
+    }
+    return allDigits;
   },
 
   /**
-   * Update URL without page reload
-   * @param {Object} params - Parameters to set
+   * Update URL without page reload.
+   * Delegates to Lex.Nav.updateParams() when available.
+   * @param {Object} params - Parameters to set (null values remove keys)
    */
   updateURL(params) {
-    const urlParams = new URLSearchParams(window.location.search);
+    if (window.Lex && window.Lex.Nav) {
+      window.Lex.Nav.updateParams(params);
+      return;
+    }
 
-    Object.entries(params).forEach(([key, value]) => {
-      if (value === null || value === undefined) {
+    // Fallback
+    var urlParams = new URLSearchParams(window.location.search);
+    var keys = Object.keys(params);
+    for (var i = 0; i < keys.length; i++) {
+      var key = keys[i];
+      var val = params[key];
+      if (val === null || val === undefined) {
         urlParams.delete(key);
       } else {
-        urlParams.set(key, value);
+        urlParams.set(key, val);
       }
-    });
-
-    const newURL = `${window.location.pathname}?${urlParams.toString()}`;
+    }
+    var newURL = window.location.pathname + '?' + urlParams.toString();
     window.history.pushState({}, '', newURL);
   }
 };

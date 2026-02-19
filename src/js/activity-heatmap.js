@@ -293,10 +293,13 @@ const ActivityHeatmap = (function() {
   }
 
   /**
-   * Add tooltip container
+   * Ensure tooltip container exists. Reuses the element from dashboard.html
+   * if already present; creates one inside the given container otherwise.
    */
   function addTooltip(container) {
-    const tooltip = document.createElement('div');
+    if (document.getElementById('activity-heatmap-tooltip')) return;
+
+    var tooltip = document.createElement('div');
     tooltip.id = 'activity-heatmap-tooltip';
     tooltip.style.position = 'absolute';
     tooltip.style.display = 'none';
@@ -310,7 +313,7 @@ const ActivityHeatmap = (function() {
     tooltip.style.whiteSpace = 'nowrap';
     tooltip.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.15)';
 
-    document.body.appendChild(tooltip);
+    container.appendChild(tooltip);
   }
 
   /**

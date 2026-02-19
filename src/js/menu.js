@@ -118,7 +118,7 @@ const MenuConfig = {
             onClick: 'openConversationSearchModal'
           },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
-          { id: 'storage', label: 'My Drive', href: '/storage.html', icon: 'folder' },
+          { id: 'storage', label: 'My Drive', href: '/drive.html', icon: 'folder' },
         ]
       },
       // Section 2: Infinite scrolling – Your Chats, New Chat, {{conversations}} (Data Connectors + Reports scroll with this)
@@ -127,7 +127,7 @@ const MenuConfig = {
         title: null,
         requiredRoles: [],
         items: [
-          { id: 'connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
+          { id: 'connectors', label: 'Data Connectors', href: '/integrations/data_connectors.html', icon: 'connectors' },
           { id: 'insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
         ]
       },
@@ -229,7 +229,7 @@ const MenuConfig = {
             onClick: 'openConversationSearchModal'
           },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
-          { id: 'storage', label: 'My Drive', href: '/storage.html', icon: 'folder' },
+          { id: 'storage', label: 'My Drive', href: '/drive.html', icon: 'folder' },
         ]
       },
       {
@@ -237,7 +237,7 @@ const MenuConfig = {
         title: null,
         requiredRoles: [],
         items: [
-          { id: 'connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
+          { id: 'connectors', label: 'Data Connectors', href: '/integrations/data_connectors.html', icon: 'connectors' },
           { id: 'insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
         ]
       },
@@ -297,7 +297,7 @@ const MenuConfig = {
             onClick: 'openConversationSearchModal'
           },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
-          { id: 'storage', label: 'My Drive', href: '/storage.html', icon: 'folder' },
+          { id: 'storage', label: 'My Drive', href: '/drive.html', icon: 'folder' },
         ]
       },
       {
@@ -305,7 +305,7 @@ const MenuConfig = {
         title: null,
         requiredRoles: [],
         items: [
-          { id: 'connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
+          { id: 'connectors', label: 'Data Connectors', href: '/integrations/data_connectors.html', icon: 'connectors' },
           { id: 'insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
         ]
       },
@@ -365,7 +365,7 @@ const MenuConfig = {
             onClick: 'openConversationSearchModal'
           },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
-          { id: 'storage', label: 'My Drive', href: '/storage.html', icon: 'folder' },
+          { id: 'storage', label: 'My Drive', href: '/drive.html', icon: 'folder' },
         ]
       },
       {
@@ -373,7 +373,7 @@ const MenuConfig = {
         title: null,
         requiredRoles: [],
         items: [
-          { id: 'connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
+          { id: 'connectors', label: 'Data Connectors', href: '/integrations/data_connectors.html', icon: 'connectors' },
           { id: 'insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
         ]
       },
@@ -434,7 +434,7 @@ const MenuConfig = {
             onClick: 'openConversationSearchModal'
           },
           { id: 'chat-matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
-          { id: 'chat-storage', label: 'My Drive', href: '/storage.html', icon: 'folder' },
+          { id: 'chat-storage', label: 'My Drive', href: '/drive.html', icon: 'folder' },
         ]
       },
       // Section 2: Infinite scrolling – Your Chats, New Chat, {{conversations}} (Data Connectors + Reports scroll with this)
@@ -443,7 +443,7 @@ const MenuConfig = {
         title: null,
         requiredRoles: [],
         items: [
-          { id: 'chat-connectors', label: 'Data Connectors', href: '/integrations/connectors.html', icon: 'connectors' },
+          { id: 'chat-connectors', label: 'Data Connectors', href: '/integrations/data_connectors.html', icon: 'connectors' },
           { id: 'chat-insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
         ]
       },
