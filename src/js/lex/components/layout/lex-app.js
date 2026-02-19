@@ -593,7 +593,7 @@
           isStaticTop: true,
           items: [
             { id: 'dashboard', label: 'Dashboard', icon: 'home', href: 'dashboard.html' },
-            { id: 'search', label: 'Search Conversations', icon: 'search', isButton: true, onClick: 'openConversationSearchModal' },
+            { id: 'search', label: 'Search Conversations', icon: 'search', href: 'search-conversations.html' },
             { id: 'workspaces', label: 'Workspaces', icon: 'briefcase', href: 'workspaces.html' },
             { id: 'storage', label: 'My Drive', icon: 'folder', href: 'drive.html' }
           ]

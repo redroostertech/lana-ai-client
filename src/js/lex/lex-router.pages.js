@@ -202,6 +202,17 @@
     },
 
     // ── Search ──
+    'search-conversations.html': {
+      title: 'Search Conversations',
+      activeNav: 'search',
+      scripts: [
+        'js/lex/components/foundation/lex-card.js',
+        'js/lex/components/form/lex-input.js',
+        'js/search-conversations.js'
+      ],
+      stylesheets: []
+    },
+
     'search-results.html': {
       title: 'Search Results',
       activeNav: '',

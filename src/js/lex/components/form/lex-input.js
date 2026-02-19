@@ -190,6 +190,11 @@
     render() {
       injectStyles();
 
+      // Save focus state before innerHTML replacement destroys the old input
+      var oldInput = this.querySelector('input');
+      this._hadFocus = oldInput && this.contains(document.activeElement);
+      this._savedCaret = (this._hadFocus && oldInput) ? oldInput.selectionStart : null;
+
       // Semantic type from data-lex-type (preferred) or type prop; never render native type on input
       const semanticType = (this.dataset.lexType || this.type || 'text').toLowerCase();
 
@@ -301,9 +306,14 @@
       const input = this.querySelector('input');
       if (!input) return;
 
-      // Sync cursor position — preserve caret on re-render
-      if (document.activeElement === input || this.contains(document.activeElement)) {
-        // Already focused, don't interfere
+      // Restore focus + caret position after re-render replaced the old input element
+      if (this._hadFocus) {
+        input.focus();
+        if (this._savedCaret !== null) {
+          try { input.setSelectionRange(this._savedCaret, this._savedCaret); } catch (e) { /* ignore for non-text types */ }
+        }
+        this._hadFocus = false;
+        this._savedCaret = null;
       }
 
       // Input event (real-time)

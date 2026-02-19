@@ -112,10 +112,8 @@ const MenuConfig = {
           {
             id: 'search-conversations',
             label: 'Search Conversations',
-            href: '#',
-            icon: 'search',
-            isButton: true,
-            onClick: 'openConversationSearchModal'
+            href: '/search-conversations.html',
+            icon: 'search'
           },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
           { id: 'storage', label: 'My Drive', href: '/drive.html', icon: 'folder' },
@@ -223,10 +221,8 @@ const MenuConfig = {
           {
             id: 'search-conversations',
             label: 'Search Conversations',
-            href: '#',
-            icon: 'search',
-            isButton: true,
-            onClick: 'openConversationSearchModal'
+            href: '/search-conversations.html',
+            icon: 'search'
           },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
           { id: 'storage', label: 'My Drive', href: '/drive.html', icon: 'folder' },
@@ -291,10 +287,8 @@ const MenuConfig = {
           {
             id: 'search-conversations',
             label: 'Search Conversations',
-            href: '#',
-            icon: 'search',
-            isButton: true,
-            onClick: 'openConversationSearchModal'
+            href: '/search-conversations.html',
+            icon: 'search'
           },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
           { id: 'storage', label: 'My Drive', href: '/drive.html', icon: 'folder' },
@@ -359,10 +353,8 @@ const MenuConfig = {
           {
             id: 'search-conversations',
             label: 'Search Conversations',
-            href: '#',
-            icon: 'search',
-            isButton: true,
-            onClick: 'openConversationSearchModal'
+            href: '/search-conversations.html',
+            icon: 'search'
           },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
           { id: 'storage', label: 'My Drive', href: '/drive.html', icon: 'folder' },

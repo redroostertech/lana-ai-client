@@ -1,0 +1,67 @@
+<!-- Search Conversations — Full-page search experience.
+     SPA page fragment loaded by lex-router into lex-app content area.
+     Uses #lex-page-content for Strategy 1 extraction (see lex-router.js). -->
+
+<div id="lex-page-content">
+
+  <div class="max-w-3xl mx-auto px-4 py-8">
+
+    <!-- Page Header -->
+    <div class="mb-6">
+      <h1 class="lex-h3 lex-text-primary">Search Conversations</h1>
+      <p class="text-sm lex-text-secondary mt-1">Find your chats by title, message content, or matter name</p>
+    </div>
+
+    <!-- Search Input -->
+    <div class="mb-6">
+      <lex-input
+        id="searchConversationsInput"
+        data-lex-type="search"
+        placeholder="Search conversations..."
+        leading-icon="search"
+        clearable
+      ></lex-input>
+    </div>
+
+    <!-- Results Container -->
+    <div id="searchConversationsResults">
+
+      <!-- Loading State (shown during fetch) -->
+      <div id="searchConvLoading" class="hidden">
+        <div class="flex flex-col items-center justify-center py-12">
+          <lex-spinner label="Searching..."></lex-spinner>
+        </div>
+      </div>
+
+      <!-- Empty State (shown when no results) -->
+      <div id="searchConvEmpty" class="hidden">
+        <lex-empty
+          id="searchConvEmptyState"
+          icon="search"
+          message="No conversations found"
+          description="Try a different search term"
+        ></lex-empty>
+      </div>
+
+      <!-- Results List -->
+      <div id="searchConvList">
+        <!-- Section header (changes between "Recent Conversations" and "Search Results") -->
+        <div id="searchConvSectionHeader" class="mb-4">
+          <h2 id="searchConvSectionTitle" class="text-sm font-semibold lex-text-secondary uppercase tracking-wider">Recent Conversations</h2>
+          <p id="searchConvSectionSubtitle" class="text-xs lex-text-tertiary mt-1">Your most recent chats</p>
+        </div>
+
+        <!-- Result items rendered here by JS -->
+        <div id="searchConvItems" class="space-y-2"></div>
+
+        <!-- Load More (infinite scroll indicator) -->
+        <div id="searchConvLoadMore" class="hidden py-6 flex justify-center">
+          <lex-spinner id="searchConvLoadMoreSpinner" size="sm" label="Loading more..."></lex-spinner>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
