@@ -286,6 +286,19 @@
     }
   }
 
+  /**
+   * Resolve a route path into a fetchable URL.
+   * Under file:// protocol, root-relative paths like '/index.html' would
+   * resolve to file:///index.html (filesystem root). Strip the leading
+   * slash so fetch resolves relative to the current document instead.
+   */
+  function resolveFetchUrl(path) {
+    if (window.location.protocol === 'file:' && path.indexOf('/') === 0) {
+      return path.substring(1);
+    }
+    return path;
+  }
+
   // ---------------------------------------------------------------------------
   // Token refresh + retry navigation
   // ---------------------------------------------------------------------------
@@ -394,7 +407,7 @@
     }
 
     // Step 4: Fetch and swap content
-    return fetch(path, { headers: { 'X-Requested-With': 'LexRouter' } })
+    return fetch(resolveFetchUrl(path), { headers: { 'X-Requested-With': 'LexRouter' } })
       .then(function (response) {
         if (!response.ok) {
           throw new Error('Failed to load page: ' + response.status);
