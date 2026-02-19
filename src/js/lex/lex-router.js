@@ -40,6 +40,11 @@
   let _app = null;               // <lex-app> element reference
   let _started = false;
 
+  // Capture the real document URL before history.replaceState can change it.
+  // Under file:// protocol, replaceState('/index.html') would change the URL
+  // to file:///index.html, breaking all relative URL resolution.
+  var _appBaseUrl = window.location.href;
+
   // ---------------------------------------------------------------------------
   // Path resolution
   // ---------------------------------------------------------------------------
@@ -278,9 +283,10 @@
     // Already a full file:// path
     if (src.indexOf('file://') === 0) return src;
 
-    // Relative path — resolve against app.html location
+    // Resolve against _appBaseUrl (not window.location.href, which may
+    // have been changed by history.replaceState under file:// protocol)
     try {
-      return new URL(src, window.location.href).href;
+      return new URL(src, _appBaseUrl).href;
     } catch (e) {
       return src;
     }
@@ -289,12 +295,18 @@
   /**
    * Resolve a route path into a fetchable URL.
    * Under file:// protocol, root-relative paths like '/index.html' would
-   * resolve to file:///index.html (filesystem root). Strip the leading
-   * slash so fetch resolves relative to the current document instead.
+   * resolve to file:///index.html (filesystem root). We resolve against
+   * _appBaseUrl (captured at module load) since history.replaceState may
+   * have already changed window.location.href.
    */
   function resolveFetchUrl(path) {
-    if (window.location.protocol === 'file:' && path.indexOf('/') === 0) {
-      return path.substring(1);
+    if (window.location.protocol === 'file:') {
+      var relative = path.indexOf('/') === 0 ? path.substring(1) : path;
+      try {
+        return new URL(relative, _appBaseUrl).href;
+      } catch (e) {
+        return relative;
+      }
     }
     return path;
   }
@@ -443,7 +455,11 @@
 
         // Step 10: Push to history
         if (pushState) {
-          history.pushState({ path: path }, descriptor.title, path);
+          if (window.location.protocol === 'file:') {
+            history.pushState({ path: path }, descriptor.title);
+          } else {
+            history.pushState({ path: path }, descriptor.title, path);
+          }
         }
 
         // Step 11: Scroll to top
@@ -577,10 +593,17 @@
 
       _app = document.querySelector('lex-app');
 
-      // Set initial history state
+      // Set initial history state.
+      // Under file:// protocol, do NOT pass the path as the URL argument —
+      // replaceState('/index.html') would change the URL to file:///index.html,
+      // breaking all relative resolution. Store the path only in state.
       var startPath = initialPath || window.location.pathname || '/index.html';
       if (startPath === '/' || startPath === '') startPath = '/index.html';
-      history.replaceState({ path: startPath }, '', startPath);
+      if (window.location.protocol === 'file:') {
+        history.replaceState({ path: startPath }, '');
+      } else {
+        history.replaceState({ path: startPath }, '', startPath);
+      }
 
       // Wire event listeners
       document.addEventListener('click', handleLinkClick, { capture: true });
