@@ -130,7 +130,7 @@
       }
 
       function startApp() {
-        app.addEventListener('lex-app-ready', function () {
+        function onShellReady() {
           // Determine initial page from URL or default to dashboard
           var startPath = window.location.pathname || '/index.html';
           if (startPath === '/' || startPath === '' || startPath.endsWith('/app.html')) {
@@ -166,7 +166,16 @@
             // with no LexDataSource, or if the API is slow.
             setTimeout(dismissLoader, 2000);
           });
-        });
+        }
+
+        // lex-app renders synchronously during HTML parsing, so lex-app-ready
+        // fires before this script runs. Check if the shell already rendered;
+        // if so, proceed immediately. Otherwise wait for the event.
+        if (app._shellRendered) {
+          onShellReady();
+        } else {
+          app.addEventListener('lex-app-ready', onShellReady);
+        }
       }
 
       checkAuthWithRetry();
