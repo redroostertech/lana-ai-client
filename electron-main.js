@@ -152,6 +152,7 @@ function createWindow(serverUrl = null) {
   });
 
   // Load the index.html from public_html directory
+  // TODO: Switch to 'public_html/app.html' once SPA shell migration is complete
   const startUrl = createFileUrl(path.join(__dirname, 'public_html/index.html'));
   mainWindow.loadURL(startUrl);
 
