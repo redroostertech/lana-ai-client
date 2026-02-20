@@ -568,10 +568,10 @@ const ConversationActionsModal = {
     const renameInput = document.getElementById('renameInput');
 
     const decodedTitle = this.selectedConversationTitle
-      .replace(/&apos;/g, "'")
-      .replace(/&quot;/g, '"')
-      .replace(/&#96;/g, '`')
-      .replace(/&amp;/g, '&');
+      .split('&apos;').join("'")
+      .split('&quot;').join('"')
+      .split('&#96;').join('`')
+      .split('&amp;').join('&');
 
     renameInput.value = decodedTitle;
     renameModal.classList.remove('hidden');

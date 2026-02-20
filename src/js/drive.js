@@ -46,12 +46,6 @@
   // Currently selected matter for the actions modal
   var selectedMatter = null;
 
-  // Conversation actions modal state
-  var selectedConversationId = null;
-  var selectedConversationTitle = null;
-  var selectedConversationIsProject = false;
-  var selectedConversationMatterId = null;
-
   // ── State reset ─────────────────────────────────────────────────────
 
   /**
@@ -2198,204 +2192,6 @@
     return '<svg class="w-10 h-10" style="color: var(--lex-text-tertiary)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>';
   }
 
-  // ── Conversation actions (from inline script) ────────────────────────
-
-  /**
-   * Open the conversation actions modal for a given thread.
-   * @param {string} threadId
-   * @param {string} title
-   * @param {string|null} matterId
-   */
-  function openConversationActionsModal(threadId, title, matterId) {
-    selectedConversationId = threadId;
-    selectedConversationTitle = title;
-    selectedConversationMatterId = matterId;
-    selectedConversationIsProject = matterId !== null;
-
-    // Decode HTML entities using Lex.Utils (no regex)
-    var decodedTitle = Lex.Utils.decodeHtmlEntities(title);
-    var titleEl = document.getElementById('modalConversationTitle');
-    if (titleEl) titleEl.textContent = decodedTitle;
-
-    var matterBtn = document.getElementById('viewMatterDetailsBtn');
-    if (matterBtn) {
-      if (matterId && matterId !== 'null') {
-        matterBtn.classList.remove('hidden');
-      } else {
-        matterBtn.classList.add('hidden');
-      }
-    }
-
-    var modal = document.getElementById('conversationActionsModal');
-    if (modal) modal.open = true;
-  }
-
-  /**
-   * Close the conversation actions modal and reset its state.
-   */
-  function closeConversationActionsModal() {
-    var modal = document.getElementById('conversationActionsModal');
-    if (modal) modal.open = false;
-
-    selectedConversationId = null;
-    selectedConversationTitle = null;
-    selectedConversationIsProject = false;
-    selectedConversationMatterId = null;
-  }
-
-  /**
-   * Transition from the conversation actions modal to the rename modal.
-   */
-  function editConversationFromModal() {
-    if (!selectedConversationId || !selectedConversationTitle) {
-      Lex.Toast.error('No conversation selected');
-      closeConversationActionsModal();
-      return;
-    }
-
-    var actionsModal = document.getElementById('conversationActionsModal');
-    if (actionsModal) actionsModal.open = false;
-
-    var renameModal = document.getElementById('renameConversationModal');
-    var lexInput = document.getElementById('renameInput');
-
-    // Decode HTML entities using Lex.Utils (no regex)
-    var decodedTitle = Lex.Utils.decodeHtmlEntities(selectedConversationTitle);
-    if (lexInput) lexInput.value = decodedTitle;
-
-    if (renameModal) renameModal.open = true;
-
-    setTimeout(function () {
-      var inner = lexInput && lexInput.querySelector('input');
-      if (inner) {
-        inner.focus();
-        inner.select();
-      }
-    }, 150);
-  }
-
-  /**
-   * Close the rename conversation modal.
-   */
-  function closeRenameModal() {
-    var modal = document.getElementById('renameConversationModal');
-    if (modal) modal.open = false;
-  }
-
-  /**
-   * Confirm and submit the renamed conversation title via API.
-   */
-  async function confirmRename() {
-    if (!selectedConversationId) {
-      Lex.Toast.error('No conversation selected');
-      closeRenameModal();
-      return;
-    }
-
-    var lexRenameInput = document.getElementById('renameInput');
-    var newTitle = lexRenameInput ? (lexRenameInput.value || '').trim() : '';
-
-    if (!newTitle) {
-      Lex.Toast.error('Conversation name cannot be empty');
-      return;
-    }
-
-    try {
-      await api.put('/api/v1/chat/sessions/' + selectedConversationId, {
-        title: newTitle
-      });
-
-      Lex.Toast.success('Conversation renamed');
-      closeRenameModal();
-
-      if (typeof ConversationMenu !== 'undefined') {
-        await ConversationMenu.loadConversations(true);
-      }
-    } catch (error) {
-      console.error('[Drive] Failed to rename conversation:', error);
-      Lex.Toast.error('Failed to rename conversation');
-    }
-  }
-
-  /**
-   * Navigate to the matter details page for the selected conversation's matter.
-   */
-  function viewMatterDetailsFromModal() {
-    if (!selectedConversationMatterId) {
-      Lex.Toast.error('No matter associated with this conversation');
-      return;
-    }
-
-    window.location.href = 'workspaces.html?matter_id=' + selectedConversationMatterId;
-  }
-
-  /**
-   * Initiate conversation deletion from the conversation actions modal.
-   * Shows a custom confirmation modal before executing.
-   */
-  function deleteConversationFromModal() {
-    var confirmTitle = selectedConversationIsProject
-      ? 'Delete Project Conversation?'
-      : 'Delete Conversation?';
-
-    var confirmMessage = selectedConversationIsProject
-      ? 'This will only delete the chat messages. The matter/project itself will NOT be deleted and you can create new conversations for it later.'
-      : 'This action cannot be undone. All messages in this conversation will be permanently deleted.';
-
-    openDeleteConfirmModal(confirmTitle, confirmMessage);
-  }
-
-  /**
-   * Open the custom delete confirmation modal with dynamic title and message.
-   * @param {string} title
-   * @param {string} message
-   */
-  function openDeleteConfirmModal(title, message) {
-    var titleEl = document.getElementById('deleteConfirmTitle');
-    var messageEl = document.getElementById('deleteConfirmMessage');
-    if (titleEl) titleEl.textContent = title;
-    if (messageEl) messageEl.textContent = message;
-
-    var modal = document.getElementById('deleteConfirmModal');
-    if (modal) modal.open = true;
-  }
-
-  /**
-   * Close the custom delete confirmation modal.
-   */
-  function closeDeleteConfirmModal() {
-    var modal = document.getElementById('deleteConfirmModal');
-    if (modal) modal.open = false;
-  }
-
-  /**
-   * Confirm and execute conversation deletion via API.
-   */
-  async function confirmDeleteConversation() {
-    var conversationIdToDelete = selectedConversationId;
-    if (!conversationIdToDelete) {
-      Lex.Toast.error('No conversation selected');
-      closeDeleteConfirmModal();
-      closeConversationActionsModal();
-      return;
-    }
-
-    try {
-      closeDeleteConfirmModal();
-      closeConversationActionsModal();
-
-      await api.delete('/api/v1/chat/sessions/' + conversationIdToDelete);
-      Lex.Toast.success('Conversation deleted');
-
-      if (typeof ConversationMenu !== 'undefined') {
-        await ConversationMenu.loadConversations(true);
-      }
-    } catch (error) {
-      console.error('[Drive] Failed to delete conversation:', error);
-      Lex.Toast.error('Failed to delete conversation');
-    }
-  }
-
   // ── Lifecycle hooks ──────────────────────────────────────────────────
 
   /**
@@ -2436,21 +2232,11 @@
     exposeGlobal('deleteMatterFromModal', deleteMatterFromModal);
     exposeGlobal('closeDeleteMatterConfirmModal', closeDeleteMatterConfirmModal);
     exposeGlobal('confirmDeleteMatter', confirmDeleteMatter);
-    exposeGlobal('openConversationActionsModal', openConversationActionsModal);
-    exposeGlobal('closeConversationActionsModal', closeConversationActionsModal);
-    exposeGlobal('editConversationFromModal', editConversationFromModal);
-    exposeGlobal('viewMatterDetailsFromModal', viewMatterDetailsFromModal);
-    exposeGlobal('deleteConversationFromModal', deleteConversationFromModal);
-    exposeGlobal('closeRenameModal', closeRenameModal);
-    exposeGlobal('confirmRename', confirmRename);
     exposeGlobal('togglePin', togglePin);
     exposeGlobal('openRecentFile', openRecentFile);
     exposeGlobal('goToPreviousPage', goToPreviousPage);
     exposeGlobal('goToNextPage', goToNextPage);
     exposeGlobal('refreshPage', refreshPage);
-    exposeGlobal('openDeleteConfirmModal', openDeleteConfirmModal);
-    exposeGlobal('closeDeleteConfirmModal', closeDeleteConfirmModal);
-    exposeGlobal('confirmDeleteConversation', confirmDeleteConversation);
 
     // Set up event listeners
     setupEventListeners();
@@ -2495,10 +2281,6 @@
     // Reset module-level state
     pendingUploadFiles = null;
     selectedMatter = null;
-    selectedConversationId = null;
-    selectedConversationTitle = null;
-    selectedConversationIsProject = false;
-    selectedConversationMatterId = null;
 
     // Ensure context menu listener is removed (not tracked via trackDocListener)
     hideContextMenu();
