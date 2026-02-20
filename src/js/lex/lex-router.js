@@ -9,6 +9,7 @@
      - Page-specific script and stylesheet loading/unloading
      - history.pushState / popstate for back/forward
      - View lifecycle: onEnter / onLeave hooks
+     - Page init registry for SPA re-navigation (registerPageInit)
      - lex-page-ready event for legacy DOMContentLoaded compat
      - Content swap transition (opacity fade via design tokens)
 
@@ -18,7 +19,11 @@
        LexRouter.start();
      });
 
-     // In a page script:
+     // In a page entry script (IIFE):
+     LexRouter.registerPageInit('/my-page.html', init);
+     // The router calls init() on every navigation to this page.
+
+     // Optional view lifecycle hooks:
      LexRouter.registerView({
        onEnter(ctx) { ... },
        onLeave() { ... }
@@ -39,6 +44,11 @@
   let _navigating = false;
   let _app = null;               // <lex-app> element reference
   let _started = false;
+
+  // Page init registry — page entry scripts register an init function once
+  // (inside their IIFE). The router calls it on every navigation to that page,
+  // including the first load and re-navigation from cached scripts.
+  var _pageInits = {};
 
   // Capture the real document URL before history.replaceState can change it.
   // Under file:// protocol, replaceState('/index.html') would change the URL
@@ -237,13 +247,15 @@
     }
     _currentView = null;
 
-    // Remove page-specific script tags and clear their cache entries so they
-    // re-execute when the user navigates back to this page.
+    // Remove page-specific script tags (does not undo execution).
+    // Scripts stay in _loadedScripts so they are NOT re-executed on
+    // re-navigation — top-level const/class bindings would throw
+    // "Identifier has already been declared". Page entry scripts use
+    // registerPageInit() for re-initialization instead.
     var scripts = document.querySelectorAll('script[data-lex-page="' + pagePath + '"]');
     for (var i = 0; i < scripts.length; i++) {
-      // Keep CDN scripts in place — they are safe to leave and should stay cached
+      // Keep CDN scripts in place — they are safe to leave
       if (scripts[i].src.indexOf('cdn.') === -1 && scripts[i].src.indexOf('cdnjs.') === -1) {
-        _loadedScripts.delete(scripts[i].src);
         scripts[i].remove();
       }
     }
@@ -465,6 +477,16 @@
         return loadPageScripts(descriptor.scripts, path);
       })
       .then(function () {
+        // Step 8b: Call registered page init (supports SPA re-navigation).
+        // On first load the IIFE registers init via registerPageInit();
+        // on re-navigation cached scripts skip, but the router calls it.
+        var initKey = pathKey(path);
+        if (_pageInits[initKey]) {
+          try { _pageInits[initKey](); } catch (e) {
+            console.warn('[LexRouter] Page init error:', e);
+          }
+        }
+
         // Step 9: Update shell
         _currentPath = path;
         if (_app) {
@@ -657,6 +679,22 @@
      * @param {object} [options] - { force: bool, pushState: bool }
      */
     navigate: navigate,
+
+    /**
+     * Register an init function for a page. Called once by the page's entry
+     * script (inside its IIFE). The router calls it on every navigation to
+     * that page — both first load and SPA re-navigation.
+     *
+     * This solves the re-navigation problem: utility scripts with top-level
+     * const/class declarations stay cached (avoiding redeclaration errors),
+     * while the page's bootstrap logic re-runs via this registered init.
+     *
+     * @param {string} pagePath - e.g. '/dashboard.html' or 'dashboard.html'
+     * @param {Function} initFn - the page's init/bootstrap function
+     */
+    registerPageInit: function (pagePath, initFn) {
+      _pageInits[pathKey(pagePath)] = initFn;
+    },
 
     /**
      * Register a view with lifecycle hooks for the current page.

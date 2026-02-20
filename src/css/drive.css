@@ -1,0 +1,74 @@
+/* drive.css — Page-specific styles for My Drive (SPA page).
+   Extracted from the legacy storage.html inline <style> block.
+   Preloader styles omitted — the SPA shell provides <lex-loader>. */
+
+/* Folder tree styles */
+.folder-item {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.folder-item:hover {
+  background-color: var(--lex-bg-tertiary);
+}
+
+.folder-item.active {
+  background-color: var(--lex-bg-accent-soft);
+  border-left: 3px solid var(--lex-border-accent);
+}
+
+.folder-children {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.folder-children.expanded {
+  max-height: 2000px;
+}
+
+/* Grid view styles */
+.grid-item {
+  transition: all 0.2s ease;
+}
+
+.grid-item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--lex-shadow-md);
+}
+
+/* Breadcrumb styles */
+.breadcrumb-separator {
+  color: var(--lex-text-tertiary);
+  margin: 0 0.5rem;
+}
+
+/* File card styles */
+.file-card {
+  min-width: 180px;
+  max-width: 180px;
+  transition: all 0.2s ease;
+}
+.file-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--lex-shadow-lg);
+}
+
+/* Context menu item hover states — token-based replacements for Tailwind hover:bg-gray-100 */
+.context-menu-item:hover {
+  background-color: var(--lex-bg-tertiary);
+}
+
+.context-menu-item--danger:hover {
+  background-color: var(--lex-status-danger-bg);
+}
+
+/* Icon button hover (view toggle, sort order) */
+.drive-icon-btn:hover {
+  background-color: var(--lex-bg-tertiary);
+}
+
+/* Row/label hover (checkbox labels, option labels) */
+.drive-hover-row:hover {
+  background-color: var(--lex-bg-secondary);
+}

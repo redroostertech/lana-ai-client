@@ -40,10 +40,11 @@
 
   var _deepLinks = {
     'chat.html':                              { session: 'string', matter: 'string', openModal: 'string' },
+    'chat_v2.html':                           { matter: 'string', session: 'string' },
     'matters.html':                           { matter_id: 'string', open: 'string', tab: 'string', action: 'string' },
     'drive.html':                             { matter_id: 'string', matter_name: 'string', folder_id: 'string', tab: 'string' },
     'storage.html':                           { matter_id: 'string', matter_name: 'string', folder_id: 'string', tab: 'string' },
-    'search-conversations.html':               { q: 'string' },
+    'search-conversations.html':               {},
     'search-results.html':                    { q: 'string' },
     'article.html':                           { section: 'string', id: 'string' },
     'help.html':                              { section: 'string' },

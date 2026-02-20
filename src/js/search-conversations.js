@@ -14,7 +14,6 @@
 
   var _searchTimeout = null;
   var _currentQuery = '';
-  var _actionsObserver = null;
   var _page = 1;
   var _hasMore = false;
   var _isLoadingMore = false;
@@ -57,6 +56,14 @@
 
     if (!_els.input) return;
 
+    // Reset closure state on every page entry (script persists across navigations)
+    _currentQuery = '';
+    _page = 1;
+    _hasMore = false;
+    _isLoadingMore = false;
+    clearTimeout(_searchTimeout);
+    _els.input.value = '';
+
     // Listen for search input (lex-input emits 'lex-input' on keystroke)
     _els.input.addEventListener('lex-input', function (e) {
       var value = (e.detail && e.detail.value !== undefined) ? e.detail.value : '';
@@ -98,8 +105,10 @@
       });
     }
 
-    // Refresh results after rename/delete via ConversationActionsModal
-    _observeActionsModal();
+    // Register refresh callback so ConversationActionsModal refreshes data instead of full reload
+    if (window.ConversationActionsModal) {
+      window.ConversationActionsModal.onRefresh = refreshResults;
+    }
 
     // Infinite scroll — load more when near bottom
     var scrollContainer = document.getElementById('lex-main-content');
@@ -118,30 +127,22 @@
     if (window.LexRouter && window.LexRouter.registerView) {
       window.LexRouter.registerView({
         onLeave: function () {
-          // Reset state
+          // Clear input and closure state
           if (_els.input) _els.input.value = '';
           _currentQuery = '';
           _page = 1;
           _hasMore = false;
           clearTimeout(_searchTimeout);
-          // Disconnect modal observer
-          if (_actionsObserver) {
-            _actionsObserver.disconnect();
-            _actionsObserver = null;
+          // Unregister refresh callback
+          if (window.ConversationActionsModal) {
+            window.ConversationActionsModal.onRefresh = null;
           }
         }
       });
     }
 
-    // Check for deep-link ?q= parameter
-    var params = (window.Lex && window.Lex.Nav) ? window.Lex.Nav.getParams() : new URLSearchParams(window.location.search);
-    var qParam = params.get('q');
-    if (qParam) {
-      _els.input.value = qParam;
-      performSearch(qParam);
-    } else {
-      loadRecentConversations();
-    }
+    // Always start fresh — load recent conversations
+    loadRecentConversations();
   }
 
   // =========================================================================
@@ -203,11 +204,6 @@
     _page = 1;
     _hasMore = false;
     showLoading();
-
-    // Update URL params for deep-link support
-    if (window.Lex && window.Lex.Nav) {
-      window.Lex.Nav.updateParams({ q: query });
-    }
 
     api.get('/api/v1/chat/sessions?page=1&limit=' + _PAGE_SIZE + '&search=' + encodeURIComponent(query))
       .then(function (response) {
@@ -283,6 +279,11 @@
       html += renderResultItem(conversations[i], query);
     }
     _els.items.innerHTML = html;
+
+    // Clear redacted shimmer if active
+    if (window.Lex && window.Lex.Redact) {
+      window.Lex.Redact.off(_els.items);
+    }
   }
 
   function appendResults(conversations, query) {
@@ -368,7 +369,7 @@
     if (matterId) params.matter = matterId;
 
     if (window.Lex && window.Lex.Nav) {
-      window.Lex.Nav.go('chat.html', { params: params });
+      window.Lex.Nav.go('chat_v2.html', { params: params });
     } else if (window.NavigationHelpers) {
       window.NavigationHelpers.navigateToConversation(threadId, matterId);
     } else {
@@ -395,6 +396,10 @@
     if (_els.emptyState) {
       _els.emptyState.message = message || 'No conversations found';
       _els.emptyState.description = description || '';
+    }
+    // Clear redacted shimmer if active
+    if (_els.items && window.Lex && window.Lex.Redact) {
+      window.Lex.Redact.off(_els.items);
     }
   }
 
@@ -423,38 +428,15 @@
   }
 
   // =========================================================================
-  // Modal observer — refresh results after rename/delete
+  // Refresh results after rename/delete (called by ConversationActionsModal)
   // =========================================================================
 
-  function _observeActionsModal() {
-    // Watch the ConversationActionsModal for close (hidden class added back).
-    // When it closes, a rename or delete may have occurred, so refresh.
-    var actionsModal = document.getElementById('conversationActionsModal');
-    var renameModal = document.getElementById('renameConversationModal');
-    if (!actionsModal && !renameModal) return;
-
-    _actionsObserver = new MutationObserver(function (mutations) {
-      for (var i = 0; i < mutations.length; i++) {
-        var m = mutations[i];
-        if (m.attributeName !== 'class') continue;
-        var target = m.target;
-        // Modal was just hidden — refresh
-        if (target.classList.contains('hidden')) {
-          refreshResults();
-          return;
-        }
-      }
-    });
-
-    if (actionsModal) {
-      _actionsObserver.observe(actionsModal, { attributes: true, attributeFilter: ['class'] });
-    }
-    if (renameModal) {
-      _actionsObserver.observe(renameModal, { attributes: true, attributeFilter: ['class'] });
-    }
-  }
-
   function refreshResults() {
+    // Show redacted shimmer on existing results while data reloads
+    if (_els.items && window.Lex && window.Lex.Redact) {
+      window.Lex.Redact.on(_els.items);
+    }
+
     if (_currentQuery) {
       performSearch(_currentQuery);
     } else {

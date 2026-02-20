@@ -238,15 +238,24 @@
       };
     }
 
+    connected() {
+      // Prevent _restoreContent() from re-cloning children on subsequent
+      // updates — preserves live DOM and event listeners bound by page scripts.
+      this._originalChildren = null;
+    }
+
     render() {
       injectStyles();
 
-      if (!this.open) return '';
+      // After first render, skip innerHTML to preserve live children.
+      if (this._rendered) return null;
+      this._rendered = true;
 
       const sideCls = this.side === 'left' ? 'lex-drawer-overlay--left' : 'lex-drawer-overlay--right';
       const widthCls = `lex-drawer-panel--${this.width || 'md'}`;
 
-      let html = `<div class="lex-drawer-overlay ${sideCls}">`;
+      // Always render full structure; starts hidden.
+      let html = `<div class="lex-drawer-overlay ${sideCls}" style="display:none">`;
       html += `<div class="lex-drawer-backdrop" data-action="overlay"></div>`;
       html += `<div class="lex-drawer-panel ${widthCls}">`;
 
@@ -278,17 +287,31 @@
 
       html += `</div></div>`;
 
-      // Lock body scroll
-      document.body.style.overflow = 'hidden';
-
       return html;
     }
 
-    updated() {
+    updated(changedProps) {
+      // Toggle overlay visibility + body scroll lock
+      const overlay = this.querySelector('.lex-drawer-overlay');
+      if (overlay) {
+        overlay.style.display = this.open ? '' : 'none';
+      }
+
+      // Sync heading/subtitle without re-render
+      if (changedProps && changedProps.has('heading')) {
+        const titleEl = this.querySelector('.lex-drawer-title');
+        if (titleEl) titleEl.textContent = this.heading;
+      }
+      if (changedProps && changedProps.has('subtitle')) {
+        const subEl = this.querySelector('.lex-drawer-subtitle');
+        if (subEl) subEl.textContent = this.subtitle;
+      }
+
       if (!this.open) {
         document.body.style.overflow = '';
         return;
       }
+      document.body.style.overflow = 'hidden';
 
       this.delegate('click', '[data-action="close"]', () => {
         this.emit('lex-close');

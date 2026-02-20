@@ -405,16 +405,28 @@ const ConversationActionsModal = {
   selectedConversationTitle: null,
   selectedConversationMatterId: null,
   selectedConversationIsProject: false,
-  modalInitialized: false,
+  _boundActionsModal: null,
+  _boundRenameModal: null,
 
-  // Wire up modal elements rendered by <lex-app> (called once on first use)
+  // Wire up modal elements (re-binds on every call to handle SPA navigation
+  // where the DOM elements are replaced by the router).
+  // Injects modal HTML into document.body if not already present (so it works
+  // on any page, not just search-conversations.html).
   init() {
-    if (this.modalInitialized) return;
+    var actionsModal = document.getElementById('conversationActionsModal');
+    var renameModal = document.getElementById('renameConversationModal');
 
-    // Find elements already rendered by <lex-app>
-    const actionsModal = document.getElementById('conversationActionsModal');
-    const renameModal = document.getElementById('renameConversationModal');
+    // Inject modal DOM if not present on the current page
+    if (!actionsModal || !renameModal) {
+      this._injectModalHtml();
+      actionsModal = document.getElementById('conversationActionsModal');
+      renameModal = document.getElementById('renameConversationModal');
+    }
+
     if (!actionsModal || !renameModal) return;
+
+    // Skip if already bound to THESE exact elements
+    if (this._boundActionsModal === actionsModal && this._boundRenameModal === renameModal) return;
 
     // Close on background click
     actionsModal.onclick = (e) => {
@@ -429,7 +441,68 @@ const ConversationActionsModal = {
       }
     };
 
-    this.modalInitialized = true;
+    this._boundActionsModal = actionsModal;
+    this._boundRenameModal = renameModal;
+  },
+
+  // Inject the conversation actions + rename modal HTML into document.body.
+  // Called by init() when the modal elements are not found on the current page.
+  _injectModalHtml() {
+    var container = document.createElement('div');
+    container.id = 'conversation-modals-injected';
+    container.innerHTML =
+      '<div id="conversationActionsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 9999;">' +
+        '<div class="bg-white rounded-xl shadow-2xl w-full max-w-md" onclick="event.stopPropagation()">' +
+          '<div class="flex items-center justify-between p-6 border-b border-gray-200">' +
+            '<h2 class="text-xl font-semibold text-gray-900">Conversation Options</h2>' +
+            '<button onclick="ConversationActionsModal.close()" class="text-gray-400 hover:text-gray-600 transition-colors">' +
+              '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>' +
+            '</button>' +
+          '</div>' +
+          '<div class="p-6">' +
+            '<h3 id="modalConversationTitle" class="text-lg font-medium text-gray-900 mb-6"></h3>' +
+            '<div class="space-y-3">' +
+              '<button onclick="ConversationActionsModal.editConversation()" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-indigo-300 hover:bg-indigo-50 transition-all group">' +
+                '<div class="flex-shrink-0 w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-200 transition-colors">' +
+                  '<svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>' +
+                '</div>' +
+                '<div class="flex-1"><div class="font-medium text-gray-900">Rename Conversation</div><div class="text-sm text-gray-500">Change the conversation name</div></div>' +
+              '</button>' +
+              '<button id="viewMatterDetailsBtn" onclick="ConversationActionsModal.viewMatterDetails()" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-indigo-300 hover:bg-indigo-50 transition-all group hidden">' +
+                '<div class="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">' +
+                  '<svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>' +
+                '</div>' +
+                '<div class="flex-1"><div class="font-medium text-gray-900">View Matter Details</div><div class="text-sm text-gray-500">Open the associated matter</div></div>' +
+              '</button>' +
+              '<button onclick="ConversationActionsModal.deleteConversation()" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-red-300 hover:bg-red-50 transition-all group">' +
+                '<div class="flex-shrink-0 w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center group-hover:bg-red-200 transition-colors">' +
+                  '<svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>' +
+                '</div>' +
+                '<div class="flex-1"><div class="font-medium text-gray-900">Delete Conversation</div><div class="text-sm text-gray-500">Permanently remove this conversation</div></div>' +
+              '</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div id="renameConversationModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 10000;">' +
+        '<div class="bg-white rounded-xl shadow-2xl w-full max-w-md" onclick="event.stopPropagation()">' +
+          '<div class="flex items-center justify-between p-6 border-b border-gray-200">' +
+            '<h2 class="text-xl font-semibold text-gray-900">Rename Conversation</h2>' +
+            '<button onclick="ConversationActionsModal.closeRename()" class="text-gray-400 hover:text-gray-600 transition-colors">' +
+              '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>' +
+            '</button>' +
+          '</div>' +
+          '<div class="p-6">' +
+            '<label class="block text-sm font-medium text-gray-700 mb-2">New Conversation Name</label>' +
+            '<input type="text" id="renameInput" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" placeholder="Enter new name">' +
+          '</div>' +
+          '<div class="flex justify-end gap-3 p-6 border-t border-gray-200">' +
+            '<button onclick="ConversationActionsModal.closeRename()" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Cancel</button>' +
+            '<button onclick="ConversationActionsModal.confirmRename()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">Rename</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(container);
   },
 
   // Open conversation actions modal
@@ -441,12 +514,12 @@ const ConversationActionsModal = {
     this.selectedConversationMatterId = matterId;
     this.selectedConversationIsProject = matterId !== null && matterId !== 'null';
 
-    // Decode HTML entities in title
+    // Decode HTML entities in title — string methods only, no regex
     const decodedTitle = conversationTitle
-      .replace(/&apos;/g, "'")
-      .replace(/&quot;/g, '"')
-      .replace(/&#96;/g, '`')
-      .replace(/&amp;/g, '&');
+      .split('&apos;').join("'")
+      .split('&quot;').join('"')
+      .split('&#96;').join('`')
+      .split('&amp;').join('&');
 
     document.getElementById('modalConversationTitle').textContent = decodedTitle;
 
@@ -543,11 +616,13 @@ const ConversationActionsModal = {
       Toast.success('Conversation renamed successfully');
       this.closeRename();
 
-      // Reload conversation menu
-      if (typeof window.conversationMenu !== 'undefined' && window.conversationMenu.loadConversations) {
-        window.conversationMenu.loadConversations(true);
-      } else {
-        window.location.reload();
+      // Refresh sidebar conversation menu
+      if (typeof window.ConversationMenu !== 'undefined' && window.ConversationMenu.loadConversations) {
+        window.ConversationMenu.loadConversations(true);
+      }
+      // Refresh page-level content (e.g. search results)
+      if (typeof this.onRefresh === 'function') {
+        this.onRefresh();
       }
     } catch (error) {
       console.error('Failed to rename conversation:', error);
@@ -574,22 +649,32 @@ const ConversationActionsModal = {
       return;
     }
 
+    // Capture values before close() clears state
+    const convId = this.selectedConversationId;
+    const convTitle = this.selectedConversationTitle
+      .split('&apos;').join("'")
+      .split('&quot;').join('"')
+      .split('&#96;').join('`')
+      .split('&amp;').join('&');
+
     this.close();
 
     // Show confirmation modal
     Modal.confirm(
       'Delete Conversation',
-      `Are you sure you want to delete "${this.selectedConversationTitle.replace(/&apos;/g, "'").replace(/&quot;/g, '"').replace(/&#96;/g, '`').replace(/&amp;/g, '&')}"? This action cannot be undone.`,
+      `Are you sure you want to delete "${convTitle}"? This action cannot be undone.`,
       async () => {
         try {
-          await api.delete(`/api/v1/chat/sessions/${this.selectedConversationId}`);
+          await api.delete(`/api/v1/chat/sessions/${convId}`);
           Toast.success('Conversation deleted successfully');
 
-          // Reload conversation menu
-          if (typeof window.conversationMenu !== 'undefined' && window.conversationMenu.loadConversations) {
-            window.conversationMenu.loadConversations(true);
-          } else {
-            window.location.reload();
+          // Refresh sidebar conversation menu
+          if (typeof window.ConversationMenu !== 'undefined' && window.ConversationMenu.loadConversations) {
+            window.ConversationMenu.loadConversations(true);
+          }
+          // Refresh page-level content (e.g. search results)
+          if (typeof this.onRefresh === 'function') {
+            this.onRefresh();
           }
         } catch (error) {
           console.error('Failed to delete conversation:', error);
@@ -601,6 +686,9 @@ const ConversationActionsModal = {
     );
   }
 };
+
+// Expose on window so SPA pages can register callbacks
+window.ConversationActionsModal = ConversationActionsModal;
 
 // Create global alias for backward compatibility
 window.openConversationActionsModal = function(conversationId, conversationTitle, matterId) {

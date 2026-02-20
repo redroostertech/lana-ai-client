@@ -52,8 +52,12 @@
 
   function startApp() {
     function onShellReady() {
-      // Determine initial page from URL or default to dashboard
-      var startPath = window.location.pathname || '/dashboard.html';
+      // Determine initial page: check history.state first (preserves route
+      // across refresh — under file:// protocol the URL bar always shows
+      // app.html so window.location.pathname is useless for routing).
+      var startPath = (history.state && history.state.path)
+        || window.location.pathname
+        || '/dashboard.html';
       if (startPath === '/' || startPath === '' || startPath.endsWith('/app.html')) {
         startPath = '/dashboard.html';
       }

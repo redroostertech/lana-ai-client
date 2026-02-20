@@ -53,15 +53,15 @@
     let hasTrackedPageView = false;
 
     // Security: HTML escaping to prevent XSS attacks
-    // Using explicit string replacement for better performance and security
+    // Uses string splitting and joining — no regex per project constraint.
     function escapeHtml(unsafe) {
       if (unsafe === null || unsafe === undefined) return '';
       return String(unsafe)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+        .split('&').join('&amp;')
+        .split('<').join('&lt;')
+        .split('>').join('&gt;')
+        .split('"').join('&quot;')
+        .split("'").join('&#039;');
     }
 
     // Helper function to render a single matter card
@@ -75,11 +75,11 @@
       const escapedSource = escapeHtml(matter.source || 'lana');  // Use 'source' not 'source_type' for pin API
 
       return `
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow relative matter-card ${selectedMatters.has(matter.matter_id) ? 'ring-2 ring-indigo-500' : ''}" data-matter-id="${escapedMatterId}">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow relative matter-card ${selectedMatters.has(matter.matter_id) ? 'ring-2 lex-ring-focus' : ''}" data-matter-id="${escapedMatterId}">
           <!-- Selection Checkbox -->
           <div class="absolute top-4 left-4 z-10">
             <input type="checkbox"
-                   class="matter-checkbox w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                   class="matter-checkbox w-5 h-5 lex-text-accent border-gray-300 rounded lex-ring-focus"
                    data-matter-id="${escapedMatterId}"
                    ${selectedMatters.has(matter.matter_id) ? 'checked' : ''}
                    onclick="event.stopPropagation(); toggleMatterSelection('${escapedMatterId}')">
@@ -142,7 +142,7 @@
                   </svg>
                 </button>
                 <div id="matter-card-options-${escapedMatterId}" class="hidden absolute right-0 top-full mt-1 w-32 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-                  <button onclick="event.stopPropagation(); editMatter('${escapedMatterId}'); closeMatterCardOptions('${escapedMatterId}')" class="w-full px-4 py-2 text-left text-sm text-indigo-600 hover:bg-indigo-50 transition-colors">Edit</button>
+                  <button onclick="event.stopPropagation(); editMatter('${escapedMatterId}'); closeMatterCardOptions('${escapedMatterId}')" class="w-full px-4 py-2 text-left text-sm lex-text-accent hover:bg-gray-50 transition-colors">Edit</button>
                   <button onclick="event.stopPropagation(); deleteMatter('${escapedMatterId}'); closeMatterCardOptions('${escapedMatterId}')" class="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors">Delete</button>
                 </div>
               </div>
@@ -163,6 +163,133 @@
         clearTimeout(timeout);
         timeout = setTimeout(later, wait);
       };
+    }
+
+    // ── Summary metrics ──
+
+    function formatEventType(eventType) {
+      if (!eventType) return 'Activity';
+      // Convert snake_case/dot-separated to readable text
+      var parts = eventType.split('.');
+      var last = parts[parts.length - 1] || eventType;
+      // Split on underscores and capitalize each word
+      var words = last.split('_');
+      for (var i = 0; i < words.length; i++) {
+        if (words[i].length > 0) {
+          words[i] = words[i].charAt(0).toUpperCase() + words[i].substring(1);
+        }
+      }
+      return words.join(' ');
+    }
+
+    function formatTimeAgoLocal(dateString) {
+      if (!dateString) return '';
+      // Prefer global timeAgo from Lex.Utils if available
+      if (typeof timeAgo === 'function') return timeAgo(dateString);
+      // Fallback: simple relative time
+      var now = Date.now();
+      var then = new Date(dateString).getTime();
+      var diffMs = now - then;
+      var diffMin = Math.floor(diffMs / 60000);
+      if (diffMin < 1) return 'just now';
+      if (diffMin < 60) return diffMin + 'm ago';
+      var diffHr = Math.floor(diffMin / 60);
+      if (diffHr < 24) return diffHr + 'h ago';
+      var diffDay = Math.floor(diffHr / 24);
+      if (diffDay < 30) return diffDay + 'd ago';
+      return Math.floor(diffDay / 30) + 'mo ago';
+    }
+
+    async function loadSummaryMetrics() {
+      try {
+        var data = await api.get('/api/v1/matters/summary?activity_limit=8');
+
+        // Update metric tiles
+        var metricActive = document.getElementById('metricActiveMatters');
+        var metricTasks  = document.getElementById('metricOutstandingTasks');
+        var metricEvents = document.getElementById('metricRecentActivity');
+
+        if (metricActive) metricActive.setAttribute('value', String(data.active_matters_30d || 0));
+
+        if (metricTasks) {
+          metricTasks.setAttribute('value', String(data.outstanding_tasks || 0));
+          if ((data.outstanding_tasks || 0) > 0) {
+            metricTasks.setAttribute('status', 'red');
+          }
+        }
+
+        var events = data.recent_events || [];
+        if (metricEvents) metricEvents.setAttribute('value', String(events.length));
+
+        // Populate the detail panel with recent events
+        var panel = document.getElementById('recentActivityPanel');
+        if (panel && events.length > 0) {
+          var html = '<div class="divide-y divide-gray-100">';
+          for (var i = 0; i < events.length; i++) {
+            var evt = events[i];
+            var matterName = escapeHtml(evt.matter_name || 'Unknown');
+            var actorName = escapeHtml(evt.actor_name || 'System');
+            var eventLabel = escapeHtml(formatEventType(evt.event_type));
+            var content = escapeHtml(evt.content || '');
+            if (content.length > 80) content = content.substring(0, 80) + '...';
+            var ago = formatTimeAgoLocal(evt.created_at);
+            var matterId = escapeHtml(evt.matter_id || '');
+
+            html += '<div class="flex items-start gap-3 py-3 px-1 hover:bg-gray-50 rounded cursor-pointer" onclick="viewMatter(\'' + matterId + '\')">';
+            html += '  <div class="flex-shrink-0 w-8 h-8 rounded-full lex-bg-accent-muted flex items-center justify-center">';
+            html += '    <span class="lex-text-accent text-xs font-semibold">' + actorName.charAt(0) + '</span>';
+            html += '  </div>';
+            html += '  <div class="flex-1 min-w-0">';
+            html += '    <p class="text-sm text-gray-900 truncate"><span class="font-medium">' + actorName + '</span> &middot; ' + eventLabel + '</p>';
+            if (content) {
+              html += '    <p class="text-xs text-gray-500 truncate mt-0.5">' + content + '</p>';
+            }
+            html += '    <p class="text-xs text-gray-400 mt-0.5">' + escapeHtml(matterName) + ' &middot; ' + escapeHtml(ago) + '</p>';
+            html += '  </div>';
+            html += '</div>';
+          }
+          html += '</div>';
+          panel.innerHTML = html;
+        } else if (panel) {
+          panel.innerHTML = '<p class="text-sm text-gray-500 py-4 text-center">No recent activity</p>';
+        }
+
+        // Show metrics content, hide loading skeleton
+        var metricsLoading = document.getElementById('metricsLoading');
+        var metricsContent = document.getElementById('metricsContent');
+        if (metricsLoading) metricsLoading.classList.add('hidden');
+        if (metricsContent) metricsContent.classList.remove('hidden');
+
+      } catch (err) {
+        // On error, just hide the loading skeleton
+        var loading = document.getElementById('metricsLoading');
+        if (loading) loading.classList.add('hidden');
+        console.warn('[Workspaces] Could not load summary metrics:', err.message || err);
+      }
+    }
+
+    function setupMetricInteractions() {
+      // "Learn More" banner button → open the existing Matters Info modal
+      var learnMoreBtn = document.getElementById('learnMoreBtn');
+      if (learnMoreBtn) {
+        learnMoreBtn.addEventListener('click', function () {
+          openMattersInfoModal();
+        });
+      }
+
+      // Toggle detail panel when "Recent Events" metric is clicked
+      var trigger = document.getElementById('recentActivityTrigger');
+      var panel = document.getElementById('recentActivityPanel');
+      if (trigger && panel) {
+        trigger.addEventListener('click', function () {
+          var isOpen = panel.hasAttribute('open');
+          if (isOpen) {
+            panel.removeAttribute('open');
+          } else {
+            panel.setAttribute('open', '');
+          }
+        });
+      }
     }
 
     // Load matters
@@ -244,14 +371,14 @@
           grid.innerHTML = `
             <div class="col-span-full py-16">
               <div class="max-w-md mx-auto text-center">
-                <div class="w-24 h-24 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <svg class="w-12 h-12 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="w-24 h-24 bg-gradient-to-br from-stone-100 to-stone-200 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <svg class="w-12 h-12 lex-text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
                   </svg>
                 </div>
                 <h3 class="text-xl font-semibold text-gray-900 mb-2">No matters yet</h3>
                 <p class="text-gray-500 mb-6">Get started by creating your first matter to organize your documents and collaborate with your team.</p>
-                <button onclick="document.getElementById('createMatterBtn').click()" class="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors shadow-lg shadow-indigo-200">
+                <button onclick="document.getElementById('createMatterBtn').click()" class="inline-flex items-center gap-2 px-6 py-3 lex-bg-accent hover:lex-bg-accent text-white font-medium rounded-lg transition-colors shadow-lg shadow-stone-200">
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                   </svg>
@@ -360,7 +487,7 @@
               </div>
               <h3 class="text-xl font-semibold text-gray-900 mb-2">Failed to load matters</h3>
               <p class="text-gray-500 mb-6">There was a problem loading your matters. Please try again.</p>
-              <button onclick="loadMatters()" class="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">
+              <button onclick="loadMatters()" class="inline-flex items-center gap-2 px-6 py-3 lex-bg-accent hover:lex-bg-accent text-white font-medium rounded-lg transition-colors">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                 </svg>
@@ -369,7 +496,7 @@
             </div>
           </div>
         `;
-        Toast.error('Failed to load matters');
+        Lex.Toast.error('Failed to load matters');
       }
     }
 
@@ -407,7 +534,7 @@
 
       } catch (error) {
         console.error('[Matters] Failed to load more pinned matters:', error);
-        Toast.error('Failed to load more pinned matters');
+        Lex.Toast.error('Failed to load more pinned matters');
 
         // Decrement page back if failed
         pinnedPage--;
@@ -448,8 +575,9 @@
     }
 
     // Search and filter
-    document.getElementById('searchInput').addEventListener('input', debounce(() => {
-      const searchQuery = document.getElementById('searchInput').value;
+    var _searchInput = document.getElementById('searchInput');
+    if (_searchInput) _searchInput.addEventListener('lex-input', debounce((e) => {
+      const searchQuery = e.detail || document.getElementById('searchInput').value;
 
       // Track matter searched event (truncate query to 200 chars for analytics)
       if (searchQuery && window.analytics) {
@@ -469,8 +597,9 @@
       loadMatters();
     }, 300));
 
-    document.getElementById('statusFilter').addEventListener('change', () => {
-      const filterValue = document.getElementById('statusFilter').value;
+    var _statusFilter = document.getElementById('statusFilter');
+    if (_statusFilter) _statusFilter.addEventListener('lex-change', (e) => {
+      const filterValue = e.detail || document.getElementById('statusFilter').value;
 
       // Track matter filtered event
       if (window.analytics) {
@@ -488,8 +617,9 @@
       loadMatters();
     });
 
-    document.getElementById('matterTypeFilter').addEventListener('change', () => {
-      const filterValue = document.getElementById('matterTypeFilter').value;
+    var _matterTypeFilter = document.getElementById('matterTypeFilter');
+    if (_matterTypeFilter) _matterTypeFilter.addEventListener('lex-change', (e) => {
+      const filterValue = e.detail || document.getElementById('matterTypeFilter').value;
 
       // Track matter type filtered event
       if (window.analytics) {
@@ -542,26 +672,20 @@
       }
     }
 
-    // Populate workspace selector dropdown
+    // Populate workspace selector dropdown (lex-select uses options array)
     function populateWorkspaceSelector() {
       const workspaceSelector = document.getElementById('workspaceSelector');
       if (!workspaceSelector) return;
 
-      // Keep the default "No workspace" option
-      const defaultOption = workspaceSelector.querySelector('option[value=""]');
-      workspaceSelector.innerHTML = '';
-      if (defaultOption) {
-        workspaceSelector.appendChild(defaultOption);
-      }
-
-      // Add workspace options
+      const options = [{ value: '', label: 'No workspace (standalone matter)' }];
       allWorkspaces.forEach(workspace => {
-        const option = document.createElement('option');
-        option.value = workspace.matter_id;
-        option.textContent = workspace.matter_name || workspace.matter_id;
-        workspaceSelector.appendChild(option);
+        options.push({
+          value: workspace.matter_id,
+          label: workspace.matter_name || workspace.matter_id
+        });
       });
 
+      workspaceSelector.options = options;
       console.log('[populateWorkspaceSelector] Added workspace options:', allWorkspaces.length);
     }
 
@@ -607,14 +731,14 @@
     const selectedUsersList = document.getElementById('selectedUsersList');
     const noUsersSelected = document.getElementById('noUsersSelected');
 
-    userSearchInput.addEventListener('input', debounce(() => {
+    if (userSearchInput) userSearchInput.addEventListener('lex-input', debounce(() => {
       const query = userSearchInput.value.toLowerCase().trim();
       if (query.length < 2) {
-        userSearchResults.classList.add('hidden');
+        if (userSearchResults) userSearchResults.classList.add('hidden');
         return;
       }
 
-      const filtered = allOrgUsers.filter(u => 
+      const filtered = allOrgUsers.filter(u =>
         !selectedUsers.some(s => s.id === u.id) && (
           (u.email || '').toLowerCase().includes(query) ||
           (u.first_name || '').toLowerCase().includes(query) ||
@@ -623,12 +747,12 @@
       ).slice(0, 8);
 
       if (filtered.length === 0) {
-        userSearchResults.innerHTML = '<div class="p-3 text-sm text-gray-500">No users found</div>';
+        if (userSearchResults) userSearchResults.innerHTML = '<div class="p-3 text-sm text-gray-500">No users found</div>';
       } else {
-        userSearchResults.innerHTML = filtered.map(u => `
+        if (userSearchResults) userSearchResults.innerHTML = filtered.map(u => `
           <div class="p-2 hover:bg-gray-50 cursor-pointer flex items-center gap-2" onclick="addUserToShare('${u.id}')">
-            <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <span class="text-xs font-medium text-indigo-600">${(u.first_name?.[0] || '') + (u.last_name?.[0] || '') || u.email?.[0]?.toUpperCase() || 'U'}</span>
+            <div class="w-8 h-8 lex-bg-accent-soft rounded-full flex items-center justify-center flex-shrink-0">
+              <span class="text-xs font-medium lex-text-accent">${(u.first_name?.[0] || '') + (u.last_name?.[0] || '') || u.email?.[0]?.toUpperCase() || 'U'}</span>
             </div>
             <div class="flex-1 min-w-0">
               <p class="text-sm font-medium text-gray-900 truncate">${u.first_name || ''} ${u.last_name || ''}</p>
@@ -637,12 +761,12 @@
           </div>
         `).join('');
       }
-      userSearchResults.classList.remove('hidden');
+      if (userSearchResults) userSearchResults.classList.remove('hidden');
     }, 200));
 
     // Hide search results when clicking outside
     document.addEventListener('click', (e) => {
-      if (!userSearchInput.contains(e.target) && !userSearchResults.contains(e.target)) {
+      if (userSearchInput && userSearchResults && !userSearchInput.contains(e.target) && !userSearchResults.contains(e.target)) {
         userSearchResults.classList.add('hidden');
       }
     });
@@ -650,11 +774,11 @@
     window.addUserToShare = function(userId) {
       const user = allOrgUsers.find(u => u.id === userId);
       if (!user || selectedUsers.some(u => u.id === userId)) return;
-      
+
       selectedUsers.push(user);
       renderSelectedUsers();
-      userSearchInput.value = '';
-      userSearchResults.classList.add('hidden');
+      if (userSearchInput) userSearchInput.value = '';
+      if (userSearchResults) userSearchResults.classList.add('hidden');
       
       // Auto-set visibility to private when users are selected
       document.getElementById('matterVisibility').value = 'private';
@@ -666,9 +790,9 @@
       renderSelectedUsers();
     }
 
-    // Handle visibility change
+    // Handle visibility change (lex-select emits lex-change)
     const visibilitySelect = document.getElementById('matterVisibility');
-    visibilitySelect.addEventListener('change', () => {
+    if (visibilitySelect) visibilitySelect.addEventListener('lex-change', () => {
       if (visibilitySelect.value === 'organization') {
         // Clear selected users when switching to organization visibility
         selectedUsers = [];
@@ -681,15 +805,17 @@
     function updateShareSectionVisibility() {
       const shareSection = document.getElementById('shareWithSection');
       const visibility = document.getElementById('matterVisibility').value;
-      
+      const userSearchInput = document.getElementById('userSearchInput');
+      const sectionLabel = shareSection.querySelector('label');
+
       if (visibility === 'organization') {
         shareSection.classList.add('opacity-50');
-        shareSection.querySelector('#userSearchInput').disabled = true;
-        shareSection.querySelector('label').innerHTML = 'Share with Team Members <span class="text-gray-400 text-xs font-normal">(Not needed for organization visibility)</span>';
+        if (userSearchInput) userSearchInput.disabled = true;
+        if (sectionLabel) sectionLabel.innerHTML = 'Share with Team Members <span class="text-gray-400 text-xs font-normal">(Not needed for organization visibility)</span>';
       } else {
         shareSection.classList.remove('opacity-50');
-        shareSection.querySelector('#userSearchInput').disabled = false;
-        shareSection.querySelector('label').innerHTML = 'Share with Team Members';
+        if (userSearchInput) userSearchInput.disabled = false;
+        if (sectionLabel) sectionLabel.innerHTML = 'Share with Team Members';
       }
     }
 
@@ -702,8 +828,8 @@
       selectedUsersList.innerHTML = selectedUsers.map(u => `
         <div class="flex items-center justify-between bg-gray-50 rounded-lg p-2">
           <div class="flex items-center gap-2">
-            <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <span class="text-xs font-medium text-indigo-600">${(u.first_name?.[0] || '') + (u.last_name?.[0] || '') || u.email?.[0]?.toUpperCase() || 'U'}</span>
+            <div class="w-8 h-8 lex-bg-accent-soft rounded-full flex items-center justify-center flex-shrink-0">
+              <span class="text-xs font-medium lex-text-accent">${(u.first_name?.[0] || '') + (u.last_name?.[0] || '') || u.email?.[0]?.toUpperCase() || 'U'}</span>
             </div>
             <div>
               <p class="text-sm font-medium text-gray-900">${u.first_name || ''} ${u.last_name || ''}</p>
@@ -728,12 +854,20 @@
 
     // ================== DOCUMENT UPLOAD HANDLING (Removed - use Documents tab in matter drawer) ==================
 
-    document.getElementById('createMatterBtn').addEventListener('click', () => {
-      document.getElementById('matterModalTitle').textContent = 'Create Matter';
+    var _createMatterBtn = document.getElementById('createMatterBtn');
+    if (_createMatterBtn) _createMatterBtn.addEventListener('click', () => {
+      document.getElementById('matterModal').heading = 'Create Matter';
       document.getElementById('matterId').value = '';
       document.getElementById('matterIdDisplay').classList.add('hidden');
       document.getElementById('shareWithSection').classList.remove('hidden');
       form.reset();
+      // Reset Lex components (not affected by native form.reset())
+      ['matterName', 'clientName', 'matterDescription'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+      const matterStatusEl = document.getElementById('matterStatus');
+      if (matterStatusEl) matterStatusEl.value = 'active';
       resetShareForm();
 
       // Enable matter type selection and reset to workspace default
@@ -752,17 +886,19 @@
       conflictDetection = new ConflictDetection(api);
       conflictDetection.initialize('conflictDetectionContainer');
 
-      modal.classList.remove('hidden');
+      modal.open = true;
     });
 
-    document.getElementById('closeMatterModal').addEventListener('click', () => {
-      modal.classList.add('hidden');
+    var _matterModalEl = document.getElementById('matterModal');
+    if (_matterModalEl) _matterModalEl.addEventListener('lex-close', () => {
+      modal.open = false;
       if (conflictDetection) {
         conflictDetection.reset();
       }
     });
-    document.getElementById('cancelMatterBtn').addEventListener('click', () => {
-      modal.classList.add('hidden');
+    var _cancelMatterBtn = document.getElementById('cancelMatterBtn');
+    if (_cancelMatterBtn) _cancelMatterBtn.addEventListener('click', () => {
+      modal.open = false;
       if (conflictDetection) {
         conflictDetection.reset();
       }
@@ -865,9 +1001,9 @@
 
         // Show user-friendly error message
         if (error.response?.data?.error?.code === 'MATTER_NOT_FOUND') {
-          Toast.error(`Matter not found. Please refresh the page and try again.`);
+          Lex.Toast.error(`Matter not found. Please refresh the page and try again.`);
         } else {
-          Toast.error(`Failed to create conversation: ${error.message || 'Unknown error'}`);
+          Lex.Toast.error(`Failed to create conversation: ${error.message || 'Unknown error'}`);
         }
       }
     };
@@ -887,7 +1023,7 @@
         const matter = matterResult.matter;
         const permissions = permResult.permissions || [];
 
-        document.getElementById('matterModalTitle').textContent = 'Edit Matter';
+        document.getElementById('matterModal').heading = 'Edit Matter';
         document.getElementById('matterId').value = matter.matter_id;
         document.getElementById('matterIdDisplay').classList.remove('hidden');
         const matterIdValueEl = document.getElementById('matterIdValue');
@@ -946,9 +1082,9 @@
         document.getElementById('shareWithSection').classList.remove('hidden');
         updateShareSectionVisibility();
 
-        modal.classList.remove('hidden');
+        modal.open = true;
       } catch (error) {
-        Toast.error('Failed to load matter');
+        Lex.Toast.error('Failed to load matter');
       }
     }
 
@@ -1130,10 +1266,9 @@
         // Render the specified tab (default is 'details')
         switchMatterTab(defaultTab);
 
-        drawer.classList.remove('hidden', 'translate-x-full');
-        overlay.classList.remove('hidden');
+        drawer.open = true;
       } catch (error) {
-        Toast.error('Failed to load matter details');
+        Lex.Toast.error('Failed to load matter details');
       }
     }
 
@@ -1150,11 +1285,11 @@
         const btn = document.getElementById(`tab${tab}`);
         const content = document.getElementById(`tabContent${tab}`);
         if (tab.toLowerCase() === tabName.toLowerCase()) {
-          btn.classList.add('text-indigo-600', 'border-indigo-600');
+          btn.classList.add('lex-text-accent', 'lex-border-accent');
           btn.classList.remove('text-gray-500', 'border-transparent');
           content.classList.remove('hidden');
         } else {
-          btn.classList.remove('text-indigo-600', 'border-indigo-600');
+          btn.classList.remove('lex-text-accent', 'lex-border-accent');
           btn.classList.add('text-gray-500', 'border-transparent');
           content.classList.add('hidden');
         }
@@ -1274,7 +1409,7 @@
       const customFieldsActions = `
         <button
           onclick="openEditCustomFieldsModal('${matter.matter_id}')"
-          class="inline-flex items-center justify-center w-8 h-8 text-white rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors"
+          class="inline-flex items-center justify-center w-8 h-8 text-white rounded-lg lex-bg-accent hover:lex-bg-accent transition-colors"
           title="Edit custom fields"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1347,20 +1482,20 @@
               if (notificationContainer) {
                 const userName = window.currentUser?.name?.split(' ')[0] || 'there';
                 notificationContainer.innerHTML = `
-                  <div class="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-5">
+                  <div class="bg-gradient-to-r lex-bg-accent-muted border lex-border rounded-lg p-5">
                     <div class="flex items-start gap-4">
                       <div class="flex-shrink-0">
-                        <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center shadow-sm">
+                        <div class="w-10 h-10 bg-gradient-to-br lex-bg-accent rounded-full flex items-center justify-center shadow-sm">
                           <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
                           </svg>
                         </div>
                       </div>
                       <div class="flex-1">
-                        <p class="text-sm font-medium text-indigo-900 mb-1">
+                        <p class="text-sm font-medium lex-text-primary mb-1">
                           Hey ${userName}! 👋
                         </p>
-                        <p class="text-sm text-indigo-700 leading-relaxed">
+                        <p class="text-sm lex-text-accent leading-relaxed">
                           I'm running an analysis on this matter to generate a profile on this matter. This helps me understand the context, key entities, and themes so I can assist you better. I'll be done soon!
                         </p>
                       </div>
@@ -1387,11 +1522,11 @@
         if (!profile) {
           // No profile available yet - show generate button
           container.innerHTML = `
-            <div class="bg-gradient-to-r from-gray-50 to-indigo-50 border border-gray-200 rounded-lg p-5">
+            <div class="bg-gradient-to-r lex-bg-accent-muted border border-gray-200 rounded-lg p-5">
               <div class="flex items-center justify-between">
                 <div class="flex items-start gap-3">
-                  <div class="w-9 h-9 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div class="w-9 h-9 bg-gradient-to-br from-stone-100 to-stone-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 lex-text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
                     </svg>
                   </div>
@@ -1402,7 +1537,7 @@
                 </div>
                 <button
                   onclick="generateMatterIntelligence('${matter.matter_id}')"
-                  class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium transition-colors shadow-sm flex-shrink-0 ml-4"
+                  class="inline-flex items-center gap-1.5 px-4 py-2 lex-bg-accent hover:lex-bg-accent text-white text-sm rounded-lg font-medium transition-colors shadow-sm flex-shrink-0 ml-4"
                 >
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
@@ -1449,11 +1584,11 @@
         // If profile has no meaningful content, show generate button
         if (brandVoiceItems.length === 0 && keyEntitiesItems.length === 0 && themes.length === 0) {
           container.innerHTML = `
-            <div class="bg-gradient-to-r from-gray-50 to-indigo-50 border border-gray-200 rounded-lg p-5">
+            <div class="bg-gradient-to-r lex-bg-accent-muted border border-gray-200 rounded-lg p-5">
               <div class="flex items-center justify-between">
                 <div class="flex items-start gap-3">
-                  <div class="w-9 h-9 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div class="w-9 h-9 bg-gradient-to-br from-stone-100 to-stone-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 lex-text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
                     </svg>
                   </div>
@@ -1464,7 +1599,7 @@
                 </div>
                 <button
                   onclick="generateMatterIntelligence('${matter.matter_id}')"
-                  class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium transition-colors shadow-sm flex-shrink-0 ml-4"
+                  class="inline-flex items-center gap-1.5 px-4 py-2 lex-bg-accent hover:lex-bg-accent text-white text-sm rounded-lg font-medium transition-colors shadow-sm flex-shrink-0 ml-4"
                 >
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
@@ -1499,7 +1634,7 @@
                 <h6 class="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-2">Document Themes</h6>
                 <div class="flex flex-wrap gap-2">
                   ${themes.map(theme => `
-                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium lex-bg-accent-soft lex-text-accent">
                       ${escapeHtml(String(theme))}
                     </span>
                   `).join('')}
@@ -1538,12 +1673,12 @@
         // Show loading state in the button area
         if (container) {
           container.innerHTML = `
-            <div class="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-5">
+            <div class="bg-gradient-to-r lex-bg-accent-muted border lex-border rounded-lg p-5">
               <div class="flex items-center gap-3">
-                <div class="animate-spin rounded-full h-8 w-8 border-3 border-indigo-200 border-t-indigo-600 flex-shrink-0"></div>
+                <div class="animate-spin rounded-full h-8 w-8 border-3 lex-border border-t-stone-600 flex-shrink-0"></div>
                 <div>
-                  <h5 class="text-sm font-semibold text-indigo-900">Generating Matter Intelligence...</h5>
-                  <p class="text-xs text-indigo-700 mt-0.5">Analyzing documents, notes, and matter data. This may take a moment.</p>
+                  <h5 class="text-sm font-semibold lex-text-primary">Generating Matter Intelligence...</h5>
+                  <p class="text-xs lex-text-accent mt-0.5">Analyzing documents, notes, and matter data. This may take a moment.</p>
                 </div>
               </div>
             </div>
@@ -1556,18 +1691,18 @@
         if (notificationContainer) {
           const userName = window.currentUser?.name?.split(' ')[0] || 'there';
           notificationContainer.innerHTML = `
-            <div class="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-5 mb-4">
+            <div class="bg-gradient-to-r lex-bg-accent-muted border lex-border rounded-lg p-5 mb-4">
               <div class="flex items-start gap-4">
                 <div class="flex-shrink-0">
-                  <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center shadow-sm">
+                  <div class="w-10 h-10 bg-gradient-to-br lex-bg-accent rounded-full flex items-center justify-center shadow-sm">
                     <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
                     </svg>
                   </div>
                 </div>
                 <div class="flex-1">
-                  <p class="text-sm font-medium text-indigo-900 mb-1">Analysis Started</p>
-                  <p class="text-sm text-indigo-700 leading-relaxed">
+                  <p class="text-sm font-medium lex-text-primary mb-1">Analysis Started</p>
+                  <p class="text-sm lex-text-accent leading-relaxed">
                     I'm running an analysis on this matter to generate a profile. This helps me understand the context, key entities, and themes so I can assist you better. I'll be done soon!
                   </p>
                 </div>
@@ -1579,8 +1714,8 @@
         // Clear the profile section while processing
         if (container) container.innerHTML = '';
 
-        if (typeof Toast !== 'undefined' && Toast.success) {
-          Toast.success('Matter intelligence generation started');
+        if (typeof Lex !== 'undefined' && Lex.Toast && Lex.Toast.success) {
+          Lex.Toast.success('Matter intelligence generation started');
         }
       } catch (error) {
         console.error('[generateMatterIntelligence] Failed:', error);
@@ -1603,7 +1738,7 @@
                 </div>
                 <button
                   onclick="generateMatterIntelligence('${matterId}')"
-                  class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium transition-colors shadow-sm flex-shrink-0 ml-4"
+                  class="inline-flex items-center gap-1.5 px-4 py-2 lex-bg-accent hover:lex-bg-accent text-white text-sm rounded-lg font-medium transition-colors shadow-sm flex-shrink-0 ml-4"
                 >
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
@@ -1615,8 +1750,8 @@
           `;
         }
 
-        if (typeof Toast !== 'undefined' && Toast.error) {
-          Toast.error('Failed to generate matter intelligence');
+        if (typeof Lex !== 'undefined' && Lex.Toast && Lex.Toast.error) {
+          Lex.Toast.error('Failed to generate matter intelligence');
         }
       }
     };
@@ -1663,10 +1798,10 @@
           <div class="flex items-center justify-between mb-3 py-1 -mx-1">
             <button
               onclick="toggleSection('${id}')"
-              class="flex items-center gap-2 text-base font-semibold text-gray-900 hover:text-indigo-600 border-l-2 border-indigo-200 hover:border-indigo-500 pl-3 -ml-1 transition-colors group"
+              class="flex items-center gap-2 text-base font-semibold text-gray-900 hover:lex-text-accent border-l-2 lex-border hover:lex-border-accent pl-3 -ml-1 transition-colors group"
             >
               <svg
-                class="w-4 h-4 text-gray-500 group-hover:text-indigo-600 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}"
+                class="w-4 h-4 text-gray-500 group-hover:lex-text-accent transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}"
                 id="${id}-chevron"
                 fill="none"
                 stroke="currentColor"
@@ -1736,7 +1871,7 @@
       const sharedWithActions = `
         <button
           onclick="openManageShareModal('${matter.matter_id}')"
-          class="inline-flex items-center justify-center w-8 h-8 text-white rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors"
+          class="inline-flex items-center justify-center w-8 h-8 text-white rounded-lg lex-bg-accent hover:lex-bg-accent transition-colors"
           title="Manage Sharing"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1748,8 +1883,8 @@
       const sharedWithContent = permissions.length > 0 ? permissions.map(p => `
         <div class="flex items-center justify-between bg-white rounded-lg p-3 border border-gray-200">
           <div class="flex items-center gap-3">
-            <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
-              <span class="text-xs font-medium text-indigo-600">${(p.first_name?.[0] || '') + (p.last_name?.[0] || '') || p.email?.[0]?.toUpperCase() || 'U'}</span>
+            <div class="w-8 h-8 lex-bg-accent-soft rounded-full flex items-center justify-center">
+              <span class="text-xs font-medium lex-text-accent">${(p.first_name?.[0] || '') + (p.last_name?.[0] || '') || p.email?.[0]?.toUpperCase() || 'U'}</span>
             </div>
             <div>
               <p class="text-sm font-medium text-gray-900">${p.first_name || ''} ${p.last_name || ''}</p>
@@ -1876,7 +2011,7 @@
     window.refreshCurrentMatter = async function() {
       if (!currentMatterData || !currentMatterData.matter || !currentMatterData.matter.matter_id) {
         console.warn('[refreshCurrentMatter] No matter currently open');
-        Toast.error('No matter is currently open');
+        Lex.Toast.error('No matter is currently open');
         return;
       }
 
@@ -1897,10 +2032,10 @@
         // Re-fetch matter with cache busting
         await viewMatter(currentMatterData.matter.matter_id, currentTab, { bustCache: true });
 
-        Toast.success('Matter details refreshed');
+        Lex.Toast.success('Matter details refreshed');
       } catch (error) {
         console.error('[refreshCurrentMatter] Error refreshing matter:', error);
-        Toast.error('Failed to refresh matter details');
+        Lex.Toast.error('Failed to refresh matter details');
       } finally {
         // Remove spinning animation
         if (refreshBtn) {
@@ -1943,7 +2078,7 @@
           return '<svg class="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM8 13h2v2H8v-2zm0 3h2v2H8v-2zm3-3h2v2h-2v-2zm0 3h2v2h-2v-2zm3-3h2v2h-2v-2zm0 3h2v2h-2v-2z"/></svg>';
         }
         if (contentType.includes('image')) {
-          return '<svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>';
+          return '<svg class="w-5 h-5 lex-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>';
         }
         return '<svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>';
       }
@@ -1965,14 +2100,14 @@
             </svg>
             <h4 class="text-lg font-semibold text-gray-900 mb-2">No documents yet</h4>
             <p class="text-gray-500 mb-6">Upload documents to this matter to enable AI-powered search and analysis</p>
-            <div id="drawerEmptyDropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-indigo-400 transition-colors cursor-pointer">
+            <div id="drawerEmptyDropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:lex-border-accent transition-colors cursor-pointer">
               <input type="file" id="drawerEmptyFileInput" multiple accept=".pdf,.doc,.docx,.txt,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.pptx,.ppt" class="hidden">
               <div class="text-center">
                 <svg class="mx-auto h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
                 </svg>
                 <p class="mt-2 text-sm text-gray-600">
-                  <span class="text-indigo-600 hover:text-indigo-800 font-medium">Click to upload</span> or drag and drop
+                  <span class="lex-text-accent hover:lex-text-accent font-medium">Click to upload</span> or drag and drop
                 </p>
                 <p class="mt-1 text-xs text-gray-500">PDF, Word, Excel, Images up to 50MB</p>
               </div>
@@ -1986,18 +2121,18 @@
       content.innerHTML = `
         <div class="space-y-4">
           <!-- Upload area -->
-          <div id="drawerDocDropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-indigo-400 transition-colors cursor-pointer">
+          <div id="drawerDocDropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:lex-border-accent transition-colors cursor-pointer">
             <input type="file" id="drawerDocFileInput" multiple accept=".pdf,.doc,.docx,.txt,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.pptx,.ppt" class="hidden">
             <div id="drawerDocDropContent" class="flex items-center justify-center gap-3">
               <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
               </svg>
               <span class="text-sm text-gray-600">
-                <span class="text-indigo-600 font-medium">Upload files</span> or drag and drop
+                <span class="lex-text-accent font-medium">Upload files</span> or drag and drop
               </span>
             </div>
             <div id="drawerDocUploadProgress" class="hidden flex items-center justify-center gap-3">
-              <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full"></div>
+              <div class="animate-spin w-5 h-5 border-2 lex-border border-t-stone-600 rounded-full"></div>
               <span id="drawerDocUploadText" class="text-sm text-gray-600">Uploading...</span>
             </div>
           </div>
@@ -2011,7 +2146,7 @@
             <!-- Document list -->
             <div class="space-y-2">
               ${documents.map(doc => `
-              <div class="bg-white border border-gray-200 hover:border-indigo-300 rounded-lg p-3 transition-all group" data-doc-id="${doc.id}">
+              <div class="bg-white border border-gray-200 hover:lex-border-accent rounded-lg p-3 transition-all group" data-doc-id="${doc.id}">
                 <div class="flex items-start gap-3">
                   <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
                     ${getFileIcon(doc.content_type)}
@@ -2026,7 +2161,7 @@
                           <span>${timeAgo(doc.created_at)}</span>
                           ${doc.source === 'workspace' ? `
                             <span class="text-gray-300">|</span>
-                            <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded">
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 lex-bg-accent-soft lex-text-accent text-xs font-medium rounded">
                               <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
                               </svg>
@@ -2053,7 +2188,7 @@
                           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
                           View
                         </button>
-                        <button onclick="downloadDocument('${doc.id}', '${matter.matter_id}', '${doc.filename}')" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1">
+                        <button onclick="downloadDocument('${doc.id}', '${matter.matter_id}', '${doc.filename}')" class="text-xs lex-text-accent hover:lex-text-accent font-medium flex items-center gap-1">
                           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                           Download
                         </button>
@@ -2140,7 +2275,7 @@
                           </div>
                         </div>
                         <div class="flex items-center gap-2 mt-2">
-                          <button onclick="assignOrphanedFile('${file.storage_key}', '${matter.matter_id}', '${file.filename.replace(/'/g, "\\'")}', '${file.content_type}', ${file.file_size}, '${file.id || ''}', '${file.source || 'minio'}')" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1">
+                          <button onclick="assignOrphanedFile('${file.storage_key}', '${matter.matter_id}', '${file.filename.replace(/'/g, "\\'")}', '${file.content_type}', ${file.file_size}, '${file.id || ''}', '${file.source || 'minio'}')" class="text-xs lex-text-accent hover:lex-text-accent font-medium flex items-center gap-1">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                             Assign to Matter
                           </button>
@@ -2193,9 +2328,9 @@
 
           // Show toast for completed/failed
           if (data.status === 'completed') {
-            Toast.success(`Document ready: ${filename}`);
+            Lex.Toast.success(`Document ready: ${filename}`);
           } else if (data.status === 'failed') {
-            Toast.error(`Document processing failed: ${filename}`);
+            Lex.Toast.error(`Document processing failed: ${filename}`);
           }
         } catch (error) {
           console.error('Failed to parse SSE status event:', error);
@@ -2252,7 +2387,7 @@
     function getDocumentActions(fileId, status) {
       // This will be updated with actual matter ID when rendered
       return `
-        <button onclick="downloadDocument('${fileId}', currentMatterData.matter.matter_id, '')" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1">
+        <button onclick="downloadDocument('${fileId}', currentMatterData.matter.matter_id, '')" class="text-xs lex-text-accent hover:lex-text-accent font-medium flex items-center gap-1">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
           Download
         </button>
@@ -2287,7 +2422,7 @@
           activeSSEConnections.delete(jobId);
         }
 
-        Toast.success(`Cancelled processing: ${filename}`);
+        Lex.Toast.success(`Cancelled processing: ${filename}`);
 
         // Refresh documents
         if (currentMatterData) {
@@ -2295,7 +2430,7 @@
         }
       } catch (error) {
         console.error('Failed to cancel document processing:', error);
-        Toast.error(error.message || 'Failed to cancel processing');
+        Lex.Toast.error(error.message || 'Failed to cancel processing');
       }
     };
 
@@ -2332,17 +2467,17 @@
       // Drag and drop
       dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
-        dropZone.classList.add('border-indigo-400', 'bg-indigo-50');
+        dropZone.classList.add('lex-border-accent', 'lex-bg-accent-muted');
       });
 
       dropZone.addEventListener('dragleave', (e) => {
         e.preventDefault();
-        dropZone.classList.remove('border-indigo-400', 'bg-indigo-50');
+        dropZone.classList.remove('lex-border-accent', 'lex-bg-accent-muted');
       });
 
       dropZone.addEventListener('drop', async (e) => {
         e.preventDefault();
-        dropZone.classList.remove('border-indigo-400', 'bg-indigo-50');
+        dropZone.classList.remove('lex-border-accent', 'lex-bg-accent-muted');
         const files = e.dataTransfer.files;
         if (files.length > 0) {
           await handleDrawerFileUpload(files, matterId);
@@ -2401,7 +2536,7 @@
               startDocumentStatusStream(result.job_id, result.file_id, matterId, file.name);
             }
           } catch (error) {
-            Toast.error(`Failed to upload ${file.name}: ${error.message}`);
+            Lex.Toast.error(`Failed to upload ${file.name}: ${error.message}`);
           }
         });
 
@@ -2420,7 +2555,7 @@
       if (docFileInput) docFileInput.value = '';
 
       if (successCount > 0) {
-        Toast.success(`Uploaded ${successCount} document(s) - processing started`);
+        Lex.Toast.success(`Uploaded ${successCount} document(s) - processing started`);
         // Refresh documents to show initial state
         await refreshDrawerDocuments(matterId);
       }
@@ -2451,10 +2586,10 @@
       Modal.confirm('Delete Document', 'Are you sure you want to delete this document? This action cannot be undone.', async () => {
         try {
           await api.deleteDocument(fileId); // Using universal endpoint - no matterId needed
-          Toast.success('Document deleted successfully');
+          Lex.Toast.success('Document deleted successfully');
           await refreshDrawerDocuments(matterId);
         } catch (error) {
-          Toast.error(error.message || 'Failed to delete document');
+          Lex.Toast.error(error.message || 'Failed to delete document');
         }
       });
     }
@@ -2466,12 +2601,12 @@
         `Retry processing for "${filename}"? This will re-attempt to parse, chunk, and embed the document.`,
         async () => {
           try {
-            Toast.info('Retriggering document ingestion...');
+            Lex.Toast.info('Retriggering document ingestion...');
 
             // Call the retry endpoint
             const result = await api.post(`/api/v1/storage/documents/${fileId}/retry-ingestion`, {});
 
-            Toast.success('Document processing started. This may take a few minutes.');
+            Lex.Toast.success('Document processing started. This may take a few minutes.');
 
             // Refresh the documents list after a short delay
             setTimeout(async () => {
@@ -2480,7 +2615,7 @@
 
           } catch (error) {
             console.error('Failed to retry document ingestion:', error);
-            Toast.error(error.message || 'Failed to retry document processing');
+            Lex.Toast.error(error.message || 'Failed to retry document processing');
           }
         },
         'Retry', // Button text
@@ -2503,14 +2638,14 @@
           `Replace document with "${file.name}"? This will re-process the document and update all embeddings for search.`,
           async () => {
             try {
-              Toast.info('Replacing document...');
+              Lex.Toast.info('Replacing document...');
               const result = await api.replaceDocument(fileId, file, (progress) => {
                 console.log(`Upload progress: ${progress}%`);
               });
-              Toast.success('Document replaced successfully. Re-processing for search...');
+              Lex.Toast.success('Document replaced successfully. Re-processing for search...');
               await refreshDrawerDocuments(matterId);
             } catch (error) {
-              Toast.error(error.message || 'Failed to replace document');
+              Lex.Toast.error(error.message || 'Failed to replace document');
             }
           }
         );
@@ -2530,7 +2665,7 @@
         message,
         async () => {
           try {
-            Toast.info('Assigning file...');
+            Lex.Toast.info('Assigning file...');
             const result = await api.assignOrphanedFile({
               storage_key: storageKey,
               matter_id: matterId,
@@ -2540,12 +2675,12 @@
               document_id: documentId || null,
               source: source || 'minio'
             });
-            Toast.success('Document assigned! Processing started - refresh page in a few moments to see the processed document', { duration: 8000 });
+            Lex.Toast.success('Document assigned! Processing started - refresh page in a few moments to see the processed document', { duration: 8000 });
 
             // Refresh the matter view to update documents list
             await viewMatter(matterId, 'documents');
           } catch (error) {
-            Toast.error(error.message || 'Failed to assign file');
+            Lex.Toast.error(error.message || 'Failed to assign file');
           }
         },
         'Assign',
@@ -2556,7 +2691,7 @@
     // View orphaned document in file viewer modal (using storage key)
     window.viewOrphanedDocument = async function(storageKey, matterId, filename, contentType, fileSize) {
       // Show modal with loading state
-      viewerModal.classList.remove('hidden');
+      viewerModal.open = true;
       viewerLoading.classList.remove('hidden');
       viewerError.classList.add('hidden');
       viewerIframe.classList.add('hidden');
@@ -2589,7 +2724,7 @@
             } else {
               localStorage.removeItem('token');
               localStorage.removeItem('user');
-              Toast.error('Session expired. Redirecting to login...');
+              Lex.Toast.error('Session expired. Redirecting to login...');
               setTimeout(() => { window.location.href = 'login.html'; }, 1500);
             }
             throw new Error('Session expired');
@@ -2678,15 +2813,15 @@
         `Permanently delete "${filename}" from storage? This action cannot be undone.`,
         async () => {
           try {
-            Toast.info('Deleting file...');
+            Lex.Toast.info('Deleting file...');
             // We'll need to create a delete endpoint for orphaned files
             await api.delete(`/api/v1/storage/orphaned?storage_key=${encodeURIComponent(storageKey)}`);
-            Toast.success('File deleted successfully');
+            Lex.Toast.success('File deleted successfully');
 
             // Refresh the matter view to update orphaned files list
             await viewMatter(matterId, 'documents');
           } catch (error) {
-            Toast.error(error.message || 'Failed to delete file');
+            Lex.Toast.error(error.message || 'Failed to delete file');
           }
         }
       );
@@ -2701,7 +2836,6 @@
     const metadataNotes = document.getElementById('metadataNotes');
     const confirmMetadataUpload = document.getElementById('confirmMetadataUpload');
     const cancelMetadataUpload = document.getElementById('cancelMetadataUpload');
-    const closeMetadataModal = document.getElementById('closeMetadataModal');
 
     let pendingFileUpload = null;
     let pendingMatterId = null;
@@ -2727,16 +2861,12 @@
       metadataTags.value = '';
       metadataNotes.value = '';
 
-      // Reset character counter
-      const charCount = document.getElementById('notesCharCount');
-      if (charCount) charCount.textContent = '0';
-
       // Show modal
-      metadataModal.classList.remove('hidden');
+      metadataModal.open = true;
     }
 
     function closeMetadataModalFn() {
-      metadataModal.classList.add('hidden');
+      metadataModal.open = false;
       pendingFileUpload = null;
       pendingMatterId = null;
 
@@ -2750,7 +2880,7 @@
 
     async function confirmMetadataUploadFn() {
       if (!pendingFileUpload || !pendingMatterId) {
-        Toast.error('No file selected for upload');
+        Lex.Toast.error('No file selected for upload');
         return;
       }
 
@@ -2815,10 +2945,10 @@
           startDocumentStatusStream(result.job_id, result.file_id, matterId, file.name);
         }
 
-        Toast.success(`Document uploaded - processing started`);
+        Lex.Toast.success(`Document uploaded - processing started`);
         await refreshDrawerDocuments(matterId);
       } catch (error) {
-        Toast.error(`Failed to upload ${file.name}: ${error.message}`);
+        Lex.Toast.error(`Failed to upload ${file.name}: ${error.message}`);
       } finally {
         // Reset UI
         if (dropContent) dropContent.classList.remove('hidden');
@@ -2826,32 +2956,12 @@
       }
     }
 
-    // Event listeners for metadata modal
-    closeMetadataModal.addEventListener('click', closeMetadataModalFn);
-    cancelMetadataUpload.addEventListener('click', closeMetadataModalFn);
-    confirmMetadataUpload.addEventListener('click', confirmMetadataUploadFn);
+    // Event listeners for metadata modal (lex-modal handles close button and ESC/overlay)
+    if (cancelMetadataUpload) cancelMetadataUpload.addEventListener('click', closeMetadataModalFn);
+    if (confirmMetadataUpload) confirmMetadataUpload.addEventListener('click', confirmMetadataUploadFn);
+    if (metadataModal) metadataModal.addEventListener('lex-close', closeMetadataModalFn);
 
-    // Character counter for notes field
-    metadataNotes.addEventListener('input', (e) => {
-      const charCount = document.getElementById('notesCharCount');
-      if (charCount) {
-        charCount.textContent = e.target.value.length;
-      }
-    });
-
-    // Close modal when clicking outside
-    metadataModal.addEventListener('click', (e) => {
-      if (e.target === metadataModal) {
-        closeMetadataModalFn();
-      }
-    });
-
-    // Close modal with ESC key
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && !metadataModal.classList.contains('hidden')) {
-        closeMetadataModalFn();
-      }
-    });
+    // Character counter handled by lex-textarea show-count attribute
 
     // Document Viewer Modal Setup
     const viewerModal = document.getElementById('documentViewerModal');
@@ -2872,36 +2982,37 @@
     const layoutSplit = document.getElementById('layoutSplit');
     const layoutMetadataOnly = document.getElementById('layoutMetadataOnly');
 
-    // Layout toggle handlers
-    layoutPreviewOnly.addEventListener('click', () => setViewerLayout('preview-only'));
-    layoutSplit.addEventListener('click', () => setViewerLayout('split'));
-    layoutMetadataOnly.addEventListener('click', () => setViewerLayout('metadata-only'));
+    // Layout toggle handlers (elements inside lex-modal may be null at init)
+    if (layoutPreviewOnly) layoutPreviewOnly.addEventListener('click', () => setViewerLayout('preview-only'));
+    if (layoutSplit) layoutSplit.addEventListener('click', () => setViewerLayout('split'));
+    if (layoutMetadataOnly) layoutMetadataOnly.addEventListener('click', () => setViewerLayout('metadata-only'));
 
     function setViewerLayout(layout) {
       // Update button states
-      [layoutPreviewOnly, layoutSplit, layoutMetadataOnly].forEach(btn => btn.classList.remove('active'));
+      [layoutPreviewOnly, layoutSplit, layoutMetadataOnly].forEach(btn => { if (btn) btn.classList.remove('active'); });
       if (layout === 'preview-only') {
-        layoutPreviewOnly.classList.add('active');
-        viewerContent.classList.remove('hidden');
-        viewerMetadataSidebar.classList.add('hidden');
+        if (layoutPreviewOnly) layoutPreviewOnly.classList.add('active');
+        if (viewerContent) viewerContent.classList.remove('hidden');
+        if (viewerMetadataSidebar) viewerMetadataSidebar.classList.add('hidden');
       } else if (layout === 'split') {
-        layoutSplit.classList.add('active');
-        viewerContent.classList.remove('hidden');
-        viewerMetadataSidebar.classList.remove('hidden');
+        if (layoutSplit) layoutSplit.classList.add('active');
+        if (viewerContent) viewerContent.classList.remove('hidden');
+        if (viewerMetadataSidebar) viewerMetadataSidebar.classList.remove('hidden');
       } else if (layout === 'metadata-only') {
-        layoutMetadataOnly.classList.add('active');
-        viewerContent.classList.add('hidden');
-        viewerMetadataSidebar.classList.remove('hidden');
+        if (layoutMetadataOnly) layoutMetadataOnly.classList.add('active');
+        if (viewerContent) viewerContent.classList.add('hidden');
+        if (viewerMetadataSidebar) viewerMetadataSidebar.classList.remove('hidden');
       }
     }
 
-    document.getElementById('closeDocumentViewer').addEventListener('click', closeDocumentViewer);
-    viewerModal.addEventListener('click', (e) => {
+    var closeViewerBtn = document.getElementById('closeDocumentViewer');
+    if (closeViewerBtn) closeViewerBtn.addEventListener('click', closeDocumentViewer);
+    if (viewerModal) viewerModal.addEventListener('click', (e) => {
       if (e.target === viewerModal) closeDocumentViewer();
     });
 
     function closeDocumentViewer() {
-      viewerModal.classList.add('hidden');
+      viewerModal.open = false;
       // Clean up content
       viewerIframe.src = '';
       viewerIframe.classList.add('hidden');
@@ -3004,7 +3115,7 @@
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
             ${dataRows.map((row, rowIndex) => `
-              <tr class="${rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-indigo-50">
+              <tr class="${rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-50">
                 ${row.map((cell, cellIndex) => `
                   <td class="px-4 py-2 ${cellIndex === 0 ? 'font-medium text-gray-900' : 'text-gray-600'} border-r border-gray-100 whitespace-nowrap">
                     ${escapeHtml(cell)}
@@ -3029,7 +3140,7 @@
     // View document in modal
     window.viewDocument = async function(fileId, matterId, filename, contentType, fileSize) {
       // Show modal with loading state
-      viewerModal.classList.remove('hidden');
+      viewerModal.open = true;
       viewerLoading.classList.remove('hidden');
       viewerError.classList.add('hidden');
       viewerIframe.classList.add('hidden');
@@ -3062,7 +3173,7 @@
             } else {
               localStorage.removeItem('token');
               localStorage.removeItem('user');
-              Toast.error('Session expired. Redirecting to login...');
+              Lex.Toast.error('Session expired. Redirecting to login...');
               setTimeout(() => { window.location.href = 'login.html'; }, 1500);
             }
             throw new Error('Session expired');
@@ -3187,7 +3298,7 @@
             } else {
               localStorage.removeItem('token');
               localStorage.removeItem('user');
-              Toast.error('Session expired. Redirecting to login...');
+              Lex.Toast.error('Session expired. Redirecting to login...');
               setTimeout(() => { window.location.href = 'login.html'; }, 1500);
             }
             throw new Error('Session expired');
@@ -3207,10 +3318,10 @@
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
 
-        Toast.success('Download started');
+        Lex.Toast.success('Download started');
       } catch (error) {
         console.error('Download failed:', error);
-        Toast.error(error.message || 'Failed to download file');
+        Lex.Toast.error(error.message || 'Failed to download file');
       }
     }
 
@@ -3231,7 +3342,7 @@
             } else {
               localStorage.removeItem('token');
               localStorage.removeItem('user');
-              Toast.error('Session expired. Redirecting to login...');
+              Lex.Toast.error('Session expired. Redirecting to login...');
               setTimeout(() => { window.location.href = 'login.html'; }, 1500);
             }
             throw new Error('Session expired');
@@ -3251,10 +3362,10 @@
         document.body.removeChild(a);
         URL.revokeObjectURL(objectUrl);
 
-        Toast.success('Download started');
+        Lex.Toast.success('Download started');
       } catch (error) {
         console.error('Download failed:', error);
-        Toast.error(error.message || 'Failed to download file');
+        Lex.Toast.error(error.message || 'Failed to download file');
       }
     }
 
@@ -3270,7 +3381,7 @@
             </svg>
             <h4 class="text-lg font-semibold text-gray-900 mb-2">No conversations yet</h4>
             <p class="text-gray-500 mb-6">Start a conversation in this matter to organize all related chats</p>
-            <button onclick="createMatterConversation('${matter.matter_id}', '${(matter.name || matter.matter_name || '').replace(/'/g, "\\'")}')" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium">
+            <button onclick="createMatterConversation('${matter.matter_id}', '${(matter.name || matter.matter_name || '').replace(/'/g, "\\'")}')" class="inline-flex items-center gap-2 px-4 py-2 lex-bg-accent hover:lex-bg-accent text-white rounded-lg font-medium">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
               </svg>
@@ -3292,7 +3403,7 @@
         <div class="space-y-4">
           <div class="flex items-center justify-between">
             <p class="text-sm text-gray-500">${total} conversation${total !== 1 ? 's' : ''}</p>
-            <button onclick="createMatterConversation('${matter.matter_id}', '${(matter.name || matter.matter_name || '').replace(/'/g, "\\'")}')" class="inline-flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium">
+            <button onclick="createMatterConversation('${matter.matter_id}', '${(matter.name || matter.matter_name || '').replace(/'/g, "\\'")}')" class="inline-flex items-center gap-2 px-3 py-1.5 lex-bg-accent hover:lex-bg-accent text-white text-sm rounded-lg font-medium">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
               </svg>
@@ -3302,21 +3413,21 @@
 
           <div class="space-y-2">
             ${chats.map(chat => `
-              <div onclick="NavigationHelpers.navigateToConversation('${chat.thread_id}', '${matter.matter_id}')" class="block bg-white border border-gray-200 hover:border-indigo-300 hover:shadow-sm rounded-lg p-4 transition-all group cursor-pointer">
+              <div onclick="NavigationHelpers.navigateToConversation('${chat.thread_id}', '${matter.matter_id}')" class="block bg-white border border-gray-200 hover:lex-border-accent hover:shadow-sm rounded-lg p-4 transition-all group cursor-pointer">
                 <div class="flex items-start gap-3">
-                  <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <div class="w-10 h-10 bg-gradient-to-br lex-bg-accent rounded-lg flex items-center justify-center flex-shrink-0">
                     <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
                     </svg>
                   </div>
                   <div class="flex-1 min-w-0">
-                    <h6 class="text-sm font-semibold text-gray-900 group-hover:text-indigo-600 mb-1 truncate">${chat.metadata?.title || 'Untitled Conversation'}</h6>
+                    <h6 class="text-sm font-semibold text-gray-900 group-hover:lex-text-accent mb-1 truncate">${chat.metadata?.title || 'Untitled Conversation'}</h6>
                     <p class="text-xs text-gray-500 flex items-center gap-4">
                       <span>Started ${timeAgo(chat.created_at)}</span>
                       ${chat.metadata?.messageCount ? `<span>• ${chat.metadata.messageCount} messages</span>` : ''}
                     </p>
                   </div>
-                  <svg class="w-5 h-5 text-gray-400 group-hover:text-indigo-600 flex-shrink-0 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-5 h-5 text-gray-400 group-hover:lex-text-accent flex-shrink-0 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                   </svg>
                 </div>
@@ -3467,10 +3578,10 @@
         'document_uploaded': '<svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>',
         'document_viewed': '<svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>',
         'document_deleted': '<svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>',
-        'matter_created': '<svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>',
+        'matter_created': '<svg class="w-4 h-4 lex-text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>',
         'matter_updated': '<svg class="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>',
-        'chat_message': '<svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>',
-        'conversation_created': '<svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>',
+        'chat_message': '<svg class="w-4 h-4 lex-text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>',
+        'conversation_created': '<svg class="w-4 h-4 lex-text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>',
         'task_created': '<svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>',
         'task_updated': '<svg class="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>',
         'user_shared': '<svg class="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>'
@@ -3493,10 +3604,10 @@
         'document_uploaded': 'bg-blue-100',
         'document_viewed': 'bg-green-100',
         'document_deleted': 'bg-red-100',
-        'matter_created': 'bg-indigo-100',
+        'matter_created': 'lex-bg-accent-soft',
         'matter_updated': 'bg-yellow-100',
-        'chat_message': 'bg-purple-100',
-        'conversation_created': 'bg-purple-100',
+        'chat_message': 'lex-bg-accent-soft',
+        'conversation_created': 'lex-bg-accent-soft',
         'task_created': 'bg-green-100',
         'task_updated': 'bg-yellow-100',
         'user_shared': 'bg-teal-100'
@@ -3562,7 +3673,7 @@
         }
       } catch (error) {
         console.error('[loadActivityPage] Failed to load activity page:', error);
-        Toast.error('Failed to load activity');
+        Lex.Toast.error('Failed to load activity');
       }
     };
 
@@ -3582,7 +3693,7 @@
         }
       } catch (error) {
         console.error('[loadConversationsPage] Failed to load conversations page:', error);
-        Toast.error('Failed to load conversations');
+        Lex.Toast.error('Failed to load conversations');
       }
     };
 
@@ -3612,14 +3723,14 @@
           <!-- Comment Composer -->
           <div class="bg-white rounded-lg border border-gray-200 p-4">
             <div class="flex items-start gap-3">
-              <div class="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center flex-shrink-0 font-semibold">
+              <div class="w-10 h-10 lex-bg-accent-soft lex-text-accent rounded-full flex items-center justify-center flex-shrink-0 font-semibold">
                 ${api.user ? ((api.user.firstName?.[0] || '') + (api.user.lastName?.[0] || '')).toUpperCase() : 'U'}
               </div>
               <div class="flex-1 relative">
                 <div
                   id="commentInput"
                   contenteditable="true"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 min-h-[76px] text-sm outline-none"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 lex-ring-focus lex-border-focus min-h-[76px] text-sm outline-none"
                   data-placeholder="Add a comment... (type @ to mention teammates, # to reference documents)"
                 ></div>
 
@@ -3635,7 +3746,7 @@
 
                 <div class="mt-3 flex justify-end gap-2">
                   <button id="cancelComment" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
-                  <button id="postComment" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">Post Comment</button>
+                  <button id="postComment" class="px-4 py-2 lex-bg-accent hover:lex-bg-accent text-white rounded-lg text-sm font-medium">Post Comment</button>
                 </div>
               </div>
             </div>
@@ -3644,7 +3755,7 @@
           <!-- Comments List -->
           <div id="commentsList" class="space-y-4">
             <div class="text-center py-8">
-              <div class="inline-block animate-spin w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full"></div>
+              <div class="inline-block animate-spin w-8 h-8 border-4 lex-border-accent border-t-transparent rounded-full"></div>
               <p class="mt-2 text-sm text-gray-500">Loading comments...</p>
             </div>
           </div>
@@ -3879,8 +3990,8 @@
                 ` : ''}
 
                 <div class="mt-2 flex items-center gap-3">
-                  <button class="reply-btn text-xs text-gray-600 hover:text-indigo-600 font-medium" data-comment-id="${comment.id}">Reply</button>
-                  ${isAuthor ? `<button class="edit-comment-btn text-xs text-gray-600 hover:text-indigo-600 font-medium" data-comment-id="${comment.id}">Edit</button>` : ''}
+                  <button class="reply-btn text-xs text-gray-600 hover:lex-text-accent font-medium" data-comment-id="${comment.id}">Reply</button>
+                  ${isAuthor ? `<button class="edit-comment-btn text-xs text-gray-600 hover:lex-text-accent font-medium" data-comment-id="${comment.id}">Edit</button>` : ''}
                   ${isAuthor ? `<button class="delete-comment-btn text-xs text-red-600 hover:text-red-700 font-medium" data-comment-id="${comment.id}">Delete</button>` : ''}
                   <button class="pin-comment-btn text-xs text-yellow-600 hover:text-yellow-700 font-medium" data-comment-id="${comment.id}">${isPinned ? 'Unpin' : 'Pin'}</button>
                 </div>
@@ -3890,7 +4001,7 @@
                   <textarea class="reply-textarea w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" rows="2" placeholder="Write a reply..."></textarea>
                   <div class="mt-2 flex justify-end gap-2">
                     <button class="cancel-reply-btn px-3 py-1 text-xs text-gray-600 hover:text-gray-800">Cancel</button>
-                    <button class="post-reply-btn px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-medium">Reply</button>
+                    <button class="post-reply-btn px-3 py-1 lex-bg-accent hover:lex-bg-accent text-white rounded text-xs font-medium">Reply</button>
                   </div>
                 </div>
               </div>
@@ -3925,7 +4036,7 @@
               <div class="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">${renderCommentContent(reply.content)}</div>
 
               <div class="mt-2 flex items-center gap-3">
-                ${isAuthor ? `<button class="edit-comment-btn text-xs text-gray-600 hover:text-indigo-600 font-medium" data-comment-id="${reply.id}">Edit</button>` : ''}
+                ${isAuthor ? `<button class="edit-comment-btn text-xs text-gray-600 hover:lex-text-accent font-medium" data-comment-id="${reply.id}">Edit</button>` : ''}
                 ${isAuthor ? `<button class="delete-comment-btn text-xs text-red-600 hover:text-red-700 font-medium" data-comment-id="${reply.id}">Delete</button>` : ''}
               </div>
             </div>
@@ -3938,7 +4049,7 @@
       // Convert @[Name](uuid) to highlighted mentions
       // Convert #[DocName](uuid) to highlighted document references
       return content
-        .replace(/@\[([^\]]+)\]\(([^)]+)\)/g, '<span class="inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 text-sm font-medium">@$1</span>')
+        .replace(/@\[([^\]]+)\]\(([^)]+)\)/g, '<span class="inline-flex items-center px-1.5 py-0.5 rounded lex-bg-accent-soft lex-text-accent text-sm font-medium">@$1</span>')
         .replace(/#\[([^\]]+)\]\(([^)]+)\)/g, '<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-sm font-medium"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>$1</span>')
         .replace(/\n/g, '<br>');
     }
@@ -4084,7 +4195,7 @@
       // Create styled mention span
       const mentionSpan = document.createElement('span');
       mentionSpan.contentEditable = 'false';
-      mentionSpan.className = 'mention-tag inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 text-sm font-medium mx-0.5';
+      mentionSpan.className = 'mention-tag inline-flex items-center px-1.5 py-0.5 rounded lex-bg-accent-soft lex-text-accent text-sm font-medium mx-0.5';
       mentionSpan.setAttribute('data-user-id', userId);
       mentionSpan.setAttribute('data-user-name', userName);
       mentionSpan.textContent = '@' + userName;
@@ -4244,7 +4355,7 @@
       content = tempEl.value.trim();
 
       if (!content) {
-        Toast.warning('Please enter a comment');
+        Lex.Toast.warning('Please enter a comment');
         return;
       }
 
@@ -4268,7 +4379,7 @@
         });
 
         input.innerHTML = '';
-        Toast.success('Comment posted');
+        Lex.Toast.success('Comment posted');
         await loadComments(matterId);
 
         // Restore button state
@@ -4277,7 +4388,7 @@
         postBtn.innerHTML = originalButtonHtml;
       } catch (error) {
         console.error('Failed to post comment:', error);
-        Toast.error('Failed to post comment');
+        Lex.Toast.error('Failed to post comment');
 
         // Restore button state on error
         postBtn.disabled = false;
@@ -4314,7 +4425,7 @@
           const content = textarea.value.trim();
 
           if (!content) {
-            Toast.warning('Please enter a reply');
+            Lex.Toast.warning('Please enter a reply');
             return;
           }
 
@@ -4322,11 +4433,11 @@
             await api.replyToComment(commentId, { content });
             textarea.value = '';
             container.classList.add('hidden');
-            Toast.success('Reply posted');
+            Lex.Toast.success('Reply posted');
             await loadComments(matterId);
           } catch (error) {
             console.error('Failed to post reply:', error);
-            Toast.error('Failed to post reply');
+            Lex.Toast.error('Failed to post reply');
           }
         });
       });
@@ -4349,7 +4460,7 @@
             <textarea class="edit-comment-textarea w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" rows="3">${currentContent}</textarea>
             <div class="mt-2 flex justify-end gap-2">
               <button class="cancel-edit-btn px-3 py-1 text-xs text-gray-600 hover:text-gray-800 border border-gray-300 rounded">Cancel</button>
-              <button class="save-edit-btn px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-medium">Save</button>
+              <button class="save-edit-btn px-3 py-1 lex-bg-accent hover:lex-bg-accent text-white rounded text-xs font-medium">Save</button>
             </div>
           `;
 
@@ -4371,7 +4482,7 @@
             const newContent = textarea.value.trim();
 
             if (!newContent) {
-              Toast.warning('Comment cannot be empty');
+              Lex.Toast.warning('Comment cannot be empty');
               return;
             }
 
@@ -4386,11 +4497,11 @@
               saveBtn.textContent = 'Saving...';
 
               await api.updateComment(commentId, { content: newContent });
-              Toast.success('Comment updated');
+              Lex.Toast.success('Comment updated');
               await loadComments(matterId);
             } catch (error) {
               console.error('Failed to update comment:', error);
-              Toast.error('Failed to update comment');
+              Lex.Toast.error('Failed to update comment');
               contentElement.innerHTML = originalHTML;
             }
           });
@@ -4408,11 +4519,11 @@
             async () => {
               try {
                 await api.deleteComment(commentId);
-                Toast.success('Comment deleted');
+                Lex.Toast.success('Comment deleted');
                 await loadComments(matterId);
               } catch (error) {
                 console.error('Failed to delete comment:', error);
-                Toast.error('Failed to delete comment');
+                Lex.Toast.error('Failed to delete comment');
               }
             }
           );
@@ -4428,15 +4539,15 @@
           try {
             if (isPinned) {
               await api.unpinComment(commentId);
-              Toast.success('Comment unpinned');
+              Lex.Toast.success('Comment unpinned');
             } else {
               await api.pinComment(commentId);
-              Toast.success('Comment pinned');
+              Lex.Toast.success('Comment pinned');
             }
             await loadComments(matterId);
           } catch (error) {
             console.error('Failed to pin/unpin comment:', error);
-            Toast.error('Failed to update comment');
+            Lex.Toast.error('Failed to update comment');
           }
         });
       });
@@ -4456,12 +4567,12 @@
       const statusMap = {
         'pending': { class: 'bg-yellow-100 text-yellow-800', label: 'Pending' },
         'in_progress': { class: 'bg-blue-100 text-blue-800', label: 'In Progress' },
-        'in_review': { class: 'bg-purple-100 text-purple-800', label: 'In Review' },
+        'in_review': { class: 'lex-bg-accent-soft lex-text-accent', label: 'In Review' },
         'complete': { class: 'bg-green-100 text-green-800', label: 'Complete' },
         'cancelled': { class: 'bg-gray-100 text-gray-800', label: 'Cancelled' },
         'Pending': { class: 'bg-yellow-100 text-yellow-800', label: 'Pending' },
         'In Progress': { class: 'bg-blue-100 text-blue-800', label: 'In Progress' },
-        'In Review': { class: 'bg-purple-100 text-purple-800', label: 'In Review' },
+        'In Review': { class: 'lex-bg-accent-soft lex-text-accent', label: 'In Review' },
         'Complete': { class: 'bg-green-100 text-green-800', label: 'Complete' },
         'Cancelled': { class: 'bg-gray-100 text-gray-800', label: 'Cancelled' }
       };
@@ -4543,7 +4654,7 @@
             </div>
             <button
               onclick="openCreateTaskModal('${matterId}')"
-              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium flex items-center gap-2"
+              class="px-4 py-2 lex-bg-accent text-white rounded-lg hover:lex-bg-accent transition-colors text-sm font-medium flex items-center gap-2"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
@@ -4557,7 +4668,7 @@
             <div class="inline-flex gap-4 min-w-full pb-4">
               ${renderKanbanColumn('pending', 'Pending', tasksByStatus.pending, 'bg-yellow-50 border-yellow-200', 'text-yellow-800')}
               ${renderKanbanColumn('in_progress', 'In Progress', tasksByStatus.in_progress, 'bg-blue-50 border-blue-200', 'text-blue-800')}
-              ${renderKanbanColumn('in_review', 'In Review', tasksByStatus.in_review, 'bg-purple-50 border-purple-200', 'text-purple-800')}
+              ${renderKanbanColumn('in_review', 'In Review', tasksByStatus.in_review, 'lex-bg-accent-muted lex-border-accent', 'lex-text-accent')}
               ${renderKanbanColumn('complete', 'Complete', tasksByStatus.complete, 'bg-green-50 border-green-200', 'text-green-800')}
               ${renderKanbanColumn('cancelled', 'Cancelled', tasksByStatus.cancelled, 'bg-gray-50 border-gray-200', 'text-gray-800')}
             </div>
@@ -4612,7 +4723,7 @@
             <div class="bg-white border-2 border-t-0 ${bgClass.split(' ')[1]} rounded-b-lg px-3 py-2 flex items-center justify-between text-xs">
               <button
                 onclick="changeKanbanPage('${status}', ${pagination.page - 1})"
-                class="px-2 py-1 rounded ${hasPrevious ? 'text-indigo-600 hover:bg-indigo-50' : 'text-gray-300 cursor-not-allowed'}"
+                class="px-2 py-1 rounded ${hasPrevious ? 'lex-text-accent hover:bg-gray-50' : 'text-gray-300 cursor-not-allowed'}"
                 ${!hasPrevious ? 'disabled' : ''}
               >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -4622,7 +4733,7 @@
               <span class="text-gray-600">Page ${formatNumber(pagination.page)} of ${formatNumber(totalPages)}</span>
               <button
                 onclick="changeKanbanPage('${status}', ${pagination.page + 1})"
-                class="px-2 py-1 rounded ${hasMore ? 'text-indigo-600 hover:bg-indigo-50' : 'text-gray-300 cursor-not-allowed'}"
+                class="px-2 py-1 rounded ${hasMore ? 'lex-text-accent hover:bg-gray-50' : 'text-gray-300 cursor-not-allowed'}"
                 ${!hasMore ? 'disabled' : ''}
               >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -4653,7 +4764,7 @@
           <!-- Task Title -->
           <div class="flex items-start gap-2 mb-2">
             <h5 class="text-sm font-medium text-gray-900 flex-1 line-clamp-2">${title}</h5>
-            ${!isLana ? `<span class="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded flex-shrink-0">External</span>` : ''}
+            ${!isLana ? `<span class="text-xs lex-bg-accent-soft lex-text-accent px-2 py-0.5 rounded flex-shrink-0">External</span>` : ''}
           </div>
 
           <!-- Priority Badge -->
@@ -4704,16 +4815,16 @@
     window.handleKanbanDragOver = function(event) {
       event.preventDefault();
       event.dataTransfer.dropEffect = 'move';
-      event.currentTarget.classList.add('ring-2', 'ring-indigo-400');
+      event.currentTarget.classList.add('ring-2', 'lex-ring-focus');
     };
 
     window.handleKanbanDragLeave = function(event) {
-      event.currentTarget.classList.remove('ring-2', 'ring-indigo-400');
+      event.currentTarget.classList.remove('ring-2', 'lex-ring-focus');
     };
 
     window.handleKanbanDrop = async function(event, newStatus) {
       event.preventDefault();
-      event.currentTarget.classList.remove('ring-2', 'ring-indigo-400');
+      event.currentTarget.classList.remove('ring-2', 'lex-ring-focus');
 
       if (!draggedTask) return;
 
@@ -4731,7 +4842,7 @@
       try {
         // Update task status
         await updateTaskStatus(task.id, newStatus);
-        Toast.success(`Task moved to ${newStatus.replace('_', ' ')}`);
+        Lex.Toast.success(`Task moved to ${newStatus.replace('_', ' ')}`);
 
         // CRITICAL FIX: Refresh tasks immediately instead of full viewMatter() reload
         const matterId = (currentMatterData && currentMatterData.matter_id) ||
@@ -4753,7 +4864,7 @@
         }
       } catch (error) {
         console.error('Failed to update task status:', error);
-        Toast.error('Failed to move task');
+        Lex.Toast.error('Failed to move task');
       }
     };
 
@@ -4795,7 +4906,7 @@
       // Find task
       const task = currentTasksList.find(t => t.id === taskId);
       if (!task) {
-        Toast.error('Task not found');
+        Lex.Toast.error('Task not found');
         return;
       }
 
@@ -4825,7 +4936,7 @@
             </div>
             <div class="p-6 space-y-4">
               <div class="flex items-center gap-2">
-                <span class="text-xs bg-purple-100 text-purple-800 px-3 py-1 rounded">ActionStep Task (Read-only)</span>
+                <span class="text-xs lex-bg-accent-soft lex-text-accent px-3 py-1 rounded">ActionStep Task (Read-only)</span>
                 ${getStatusBadge(task.status, task.source)}
                 ${getPriorityBadge(task.priority)}
               </div>
@@ -4905,12 +5016,12 @@
         const title = task.title || task.task_name;
 
         return `
-          <div class="bg-white border border-gray-200 hover:border-indigo-300 rounded-lg p-4 transition-all">
+          <div class="bg-white border border-gray-200 hover:lex-border-accent rounded-lg p-4 transition-all">
             <div class="flex items-start justify-between gap-4">
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-2">
                   <h4 class="text-sm font-medium text-gray-900">${title}</h4>
-                  ${!isLana ? `<span class="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">ActionStep</span>` : ''}
+                  ${!isLana ? `<span class="text-xs lex-bg-accent-soft lex-text-accent px-2 py-1 rounded">ActionStep</span>` : ''}
                 </div>
                 <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-2">
                   ${getStatusBadge(task.status, task.source)}
@@ -4943,7 +5054,7 @@
                 ${isLana ? `
                   <button
                     onclick="editTask('${task.id}')"
-                    class="text-indigo-600 hover:text-indigo-800 p-1"
+                    class="lex-text-accent hover:lex-text-accent p-1"
                     title="Edit task"
                   >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -4990,7 +5101,7 @@
             <p class="text-gray-500 mb-4">Create a task or connect ActionStep to import tasks</p>
             <button
               onclick="openCreateTaskModal('${matter.matter_id}')"
-              class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium transition-colors"
+              class="inline-flex items-center gap-2 px-4 py-2 lex-bg-accent hover:lex-bg-accent text-white text-sm rounded-lg font-medium transition-colors"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
@@ -5019,7 +5130,7 @@
       // Show loading state
       content.innerHTML = `
         <div class="flex items-center justify-center py-12">
-          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 lex-border-accent"></div>
         </div>
       `;
 
@@ -5067,12 +5178,12 @@
       const modal = document.getElementById('contactModal');
       document.getElementById('contactForm').reset();
       document.getElementById('contactMatterId').value = matterId;
-      modal.classList.remove('hidden');
+      modal.open = true;;
     };
 
     // Close Contact Modal
     window.closeContactModal = function() {
-      document.getElementById('contactModal').classList.add('hidden');
+      document.getElementById('contactModal').open = false;
       document.getElementById('contactForm').reset();
     };
 
@@ -5110,10 +5221,10 @@
 
       try {
         await api.createContact(matterId, contactData);
-        Toast.success('Contact created successfully');
+        Lex.Toast.success('Contact created successfully');
 
         // Close modal
-        document.getElementById('contactModal').classList.add('hidden');
+        document.getElementById('contactModal').open = false;
 
         // Restore button state
         submitBtn.disabled = false;
@@ -5124,7 +5235,7 @@
         await refreshCurrentMatter();
       } catch (error) {
         console.error('Save contact error:', error);
-        Toast.error('Failed to create contact');
+        Lex.Toast.error('Failed to create contact');
 
         // Restore button state on error
         submitBtn.disabled = false;
@@ -5143,10 +5254,10 @@
       // Show loading state
       content.innerHTML = `
         <div class="flex items-center justify-center py-12">
-          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 lex-border-accent"></div>
         </div>
       `;
-      modal.classList.remove('hidden');
+      modal.open = true;;
 
       try {
         // Get current matter ID from drawer
@@ -5221,7 +5332,7 @@
                 <h3 class="text-2xl font-semibold text-gray-900">${displayName}</h3>
                 <span class="text-sm ${contactTypeInfo.class} px-2 py-1 rounded">${contactTypeInfo.label}</span>
                 ${isConnectorContact ? `
-                  <span class="inline-flex items-center text-sm bg-purple-100 text-purple-800 px-2 py-1 rounded" title="Synced from ${connectorDisplayName}">
+                  <span class="inline-flex items-center text-sm lex-bg-accent-soft lex-text-accent px-2 py-1 rounded" title="Synced from ${connectorDisplayName}">
                     <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                     </svg>
@@ -5281,27 +5392,27 @@
               ${contact.email ? `
                 <div class="md:col-span-2">
                   <label class="block text-sm font-medium text-gray-500 mb-1">Email</label>
-                  <a href="mailto:${contact.email}" class="text-indigo-600 hover:text-indigo-800">${contact.email}</a>
+                  <a href="mailto:${contact.email}" class="lex-text-accent hover:lex-text-accent">${contact.email}</a>
                 </div>
               ` : ''}
               ${contact.phone_mobile ? `
                 <div>
                   <label class="block text-sm font-medium text-gray-500 mb-1">Mobile Phone</label>
-                  <a href="tel:${contact.phone_mobile}" class="text-indigo-600 hover:text-indigo-800">${contact.phone_mobile}</a>
+                  <a href="tel:${contact.phone_mobile}" class="lex-text-accent hover:lex-text-accent">${contact.phone_mobile}</a>
                 </div>
               ` : ''}
               ${contact.phone_work ? `
                 <div>
                   <label class="block text-sm font-medium text-gray-500 mb-1">Work Phone</label>
-                  <a href="tel:${contact.phone_work}" class="text-indigo-600 hover:text-indigo-800">${contact.phone_work}</a>
+                  <a href="tel:${contact.phone_work}" class="lex-text-accent hover:lex-text-accent">${contact.phone_work}</a>
                 </div>
               ` : ''}
             </div>
 
             <!-- Source info for connector contacts -->
             ${isConnectorContact ? `
-              <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                <p class="text-sm text-purple-800">
+              <div class="lex-bg-accent-muted border lex-border-accent rounded-lg p-4">
+                <p class="text-sm lex-text-accent">
                   <strong>Note:</strong> This contact was originally synced from ${connectorDisplayName}. You can edit the local copy below.
                 </p>
               </div>
@@ -5320,7 +5431,7 @@
               </button>
               <button
                 onclick="openEditContactModal('${contact.id}')"
-                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                class="px-4 py-2 lex-bg-accent hover:lex-bg-accent text-white rounded-lg font-medium transition-colors flex items-center gap-2"
               >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
@@ -5348,7 +5459,7 @@
 
     // Close Contact Detail Modal
     window.closeContactDetailModal = function() {
-      document.getElementById('contactDetailModal').classList.add('hidden');
+      document.getElementById('contactDetailModal').open = false;
     };
 
     // Open Edit Contact Modal
@@ -5391,17 +5502,26 @@
         document.getElementById('editContactType').value = contact.contact_type || 'contact:other';
 
         // Show modal
-        document.getElementById('editContactModal').classList.remove('hidden');
+        document.getElementById('editContactModal').open = true;
       } catch (error) {
         console.error('Error loading contact for editing:', error);
-        Toast.error('Failed to load contact');
+        Lex.Toast.error('Failed to load contact');
       }
     };
 
     // Close Edit Contact Modal
     window.closeEditContactModal = function() {
-      document.getElementById('editContactModal').classList.add('hidden');
-      document.getElementById('editContactForm').reset();
+      document.getElementById('editContactModal').open = false;
+      // Manually clear Lex components since native form.reset() does not affect custom elements
+      const fields = ['editContactFirstName', 'editContactLastName', 'editContactDisplayName',
+        'editContactCompanyName', 'editContactTitle', 'editContactEmail',
+        'editContactPhoneMobile', 'editContactPhoneWork'];
+      fields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+      const typeEl = document.getElementById('editContactType');
+      if (typeEl) typeEl.value = 'contact:participant';
     };
 
     // Update Contact
@@ -5422,18 +5542,13 @@
         contact_type: document.getElementById('editContactType').value
       };
 
-      const submitBtn = event.target.querySelector('button[type="submit"]');
-      const originalButtonHtml = submitBtn.innerHTML;
+      const submitBtn = event.target.querySelector('lex-btn[type="submit"]') || event.target.querySelector('button[type="submit"]');
+      const originalButtonText = submitBtn ? submitBtn.textContent : '';
 
-      submitBtn.disabled = true;
-      submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
-      submitBtn.innerHTML = `
-        <svg class="animate-spin h-4 w-4 inline-block mr-2" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        Updating...
-      `;
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Updating...';
+      }
 
       try {
         const response = await fetch(`${api.baseUrl}/api/v1/matters/${matterId}/contacts/${contactId}`, {
@@ -5449,23 +5564,25 @@
           throw new Error('Failed to update contact');
         }
 
-        Toast.success('Contact updated successfully');
+        Lex.Toast.success('Contact updated successfully');
         closeEditContactModal();
 
         // Restore button state before refreshing data
-        submitBtn.disabled = false;
-        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-        submitBtn.innerHTML = originalButtonHtml;
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalButtonText;
+        }
 
         // Use the same refresh functionality as the refresh button
         await refreshCurrentMatter();
       } catch (error) {
         console.error('Update contact error:', error);
-        Toast.error('Failed to update contact');
+        Lex.Toast.error('Failed to update contact');
 
-        submitBtn.disabled = false;
-        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-        submitBtn.innerHTML = originalButtonHtml;
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalButtonText;
+        }
       }
     };
 
@@ -5486,7 +5603,7 @@
     window.deleteContact = async function(contactId) {
       const matterId = currentMatterData?.matter?.matter_id;
       if (!matterId) {
-        Toast.error('Matter ID not found');
+        Lex.Toast.error('Matter ID not found');
         return;
       }
 
@@ -5515,14 +5632,14 @@
         const result = await response.json();
         console.log('[deleteContact] Success:', result);
 
-        Toast.success('Contact deleted successfully');
+        Lex.Toast.success('Contact deleted successfully');
         closeContactDetailModal();
 
         // Use the same refresh functionality as the refresh button
         await refreshCurrentMatter();
       } catch (error) {
         console.error('Delete contact error:', error);
-        Toast.error('Failed to delete contact');
+        Lex.Toast.error('Failed to delete contact');
       }
     };
 
@@ -5558,7 +5675,7 @@
                 </svg>
                 Link Existing
               </button>
-              <button onclick="openAddContactModal('${matter.matter_id}')" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium transition-colors">
+              <button onclick="openAddContactModal('${matter.matter_id}')" class="inline-flex items-center gap-2 px-4 py-2 lex-bg-accent hover:lex-bg-accent text-white text-sm rounded-lg font-medium transition-colors">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                 </svg>
@@ -5673,7 +5790,7 @@
 
         // Role badge for linked contacts
         const roleBadge = isLinkedContact && contact.role ? `
-          <span class="inline-flex items-center text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded" title="Role in this matter">
+          <span class="inline-flex items-center text-xs lex-bg-accent-soft lex-text-accent px-2 py-0.5 rounded" title="Role in this matter">
             <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
             </svg>
@@ -5705,7 +5822,7 @@
         ` : '';
 
         return `
-          <div onclick="openContactDetail('${contact.id}')" class="bg-white border border-gray-200 hover:border-indigo-300 hover:shadow-sm rounded-lg p-4 transition-all cursor-pointer">
+          <div onclick="openContactDetail('${contact.id}')" class="bg-white border border-gray-200 hover:lex-border-accent hover:shadow-sm rounded-lg p-4 transition-all cursor-pointer">
             <div class="flex items-start justify-between gap-4">
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 flex-wrap">
@@ -5714,7 +5831,7 @@
                   ${roleBadge}
                   ${linkedBadge}
                   ${isConnectorContact ? `
-                    <span class="inline-flex items-center text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded" title="Synced from ${connectorDisplayName}">
+                    <span class="inline-flex items-center text-xs lex-bg-accent-soft lex-text-accent px-2 py-0.5 rounded" title="Synced from ${connectorDisplayName}">
                       <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                       </svg>
@@ -5746,7 +5863,7 @@
                     <svg class="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
                     </svg>
-                    <a href="mailto:${contact.email}" onclick="event.stopPropagation()" class="text-xs text-indigo-600 hover:text-indigo-800 truncate">${contact.email}</a>
+                    <a href="mailto:${contact.email}" onclick="event.stopPropagation()" class="text-xs lex-text-accent hover:lex-text-accent truncate">${contact.email}</a>
                   </div>
                 ` : ''}
                 ${contact.phone_mobile || contact.phone_work ? `
@@ -5754,7 +5871,7 @@
                     <svg class="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>
                     </svg>
-                    <a href="tel:${contact.phone_mobile || contact.phone_work}" onclick="event.stopPropagation()" class="text-xs text-gray-600 hover:text-indigo-600 truncate">${contact.phone_mobile || contact.phone_work}</a>
+                    <a href="tel:${contact.phone_mobile || contact.phone_work}" onclick="event.stopPropagation()" class="text-xs text-gray-600 hover:lex-text-accent truncate">${contact.phone_mobile || contact.phone_work}</a>
                   </div>
                 ` : ''}
               </div>
@@ -5764,7 +5881,7 @@
         `;
       }
 
-      function renderContactSection(title, contactsList, iconColor = 'text-indigo-600') {
+      function renderContactSection(title, contactsList, iconColor = 'lex-text-accent') {
         if (contactsList.length === 0) return '';
 
         return `
@@ -5794,7 +5911,7 @@
                 </svg>
                 Link Existing
               </button>
-              <button onclick="openAddContactModal('${matter.matter_id}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium flex items-center gap-1.5 transition-colors">
+              <button onclick="openAddContactModal('${matter.matter_id}')" class="px-3 py-1.5 lex-bg-accent hover:lex-bg-accent text-white text-sm rounded-lg font-medium flex items-center gap-1.5 transition-colors">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                 </svg>
@@ -5816,7 +5933,7 @@
                 placeholder="Search by name, email, company, or title..."
                 value="${contactsSearchQuery}"
                 oninput="updateContactsSearch(this.value)"
-                class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 lex-ring-focus lex-border-focus"
               />
             </div>
 
@@ -5828,7 +5945,7 @@
                 <select
                   id="contactsFilterSelect"
                   onchange="updateContactsFilter(this.value)"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 lex-ring-focus text-sm"
                 >
                   <option value="all" ${contactsFilterType === 'all' ? 'selected' : ''}>All Types</option>
                   <option value="contact:participant" ${contactsFilterType === 'contact:participant' ? 'selected' : ''}>Participants</option>
@@ -5844,7 +5961,7 @@
                 <select
                   id="contactsSortSelect"
                   onchange="updateContactsSort(this.value)"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 lex-ring-focus text-sm"
                 >
                   <option value="name" ${contactsSortBy === 'name' ? 'selected' : ''}>Name (A-Z)</option>
                   <option value="name-desc" ${contactsSortBy === 'name-desc' ? 'selected' : ''}>Name (Z-A)</option>
@@ -5864,7 +5981,7 @@
               ${contactsSearchQuery || contactsFilterType !== 'all' ? `
                 <button
                   onclick="clearContactsFilters()"
-                  class="text-indigo-600 hover:text-indigo-800 font-medium"
+                  class="lex-text-accent hover:lex-text-accent font-medium"
                 >
                   Clear Filters
                 </button>
@@ -5907,7 +6024,7 @@
                     onclick="changeContactsPage(${page})"
                     class="px-3 py-2 text-sm font-medium rounded-lg ${
                       page === contactsPage
-                        ? 'bg-indigo-600 text-white'
+                        ? 'lex-bg-accent text-white'
                         : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
                     }"
                   >
@@ -5984,8 +6101,8 @@
 
       try {
         await api.delete(`/api/v1/matters/${matterId}/contacts/${contactId}/unlink`);
-        if (typeof Toast !== 'undefined' && Toast.success) {
-          Toast.success('Contact unlinked from matter');
+        if (typeof Lex !== 'undefined' && Lex.Toast && Lex.Toast.success) {
+          Lex.Toast.success('Contact unlinked from matter');
         }
         if (typeof refreshCurrentMatter === 'function') {
           await refreshCurrentMatter();
@@ -5993,8 +6110,8 @@
       } catch (error) {
         console.error('Failed to unlink contact:', error);
         const message = (error && error.message) ? error.message : 'Failed to unlink contact';
-        if (typeof Toast !== 'undefined' && Toast.error) {
-          Toast.error(message);
+        if (typeof Lex !== 'undefined' && Lex.Toast && Lex.Toast.error) {
+          Lex.Toast.error(message);
         }
       }
     };
@@ -6063,7 +6180,7 @@
       if (totalLinks === 0) {
         content.innerHTML = `
           <div class="text-center py-12">
-            <div class="w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div class="w-16 h-16 bg-gradient-to-br lex-bg-accent rounded-full flex items-center justify-center mx-auto mb-4">
               <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
               </svg>
@@ -6074,7 +6191,7 @@
               ${isWorkspace ? `
                 <button
                   onclick="openCreateLinkModal('${matter.matter_id}', true)"
-                  class="inline-flex items-center justify-center w-10 h-10 text-white rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors"
+                  class="inline-flex items-center justify-center w-10 h-10 text-white rounded-lg lex-bg-accent hover:lex-bg-accent transition-colors"
                   title="Link Existing Matter"
                 >
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -6083,7 +6200,7 @@
                 </button>
                 <button
                   onclick="openCreateMatterDrawer('${matter.matter_id}')"
-                  class="inline-flex items-center justify-center w-10 h-10 text-white rounded-lg bg-purple-600 hover:bg-purple-700 transition-colors"
+                  class="inline-flex items-center justify-center w-10 h-10 text-white rounded-lg lex-bg-accent hover:lex-bg-accent transition-colors"
                   title="Create New Matter"
                 >
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -6106,7 +6223,7 @@
           <div class="flex justify-end gap-3">
             <button
               onclick="openCreateLinkModal('${matter.matter_id}', true)"
-              class="inline-flex items-center justify-center w-10 h-10 text-white rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors"
+              class="inline-flex items-center justify-center w-10 h-10 text-white rounded-lg lex-bg-accent hover:lex-bg-accent transition-colors"
               title="Link Existing Matter"
             >
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -6115,7 +6232,7 @@
             </button>
             <button
               onclick="openCreateMatterDrawer('${matter.matter_id}')"
-              class="inline-flex items-center justify-center w-10 h-10 text-white rounded-lg bg-purple-600 hover:bg-purple-700 transition-colors"
+              class="inline-flex items-center justify-center w-10 h-10 text-white rounded-lg lex-bg-accent hover:lex-bg-accent transition-colors"
               title="Create New Matter"
             >
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -6131,7 +6248,7 @@
           <div class="flex justify-end">
             <button
               onclick="openCreateLinkModal('${matter.matter_id}', false)"
-              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
+              class="px-4 py-2 lex-bg-accent text-white rounded-lg hover:lex-bg-accent transition-colors flex items-center gap-2"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
@@ -6218,9 +6335,9 @@
     function getLinkIcon(linkType) {
       switch(linkType) {
         case 'workspace_matter':
-          return '<svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>';
+          return '<svg class="w-4 h-4 lex-text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>';
         case 'related_to':
-          return '<svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>';
+          return '<svg class="w-4 h-4 lex-text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>';
         case 'parent':
           return '<svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>';
         case 'child':
@@ -6243,12 +6360,12 @@
       const canDelete = !isReadOnly && linkId && linkId !== 'null' && linkId !== 'undefined';
 
       return `
-        <div class="bg-white border border-gray-200 hover:border-indigo-300 rounded-lg p-3 flex items-center justify-between gap-3 transition-all">
+        <div class="bg-white border border-gray-200 hover:lex-border-accent rounded-lg p-3 flex items-center justify-between gap-3 transition-all">
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2">
               <button
                 onclick="viewMatter('${linkedId}')"
-                class="text-sm font-medium text-indigo-600 hover:text-indigo-800 truncate"
+                class="text-sm font-medium lex-text-accent hover:lex-text-accent truncate"
               >
                 ${linkedName}
               </button>
@@ -6291,7 +6408,7 @@
       // Show loading state
       content.innerHTML = `
         <div class="flex items-center justify-center py-6">
-          <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
+          <div class="animate-spin rounded-full h-6 w-6 border-b-2 lex-border-accent"></div>
         </div>
       `;
 
@@ -6342,7 +6459,7 @@
           <div class="flex items-center gap-2">
             <button
               onclick="openCreateLinkModal('${matter.matter_id}', true)"
-              class="inline-flex items-center justify-center w-8 h-8 text-white rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors"
+              class="inline-flex items-center justify-center w-8 h-8 text-white rounded-lg lex-bg-accent hover:lex-bg-accent transition-colors"
               title="Link Existing Matter"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -6351,7 +6468,7 @@
             </button>
             <button
               onclick="openCreateMatterDrawer('${matter.matter_id}')"
-              class="inline-flex items-center justify-center w-8 h-8 text-white rounded-lg bg-purple-600 hover:bg-purple-700 transition-colors"
+              class="inline-flex items-center justify-center w-8 h-8 text-white rounded-lg lex-bg-accent hover:lex-bg-accent transition-colors"
               title="Create New Matter"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -6372,7 +6489,7 @@
           <div class="flex items-center justify-center gap-3">
             <button
               onclick="openCreateLinkModal('${matter.matter_id}', true)"
-              class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+              class="px-4 py-2 lex-bg-accent hover:lex-bg-accent text-white font-medium rounded-lg transition-colors flex items-center gap-2"
             >
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
@@ -6381,7 +6498,7 @@
             </button>
             <button
               onclick="openCreateMatterDrawer('${matter.matter_id}')"
-              class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+              class="px-4 py-2 lex-bg-accent hover:lex-bg-accent text-white font-medium rounded-lg transition-colors flex items-center gap-2"
             >
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
@@ -6487,7 +6604,7 @@
       content.innerHTML = `
         <div class="flex items-center justify-center py-12">
           <div class="text-center">
-            <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto mb-4"></div>
+            <div class="animate-spin w-8 h-8 border-4 lex-border border-t-stone-600 rounded-full mx-auto mb-4"></div>
             <p class="text-gray-500">Loading connected data...</p>
           </div>
         </div>
@@ -6520,7 +6637,7 @@
               <h4 class="text-lg font-semibold text-gray-900 mb-2">No connected data</h4>
               <p class="text-gray-500">When data is synced from integrations, it will appear here.</p>
               <!-- Hidden for now - Manual linking button
-              <button onclick="showManualConnectModal('${matter.matter_id}')" class="mt-4 inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+              <button onclick="showManualConnectModal('${matter.matter_id}')" class="mt-4 inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white lex-bg-accent hover:lex-bg-accent focus:outline-none focus:ring-2 focus:ring-offset-2 lex-ring-focus">
                 <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
                 </svg>
@@ -6564,7 +6681,7 @@
         if (summary.total_records > 0) {
           html += `
             <!-- Summary -->
-            <div class="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-4 border border-indigo-100">
+            <div class="bg-gradient-to-r lex-bg-accent-muted rounded-lg p-4 border lex-border-subtle">
               <div class="flex items-center justify-between">
                 <div class="flex-1">
                   <h3 class="text-sm font-medium text-gray-900">Connected Data Summary</h3>
@@ -6578,7 +6695,7 @@
                       </span>
                     `).join('')}
                   </div>
-                  <button onclick="showManualConnectModal('${matter.matter_id}')" class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-indigo-700 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                  <button onclick="showManualConnectModal('${matter.matter_id}')" class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md lex-text-accent bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 lex-ring-focus">
                     <svg class="-ml-0.5 mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                     </svg>
@@ -6598,7 +6715,7 @@
             <div class="space-y-3">
               <div class="flex items-center justify-between">
                 <h4 class="text-lg font-semibold text-gray-900">${entityLabel} (${records.length})</h4>
-                <button onclick="toggleEntityGroup('${entityType}')" class="text-sm text-indigo-600 hover:text-indigo-800">
+                <button onclick="toggleEntityGroup('${entityType}')" class="text-sm lex-text-accent hover:lex-text-accent">
                   <span id="toggle-${entityType}">Collapse All</span>
                 </button>
               </div>
@@ -6642,12 +6759,12 @@
       else confidenceColor = 'red';
 
       return `
-        <div id="${cardId}" class="bg-white border border-gray-200 rounded-lg hover:border-indigo-300 transition-all">
+        <div id="${cardId}" class="bg-white border border-gray-200 rounded-lg hover:lex-border-accent transition-all">
           <div class="p-4">
             <div class="flex items-start justify-between gap-4">
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-2">
-                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium lex-bg-accent-soft lex-text-accent">
                     ${record.connector_name}
                   </span>
                   <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-${confidenceColor}-100 text-${confidenceColor}-800">
@@ -6670,7 +6787,7 @@
 
               <button
                 onclick="toggleConnectorDetails('${detailsId}')"
-                class="text-indigo-600 hover:text-indigo-800 p-1"
+                class="lex-text-accent hover:lex-text-accent p-1"
                 title="Toggle details"
               >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -6715,7 +6832,7 @@
             <div class="flex-1 min-w-0">
               <!-- Badges -->
               <div class="flex flex-wrap items-center gap-2 mb-2">
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium lex-bg-accent-soft lex-text-accent">
                   ${connector_name || 'Unknown Connector'}
                 </span>
                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
@@ -6849,7 +6966,7 @@
               <textarea
                 id="declineReason"
                 rows="3"
-                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 lex-ring-focus"
                 placeholder="E.g., Wrong client, Different matter, Incorrect data..."
               ></textarea>
 
@@ -6888,7 +7005,7 @@
 
     async function approvePendingMatch(matchId, matterId) {
       try {
-        Toast.info('Approving match...');
+        Lex.Toast.info('Approving match...');
 
         await api.approvePendingMatch(matterId, matchId);
 
@@ -6899,7 +7016,7 @@
           setTimeout(() => matchCard.remove(), 300);
         }
 
-        Toast.success('Match approved successfully! The data will now appear in Connected Data.');
+        Lex.Toast.success('Match approved successfully! The data will now appear in Connected Data.');
 
         // Reload the tab after a short delay
         setTimeout(() => {
@@ -6909,13 +7026,13 @@
 
       } catch (error) {
         console.error('[approvePendingMatch] Error:', error);
-        Toast.error(error.message || 'Failed to approve match');
+        Lex.Toast.error(error.message || 'Failed to approve match');
       }
     }
 
     async function declinePendingMatch(matchId, matterId, reason) {
       try {
-        Toast.info('Declining match...');
+        Lex.Toast.info('Declining match...');
 
         await api.declinePendingMatch(matterId, matchId, reason);
 
@@ -6926,11 +7043,11 @@
           setTimeout(() => matchCard.remove(), 300);
         }
 
-        Toast.success('Match declined. This suggestion will not appear again.');
+        Lex.Toast.success('Match declined. This suggestion will not appear again.');
 
       } catch (error) {
         console.error('[declinePendingMatch] Error:', error);
-        Toast.error(error.message || 'Failed to decline match');
+        Lex.Toast.error(error.message || 'Failed to decline match');
       }
     }
 
@@ -7035,9 +7152,8 @@
       const sourceInput = document.getElementById('linkSourceMatterId');
       const searchInput = document.getElementById('linkMatterSearch');
       const submitBtn = document.getElementById('createLinkBtn');
-      const modalTitle = modal.querySelector('h3');
-      const modalSubtitle = modal.querySelector('p.text-sm.text-gray-500');
       const linkTypeContainer = document.getElementById('linkTypeContainer');
+      const linkTypeSelect = document.getElementById('linkType');
 
       // Set source matter ID
       sourceInput.value = sourceMatterId;
@@ -7045,17 +7161,17 @@
 
       console.log('[openCreateLinkModal] Dataset set to:', sourceInput.dataset.isWorkspace);
 
-      // Update modal text based on source type
+      // Update modal text based on source type (lex-modal uses heading/subtitle properties)
       if (isWorkspace) {
-        modalTitle.textContent = 'Add Matter to Workspace';
-        modalSubtitle.textContent = 'Link an existing matter to this workspace';
+        modal.heading = 'Add Matter to Workspace';
+        modal.subtitle = 'Link an existing matter to this workspace';
         linkTypeContainer.style.display = 'none'; // Hide link type for workspaces
-        document.getElementById('linkType').value = 'workspace_matter';
+        if (linkTypeSelect) linkTypeSelect.value = 'workspace_matter';
       } else {
-        modalTitle.textContent = 'Link Related Matter';
-        modalSubtitle.textContent = 'Connect this matter to another matter';
+        modal.heading = 'Link Related Matter';
+        modal.subtitle = 'Connect this matter to another matter';
         linkTypeContainer.style.display = 'block'; // Show link type for matters
-        document.getElementById('linkType').value = 'related_to';
+        if (linkTypeSelect) linkTypeSelect.value = 'related_to';
       }
 
       // Reset form
@@ -7066,8 +7182,11 @@
       selectedLinkTargetMatter = null;
 
       // Show modal
-      modal.classList.remove('hidden');
-      setTimeout(() => searchInput.focus(), 100);
+      modal.open = true;
+      setTimeout(() => {
+        const inner = searchInput.querySelector('input');
+        if (inner) inner.focus();
+      }, 100);
 
       // Setup click outside handler to close dropdown
       setTimeout(() => {
@@ -7095,7 +7214,7 @@
      */
     window.closeCreateLinkModal = function() {
       const modal = document.getElementById('createLinkModal');
-      modal.classList.add('hidden');
+      modal.open = false;
       selectedLinkTargetMatter = null;
 
       // Clear any pending search
@@ -7111,6 +7230,22 @@
       const resultsDiv = document.getElementById('linkMatterSearchResults');
       if (resultsDiv) {
         resultsDiv.classList.add('hidden');
+      }
+    }
+
+    // Wire up linkMatterSearch lex-input events (replaces inline onfocus/oninput handlers)
+    const linkMatterSearchEl = document.getElementById('linkMatterSearch');
+    if (linkMatterSearchEl) {
+      linkMatterSearchEl.addEventListener('lex-input', (e) => {
+        const syntheticEvent = { target: { value: e.detail !== undefined ? e.detail : linkMatterSearchEl.value } };
+        searchMattersForLink(syntheticEvent);
+      });
+      // Show dropdown on focus (inner input focus bubbles up)
+      const linkInnerInput = linkMatterSearchEl.querySelector('input');
+      if (linkInnerInput) {
+        linkInnerInput.addEventListener('focus', () => showLinkMatterDropdown());
+      } else {
+        linkMatterSearchEl.addEventListener('focus', () => showLinkMatterDropdown());
       }
     }
 
@@ -7158,7 +7293,7 @@
         <button
           type="button"
           onclick="selectLinkMatter('${matter.matter_id}', '${matterName.replace(/'/g, "&apos;")}', '${matter.matter_type}')"
-          class="w-full text-left px-4 py-3 hover:bg-indigo-50 border-b border-gray-100 last:border-b-0 transition-colors"
+          class="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition-colors"
         >
           <div class="flex items-start gap-2">
             ${pinIcon}
@@ -7268,7 +7403,7 @@
         const resultsDiv = document.getElementById('linkMatterSearchResults');
         resultsDiv.innerHTML = `
           <div class="p-4 text-center text-gray-500">
-            <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto mb-2"></div>
+            <div class="animate-spin w-5 h-5 border-2 lex-border border-t-stone-600 rounded-full mx-auto mb-2"></div>
             Loading matters...
           </div>
         `;
@@ -7312,7 +7447,7 @@
           // Show loading state
           resultsDiv.innerHTML = `
             <div class="p-4 text-center text-gray-500">
-              <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto mb-2"></div>
+              <div class="animate-spin w-5 h-5 border-2 lex-border border-t-stone-600 rounded-full mx-auto mb-2"></div>
               Searching...
             </div>
           `;
@@ -7443,7 +7578,7 @@
       const submitBtn = document.getElementById('createLinkBtn');
 
       if (!selectedLinkTargetMatter) {
-        Toast.error('Please select a matter to link');
+        Lex.Toast.error('Please select a matter to link');
         return;
       }
 
@@ -7481,7 +7616,7 @@
 
         const data = await response.json();
 
-        Toast.success('Link created successfully');
+        Lex.Toast.success('Link created successfully');
         closeCreateLinkModal();
 
         // Refresh the linked matters section if we're viewing a matter
@@ -7492,7 +7627,7 @@
 
       } catch (error) {
         console.error('Create link error:', error);
-        Toast.error(error.message || 'Failed to create link');
+        Lex.Toast.error(error.message || 'Failed to create link');
         submitBtn.disabled = false;
         submitBtn.textContent = 'Create Link';
       }
@@ -7505,20 +7640,21 @@
       // Store the link ID for later use
       window.pendingUnlinkId = linkId;
 
-      // Show the custom unlink confirmation modal
+      // Show the unlink confirmation modal
       document.getElementById('unlinkMatterName').textContent = `"${linkedMatterName}"`;
 
       const modal = document.getElementById('unlinkConfirmModal');
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-
-      // Set up the confirm button click handler
-      const confirmBtn = document.getElementById('confirmUnlinkButton');
-      confirmBtn.onclick = function() {
-        const linkIdToDelete = window.pendingUnlinkId; // Save before closing modal
-        closeUnlinkConfirmModal();
-        deleteLink(linkIdToDelete);
-      };
+      // Wire lex-confirm event once (guard against duplicate listeners)
+      if (!modal._confirmListenerAttached) {
+        modal.addEventListener('lex-confirm', () => {
+          const linkIdToDelete = window.pendingUnlinkId;
+          closeUnlinkConfirmModal();
+          deleteLink(linkIdToDelete);
+        });
+        modal.addEventListener('lex-cancel', () => closeUnlinkConfirmModal());
+        modal._confirmListenerAttached = true;
+      }
+      modal.open = true;
     }
 
     /**
@@ -7526,8 +7662,7 @@
      */
     window.closeUnlinkConfirmModal = function() {
       const modal = document.getElementById('unlinkConfirmModal');
-      modal.classList.remove('flex');
-      modal.classList.add('hidden');
+      modal.open = false;
       window.pendingUnlinkId = null;
     }
 
@@ -7538,7 +7673,7 @@
       // Validate linkId before making API call
       if (!linkId || linkId === 'null' || linkId === 'undefined') {
         console.error('Invalid link ID:', linkId);
-        Toast.error('Cannot delete link: Invalid link ID');
+        Lex.Toast.error('Cannot delete link: Invalid link ID');
         return;
       }
 
@@ -7556,7 +7691,7 @@
           throw new Error(error.error?.message || 'Failed to delete link');
         }
 
-        Toast.success('Link removed successfully');
+        Lex.Toast.success('Link removed successfully');
 
         // Refresh the linked matters section if we're viewing a matter
         // Linked matters are displayed in the Details tab, not as a separate tab
@@ -7566,7 +7701,7 @@
 
       } catch (error) {
         console.error('Delete link error:', error);
-        Toast.error(error.message || 'Failed to delete link');
+        Lex.Toast.error(error.message || 'Failed to delete link');
       }
     }
 
@@ -7583,6 +7718,15 @@
 
       // Reset form
       form.reset();
+      // Reset Lex components (not affected by native form.reset())
+      ['workspaceMatterName', 'workspaceClientName', 'workspaceMatterDescription'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+      const wsStatusEl = document.getElementById('workspaceMatterStatus');
+      if (wsStatusEl) wsStatusEl.value = 'active';
+      const wsVisEl = document.getElementById('workspaceMatterVisibility');
+      if (wsVisEl) wsVisEl.value = 'private';
       workspaceSelectedUsers = [];
       document.getElementById('workspaceSelectedUsersList').innerHTML = '<p class="text-sm text-gray-500 italic" id="workspaceNoUsersSelected">No users selected. Start typing to search and add team members.</p>';
 
@@ -7594,7 +7738,7 @@
       workspaceConflictDetection.initialize('workspaceConflictDetectionContainer');
 
       // Show modal
-      modal.classList.remove('hidden');
+      modal.open = true;;
     }
 
     // =============================================================================
@@ -7614,14 +7758,14 @@
         const dropdown = document.getElementById('taskAssignedTo');
         const currentUserId = api.user?.id;
 
-        // Build dropdown options
-        let options = '<option value="">Unassigned</option>';
+        // Build lex-select options array
+        const optionsList = [{ value: '', label: 'Unassigned' }];
 
         // Add "Me" option for current user
         if (currentUserId) {
           const currentUser = users.find(u => u.id === currentUserId);
           if (currentUser) {
-            options += `<option value="${currentUserId}">Me (${currentUser.first_name} ${currentUser.last_name})</option>`;
+            optionsList.push({ value: currentUserId, label: `Me (${currentUser.first_name} ${currentUser.last_name})` });
           }
         }
 
@@ -7629,16 +7773,16 @@
         users
           .filter(u => u.id !== currentUserId)
           .forEach(user => {
-            options += `<option value="${user.id}">${user.first_name} ${user.last_name}</option>`;
+            optionsList.push({ value: user.id, label: `${user.first_name} ${user.last_name}` });
           });
 
-        dropdown.innerHTML = options;
+        dropdown.options = optionsList;
 
         // Set selected value (default to current user if no selection provided)
         dropdown.value = selectedUserId || currentUserId || '';
       } catch (error) {
         console.error('Failed to load users for task assignment:', error);
-        Toast.error('Failed to load users');
+        Lex.Toast.error('Failed to load users');
       }
     }
 
@@ -7646,14 +7790,23 @@
     window.openCreateTaskModal = async function(matterId) {
       currentTaskMatterId = matterId;
       const modal = document.getElementById('taskModal');
-      document.getElementById('taskModalTitle').textContent = 'Create Task';
+      document.getElementById('taskModal').heading = 'Create Task';
       document.getElementById('taskForm').reset();
       document.getElementById('taskId').value = '';
+      // Reset Lex components
+      ['taskTitle', 'taskDescription', 'taskNotes', 'taskDueDate'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+      const taskStatusEl = document.getElementById('taskStatus');
+      if (taskStatusEl) taskStatusEl.value = 'pending';
+      const taskPriorityEl = document.getElementById('taskPriority');
+      if (taskPriorityEl) taskPriorityEl.value = 'normal';
 
       // Populate assignees with current user as default
       await populateTaskAssignees();
 
-      modal.classList.remove('hidden');
+      modal.open = true;;
     };
 
     // Edit Task
@@ -7663,13 +7816,14 @@
         const task = currentTasksList.find(t => t.id === taskId);
 
         if (!task) {
-          Toast.error('Task not found');
+          Lex.Toast.error('Task not found');
           return;
         }
 
         currentEditingTask = task;
         const modal = document.getElementById('taskModal');
-        document.getElementById('taskModalTitle').textContent = 'Edit Task';
+        document.getElementById('taskModal').heading = 'Edit Task';
+        modal.open = true;
         document.getElementById('taskId').value = task.id;
         document.getElementById('taskTitle').value = task.title || '';
         document.getElementById('taskDescription').value = task.description || '';
@@ -7687,10 +7841,10 @@
         // Populate assignees with task's assigned user selected
         await populateTaskAssignees(task.assigned_to_user_id || null);
 
-        modal.classList.remove('hidden');
+        modal.open = true;;
       } catch (error) {
         console.error('Edit task error:', error);
-        Toast.error('Failed to load task details');
+        Lex.Toast.error('Failed to load task details');
       }
     };
 
@@ -7698,7 +7852,7 @@
     window.quickCompleteTask = async function(taskId) {
       try {
         await api.completeTask(taskId);
-        Toast.success('Task completed');
+        Lex.Toast.success('Task completed');
 
         // Refresh tasks - CRITICAL FIX: Always refresh UI regardless of currentMatterData state
         const matterId = currentTaskMatterId || (currentMatterData && currentMatterData.matter_id);
@@ -7718,7 +7872,7 @@
         }
       } catch (error) {
         console.error('Complete task error:', error);
-        Toast.error('Failed to complete task');
+        Lex.Toast.error('Failed to complete task');
       }
     };
 
@@ -7730,7 +7884,7 @@
 
       try {
         await api.deleteTask(taskId);
-        Toast.success('Task deleted successfully');
+        Lex.Toast.success('Task deleted successfully');
 
         // Refresh tasks - CRITICAL FIX: Always refresh UI regardless of currentMatterData state
         const matterId = currentTaskMatterId || (currentMatterData && currentMatterData.matter_id);
@@ -7750,7 +7904,7 @@
         }
       } catch (error) {
         console.error('Delete task error:', error);
-        Toast.error('Failed to delete task');
+        Lex.Toast.error('Failed to delete task');
       }
     };
 
@@ -7789,14 +7943,14 @@
       try {
         if (isEdit) {
           await api.updateTask(taskId, taskData);
-          Toast.success('Task updated successfully');
+          Lex.Toast.success('Task updated successfully');
         } else {
           await api.createTask(currentTaskMatterId, taskData);
-          Toast.success('Task created successfully');
+          Lex.Toast.success('Task created successfully');
         }
 
         // Close modal
-        document.getElementById('taskModal').classList.add('hidden');
+        document.getElementById('taskModal').open = false;
 
         // Restore button state (will be reset when modal reopens anyway)
         submitBtn.disabled = false;
@@ -7822,7 +7976,7 @@
         }
       } catch (error) {
         console.error('Save task error:', error);
-        Toast.error(isEdit ? 'Failed to update task' : 'Failed to create task');
+        Lex.Toast.error(isEdit ? 'Failed to update task' : 'Failed to create task');
 
         // Restore button state on error
         submitBtn.disabled = false;
@@ -7833,7 +7987,7 @@
 
     // Close Task Modal
     window.closeTaskModal = function() {
-      document.getElementById('taskModal').classList.add('hidden');
+      document.getElementById('taskModal').open = false;
       document.getElementById('taskForm').reset();
       currentTaskMatterId = null;
       currentEditingTask = null;
@@ -7843,21 +7997,14 @@
     window.closeDrawer = function() {
       const optionsDropdown = document.getElementById('drawerOptionsDropdown');
       if (optionsDropdown) optionsDropdown.classList.add('hidden');
-      document.getElementById('matterDrawer').classList.add('translate-x-full');
-      setTimeout(() => {
-        document.getElementById('matterDrawer').classList.add('hidden');
-        document.getElementById('drawerOverlay').classList.add('hidden');
-      }, 300);
+      const drawer = document.getElementById('matterDrawer');
+      if (drawer) drawer.open = false;
     }
 
-    // Close drawer event listeners
-    const closeDrawerBtn = document.getElementById('closeDrawer');
-    const drawerOverlay = document.getElementById('drawerOverlay');
-    if (closeDrawerBtn) {
-      closeDrawerBtn.addEventListener('click', closeDrawer);
-    }
-    if (drawerOverlay) {
-      drawerOverlay.addEventListener('click', closeDrawer);
+    // Close drawer event listener (lex-drawer emits lex-close)
+    const drawerEl = document.getElementById('matterDrawer');
+    if (drawerEl) {
+      drawerEl.addEventListener('lex-close', closeDrawer);
     }
 
     // Security: Prevent concurrent pin/unpin requests (race condition fix)
@@ -7912,7 +8059,7 @@
             window.analytics.trackEvent('matter.unpinned', 'matter', matterId, { source });
           }
 
-          Toast.success('Matter unpinned');
+          Lex.Toast.success('Matter unpinned');
         } else {
           await api.pinMatter(matterId, source);
 
@@ -7921,7 +8068,7 @@
             window.analytics.trackEvent('matter.pinned', 'matter', matterId, { source });
           }
 
-          Toast.success('Matter pinned');
+          Lex.Toast.success('Matter pinned');
         }
 
         // Clear pinned matters cache to force fresh load
@@ -7940,11 +8087,11 @@
 
         // Show error message
         if (error.message?.includes('404') || error.message?.includes('not found')) {
-          Toast.error('Matter not found or you do not have access');
+          Lex.Toast.error('Matter not found or you do not have access');
         } else if (error.message?.includes('429') || error.message?.includes('rate limit')) {
-          Toast.error('Too many requests. Please wait a moment and try again.');
+          Lex.Toast.error('Too many requests. Please wait a moment and try again.');
         } else {
-          Toast.error(error.message || 'Failed to update pin status');
+          Lex.Toast.error(error.message || 'Failed to update pin status');
         }
 
         // Track error for analytics
@@ -7978,14 +8125,14 @@
             });
           }
 
-          Toast.success('Matter deleted');
+          Lex.Toast.success('Matter deleted');
           closeDrawer();
           loadMatters();
         } catch (error) {
           if (window.analytics) {
             window.analytics.trackError(error, { action: 'matter.delete', matter_id: matterId });
           }
-          Toast.error(error.message);
+          Lex.Toast.error(error.message);
         }
       });
     }
@@ -8063,17 +8210,18 @@
         const matterId = card.dataset.matterId;
         const checkbox = card.querySelector('.matter-checkbox');
         if (selectedMatters.has(matterId)) {
-          card.classList.add('ring-2', 'ring-indigo-500');
+          card.classList.add('ring-2', 'lex-ring-focus');
           if (checkbox) checkbox.checked = true;
         } else {
-          card.classList.remove('ring-2', 'ring-indigo-500');
+          card.classList.remove('ring-2', 'lex-ring-focus');
           if (checkbox) checkbox.checked = false;
         }
       });
     }
 
     // Select all matters on current page
-    document.getElementById('selectAllMatters').addEventListener('change', (e) => {
+    var _selectAll = document.getElementById('selectAllMatters');
+    if (_selectAll) _selectAll.addEventListener('lex-change', (e) => {
       if (e.target.checked) {
         // Select all
         currentMatters.forEach(matter => selectedMatters.add(matter.matter_id));
@@ -8085,13 +8233,15 @@
     });
 
     // Clear selection
-    document.getElementById('clearSelectionBtn').addEventListener('click', () => {
+    var _clearSelBtn = document.getElementById('clearSelectionBtn');
+    if (_clearSelBtn) _clearSelBtn.addEventListener('click', () => {
       selectedMatters.clear();
       updateSelectionUI();
     });
 
     // Bulk delete
-    document.getElementById('bulkDeleteBtn').addEventListener('click', async () => {
+    var _bulkDelBtn = document.getElementById('bulkDeleteBtn');
+    if (_bulkDelBtn) _bulkDelBtn.addEventListener('click', async () => {
       const count = selectedMatters.size;
       const matterIds = Array.from(selectedMatters);
 
@@ -8114,9 +8264,9 @@
             }
 
             if (result.errors && result.errors.length > 0) {
-              Toast.warning(`Deleted ${result.soft_deleted + result.hard_deleted} matters, ${result.errors.length} failed`);
+              Lex.Toast.warning(`Deleted ${result.soft_deleted + result.hard_deleted} matters, ${result.errors.length} failed`);
             } else {
-              Toast.success(`Successfully deleted ${result.soft_deleted + result.hard_deleted} matter(s)`);
+              Lex.Toast.success(`Successfully deleted ${result.soft_deleted + result.hard_deleted} matter(s)`);
             }
 
             // Clear selection and reload
@@ -8132,7 +8282,7 @@
                 count: matterIds.length
               });
             }
-            Toast.error(error.message || 'Failed to delete matters');
+            Lex.Toast.error(error.message || 'Failed to delete matters');
           }
         }
       );
@@ -8169,16 +8319,16 @@
         onConfirm: async () => {
           const userId = document.getElementById('shareUserId').value;
           if (!userId) {
-            Toast.error('Please select a user');
+            Lex.Toast.error('Please select a user');
             return;
           }
           const permissions = Array.from(document.querySelectorAll('input[name="perm"]:checked')).map(cb => cb.value);
           try {
             await api.shareMatterWithUser(matterId, userId, permissions);
-            Toast.success('Matter shared');
+            Lex.Toast.success('Matter shared');
             viewMatter(matterId);
           } catch (error) {
-            Toast.error(error.message);
+            Lex.Toast.error(error.message);
           }
         }
       });
@@ -8188,10 +8338,10 @@
     window.removeShare = async function(matterId, userId) {
       try {
         await api.removeMatterShare(matterId, userId);
-        Toast.success('Access removed');
+        Lex.Toast.success('Access removed');
         viewMatter(matterId);
       } catch (error) {
-        Toast.error(error.message);
+        Lex.Toast.error(error.message);
       }
     }
 
@@ -8319,12 +8469,12 @@
                   name="shareUser"
                   value="${u.id}"
                   ${isChecked ? 'checked' : ''}
-                  class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 focus:ring-2"
+                  class="w-4 h-4 lex-text-accent border-gray-300 rounded lex-ring-focus focus:ring-2"
                 />
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2">
-                    <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
-                      <span class="text-xs font-medium text-indigo-600">
+                    <div class="w-8 h-8 lex-bg-accent-soft rounded-full flex items-center justify-center flex-shrink-0">
+                      <span class="text-xs font-medium lex-text-accent">
                         ${(u.first_name?.[0] || '') + (u.last_name?.[0] || '') || u.email?.[0]?.toUpperCase() || 'U'}
                       </span>
                     </div>
@@ -8343,8 +8493,9 @@
         const visibilitySelect = document.getElementById('modalMatterVisibility');
         const shareSection = document.getElementById('modalShareSection');
 
-        visibilitySelect.addEventListener('change', function() {
-          if (this.value === 'organization') {
+        visibilitySelect.addEventListener('lex-change', function(e) {
+          const val = e.detail !== undefined ? e.detail : visibilitySelect.value;
+          if (val === 'organization') {
             shareSection.style.opacity = '0.5';
             shareSection.style.pointerEvents = 'none';
             // Uncheck all checkboxes when switching to organization
@@ -8363,8 +8514,8 @@
 
         // Add search functionality
         const searchInput = document.getElementById('modalShareSearch');
-        searchInput.addEventListener('input', function() {
-          const searchTerm = this.value.toLowerCase().trim();
+        searchInput.addEventListener('lex-input', function(e) {
+          const searchTerm = (e.detail !== undefined ? e.detail : searchInput.value).toLowerCase().trim();
           const userLabels = shareWithContainer.querySelectorAll('label');
 
           userLabels.forEach(label => {
@@ -8401,12 +8552,11 @@
 
         // Show modal
         const modal = document.getElementById('manageShareModal');
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-
+        modal.open = true;
+  
       } catch (error) {
         console.error('Error opening share modal:', error);
-        Toast.error(error.message || 'Failed to open share modal');
+        Lex.Toast.error(error.message || 'Failed to open share modal');
       }
     }
 
@@ -8415,8 +8565,8 @@
      */
     window.closeManageShareModal = function() {
       const modal = document.getElementById('manageShareModal');
-      modal.classList.remove('flex');
-      modal.classList.add('hidden');
+      
+      modal.open = false;;
       window.currentManageShareMatterId = null;
 
       // Clear search input
@@ -8502,7 +8652,7 @@
           }
         }
 
-        Toast.success('Sharing settings updated successfully');
+        Lex.Toast.success('Sharing settings updated successfully');
         closeManageShareModal();
 
         // Refresh the matter view to show updated sharing
@@ -8510,7 +8660,7 @@
 
       } catch (error) {
         console.error('Error saving share settings:', error);
-        Toast.error(error.message || 'Failed to save sharing settings');
+        Lex.Toast.error(error.message || 'Failed to save sharing settings');
       } finally {
         const saveButton = document.getElementById('saveShareButton');
         saveButton.disabled = false;
@@ -8524,12 +8674,12 @@
     }
 
     // Form submission
-    form.addEventListener('submit', async (e) => {
+    if (form) form.addEventListener('submit', async (e) => {
       e.preventDefault();
 
       // Check if conflicts are acknowledged
       if (conflictDetection && !conflictDetection.canProceed()) {
-        Toast.error('Please acknowledge the conflicts before proceeding');
+        Lex.Toast.error('Please acknowledge the conflicts before proceeding');
         return;
       }
 
@@ -8624,17 +8774,17 @@
 
                   if (createLinkResponse.ok) {
                     console.log('[Edit Matter] Created new workspace link:', selectedWorkspaceId);
-                    Toast.success('Workspace link updated');
+                    Lex.Toast.success('Workspace link updated');
                   } else {
                     const errorData = await createLinkResponse.json().catch(() => ({}));
                     console.error('[Edit Matter] Failed to create workspace link:', errorData);
-                    Toast.error(`Failed to update workspace link: ${errorData.error || 'Unknown error'}`);
+                    Lex.Toast.error(`Failed to update workspace link: ${errorData.error || 'Unknown error'}`);
                   }
                 }
               }
             } catch (error) {
               console.error('[Edit Matter] Error updating workspace link:', error);
-              Toast.error('Failed to update workspace link');
+              Lex.Toast.error('Failed to update workspace link');
             }
           }
 
@@ -8656,7 +8806,7 @@
             });
           }
 
-          Toast.success('Matter updated');
+          Lex.Toast.success('Matter updated');
         } else {
           const result = await api.createMatter(data);
           createdMatterId = result.matter?.id;
@@ -8670,7 +8820,7 @@
             });
           }
 
-          Toast.success(`Matter created: ${result.matter?.matter_id || 'Success'}`);
+          Lex.Toast.success(`Matter created: ${result.matter?.matter_id || 'Success'}`);
 
           // Get selected workspace from dropdown
           const selectedWorkspaceId = document.getElementById('workspaceSelector')?.value;
@@ -8695,15 +8845,15 @@
 
               if (linkResponse.ok) {
                 console.log('[Matter Creation] Auto-linked matter to workspace:', workspaceToLinkTo);
-                Toast.success('Matter linked to workspace successfully');
+                Lex.Toast.success('Matter linked to workspace successfully');
               } else {
                 const errorData = await linkResponse.json().catch(() => ({}));
                 console.error('[Matter Creation] Failed to auto-link to workspace:', errorData);
-                Toast.error(`Failed to link to workspace: ${errorData.error || 'Unknown error'}`);
+                Lex.Toast.error(`Failed to link to workspace: ${errorData.error || 'Unknown error'}`);
               }
             } catch (error) {
               console.error('[Matter Creation] Error auto-linking to workspace:', error);
-              Toast.error('Failed to link to workspace');
+              Lex.Toast.error('Failed to link to workspace');
             } finally {
               // Clear the workspace ID
               createMatterForWorkspaceId = null;
@@ -8737,7 +8887,7 @@
           }
         }
 
-        modal.classList.add('hidden');
+        modal.open = false;;
         resetShareForm();
         if (conflictDetection) {
           conflictDetection.reset();
@@ -8753,7 +8903,7 @@
           window._editingMatterFromDrawer = null; // Clear the flag
         }
       } catch (error) {
-        Toast.error(error.message);
+        Lex.Toast.error(error.message);
 
         // Track error for analytics
         if (window.analytics) {
@@ -8774,23 +8924,26 @@
     const workspaceMatterForm = document.getElementById('workspaceMatterForm');
 
     // Close modal handlers
-    document.getElementById('closeWorkspaceMatterModal').addEventListener('click', () => {
-      workspaceMatterModal.classList.add('hidden');
+    var _closeWsModal = document.getElementById('closeWorkspaceMatterModal');
+    if (_closeWsModal) _closeWsModal.addEventListener('click', () => {
+      if (workspaceMatterModal) workspaceMatterModal.open = false;
       if (workspaceConflictDetection) {
         workspaceConflictDetection.reset();
       }
     });
 
-    document.getElementById('cancelWorkspaceMatterBtn').addEventListener('click', () => {
-      workspaceMatterModal.classList.add('hidden');
+    var _cancelWsBtn = document.getElementById('cancelWorkspaceMatterBtn');
+    if (_cancelWsBtn) _cancelWsBtn.addEventListener('click', () => {
+      if (workspaceMatterModal) workspaceMatterModal.open = false;
       if (workspaceConflictDetection) {
         workspaceConflictDetection.reset();
       }
     });
 
-    // User search for workspace matter
-    document.getElementById('workspaceUserSearchInput').addEventListener('input', (e) => {
-      const query = e.target.value.toLowerCase().trim();
+    // User search for workspace matter (lex-input emits lex-input event)
+    var _wsUserSearch = document.getElementById('workspaceUserSearchInput');
+    if (_wsUserSearch) _wsUserSearch.addEventListener('lex-input', (e) => {
+      const query = (e.detail !== undefined ? e.detail : document.getElementById('workspaceUserSearchInput').value).toLowerCase().trim();
       const resultsDiv = document.getElementById('workspaceUserSearchResults');
 
       if (query.length < 2) {
@@ -8825,8 +8978,10 @@
       workspaceSelectedUsers.push(user);
       renderWorkspaceSelectedUsers();
 
-      document.getElementById('workspaceUserSearchInput').value = '';
-      document.getElementById('workspaceUserSearchResults').classList.add('hidden');
+      var _wsInput = document.getElementById('workspaceUserSearchInput');
+      if (_wsInput) _wsInput.value = '';
+      var _wsResults = document.getElementById('workspaceUserSearchResults');
+      if (_wsResults) _wsResults.classList.add('hidden');
     };
 
     window.removeWorkspaceUserFromShare = function(userId) {
@@ -8859,12 +9014,12 @@
     }
 
     // Form submission for workspace matter
-    workspaceMatterForm.addEventListener('submit', async (e) => {
+    if (workspaceMatterForm) workspaceMatterForm.addEventListener('submit', async (e) => {
       e.preventDefault();
 
       // Check if conflicts are acknowledged
       if (workspaceConflictDetection && !workspaceConflictDetection.canProceed()) {
-        Toast.error('Please acknowledge the conflicts before proceeding');
+        Lex.Toast.error('Please acknowledge the conflicts before proceeding');
         return;
       }
 
@@ -8883,7 +9038,7 @@
         const result = await api.createMatter(data);
         const createdMatterId = result.matter?.matter_id;
 
-        Toast.success(`Matter created: ${createdMatterId || 'Success'}`);
+        Lex.Toast.success(`Matter created: ${createdMatterId || 'Success'}`);
 
         // Save parties if any
         if (workspaceConflictDetection && workspaceConflictDetection.getParties().length > 0) {
@@ -8927,7 +9082,7 @@
 
             if (linkResponse.ok) {
               console.log('[Workspace Matter Creation] Auto-linked to workspace:', workspaceId);
-              Toast.success('Matter linked to workspace successfully');
+              Lex.Toast.success('Matter linked to workspace successfully');
             } else {
               console.error('[Workspace Matter Creation] Failed to auto-link');
             }
@@ -8936,7 +9091,7 @@
           }
         }
 
-        workspaceMatterModal.classList.add('hidden');
+        workspaceMatterModal.open = false;
         workspaceSelectedUsers = [];
         if (workspaceConflictDetection) {
           workspaceConflictDetection.reset();
@@ -8952,7 +9107,7 @@
         }
 
       } catch (error) {
-        Toast.error(error.message);
+        Lex.Toast.error(error.message);
         if (window.analytics) {
           window.analytics.trackError(error, {
             action: 'workspace_matter.create',
@@ -8964,7 +9119,9 @@
 
       // Initialize - use async IIFE to handle promise-based flow
       (async function init() {
-        // Load matters first
+        // Set up metric interactions and load summary + matters in parallel
+        setupMetricInteractions();
+        loadSummaryMetrics(); // fire-and-forget (non-blocking)
         await loadMatters();
 
         // Check for matter_id or open URL parameter and auto-open drawer
@@ -8981,208 +9138,16 @@
     // Matters Info Modal Functions
     window.openMattersInfoModal = function() {
       const modal = document.getElementById('mattersInfoModal');
-      modal.classList.remove('hidden');
+      modal.open = true;
     }
 
     window.closeMattersInfoModal = function() {
       const modal = document.getElementById('mattersInfoModal');
-      modal.classList.add('hidden');
+      modal.open = false;
     }
 
-    // Conversation actions modal state
-    let selectedConversationId = null;
-    let selectedConversationTitle = null;
-    let selectedConversationIsProject = false;
-    let selectedConversationMatterId = null;
-
-    // Open conversation actions modal
-    window.openConversationActionsModal = function(threadId, title, matterId) {
-      selectedConversationId = threadId;
-      selectedConversationTitle = title;
-      selectedConversationMatterId = matterId;
-      selectedConversationIsProject = matterId !== null;
-
-      // Set the conversation title in the modal (decode HTML entities)
-      document.getElementById('modalConversationTitle').textContent = title
-        .replace(/&apos;/g, "'")
-        .replace(/&quot;/g, '"')
-        .replace(/&#96;/g, '`');
-
-      // Show or hide the "View Matter Details" button
-      const matterBtn = document.getElementById('viewMatterDetailsBtn');
-      if (matterId && matterId !== 'null') {
-        matterBtn.classList.remove('hidden');
-      } else {
-        matterBtn.classList.add('hidden');
-      }
-
-      // Show the modal
-      const modal = document.getElementById('conversationActionsModal');
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-    }
-
-    // Close conversation actions modal
-    window.closeConversationActionsModal = function() {
-      const modal = document.getElementById('conversationActionsModal');
-      modal.classList.remove('flex');
-      modal.classList.add('hidden');
-
-      // Reset state
-      selectedConversationId = null;
-      selectedConversationTitle = null;
-      selectedConversationIsProject = false;
-      selectedConversationMatterId = null;
-    }
-
-    // Open rename conversation modal
-    window.editConversationFromModal = function() {
-      if (!selectedConversationId || !selectedConversationTitle) {
-        Toast.error('No conversation selected');
-        closeConversationActionsModal();
-        return;
-      }
-
-      // Hide actions modal
-      const actionsModal = document.getElementById('conversationActionsModal');
-      actionsModal.classList.remove('flex');
-      actionsModal.classList.add('hidden');
-
-      // Show rename modal with current title
-      const renameModal = document.getElementById('renameConversationModal');
-      const renameInput = document.getElementById('renameInput');
-
-      // Decode HTML entities for editing
-      const decodedTitle = selectedConversationTitle
-        .replace(/&apos;/g, "'")
-        .replace(/&quot;/g, '"')
-        .replace(/&#96;/g, '`')
-        .replace(/&amp;/g, '&');
-
-      renameInput.value = decodedTitle;
-
-      renameModal.classList.remove('hidden');
-      renameModal.classList.add('flex');
-
-      // Focus the input
-      setTimeout(() => {
-        renameInput.focus();
-        renameInput.select();
-      }, 100);
-    }
-
-    // Close rename conversation modal
-    window.closeRenameModal = function() {
-      const modal = document.getElementById('renameConversationModal');
-      modal.classList.remove('flex');
-      modal.classList.add('hidden');
-    }
-
-    // Confirm rename
-    window.confirmRename = async function() {
-      if (!selectedConversationId) {
-        Toast.error('No conversation selected');
-        closeRenameModal();
-        return;
-      }
-
-      const renameInput = document.getElementById('renameInput');
-      const newTitle = renameInput.value.trim();
-
-      if (!newTitle) {
-        Toast.error('Conversation name cannot be empty');
-        return;
-      }
-
-      try {
-        // Call API to rename
-        await api.put(`/api/v1/chat/sessions/${selectedConversationId}`, {
-          title: newTitle
-        });
-
-        Toast.success('Conversation renamed');
-        closeRenameModal();
-
-        // Reload the conversation menu
-        if (typeof ConversationMenu !== 'undefined') {
-          await ConversationMenu.loadConversations(true);
-        }
-      } catch (error) {
-        console.error('Failed to rename conversation:', error);
-        Toast.error('Failed to rename conversation');
-      }
-    }
-
-    // View matter details from modal
-    window.viewMatterDetailsFromModal = function() {
-      if (!selectedConversationMatterId) {
-        Toast.error('No matter associated with this conversation');
-        return;
-      }
-
-      // Navigate to matters page with the matter ID
-      window.location.href = `matters.html?matter_id=${selectedConversationMatterId}`;
-    }
-
-    // Delete conversation from modal
-    window.deleteConversationFromModal = function() {
-      // Show custom confirmation modal
-      const confirmTitle = selectedConversationIsProject
-        ? 'Delete Project Conversation?'
-        : 'Delete Conversation?';
-
-      const confirmMessage = selectedConversationIsProject
-        ? 'This will only delete the chat messages. The matter/project itself will NOT be deleted and you can create new conversations for it later.'
-        : 'This action cannot be undone. All messages in this conversation will be permanently deleted.';
-
-      openDeleteConfirmModal(confirmTitle, confirmMessage);
-    }
-
-    // Open custom delete confirmation modal
-    window.openDeleteConfirmModal = function(title, message) {
-      document.getElementById('deleteConfirmTitle').textContent = title;
-      document.getElementById('deleteConfirmMessage').textContent = message;
-
-      const modal = document.getElementById('deleteConfirmModal');
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-    }
-
-    // Close custom delete confirmation modal
-    window.closeDeleteConfirmModal = function() {
-      const modal = document.getElementById('deleteConfirmModal');
-      modal.classList.remove('flex');
-      modal.classList.add('hidden');
-    }
-
-    // Confirm delete action
-    window.confirmDeleteConversation = async function() {
-      const conversationIdToDelete = selectedConversationId;
-      if (!conversationIdToDelete) {
-        Toast.error('No conversation selected');
-        closeDeleteConfirmModal();
-        closeConversationActionsModal();
-        return;
-      }
-
-      try {
-        // Close both modals
-        closeDeleteConfirmModal();
-        closeConversationActionsModal();
-
-        // Call API to delete
-        await api.delete(`/api/v1/chat/sessions/${conversationIdToDelete}`);
-        Toast.success('Conversation deleted');
-
-        // Reload the conversation menu
-        if (typeof ConversationMenu !== 'undefined') {
-          await ConversationMenu.loadConversations(true);
-        }
-      } catch (error) {
-        console.error('Failed to delete conversation:', error);
-        Toast.error('Failed to delete conversation');
-      }
-    }
+    // Conversation actions are handled by the global ConversationActionsModal
+    // from components.js — no page-specific overrides needed.
 
     // Global refresh page function (accessible from inline onclick handlers)
     function refreshPage() {
@@ -9201,8 +9166,7 @@
     function showManualConnectModal(matterId) {
       currentManualConnectMatter = matterId;
       const modal = document.getElementById('manualConnectModal');
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
+      modal.open = true;
 
       // Load available connectors for filter
       loadAvailableConnectors();
@@ -9212,13 +9176,13 @@
       const entityTypeSelect = document.getElementById('manualConnectEntityType');
       const connectorSelect = document.getElementById('manualConnectConnector');
 
-      searchInput.addEventListener('input', () => {
+      searchInput.addEventListener('lex-input', () => {
         clearTimeout(manualConnectSearchTimeout);
         manualConnectSearchTimeout = setTimeout(() => performManualConnectSearch(), 300);
       });
 
-      entityTypeSelect.addEventListener('change', performManualConnectSearch);
-      connectorSelect.addEventListener('change', performManualConnectSearch);
+      entityTypeSelect.addEventListener('lex-change', performManualConnectSearch);
+      connectorSelect.addEventListener('lex-change', performManualConnectSearch);
 
       // Clear previous search
       searchInput.value = '';
@@ -9229,26 +9193,23 @@
     // Close manual connect modal
     function closeManualConnectModal() {
       const modal = document.getElementById('manualConnectModal');
-      modal.classList.add('hidden');
-      modal.classList.remove('flex');
+      modal.open = false;
+      
       currentManualConnectMatter = null;
     }
 
-    // Load available connectors
+    // Load available connectors (lex-select uses options array)
     async function loadAvailableConnectors() {
       try {
         const response = await api.get('/api/v1/connectors/integration-sources?status=active');
         const connectors = response.sources || [];
 
         const select = document.getElementById('manualConnectConnector');
-        select.innerHTML = '<option value="">All Connectors</option>';
-
+        const optionsList = [{ value: '', label: 'All Connectors' }];
         connectors.forEach(conn => {
-          const option = document.createElement('option');
-          option.value = conn.connector_id;
-          option.textContent = conn.connector_name || conn.connector_id;
-          select.appendChild(option);
+          optionsList.push({ value: conn.connector_id, label: conn.connector_name || conn.connector_id });
         });
+        select.options = optionsList;
       } catch (error) {
         console.error('[loadAvailableConnectors] Error:', error);
       }
@@ -9268,7 +9229,7 @@
       // Show loading
       resultsDiv.innerHTML = `
         <div class="text-center py-8">
-          <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto mb-4"></div>
+          <div class="animate-spin w-8 h-8 border-4 lex-border border-t-stone-600 rounded-full mx-auto mb-4"></div>
           <p class="text-gray-500">Searching...</p>
         </div>
       `;
@@ -9323,7 +9284,7 @@
       const subtitle = data.description || data.status || item.entity_type;
 
       return `
-        <div class="border border-gray-200 rounded-lg p-4 hover:border-indigo-300 hover:bg-indigo-50 transition-colors">
+        <div class="border border-gray-200 rounded-lg p-4 hover:lex-border-accent hover:bg-gray-50 transition-colors">
           <div class="flex items-start justify-between">
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-1">
@@ -9340,7 +9301,7 @@
               <p class="text-xs text-gray-500 mt-1">${escapeHtml(subtitle)}</p>
               <p class="text-xs text-gray-400 mt-1">ID: ${escapeHtml(item.external_id)}</p>
             </div>
-            <button onclick="linkConnectorData('${item.id}')" class="ml-4 flex-shrink-0 inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+            <button onclick="linkConnectorData('${item.id}')" class="ml-4 flex-shrink-0 inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white lex-bg-accent hover:lex-bg-accent focus:outline-none focus:ring-2 focus:ring-offset-2 lex-ring-focus">
               <svg class="-ml-0.5 mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
               </svg>
@@ -9356,7 +9317,7 @@
       try {
         await api.linkConnectorDataToMatter(currentManualConnectMatter, connectorDataId);
 
-        Toast.success('Data linked successfully!');
+        Lex.Toast.success('Data linked successfully!');
         closeManualConnectModal();
 
         // Reload the connected data tab
@@ -9366,7 +9327,7 @@
         }
       } catch (error) {
         console.error('[linkConnectorData] Error:', error);
-        Toast.error(error.message || 'Failed to link data');
+        Lex.Toast.error(error.message || 'Failed to link data');
       }
     }
 
@@ -9381,7 +9342,7 @@
       // Validate matterId is provided
       if (!matterId || matterId === 'null' || matterId === 'undefined') {
         console.error('[openEditCustomFieldsModal] Invalid matter ID:', matterId);
-        Toast.error('Cannot open custom fields: Invalid matter ID');
+        Lex.Toast.error('Cannot open custom fields: Invalid matter ID');
         return;
       }
 
@@ -9398,7 +9359,7 @@
           // Check for error response from backend: { error: { message: "...", code: "..." } }
           if (result && result.error) {
             console.error('[openEditCustomFieldsModal] API error:', result.error);
-            Toast.error(result.error.message || 'Failed to load matter details');
+            Lex.Toast.error(result.error.message || 'Failed to load matter details');
             return;
           }
 
@@ -9408,12 +9369,12 @@
             window.currentViewedMatter = matter;
           } else {
             console.error('[openEditCustomFieldsModal] Invalid API response:', result);
-            Toast.error('Failed to load matter details');
+            Lex.Toast.error('Failed to load matter details');
             return;
           }
         } catch (error) {
           console.error('[openEditCustomFieldsModal] Error loading matter:', error);
-          Toast.error(error.message || 'Failed to load matter details');
+          Lex.Toast.error(error.message || 'Failed to load matter details');
           return;
         }
       }
@@ -9440,15 +9401,14 @@
       renderCustomFieldsModal();
 
       const modal = document.getElementById('editCustomFieldsModal');
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
+      modal.open = true;
     }
 
     // Close custom fields modal
     function closeEditCustomFieldsModal() {
       const modal = document.getElementById('editCustomFieldsModal');
-      modal.classList.remove('flex');
-      modal.classList.add('hidden');
+      
+      modal.open = false;;
       currentEditFieldsMatter = null;
       customFieldDefinitions = [];
       customFieldValues = [];
@@ -9488,7 +9448,7 @@
                       value="${escapeHtml(def.key || '')}"
                       onchange="updateFieldDefinition(${index}, 'key', this.value)"
                       placeholder="e.g., case_number"
-                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus"
                     />
                   </div>
 
@@ -9500,7 +9460,7 @@
                       value="${escapeHtml(def.display_name || '')}"
                       onchange="updateFieldDefinition(${index}, 'display_name', this.value)"
                       placeholder="e.g., Case Number"
-                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus"
                     />
                   </div>
 
@@ -9509,7 +9469,7 @@
                     <label class="block text-xs font-medium text-gray-700 mb-1">Type</label>
                     <select
                       onchange="updateFieldDefinition(${index}, 'type', this.value)"
-                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus"
                     >
                       <option value="text" ${def.type === 'text' ? 'selected' : ''}>Text</option>
                       <option value="textarea" ${def.type === 'textarea' ? 'selected' : ''}>Long Text</option>
@@ -9530,7 +9490,7 @@
                         type="checkbox"
                         ${def.required ? 'checked' : ''}
                         onchange="updateFieldDefinition(${index}, 'required', this.checked)"
-                        class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        class="rounded border-gray-300 lex-text-accent lex-ring-focus"
                       />
                       <span class="ml-2 text-sm text-gray-700">Yes</span>
                     </label>
@@ -9559,7 +9519,7 @@
                       value="${escapeHtml((def.options || []).join(', '))}"
                       onchange="updateFieldDefinition(${index}, 'options', this.value.split(',').map(s => s.trim()).filter(s => s))"
                       placeholder="e.g., Active, Pending, Closed"
-                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus"
                     />
                   </div>
                 ` : ''}
@@ -9587,7 +9547,7 @@
               onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
               placeholder="Enter ${escapeHtml(def.display_name || def.key)}"
               rows="3"
-              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus"
             >${escapeHtml(currentValue || '')}</textarea>
           `;
 
@@ -9598,7 +9558,7 @@
               value="${escapeHtml(currentValue || '')}"
               onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
               placeholder="Enter ${escapeHtml(def.display_name || def.key)}"
-              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus"
             />
           `;
 
@@ -9614,7 +9574,7 @@
                 value="${escapeHtml(currentValue || '')}"
                 onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
                 placeholder="0.00"
-                class="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                class="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus"
               />
             </div>
           `;
@@ -9625,7 +9585,7 @@
               type="date"
               value="${escapeHtml(currentValue || '')}"
               onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
-              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus"
             />
           `;
 
@@ -9635,7 +9595,7 @@
               type="datetime-local"
               value="${escapeHtml(currentValue || '')}"
               onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
-              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus"
             />
           `;
 
@@ -9646,7 +9606,7 @@
                 type="checkbox"
                 ${currentValue === true || currentValue === 'true' ? 'checked' : ''}
                 onchange="updateFieldValue('${escapeHtml(key)}', this.checked)"
-                class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                class="rounded border-gray-300 lex-text-accent lex-ring-focus"
               />
               <span class="ml-2 text-sm text-gray-700">${escapeHtml(def.display_name || def.key)}</span>
             </label>
@@ -9656,7 +9616,7 @@
           return `
             <select
               onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
-              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus"
             >
               <option value="">-- Select ${escapeHtml(def.display_name || def.key)} --</option>
               ${(def.options || []).map(option => `
@@ -9675,7 +9635,7 @@
               value="${escapeHtml(currentValue || '')}"
               onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
               placeholder="Enter ${escapeHtml(def.display_name || def.key)}"
-              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus"
             />
           `;
       }
@@ -9755,7 +9715,7 @@
         });
 
         if (validDefinitions.length === 0 && customFieldDefinitions.length > 0) {
-          Toast.error('Please fill in Key and Display Name for all fields');
+          Lex.Toast.error('Please fill in Key and Display Name for all fields');
           return;
         }
 
@@ -9763,7 +9723,7 @@
         const keys = validDefinitions.map(f => f.key.toLowerCase().trim());
         const duplicates = keys.filter((key, index) => keys.indexOf(key) !== index);
         if (duplicates.length > 0) {
-          Toast.error(`Duplicate field keys: ${duplicates.join(', ')}`);
+          Lex.Toast.error(`Duplicate field keys: ${duplicates.join(', ')}`);
           return;
         }
 
@@ -9773,7 +9733,7 @@
 
         // Validate we have a matter ID
         if (!currentEditFieldsMatter) {
-          Toast.error('Matter ID not found');
+          Lex.Toast.error('Matter ID not found');
           return;
         }
 
@@ -9786,7 +9746,7 @@
           custom_fields: validValues
         });
 
-        Toast.success('Custom fields updated successfully!');
+        Lex.Toast.success('Custom fields updated successfully!');
         closeEditCustomFieldsModal();
 
         // Reload matter details - backend returns { matter: {...} }
@@ -9805,7 +9765,7 @@
         }
       } catch (error) {
         console.error('[saveCustomFields] Error:', error);
-        Toast.error(error.message || 'Failed to save custom fields');
+        Lex.Toast.error(error.message || 'Failed to save custom fields');
       }
     }
 
@@ -9854,12 +9814,17 @@
     }
   }
 
-  // Register lifecycle with router
+  // registerPageInit ensures onEnter() is called on every navigation
+  // (first load + re-navigation from cached scripts).
+  // registerView only carries onLeave for cleanup — onEnter is handled
+  // by registerPageInit to avoid double-init.
   if (window.LexRouter) {
-    LexRouter.registerView({ onEnter: onEnter, onLeave: onLeave });
+    LexRouter.registerPageInit('workspaces.html', function () {
+      LexRouter.registerView({ onLeave: onLeave });
+      onEnter();
+    });
+  } else {
+    onEnter();
   }
-
-  // Auto-run on first load (router has already injected HTML and deps)
-  onEnter();
 
 })();

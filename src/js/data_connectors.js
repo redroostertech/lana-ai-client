@@ -41,6 +41,7 @@
   var allAvailableConnectors = [];
   var currentInstalledConnectors = [];
   var selectedConnectorForActions = null;
+  var _suppressActionsClose = false;
   var selectedConnectorFile = null;
   var parsedConnectorConfig = null;
   var searchTimeout = null;
@@ -50,6 +51,7 @@
     allAvailableConnectors = [];
     currentInstalledConnectors = [];
     selectedConnectorForActions = null;
+    _suppressActionsClose = false;
     selectedConnectorFile = null;
     parsedConnectorConfig = null;
     if (searchTimeout) {
@@ -195,37 +197,29 @@
       ui_layout_id: connector.ui_layout_id || null
     };
 
-    var statusColors = {
-      connected: 'bg-green-100 text-green-800',
-      active: 'bg-green-100 text-green-800',
-      installed: 'bg-blue-100 text-blue-800',
-      disconnected: 'bg-gray-100 text-gray-600',
-      error: 'bg-red-100 text-red-800',
-      syncing: 'bg-blue-100 text-blue-800',
-      coming_soon: 'bg-yellow-100 text-yellow-800'
-    };
-
-    var statusIcons = {
-      connected: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>',
-      active: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>',
-      installed: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>',
-      disconnected: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>',
-      error: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
-      syncing: '<svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>',
-      coming_soon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>'
+    /**
+     * Map connector status values to lex-badge color and label.
+     * Valid colors: gray | green | red | yellow | blue | indigo
+     */
+    var statusBadgeMap = {
+      connected:    { color: 'green',  label: 'Connected' },
+      active:       { color: 'green',  label: 'Active' },
+      installed:    { color: 'blue',   label: 'Installed' },
+      disconnected: { color: 'gray',   label: 'Disconnected' },
+      error:        { color: 'red',    label: 'Error' },
+      syncing:      { color: 'blue',   label: 'Syncing' },
+      coming_soon:  { color: 'yellow', label: 'Coming Soon' }
     };
 
     var displayStatus = normalizedConnector.status;
-    var statusColor = statusColors[displayStatus] || statusColors.disconnected;
-    var statusIcon = statusIcons[displayStatus] || statusIcons.disconnected;
-    var statusLabel = displayStatus === 'coming_soon' ? 'Coming Soon' : displayStatus.split('_').join(' ');
+    var badgeConfig = statusBadgeMap[displayStatus] || statusBadgeMap.disconnected;
     var isComingSoon = displayStatus === 'coming_soon';
     var isActive = displayStatus === 'connected' || displayStatus === 'active';
     var isInstalled = displayStatus === 'installed';
 
     var logoHtml = normalizedConnector.logo_url
-      ? '<img src="' + normalizedConnector.logo_url + '" alt="' + normalizedConnector.name + '" class="w-10 h-10 object-contain" onerror="this.parentElement.innerHTML=\'<span class=\\\'text-lg font-bold text-gray-400\\\'>' + normalizedConnector.name.charAt(0) + '</span>\'">'
-      : '<span class="text-lg font-bold text-gray-400">' + normalizedConnector.name.charAt(0) + '</span>';
+      ? '<img src="' + normalizedConnector.logo_url + '" alt="' + normalizedConnector.name + '" class="w-10 h-10 object-contain" onerror="this.parentElement.innerHTML=\'<span class=\\\'text-lg font-bold\\\' style=\\\'color:var(--lex-text-disabled)\\\'>' + normalizedConnector.name.charAt(0) + '</span>\'">'
+      : '<span class="text-lg font-bold" style="color:var(--lex-text-disabled)">' + normalizedConnector.name.charAt(0) + '</span>';
 
     var timeAgoStr = normalizedConnector.lastSync ? Lex.Utils.timeAgo(normalizedConnector.lastSync) : 'Never';
 
@@ -238,40 +232,43 @@
       }
     }
 
+    /** SVG icon used inside detail icon-only buttons. */
+    var infoIconSvg = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+
     var buttonsHtml = '';
     if (isComingSoon) {
-      buttonsHtml = '<button onclick="showConnectorDetails(\'' + normalizedConnector.id + '\', event)" class="w-full px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors">View Details</button>';
+      buttonsHtml = '<lex-btn variant="ghost" size="sm" onclick="showConnectorDetails(\'' + normalizedConnector.id + '\', event)" style="width:100%">View Details</lex-btn>';
     } else if (isActive) {
       buttonsHtml = '<div class="flex gap-2">' +
-        '<button onclick="showConnectorActionsModal(\'' + normalizedConnector.id + '\'); event.stopPropagation();" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">Manage</button>' +
-        '<button onclick="showConnectorDetails(\'' + normalizedConnector.id + '\', event)" class="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></button>' +
+        '<lex-btn variant="primary" size="sm" onclick="showConnectorActionsModal(\'' + normalizedConnector.id + '\'); event.stopPropagation();" style="flex:1">Manage</lex-btn>' +
+        '<lex-btn variant="ghost" size="sm" icon="true" onclick="showConnectorDetails(\'' + normalizedConnector.id + '\', event)" aria-label="View details">' + infoIconSvg + '</lex-btn>' +
         '</div>';
     } else if (isInstalled) {
       buttonsHtml = '<div class="flex gap-2">' +
-        '<button onclick="showConnectorActionsModal(\'' + normalizedConnector.id + '\'); event.stopPropagation();" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">Configure</button>' +
-        '<button onclick="showConnectorDetails(\'' + normalizedConnector.id + '\', event)" class="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></button>' +
+        '<lex-btn variant="primary" size="sm" onclick="showConnectorActionsModal(\'' + normalizedConnector.id + '\'); event.stopPropagation();" style="flex:1">Configure</lex-btn>' +
+        '<lex-btn variant="ghost" size="sm" icon="true" onclick="showConnectorDetails(\'' + normalizedConnector.id + '\', event)" aria-label="View details">' + infoIconSvg + '</lex-btn>' +
         '</div>';
     } else {
       buttonsHtml = '<div class="flex gap-2">' +
-        '<button onclick="showConnectorActionsModal(\'' + normalizedConnector.id + '\'); event.stopPropagation();" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">Connect</button>' +
-        '<button onclick="showConnectorDetails(\'' + normalizedConnector.id + '\', event)" class="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></button>' +
+        '<lex-btn variant="primary" size="sm" onclick="showConnectorActionsModal(\'' + normalizedConnector.id + '\'); event.stopPropagation();" style="flex:1">Connect</lex-btn>' +
+        '<lex-btn variant="ghost" size="sm" icon="true" onclick="showConnectorDetails(\'' + normalizedConnector.id + '\', event)" aria-label="View details">' + infoIconSvg + '</lex-btn>' +
         '</div>';
     }
 
     var syncInfoHtml = (isActive || isInstalled)
-      ? '<div class="text-xs text-gray-400 mb-3"><span>Last sync: ' + timeAgoStr + '</span></div>'
+      ? '<div class="text-xs mb-3" style="color:var(--lex-text-tertiary)"><span>Last sync: ' + timeAgoStr + '</span></div>'
       : '';
 
-    return '<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 ' +
+    return '<div class="p-5 ' +
       (isComingSoon ? 'opacity-60' : 'hover:shadow-md') + ' transition-shadow ' +
-      (isComingSoon ? '' : 'cursor-pointer') + '" ' + cardClick + '>' +
+      (isComingSoon ? '' : 'cursor-pointer') + '" style="background:var(--lex-card-bg);border:1px solid var(--lex-card-border);border-radius:var(--lex-card-radius);box-shadow:var(--lex-card-shadow)" ' + cardClick + '>' +
       '<div class="flex items-start justify-between mb-4">' +
-        '<div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">' + logoHtml + '</div>' +
-        '<span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ' + statusColor + '">' + statusIcon + ' ' + statusLabel + '</span>' +
+        '<div class="w-12 h-12 rounded-lg flex items-center justify-center" style="background:var(--lex-bg-tertiary)">' + logoHtml + '</div>' +
+        '<lex-badge color="' + badgeConfig.color + '" label="' + badgeConfig.label + '" size="sm"></lex-badge>' +
       '</div>' +
-      '<h3 class="font-semibold text-gray-900 mb-1">' + normalizedConnector.name + '</h3>' +
-      (normalizedConnector.vendor ? '<p class="text-xs text-gray-400 mb-2">' + normalizedConnector.vendor + '</p>' : '') +
-      '<p class="text-sm text-gray-500 mb-3 line-clamp-2">' + normalizedConnector.description + '</p>' +
+      '<h3 class="font-semibold mb-1" style="color:var(--lex-text-primary)">' + normalizedConnector.name + '</h3>' +
+      (normalizedConnector.vendor ? '<p class="text-xs mb-2" style="color:var(--lex-text-tertiary)">' + normalizedConnector.vendor + '</p>' : '') +
+      '<p class="text-sm mb-3 line-clamp-2" style="color:var(--lex-text-secondary)">' + normalizedConnector.description + '</p>' +
       syncInfoHtml +
       buttonsHtml +
     '</div>';
@@ -282,39 +279,46 @@
     var isComingSoon = connector.status === 'coming_soon';
 
     var logoHtml = connector.logo_url
-      ? '<img src="' + connector.logo_url + '" alt="' + connector.name + '" class="w-10 h-10 object-contain" onerror="this.parentElement.innerHTML=\'<span class=\\\'text-lg font-bold text-indigo-600\\\'>' + connector.name.charAt(0) + '</span>\'">'
-      : '<span class="text-lg font-bold text-indigo-600">' + connector.name.charAt(0) + '</span>';
+      ? '<img src="' + connector.logo_url + '" alt="' + connector.name + '" class="w-10 h-10 object-contain" onerror="this.parentElement.innerHTML=\'<span class=\\\'text-lg font-bold\\\' style=\\\'color:var(--lex-text-accent)\\\'>' + connector.name.charAt(0) + '</span>\'">'
+      : '<span class="text-lg font-bold" style="color:var(--lex-text-accent)">' + connector.name.charAt(0) + '</span>';
 
+    /**
+     * Determine the lex-badge config for available connector cards.
+     * Valid colors: gray | green | red | yellow | blue | indigo
+     */
     var statusBadge = '';
     if (isInstalled) {
-      statusBadge = '<span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Installed</span>';
+      statusBadge = '<lex-badge color="green" label="Installed" size="sm"></lex-badge>';
     } else if (isComingSoon) {
-      statusBadge = '<span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>Coming Soon</span>';
+      statusBadge = '<lex-badge color="yellow" label="Coming Soon" size="sm"></lex-badge>';
     } else {
-      statusBadge = '<span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-600">Available</span>';
+      statusBadge = '<lex-badge color="blue" label="Available" size="sm"></lex-badge>';
     }
+
+    /** SVG icon used inside detail icon-only buttons. */
+    var infoIconSvgAvail = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
 
     var actionButton = '';
     if (isInstalled) {
-      actionButton = '<button disabled class="w-full px-4 py-2 bg-gray-100 text-gray-400 text-sm font-medium rounded-lg cursor-not-allowed">Already Installed</button>';
+      actionButton = '<lex-btn variant="secondary" size="sm" disabled style="width:100%">Already Installed</lex-btn>';
     } else if (isComingSoon) {
-      actionButton = '<button onclick="showConnectorDetails(\'' + connector.id + '\', event)" class="w-full px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors">View Details</button>';
+      actionButton = '<lex-btn variant="ghost" size="sm" onclick="showConnectorDetails(\'' + connector.id + '\', event)" style="width:100%">View Details</lex-btn>';
     } else {
       actionButton = '<div class="flex gap-2">' +
-        '<button onclick="installConnector(\'' + connector.id + '\')" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">Install</button>' +
-        '<button onclick="showConnectorDetails(\'' + connector.id + '\', event)" class="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></button>' +
+        '<lex-btn variant="primary" size="sm" onclick="installConnector(\'' + connector.id + '\', event)" style="flex:1">Install</lex-btn>' +
+        '<lex-btn variant="ghost" size="sm" icon="true" onclick="showConnectorDetails(\'' + connector.id + '\', event)" aria-label="View details">' + infoIconSvgAvail + '</lex-btn>' +
         '</div>';
     }
 
-    return '<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 ' + (isComingSoon ? 'opacity-75' : 'hover:shadow-md') + ' transition-shadow">' +
+    return '<div class="p-5 ' + (isComingSoon ? 'opacity-75' : 'hover:shadow-md') + ' transition-shadow" style="background:var(--lex-card-bg);border:1px solid var(--lex-card-border);border-radius:var(--lex-card-radius);box-shadow:var(--lex-card-shadow)">' +
       '<div class="flex items-start justify-between mb-4">' +
-        '<div class="w-12 h-12 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-lg flex items-center justify-center">' + logoHtml + '</div>' +
+        '<div class="w-12 h-12 rounded-lg flex items-center justify-center" style="background:var(--lex-bg-accent-muted)">' + logoHtml + '</div>' +
         statusBadge +
       '</div>' +
-      '<h3 class="font-semibold text-gray-900 mb-1">' + connector.name + '</h3>' +
-      (connector.vendor ? '<p class="text-xs text-gray-400 mb-2">' + connector.vendor + '</p>' : '') +
-      '<p class="text-sm text-gray-500 mb-3 line-clamp-2">' + connector.description + '</p>' +
-      '<div class="flex items-center justify-between text-xs text-gray-400 mb-3">' +
+      '<h3 class="font-semibold mb-1" style="color:var(--lex-text-primary)">' + connector.name + '</h3>' +
+      (connector.vendor ? '<p class="text-xs mb-2" style="color:var(--lex-text-tertiary)">' + connector.vendor + '</p>' : '') +
+      '<p class="text-sm mb-3 line-clamp-2" style="color:var(--lex-text-secondary)">' + connector.description + '</p>' +
+      '<div class="flex items-center justify-between text-xs mb-3" style="color:var(--lex-text-tertiary)">' +
         '<span class="inline-flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>' + formatText(connector.category) + '</span>' +
         (connector.version ? '<span>v' + connector.version + '</span>' : '') +
       '</div>' +
@@ -370,8 +374,8 @@
 
   // ── Install connector ───────────────────────────────────────────────
 
-  function installConnector(connectorId) {
-    var button = event ? event.target : null;
+  function installConnector(connectorId, evt) {
+    var button = evt ? evt.target : null;
     if (button) {
       button.disabled = true;
       button.textContent = 'Installing...';
@@ -444,34 +448,36 @@
     if (nc.logo_url) {
       logoEl.innerHTML = '<img src="' + nc.logo_url + '" alt="' + nc.name + '" class="w-12 h-12 object-contain">';
     } else {
-      logoEl.innerHTML = '<span class="text-2xl font-bold text-gray-400">' + nc.name.charAt(0) + '</span>';
+      logoEl.innerHTML = '<span class="text-2xl font-bold" style="color:var(--lex-text-disabled)">' + nc.name.charAt(0) + '</span>';
     }
 
     var contentParts = [];
 
-    contentParts.push('<div><h4 class="font-semibold text-gray-900 mb-2">Description</h4><p class="text-gray-600">' + nc.description + '</p></div>');
-    contentParts.push('<div><h4 class="font-semibold text-gray-900 mb-2">Category</h4><span class="inline-flex items-center px-3 py-1 rounded-full text-sm bg-gray-100 text-gray-800">' + formatText(nc.category) + '</span></div>');
+    contentParts.push('<div><h4 class="font-semibold mb-2" style="color:var(--lex-text-primary)">Description</h4><p style="color:var(--lex-text-secondary)">' + nc.description + '</p></div>');
+    contentParts.push('<div><h4 class="font-semibold mb-2" style="color:var(--lex-text-primary)">Category</h4><span class="inline-flex items-center px-3 py-1 rounded-full text-sm" style="background:var(--lex-status-neutral-bg);color:var(--lex-status-neutral-text)">' + formatText(nc.category) + '</span></div>');
 
     var authTypeLabel = nc.auth_type === 'oauth2' ? 'OAuth 2.0' :
                         nc.auth_type === 'api_key' ? 'API Key' :
                         formatText(nc.auth_type);
-    var authBgClass = nc.auth_type === 'oauth2' ? 'bg-blue-100 text-blue-800' :
-                      nc.auth_type === 'api_key' ? 'bg-purple-100 text-purple-800' :
-                      'bg-gray-100 text-gray-800';
-    contentParts.push('<div><h4 class="font-semibold text-gray-900 mb-2">Authentication</h4><span class="inline-flex items-center px-3 py-1 rounded-full text-sm ' + authBgClass + '">' + authTypeLabel + '</span></div>');
+    var authStyle = nc.auth_type === 'oauth2'
+      ? 'background:var(--lex-status-info-bg);color:var(--lex-status-info-text)'
+      : nc.auth_type === 'api_key'
+        ? 'background:var(--lex-bg-accent-muted);color:var(--lex-text-accent)'
+        : 'background:var(--lex-status-neutral-bg);color:var(--lex-status-neutral-text)';
+    contentParts.push('<div><h4 class="font-semibold mb-2" style="color:var(--lex-text-primary)">Authentication</h4><span class="inline-flex items-center px-3 py-1 rounded-full text-sm" style="' + authStyle + '">' + authTypeLabel + '</span></div>');
 
     if (nc.capabilities && nc.capabilities.length > 0) {
-      contentParts.push('<div><h4 class="font-semibold text-gray-900 mb-2">Capabilities</h4><div class="flex flex-wrap gap-2">' +
+      contentParts.push('<div><h4 class="font-semibold mb-2" style="color:var(--lex-text-primary)">Capabilities</h4><div class="flex flex-wrap gap-2">' +
         nc.capabilities.map(function (cap) {
-          return '<span class="inline-flex items-center px-2 py-1 bg-indigo-50 text-indigo-700 rounded text-sm">' + formatText(cap) + '</span>';
+          return '<span class="inline-flex items-center px-2 py-1 rounded text-sm" style="background:var(--lex-bg-accent-muted);color:var(--lex-text-accent)">' + formatText(cap) + '</span>';
         }).join('') +
       '</div></div>');
     }
 
     if (nc.tags && nc.tags.length > 0) {
-      contentParts.push('<div><h4 class="font-semibold text-gray-900 mb-2">Tags</h4><div class="flex flex-wrap gap-2">' +
+      contentParts.push('<div><h4 class="font-semibold mb-2" style="color:var(--lex-text-primary)">Tags</h4><div class="flex flex-wrap gap-2">' +
         nc.tags.map(function (tag) {
-          return '<span class="inline-flex items-center px-2 py-1 bg-gray-100 text-gray-600 rounded text-sm">' + tag + '</span>';
+          return '<span class="inline-flex items-center px-2 py-1 rounded text-sm" style="background:var(--lex-status-neutral-bg);color:var(--lex-status-neutral-text)">' + tag + '</span>';
         }).join('') +
       '</div></div>');
     }
@@ -496,11 +502,21 @@
       };
     }
 
-    document.getElementById('connectorDetailsModal').classList.remove('hidden');
+    // Update the lex-modal heading to reflect the connector name, then open it.
+    // lex-modal skips re-rendering after first render, so update the heading DOM directly.
+    var detailsModal = document.getElementById('connectorDetailsModal');
+    var detailsTitle = detailsModal ? detailsModal.querySelector('.lex-modal-title') : null;
+    if (detailsTitle) {
+      detailsTitle.textContent = nc.name;
+    }
+    if (detailsModal) {
+      detailsModal.open = true;
+    }
   }
 
   function closeDetailsModal() {
-    document.getElementById('connectorDetailsModal').classList.add('hidden');
+    var modal = document.getElementById('connectorDetailsModal');
+    if (modal) modal.open = false;
   }
 
   // ── Actions modal ───────────────────────────────────────────────────
@@ -517,15 +533,28 @@
     var connectorName = (connector.manifest && connector.manifest.name) || connector.name || connector.connector_name || 'Connector';
     document.getElementById('actionsConnectorName').textContent = connectorName;
 
-    var modalIcon = document.querySelector('#connectorActionsModal .w-20.h-20');
+    var modalIcon = document.getElementById('connectorActionsIcon');
     var logoUrl = (connector.manifest && connector.manifest.icon) || connector.logo_url || connector.logo || connector.icon;
 
-    if (logoUrl) {
-      modalIcon.className = 'w-20 h-20 mx-auto mb-4 bg-white border-2 border-gray-200 rounded-2xl flex items-center justify-center p-3';
-      modalIcon.innerHTML = '<img src="' + logoUrl + '" alt="' + connectorName + '" class="w-full h-full object-contain">';
-    } else {
-      modalIcon.className = 'w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center';
-      modalIcon.innerHTML = '<span class="text-3xl font-bold text-white">' + connectorName.charAt(0).toUpperCase() + '</span>';
+    if (modalIcon) {
+      if (logoUrl) {
+        modalIcon.className = 'w-20 h-20 mx-auto mb-4 rounded-2xl flex items-center justify-center p-3';
+        modalIcon.style.background = 'var(--lex-card-bg)';
+        modalIcon.style.border = '2px solid var(--lex-border-default)';
+        modalIcon.innerHTML = '<img src="' + logoUrl + '" alt="' + connectorName + '" class="w-full h-full object-contain">';
+      } else {
+        modalIcon.className = 'w-20 h-20 mx-auto mb-4 rounded-2xl flex items-center justify-center';
+        modalIcon.style.background = 'var(--lex-bg-accent)';
+        modalIcon.innerHTML = '<span class="text-3xl font-bold" style="color:var(--lex-text-on-accent)">' + connectorName.charAt(0).toUpperCase() + '</span>';
+      }
+    }
+
+    // Update the lex-modal heading to show the connector name.
+    // lex-modal skips re-rendering after first render, so update the heading DOM directly.
+    var modal = document.getElementById('connectorActionsModal');
+    var modalTitle = modal ? modal.querySelector('.lex-modal-title') : null;
+    if (modalTitle) {
+      modalTitle.textContent = connectorName;
     }
 
     var systemConnectors = ['case-actionstep', 'crm-leadly', 'crm-gohighlevel'];
@@ -535,16 +564,18 @@
     var deleteButton = document.getElementById('actionDelete');
     deleteButton.style.display = isSystemConnector ? 'none' : 'flex';
 
-    var modal = document.getElementById('connectorActionsModal');
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
+    if (modal) {
+      modal.open = true;
+    }
   }
 
   function closeConnectorActionsModal(clearSelection) {
     if (clearSelection === undefined) clearSelection = true;
+    // Suppress the lex-close handler when closing programmatically
+    // without clearing selection (uninstall/delete flows need the connector).
+    _suppressActionsClose = !clearSelection;
     var modal = document.getElementById('connectorActionsModal');
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
+    if (modal) modal.open = false;
     if (clearSelection) {
       selectedConnectorForActions = null;
     }
@@ -573,24 +604,27 @@
     var connector = selectedConnectorForActions;
     var connectorName = (connector.manifest && connector.manifest.name) || connector.name || connector.connector_name || 'this connector';
 
-    document.getElementById('uninstallConfirmMessage').innerHTML =
-      'Are you sure you want to uninstall <strong>"' + connectorName + '"</strong>?';
-
     closeConnectorActionsModal(false);
-    showUninstallConfirmModal();
+    showUninstallConfirmModal(connectorName);
   }
 
-  function showUninstallConfirmModal() {
-    var modal = document.getElementById('uninstallConfirmModal');
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-  }
+  function showUninstallConfirmModal(connectorName) {
+    var message = '<div class="space-y-3">' +
+      '<p>Are you sure you want to uninstall <strong>' + Lex.Utils.escapeHtml(connectorName) + '</strong>?</p>' +
+      '<div class="text-sm" style="background:var(--lex-status-warning-bg, #fefce8);border:1px solid var(--lex-status-warning, #ca8a04);border-radius:var(--lex-radius-md, 6px);padding:0.75rem;">' +
+        '<p class="font-medium" style="color:var(--lex-status-warning-text, #713f12);">What will happen:</p>' +
+        '<ul class="list-disc ml-4 mt-1" style="color:var(--lex-status-warning-text, #713f12);">' +
+          '<li>All synced data will be preserved</li>' +
+          '<li>The connector will stop syncing</li>' +
+          '<li>OAuth tokens will be revoked</li>' +
+          '<li>You can reinstall later</li>' +
+        '</ul>' +
+      '</div>' +
+    '</div>';
 
-  function closeUninstallConfirmModal() {
-    var modal = document.getElementById('uninstallConfirmModal');
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-    selectedConnectorForActions = null;
+    Lex.Modal.confirm('Uninstall Connector', message, function () {
+      confirmUninstallConnector();
+    }, { variant: 'default', confirmText: 'Uninstall', cancelText: 'Cancel', size: 'sm' });
   }
 
   function confirmUninstallConnector() {
@@ -599,8 +633,7 @@
     var connector = selectedConnectorForActions;
     var connectorName = (connector.manifest && connector.manifest.name) || connector.name || connector.connector_name || 'this connector';
 
-    closeUninstallConfirmModal();
-
+    // The Lex.Modal.confirm() dialog auto-closes on confirm — no explicit close needed.
     api.delete('/api/v1/integrations/connectors/' + connector.id).then(function () {
       Lex.Toast.success(connectorName + ' has been uninstalled successfully');
       selectedConnectorForActions = null;
@@ -620,29 +653,27 @@
     var connector = selectedConnectorForActions;
     var connectorName = (connector.manifest && connector.manifest.name) || connector.name || connector.connector_name || 'this connector';
 
-    var messageEl = document.getElementById('deleteConfirmMessage');
-    if (!messageEl) return;
-
-    messageEl.innerHTML = 'Are you sure you want to permanently delete <strong>"' + connectorName + '"</strong>?';
-
     closeConnectorActionsModal(false);
-    showDeleteConfirmModal();
+    showDeleteConfirmModal(connectorName);
   }
 
-  function showDeleteConfirmModal() {
-    var modal = document.getElementById('deleteConfirmModal');
-    if (!modal) return;
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-  }
+  function showDeleteConfirmModal(connectorName) {
+    var message = '<div class="space-y-3">' +
+      '<p>Are you sure you want to permanently delete <strong>' + Lex.Utils.escapeHtml(connectorName) + '</strong>?</p>' +
+      '<div class="text-sm" style="background:var(--lex-status-danger-bg, #fef2f2);border:1px solid var(--lex-status-danger, #dc2626);border-radius:var(--lex-radius-md, 6px);padding:0.75rem;">' +
+        '<p class="font-medium" style="color:var(--lex-status-danger-text, #7f1d1d);">This will permanently remove:</p>' +
+        '<ul class="list-disc ml-4 mt-1" style="color:var(--lex-status-danger-text, #7f1d1d);">' +
+          '<li>All connector configuration</li>' +
+          '<li>All synced data</li>' +
+          '<li>All custom UI files</li>' +
+          '<li>All integration history</li>' +
+        '</ul>' +
+      '</div>' +
+    '</div>';
 
-  function closeDeleteConfirmModal() {
-    var modal = document.getElementById('deleteConfirmModal');
-    if (modal) {
-      modal.classList.add('hidden');
-      modal.classList.remove('flex');
-    }
-    selectedConnectorForActions = null;
+    Lex.Modal.confirm('Delete Connector', message, function () {
+      confirmDeleteConnector();
+    }, { variant: 'danger', confirmText: 'Delete Permanently', cancelText: 'Cancel', size: 'sm' });
   }
 
   function confirmDeleteConnector() {
@@ -651,9 +682,14 @@
     var connector = selectedConnectorForActions;
     var connectorName = (connector.manifest && connector.manifest.name) || connector.name || connector.connector_name || 'this connector';
 
-    closeDeleteConfirmModal();
+    // The Lex.Modal.confirm() dialog auto-closes on confirm — no explicit close needed.
 
-    api.delete('/api/v1/integrations/connectors/' + connector.id).then(function () {
+    // permanent=true triggers a hard-delete on the backend: the integration_sources
+    // row plus all associated connector_data, connector_sync_logs, and entity_links
+    // rows are removed inside a transaction. This is irreversible.
+    // confirmUninstallConnector() calls the same endpoint WITHOUT this parameter,
+    // which performs a soft-delete (is_active = false) — keeping the record.
+    api.delete('/api/v1/integrations/connectors/' + connector.id + '?permanent=true').then(function () {
       Lex.Toast.success(connectorName + ' has been permanently deleted');
       selectedConnectorForActions = null;
       loadConnectors();
@@ -673,9 +709,10 @@
 
     if (!searchInput || !categoryFilterEl || !authTypeFilterEl) return;
 
-    var searchTerm = searchInput.value.toLowerCase();
-    var categoryVal = categoryFilterEl.value;
-    var authTypeVal = authTypeFilterEl.value;
+    // lex-input and lex-select both expose .value on the element directly.
+    var searchTerm = (searchInput.value || '').toLowerCase();
+    var categoryVal = categoryFilterEl.value || '';
+    var authTypeVal = authTypeFilterEl.value || '';
 
     var filtered = allAvailableConnectors.filter(function (connector) {
       if (searchTerm) {
@@ -720,13 +757,15 @@
 
     if (!searchInput || !categoryFilterEl || !authTypeFilterEl) return;
 
-    searchInput.addEventListener('input', function () {
+    // lex-input fires 'lex-input' on each keystroke (equivalent to native 'input').
+    searchInput.addEventListener('lex-input', function () {
       if (searchTimeout) clearTimeout(searchTimeout);
       searchTimeout = setTimeout(filterAvailableConnectors, 300);
     });
 
-    categoryFilterEl.addEventListener('change', filterAvailableConnectors);
-    authTypeFilterEl.addEventListener('change', filterAvailableConnectors);
+    // lex-select fires 'lex-change' when a selection is made (equivalent to native 'change').
+    categoryFilterEl.addEventListener('lex-change', filterAvailableConnectors);
+    authTypeFilterEl.addEventListener('lex-change', filterAvailableConnectors);
   }
 
   // ── Page refresh ────────────────────────────────────────────────────
@@ -845,7 +884,7 @@
           } else {
             var availableContainer = document.getElementById('availableConnectors');
             if (availableContainer) {
-              availableContainer.innerHTML = '<p class="text-sm text-gray-500 text-center py-8 col-span-full">All available connectors are already installed.</p>';
+              availableContainer.innerHTML = '<p class="text-sm text-center py-8 col-span-full" style="color:var(--lex-text-secondary)">All available connectors are already installed.</p>';
             }
             availableSection.classList.remove('hidden');
           }
@@ -858,12 +897,12 @@
 
         if (availableContainer) {
           availableContainer.innerHTML =
-            '<div class="col-span-full bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">' +
-              '<svg class="w-12 h-12 text-yellow-600 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+            '<div class="col-span-full rounded-lg p-6 text-center" style="background:var(--lex-status-warning-bg);border:1px solid var(--lex-status-warning)">' +
+              '<svg class="w-12 h-12 mx-auto mb-3" style="color:var(--lex-icon-warning)" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
                 '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>' +
               '</svg>' +
-              '<p class="text-sm text-yellow-800 font-medium mb-1">Connector registry unavailable</p>' +
-              '<p class="text-xs text-yellow-700">Cannot fetch available connectors from the registry. Check your network connection or contact support.</p>' +
+              '<p class="text-sm font-medium mb-1" style="color:var(--lex-status-warning-text)">Connector registry unavailable</p>' +
+              '<p class="text-xs" style="color:var(--lex-status-warning-text)">Cannot fetch available connectors from the registry. Check your network connection or contact support.</p>' +
             '</div>';
         }
         if (availableSection) availableSection.classList.remove('hidden');
@@ -884,16 +923,14 @@
   function openImportConnectorModal() {
     var modal = document.getElementById('importConnectorModal');
     if (!modal) return;
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
     clearConnectorFile();
+    modal.open = true;
   }
 
   function closeImportConnectorModal() {
     var modal = document.getElementById('importConnectorModal');
     if (!modal) return;
-    modal.classList.remove('flex');
-    modal.classList.add('hidden');
+    modal.open = false;
     clearConnectorFile();
   }
 
@@ -975,19 +1012,19 @@
   function showValidationError(message) {
     var el = document.getElementById('validationStatus');
     if (!el) return;
-    el.innerHTML = '<div class="bg-red-50 border border-red-200 rounded-lg p-4"><div class="flex gap-3"><svg class="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><div><h4 class="text-sm font-semibold text-red-900 mb-1">Validation Error</h4><p class="text-sm text-red-800 whitespace-pre-line">' + message + '</p></div></div></div>';
+    el.innerHTML = '<div class="rounded-lg p-4" style="background:var(--lex-status-danger-bg);border:1px solid var(--lex-status-danger)"><div class="flex gap-3"><svg class="w-5 h-5 flex-shrink-0 mt-0.5" style="color:var(--lex-icon-danger)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><div><h4 class="text-sm font-semibold mb-1" style="color:var(--lex-status-danger-text)">Validation Error</h4><p class="text-sm whitespace-pre-line" style="color:var(--lex-status-danger-text)">' + message + '</p></div></div></div>';
   }
 
   function showValidationWarning(message) {
     var el = document.getElementById('validationStatus');
     if (!el) return;
-    el.innerHTML = '<div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4"><div class="flex gap-3"><svg class="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg><div><h4 class="text-sm font-semibold text-yellow-900 mb-1">Validation Warning</h4><p class="text-sm text-yellow-800 whitespace-pre-line">' + message + '</p></div></div></div>';
+    el.innerHTML = '<div class="rounded-lg p-4" style="background:var(--lex-status-warning-bg);border:1px solid var(--lex-status-warning)"><div class="flex gap-3"><svg class="w-5 h-5 flex-shrink-0 mt-0.5" style="color:var(--lex-icon-warning)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg><div><h4 class="text-sm font-semibold mb-1" style="color:var(--lex-status-warning-text)">Validation Warning</h4><p class="text-sm whitespace-pre-line" style="color:var(--lex-status-warning-text)">' + message + '</p></div></div></div>';
   }
 
   function showValidationSuccess(message) {
     var el = document.getElementById('validationStatus');
     if (!el) return;
-    el.innerHTML = '<div class="bg-green-50 border border-green-200 rounded-lg p-4"><div class="flex gap-3"><svg class="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg><div><h4 class="text-sm font-semibold text-green-900 mb-1">Valid Configuration</h4><p class="text-sm text-green-800">' + message + '</p></div></div></div>';
+    el.innerHTML = '<div class="rounded-lg p-4" style="background:var(--lex-status-success-bg);border:1px solid var(--lex-status-success)"><div class="flex gap-3"><svg class="w-5 h-5 flex-shrink-0 mt-0.5" style="color:var(--lex-icon-success)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg><div><h4 class="text-sm font-semibold mb-1" style="color:var(--lex-status-success-text)">Valid Configuration</h4><p class="text-sm" style="color:var(--lex-status-success-text)">' + message + '</p></div></div></div>';
   }
 
   function clearConnectorFile() {
@@ -1026,52 +1063,31 @@
     var formData = new FormData();
     formData.append('file', selectedConnectorFile);
 
-    var baseUrl = (window.lanaAPI && window.lanaAPI.baseUrl) || (window.LanaConfig && window.LanaConfig.API_BASE_URL) || '';
+    api.post('/api/v1/generic-connectors/import', formData).then(function (result) {
+      if (result && result.success) {
+        var connectorName = result.connector_name || selectedConnectorFile.name;
+        Lex.Toast.success('Connector "' + connectorName + '" imported successfully!');
 
-    if (!baseUrl) {
-      Lex.Toast.error('API server not configured. Please set API_BASE_URL in config.js or connect to a server.');
-      if (importBtn) {
-        importBtn.disabled = false;
-        importBtn.innerHTML = originalBtnText;
-      }
-      return;
-    }
-
-    var uploadUrl = baseUrl + '/api/connectors/ui/import';
-
-    fetch(uploadUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + localStorage.getItem('token')
-      },
-      body: formData
-    }).then(function (response) {
-      return response.json().then(function (result) {
-        if (response.ok && result.success) {
-          var connectorName = result.connector_name || selectedConnectorFile.name;
-          Lex.Toast.success('Connector "' + connectorName + '" imported successfully!');
-
-          if (result.violations && result.violations.length > 0) {
-            var tid = setTimeout(function () {
-              Lex.Toast.warning('Security scan found ' + result.violations.length + ' warnings. Check logs for details.');
-            }, 1500);
-            _timeouts.push(tid);
-          }
-
-          closeImportConnectorModal();
-
-          var tid2 = setTimeout(function () {
-            loadConnectors();
-          }, 2000);
-          _timeouts.push(tid2);
-        } else {
-          throw new Error(result.error || result.message || 'Failed to import connector');
+        if (result.violations && result.violations.length > 0) {
+          var tid = setTimeout(function () {
+            Lex.Toast.warning('Security scan found ' + result.violations.length + ' warnings. Check logs for details.');
+          }, 1500);
+          _timeouts.push(tid);
         }
-      });
+
+        closeImportConnectorModal();
+
+        var tid2 = setTimeout(function () {
+          loadConnectors();
+        }, 2000);
+        _timeouts.push(tid2);
+      } else {
+        throw new Error((result && (result.error || result.message)) || 'Failed to import connector');
+      }
     }).catch(function (error) {
       console.error('Import error:', error);
 
-      var errorMessage = error.message;
+      var errorMessage = error.message || '';
       if (errorMessage.includes('404')) {
         errorMessage = 'Import endpoint not available. Contact your administrator.';
       } else if (errorMessage.includes('401') || errorMessage.includes('403')) {
@@ -1082,7 +1098,7 @@
         errorMessage = 'Invalid connector package. Please check the ZIP file structure.';
       } else if (errorMessage.includes('security')) {
         errorMessage = 'Security validation failed. ' + errorMessage;
-      } else if (errorMessage.includes('fetch')) {
+      } else if (errorMessage.includes('fetch') || errorMessage.includes('network') || !errorMessage) {
         errorMessage = 'Network error. Check your connection and try again.';
       }
 
@@ -1109,20 +1125,21 @@
     var dragEvents = ['dragenter', 'dragover', 'dragleave', 'drop'];
     dragEvents.forEach(function (eventName) {
       dropZone.addEventListener(eventName, preventDefaults, false);
-      document.body.addEventListener(eventName, preventDefaults, false);
     });
 
     var highlightEvents = ['dragenter', 'dragover'];
     highlightEvents.forEach(function (eventName) {
       dropZone.addEventListener(eventName, function () {
-        dropZone.classList.add('border-indigo-400', 'bg-indigo-50');
+        dropZone.style.borderColor = 'var(--lex-border-accent)';
+        dropZone.style.background = 'var(--lex-bg-accent-soft)';
       }, false);
     });
 
     var unhighlightEvents = ['dragleave', 'drop'];
     unhighlightEvents.forEach(function (eventName) {
       dropZone.addEventListener(eventName, function () {
-        dropZone.classList.remove('border-indigo-400', 'bg-indigo-50');
+        dropZone.style.borderColor = '';
+        dropZone.style.background = '';
       }, false);
     });
 
@@ -1139,49 +1156,34 @@
   // ── Event wiring ────────────────────────────────────────────────────
 
   function handleEscapeKey(e) {
-    if (e.key === 'Escape') {
-      closeDetailsModal();
-      closeConnectorActionsModal();
-      closeUninstallConfirmModal();
-      closeDeleteConfirmModal();
-
-      var importModal = document.getElementById('importConnectorModal');
-      if (importModal && !importModal.classList.contains('hidden')) {
-        closeImportConnectorModal();
-      }
-    }
+    // lex-modal components handle Escape natively — no manual close needed here.
+    // This handler is kept for any future non-lex-modal overlay logic.
+    void e;
   }
 
   function setupEventListeners() {
+    // Escape key tracking (lex-modal handles Escape natively; handler is a no-op but kept
+    // for the trackDocListener cleanup pattern so no listeners leak on page leave).
     trackDocListener('keydown', handleEscapeKey);
 
-    // Modal background click handlers
-    var detailsModal = document.getElementById('connectorDetailsModal');
-    if (detailsModal) {
-      detailsModal.addEventListener('click', function (e) {
-        if (e.target.id === 'connectorDetailsModal') closeDetailsModal();
-      });
-    }
+    // All modal backdrop click handling is now delegated to lex-modal (close-on-overlay).
+    // No manual click-on-backdrop wiring needed for the converted modals.
 
+    // Actions modal — clear state when closed via overlay click or Escape.
+    // lex-modal fires 'lex-close' on any close; _suppressActionsClose is set by
+    // closeConnectorActionsModal(false) to prevent clearing during uninstall/delete
+    // flows that need selectedConnectorForActions to remain alive.
     var actionsModal = document.getElementById('connectorActionsModal');
     if (actionsModal) {
-      actionsModal.addEventListener('click', function (e) {
-        if (e.target.id === 'connectorActionsModal') closeConnectorActionsModal();
-      });
-    }
-
-    var uninstallModal = document.getElementById('uninstallConfirmModal');
-    if (uninstallModal) {
-      uninstallModal.addEventListener('click', function (e) {
-        if (e.target.id === 'uninstallConfirmModal') closeUninstallConfirmModal();
-      });
-    }
-
-    var deleteModal = document.getElementById('deleteConfirmModal');
-    if (deleteModal) {
-      deleteModal.addEventListener('click', function (e) {
-        if (e.target.id === 'deleteConfirmModal') closeDeleteConfirmModal();
-      });
+      var actionsCloseHandler = function () {
+        if (_suppressActionsClose) {
+          _suppressActionsClose = false;
+          return;
+        }
+        selectedConnectorForActions = null;
+      };
+      actionsModal.addEventListener('lex-close', actionsCloseHandler);
+      _documentListeners.push({ event: 'lex-close', handler: actionsCloseHandler, target: actionsModal });
     }
 
     // Search and filters
@@ -1189,6 +1191,13 @@
 
     // Drag and drop
     setupDragAndDrop();
+
+    // Banner import button (lex-banner slot — element is already in the DOM
+    // when setupEventListeners runs since the HTML fragment is static)
+    var bannerImportBtn = document.getElementById('importConnectorBannerBtn');
+    if (bannerImportBtn) {
+      bannerImportBtn.addEventListener('click', openImportConnectorModal);
+    }
   }
 
   // ── Lifecycle hooks ─────────────────────────────────────────────────
@@ -1208,11 +1217,8 @@
     exposeGlobal('closeConnectorActionsModal', closeConnectorActionsModal);
     exposeGlobal('navigateToConnectorDashboard', navigateToConnectorDashboard);
     exposeGlobal('uninstallConnector', uninstallConnector);
-    exposeGlobal('closeUninstallConfirmModal', closeUninstallConfirmModal);
     exposeGlobal('confirmUninstallConnector', confirmUninstallConnector);
     exposeGlobal('deleteConnector', deleteConnector);
-    exposeGlobal('showDeleteConfirmModal', showDeleteConfirmModal);
-    exposeGlobal('closeDeleteConfirmModal', closeDeleteConfirmModal);
     exposeGlobal('confirmDeleteConnector', confirmDeleteConnector);
     exposeGlobal('installConnector', installConnector);
     exposeGlobal('openConnector', openConnector);
@@ -1246,7 +1252,8 @@
 
     // Remove tracked document listeners
     _documentListeners.forEach(function (entry) {
-      document.removeEventListener(entry.event, entry.handler);
+      var target = entry.target || document;
+      target.removeEventListener(entry.event, entry.handler);
     });
     _documentListeners = [];
 
@@ -1260,9 +1267,17 @@
   }
 
   // ── Register with router ────────────────────────────────────────────
+  // registerPageInit ensures onEnter() is called on every navigation
+  // (first load + re-navigation from cached scripts).
+  // registerView only carries onLeave for cleanup — onEnter is handled
+  // by registerPageInit to avoid double-init.
   if (window.LexRouter) {
-    LexRouter.registerView({ onEnter: onEnter, onLeave: onLeave });
+    LexRouter.registerPageInit('integrations/data_connectors.html', function () {
+      LexRouter.registerView({ onLeave: onLeave });
+      onEnter();
+    });
+  } else {
+    onEnter();
   }
-  onEnter();
 
 })();

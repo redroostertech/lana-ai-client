@@ -64,7 +64,7 @@
       currentMatterName: null,
       currentFolderId: null,
       currentFolderPath: [],
-      viewMode: 'grid',
+      viewMode: 'list',
       folders: [],
       files: [],
       loadingFolders: false,
@@ -82,20 +82,26 @@
   // ── View management ─────────────────────────────────────────────────
 
   /**
-   * Update button visibility based on current view (root vs matter).
-   * At root: show New Folder only (creates matters).
-   * Inside a matter: show Upload only.
+   * Update button state based on current view (root vs matter).
+   * At root: New Folder enabled, Upload disabled (no target matter).
+   * Inside a matter: both enabled (New Folder creates sub-folders).
    */
   function updateViewButtons() {
     var uploadBtn = document.getElementById('uploadBtn');
     var newFolderBtn = document.getElementById('newFolderBtn');
 
     if (storageState.currentMatterId) {
-      uploadBtn && uploadBtn.classList.remove('hidden');
-      newFolderBtn && newFolderBtn.classList.add('hidden');
+      if (uploadBtn){
+        uploadBtn.disabled = false;
+        uploadBtn.classList.remove('hidden');
+      }
+      if (newFolderBtn) newFolderBtn.disabled = false;
     } else {
-      uploadBtn && uploadBtn.classList.add('hidden');
-      newFolderBtn && newFolderBtn.classList.remove('hidden');
+      if (uploadBtn){
+        uploadBtn.disabled = true;
+        uploadBtn.classList.add('hidden');
+      }
+      if (newFolderBtn) newFolderBtn.disabled = false;
     }
   }
 
@@ -106,12 +112,13 @@
    * Uses trackDocListener for document-level events so they are removed on onLeave.
    */
   function setupEventListeners() {
-    // New Folder buttons
+    // New Folder buttons (lex-btn fires native click events)
     var newFolderBtn = document.getElementById('newFolderBtn');
     newFolderBtn && newFolderBtn.addEventListener('click', showNewFolderModal);
 
-    var emptyStateNewFolderBtn = document.getElementById('emptyStateNewFolderBtn');
-    emptyStateNewFolderBtn && emptyStateNewFolderBtn.addEventListener('click', showNewFolderModal);
+    // Empty state new folder button — lex-empty fires 'action' event
+    var contentEmptyWidget = document.getElementById('contentEmptyWidget');
+    contentEmptyWidget && contentEmptyWidget.addEventListener('action', showNewFolderModal);
 
     var cancelNewFolderBtn = document.getElementById('cancelNewFolderBtn');
     cancelNewFolderBtn && cancelNewFolderBtn.addEventListener('click', hideNewFolderModal);
@@ -119,7 +126,7 @@
     var newFolderForm = document.getElementById('newFolderForm');
     newFolderForm && newFolderForm.addEventListener('submit', handleCreateFolder);
 
-    // Upload button triggers file picker
+    // Upload button triggers file picker (lex-btn fires native click)
     var uploadBtn = document.getElementById('uploadBtn');
     uploadBtn && uploadBtn.addEventListener('click', function () {
       var input = document.getElementById('fileUploadInput');
@@ -130,40 +137,47 @@
     var fileUploadInput = document.getElementById('fileUploadInput');
     fileUploadInput && fileUploadInput.addEventListener('change', handleFileSelection);
 
-    // Single file upload modal
-    var cancelSingleUploadBtn = document.getElementById('cancelSingleUploadBtn');
-    cancelSingleUploadBtn && cancelSingleUploadBtn.addEventListener('click', hideSingleUploadModal);
+    // Single file upload modal (lex-btn fires native click)
+    var cancelSingleUploadBtnFooter = document.getElementById('cancelSingleUploadBtnFooter');
+    cancelSingleUploadBtnFooter && cancelSingleUploadBtnFooter.addEventListener('click', hideSingleUploadModal);
 
     var confirmSingleUploadBtn = document.getElementById('confirmSingleUploadBtn');
     confirmSingleUploadBtn && confirmSingleUploadBtn.addEventListener('click', handleSingleFileUploadWithHints);
 
-    // Bulk upload modal
+    // Bulk upload modal (lex-btn fires native click)
     var cancelBulkUploadBtn = document.getElementById('cancelBulkUploadBtn');
     cancelBulkUploadBtn && cancelBulkUploadBtn.addEventListener('click', hideBulkUploadModal);
 
     var confirmBulkUploadBtn = document.getElementById('confirmBulkUploadBtn');
     confirmBulkUploadBtn && confirmBulkUploadBtn.addEventListener('click', handleBulkUploadWithHints);
 
-    var applyToAllBtn = document.getElementById('applyToAllBtn');
-    applyToAllBtn && applyToAllBtn.addEventListener('click', applyHintsToAll);
+    // Bulk upload hint apply buttons (lex-btn fires native click)
+    var applyDocTypeBtn = document.getElementById('applyDocTypeBtn');
+    applyDocTypeBtn && applyDocTypeBtn.addEventListener('click', applyDocTypeToAll);
 
-    // View toggle
+    var applySignaturesBtn = document.getElementById('applySignaturesBtn');
+    applySignaturesBtn && applySignaturesBtn.addEventListener('click', applySignaturesToAll);
+
+    var applyFormsBtn = document.getElementById('applyFormsBtn');
+    applyFormsBtn && applyFormsBtn.addEventListener('click', applyFormsToAll);
+
+    var clearAllHintsBtn = document.getElementById('clearAllHintsBtn');
+    clearAllHintsBtn && clearAllHintsBtn.addEventListener('click', clearAllHints);
+
+    // View toggle (plain buttons)
     var gridViewBtn = document.getElementById('gridViewBtn');
     gridViewBtn && gridViewBtn.addEventListener('click', function () { switchView('grid'); });
 
     var listViewBtn = document.getElementById('listViewBtn');
     listViewBtn && listViewBtn.addEventListener('click', function () { switchView('list'); });
 
-    // Search with debounce
-    var searchInput = document.getElementById('searchInput');
-    var clearSearchBtn = document.getElementById('clearSearchBtn');
+    // Search with debounce — lex-input fires 'lex-input' event
+    var searchLexInput = document.getElementById('searchInput');
     var searchTimeout;
 
-    if (searchInput) {
-      searchInput.addEventListener('input', function (e) {
-        var query = e.target.value;
-        clearSearchBtn && clearSearchBtn.classList.toggle('hidden', !query);
-
+    if (searchLexInput) {
+      searchLexInput.addEventListener('lex-input', function (e) {
+        var query = e.detail.value || '';
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(function () {
           storageState.searchQuery = query;
@@ -171,29 +185,27 @@
           loadFolderContents();
         }, 500);
       });
-    }
 
-    if (clearSearchBtn) {
-      clearSearchBtn.addEventListener('click', function () {
-        if (searchInput) searchInput.value = '';
-        storageState.searchQuery = '';
+      // lex-change fires on clear
+      searchLexInput.addEventListener('lex-change', function (e) {
+        var query = e.detail.value || '';
+        storageState.searchQuery = query;
         storageState.currentPage = 1;
-        clearSearchBtn.classList.add('hidden');
         loadFolderContents();
       });
     }
 
-    // Sort by dropdown
+    // Sort by dropdown — lex-select fires 'lex-change'
     var sortSelect = document.getElementById('sortSelect');
     if (sortSelect) {
-      sortSelect.addEventListener('change', function (e) {
-        storageState.sortBy = e.target.value;
+      sortSelect.addEventListener('lex-change', function (e) {
+        storageState.sortBy = e.detail.value || 'name';
         storageState.currentPage = 1;
         loadFolderContents();
       });
     }
 
-    // Sort order toggle
+    // Sort order toggle (plain button)
     var sortOrderBtn = document.getElementById('sortOrderBtn');
     if (sortOrderBtn) {
       sortOrderBtn.addEventListener('click', function () {
@@ -218,11 +230,11 @@
       });
     }
 
-    // Source filter
+    // Source filter — lex-select fires 'lex-change'
     var sourceFilter = document.getElementById('sourceFilter');
     if (sourceFilter) {
-      sourceFilter.addEventListener('change', function (e) {
-        storageState.sourceFilter = e.target.value;
+      sourceFilter.addEventListener('lex-change', function (e) {
+        storageState.sourceFilter = e.detail.value || 'all';
         storageState.currentPage = 1;
         loadFolderContents();
       });
@@ -344,13 +356,13 @@
       '    style="padding-left: ' + (indent + 12) + 'px"',
       '  >',
       hasChildren
-        ? '<button class="folder-toggle mr-1 text-gray-400 hover:text-gray-600" onclick="event.stopPropagation(); toggleFolder(' + JSON.stringify(folder.id) + ')"><svg class="w-4 h-4 transform transition-transform" data-folder-id="' + escapeHtml(folder.id) + '-arrow"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"></path></svg></button>'
+        ? '<button class="folder-toggle mr-1" style="color: var(--lex-text-tertiary)" onclick="event.stopPropagation(); toggleFolder(' + JSON.stringify(folder.id) + ')"><svg class="w-4 h-4 transform transition-transform" data-folder-id="' + escapeHtml(folder.id) + '-arrow"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"></path></svg></button>'
         : '<span class="w-5"></span>',
-      '    <svg class="w-4 h-4 mr-2 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
+      '    <svg class="w-4 h-4 mr-2" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
       '      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>',
       '    </svg>',
-      '    <span class="text-sm font-medium text-gray-700 truncate">' + escapeHtml(folder.name) + '</span>',
-      folder.document_count > 0 ? '<span class="ml-auto text-xs text-gray-500">' + folder.document_count + '</span>' : '',
+      '    <span class="text-sm font-medium truncate" style="color: var(--lex-text-primary)">' + escapeHtml(folder.name) + '</span>',
+      folder.document_count > 0 ? '<span class="ml-auto text-xs" style="color: var(--lex-text-secondary)">' + folder.document_count + '</span>' : '',
       '  </div>',
       hasChildren
         ? '<div class="folder-children" data-folder-id="' + escapeHtml(folder.id) + '-children">' + childFolders.map(function (child) { return renderFolderTreeItem(child, depth + 1); }).join('') + '</div>'
@@ -508,25 +520,32 @@
     var breadcrumbsEl = document.getElementById('breadcrumbs');
     if (!breadcrumbsEl) return;
 
-    var html = '<a href="#" onclick="navigateToRoot(); return false;" class="hover:text-indigo-600 cursor-pointer">Home</a>';
+    // At root level — hide breadcrumbs (the banner serves as page header)
+    if (!storageState.currentMatterId) {
+      breadcrumbsEl.classList.add('hidden');
+      return;
+    }
 
-    if (storageState.currentMatterId) {
-      var matterName = storageState.currentMatterName || storageState.currentMatterId;
+    // Inside a matter/folder — show breadcrumbs
+    breadcrumbsEl.classList.remove('hidden');
 
-      html += '<span class="breadcrumb-separator">/</span>';
-      if (!storageState.currentFolderId) {
-        html += '<span class="text-gray-900 font-medium">' + escapeHtml(matterName) + '</span>';
-      } else {
-        html += '<a href="#" onclick="navigateToMatterBreadcrumb(' + JSON.stringify(storageState.currentMatterId) + ', ' + JSON.stringify(matterName) + '); return false;" class="hover:text-indigo-600 cursor-pointer">' + escapeHtml(matterName) + '</a>';
-      }
+    var html = '<a href="#" onclick="navigateToRoot(); return false;" class="cursor-pointer" style="color: var(--lex-text-secondary)">Home</a>';
+
+    var matterName = storageState.currentMatterName || storageState.currentMatterId;
+
+    html += '<span class="breadcrumb-separator">/</span>';
+    if (!storageState.currentFolderId) {
+      html += '<span class="font-medium" style="color: var(--lex-text-primary)">' + escapeHtml(matterName) + '</span>';
+    } else {
+      html += '<a href="#" onclick="navigateToMatterBreadcrumb(' + JSON.stringify(storageState.currentMatterId) + ', ' + JSON.stringify(matterName) + '); return false;" class="cursor-pointer" style="color: var(--lex-text-secondary)">' + escapeHtml(matterName) + '</a>';
     }
 
     storageState.currentFolderPath.forEach(function (folder, index) {
       html += '<span class="breadcrumb-separator">/</span>';
       if (index === storageState.currentFolderPath.length - 1) {
-        html += '<span class="text-gray-900 font-medium">' + escapeHtml(folder.name) + '</span>';
+        html += '<span class="font-medium" style="color: var(--lex-text-primary)">' + escapeHtml(folder.name) + '</span>';
       } else {
-        html += '<a href="#" class="hover:text-indigo-600" onclick="navigateToFolder(' + JSON.stringify(folder.id) + ', ' + JSON.stringify(folder.name) + '); return false;">' + escapeHtml(folder.name) + '</a>';
+        html += '<a href="#" style="color: var(--lex-text-secondary)" onclick="navigateToFolder(' + JSON.stringify(folder.id) + ', ' + JSON.stringify(folder.name) + '); return false;">' + escapeHtml(folder.name) + '</a>';
       }
     });
 
@@ -807,13 +826,13 @@
     var folderCards = folders.map(function (folder) {
       var displayHtml = folder.isMatter
         ? [
-            '<h3 class="text-sm font-medium text-gray-900 text-center truncate w-full">' + escapeHtml(folder.name) + '</h3>',
-            '<p class="text-xs text-gray-600 font-mono text-center truncate w-full" title="' + escapeHtml(folder.matter_id) + '">' + escapeHtml(folder.matter_id) + '</p>',
-            '<p class="text-xs text-gray-500 text-center mt-1">' + (folder.document_count || 0) + ' files \u2022 ' + (folder.child_folder_count || 0) + ' folders</p>'
+            '<h3 class="text-sm font-medium text-center truncate w-full" style="color: var(--lex-text-primary)">' + escapeHtml(folder.name) + '</h3>',
+            '<p class="text-xs font-mono text-center truncate w-full" style="color: var(--lex-text-secondary)" title="' + escapeHtml(folder.matter_id) + '">' + escapeHtml(folder.matter_id) + '</p>',
+            '<p class="text-xs text-center mt-1" style="color: var(--lex-text-secondary)">' + (folder.document_count || 0) + ' files \u2022 ' + (folder.child_folder_count || 0) + ' folders</p>'
           ].join('')
         : [
-            '<h3 class="text-sm font-medium text-gray-900 text-center truncate w-full">' + escapeHtml(folder.name) + '</h3>',
-            '<p class="text-xs text-gray-500 text-center mt-1">' + (folder.document_count || 0) + ' files</p>'
+            '<h3 class="text-sm font-medium text-center truncate w-full" style="color: var(--lex-text-primary)">' + escapeHtml(folder.name) + '</h3>',
+            '<p class="text-xs text-center mt-1" style="color: var(--lex-text-secondary)">' + (folder.document_count || 0) + ' files</p>'
           ].join('');
 
       var dataAttrs = folder.isMatter
@@ -825,12 +844,12 @@
         : 'onclick="event.stopPropagation(); showFolderMenu(' + JSON.stringify(folder.id) + ', event)"';
 
       return [
-        '<div class="grid-item bg-white rounded-lg border border-gray-200 p-4 cursor-pointer hover:shadow-md transition-shadow relative group" ' + dataAttrs + ' onclick="handleFolderClick(this)">',
-        '  <button class="absolute top-2 right-2 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded opacity-0 group-hover:opacity-100 transition-opacity" ' + menuButtonAttrs + ' style="opacity: 1">',
+        '<div class="grid-item rounded-lg border p-4 cursor-pointer hover:shadow-md transition-shadow relative group" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)" ' + dataAttrs + ' onclick="handleFolderClick(this)">',
+        '  <button class="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity" style="color: var(--lex-text-tertiary); opacity: 1" ' + menuButtonAttrs + '>',
         '    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>',
         '  </button>',
         '  <div class="flex flex-col items-center">',
-        '    <svg class="w-16 h-16 text-indigo-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
+        '    <svg class="w-16 h-16 mb-2" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
         '      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>',
         '    </svg>',
         '    ' + displayHtml,
@@ -841,15 +860,15 @@
 
     var fileCards = files.map(function (file) {
       return [
-        '<div class="grid-item bg-white rounded-lg border border-gray-200 p-4 cursor-pointer hover:shadow-md transition-shadow relative" onclick="openFileViewer(' + JSON.stringify(file.id) + ')">',
-        '  <button class="absolute top-2 right-2 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded opacity-0 group-hover:opacity-100 transition-opacity" onclick="event.stopPropagation(); showFileMenu(' + JSON.stringify(file.id) + ', event)" style="opacity: 1">',
+        '<div class="grid-item rounded-lg border p-4 cursor-pointer hover:shadow-md transition-shadow relative" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)" onclick="openFileViewer(' + JSON.stringify(file.id) + ')">',
+        '  <button class="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity" style="color: var(--lex-text-tertiary); opacity: 1" onclick="event.stopPropagation(); showFileMenu(' + JSON.stringify(file.id) + ', event)">',
         '    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>',
         '  </button>',
         '  <div class="flex flex-col items-center">',
         '    ' + getFileIcon(file.filename),
-        '    <h3 class="text-sm font-medium text-gray-900 text-center truncate w-full mt-2">' + escapeHtml(file.filename) + '</h3>',
-        '    <p class="text-xs text-gray-500 mt-1">' + formatFileSize(file.file_size) + '</p>',
-        '    <p class="text-xs text-gray-400">' + formatRelativeDate(file.updated_at) + '</p>',
+        '    <h3 class="text-sm font-medium text-center truncate w-full mt-2" style="color: var(--lex-text-primary)">' + escapeHtml(file.filename) + '</h3>',
+        '    <p class="text-xs mt-1" style="color: var(--lex-text-secondary)">' + formatFileSize(file.file_size) + '</p>',
+        '    <p class="text-xs" style="color: var(--lex-text-tertiary)">' + formatRelativeDate(file.updated_at) + '</p>',
         '  </div>',
         '</div>'
       ].join('');
@@ -875,21 +894,21 @@
       var displayHtml = folder.isMatter
         ? [
             '<div class="flex items-center">',
-            '  <svg class="w-5 h-5 text-indigo-500 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
+            '  <svg class="w-5 h-5 mr-3 flex-shrink-0" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
             '    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>',
             '  </svg>',
             '  <div class="min-w-0 flex-1">',
-            '    <div class="text-sm font-medium text-gray-900 truncate">' + escapeHtml(folder.name) + '</div>',
-            '    <div class="text-xs text-gray-600 font-mono truncate" title="' + escapeHtml(folder.matter_id) + '">' + escapeHtml(folder.matter_id) + '</div>',
+            '    <div class="text-sm font-medium truncate" style="color: var(--lex-text-primary)">' + escapeHtml(folder.name) + '</div>',
+            '    <div class="text-xs font-mono truncate" style="color: var(--lex-text-secondary)" title="' + escapeHtml(folder.matter_id) + '">' + escapeHtml(folder.matter_id) + '</div>',
             '  </div>',
             '</div>'
           ].join('')
         : [
             '<div class="flex items-center">',
-            '  <svg class="w-5 h-5 text-indigo-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
+            '  <svg class="w-5 h-5 mr-3" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
             '    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>',
             '  </svg>',
-            '  <span class="text-sm font-medium text-gray-900">' + escapeHtml(folder.name) + '</span>',
+            '  <span class="text-sm font-medium" style="color: var(--lex-text-primary)">' + escapeHtml(folder.name) + '</span>',
             '</div>'
           ].join('');
 
@@ -902,14 +921,13 @@
         : 'onclick="event.stopPropagation(); showFolderMenu(' + JSON.stringify(folder.id) + ', event)"';
 
       return [
-        '<tr class="hover:bg-gray-50 cursor-pointer" ' + dataAttrs + ' onclick="handleFolderClick(this)">',
-        '  <td class="px-6 py-4"><input type="checkbox" class="rounded text-indigo-600" onclick="event.stopPropagation()"></td>',
+        '<tr class="cursor-pointer" style="background: transparent" onmouseover="this.style.background=\'var(--lex-bg-secondary)\'" onmouseout="this.style.background=\'transparent\'" ' + dataAttrs + ' onclick="handleFolderClick(this)">',
         '  <td class="px-6 py-4">' + displayHtml + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">\u2014</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">' + formatRelativeDate(folder.created_at) + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">' + sizeDisplay + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">',
-        '    <button class="text-gray-400 hover:text-gray-600" ' + menuButtonAttrs + '>',
+        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">\u2014</td>',
+        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + formatRelativeDate(folder.created_at) + '</td>',
+        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + sizeDisplay + '</td>',
+        '  <td class="px-6 py-4 whitespace-nowrap text-sm">',
+        '    <button style="color: var(--lex-text-tertiary)" ' + menuButtonAttrs + '>',
         '      <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>',
         '    </button>',
         '  </td>',
@@ -919,19 +937,18 @@
 
     var fileRows = files.map(function (file) {
       return [
-        '<tr class="hover:bg-gray-50 cursor-pointer" onclick="openFileViewer(' + JSON.stringify(file.id) + ')">',
-        '  <td class="px-6 py-4"><input type="checkbox" class="rounded text-indigo-600" onclick="event.stopPropagation()"></td>',
+        '<tr class="cursor-pointer" style="background: transparent" onmouseover="this.style.background=\'var(--lex-bg-secondary)\'" onmouseout="this.style.background=\'transparent\'" onclick="openFileViewer(' + JSON.stringify(file.id) + ')">',
         '  <td class="px-6 py-4 whitespace-nowrap">',
         '    <div class="flex items-center">',
         '      ' + getFileIconSmall(file.filename),
-        '      <span class="text-sm font-medium text-gray-900">' + escapeHtml(file.filename) + '</span>',
+        '      <span class="text-sm font-medium" style="color: var(--lex-text-primary)">' + escapeHtml(file.filename) + '</span>',
         '    </div>',
         '  </td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">' + escapeHtml(file.created_by_username || 'Unknown') + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">' + formatRelativeDate(file.created_at) + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">' + formatFileSize(file.file_size) + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">',
-        '    <button class="text-gray-400 hover:text-gray-600" onclick="event.stopPropagation(); showFileMenu(' + JSON.stringify(file.id) + ', event)">',
+        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + escapeHtml(file.created_by_username || 'Unknown') + '</td>',
+        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + formatRelativeDate(file.created_at) + '</td>',
+        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + formatFileSize(file.file_size) + '</td>',
+        '  <td class="px-6 py-4 whitespace-nowrap text-sm">',
+        '    <button style="color: var(--lex-text-tertiary)" onclick="event.stopPropagation(); showFileMenu(' + JSON.stringify(file.id) + ', event)">',
         '      <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>',
         '    </button>',
         '  </td>',
@@ -954,16 +971,13 @@
     var gridBtn = document.getElementById('gridViewBtn');
     var listBtn = document.getElementById('listViewBtn');
 
+    // lex-btn: switch variant to indicate active view (primary = active, ghost = inactive)
     if (mode === 'grid') {
-      gridBtn && gridBtn.classList.add('text-indigo-600');
-      gridBtn && gridBtn.classList.remove('text-gray-400');
-      listBtn && listBtn.classList.add('text-gray-400');
-      listBtn && listBtn.classList.remove('text-indigo-600');
+      gridBtn && (gridBtn.variant = 'primary');
+      listBtn && (listBtn.variant = 'ghost');
     } else {
-      listBtn && listBtn.classList.add('text-indigo-600');
-      listBtn && listBtn.classList.remove('text-gray-400');
-      gridBtn && gridBtn.classList.add('text-gray-400');
-      gridBtn && gridBtn.classList.remove('text-indigo-600');
+      listBtn && (listBtn.variant = 'primary');
+      gridBtn && (gridBtn.variant = 'ghost');
     }
 
     renderFolderContents();
@@ -976,9 +990,13 @@
    */
   function showNewFolderModal() {
     var modal = document.getElementById('newFolderModal');
-    modal && modal.classList.remove('hidden');
-    var input = document.getElementById('folderNameInput');
-    input && input.focus();
+    if (modal) modal.open = true;
+    // Focus the lex-input's inner input after modal opens
+    setTimeout(function () {
+      var lexInput = document.getElementById('folderNameInput');
+      var inner = lexInput && lexInput.querySelector('input');
+      inner && inner.focus();
+    }, 100);
   }
 
   /**
@@ -986,9 +1004,9 @@
    */
   function hideNewFolderModal() {
     var modal = document.getElementById('newFolderModal');
-    modal && modal.classList.add('hidden');
-    var input = document.getElementById('folderNameInput');
-    if (input) input.value = '';
+    if (modal) modal.open = false;
+    var lexInput = document.getElementById('folderNameInput');
+    if (lexInput) lexInput.value = '';
   }
 
   /**
@@ -998,8 +1016,8 @@
   async function handleCreateFolder(event) {
     event.preventDefault();
 
-    var folderNameInput = document.getElementById('folderNameInput');
-    var folderName = folderNameInput ? folderNameInput.value.trim() : '';
+    var lexInput = document.getElementById('folderNameInput');
+    var folderName = lexInput ? (lexInput.value || '').trim() : '';
 
     if (!folderName) {
       Lex.Toast.error('Please enter a folder name');
@@ -1066,11 +1084,11 @@
     if (fileNameEl) fileNameEl.textContent = file.name;
     if (fileSizeEl) fileSizeEl.textContent = formatFileSize(file.size);
 
+    // lex-checkbox: reset via the .checked property on the component element
     if (signaturesCheckbox) signaturesCheckbox.checked = false;
     if (formsCheckbox) formsCheckbox.checked = false;
 
-    modal && modal.classList.remove('hidden');
-    modal && modal.classList.add('flex');
+    if (modal) modal.open = true;
   }
 
   /**
@@ -1078,8 +1096,7 @@
    */
   function hideSingleUploadModal() {
     var modal = document.getElementById('uploadSingleFileModal');
-    modal && modal.classList.add('hidden');
-    modal && modal.classList.remove('flex');
+    if (modal) modal.open = false;
 
     pendingUploadFiles = null;
     var fileInput = document.getElementById('fileUploadInput');
@@ -1176,19 +1193,21 @@
     var rows = files.map(function (file, index) {
       return [
         '<tr>',
-        '  <td class="px-4 py-3 text-sm text-gray-700">' + escapeHtml(file.name) + '</td>',
-        '  <td class="px-4 py-3 text-sm text-gray-500">' + formatFileSize(file.size) + '</td>',
-        '  <td class="px-4 py-3 text-sm text-gray-500 bulk-doc-type" data-index="' + index + '">' + getFileType(file) + '</td>',
-        '  <td class="px-4 py-3 text-center"><input type="checkbox" class="bulk-signatures-checkbox rounded text-indigo-600" data-index="' + index + '"></td>',
-        '  <td class="px-4 py-3 text-center"><input type="checkbox" class="bulk-forms-checkbox rounded text-indigo-600" data-index="' + index + '"></td>',
+        '  <td class="px-4 py-3 text-sm" style="color: var(--lex-text-primary)">' + escapeHtml(file.name) + '</td>',
+        '  <td class="px-4 py-3 text-sm" style="color: var(--lex-text-secondary)">' + formatFileSize(file.size) + '</td>',
+        '  <td class="px-4 py-3 text-sm bulk-doc-type" style="color: var(--lex-text-secondary)" data-index="' + index + '">' + getFileType(file) + '</td>',
+        '  <td class="px-4 py-3 text-center"><lex-checkbox class="bulk-signatures-checkbox" data-index="' + index + '"></lex-checkbox></td>',
+        '  <td class="px-4 py-3 text-center"><lex-checkbox class="bulk-forms-checkbox" data-index="' + index + '"></lex-checkbox></td>',
         '</tr>'
       ].join('');
     }).join('');
 
     if (gridBodyEl) gridBodyEl.innerHTML = rows;
 
-    modal && modal.classList.remove('hidden');
-    modal && modal.classList.add('flex');
+    var fileCountEl = document.getElementById('bulkFileCount');
+    if (fileCountEl) fileCountEl.textContent = files.length;
+
+    if (modal) modal.open = true;
   }
 
   /**
@@ -1196,8 +1215,7 @@
    */
   function hideBulkUploadModal() {
     var modal = document.getElementById('bulkUploadModal');
-    modal && modal.classList.add('hidden');
-    modal && modal.classList.remove('flex');
+    if (modal) modal.open = false;
 
     pendingUploadFiles = null;
     var fileInput = document.getElementById('fileUploadInput');
@@ -1221,6 +1239,66 @@
     });
 
     Lex.Toast.success('Hints applied to all files');
+  }
+
+  /**
+   * Apply the selected document type from the bulk dropdown to all rows.
+   */
+  function applyDocTypeToAll() {
+    var lexSelect = document.getElementById('bulkApplyDocType');
+    var selectedType = lexSelect ? lexSelect.value : '';
+    if (!selectedType) {
+      Lex.Toast.warning('Please select a document type first');
+      return;
+    }
+    // Find the label from the options attribute
+    var label = selectedType;
+    try {
+      var opts = JSON.parse(lexSelect.getAttribute('options') || '[]');
+      for (var i = 0; i < opts.length; i++) {
+        if (opts[i].value === selectedType) { label = opts[i].label; break; }
+      }
+    } catch (e) { /* use selectedType as fallback */ }
+    document.querySelectorAll('.bulk-doc-type').forEach(function (cell) {
+      cell.textContent = label;
+      cell.dataset.docType = selectedType;
+    });
+    Lex.Toast.success('Document type applied to all files');
+  }
+
+  /**
+   * Check all signature hint checkboxes in the bulk upload grid.
+   */
+  function applySignaturesToAll() {
+    document.querySelectorAll('.bulk-signatures-checkbox').forEach(function (checkbox) {
+      checkbox.checked = true;
+    });
+    Lex.Toast.success('Signatures hint checked for all files');
+  }
+
+  /**
+   * Check all forms hint checkboxes in the bulk upload grid.
+   */
+  function applyFormsToAll() {
+    document.querySelectorAll('.bulk-forms-checkbox').forEach(function (checkbox) {
+      checkbox.checked = true;
+    });
+    Lex.Toast.success('Forms hint checked for all files');
+  }
+
+  /**
+   * Clear all hint checkboxes and reset doc types in the bulk upload grid.
+   */
+  function clearAllHints() {
+    document.querySelectorAll('.bulk-signatures-checkbox').forEach(function (checkbox) {
+      checkbox.checked = false;
+    });
+    document.querySelectorAll('.bulk-forms-checkbox').forEach(function (checkbox) {
+      checkbox.checked = false;
+    });
+    var select = document.getElementById('bulkApplyDocType');
+    if (select) select.value = '';
+    Lex.Toast.info('All hints cleared');
   }
 
   /**
@@ -1512,12 +1590,17 @@
 
     var menuHTML = menuItems.map(function (item, index) {
       if (item.divider) {
-        return '<div class="border-t border-gray-200 my-1"></div>';
+        return '<div class="my-1" style="border-top: 1px solid var(--lex-border-default)"></div>';
       }
 
-      var className = item.className || 'text-gray-700 hover:bg-gray-100';
+      // Danger items keep their semantic color; default items use Lex tokens
+      var isDanger = item.className && item.className.indexOf('red') !== -1;
+      var itemStyle = isDanger
+        ? 'color: var(--lex-status-danger-text)'
+        : 'color: var(--lex-text-primary)';
+      var hoverClass = isDanger ? 'context-menu-item--danger' : 'context-menu-item';
       return [
-        '<button class="w-full text-left px-4 py-2 text-sm ' + className + ' flex items-center gap-3 transition-colors" onclick="window.contextMenuAction_' + index + '()">',
+        '<button class="w-full text-left px-4 py-2 text-sm flex items-center gap-3 transition-colors ' + hoverClass + '" style="' + itemStyle + '" onclick="window.contextMenuAction_' + index + '()">',
         '  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' + item.icon + '</svg>',
         '  ' + item.label,
         '</button>'
@@ -1629,10 +1712,7 @@
     }
 
     var modal = document.getElementById('matterActionsModal');
-    if (modal) {
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-    }
+    if (modal) modal.open = true;
   }
 
   /**
@@ -1640,10 +1720,7 @@
    */
   function closeMatterActionsModal() {
     var modal = document.getElementById('matterActionsModal');
-    if (modal) {
-      modal.classList.add('hidden');
-      modal.classList.remove('flex');
-    }
+    if (modal) modal.open = false;
     selectedMatter = null;
   }
 
@@ -1692,16 +1769,10 @@
     }
 
     var optionsModal = document.getElementById('matterActionsModal');
-    if (optionsModal) {
-      optionsModal.classList.add('hidden');
-      optionsModal.classList.remove('flex');
-    }
+    if (optionsModal) optionsModal.open = false;
 
     var confirmModal = document.getElementById('deleteMatterConfirmModal');
-    if (confirmModal) {
-      confirmModal.classList.remove('hidden');
-      confirmModal.classList.add('flex');
-    }
+    if (confirmModal) confirmModal.open = true;
   }
 
   // ── Delete matter confirmation ────────────────────────────────────────
@@ -1711,10 +1782,7 @@
    */
   function closeDeleteMatterConfirmModal() {
     var modal = document.getElementById('deleteMatterConfirmModal');
-    if (modal) {
-      modal.classList.add('hidden');
-      modal.classList.remove('flex');
-    }
+    if (modal) modal.open = false;
     selectedMatter = null;
   }
 
@@ -1788,31 +1856,16 @@
       var isFirstPage = storageState.currentPage === 1;
       var isLastPage = storageState.currentPage >= storageState.totalPages;
 
+      // lex-btn: disabled is a reflected property — set it directly on the element
       var prevBtn = document.getElementById('prevPage');
       var nextBtn = document.getElementById('nextPage');
-      if (prevBtn) {
-        prevBtn.disabled = isFirstPage;
-        prevBtn.classList.toggle('opacity-50', isFirstPage);
-        prevBtn.classList.toggle('cursor-not-allowed', isFirstPage);
-      }
-      if (nextBtn) {
-        nextBtn.disabled = isLastPage;
-        nextBtn.classList.toggle('opacity-50', isLastPage);
-        nextBtn.classList.toggle('cursor-not-allowed', isLastPage);
-      }
+      if (prevBtn) prevBtn.disabled = isFirstPage;
+      if (nextBtn) nextBtn.disabled = isLastPage;
 
       var prevBtnMobile = document.getElementById('prevPageMobile');
       var nextBtnMobile = document.getElementById('nextPageMobile');
-      if (prevBtnMobile) {
-        prevBtnMobile.disabled = isFirstPage;
-        prevBtnMobile.classList.toggle('opacity-50', isFirstPage);
-        prevBtnMobile.classList.toggle('cursor-not-allowed', isFirstPage);
-      }
-      if (nextBtnMobile) {
-        nextBtnMobile.disabled = isLastPage;
-        nextBtnMobile.classList.toggle('opacity-50', isLastPage);
-        nextBtnMobile.classList.toggle('cursor-not-allowed', isLastPage);
-      }
+      if (prevBtnMobile) prevBtnMobile.disabled = isFirstPage;
+      if (nextBtnMobile) nextBtnMobile.disabled = isLastPage;
     } else {
       paginationControls && paginationControls.classList.add('hidden');
     }
@@ -1943,13 +1996,13 @@
     var lastAccessed = file.last_accessed_at ? new Date(file.last_accessed_at).toLocaleDateString() : '';
 
     return [
-      '<div class="file-card bg-white rounded-lg shadow-sm border border-gray-200 p-4 cursor-pointer relative group hover:shadow-md transition-shadow"',
+      '<div class="file-card rounded-lg shadow-sm border p-4 cursor-pointer relative group hover:shadow-md transition-shadow" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)"',
       '     onclick="openRecentFile(' + JSON.stringify(file.id) + ', ' + JSON.stringify(file.client_matter || '') + ')">',
       '  <div class="flex flex-col items-center text-center">',
       '    <div class="w-12 h-12 mb-3 flex items-center justify-center">' + fileIcon + '</div>',
-      '    <p class="text-sm font-medium text-gray-900 truncate w-full mb-1" title="' + fileName + '">' + fileName + '</p>',
-      '    <p class="text-xs text-gray-500">' + fileSize + '</p>',
-      lastAccessed ? '    <p class="text-xs text-gray-400 mt-1">' + lastAccessed + '</p>' : '',
+      '    <p class="text-sm font-medium truncate w-full mb-1" style="color: var(--lex-text-primary)" title="' + fileName + '">' + fileName + '</p>',
+      '    <p class="text-xs" style="color: var(--lex-text-secondary)">' + fileSize + '</p>',
+      lastAccessed ? '    <p class="text-xs mt-1" style="color: var(--lex-text-tertiary)">' + lastAccessed + '</p>' : '',
       '  </div>',
       '</div>'
     ].join('');
@@ -2035,36 +2088,36 @@
     var lastModified = matter.updated_at ? new Date(matter.updated_at).toLocaleDateString() : '';
 
     return [
-      '<div class="file-card bg-white rounded-lg shadow-sm border border-gray-200 p-4 cursor-pointer relative group hover:shadow-md transition-shadow"',
+      '<div class="file-card rounded-lg shadow-sm border p-4 cursor-pointer relative group hover:shadow-md transition-shadow" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)"',
       '     onclick="navigateToMatter(' + JSON.stringify(matter.matter_id) + ', ' + JSON.stringify(matter.name || matter.matter_id) + ')">',
       isPinned
-        ? '<div class="absolute top-2 right-8 p-1 rounded-full bg-yellow-50 border border-yellow-200" title="Pinned"><svg class="w-3 h-3 text-yellow-600" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg></div>'
+        ? '<div class="absolute top-2 right-8 p-1 rounded-full" style="background: var(--lex-status-warning-bg); border: 1px solid var(--lex-status-warning-border)" title="Pinned"><svg class="w-3 h-3" style="color: var(--lex-status-warning-text)" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg></div>'
         : '',
-      '<button class="matter-menu-btn absolute top-2 right-2 p-1 rounded-full hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-opacity"',
+      '<button class="matter-menu-btn absolute top-2 right-2 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" style="color: var(--lex-text-secondary)"',
       '        data-matter-id="' + matterNumber + '"',
       '        data-matter-name="' + matterName + '"',
       '        data-is-pinned="' + (matter.is_pinned || isPinned) + '"',
       '        data-source="' + escapeHtml(matter.source || 'lana') + '"',
       '        onclick="event.stopPropagation(); showMatterActionsModal(event)"',
       '        title="More options">',
-      '  <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
+      '  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
       '    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>',
       '  </svg>',
       '</button>',
       '<div class="flex flex-col items-center text-center">',
       '  <div class="w-12 h-12 mb-3 flex items-center justify-center">',
-      '    <svg class="w-12 h-12 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
+      '    <svg class="w-12 h-12" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
       '      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>',
       '    </svg>',
       '  </div>',
-      '  <p class="text-sm font-medium text-gray-900 text-center truncate w-full mb-1" title="' + matterName + '">' + matterName + '</p>',
-      matterNumber ? '  <p class="text-xs text-gray-500 font-mono text-center truncate w-full mb-1" title="' + matterNumber + '">' + matterNumber + '</p>' : '',
-      '  <div class="flex items-center gap-2 text-xs text-gray-500">',
+      '  <p class="text-sm font-medium text-center truncate w-full mb-1" style="color: var(--lex-text-primary)" title="' + matterName + '">' + matterName + '</p>',
+      matterNumber ? '  <p class="text-xs font-mono text-center truncate w-full mb-1" style="color: var(--lex-text-secondary)" title="' + matterNumber + '">' + matterNumber + '</p>' : '',
+      '  <div class="flex items-center gap-2 text-xs" style="color: var(--lex-text-secondary)">',
       '    <span>' + docCount + ' ' + (docCount === 1 ? 'file' : 'files') + '</span>',
       '    <span>\u2022</span>',
       '    <span>' + folderCount + ' ' + (folderCount === 1 ? 'folder' : 'folders') + '</span>',
       '  </div>',
-      lastModified ? '  <p class="text-xs text-gray-400 mt-1">' + lastModified + '</p>' : '',
+      lastModified ? '  <p class="text-xs mt-1" style="color: var(--lex-text-tertiary)">' + lastModified + '</p>' : '',
       '</div>',
       '</div>'
     ].join('');
@@ -2111,7 +2164,7 @@
 
     // Fallback if lex.icons.js not yet loaded
     if (!contentType) {
-      return '<svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>';
+      return '<svg class="w-10 h-10" style="color: var(--lex-text-tertiary)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>';
     }
 
     if (contentType.indexOf('pdf') !== -1) {
@@ -2133,16 +2186,16 @@
       return '<svg class="w-10 h-10 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>';
     }
     if (contentType.indexOf('audio') !== -1) {
-      return '<svg class="w-10 h-10 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path></svg>';
+      return '<svg class="w-10 h-10" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path></svg>';
     }
     if (contentType.indexOf('zip') !== -1 || contentType.indexOf('archive') !== -1 || contentType.indexOf('compressed') !== -1) {
       return '<svg class="w-10 h-10 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"></path></svg>';
     }
     if (contentType.indexOf('text') !== -1) {
-      return '<svg class="w-10 h-10 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>';
+      return '<svg class="w-10 h-10" style="color: var(--lex-text-secondary)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>';
     }
 
-    return '<svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>';
+    return '<svg class="w-10 h-10" style="color: var(--lex-text-tertiary)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>';
   }
 
   // ── Conversation actions (from inline script) ────────────────────────
@@ -2174,10 +2227,7 @@
     }
 
     var modal = document.getElementById('conversationActionsModal');
-    if (modal) {
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-    }
+    if (modal) modal.open = true;
   }
 
   /**
@@ -2185,10 +2235,7 @@
    */
   function closeConversationActionsModal() {
     var modal = document.getElementById('conversationActionsModal');
-    if (modal) {
-      modal.classList.remove('flex');
-      modal.classList.add('hidden');
-    }
+    if (modal) modal.open = false;
 
     selectedConversationId = null;
     selectedConversationTitle = null;
@@ -2207,29 +2254,24 @@
     }
 
     var actionsModal = document.getElementById('conversationActionsModal');
-    if (actionsModal) {
-      actionsModal.classList.remove('flex');
-      actionsModal.classList.add('hidden');
-    }
+    if (actionsModal) actionsModal.open = false;
 
     var renameModal = document.getElementById('renameConversationModal');
-    var renameInput = document.getElementById('renameInput');
+    var lexInput = document.getElementById('renameInput');
 
     // Decode HTML entities using Lex.Utils (no regex)
     var decodedTitle = Lex.Utils.decodeHtmlEntities(selectedConversationTitle);
-    if (renameInput) renameInput.value = decodedTitle;
+    if (lexInput) lexInput.value = decodedTitle;
 
-    if (renameModal) {
-      renameModal.classList.remove('hidden');
-      renameModal.classList.add('flex');
-    }
+    if (renameModal) renameModal.open = true;
 
     setTimeout(function () {
-      if (renameInput) {
-        renameInput.focus();
-        renameInput.select();
+      var inner = lexInput && lexInput.querySelector('input');
+      if (inner) {
+        inner.focus();
+        inner.select();
       }
-    }, 100);
+    }, 150);
   }
 
   /**
@@ -2237,10 +2279,7 @@
    */
   function closeRenameModal() {
     var modal = document.getElementById('renameConversationModal');
-    if (modal) {
-      modal.classList.remove('flex');
-      modal.classList.add('hidden');
-    }
+    if (modal) modal.open = false;
   }
 
   /**
@@ -2253,8 +2292,8 @@
       return;
     }
 
-    var renameInput = document.getElementById('renameInput');
-    var newTitle = renameInput ? renameInput.value.trim() : '';
+    var lexRenameInput = document.getElementById('renameInput');
+    var newTitle = lexRenameInput ? (lexRenameInput.value || '').trim() : '';
 
     if (!newTitle) {
       Lex.Toast.error('Conversation name cannot be empty');
@@ -2318,10 +2357,7 @@
     if (messageEl) messageEl.textContent = message;
 
     var modal = document.getElementById('deleteConfirmModal');
-    if (modal) {
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-    }
+    if (modal) modal.open = true;
   }
 
   /**
@@ -2329,10 +2365,7 @@
    */
   function closeDeleteConfirmModal() {
     var modal = document.getElementById('deleteConfirmModal');
-    if (modal) {
-      modal.classList.remove('flex');
-      modal.classList.add('hidden');
-    }
+    if (modal) modal.open = false;
   }
 
   /**
@@ -2449,7 +2482,7 @@
 
     // Remove window globals exposed by this module
     _globalFns.forEach(function (name) {
-      delete window[name];
+      window[name] = undefined;
     });
     _globalFns = [];
 
@@ -2467,6 +2500,9 @@
     selectedConversationIsProject = false;
     selectedConversationMatterId = null;
 
+    // Ensure context menu listener is removed (not tracked via trackDocListener)
+    hideContextMenu();
+
     // Clean up dynamic contextMenuAction_* globals
     var keysToDelete = [];
     for (var key in window) {
@@ -2480,9 +2516,17 @@
   }
 
   // ── Register with router ─────────────────────────────────────────────
+  // registerPageInit ensures onEnter() is called on every navigation
+  // (first load + re-navigation from cached scripts).
+  // registerView only carries onLeave for cleanup — onEnter is handled
+  // by registerPageInit to avoid double-init.
   if (window.LexRouter) {
-    LexRouter.registerView({ onEnter: onEnter, onLeave: onLeave });
+    LexRouter.registerPageInit('drive.html', function () {
+      LexRouter.registerView({ onLeave: onLeave });
+      onEnter();
+    });
+  } else {
+    onEnter();
   }
-  onEnter();
 
 })();

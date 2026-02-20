@@ -3,14 +3,18 @@
 
    Usage:
      <lex-btn variant="primary">Save</lex-btn>
+     <lex-btn variant="primary" leading-icon="plus">Add Item</lex-btn>
+     <lex-btn variant="danger" trailing-icon="trash">Delete</lex-btn>
+     <lex-btn variant="ghost" leading-icon="settings" icon>settings icon-only</lex-btn>
      <lex-btn variant="danger" loading="true">Deleting...</lex-btn>
      <lex-btn variant="success" icon="true"><svg>...</svg></lex-btn>
      <lex-btn variant="info"><svg>...</svg> Attach File</lex-btn>
      <lex-btn variant="ghost" icon="true" badge="5"><svg>...</svg></lex-btn>
 
+   Icon names: any Lex.Icons name (Lucide icons) — e.g. "plus", "search", "arrow-right"
    Variants: primary | secondary | danger | success | warning | info | ghost
    Sizes: sm | md | lg
-   icon="true" for icon-only buttons
+   icon="true" for icon-only buttons (square padding)
    badge="N" shows a red notification bubble (0 or empty hides it, >99 shows "99+")
 */
 
@@ -18,6 +22,19 @@
   'use strict';
 
   const { LexElement, defineLex } = window.Lex;
+  var Icons = (window.Lex && window.Lex.Icons) || null;
+
+  // Icon size per button size (matches visual weight)
+  var ICON_SIZES = { sm: 'small', md: 'small', lg: 'normal' };
+
+  function getIcon(name, btnSize) {
+    if (!name) return '';
+    if (Icons && Icons.has && Icons.has(name)) {
+      var sizeToken = ICON_SIZES[btnSize] || 'small';
+      return String(Icons[name][sizeToken]);
+    }
+    return '';
+  }
 
   // Inject button styles once
   let stylesInjected = false;
@@ -154,13 +171,15 @@
   class LexBtn extends LexElement {
     static get properties() {
       return {
-        variant:  { type: String, default: 'primary' },
-        size:     { type: String, default: 'md' },
-        disabled: { type: Boolean, default: false, reflect: true },
-        loading:  { type: Boolean, default: false },
-        type:     { type: String, default: 'button' },
-        icon:     { type: Boolean, default: false },
-        badge:    { type: Number, default: 0 }
+        variant:      { type: String, default: 'primary' },
+        size:         { type: String, default: 'md' },
+        disabled:     { type: Boolean, default: false, reflect: true },
+        loading:      { type: Boolean, default: false },
+        type:         { type: String, default: 'button' },
+        icon:         { type: Boolean, default: false },
+        badge:        { type: Number, default: 0 },
+        leadingIcon:  { type: String, default: '' },
+        trailingIcon: { type: String, default: '' }
       };
     }
 
@@ -224,11 +243,18 @@
 
       const radius = radii[this.size] || radii.md;
 
-      // Sizes: text buttons get horizontal padding, icon buttons get equal padding
+      // Sizes — icon-only buttons get square padding, text buttons get horizontal padding.
+      // font-size always applied regardless of icon mode.
       const sizes = {
-        sm: this.icon ? 'padding:0.375rem;' : 'padding:0.375rem 0.875rem; font-size:var(--lex-body-xs-size, 0.75rem);',
-        md: this.icon ? 'padding:0.5rem;'   : 'padding:0.5rem 1.125rem; font-size:var(--lex-body-sm-size, 0.875rem);',
-        lg: this.icon ? 'padding:0.625rem;'  : 'padding:0.625rem 1.5rem; font-size:var(--lex-body-base-size, 1rem);'
+        sm: this.icon
+          ? 'padding:0.375rem; font-size:var(--lex-body-xs-size, 0.75rem);'
+          : 'padding:0.375rem 0.875rem; font-size:var(--lex-body-xs-size, 0.75rem);',
+        md: this.icon
+          ? 'padding:0.5rem; font-size:var(--lex-body-sm-size, 0.875rem);'
+          : 'padding:0.5rem 1.125rem; font-size:var(--lex-body-sm-size, 0.875rem);',
+        lg: this.icon
+          ? 'padding:0.625rem; font-size:var(--lex-body-base-size, 1rem);'
+          : 'padding:0.625rem 1.5rem; font-size:var(--lex-body-base-size, 1rem);'
       };
 
       const sizeStyle = sizes[this.size] || sizes.md;
@@ -249,12 +275,15 @@
         ? `<span class="lex-btn-badge${badgeSizeCls}">${badgeCount > 99 ? '99+' : badgeCount}</span>`
         : '';
 
+      const leadSvg = this.leadingIcon ? getIcon(this.leadingIcon, this.size) : '';
+      const trailSvg = this.trailingIcon ? getIcon(this.trailingIcon, this.size) : '';
+
       return `${badgeHtml}<button
           type="${this.type}"
           class="lex-btn-inner"
           style="${cssVars}${sizeStyle}"
           ${this.disabled || this.loading ? 'disabled' : ''}
-        >${spinner}<slot-content></slot-content></button>`;
+        >${spinner}${leadSvg}<slot-content></slot-content>${trailSvg}</button>`;
     }
 
     updated() {

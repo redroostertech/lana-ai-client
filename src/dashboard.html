@@ -6,7 +6,7 @@
 
 <div id="lex-page-content">
 
-  <main class="cc-dashboard">
+  <main>
 
     <!-- ================================================================
          Zone A — Morning Orientation Bar (full width)
@@ -19,7 +19,7 @@
       heading="Good morning, there"
       subtitle=""
     >
-      <lex-btn id="ccZoneAMatters" variant="secondary" size="sm">
+      <lex-btn id="ccZoneAMatters" variant="secondary">
         <span id="ccZoneAMattersCount">-</span> active matters
       </lex-btn>
     </lex-banner>
@@ -30,10 +30,13 @@
          Populated by dashboard.js:renderZoneE()
          ================================================================ -->
     <div class="cc-pipeline" id="ccZoneE">
-      <lex-metric label="Team Members" value="-" status="blue"></lex-metric>
-      <lex-metric label="Total Documents" value="-" status="blue"></lex-metric>
-      <lex-metric label="Storage Used" value="-" status="blue"></lex-metric>
+      <lex-metric data-metric-key="team" label="Team Members" value="-" status="blue"></lex-metric>
+      <lex-metric data-metric-key="docs" label="Total Documents" value="-" status="blue"></lex-metric>
+      <lex-metric data-metric-key="storage" label="Storage Used" value="-" status="blue"></lex-metric>
     </div>
+
+    <!-- Expandable detail panel (accordion — one open at a time) -->
+    <lex-detail-panel id="ccDetailPanel"></lex-detail-panel>
 
 
     <!-- ================================================================

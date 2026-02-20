@@ -280,10 +280,22 @@
       };
     }
 
+    connected() {
+      // connectedCallback already ran _performUpdate() synchronously,
+      // so children have been captured and restored into <slot-content>.
+      // Null out _originalChildren to prevent _restoreContent() from
+      // re-cloning on subsequent updates — this preserves live DOM nodes
+      // and any event listeners bound to them by page scripts.
+      this._originalChildren = null;
+    }
+
     render() {
       injectStyles();
 
-      if (!this.open) return '';
+      // After first render, skip innerHTML replacement to preserve live children.
+      // open/close is handled in updated() via CSS visibility.
+      if (this._rendered) return null;
+      this._rendered = true;
 
       const isFull = this.size === 'full';
       const overlayCls = `lex-modal-overlay${isFull ? ' lex-modal-overlay--full' : ''}`;
@@ -298,7 +310,8 @@
       };
       const confirmBtnCls = btnVariantMap[this.variant] || btnVariantMap.default;
 
-      let html = `<div class="${overlayCls}">`;
+      // Always render the full structure; starts hidden.
+      let html = `<div class="${overlayCls}" style="display:none">`;
       html += `<div class="lex-modal-backdrop" data-action="overlay"></div>`;
       html += `<div class="${panelCls}">`;
 
@@ -325,17 +338,27 @@
 
       html += `</div></div>`;
 
-      // Lock body scroll
-      document.body.style.overflow = 'hidden';
-
       return html;
     }
 
-    updated() {
+    updated(changedProps) {
+      // Toggle overlay visibility + body scroll lock
+      const overlay = this.querySelector('.lex-modal-overlay');
+      if (overlay) {
+        overlay.style.display = this.open ? '' : 'none';
+      }
+
+      // Sync heading text without re-render
+      if (changedProps && changedProps.has('heading')) {
+        const titleEl = this.querySelector('.lex-modal-title');
+        if (titleEl) titleEl.textContent = this.heading;
+      }
+
       if (!this.open) {
         document.body.style.overflow = '';
         return;
       }
+      document.body.style.overflow = 'hidden';
 
       this.delegate('click', '[data-action="confirm"]', () => {
         this.emit('lex-confirm');

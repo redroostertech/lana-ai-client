@@ -1,0 +1,233 @@
+/* ==========================================================================
+   Chat V2 — Page-specific styles
+   All values use Lex design tokens (--lex-*) from lex-tokens.css.
+   Do not add colours or spacing that are not from the token system.
+   ========================================================================== */
+
+/* ── Page root ──────────────────────────────────────────────────────────── */
+
+.cv2-page {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - var(--lex-topbar-height, 64px));
+  background: var(--lex-bg-primary);
+  overflow: hidden;
+}
+
+/* ── Centered column (matter selection + greeting) ──────────────────────── */
+
+.cv2-stage-center {
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 40px 24px 120px;
+}
+
+
+/* ── Matter panel (cards + search) ─────────────────────────────────────── */
+
+.cv2-matter-panel {
+  overflow: hidden;
+  transition: opacity 350ms ease, transform 350ms ease, max-height 350ms ease;
+  transform-origin: top;
+  max-height: 1000px;  /* large enough to never clip */
+  opacity: 1;
+  transform: scaleY(1);
+}
+
+.cv2-matter-panel.cv2-collapsing {
+  opacity: 0;
+  transform: scaleY(0.92);
+  max-height: 0;
+  pointer-events: none;
+}
+
+/* Match divider label background to page background */
+.cv2-matter-panel lex-divider span {
+  background: var(--lex-bg-secondary);
+}
+
+/* ── Matter cards wrapper ───────────────────────────────────────────────── */
+
+.cv2-cards-wrapper {
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: var(--lex-radius-lg, 12px);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.cv2-cards-wrapper lex-action-card:not(:last-child) {
+  border-bottom: 1px solid var(--lex-border-subtle);
+}
+
+/* ── Search wrapper ─────────────────────────────────────────────────────── */
+
+.cv2-search-wrapper {
+  margin-top: 16px;
+}
+
+/* Search results dropdown */
+.cv2-search-results {
+  background: var(--lex-bg-primary);
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: var(--lex-radius-md, 6px);
+  box-shadow: var(--lex-shadow-md, 0 4px 16px rgba(0,0,0,0.08));
+  max-height: 280px;
+  overflow-y: auto;
+  margin-top: 6px;
+  display: none;
+}
+
+.cv2-search-results.cv2-visible {
+  display: block;
+}
+
+.cv2-search-result-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  border-bottom: 1px solid var(--lex-border-subtle);
+}
+
+.cv2-search-result-item:last-child {
+  border-bottom: none;
+}
+
+.cv2-search-result-item:hover {
+  background: var(--lex-bg-secondary);
+}
+
+.cv2-search-result-name {
+  font-size: var(--lex-body-sm-size);
+  font-weight: var(--lex-weight-medium, 500);
+  color: var(--lex-text-primary);
+}
+
+.cv2-search-result-meta {
+  font-size: var(--lex-body-xs-size);
+  color: var(--lex-text-tertiary);
+  margin-top: 2px;
+}
+
+/* ── Inline composer (intent selection stage) ───────────────────────────── */
+
+.cv2-composer-inline {
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-radius-lg, 12px);
+  padding: 24px;
+  background: var(--lex-bg-primary);
+  box-shadow: var(--lex-shadow-sm, 0 1px 4px rgba(0,0,0,0.06));
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 350ms ease, transform 350ms ease;
+  display: none;
+}
+
+.cv2-composer-inline.cv2-visible {
+  display: block;
+}
+
+.cv2-composer-inline.cv2-entered {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Intent button grid */
+.cv2-intents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+/* ── Messages area (active stage) ───────────────────────────────────────── */
+
+.cv2-messages-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 24px 120px;
+  display: none;
+}
+
+.cv2-messages-area.cv2-visible {
+  display: block;
+}
+
+/* Dim the greeting when chat becomes active */
+.cv2-greeting-dimmed {
+  opacity: 0.55;
+  transition: opacity 400ms ease;
+  pointer-events: none;
+}
+
+/* ── Pinned composer (active stage) ─────────────────────────────────────── */
+
+.cv2-composer-pinned {
+  position: fixed;
+  bottom: 0;
+  left: var(--lex-sidebar-current-width, var(--lex-sidebar-width, 256px));
+  right: 0;
+  padding: 16px 24px 24px;
+  background: var(--lex-bg-primary);
+  border-top: 1px solid var(--lex-border-subtle);
+  box-shadow: 0 -4px 16px rgba(13, 8, 7, 0.06);
+  transform: translateY(100%);
+  transition: transform 400ms cubic-bezier(0.22, 1, 0.36, 1);
+  display: none;
+  z-index: var(--lex-z-sticky);
+}
+
+.cv2-composer-pinned.cv2-visible {
+  display: block;
+}
+
+.cv2-composer-pinned.cv2-entered {
+  transform: translateY(0);
+}
+
+.cv2-composer-inner {
+  max-width: 680px;
+  margin: 0 auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+/* Matter badge row above composer input */
+.cv2-composer-context {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+/* ── Utility: hidden ─────────────────────────────────────────────────────── */
+
+.cv2-hidden {
+  display: none !important;
+}
+
+/* ── Overline label style ────────────────────────────────────────────────── */
+
+/* Extends .lex-overline (from lex-tokens.css) with page-level margin */
+.cv2-overline {
+  margin-bottom: 12px;
+}
+
+/* ── Greeting text ───────────────────────────────────────────────────────── */
+/* lex-text uses display:contents — target inner element.
+   !important needed to override the inline margin:0 reset from lex-text. */
+
+.cv2-greeting > * {
+  margin-bottom: 48px !important;
+}
+
+/* Skeleton placeholder height for shimmer loading state */
+.cv2-skeleton-placeholder {
+  height: 160px;
+}
+
+/* Inline composer label */
+.cv2-intent-label {
+  margin-bottom: 4px;
+}

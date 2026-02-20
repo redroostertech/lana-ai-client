@@ -4,147 +4,95 @@
 
 <div id="lex-page-content">
 
-    <main class="p-4 lg:p-8">
-      <!-- Welcome Banner -->
-      <div class="mb-6 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-6 shadow-lg">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div class="flex-1">
-            <h2 class="text-2xl font-bold text-white mb-2">Organize with Matters</h2>
-            <p class="text-indigo-100 text-sm leading-relaxed">
-              Matters are the foundation of your workspace - they organize cases, projects, or clients into dedicated spaces. Each matter keeps conversations, documents, and AI interactions neatly separated, ensuring privacy and context are maintained across all your work.
-            </p>
+    <main>
+      <!-- Welcome Banner — Lex UI -->
+      <lex-banner
+        id="workspacesBanner"
+        variant="light"
+        corners
+        heading="Workspaces"
+        subtitle="Organize matters, cases, and projects into dedicated spaces with isolated documents, conversations, and AI context."
+      >
+        <lex-btn id="learnMoreBtn" variant="secondary">Learn More</lex-btn>
+      </lex-banner>
+
+      <!-- Summary Metrics -->
+      <div id="workspaceSummaryMetrics" class="mb-4">
+        <!-- Loading skeleton -->
+        <div id="metricsLoading" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="bg-white rounded-xl border border-gray-100 p-4 animate-pulse">
+            <div class="h-3 bg-gray-200 rounded w-24 mb-2"></div>
+            <div class="h-7 bg-gray-200 rounded w-16"></div>
           </div>
-          <button onclick="openMattersInfoModal()" class="px-5 py-2.5 bg-white text-indigo-600 hover:bg-indigo-50 font-medium rounded-lg transition-colors flex-shrink-0 shadow-md hover:shadow-lg">
-            Learn More
-          </button>
+          <div class="bg-white rounded-xl border border-gray-100 p-4 animate-pulse">
+            <div class="h-3 bg-gray-200 rounded w-24 mb-2"></div>
+            <div class="h-7 bg-gray-200 rounded w-16"></div>
+          </div>
+          <div class="bg-white rounded-xl border border-gray-100 p-4 animate-pulse">
+            <div class="h-3 bg-gray-200 rounded w-32 mb-2"></div>
+            <div class="h-7 bg-gray-200 rounded w-12"></div>
+          </div>
+        </div>
+        <!-- Actual metrics (hidden until loaded) -->
+        <div id="metricsContent" class="hidden">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-2">
+            <div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
+              <lex-metric id="metricActiveMatters" label="Active Matters (30d)" value="--" status="blue"></lex-metric>
+            </div>
+            <div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
+              <lex-metric id="metricOutstandingTasks" label="Outstanding Tasks" value="--" status="yellow"></lex-metric>
+            </div>
+            <div class="bg-white rounded-xl border border-gray-100 overflow-hidden cursor-pointer" id="recentActivityTrigger" title="Click to view recent activity">
+              <lex-metric id="metricRecentActivity" label="Recent Events" value="--" status="green"></lex-metric>
+            </div>
+          </div>
+          <!-- Expandable recent activity panel -->
+          <lex-detail-panel id="recentActivityPanel" heading="Recent Matter Activity" action-label="View All" action-href="matters/timeline.html">
+          </lex-detail-panel>
         </div>
       </div>
 
       <!-- Header Actions -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+      <div class="bg-white rounded-lg shadow-sm border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 p-4" style="border-color: var(--lex-border-default)">
         <!-- Left: Search -->
-        <div class="flex-1 max-w-md">
-          <div class="relative">
-            <input type="text" id="searchInput" placeholder="Search matters..."
-              class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-            </svg>
-          </div>
+        <div class="flex-1">
+          <lex-input id="searchInput" placeholder="Search matters..." clearable leading-icon="search"></lex-input>
         </div>
 
         <!-- Right: Selection Controls + Filters + Actions -->
         <div class="flex items-center gap-3 flex-wrap">
           <!-- Select All Checkbox -->
           <div class="flex items-center border-r border-gray-300 pr-3">
-            <input type="checkbox" id="selectAllMatters" class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
-            <label for="selectAllMatters" class="ml-2 text-sm text-gray-700 whitespace-nowrap">Select All</label>
+            <lex-checkbox id="selectAllMatters" label="Select All"></lex-checkbox>
           </div>
 
           <!-- Bulk Actions (shown when items selected) -->
           <div id="bulkActions" class="hidden flex items-center gap-2 border-r border-gray-300 pr-3">
             <span id="selectedCount" class="text-sm font-medium text-gray-700 whitespace-nowrap">0 selected</span>
-            <button id="bulkDeleteBtn" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-              </svg>
-              Delete Selected
-            </button>
+            <lex-btn id="bulkDeleteBtn" variant="danger" size="sm">Delete Selected</lex-btn>
             <button id="clearSelectionBtn" class="text-xs text-gray-600 hover:text-gray-800 underline">Clear</button>
           </div>
 
           <!-- Status Filter -->
-          <select id="statusFilter" class="select-standard inline-block w-auto pl-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-            <option value="">All Status</option>
-            <option value="active">Active</option>
-            <option value="closed">Closed</option>
-            <option value="archived">Archived</option>
-            <option value="shared">Shared with Me</option>
-          </select>
+          <lex-select id="statusFilter" placeholder="All Status"
+            options='[{"value":"","label":"All Status"},{"value":"active","label":"Active"},{"value":"closed","label":"Closed"},{"value":"archived","label":"Archived"},{"value":"shared","label":"Shared with Me"}]'>
+          </lex-select>
 
           <!-- Matter Type Filter -->
-          <select id="matterTypeFilter" class="select-standard inline-block w-auto pl-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-            <option value="">All Types</option>
-            <option value="matter">Client Matters Only</option>
-            <option value="workspace">Workspaces Only</option>
-          </select>
+          <lex-select id="matterTypeFilter" placeholder="All Types"
+            options='[{"value":"","label":"All Types"},{"value":"matter","label":"Client Matters Only"},{"value":"workspace","label":"Workspaces Only"}]'>
+          </lex-select>
 
           <!-- New Matter Button -->
-          <button id="createMatterBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-            </svg>
+          <lex-btn id="createMatterBtn" variant="primary" leading-icon="+">
             New Matter
-          </button>
+          </lex-btn>
         </div>
       </div>
 
       <!-- Loading State -->
-      <div id="mattersLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <!-- Skeleton cards -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 animate-pulse">
-          <div class="flex items-start justify-between mb-4">
-            <div class="flex-1">
-              <div class="h-3 bg-gray-200 rounded w-20 mb-2"></div>
-              <div class="h-5 bg-gray-200 rounded w-3/4 mb-2"></div>
-              <div class="h-4 bg-gray-200 rounded w-1/2"></div>
-            </div>
-            <div class="h-6 bg-gray-200 rounded-full w-16"></div>
-          </div>
-          <div class="space-y-2 mb-4">
-            <div class="h-3 bg-gray-200 rounded w-full"></div>
-            <div class="h-3 bg-gray-200 rounded w-2/3"></div>
-          </div>
-          <div class="flex items-center justify-between">
-            <div class="h-3 bg-gray-200 rounded w-24"></div>
-            <div class="flex gap-2">
-              <div class="h-3 bg-gray-200 rounded w-8"></div>
-              <div class="h-3 bg-gray-200 rounded w-10"></div>
-            </div>
-          </div>
-        </div>
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 animate-pulse hidden md:block">
-          <div class="flex items-start justify-between mb-4">
-            <div class="flex-1">
-              <div class="h-3 bg-gray-200 rounded w-20 mb-2"></div>
-              <div class="h-5 bg-gray-200 rounded w-3/4 mb-2"></div>
-              <div class="h-4 bg-gray-200 rounded w-1/2"></div>
-            </div>
-            <div class="h-6 bg-gray-200 rounded-full w-16"></div>
-          </div>
-          <div class="space-y-2 mb-4">
-            <div class="h-3 bg-gray-200 rounded w-full"></div>
-            <div class="h-3 bg-gray-200 rounded w-2/3"></div>
-          </div>
-          <div class="flex items-center justify-between">
-            <div class="h-3 bg-gray-200 rounded w-24"></div>
-            <div class="flex gap-2">
-              <div class="h-3 bg-gray-200 rounded w-8"></div>
-              <div class="h-3 bg-gray-200 rounded w-10"></div>
-            </div>
-          </div>
-        </div>
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 animate-pulse hidden lg:block">
-          <div class="flex items-start justify-between mb-4">
-            <div class="flex-1">
-              <div class="h-3 bg-gray-200 rounded w-20 mb-2"></div>
-              <div class="h-5 bg-gray-200 rounded w-3/4 mb-2"></div>
-              <div class="h-4 bg-gray-200 rounded w-1/2"></div>
-            </div>
-            <div class="h-6 bg-gray-200 rounded-full w-16"></div>
-          </div>
-          <div class="space-y-2 mb-4">
-            <div class="h-3 bg-gray-200 rounded w-full"></div>
-            <div class="h-3 bg-gray-200 rounded w-2/3"></div>
-          </div>
-          <div class="flex items-center justify-between">
-            <div class="h-3 bg-gray-200 rounded w-24"></div>
-            <div class="flex gap-2">
-              <div class="h-3 bg-gray-200 rounded w-8"></div>
-              <div class="h-3 bg-gray-200 rounded w-10"></div>
-            </div>
-          </div>
-        </div>
+      <div id="mattersLoading" class="flex justify-center py-16">
+        <lex-spinner size="lg" label="Loading matters..."></lex-spinner>
       </div>
 
       <!-- Matters Grid -->
@@ -157,14 +105,7 @@
     </main>
 
   <!-- Matter Modal -->
-  <div id="matterModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-        <h3 id="matterModalTitle" class="text-lg font-semibold text-gray-900">Create Matter</h3>
-        <button id="closeMatterModal" class="text-gray-400 hover:text-gray-600">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-        </button>
-      </div>
+  <lex-modal id="matterModal" heading="Create Matter" size="lg" hide-actions>
       <form id="matterForm" class="p-6 space-y-5">
         <input type="hidden" id="matterId">
         <div id="matterIdDisplay" class="hidden">
@@ -173,22 +114,16 @@
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Matter Name <span class="text-red-500">*</span></label>
-            <input type="text" id="matterName" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Client Name</label>
-            <input type="text" id="clientName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-          </div>
+          <lex-input id="matterName" label="Matter Name" required></lex-input>
+          <lex-input id="clientName" label="Client Name"></lex-input>
         </div>
 
         <!-- Matter Type Selector -->
         <div id="matterTypeSection">
           <label class="block text-sm font-medium text-gray-700 mb-2">Matter Type <span class="text-red-500">*</span></label>
           <div class="space-y-3">
-            <label class="flex items-start gap-3 p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-indigo-300 hover:bg-indigo-50 transition-colors">
-              <input type="radio" name="matterType" value="matter" class="mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500">
+            <label class="flex items-start gap-3 p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:lex-border-accent hover:lex-bg-accent-muted transition-colors">
+              <input type="radio" name="matterType" value="matter" class="mt-1 h-4 w-4 lex-text-accent lex-ring-focus">
               <div class="flex-1">
                 <div class="flex items-center gap-2">
                   <span class="font-semibold text-gray-900">Client Matter</span>
@@ -198,12 +133,12 @@
               </div>
             </label>
 
-            <label class="flex items-start gap-3 p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-indigo-300 hover:bg-indigo-50 transition-colors">
-              <input type="radio" name="matterType" value="workspace" class="mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500" checked>
+            <label class="flex items-start gap-3 p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:lex-border-accent hover:lex-bg-accent-muted transition-colors">
+              <input type="radio" name="matterType" value="workspace" class="mt-1 h-4 w-4 lex-text-accent lex-ring-focus" checked>
               <div class="flex-1">
                 <div class="flex items-center gap-2">
                   <span class="font-semibold text-gray-900">Workspace</span>
-                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">Collaborative</span>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium lex-bg-accent-soft lex-text-accent">Collaborative</span>
                 </div>
                 <p class="text-sm text-gray-600 mt-1">Collaborative container that can link multiple matters, upload shared documents, and enable AI reasoning across connected data sources. Excluded from billing analytics.</p>
               </div>
@@ -224,36 +159,21 @@
           <label class="block text-sm font-medium text-gray-700 mb-1">
             Link to Workspace <span class="text-gray-400">(Optional)</span>
           </label>
-          <select id="workspaceSelector" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-            <option value="">No workspace (standalone matter)</option>
-            <!-- Workspaces populated by JavaScript -->
-          </select>
+          <lex-select id="workspaceSelector" options='[{"value":"","label":"No workspace (standalone matter)"}]' placeholder="No workspace (standalone matter)"></lex-select>
           <p class="text-xs text-gray-500 mt-1">
             Linking to a workspace allows this matter to access documents from the workspace and other linked matters (read-only).
           </p>
         </div>
 
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-          <textarea id="matterDescription" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Brief description of the matter..."></textarea>
-        </div>
+        <lex-textarea id="matterDescription" label="Description" rows="3" placeholder="Brief description of the matter..."></lex-textarea>
 
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Visibility</label>
-          <select id="matterVisibility" class="select-standard w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-            <option value="private">Private - Only shared users can access</option>
-            <option value="organization">Organization - All org members can view</option>
-          </select>
-        </div>
+        <lex-select id="matterVisibility" label="Visibility"
+          options='[{"value":"private","label":"Private - Only shared users can access"},{"value":"organization","label":"Organization - All org members can view"}]'>
+        </lex-select>
 
-        <div class="mt-4">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-          <select id="matterStatus" class="select-standard w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-            <option value="active">Active</option>
-            <option value="closed">Closed</option>
-            <option value="archived">Archived</option>
-          </select>
-        </div>
+        <lex-select id="matterStatus" label="Status"
+          options='[{"value":"active","label":"Active"},{"value":"closed","label":"Closed"},{"value":"archived","label":"Archived"}]'>
+        </lex-select>
 
         <!-- Share with Users Section -->
         <div id="shareWithSection">
@@ -261,13 +181,7 @@
           <div class="border border-gray-200 rounded-lg">
             <!-- Search users input -->
             <div class="p-3 border-b border-gray-200">
-              <div class="relative">
-                <input type="text" id="userSearchInput" placeholder="Search users to add..." 
-                  class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm">
-                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                </svg>
-              </div>
+                <lex-input id="userSearchInput" placeholder="Search users to add..." type="search" leading-icon="search" size="sm"></lex-input>
               <!-- User search results dropdown -->
               <div id="userSearchResults" class="hidden mt-2 max-h-40 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
                 <!-- Results populated by JS -->
@@ -287,60 +201,31 @@
         <div id="conflictDetectionContainer"></div>
 
         <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
-          <button type="button" id="cancelMatterBtn" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium">Cancel</button>
-          <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg">Save Matter</button>
+          <lex-btn type="button" id="cancelMatterBtn" variant="secondary">Cancel</lex-btn>
+          <lex-btn type="submit" variant="primary">Save Matter</lex-btn>
         </div>
       </form>
-    </div>
-  </div>
+  </lex-modal>
 
   <!-- Create Matter from Workspace Modal -->
-  <div id="workspaceMatterModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-        <div>
-          <h3 class="text-lg font-semibold text-gray-900">Create New Matter in Workspace</h3>
-          <p class="text-sm text-gray-500 mt-1">This matter will be automatically linked to the workspace</p>
-        </div>
-        <button id="closeWorkspaceMatterModal" class="text-gray-400 hover:text-gray-600">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-        </button>
-      </div>
+  <lex-modal id="workspaceMatterModal" heading="Create New Matter in Workspace" subtitle="This matter will be automatically linked to the workspace" size="lg" hide-actions>
       <form id="workspaceMatterForm" class="p-6 space-y-5">
         <input type="hidden" id="workspaceIdForMatter">
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Matter Name <span class="text-red-500">*</span></label>
-            <input type="text" id="workspaceMatterName" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Client Name</label>
-            <input type="text" id="workspaceClientName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-          </div>
+          <lex-input id="workspaceMatterName" label="Matter Name" required></lex-input>
+          <lex-input id="workspaceClientName" label="Client Name"></lex-input>
         </div>
 
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-          <textarea id="workspaceMatterDescription" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Brief description of the matter..."></textarea>
-        </div>
+        <lex-textarea id="workspaceMatterDescription" label="Description" rows="3" placeholder="Brief description of the matter..."></lex-textarea>
 
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Visibility</label>
-          <select id="workspaceMatterVisibility" class="select-standard w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-            <option value="private">Private - Only shared users can access</option>
-            <option value="organization">Organization - All org members can view</option>
-          </select>
-        </div>
+        <lex-select id="workspaceMatterVisibility" label="Visibility"
+          options='[{"value":"private","label":"Private - Only shared users can access"},{"value":"organization","label":"Organization - All org members can view"}]'>
+        </lex-select>
 
-        <div class="mt-4">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-          <select id="workspaceMatterStatus" class="select-standard w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-            <option value="active">Active</option>
-            <option value="closed">Closed</option>
-            <option value="archived">Archived</option>
-          </select>
-        </div>
+        <lex-select id="workspaceMatterStatus" label="Status"
+          options='[{"value":"active","label":"Active"},{"value":"closed","label":"Closed"},{"value":"archived","label":"Archived"}]'>
+        </lex-select>
 
         <!-- Share with Users Section -->
         <div id="workspaceShareWithSection">
@@ -348,13 +233,7 @@
           <div class="border border-gray-200 rounded-lg">
             <!-- Search users input -->
             <div class="p-3 border-b border-gray-200">
-              <div class="relative">
-                <input type="text" id="workspaceUserSearchInput" placeholder="Search users to add..."
-                  class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm">
-                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                </svg>
-              </div>
+                <lex-input id="workspaceUserSearchInput" placeholder="Search users to add..." type="search" leading-icon="search" size="sm"></lex-input>
               <!-- User search results dropdown -->
               <div id="workspaceUserSearchResults" class="hidden mt-2 max-h-40 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
                 <!-- Results populated by JS -->
@@ -374,18 +253,18 @@
         <div id="workspaceConflictDetectionContainer"></div>
 
         <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
-          <button type="button" id="cancelWorkspaceMatterBtn" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium">Cancel</button>
-          <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg">Create Matter</button>
+          <lex-btn type="button" id="cancelWorkspaceMatterBtn" variant="secondary">Cancel</lex-btn>
+          <lex-btn type="submit" variant="primary">Create Matter</lex-btn>
         </div>
       </form>
-    </div>
-  </div>
+  </lex-modal>
 
   <!-- Matter Details Drawer -->
-  <div id="matterDrawer" class="hidden fixed inset-y-0 right-0 w-full bg-white shadow-xl z-40 transform translate-x-full transition-transform">
+  <lex-drawer id="matterDrawer" heading="Matter Details" side="right" width="full">
+    <!-- Custom header info injected via JS into heading/subtitle slots -->
     <div class="h-full flex flex-col">
-      <!-- Header -->
-      <div class="px-6 py-4 border-b border-gray-200 flex-shrink-0">
+      <!-- Header info row (matter ID, name, client, options) -->
+      <div class="px-4 pb-3 border-b border-gray-200 flex-shrink-0">
         <div class="flex items-center justify-between gap-4">
           <div class="flex-1 min-w-0">
             <span id="drawerMatterId" class="text-xs text-gray-400 font-mono block truncate"></span>
@@ -400,17 +279,14 @@
                 </svg>
               </button>
               <div id="drawerOptionsDropdown" class="hidden absolute right-0 mt-1 w-36 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-                <button id="drawerOptionsEdit" class="w-full px-4 py-2 text-left text-sm text-indigo-600 hover:bg-indigo-50 transition-colors">Edit</button>
+                <button id="drawerOptionsEdit" class="w-full px-4 py-2 text-left text-sm lex-text-accent hover:lex-bg-accent-muted transition-colors">Edit</button>
                 <button id="drawerOptionsDelete" class="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors">Delete</button>
               </div>
             </div>
-            <button id="refreshMatterBtn" onclick="refreshCurrentMatter()" class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Refresh matter details">
+            <button id="refreshMatterBtn" onclick="refreshCurrentMatter()" class="p-2 text-gray-400 hover:lex-text-accent hover:lex-bg-accent-muted rounded-lg transition-colors" title="Refresh matter details">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
               </svg>
-            </button>
-            <button id="closeDrawer" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="Close">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
           </div>
         </div>
@@ -418,38 +294,38 @@
       </div>
 
       <!-- Tabs -->
-      <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
-        <button id="tabDetails" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600" onclick="switchMatterTab('details')">
+      <div class="flex border-b border-gray-200 px-4 flex-shrink-0 overflow-x-auto">
+        <button id="tabDetails" class="px-4 py-3 text-sm font-medium lex-text-accent border-b-2 lex-border-accent whitespace-nowrap" onclick="switchMatterTab('details')">
           Details
         </button>
-        <button id="tabDocuments" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent" onclick="switchMatterTab('documents')">
+        <button id="tabDocuments" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent whitespace-nowrap" onclick="switchMatterTab('documents')">
           Documents
         </button>
-        <button id="tabConversations" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent" onclick="switchMatterTab('conversations')">
+        <button id="tabConversations" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent whitespace-nowrap" onclick="switchMatterTab('conversations')">
           Conversations
         </button>
-        <button id="tabActivity" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent" onclick="switchMatterTab('activity')">
+        <button id="tabActivity" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent whitespace-nowrap" onclick="switchMatterTab('activity')">
           Activity
         </button>
-        <button id="tabComments" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent" onclick="switchMatterTab('comments')">
+        <button id="tabComments" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent whitespace-nowrap" onclick="switchMatterTab('comments')">
           Comments
         </button>
-        <button id="tabTasks" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent" onclick="switchMatterTab('tasks')">
+        <button id="tabTasks" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent whitespace-nowrap" onclick="switchMatterTab('tasks')">
           Tasks
         </button>
-        <button id="tabContacts" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent" onclick="switchMatterTab('contacts')">
+        <button id="tabContacts" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent whitespace-nowrap" onclick="switchMatterTab('contacts')">
           Contacts
         </button>
-        <button id="tabNotes" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent" onclick="switchMatterTab('notes')">
+        <button id="tabNotes" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent whitespace-nowrap" onclick="switchMatterTab('notes')">
           Notes
         </button>
         <!-- TODO: Re-enable Skills tab when ready for production
-        <button id="tabSkills" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent" onclick="switchMatterTab('skills')">
+        <button id="tabSkills" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent whitespace-nowrap" onclick="switchMatterTab('skills')">
           Skills
-          <span class="ml-1 px-1.5 py-0.5 text-xs bg-purple-100 text-purple-800 rounded-full">BETA</span>
+          <span class="ml-1 px-1.5 py-0.5 text-xs lex-bg-accent-soft lex-text-accent rounded-full">BETA</span>
         </button>
         -->
-        <button id="tabConnectedData" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent" onclick="switchMatterTab('connectedData')">
+        <button id="tabConnectedData" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent whitespace-nowrap" onclick="switchMatterTab('connectedData')">
           Connected Data
         </button>
       </div>
@@ -470,293 +346,145 @@
         <div id="tabContentConnectedData" class="hidden p-6"></div>
       </div>
     </div>
-  </div>
-  <div id="drawerOverlay" class="hidden fixed inset-0 bg-black bg-opacity-50 z-30"></div>
+  </lex-drawer>
 
   <!-- Task Modal -->
-  <div id="taskModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-        <h3 id="taskModalTitle" class="text-lg font-semibold text-gray-900">Create Task</h3>
-        <button onclick="closeTaskModal()" class="text-gray-400 hover:text-gray-600">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-        </button>
-      </div>
+  <lex-modal id="taskModal" heading="Create Task" size="lg" hide-actions>
       <form id="taskForm" onsubmit="saveTask(event)" class="p-6 space-y-5">
         <input type="hidden" id="taskId">
 
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Title <span class="text-red-500">*</span></label>
-          <input type="text" id="taskTitle" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-        </div>
+        <lex-input id="taskTitle" label="Title" required></lex-input>
 
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-          <textarea id="taskDescription" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Describe the task..."></textarea>
-        </div>
+        <lex-textarea id="taskDescription" label="Description" rows="3" placeholder="Describe the task..."></lex-textarea>
 
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-          <textarea id="taskNotes" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Additional notes..."></textarea>
-        </div>
+        <lex-textarea id="taskNotes" label="Notes" rows="2" placeholder="Additional notes..."></lex-textarea>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-            <select id="taskStatus" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-              <option value="pending">Pending</option>
-              <option value="in_progress">In Progress</option>
-              <option value="in_review">In Review</option>
-              <option value="complete">Complete</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
+            <lex-select id="taskStatus" label="Status"
+              options='[{"value":"pending","label":"Pending"},{"value":"in_progress","label":"In Progress"},{"value":"in_review","label":"In Review"},{"value":"complete","label":"Complete"},{"value":"cancelled","label":"Cancelled"}]'>
+            </lex-select>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-            <select id="taskPriority" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-              <option value="low">Low</option>
-              <option value="normal" selected>Normal</option>
-              <option value="high">High</option>
-            </select>
+            <lex-select id="taskPriority" label="Priority"
+              options='[{"value":"low","label":"Low"},{"value":"normal","label":"Normal"},{"value":"high","label":"High"}]'>
+            </lex-select>
           </div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
-            <input type="datetime-local" id="taskDueDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+            <lex-input id="taskDueDate" label="Due Date" type="datetime-local"></lex-input>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Assign To</label>
-            <select id="taskAssignedTo" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-              <option value="">Unassigned</option>
-              <!-- Users populated dynamically -->
-            </select>
+            <!-- Assign To: populated dynamically via JS -->
+            <lex-select id="taskAssignedTo" label="Assign To" placeholder="Unassigned"
+              options='[{"value":"","label":"Unassigned"}]'>
+            </lex-select>
           </div>
         </div>
 
         <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
-          <button type="button" onclick="closeTaskModal()" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors">
-            Cancel
-          </button>
-          <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors">
-            Save Task
-          </button>
+          <lex-btn type="button" onclick="closeTaskModal()" variant="secondary">Cancel</lex-btn>
+          <lex-btn type="submit" variant="primary">Save Task</lex-btn>
         </div>
       </form>
-    </div>
-  </div>
+  </lex-modal>
 
   <!-- Contact Modal -->
-  <div id="contactModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-        <h3 class="text-lg font-semibold text-gray-900">Add Contact</h3>
-        <button onclick="closeContactModal()" class="text-gray-400 hover:text-gray-600">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-        </button>
-      </div>
+  <lex-modal id="contactModal" heading="Add Contact" size="lg" hide-actions>
       <form id="contactForm" onsubmit="saveContact(event)" class="p-6 space-y-5">
         <input type="hidden" id="contactMatterId">
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">First Name <span class="text-red-500">*</span></label>
-            <input type="text" id="contactFirstName" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Last Name <span class="text-red-500">*</span></label>
-            <input type="text" id="contactLastName" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-          </div>
+          <lex-input id="contactFirstName" label="First Name" required></lex-input>
+          <lex-input id="contactLastName" label="Last Name" required></lex-input>
         </div>
 
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Display Name</label>
-          <input type="text" id="contactDisplayName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Optional - defaults to First Last">
-        </div>
+        <lex-input id="contactDisplayName" label="Display Name" placeholder="Optional - defaults to First Last"></lex-input>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
-            <input type="text" id="contactCompanyName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Company name">
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Title/Position</label>
-            <input type="text" id="contactTitle" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g., Partner, CEO">
-          </div>
+          <lex-input id="contactCompanyName" label="Company Name" placeholder="Company name"></lex-input>
+          <lex-input id="contactTitle" label="Title/Position" placeholder="e.g., Partner, CEO"></lex-input>
         </div>
 
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-          <input type="email" id="contactEmail" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="email@example.com">
-        </div>
+        <lex-input id="contactEmail" label="Email" type="email" placeholder="email@example.com"></lex-input>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Mobile Phone</label>
-            <input type="tel" id="contactPhoneMobile" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="(555) 555-5555">
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Work Phone</label>
-            <input type="tel" id="contactPhoneWork" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="(555) 555-5555">
-          </div>
+          <lex-input id="contactPhoneMobile" label="Mobile Phone" type="tel" placeholder="(555) 555-5555"></lex-input>
+          <lex-input id="contactPhoneWork" label="Work Phone" type="tel" placeholder="(555) 555-5555"></lex-input>
         </div>
 
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Contact Type</label>
-          <select id="contactType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-            <option value="contact:participant">Participant</option>
-            <option value="contact:opportunity">Opportunity</option>
-            <option value="contact:lead">Lead</option>
-            <option value="contact:other">Other</option>
-          </select>
-        </div>
+        <lex-select id="contactType" label="Contact Type"
+          options='[{"value":"contact:participant","label":"Participant"},{"value":"contact:opportunity","label":"Opportunity"},{"value":"contact:lead","label":"Lead"},{"value":"contact:other","label":"Other"}]'>
+        </lex-select>
 
         <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
-          <button type="button" onclick="closeContactModal()" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors">
-            Cancel
-          </button>
-          <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors">
-            Save Contact
-          </button>
+          <lex-btn type="button" onclick="closeContactModal()" variant="secondary">Cancel</lex-btn>
+          <lex-btn type="submit" variant="primary">Save Contact</lex-btn>
         </div>
       </form>
-    </div>
-  </div>
+  </lex-modal>
 
   <!-- Contact Detail Modal -->
-  <div id="contactDetailModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between p-6 border-b border-gray-200">
-        <h2 class="text-xl font-semibold text-gray-900">Contact Details</h2>
-        <button onclick="closeContactDetailModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-        </button>
-      </div>
-      <div id="contactDetailContent" class="p-6">
-        <!-- Content populated by JS -->
-      </div>
+  <lex-modal id="contactDetailModal" heading="Contact Details" size="lg" hide-actions>
+    <div id="contactDetailContent" class="p-6">
+      <!-- Content populated by JS -->
     </div>
-  </div>
+  </lex-modal>
 
   <!-- Edit Contact Modal -->
-  <div id="editContactModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between p-6 border-b border-gray-200">
-        <h2 class="text-xl font-semibold text-gray-900">Edit Contact</h2>
-        <button onclick="closeEditContactModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-        </button>
-      </div>
+  <lex-modal id="editContactModal" heading="Edit Contact" size="lg" hide-actions>
       <form id="editContactForm" onsubmit="updateContact(event)" class="p-6 space-y-5">
         <input type="hidden" id="editContactId">
         <input type="hidden" id="editContactMatterId">
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">First Name <span class="text-red-500">*</span></label>
-            <input type="text" id="editContactFirstName" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Last Name <span class="text-red-500">*</span></label>
-            <input type="text" id="editContactLastName" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-          </div>
+          <lex-input id="editContactFirstName" label="First Name" required></lex-input>
+          <lex-input id="editContactLastName" label="Last Name" required></lex-input>
         </div>
 
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Display Name</label>
-          <input type="text" id="editContactDisplayName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Optional - defaults to First Last">
-        </div>
+        <lex-input id="editContactDisplayName" label="Display Name" placeholder="Optional - defaults to First Last"></lex-input>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
-            <input type="text" id="editContactCompanyName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Company name">
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Title/Position</label>
-            <input type="text" id="editContactTitle" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g., Partner, CEO">
-          </div>
+          <lex-input id="editContactCompanyName" label="Company Name" placeholder="Company name"></lex-input>
+          <lex-input id="editContactTitle" label="Title/Position" placeholder="e.g., Partner, CEO"></lex-input>
         </div>
 
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-          <input type="email" id="editContactEmail" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="email@example.com">
-        </div>
+        <lex-input id="editContactEmail" label="Email" type="email" placeholder="email@example.com"></lex-input>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Mobile Phone</label>
-            <input type="tel" id="editContactPhoneMobile" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="(555) 555-5555">
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Work Phone</label>
-            <input type="tel" id="editContactPhoneWork" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="(555) 555-5555">
-          </div>
+          <lex-input id="editContactPhoneMobile" label="Mobile Phone" type="tel" placeholder="(555) 555-5555"></lex-input>
+          <lex-input id="editContactPhoneWork" label="Work Phone" type="tel" placeholder="(555) 555-5555"></lex-input>
         </div>
 
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Contact Type</label>
-          <select id="editContactType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-            <option value="contact:participant">Participant</option>
-            <option value="contact:opportunity">Opportunity</option>
-            <option value="contact:lead">Lead</option>
-            <option value="contact:other">Other</option>
-          </select>
-        </div>
+        <lex-select id="editContactType" label="Contact Type"
+          options='[{"value":"contact:participant","label":"Participant"},{"value":"contact:opportunity","label":"Opportunity"},{"value":"contact:lead","label":"Lead"},{"value":"contact:other","label":"Other"}]'>
+        </lex-select>
 
         <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
-          <button type="button" onclick="closeEditContactModal()" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors">
-            Cancel
-          </button>
-          <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors">
-            Save Changes
-          </button>
+          <lex-btn type="button" onclick="closeEditContactModal()" variant="secondary">Cancel</lex-btn>
+          <lex-btn type="submit" variant="primary">Save Changes</lex-btn>
         </div>
       </form>
-    </div>
-  </div>
+  </lex-modal>
 
   <!-- Create Link Modal -->
-  <div id="createLinkModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl">
-      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-            <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
-            </svg>
-          </div>
-          <div>
-            <h3 class="text-lg font-semibold text-gray-900">Link Related Matter</h3>
-            <p class="text-sm text-gray-500">Connect this matter to another matter</p>
-          </div>
-        </div>
-        <button onclick="closeCreateLinkModal()" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
+  <lex-modal id="createLinkModal" heading="Link Related Matter" subtitle="Connect this matter to another matter" size="lg" hide-actions>
 
       <form onsubmit="createLink(event)" class="p-6 space-y-4">
         <input type="hidden" id="linkSourceMatterId" value="">
 
         <!-- Matter Search -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">
-            Search for Matter to Link
-          </label>
           <div class="relative">
-            <input
-              type="text"
+            <lex-input
               id="linkMatterSearch"
-              onfocus="showLinkMatterDropdown()"
-              oninput="searchMattersForLink(event)"
+              label="Search for Matter to Link"
+              type="search"
+              leading-icon="search"
               placeholder="Type matter name or ID to search..."
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              autocomplete="off"
-            >
+            ></lex-input>
             <div id="linkMatterSearchResults" class="hidden absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-96 overflow-y-auto">
               <!-- Search results populated dynamically -->
             </div>
@@ -766,12 +494,12 @@
         <!-- Selected Matter Display -->
         <div id="selectedLinkMatter" class="hidden">
           <label class="block text-sm font-medium text-gray-700 mb-2">Selected Matter</label>
-          <div class="flex items-center justify-between p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+          <div class="flex items-center justify-between p-3 lex-bg-accent-muted border lex-border rounded-lg">
             <div class="flex-1 min-w-0">
               <p id="selectedLinkMatterName" class="text-sm font-medium text-gray-900 truncate"></p>
               <p id="selectedLinkMatterId" class="text-xs text-gray-500 font-mono"></p>
             </div>
-            <button type="button" onclick="clearLinkMatterSelection()" class="ml-3 p-1 text-indigo-600 hover:text-indigo-800">
+            <button type="button" onclick="clearLinkMatterSelection()" class="ml-3 p-1 lex-text-accent hover:lex-text-accent">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
               </svg>
@@ -781,76 +509,55 @@
 
         <!-- Link Type -->
         <div id="linkTypeContainer">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Link Type</label>
-          <select id="linkType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-            <option value="related_to">Related To (bidirectional)</option>
-            <option value="parent_of">Parent Of (this matter is parent)</option>
-            <option value="child_of">Child Of (this matter is child)</option>
-          </select>
+          <lex-select id="linkType" label="Link Type"
+            options='[{"value":"related_to","label":"Related To (bidirectional)"},{"value":"parent_of","label":"Parent Of (this matter is parent)"},{"value":"child_of","label":"Child Of (this matter is child)"}]'>
+          </lex-select>
           <p class="mt-1 text-xs text-gray-500">
             Choose how these matters are related to each other
           </p>
         </div>
 
         <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
-          <button type="button" onclick="closeCreateLinkModal()" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors">
-            Cancel
-          </button>
-          <button type="submit" id="createLinkBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-            Create Link
-          </button>
+          <lex-btn type="button" onclick="closeCreateLinkModal()" variant="secondary">Cancel</lex-btn>
+          <lex-btn type="submit" id="createLinkBtn" variant="primary" disabled>Create Link</lex-btn>
         </div>
       </form>
-    </div>
-  </div>
+  </lex-modal>
 
   <!-- Document Viewer Modal -->
-  <div id="documentViewerModal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-7xl h-[90vh] flex flex-col">
-      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
-        <div class="flex items-center gap-3">
-          <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  <lex-modal id="documentViewerModal" heading="Document" size="full" hide-actions>
+    <div class="flex items-center gap-2 mb-4">
+      <p id="viewerFileInfo" class="text-sm text-gray-500 flex-1"></p>
+      <!-- Layout Toggle -->
+      <div class="metadata-layout-toggle">
+        <button id="layoutPreviewOnly" class="metadata-layout-toggle__button" title="Preview Only">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
           </svg>
-          <div>
-            <h3 id="viewerFileName" class="text-lg font-semibold text-gray-900">Document</h3>
-            <p id="viewerFileInfo" class="text-sm text-gray-500"></p>
-          </div>
-        </div>
-        <div class="flex items-center gap-2">
-          <!-- Layout Toggle -->
-          <div class="metadata-layout-toggle">
-            <button id="layoutPreviewOnly" class="metadata-layout-toggle__button" title="Preview Only">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-              </svg>
-            </button>
-            <button id="layoutSplit" class="metadata-layout-toggle__button active" title="Split View">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"></path>
-              </svg>
-            </button>
-            <button id="layoutMetadataOnly" class="metadata-layout-toggle__button" title="Metadata Only">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-            </button>
-          </div>
-          <a id="viewerDownloadBtn" href="#" class="px-4 py-2 text-indigo-600 hover:bg-indigo-50 rounded-lg font-medium flex items-center gap-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-            Download
-          </a>
-          <button id="closeDocumentViewer" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-          </button>
-        </div>
+        </button>
+        <button id="layoutSplit" class="metadata-layout-toggle__button active" title="Split View">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"></path>
+          </svg>
+        </button>
+        <button id="layoutMetadataOnly" class="metadata-layout-toggle__button" title="Metadata Only">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+        </button>
       </div>
+      <a id="viewerDownloadBtn" href="#" class="px-4 py-2 lex-text-accent hover:lex-bg-accent-muted rounded-lg font-medium flex items-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+        Download
+      </a>
+    </div>
+    <div class="flex flex-1 overflow-hidden">
       <div class="flex-1 flex overflow-hidden">
         <!-- Document Preview -->
         <div id="viewerContent" class="flex-1 overflow-auto bg-gray-100 p-4">
         <div id="viewerLoading" class="flex items-center justify-center h-full">
           <div class="text-center">
-            <div class="animate-spin w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto mb-4"></div>
+            <div class="animate-spin w-12 h-12 border-4 lex-border border-t-stone-600 rounded-full mx-auto mb-4"></div>
             <p class="text-gray-500">Loading document...</p>
           </div>
         </div>
@@ -860,7 +567,7 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
             </svg>
             <p id="viewerErrorMsg" class="text-gray-600 mb-4">Unable to preview this file</p>
-            <a id="viewerErrorDownload" href="#" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium inline-flex items-center gap-2">
+            <a id="viewerErrorDownload" href="#" class="px-4 py-2 lex-bg-accent hover:lex-bg-accent text-white rounded-lg font-medium inline-flex items-center gap-2">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
               Download Instead
             </a>
@@ -903,31 +610,11 @@
         <div id="viewerMetadataSidebar" class="w-96 border-l border-gray-200 bg-white flex-shrink-0 overflow-hidden">
           <!-- Metadata viewer component will be initialized here -->
         </div>
-      </div>
     </div>
-  </div>
+  </lex-modal>
 
   <!-- Document Metadata Modal -->
-  <div id="documentMetadataModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg">
-      <div class="px-6 py-4 border-b border-gray-200">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-              <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
-              </svg>
-            </div>
-            <div>
-              <h3 class="text-lg font-semibold text-gray-900">Document Details</h3>
-              <p class="text-sm text-gray-500">Add optional metadata to help organize and find this document</p>
-            </div>
-          </div>
-          <button id="closeMetadataModal" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-          </button>
-        </div>
-      </div>
+  <lex-modal id="documentMetadataModal" heading="Document Details" subtitle="Add optional metadata to help organize and find this document" size="md" hide-actions>
 
       <div class="p-6 space-y-4">
         <!-- File info -->
@@ -941,67 +628,33 @@
 
         <!-- Document Type -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Document Type</label>
-          <select id="metadataDocType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-            <option value="">Auto-detect (recommended)</option>
-            <option value="contract">Contract</option>
-            <option value="pleading">Pleading</option>
-            <option value="deposition">Deposition</option>
-            <option value="medical_record">Medical Record</option>
-            <option value="police_report">Police Report</option>
-            <option value="email">Email</option>
-            <option value="expert_report">Expert Report</option>
-            <option value="correspondence">Correspondence</option>
-            <option value="presentation">Presentation</option>
-            <option value="document">Other Document</option>
-          </select>
+          <lex-select id="metadataDocType" label="Document Type"
+            options='[{"value":"","label":"Auto-detect (recommended)"},{"value":"contract","label":"Contract"},{"value":"pleading","label":"Pleading"},{"value":"deposition","label":"Deposition"},{"value":"medical_record","label":"Medical Record"},{"value":"police_report","label":"Police Report"},{"value":"email","label":"Email"},{"value":"expert_report","label":"Expert Report"},{"value":"correspondence","label":"Correspondence"},{"value":"presentation","label":"Presentation"},{"value":"document","label":"Other Document"}]'>
+          </lex-select>
           <p class="text-xs text-gray-500 mt-1">Leave as "Auto-detect" to let AI classify the document</p>
         </div>
 
         <!-- Tags -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Tags</label>
-          <input type="text" id="metadataTags" maxlength="500" placeholder="e.g., important, confidential, draft" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+          <lex-input id="metadataTags" label="Tags" maxlength="500" placeholder="e.g., important, confidential, draft"></lex-input>
           <p class="text-xs text-gray-500 mt-1">Separate multiple tags with commas (max 10 tags, 500 chars total)</p>
         </div>
 
         <!-- Notes -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
-          <textarea id="metadataNotes" rows="3" maxlength="2000" placeholder="Add any notes about this document..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"></textarea>
-          <p class="text-xs text-gray-500 mt-1"><span id="notesCharCount">0</span>/2000 characters</p>
+          <lex-textarea id="metadataNotes" label="Notes" rows="3" maxlength="2000" show-count placeholder="Add any notes about this document..."></lex-textarea>
         </div>
       </div>
 
-      <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3 bg-gray-50 rounded-b-xl">
-        <button id="cancelMetadataUpload" class="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg font-medium transition-colors">
-          Cancel
-        </button>
-        <button id="confirmMetadataUpload" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-          </svg>
-          Upload Document
-        </button>
+      <div class="pt-4 border-t border-gray-200 flex items-center justify-end gap-3">
+        <lex-btn id="cancelMetadataUpload" variant="secondary">Cancel</lex-btn>
+        <lex-btn id="confirmMetadataUpload" variant="primary">Upload Document</lex-btn>
       </div>
-    </div>
-  </div>
+  </lex-modal>
 
   <!-- Matters Info Modal -->
-  <div id="mattersInfoModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) closeMattersInfoModal()">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
-      <!-- Modal Header -->
-      <div class="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white rounded-t-xl z-10">
-        <h2 class="text-2xl font-bold text-gray-900">What Are Matters?</h2>
-        <button onclick="closeMattersInfoModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-
-      <!-- Modal Body -->
-      <div class="p-6 space-y-6">
+  <lex-modal id="mattersInfoModal" heading="What Are Matters?" size="lg" hide-actions close-on-overlay>
+    <div class="p-6 space-y-6">
         <!-- Introduction -->
         <div>
           <p class="text-gray-700 text-lg leading-relaxed">
@@ -1013,10 +666,10 @@
         <div>
           <h3 class="text-lg font-semibold text-gray-900 mb-4">Why Use Matters?</h3>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="p-4 bg-indigo-50 rounded-lg border-2 border-indigo-200">
+            <div class="p-4 lex-bg-accent-muted rounded-lg border-2 lex-border">
               <div class="flex items-start gap-3">
-                <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="w-10 h-10 lex-bg-accent-soft rounded-lg flex items-center justify-center flex-shrink-0">
+                  <svg class="w-6 h-6 lex-text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
                   </svg>
                 </div>
@@ -1041,10 +694,10 @@
               </div>
             </div>
 
-            <div class="p-4 bg-purple-50 rounded-lg border-2 border-purple-200">
+            <div class="p-4 lex-bg-accent-muted rounded-lg border-2 lex-border-accent">
               <div class="flex items-start gap-3">
-                <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="w-10 h-10 lex-bg-accent-soft rounded-lg flex items-center justify-center flex-shrink-0">
+                  <svg class="w-6 h-6 lex-text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
                   </svg>
                 </div>
@@ -1076,7 +729,7 @@
           <h3 class="text-lg font-semibold text-gray-900 mb-4">How Matters Work</h3>
           <div class="space-y-4">
             <div class="flex items-start gap-4">
-              <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0 text-indigo-600 font-bold">1</div>
+              <div class="w-8 h-8 lex-bg-accent-soft rounded-full flex items-center justify-center flex-shrink-0 lex-text-accent font-bold">1</div>
               <div>
                 <h4 class="font-medium text-gray-900 mb-1">Create a Matter</h4>
                 <p class="text-sm text-gray-600">Start a new matter for each case, project, or client. Give it a descriptive name and optional details like matter ID, client name, and description.</p>
@@ -1084,7 +737,7 @@
             </div>
 
             <div class="flex items-start gap-4">
-              <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0 text-indigo-600 font-bold">2</div>
+              <div class="w-8 h-8 lex-bg-accent-soft rounded-full flex items-center justify-center flex-shrink-0 lex-text-accent font-bold">2</div>
               <div>
                 <h4 class="font-medium text-gray-900 mb-1">Upload Documents</h4>
                 <p class="text-sm text-gray-600">Add all relevant files to the matter's document library. Lana AI processes and indexes them for intelligent search and retrieval.</p>
@@ -1092,7 +745,7 @@
             </div>
 
             <div class="flex items-start gap-4">
-              <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0 text-indigo-600 font-bold">3</div>
+              <div class="w-8 h-8 lex-bg-accent-soft rounded-full flex items-center justify-center flex-shrink-0 lex-text-accent font-bold">3</div>
               <div>
                 <h4 class="font-medium text-gray-900 mb-1">Start Conversations</h4>
                 <p class="text-sm text-gray-600">Chat with Lana AI in the context of the matter. The AI has access to all matter documents and previous conversations for informed responses.</p>
@@ -1100,7 +753,7 @@
             </div>
 
             <div class="flex items-start gap-4">
-              <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0 text-indigo-600 font-bold">4</div>
+              <div class="w-8 h-8 lex-bg-accent-soft rounded-full flex items-center justify-center flex-shrink-0 lex-text-accent font-bold">4</div>
               <div>
                 <h4 class="font-medium text-gray-900 mb-1">Manage & Organize</h4>
                 <p class="text-sm text-gray-600">Track matter status (active, closed, archived), search across all content, and manage team access as your work progresses.</p>
@@ -1139,8 +792,8 @@
           <h3 class="text-lg font-semibold text-gray-900 mb-4">Example Use Cases</h3>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div class="w-10 h-10 lex-bg-accent-soft rounded-lg flex items-center justify-center mx-auto mb-3">
+                <svg class="w-6 h-6 lex-text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"></path>
                 </svg>
               </div>
@@ -1169,230 +822,31 @@
         </div>
       </div>
 
-      <!-- Modal Footer -->
-      <div class="p-6 border-t border-gray-200 bg-gray-50 rounded-b-xl">
-        <button onclick="closeMattersInfoModal()" class="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium">
-          Get Started with Matters
-        </button>
-      </div>
     </div>
-  </div>
-
-  <!-- Conversation Actions Modal -->
-  <div id="conversationActionsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 9999;" onclick="if(event.target === this) closeConversationActionsModal()">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md" onclick="event.stopPropagation()">
-      <!-- Modal Header -->
-      <div class="flex items-center justify-between p-6 border-b border-gray-200">
-        <h2 class="text-xl font-semibold text-gray-900">Conversation Options</h2>
-        <button onclick="closeConversationActionsModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-
-      <!-- Modal Body -->
-      <div class="p-6">
-        <div class="mb-4 p-4 bg-gray-50 rounded-lg">
-          <p class="text-sm font-medium text-gray-700 mb-1">Current Name:</p>
-          <p id="modalConversationTitle" class="text-base text-gray-900"></p>
-        </div>
-
-        <div class="space-y-3">
-          <!-- Rename Button -->
-          <button onclick="editConversationFromModal()" class="w-full flex items-center gap-3 px-4 py-3 bg-white border-2 border-gray-200 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-all group">
-            <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
-              <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-              </svg>
-            </div>
-            <div class="flex-1 text-left">
-              <p class="font-medium text-gray-900 group-hover:text-indigo-600 transition-colors">Rename Conversation</p>
-              <p class="text-sm text-gray-500">Change the conversation title</p>
-            </div>
-          </button>
-
-          <!-- View Matter Details Button (only shown if conversation has a matter) -->
-          <button id="viewMatterDetailsBtn" onclick="viewMatterDetailsFromModal()" class="w-full hidden flex items-center gap-3 px-4 py-3 bg-white border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all group">
-            <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-              <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-              </svg>
-            </div>
-            <div class="flex-1 text-left">
-              <p class="font-medium text-gray-900 group-hover:text-blue-600 transition-colors">View Matter Details</p>
-              <p class="text-sm text-gray-500">Open the full matter information</p>
-            </div>
-          </button>
-
-          <!-- Delete Button -->
-          <button onclick="deleteConversationFromModal()" class="w-full flex items-center gap-3 px-4 py-3 bg-white border-2 border-gray-200 rounded-lg hover:border-red-500 hover:bg-red-50 transition-all group">
-            <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center group-hover:bg-red-200 transition-colors">
-              <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-              </svg>
-            </div>
-            <div class="flex-1 text-left">
-              <p class="font-medium text-gray-900 group-hover:text-red-600 transition-colors">Delete Conversation</p>
-              <p class="text-sm text-gray-500">Permanently remove this conversation</p>
-            </div>
-          </button>
-        </div>
-      </div>
+    <div class="pt-4 border-t border-gray-200">
+      <lex-btn onclick="closeMattersInfoModal()" variant="primary" class="w-full">Get Started with Matters</lex-btn>
     </div>
-  </div>
+  </lex-modal>
 
-  <!-- Rename Conversation Modal -->
-  <div id="renameConversationModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 10000;" onclick="if(event.target === this) closeRenameModal()">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md" onclick="event.stopPropagation()">
-      <!-- Modal Header -->
-      <div class="flex items-center justify-between p-6 border-b border-gray-200">
-        <h2 class="text-xl font-semibold text-gray-900">Rename Conversation</h2>
-        <button onclick="closeRenameModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-
-      <!-- Modal Body -->
-      <div class="p-6">
-        <div class="mb-4">
-          <label for="renameInput" class="block text-sm font-medium text-gray-700 mb-2">New conversation name</label>
-          <input
-            type="text"
-            id="renameInput"
-            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
-            placeholder="Enter new name..."
-            onkeypress="if(event.key === 'Enter') confirmRename()"
-          />
-        </div>
-        <div class="flex gap-3">
-          <button onclick="closeRenameModal()" class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-            Cancel
-          </button>
-          <button onclick="confirmRename()" class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
-            Rename
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-
-  <!-- Delete Confirmation Modal -->
-  <div id="deleteConfirmModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 10001;" onclick="if(event.target === this) closeDeleteConfirmModal()">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md" onclick="event.stopPropagation()">
-      <!-- Modal Header -->
-      <div class="flex items-center justify-between p-6 border-b border-gray-200">
-        <div class="flex items-center gap-3">
-          <div class="flex-shrink-0 w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-            <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-            </svg>
-          </div>
-          <h2 id="deleteConfirmTitle" class="text-xl font-semibold text-gray-900">Delete Conversation?</h2>
-        </div>
-        <button onclick="closeDeleteConfirmModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-
-      <!-- Modal Body -->
-      <div class="p-6">
-        <p id="deleteConfirmMessage" class="text-gray-600 leading-relaxed"></p>
-      </div>
-
-      <!-- Modal Footer -->
-      <div class="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
-        <button onclick="closeDeleteConfirmModal()" class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-          Cancel
-        </button>
-        <button onclick="confirmDeleteConversation()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-          </svg>
-          Delete
-        </button>
-      </div>
-    </div>
-  </div>
+  <!-- Conversation actions/rename/delete modals are handled globally by
+       ConversationActionsModal in components.js — no page-specific modals needed. -->
 
   <!-- Unlink Confirmation Modal -->
-  <div id="unlinkConfirmModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 10001;" onclick="if(event.target === this) closeUnlinkConfirmModal()">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md" onclick="event.stopPropagation()">
-      <!-- Modal Header -->
-      <div class="flex items-center justify-between p-6 border-b border-gray-200">
-        <div class="flex items-center gap-3">
-          <div class="flex-shrink-0 w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-            <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
-            </svg>
-          </div>
-          <h2 class="text-xl font-semibold text-gray-900">Remove Link</h2>
-        </div>
-        <button onclick="closeUnlinkConfirmModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-
-      <!-- Modal Body -->
-      <div class="p-6">
-        <p class="text-gray-900 font-medium mb-2">Are you sure you want to remove the link to <span id="unlinkMatterName" class="text-indigo-600"></span>?</p>
-        <p class="text-sm text-gray-500">This action cannot be undone.</p>
-      </div>
-
-      <!-- Modal Footer -->
-      <div class="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
-        <button onclick="closeUnlinkConfirmModal()" class="px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-          Cancel
-        </button>
-        <button id="confirmUnlinkButton" class="px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
-          </svg>
-          Remove Link
-        </button>
-      </div>
+  <lex-modal id="unlinkConfirmModal" heading="Remove Link" size="sm" variant="danger" confirm-text="Remove Link" cancel-text="Cancel" close-on-overlay>
+    <div class="p-2">
+      <p class="text-gray-900 font-medium mb-2">Are you sure you want to remove the link to <span id="unlinkMatterName" class="lex-text-accent"></span>?</p>
+      <p class="text-sm text-gray-500">This action cannot be undone.</p>
     </div>
-  </div>
+  </lex-modal>
 
   <!-- Manage Share Modal -->
-  <div id="manageShareModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 10001;" onclick="if(event.target === this) closeManageShareModal()">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg">
-      <!-- Modal Header -->
-      <div class="flex items-center justify-between p-6 border-b border-gray-200">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-            <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path>
-            </svg>
-          </div>
-          <div>
-            <h3 class="text-xl font-semibold text-gray-900">Manage Sharing</h3>
-            <p class="text-sm text-gray-500 mt-0.5">Control matter visibility and access</p>
-          </div>
-        </div>
-        <button onclick="closeManageShareModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-
-      <!-- Modal Body -->
-      <div class="p-6 space-y-6">
+  <lex-modal id="manageShareModal" heading="Manage Sharing" subtitle="Control matter visibility and access" size="md" hide-actions close-on-overlay>
+    <div class="p-6 space-y-6">
         <!-- Visibility Setting -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Visibility</label>
-          <select id="modalMatterVisibility" class="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-            <option value="private">Private - Only shared users can access</option>
-            <option value="organization">Organization - All members can access</option>
-          </select>
+          <lex-select id="modalMatterVisibility" label="Visibility"
+            options='[{"value":"private","label":"Private - Only shared users can access"},{"value":"organization","label":"Organization - All members can access"}]'>
+          </lex-select>
           <p class="text-xs text-gray-500 mt-2">Organization visibility allows all team members to view this matter</p>
         </div>
 
@@ -1402,15 +856,12 @@
 
           <!-- Search Input -->
           <div class="relative mb-3">
-            <input
-              type="text"
+            <lex-input
               id="modalShareSearch"
+              type="search"
+              leading-icon="search"
               placeholder="Search users by name or email..."
-              class="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            />
-            <svg class="absolute left-3 top-2.5 h-5 w-5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-            </svg>
+            ></lex-input>
           </div>
 
           <!-- User List -->
@@ -1424,71 +875,30 @@
         </div>
       </div>
 
-      <!-- Modal Footer -->
-      <div class="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50 rounded-b-xl">
-        <button onclick="closeManageShareModal()" class="px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-          Cancel
-        </button>
-        <button id="saveShareButton" onclick="saveShareSettings()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-          </svg>
-          Save Changes
-        </button>
-      </div>
     </div>
-  </div>
+    <div class="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+      <lex-btn onclick="closeManageShareModal()" variant="secondary">Cancel</lex-btn>
+      <lex-btn id="saveShareButton" onclick="saveShareSettings()" variant="primary">Save Changes</lex-btn>
+    </div>
+  </lex-modal>
 
   <!-- Manual Connect Data Modal -->
-  <div id="manualConnectModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 10001;">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
-      <!-- Modal Header -->
-      <div class="flex items-center justify-between p-6 border-b border-gray-200">
-        <div class="flex items-center gap-3">
-          <div class="flex-shrink-0 w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-            <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
-            </svg>
-          </div>
-          <div>
-            <h2 class="text-xl font-semibold text-gray-900">Link Data to Matter</h2>
-            <p class="text-sm text-gray-500">Search and select connector data to link</p>
-          </div>
-        </div>
-        <button onclick="closeManualConnectModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-
+  <lex-modal id="manualConnectModal" heading="Link Data to Matter" subtitle="Search and select connector data to link" size="xl" hide-actions>
+    <div class="space-y-4">
       <!-- Search Bar -->
-      <div class="p-6 border-b border-gray-200">
-        <div class="relative">
-          <input type="text" id="manualConnectSearch" placeholder="Search by ID, name, or content..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-          <svg class="absolute left-3 top-2.5 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-          </svg>
-        </div>
+      <div class="pb-4 border-b border-gray-200">
+        <lex-input id="manualConnectSearch" placeholder="Search by ID, name, or content..." leading-icon="search"></lex-input>
         <div class="mt-3 flex gap-2">
-          <select id="manualConnectEntityType" class="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500">
-            <option value="">All Types</option>
-            <option value="matter">Matters</option>
-            <option value="contact">Contacts</option>
-            <option value="document">Documents</option>
-            <option value="task">Tasks</option>
-            <option value="time_entry">Time Entries</option>
-            <option value="expense">Expenses</option>
-            <option value="invoice">Invoices</option>
-          </select>
-          <select id="manualConnectConnector" class="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500">
-            <option value="">All Connectors</option>
-          </select>
+          <lex-select id="manualConnectEntityType" size="sm" placeholder="All Types"
+            options='[{"value":"","label":"All Types"},{"value":"matter","label":"Matters"},{"value":"contact","label":"Contacts"},{"value":"document","label":"Documents"},{"value":"task","label":"Tasks"},{"value":"time_entry","label":"Time Entries"},{"value":"expense","label":"Expenses"},{"value":"invoice","label":"Invoices"}]'>
+          </lex-select>
+          <lex-select id="manualConnectConnector" size="sm" placeholder="All Connectors"
+            options='[{"value":"","label":"All Connectors"}]'>
+          </lex-select>
         </div>
       </div>
-
       <!-- Results Area -->
-      <div id="manualConnectResults" class="flex-1 overflow-y-auto p-6">
+      <div id="manualConnectResults" class="min-h-48">
         <div class="text-center py-8 text-gray-500">
           <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
@@ -1496,15 +906,12 @@
           <p class="mt-2">Start typing to search for data to link</p>
         </div>
       </div>
-
       <!-- Footer -->
-      <div class="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
-        <button onclick="closeManualConnectModal()" class="px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-          Cancel
-        </button>
+      <div class="flex justify-end pt-4 border-t border-gray-200">
+        <lex-btn onclick="closeManualConnectModal()" variant="secondary">Cancel</lex-btn>
       </div>
     </div>
-  </div>
+  </lex-modal>
 
   <!-- Edit Custom Fields Modal -->
   <div id="editCustomFieldsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 10001;">
@@ -1512,8 +919,8 @@
       <!-- Modal Header -->
       <div class="flex items-center justify-between p-6 border-b border-gray-200">
         <div class="flex items-center gap-3">
-          <div class="flex-shrink-0 w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-            <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div class="flex-shrink-0 w-10 h-10 lex-bg-accent-soft rounded-lg flex items-center justify-center">
+            <svg class="w-6 h-6 lex-text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
             </svg>
           </div>
@@ -1536,7 +943,7 @@
         <!-- Add Field Button -->
         <button
           onclick="addCustomField()"
-          class="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed border-gray-300 rounded-lg text-sm font-medium text-gray-600 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+          class="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed border-gray-300 rounded-lg text-sm font-medium text-gray-600 hover:lex-border-accent hover:lex-text-accent hover:lex-bg-accent-muted transition-colors"
         >
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
@@ -1555,7 +962,7 @@
         </button>
         <button
           onclick="saveCustomFields()"
-          class="px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+          class="px-5 py-2.5 text-sm font-medium text-white lex-bg-accent rounded-lg hover:lex-bg-accent focus:outline-none focus:ring-2 focus:ring-offset-2 lex-ring-focus transition-colors"
         >
           Save Changes
         </button>
@@ -1568,8 +975,8 @@
     <!-- Modal Header -->
     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white shadow-sm">
       <div class="flex items-center gap-3">
-        <div class="flex-shrink-0 w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-          <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="flex-shrink-0 w-10 h-10 lex-bg-accent-soft rounded-lg flex items-center justify-center">
+          <svg class="w-6 h-6 lex-text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
           </svg>
         </div>
@@ -1595,7 +1002,7 @@
             <!-- Skill Header -->
             <div class="mb-6 bg-white rounded-lg p-5 border border-gray-200 shadow-sm">
               <div class="flex items-start gap-4">
-                <div class="flex-shrink-0 w-12 h-12 rounded-lg bg-purple-600 flex items-center justify-center">
+                <div class="flex-shrink-0 w-12 h-12 rounded-lg lex-bg-accent flex items-center justify-center">
                   <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                   </svg>
@@ -1603,9 +1010,9 @@
                 <div class="flex-1">
                   <label class="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Skill Intent</label>
                   <input type="text" id="skill_name" placeholder="e.g., Auto-triage new litigation documents"
-                         class="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors font-medium">
+                         class="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg lex-ring-focus transition-colors font-medium">
                   <textarea id="skill_description" rows="2" placeholder="Describe the business outcome this skill achieves..."
-                         class="w-full mt-3 px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors text-sm resize-none"></textarea>
+                         class="w-full mt-3 px-4 py-2.5 bg-white border border-gray-300 rounded-lg lex-ring-focus transition-colors text-sm resize-none"></textarea>
                 </div>
               </div>
             </div>
@@ -1613,15 +1020,15 @@
             <!-- Step Sequence Container -->
             <div id="workflow-steps-container" class="relative space-y-4">
               <!-- Connector Rail (Visual Flow Line) -->
-              <div class="absolute left-6 top-0 bottom-0 w-0.5 bg-purple-300"></div>
+              <div class="absolute left-6 top-0 bottom-0 w-0.5 lex-bg-accent-soft"></div>
 
               <!-- Steps will be added here dynamically -->
             </div>
 
             <!-- Add Step Button -->
             <button type="button" onclick="addWorkflowStep()"
-                    class="w-full mt-6 ml-14 px-6 py-3 bg-white border-2 border-dashed border-gray-300 rounded-lg text-gray-700 hover:border-purple-400 hover:bg-purple-50 hover:text-purple-700 transition-colors flex items-center justify-center gap-2 group">
-              <div class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
+                    class="w-full mt-6 ml-14 px-6 py-3 bg-white border-2 border-dashed border-gray-300 rounded-lg text-gray-700 hover:lex-border-accent hover:lex-bg-accent-soft hover:lex-text-accent transition-colors flex items-center justify-center gap-2 group">
+              <div class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center group-hover:lex-bg-accent-soft transition-colors">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                 </svg>
@@ -1669,7 +1076,7 @@
                 <div class="bg-white rounded-lg p-3 border border-gray-200">
                   <div class="flex items-center justify-between mb-1">
                     <span class="text-xs text-gray-700 font-medium">Step Health</span>
-                    <span class="text-sm font-bold text-purple-600 font-mono" id="mx-step-count">0 steps</span>
+                    <span class="text-sm font-bold lex-text-accent font-mono" id="mx-step-count">0 steps</span>
                   </div>
                   <div class="flex gap-1 mt-2">
                     <div class="flex-1 text-center">
@@ -1754,20 +1161,20 @@
                 </div>
 
                 <!-- Integration Step -->
-                <div class="bg-purple-50 border border-purple-200 rounded-lg p-4 hover:border-purple-300 hover:bg-purple-100 transition-all cursor-pointer">
+                <div class="lex-bg-accent-muted border lex-border rounded-lg p-4 hover:lex-border-accent hover:lex-bg-accent-soft transition-all cursor-pointer">
                   <div class="flex items-center gap-3 mb-2">
-                    <div class="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
-                      <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="w-8 h-8 rounded-lg lex-bg-accent-soft flex items-center justify-center">
+                      <svg class="w-4 h-4 lex-text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
                       </svg>
                     </div>
-                    <span class="text-sm font-bold text-purple-900">Integration</span>
-                    <code class="ml-auto text-xs font-mono text-purple-700 bg-purple-100 px-2 py-0.5 rounded">ext.*</code>
+                    <span class="text-sm font-bold lex-text-primary">Integration</span>
+                    <code class="ml-auto text-xs font-mono lex-text-accent lex-bg-accent-soft px-2 py-0.5 rounded">ext.*</code>
                   </div>
-                  <p class="text-xs text-purple-800 leading-relaxed">Connects to external systems</p>
+                  <p class="text-xs lex-text-accent leading-relaxed">Connects to external systems</p>
                   <div class="mt-2 flex flex-wrap gap-1">
-                    <span class="text-xs font-mono text-purple-700 bg-purple-100 px-2 py-0.5 rounded">email</span>
-                    <span class="text-xs font-mono text-purple-700 bg-purple-100 px-2 py-0.5 rounded">crm</span>
+                    <span class="text-xs font-mono lex-text-accent lex-bg-accent-soft px-2 py-0.5 rounded">email</span>
+                    <span class="text-xs font-mono lex-text-accent lex-bg-accent-soft px-2 py-0.5 rounded">crm</span>
                   </div>
                 </div>
 
@@ -1800,10 +1207,10 @@
                 Smart Variables
               </h4>
               <div class="space-y-2">
-                <code class="block bg-white text-purple-700 px-3 py-2 rounded-lg text-xs font-mono border border-gray-200">{{trigger.data}}</code>
-                <code class="block bg-white text-purple-700 px-3 py-2 rounded-lg text-xs font-mono border border-gray-200">{{step_1.output}}</code>
-                <code class="block bg-white text-purple-700 px-3 py-2 rounded-lg text-xs font-mono border border-gray-200">{{matter.name}}</code>
-                <code class="block bg-white text-purple-700 px-3 py-2 rounded-lg text-xs font-mono border border-gray-200">{{user.email}}</code>
+                <code class="block bg-white lex-text-accent px-3 py-2 rounded-lg text-xs font-mono border border-gray-200">{{trigger.data}}</code>
+                <code class="block bg-white lex-text-accent px-3 py-2 rounded-lg text-xs font-mono border border-gray-200">{{step_1.output}}</code>
+                <code class="block bg-white lex-text-accent px-3 py-2 rounded-lg text-xs font-mono border border-gray-200">{{matter.name}}</code>
+                <code class="block bg-white lex-text-accent px-3 py-2 rounded-lg text-xs font-mono border border-gray-200">{{user.email}}</code>
               </div>
               <p class="text-xs text-gray-600 mt-3">Reference data from previous steps in your workflow</p>
             </div>
@@ -1843,7 +1250,7 @@
               <button onclick="deleteSelectedNode()" class="flex-1 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100">
                 Delete Node
               </button>
-              <button onclick="saveNodeConfig()" class="flex-1 px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700">
+              <button onclick="saveNodeConfig()" class="flex-1 px-4 py-2 text-sm font-medium text-white lex-bg-accent rounded-lg hover:lex-bg-accent-hover">
                 Save
               </button>
             </div>
@@ -1863,7 +1270,7 @@
           Cancel
         </button>
         <button onclick="saveSkill()"
-                class="px-5 py-2.5 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2">
+                class="px-5 py-2.5 text-sm font-medium text-white lex-bg-accent rounded-lg hover:lex-bg-accent-hover transition-colors flex items-center gap-2">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
           </svg>
@@ -1879,8 +1286,8 @@
       <!-- Modal Header -->
       <div class="flex items-center justify-between p-6 border-b border-gray-200">
         <div class="flex items-center gap-3">
-          <div class="flex-shrink-0 w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-            <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div class="flex-shrink-0 w-10 h-10 lex-bg-accent-soft rounded-lg flex items-center justify-center">
+            <svg class="w-6 h-6 lex-text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
             </svg>
           </div>
@@ -1900,7 +1307,7 @@
       <div class="flex-1 overflow-y-auto p-6">
 
         <!-- File Drop Zone -->
-        <div id="skill-drop-zone" class="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center hover:border-purple-400 transition-colors cursor-pointer">
+        <div id="skill-drop-zone" class="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center hover:lex-border-accent transition-colors cursor-pointer">
           <input type="file" id="skill-file-input" accept=".json" class="hidden">
 
           <div id="skill-upload-prompt">
@@ -1910,7 +1317,7 @@
             <p class="text-gray-600 mb-2">Drag and drop a skill JSON file here</p>
             <p class="text-sm text-gray-500 mb-4">or</p>
             <button type="button" onclick="document.getElementById('skill-file-input').click()"
-                    class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
+                    class="px-4 py-2 lex-bg-accent text-white rounded-lg hover:lex-bg-accent-hover transition-colors">
               Browse Files
             </button>
           </div>
@@ -1960,7 +1367,7 @@
           Cancel
         </button>
         <button id="import-skill-btn" onclick="submitImportSkill()" disabled
-                class="px-5 py-2.5 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                class="px-5 py-2.5 text-sm font-medium text-white lex-bg-accent rounded-lg hover:lex-bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
           </svg>

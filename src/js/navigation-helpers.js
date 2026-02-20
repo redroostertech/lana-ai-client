@@ -44,11 +44,11 @@ const NavigationHelpers = {
   },
 
   /**
-   * Resolve path to chat.html from current location.
-   * @returns {string} Resolved path to chat.html
+   * Resolve path to chat_v2.html from current location.
+   * @returns {string} Resolved path to chat_v2.html
    */
   resolveChatPath() {
-    return this.resolvePath('chat.html');
+    return this.resolvePath('chat_v2.html');
   },
 
   /**
@@ -56,7 +56,7 @@ const NavigationHelpers = {
    * @returns {boolean} True if on chat.html
    */
   isOnChatPage() {
-    return window.location.pathname.endsWith('chat.html');
+    return window.location.pathname.endsWith('chat.html') || window.location.pathname.endsWith('chat_v2.html');
   },
 
   /**
@@ -71,7 +71,7 @@ const NavigationHelpers = {
     if (matterId) params.matter = matterId;
 
     if (window.Lex && window.Lex.Nav) {
-      window.Lex.Nav.go('chat.html', { params: params });
+      window.Lex.Nav.go('chat_v2.html', { params: params });
       return;
     }
 
@@ -88,7 +88,7 @@ const NavigationHelpers = {
    */
   navigateToNewProject() {
     if (window.Lex && window.Lex.Nav) {
-      window.Lex.Nav.go('chat.html', { params: { openModal: 'newProject' } });
+      window.Lex.Nav.go('chat_v2.html', { params: { openModal: 'newProject' } });
       return;
     }
 
@@ -102,7 +102,7 @@ const NavigationHelpers = {
    */
   navigateToMatterChat(matterId) {
     if (window.Lex && window.Lex.Nav) {
-      window.Lex.Nav.go('chat.html', { params: { matter: matterId } });
+      window.Lex.Nav.go('chat_v2.html', { params: { matter: matterId } });
       return;
     }
 

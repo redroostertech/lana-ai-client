@@ -2521,5 +2521,6 @@ class ApiError extends Error {
   }
 }
 
-// Global instance
+// Global instance — also exposed on window so IIFEs (Lex components) can access it
 const api = new ApiClient();
+window.api = api;

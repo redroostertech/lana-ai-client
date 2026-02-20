@@ -59,6 +59,7 @@
         'js/lex/components/foundation/lex-drawer.js',
         'js/lex/components/foundation/lex-card.js',
         'js/lex/components/foundation/lex-divider.js',
+        'js/lex/components/foundation/lex-detail-panel.js',
         'js/lex/components/form/lex-select.js',
         'js/utils/event-display-names.js',
         'js/services/feature-tracker.js',
@@ -102,6 +103,21 @@
       title: 'Workspaces',
       activeNav: 'workspaces',
       scripts: [
+        // Lex components not globally loaded
+        'js/lex/components/foundation/lex-banner.js',
+        'js/lex/components/foundation/lex-metric.js',
+        'js/lex/components/foundation/lex-detail-panel.js',
+        'js/lex/components/foundation/lex-badge.js',
+        'js/lex/components/foundation/lex-modal.js',
+        'js/lex/components/foundation/lex-drawer.js',
+        'js/lex/components/foundation/lex-card.js',
+        'js/lex/components/foundation/lex-tabs.js',
+        'js/lex/components/foundation/lex-accordion.js',
+        'js/lex/components/form/lex-input.js',
+        'js/lex/components/form/lex-select.js',
+        'js/lex/components/form/lex-checkbox.js',
+        'js/lex/components/form/lex-textarea.js',
+        // Page dependencies
         'js/services/feature-tracker.js',
         'js/vendor/mammoth.min.js',
         'js/conflict-detection.js',
@@ -151,6 +167,14 @@
       title: 'My Drive',
       activeNav: 'storage',
       scripts: [
+        // Lex components not globally loaded
+        'js/lex/components/foundation/lex-banner.js',
+        'js/lex/components/foundation/lex-modal.js',
+        'js/lex/components/form/lex-input.js',
+        'js/lex/components/form/lex-select.js',
+        'js/lex/components/form/lex-checkbox.js',
+        'js/lex/components/form/lex-textarea.js',
+        // Page dependencies
         'js/vendor/mammoth.min.js',
         'js/utils/metadata-formatter.js',
         'js/services/metadata-service.js',
@@ -206,6 +230,7 @@
       title: 'Search Conversations',
       activeNav: 'search',
       scripts: [
+        'js/lex/components/foundation/lex-banner.js',
         'js/lex/components/foundation/lex-card.js',
         'js/lex/components/form/lex-input.js',
         'js/search-conversations.js'
@@ -402,10 +427,10 @@
         'js/vendor/jspdf.plugin.autotable.min.js',
         'js/vendor/marked.min.js',
         'js/drilldown-renderer.js',
-        'raw-data-viewer.js'
+        'insights/raw-data-viewer.js'
       ],
       stylesheets: [
-        'raw-data-viewer.css'
+        'insights/raw-data-viewer.css'
       ]
     },
 
@@ -434,6 +459,12 @@
       title: 'Data Connectors',
       activeNav: 'connectors',
       scripts: [
+        'js/lex/components/foundation/lex-badge.js',
+        'js/lex/components/foundation/lex-btn.js',
+        'js/lex/components/foundation/lex-modal.js',
+        'js/lex/components/foundation/lex-banner.js',
+        'js/lex/components/form/lex-input.js',
+        'js/lex/components/form/lex-select.js',
         'js/connectors.js',
         'js/data_connectors.js'
       ],
@@ -635,6 +666,39 @@
         'js/chat.js'
       ],
       stylesheets: []
+    },
+
+    'chat_v2.html': {
+      title: 'New Conversation',
+      activeNav: 'chat',
+      scripts: [
+        // Foundation components NOT in shell
+        'js/lex/components/foundation/lex-text.js',
+        'js/lex/components/foundation/lex-action-card.js',
+        'js/lex/components/foundation/lex-badge.js',
+        'js/lex/components/foundation/lex-divider.js',
+        // Form components NOT in shell
+        'js/lex/components/form/lex-input.js',
+        'js/lex/components/form/lex-mention-input.js',
+        // Chat component chain (dependency order)
+        'js/lex/chat/lex-chat.format.js',
+        'js/lex/chat/lex-chat.source.js',
+        'js/lex/chat/lex-chat.source-llama.js',
+        'js/lex/chat/lex-chat.message.js',
+        'js/lex/chat/lex-chat.activity.js',
+        'js/lex/chat/lex-chat.documents.js',
+        'js/lex/chat/lex-chat.composer.js',
+        'js/lex/chat/lex-chat.thread.js',
+        'js/lex/chat/lex-chat.js',
+        'js/lex/chat/lex-chat.index.js',
+        // Demo responses for demo mode
+        'js/chat-demo-responses.js',
+        // Page controller (MUST be last)
+        'js/chat_v2.js'
+      ],
+      stylesheets: [
+        'css/chat-v2.css'
+      ]
     },
 
     // ── Lex UI demo pages ──

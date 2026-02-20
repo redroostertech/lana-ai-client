@@ -31,6 +31,9 @@
   var isAdmin        = Lex.Auth.isAdmin;
   var canViewStatus  = Lex.Auth.canViewSystemStatus;
 
+  /** Which detail panel is currently expanded: 'team' | 'docs' | 'storage' | null */
+  var activeDetailKey = null;
+
   // =========================================================================
   // Helpers
   // =========================================================================
@@ -269,12 +272,17 @@
     var usersCount   = '-';
 
     // Parallel fetch — graceful degradation
+    // Storage Used comes from /admin/health/storage (system storage, same as
+    // old index.html). Document counts come from /storage/stats.
     var results = await Promise.allSettled([
       orgId && canViewStatus()
         ? api.getOrganizationStats(orgId)
         : api.getMatters(1, 1),
       canViewStatus()
         ? api.get('/api/v1/storage/stats')
+        : Promise.resolve(null),
+      canViewStatus()
+        ? api.get('/api/v1/admin/health/storage')
         : Promise.resolve(null)
     ]);
 
@@ -297,14 +305,20 @@
       }
     }
 
-    // Storage result
+    // Document counts from /storage/stats
     if (results[1].status === 'fulfilled' && results[1].value) {
       storageStats = results[1].value;
       var totalFiles   = parseInt(storageStats.total_files   || 0, 10);
       var deletedFiles = parseInt(storageStats.deleted_files || 0, 10);
       docsCount = (totalFiles + deletedFiles).toLocaleString();
-      if (storageStats.total_size_bytes) {
-        storageStr = formatBytes(storageStats.total_size_bytes);
+    }
+
+    // System storage from /admin/health/storage (used_bytes + usage_percent)
+    if (results[2].status === 'fulfilled' && results[2].value) {
+      var storageInfo = results[2].value;
+      if (storageInfo.storage && storageInfo.storage.used_bytes) {
+        var pct = storageInfo.storage.usage_percent || 0;
+        storageStr = formatBytes(storageInfo.storage.used_bytes) + ' (' + pct + '%)';
       }
     }
 
@@ -329,8 +343,114 @@
   // =========================================================================
 
   /**
+   * Get sync age tier from a last-sync timestamp.
+   * Returns { tier, label, color } describing how stale the sync is.
+   * @param {string|null} lastSync - ISO timestamp
+   * @returns {{ tier: string, label: string, color: string, days: number }}
+   */
+  function syncAgeTier(lastSync) {
+    if (!lastSync) return { tier: 'never', label: 'Never synced', color: 'danger', days: Infinity };
+
+    var ms = Date.now() - new Date(lastSync).getTime();
+    var days = Math.floor(ms / 86400000);
+
+    if (days < 1)  return { tier: 'fresh',   label: 'Today',            color: 'success', days: days };
+    if (days < 3)  return { tier: 'recent',  label: days + 'd ago',     color: 'success', days: days };
+    if (days < 7)  return { tier: 'aging',   label: days + 'd ago',     color: 'warning', days: days };
+    if (days < 30) return { tier: 'stale',   label: days + 'd ago',     color: 'warning', days: days };
+    return            { tier: 'dormant', label: days + 'd ago',     color: 'danger',  days: days };
+  }
+
+  /**
+   * Get CSS class for the age meter bar fill color.
+   * @param {string} color - 'success' | 'warning' | 'danger'
+   * @returns {string}
+   */
+  function ageMeterColorClass(color) {
+    if (color === 'success') return 'cc-age-meter__fill--ok';
+    if (color === 'warning') return 'cc-age-meter__fill--warn';
+    return 'cc-age-meter__fill--danger';
+  }
+
+  /**
+   * Calculate age meter fill percentage (fresher = fuller).
+   * @param {number} days
+   * @returns {number} 0-100
+   */
+  function ageMeterPercent(days) {
+    if (days === Infinity) return 0;
+    if (days < 1) return 100;
+    if (days >= 30) return 5;
+    // Linear decay from 100% (0 days) to 5% (30 days)
+    return Math.max(5, Math.round(100 - (days / 30) * 95));
+  }
+
+  /**
+   * Map connector status to lex-badge color.
+   * @param {string} status
+   * @returns {string}
+   */
+  function connectorBadgeColor(status) {
+    if (!status) return 'gray';
+    var s = String(status).toLowerCase();
+    if (s === 'active' || s === 'connected' || s === 'healthy') return 'green';
+    if (s === 'warning' || s === 'degraded') return 'yellow';
+    if (s === 'error' || s === 'disconnected' || s === 'failed') return 'red';
+    return 'gray';
+  }
+
+  /**
+   * Render a list of connector row cards with age meters and recommendations.
+   * Uses lex-badge, lex-text, and custom age meter bar.
+   * @param {Array} list - Connector objects with ._age already computed
+   * @returns {string} HTML string
+   */
+  function renderConnectorRows(list) {
+    var html = '';
+    for (var n = 0; n < list.length; n++) {
+      var c         = list[n];
+      var badgeColor = connectorBadgeColor(c.status);
+      var statusLabel = connectorStatusLabel(c.status);
+      var cName     = escHtml(c.name);
+      var age       = c._age;
+      var pct       = ageMeterPercent(age.days);
+      var fillCls   = ageMeterColorClass(age.color);
+
+      // Build recommendation text using lex-text
+      var rec = '';
+      if (age.tier === 'dormant') {
+        rec = '<lex-text variant="danger" size="caption">Consider removing if no longer needed</lex-text>';
+      } else if (age.tier === 'never') {
+        rec = '<lex-text variant="danger" size="caption">Never synced — run initial sync or remove</lex-text>';
+      } else if (age.tier === 'stale' && !c.syncEnabled) {
+        rec = '<lex-text variant="warning" size="caption">Auto-sync disabled — trigger a manual sync</lex-text>';
+      } else if (age.tier === 'aging' && !c.syncEnabled) {
+        rec = '<lex-text variant="warning" size="caption">Auto-sync is off — data may be outdated</lex-text>';
+      }
+
+      html +=
+        '<div class="cc-connector-row-v2">' +
+          '<div class="cc-connector-row-v2__header">' +
+            '<div class="flex items-center gap-2 min-w-0">' +
+              '<lex-badge label="' + escHtml(statusLabel) + '" color="' + badgeColor + '" size="sm"></lex-badge>' +
+              '<lex-text variant="primary" size="body-sm" weight="medium">' + cName + '</lex-text>' +
+            '</div>' +
+            '<lex-text variant="tertiary" size="caption">' + escHtml(age.label) + '</lex-text>' +
+          '</div>' +
+          '<div class="cc-age-meter">' +
+            '<div class="cc-age-meter__fill ' + fillCls + '" style="width:' + pct + '%;"></div>' +
+          '</div>' +
+          rec +
+        '</div>';
+    }
+    return html;
+  }
+
+  /**
    * Render connector status rows in the Data Pulse panel.
-   * Fetches connector-status widgets then resolves their batch data.
+   * Fetches installed connectors from /api/v1/integrations/connectors.
+   * Shows age meter for last sync + recommendations for stale/dormant connectors.
+   * Splits by activity: Active vs Needs Attention. Capped at 10 rows.
    * @returns {Promise<void>}
    */
   async function renderZoneFRight() {
@@ -341,45 +461,21 @@
     var connectors = [];
 
     try {
-      var widgetsResult = await api.getDashboardWidgets({ widget_type: 'connector_status' });
-      var widgets = (widgetsResult && (widgetsResult.widgets || widgetsResult.data || widgetsResult)) || [];
-      if (!Array.isArray(widgets)) widgets = [];
+      var result = await api.get('/api/v1/integrations/connectors');
+      var raw = (result && result.connectors) || [];
 
-      if (widgets.length > 0) {
-        var ids = [];
-        for (var i = 0; i < widgets.length; i++) {
-          if (widgets[i].id) ids.push(widgets[i].id);
-        }
-
-        if (ids.length > 0) {
-          try {
-            var batchResult = await api.getDashboardWidgetsBatchData(ids);
-            var batchData   = (batchResult && batchResult.data) || batchResult || {};
-
-            for (var j = 0; j < widgets.length; j++) {
-              var w   = widgets[j];
-              var raw = batchData[w.id] || {};
-              connectors.push({
-                name:   w.title || (w.config && w.config.connector_name) || 'Connector',
-                status: raw.status || raw.connector_status || (w.config && w.config.status) || 'unknown',
-                last:   raw.last_sync_at || raw.last_synced_at || null
-              });
-            }
-          } catch (batchErr) {
-            console.warn('[Dashboard Zone F] Batch data failed, using widget metadata:', batchErr && batchErr.message);
-            for (var k = 0; k < widgets.length; k++) {
-              var ww = widgets[k];
-              connectors.push({
-                name:   ww.title || (ww.config && ww.config.connector_name) || 'Connector',
-                status: (ww.config && ww.config.status) || 'unknown',
-                last:   null
-              });
-            }
-          }
-        }
+      for (var i = 0; i < raw.length; i++) {
+        var c = raw[i];
+        connectors.push({
+          name:        c.name || c.connector_type || 'Connector',
+          status:      c.status || c.auth_status || 'unknown',
+          syncEnabled: c.sync_enabled != null ? c.sync_enabled : true,
+          lastSync:    c.last_sync || c.last_successful_sync || null,
+          createdAt:   c.created_at || null
+        });
       }
     } catch (err) {
-      console.warn('[Dashboard Zone F] Could not load connector widgets:', err && err.message);
+      console.warn('[Dashboard Zone F] Could not load connectors:', err && err.message);
     }
 
     if (loadingEl) hide(loadingEl);
@@ -391,24 +487,79 @@
       return;
     }
 
-    var html = '';
-    for (var n = 0; n < connectors.length; n++) {
-      var c       = connectors[n];
-      var dotCls  = connectorDotClass(c.status);
-      var label   = escHtml(connectorStatusLabel(c.status));
-      var cName   = escHtml(c.name);
-      var lastStr = c.last ? escHtml(timeAgo(c.last)) : '';
+    // Categorize connectors by sync freshness
+    var healthy = [];       // synced within 7 days
+    var needsAttention = []; // stale (7-30d), dormant (30d+), or never synced
 
-      html +=
-        '<div class="cc-connector-row">' +
-          '<span class="cc-connector-row__name">' + cName + '</span>' +
-          '<div class="flex items-center gap-1.5">' +
-            (lastStr ? '<span class="cc-connector-row__label">' + lastStr + '</span>' : '') +
-            '<div class="cc-connector-row__dot ' + dotCls + '" title="' + label + '"></div>' +
-          '</div>' +
-        '</div>';
+    for (var j = 0; j < connectors.length; j++) {
+      var age = syncAgeTier(connectors[j].lastSync);
+      connectors[j]._age = age;
+      if (age.tier === 'fresh' || age.tier === 'recent' || age.tier === 'aging') {
+        healthy.push(connectors[j]);
+      } else {
+        needsAttention.push(connectors[j]);
+      }
     }
+
+    // Sort each group: healthy by most recent first, needs attention by stalest first
+    healthy.sort(function (a, b) {
+      if (!a.lastSync) return 1;
+      if (!b.lastSync) return -1;
+      return new Date(b.lastSync).getTime() - new Date(a.lastSync).getTime();
+    });
+    needsAttention.sort(function (a, b) {
+      if (!a.lastSync && !b.lastSync) return 0;
+      if (!a.lastSync) return -1;
+      if (!b.lastSync) return 1;
+      return new Date(a.lastSync).getTime() - new Date(b.lastSync).getTime();
+    });
+
+    // Cap total displayed at 10
+    var maxDisplay = 10;
+    var totalCount = healthy.length + needsAttention.length;
+    var showHealthy = healthy.slice(0, maxDisplay);
+    var remaining = maxDisplay - showHealthy.length;
+    var showAttention = remaining > 0 ? needsAttention.slice(0, remaining) : [];
+
+    var html = '';
+
+    // Active section
+    if (showHealthy.length > 0) {
+      html += '<lex-text variant="tertiary" size="overline" weight="semibold" tag="div" style="margin-bottom:0.25rem;">Active</lex-text>';
+      html += renderConnectorRows(showHealthy);
+    }
+
+    // Needs attention section
+    if (showAttention.length > 0) {
+      if (showHealthy.length > 0) {
+        html += '<lex-divider spacing="sm"></lex-divider>';
+      }
+      html += '<lex-text variant="tertiary" size="overline" weight="semibold" tag="div" style="margin-bottom:0.25rem;">Needs Attention</lex-text>';
+      html += renderConnectorRows(showAttention);
+    }
+
+    // Footer navigation button
+    var footerLabel = totalCount > maxDisplay
+      ? 'View all ' + escHtml(String(totalCount)) + ' connectors'
+      : 'Manage connectors';
+    html +=
+      '<div style="text-align:center;padding-top:0.625rem;">' +
+        '<lex-btn variant="ghost" size="sm" class="cc-connector-nav-btn">' +
+          footerLabel +
+          ' <svg class="w-3.5 h-3.5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>' +
+        '</lex-btn>' +
+      '</div>';
+
     contentEl.innerHTML = html;
+
+    // Wire footer button click → navigate to connectors page
+    var navBtn = contentEl.querySelector('.cc-connector-nav-btn');
+    if (navBtn) {
+      navBtn.addEventListener('click', function () {
+        Lex.Nav.go('integrations/data_connectors.html');
+      });
+    }
+
     show(contentEl);
   }
 
@@ -759,6 +910,337 @@
   };
 
   // =========================================================================
+  // Zone E — Expandable detail panels (accordion)
+  // =========================================================================
+
+  /**
+   * Toggle the metric detail panel. Same key = close. Different key = swap.
+   * Permission-gated: 'team' and 'storage' require admin/canViewStatus.
+   * @param {string} key - 'team' | 'docs' | 'storage'
+   */
+  function toggleDetailPanel(key) {
+    var panel = el('ccDetailPanel');
+    if (!panel) return;
+
+    // Same card clicked — close
+    if (activeDetailKey === key) {
+      panel.open = false;
+      activeDetailKey = null;
+      highlightMetric(null);
+      return;
+    }
+
+    // Permission gates
+    if (key === 'team' && !isAdmin()) return;
+    if (key === 'storage' && !canViewStatus()) return;
+
+    activeDetailKey = key;
+    highlightMetric(key);
+
+    // Configure heading, action label, action href
+    var config = {
+      team:    { heading: 'Team Overview',     actionLabel: 'View all members',   actionHref: 'admin/users.html' },
+      docs:    { heading: 'Recent Documents',  actionLabel: 'Go to My Drive',     actionHref: 'drive.html' },
+      storage: { heading: 'Storage Breakdown', actionLabel: 'View system health', actionHref: 'admin/health.html' }
+    };
+    var c = config[key];
+    if (!c) return;
+
+    panel.heading     = c.heading;
+    panel.actionLabel = c.actionLabel;
+    panel.actionHref  = c.actionHref;
+
+    // Render content, then open (or refresh height if already open)
+    var wasOpen = panel.open;
+    var renderers = { team: renderTeamDetail, docs: renderDocsDetail, storage: renderStorageDetail };
+    renderers[key](panel).then(function () {
+      if (!wasOpen) {
+        panel.open = true;
+      } else {
+        // Already open — smoothly adjust height for new content
+        panel.refreshHeight();
+      }
+    });
+  }
+
+  /**
+   * Highlight the active metric card with a visual indicator.
+   * @param {string|null} key - metric key to highlight, or null to clear all
+   */
+  function highlightMetric(key) {
+    var zoneE = el('ccZoneE');
+    if (!zoneE) return;
+    var metrics = zoneE.querySelectorAll('lex-metric[data-metric-key]');
+    for (var i = 0; i < metrics.length; i++) {
+      var m = metrics[i];
+      if (key && m.getAttribute('data-metric-key') === key) {
+        m.classList.add('cc-metric-active');
+      } else {
+        m.classList.remove('cc-metric-active');
+      }
+    }
+  }
+
+  /**
+   * Build user rows HTML for the team detail panel.
+   * Each user object must have: first_name, last_name, email, role_name.
+   * @param {Array} users
+   * @returns {string}
+   */
+  function buildUserRows(users) {
+    var html = '';
+    for (var i = 0; i < users.length; i++) {
+      var u = users[i];
+      var fullName = ((u.first_name || '') + ' ' + (u.last_name || '')).trim() || u.email || 'Unknown';
+      var initial = fullName.charAt(0).toUpperCase();
+      var role = u.role_name || '';
+      var email = u.email || '';
+
+      html +=
+        '<div class="cc-detail-user-row">' +
+          '<div class="cc-detail-user-avatar">' + escHtml(initial) + '</div>' +
+          '<div class="flex-1 min-w-0">' +
+            '<div class="text-sm font-medium lex-text-primary truncate">' + escHtml(fullName) + '</div>' +
+            '<div class="text-xs lex-text-tertiary truncate">' + escHtml(email) + '</div>' +
+          '</div>' +
+          (role ? '<lex-badge variant="subtle" size="sm">' + escHtml(role) + '</lex-badge>' : '') +
+        '</div>';
+    }
+    return html;
+  }
+
+  /**
+   * Render team member snapshot in the detail panel.
+   * Fetches activity stats (30 days) and full user list in parallel.
+   * Splits into: Most Active (events > 0, top 3) and Needs Attention (0 events, 3 shown + overflow message).
+   * @param {Element} panel
+   * @returns {Promise<void>}
+   */
+  async function renderTeamDetail(panel) {
+    var content = panel.querySelector('.lex-detail-panel__content');
+    if (!content) return;
+
+    content.innerHTML = '<div class="py-4 text-center"><lex-spinner size="sm"></lex-spinner></div>';
+
+    try {
+      // Fetch 30-day activity stats and full user list in parallel
+      var results = await Promise.allSettled([
+        api.get('/api/v1/activity/stats?days=30'),
+        api.getOrganizationUsers()
+      ]);
+
+      var statsData = results[0].status === 'fulfilled' ? results[0].value : null;
+      var usersData = results[1].status === 'fulfilled' ? results[1].value : null;
+
+      var activeUserStats = (statsData && statsData.most_active_users) || [];
+      var allUsers = (usersData && usersData.users) || [];
+
+      if (allUsers.length === 0) {
+        content.innerHTML = '<lex-empty icon="users" message="No team members found"></lex-empty>';
+        return;
+      }
+
+      // Build activity count map: user_id → event count
+      var activityMap = {};
+      for (var i = 0; i < activeUserStats.length; i++) {
+        activityMap[activeUserStats[i].user_id] = activeUserStats[i].activity_count;
+      }
+
+      // Merge all users with their event counts, then split by active vs inactive
+      var active = [];
+      var inactive = [];
+      for (var j = 0; j < allUsers.length; j++) {
+        var u = allUsers[j];
+        var entry = {
+          id: u.id,
+          first_name: u.first_name,
+          last_name: u.last_name,
+          email: u.email,
+          role_name: u.role_name,
+          event_count: activityMap[u.id] || 0
+        };
+        if (entry.event_count > 0) {
+          active.push(entry);
+        } else {
+          inactive.push(entry);
+        }
+      }
+
+      // Sort active users by event count descending (most active first)
+      active.sort(function (a, b) { return b.event_count - a.event_count; });
+
+      var html = '<div>';
+
+      // Most Active section — users with events in last 30 days
+      if (active.length > 0) {
+        var topActive = active.slice(0, 3);
+        html +=
+          '<lex-text variant="tertiary" size="overline" weight="semibold" tag="div" style="margin-bottom:0.5rem;">Most Active — last 30 days</lex-text>';
+        html += buildUserRows(topActive);
+      }
+
+      // Needs Attention section — users with 0 events in last 30 days
+      if (inactive.length > 0) {
+        var topInactive = inactive.slice(0, 3);
+        html +=
+          '<lex-text variant="tertiary" size="overline" weight="semibold" tag="div" style="margin-bottom:0.5rem;' + (active.length > 0 ? 'margin-top:0.75rem;' : '') + '">Needs Attention</lex-text>';
+        html += buildUserRows(topInactive);
+
+        // Overflow message for remaining inactive users
+        if (inactive.length > 3) {
+          var remaining = inactive.length - 3;
+          html +=
+            '<div class="text-xs lex-text-tertiary mt-2" style="padding-left:0.5rem;">' +
+              'There ' + (remaining === 1 ? 'is' : 'are') + ' ' + escHtml(String(remaining)) +
+              ' more user' + (remaining === 1 ? '' : 's') + ' that also need' + (remaining === 1 ? 's' : '') + ' attention.' +
+            '</div>';
+        }
+      }
+
+      html += '</div>';
+      content.innerHTML = html;
+    } catch (err) {
+      console.warn('[Dashboard] renderTeamDetail failed:', err && err.message);
+      content.innerHTML = '<lex-empty icon="alert" message="Could not load team data"></lex-empty>';
+    }
+  }
+
+  /**
+   * Render recent documents snapshot in the detail panel.
+   * Source: /api/v1/storage/recent?limit=5 (cross-matter, based on file_activity)
+   * Shows 5 most recently accessed documents with filename, matter name, timestamp.
+   * @param {Element} panel
+   * @returns {Promise<void>}
+   */
+  async function renderDocsDetail(panel) {
+    var content = panel.querySelector('.lex-detail-panel__content');
+    if (!content) return;
+
+    content.innerHTML = '<div class="py-4 text-center"><lex-spinner size="sm"></lex-spinner></div>';
+
+    try {
+      var result = await api.get('/api/v1/storage/recent?limit=5');
+      var docs = (result && (result.files || result.documents || result.data)) || [];
+
+      if (docs.length === 0) {
+        content.innerHTML = '<lex-empty icon="folder" message="No documents yet" description="Upload your first document to get started"></lex-empty>';
+        return;
+      }
+
+      var html = '<div>';
+      for (var i = 0; i < docs.length; i++) {
+        var d = docs[i];
+        var name = d.filename || d.original_name || d.file_name || d.name || 'Untitled';
+        var matter = d.client_matter || d.matter_name || '';
+        var ts = (d.last_accessed_at || d.created_at) ? timeAgo(d.last_accessed_at || d.created_at) : '';
+
+        html +=
+          '<div class="cc-detail-doc-row">' +
+            '<svg class="w-4 h-4 flex-shrink-0 lex-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+              '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>' +
+            '</svg>' +
+            '<div class="flex-1 min-w-0">' +
+              '<div class="text-sm font-medium lex-text-primary truncate">' + escHtml(name) + '</div>' +
+              '<div class="text-xs lex-text-tertiary">' +
+                (matter ? escHtml(matter) + ' &middot; ' : '') +
+                escHtml(ts) +
+              '</div>' +
+            '</div>' +
+          '</div>';
+      }
+      html += '</div>';
+      content.innerHTML = html;
+    } catch (err) {
+      console.warn('[Dashboard] renderDocsDetail failed:', err && err.message);
+      content.innerHTML = '<lex-empty icon="alert" message="Could not load documents"></lex-empty>';
+    }
+  }
+
+  /**
+   * Render storage breakdown in the detail panel.
+   * Source: /api/v1/admin/health/storage
+   * Shows row-based breakdown with percentage bars.
+   * @param {Element} panel
+   * @returns {Promise<void>}
+   */
+  async function renderStorageDetail(panel) {
+    var content = panel.querySelector('.lex-detail-panel__content');
+    if (!content) return;
+
+    content.innerHTML = '<div class="py-4 text-center"><lex-spinner size="sm"></lex-spinner></div>';
+
+    try {
+      var result = await api.get('/api/v1/admin/health/storage');
+
+      if (!result || !result.storage) {
+        content.innerHTML = '<lex-empty icon="server" message="Storage data unavailable"></lex-empty>';
+        return;
+      }
+
+      var s = result.storage;
+      var html = '<div>';
+      var rows = [];
+
+      // Database storage
+      if (s.database_size_bytes != null) {
+        var dbPct = s.total_bytes ? Math.round((s.database_size_bytes / s.total_bytes) * 100) : 0;
+        rows.push({ label: 'Database', size: formatBytes(s.database_size_bytes), pct: dbPct });
+      }
+
+      // Document storage (MinIO) — derive from total used minus database
+      if (s.used_bytes != null && s.database_size_bytes != null) {
+        var docBytes = s.used_bytes - (s.database_size_bytes || 0);
+        if (docBytes < 0) docBytes = 0;
+        var docPct = s.total_bytes ? Math.round((docBytes / s.total_bytes) * 100) : 0;
+        rows.push({ label: 'Documents (MinIO)', size: formatBytes(docBytes), pct: docPct });
+      } else if (s.used_bytes != null) {
+        var usedPct = s.usage_percent || 0;
+        rows.push({ label: 'Used Storage', size: formatBytes(s.used_bytes), pct: usedPct });
+      }
+
+      // Volume breakdown if available
+      if (s.volumes && Array.isArray(s.volumes)) {
+        for (var v = 0; v < s.volumes.length; v++) {
+          var vol = s.volumes[v];
+          var volPct = vol.total_bytes ? Math.round((vol.used_bytes / vol.total_bytes) * 100) : 0;
+          rows.push({ label: vol.name || vol.mount || 'Volume', size: formatBytes(vol.used_bytes), pct: volPct });
+        }
+      }
+
+      // Render each row
+      for (var r = 0; r < rows.length; r++) {
+        var row = rows[r];
+        html +=
+          '<div class="cc-detail-storage-row">' +
+            '<div style="min-width:8rem;">' +
+              '<div class="text-sm font-medium lex-text-primary">' + escHtml(row.label) + '</div>' +
+              '<div class="text-xs lex-text-tertiary">' + escHtml(row.size) + '</div>' +
+            '</div>' +
+            '<div class="cc-detail-storage-bar">' +
+              '<div class="cc-detail-storage-fill" style="width:' + row.pct + '%;"></div>' +
+            '</div>' +
+            '<div class="text-xs font-medium lex-text-secondary" style="min-width:2.5rem;text-align:right;">' + row.pct + '%</div>' +
+          '</div>';
+      }
+
+      // Total capacity summary
+      if (s.total_bytes) {
+        html +=
+          '<div class="flex items-center justify-between pt-2 mt-2" style="border-top:1px solid var(--lex-border-subtle);">' +
+            '<span class="text-xs lex-text-tertiary">Total capacity</span>' +
+            '<span class="text-xs font-medium lex-text-primary">' + escHtml(formatBytes(s.total_bytes)) + '</span>' +
+          '</div>';
+      }
+
+      html += '</div>';
+      content.innerHTML = html;
+    } catch (err) {
+      console.warn('[Dashboard] renderStorageDetail failed:', err && err.message);
+      content.innerHTML = '<lex-empty icon="alert" message="Could not load storage data"></lex-empty>';
+    }
+  }
+
+  // =========================================================================
   // Dashboard initialization — entry point
   // =========================================================================
 
@@ -768,6 +1250,11 @@
    * using Promise.allSettled for graceful degradation.
    */
   async function initDashboard() {
+
+    // ── 0. Reset detail panel state on re-navigation ────────────────────
+    activeDetailKey = null;
+    var detailPanelReset = el('ccDetailPanel');
+    if (detailPanelReset) detailPanelReset.open = false;
 
     // ── 1. Load full user profile with roles ──────────────────────────────
     try {
@@ -901,13 +1388,30 @@
       });
     }
 
-    // Add Widget button (opens WidgetConfigModal when available)
+    // Add button → navigate to connectors page
     var addWidgetBtn = el('addWidgetBtn');
     if (addWidgetBtn) {
       addWidgetBtn.addEventListener('click', function () {
-        if (typeof WidgetConfigModal !== 'undefined') {
-          WidgetConfigModal.open();
-        }
+        Lex.Nav.go('integrations/data_connectors.html');
+      });
+    }
+
+    // Zone E — metric card click → toggle detail panel
+    var zoneE = el('ccZoneE');
+    if (zoneE) {
+      zoneE.addEventListener('click', function (e) {
+        var metric = e.target.closest('lex-metric[data-metric-key]');
+        if (!metric) return;
+        toggleDetailPanel(metric.getAttribute('data-metric-key'));
+      });
+    }
+
+    // Detail panel action button → SPA navigation
+    var detailPanel = el('ccDetailPanel');
+    if (detailPanel) {
+      detailPanel.addEventListener('detail-action', function (e) {
+        var href = e.detail && e.detail.href;
+        if (href) Lex.Nav.go(href);
       });
     }
 
@@ -926,9 +1430,16 @@
   }
 
   // =========================================================================
-  // Run
+  // Run — register with router for SPA re-navigation support
   // =========================================================================
 
-  initDashboard();
+  // registerPageInit ensures initDashboard() is called on every navigation
+  // to this page (first load + re-navigation from cached scripts).
+  if (window.LexRouter) {
+    LexRouter.registerPageInit('/dashboard.html', initDashboard);
+  } else {
+    // Fallback for non-SPA contexts (should not happen in normal flow)
+    initDashboard();
+  }
 
 })();
