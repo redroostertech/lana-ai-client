@@ -117,6 +117,7 @@
         'js/lex/components/form/lex-select.js',
         'js/lex/components/form/lex-checkbox.js',
         'js/lex/components/form/lex-textarea.js',
+        'js/lex/components/data/lex-pagination.js',
         // Page dependencies
         'js/services/feature-tracker.js',
         'js/vendor/mammoth.min.js',
@@ -162,9 +163,27 @@
       ]
     },
 
-    // ── My Drive ──
+    // ── My Drive (root matters list) ──
     'drive.html': {
       title: 'My Drive',
+      activeNav: 'storage',
+      scripts: [
+        // Lex components not globally loaded
+        'js/lex/components/foundation/lex-banner.js',
+        'js/lex/components/foundation/lex-modal.js',
+        'js/lex/components/form/lex-input.js',
+        'js/lex/components/form/lex-select.js',
+        // Page controller
+        'js/drive.js'
+      ],
+      stylesheets: [
+        'css/drive.css'
+      ]
+    },
+
+    // ── Folder (inside a matter — files, subfolders, viewer) ──
+    'folder.html': {
+      title: 'Folder',
       activeNav: 'storage',
       scripts: [
         // Lex components not globally loaded
@@ -181,7 +200,8 @@
         'js/vendor/marked.min.js',
         'js/components/document-metadata-viewer.js',
         'js/file-viewer.js',
-        'js/drive.js'
+        // Page controller
+        'js/folder.js'
       ],
       stylesheets: [
         'css/components/document-metadata.css',

@@ -401,3 +401,8 @@ const ArticleSystem = (function() {
 
 // Make it globally accessible
 window.ArticleSystem = ArticleSystem;
+
+// SPA: register with router so init runs on every navigation (including re-navigation)
+if (window.LexRouter) {
+  LexRouter.registerPageInit('article.html', function () { ArticleSystem.init(); });
+}

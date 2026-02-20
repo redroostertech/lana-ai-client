@@ -191,22 +191,15 @@
     setActiveMatter(matterId) {
       if (this._activeMatterId === matterId) return;
       this._activeMatterId = matterId;
-      if (matterId) {
-        localStorage.setItem('activeMatterId', matterId);
-      } else {
-        localStorage.removeItem('activeMatterId');
-      }
+      // Not persisted to localStorage — transient UI state, not a user preference.
+      // Resets on page navigation and refresh by design.
       this._emit('ui:changed', { property: 'activeMatterId', value: matterId });
     }
 
     setActiveConversation(conversationId) {
       if (this._activeConversationId === conversationId) return;
       this._activeConversationId = conversationId;
-      if (conversationId) {
-        localStorage.setItem('activeConversation', conversationId);
-      } else {
-        localStorage.removeItem('activeConversation');
-      }
+      // Not persisted to localStorage — transient UI state, not a user preference.
       this._emit('ui:changed', { property: 'activeConversationId', value: conversationId });
     }
 
@@ -313,9 +306,8 @@
         this._serverInfo = null;
       }
 
-      // UI preferences
-      this._activeMatterId = localStorage.getItem('activeMatterId') || null;
-      this._activeConversationId = localStorage.getItem('activeConversation') || null;
+      // UI preferences — activeMatterId and activeConversationId are transient
+      // (not persisted to localStorage). They reset on page load by design.
       this._sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
       this._theme = localStorage.getItem('theme') || 'light';
 

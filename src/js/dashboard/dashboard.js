@@ -35,6 +35,35 @@
   var activeDetailKey = null;
 
   // =========================================================================
+  // Lifecycle tracking (Finding 7)
+  // =========================================================================
+
+  var _timeouts = [];
+  var _intervals = [];
+  var _globalFns = [];
+  var _documentListeners = [];
+
+  /**
+   * Expose a function as a window global and track it for cleanup on onLeave.
+   * @param {string} name
+   * @param {Function} fn
+   */
+  function exposeGlobal(name, fn) {
+    window[name] = fn;
+    _globalFns.push(name);
+  }
+
+  /**
+   * Add a document-level event listener and track it for cleanup on onLeave.
+   * @param {string} event
+   * @param {Function} handler
+   */
+  function trackDocListener(event, handler) {
+    document.addEventListener(event, handler);
+    _documentListeners.push({ event: event, handler: handler });
+  }
+
+  // =========================================================================
   // Helpers
   // =========================================================================
 
@@ -884,17 +913,17 @@
   // =========================================================================
 
   /** Close the heatmap info modal. Exposed globally for inline onclick. */
-  window.closeActivityHeatmapInfoModal = function () {
+  exposeGlobal('closeActivityHeatmapInfoModal', function () {
     var modal = el('activityHeatmapInfoModal');
     if (modal) modal.open = false;
-  };
+  });
 
   // =========================================================================
   // Page-specific navigation helpers
   // =========================================================================
 
   /** Navigate to orphaned documents page (respects admin vs standard path). */
-  window.navigateToOrphans = function () {
+  exposeGlobal('navigateToOrphans', function () {
     var user = {};
     try {
       user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -907,7 +936,7 @@
     } else {
       Lex.Nav.go('storage.html', { params: { tab: 'orphaned' } });
     }
-  };
+  });
 
   // =========================================================================
   // Zone E — Expandable detail panels (accordion)
@@ -1297,11 +1326,11 @@
     initializeActivityUserFilter();
 
     // ── 8. Legacy Widget system (kept for backward-compat) ─────────────────
-    setTimeout(function () {
+    _timeouts.push(setTimeout(function () {
       if (typeof WidgetRenderer !== 'undefined') {
         WidgetRenderer.init();
       }
-    }, 500);
+    }, 500));
   }
 
   // =========================================================================
@@ -1430,13 +1459,46 @@
   }
 
   // =========================================================================
+  // Page lifecycle — onLeave cleanup (Finding 7)
+  // =========================================================================
+
+  /**
+   * Clean up all tracked resources when navigating away from the dashboard.
+   * Clears timeouts, intervals, document listeners, and window globals.
+   */
+  function onLeave() {
+    // Clear tracked timeouts and intervals
+    _timeouts.forEach(clearTimeout);
+    _intervals.forEach(clearInterval);
+    _timeouts = [];
+    _intervals = [];
+
+    // Remove tracked document listeners
+    _documentListeners.forEach(function (entry) {
+      document.removeEventListener(entry.event, entry.handler);
+    });
+    _documentListeners = [];
+
+    // Remove tracked window globals
+    _globalFns.forEach(function (name) {
+      delete window[name];
+    });
+    _globalFns = [];
+  }
+
+  // =========================================================================
   // Run — register with router for SPA re-navigation support
   // =========================================================================
 
   // registerPageInit ensures initDashboard() is called on every navigation
   // to this page (first load + re-navigation from cached scripts).
+  // registerView only carries onLeave for cleanup — onEnter is handled
+  // by registerPageInit to avoid double-init.
   if (window.LexRouter) {
-    LexRouter.registerPageInit('/dashboard.html', initDashboard);
+    LexRouter.registerPageInit('dashboard.html', function () {
+      LexRouter.registerView({ onLeave: onLeave });
+      initDashboard();
+    });
   } else {
     // Fallback for non-SPA contexts (should not happen in normal flow)
     initDashboard();

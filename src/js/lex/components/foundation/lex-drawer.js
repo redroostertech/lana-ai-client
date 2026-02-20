@@ -55,7 +55,7 @@
         position: fixed;
         inset: 0;
         background: rgba(0, 0, 0, 0.4);
-        animation: lex-drawer-fade-in 0.2s ease;
+        animation: lex-drawer-fade-in var(--lex-duration-fade, 200ms) var(--lex-ease-out, ease);
       }
 
       /* ── Panel ───────────────────────────────────────── */
@@ -82,13 +82,13 @@
       /* Slide-in from right */
       .lex-drawer-overlay--right .lex-drawer-panel {
         border-left: 1px solid var(--lex-border-subtle, rgba(0,0,0,0.06));
-        animation: lex-drawer-slide-in-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        animation: lex-drawer-slide-in-right var(--lex-duration-slide, 300ms) var(--lex-ease-out, ease);
       }
 
       /* Slide-in from left */
       .lex-drawer-overlay--left .lex-drawer-panel {
         border-right: 1px solid var(--lex-border-subtle, rgba(0,0,0,0.06));
-        animation: lex-drawer-slide-in-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        animation: lex-drawer-slide-in-left var(--lex-duration-slide, 300ms) var(--lex-ease-out, ease);
       }
 
       /* ── Header ──────────────────────────────────────── */
@@ -217,6 +217,35 @@
         from { transform: translateX(-100%); }
         to   { transform: translateX(0); }
       }
+
+      /* ── Exit animations ─────────────────────────────── */
+
+      @keyframes lex-drawer-fade-out {
+        from { opacity: 1; }
+        to   { opacity: 0; }
+      }
+
+      @keyframes lex-drawer-slide-out-right {
+        from { transform: translateX(0); }
+        to   { transform: translateX(100%); }
+      }
+
+      @keyframes lex-drawer-slide-out-left {
+        from { transform: translateX(0); }
+        to   { transform: translateX(-100%); }
+      }
+
+      .lex-drawer-backdrop--closing {
+        animation: lex-drawer-fade-out var(--lex-duration-fade, 200ms) var(--lex-ease-in, ease) forwards;
+      }
+
+      .lex-drawer-overlay--right .lex-drawer-panel--closing {
+        animation: lex-drawer-slide-out-right var(--lex-duration-slide, 300ms) var(--lex-ease-in, ease) forwards;
+      }
+
+      .lex-drawer-overlay--left .lex-drawer-panel--closing {
+        animation: lex-drawer-slide-out-left var(--lex-duration-slide, 300ms) var(--lex-ease-in, ease) forwards;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -291,11 +320,7 @@
     }
 
     updated(changedProps) {
-      // Toggle overlay visibility + body scroll lock
       const overlay = this.querySelector('.lex-drawer-overlay');
-      if (overlay) {
-        overlay.style.display = this.open ? '' : 'none';
-      }
 
       // Sync heading/subtitle without re-render
       if (changedProps && changedProps.has('heading')) {
@@ -308,9 +333,28 @@
       }
 
       if (!this.open) {
-        document.body.style.overflow = '';
+        // Play exit animation, then hide
+        if (overlay && overlay.style.display !== 'none') {
+          const panel = this.querySelector('.lex-drawer-panel');
+          const backdrop = this.querySelector('.lex-drawer-backdrop');
+          if (panel && !panel.classList.contains('lex-drawer-panel--closing')) {
+            panel.classList.add('lex-drawer-panel--closing');
+            if (backdrop) backdrop.classList.add('lex-drawer-backdrop--closing');
+            panel.addEventListener('animationend', () => {
+              overlay.style.display = 'none';
+              panel.classList.remove('lex-drawer-panel--closing');
+              if (backdrop) backdrop.classList.remove('lex-drawer-backdrop--closing');
+              document.body.style.overflow = '';
+            }, { once: true });
+          }
+        } else {
+          document.body.style.overflow = '';
+        }
         return;
       }
+
+      // Opening — show overlay and lock scroll
+      if (overlay) overlay.style.display = '';
       document.body.style.overflow = 'hidden';
 
       this.delegate('click', '[data-action="close"]', () => {

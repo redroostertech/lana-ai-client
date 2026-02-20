@@ -1264,6 +1264,10 @@
     selectedConnectorForActions = null;
     selectedConnectorFile = null;
     parsedConnectorConfig = null;
+
+    // Clear search input so it doesn't persist on re-navigation
+    var searchEl = document.getElementById('connectorSearch');
+    if (searchEl) searchEl.value = '';
   }
 
   // ── Register with router ────────────────────────────────────────────

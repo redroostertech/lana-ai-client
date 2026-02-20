@@ -75,14 +75,14 @@ function initializeStore() {
 
       if (fs.existsSync(configPath)) {
         fs.unlinkSync(configPath);
-        logInfo(`Deleted corrupted config file: ${configPath}`);
+        logInfo(`[electron-storage] Deleted corrupted config file: ${configPath}`);
       }
 
       // Try again with fresh config
       store = new Store(storeOptions);
-      logInfo('Successfully initialized fresh config store');
+      logInfo('[electron-storage] Successfully initialized fresh config store');
     } catch (retryError) {
-      logError('Failed to recover from corrupted config', retryError);
+      logError('[electron-storage] Failed to recover from corrupted config', retryError);
       // Last resort: create an in-memory store-like object
       store = {
         _data: storeOptions.defaults,
@@ -102,7 +102,7 @@ function initializeStore() {
           return this._data;
         }
       };
-      logInfo('Using in-memory fallback store');
+      logInfo('[electron-storage] Using in-memory fallback store');
     }
   }
 }
@@ -137,10 +137,10 @@ function saveServerConnection(server) {
     store.set('server', connectionData);
     store.set('lastConnected', new Date().toISOString());
 
-    logInfo(`Server connection saved: ${server.orgName} (${server.orgId})`);
+    logInfo(`[electron-storage] Server connection saved: ${server.orgName} (${server.orgId})`);
     return true;
   } catch (error) {
-    logError('Failed to save server connection', error);
+    logError('[electron-storage] Failed to save server connection', error);
     return false;
   }
 }
@@ -154,14 +154,14 @@ function getSavedServer() {
     const server = store.get('server');
     
     if (!server) {
-      logInfo('No saved server found');
+      logInfo('[electron-storage] No saved server found');
       return null;
     }
 
-    logInfo(`Retrieved saved server: ${server.orgName} (${server.orgId})`);
+    logInfo(`[electron-storage] Retrieved saved server: ${server.orgName} (${server.orgId})`);
     return server;
   } catch (error) {
-    logError('Failed to get saved server', error);
+    logError('[electron-storage] Failed to get saved server', error);
     return null;
   }
 }
@@ -183,7 +183,7 @@ function updateLastVerified() {
     
     return true;
   } catch (error) {
-    logError('Failed to update last verified timestamp', error);
+    logError('[electron-storage] Failed to update last verified timestamp', error);
     return false;
   }
 }
@@ -197,13 +197,13 @@ function clearSavedServer() {
     const server = store.get('server');
     
     if (server) {
-      logInfo(`Clearing saved server: ${server.orgName}`);
+      logInfo(`[electron-storage] Clearing saved server: ${server.orgName}`);
     }
 
     store.delete('server');
     return true;
   } catch (error) {
-    logError('Failed to clear saved server', error);
+    logError('[electron-storage] Failed to clear saved server', error);
     return false;
   }
 }
@@ -219,7 +219,7 @@ function getPreferences() {
       rememberServer: true
     });
   } catch (error) {
-    logError('Failed to get preferences', error);
+    logError('[electron-storage] Failed to get preferences', error);
     return {
       autoConnect: true,
       rememberServer: true
@@ -238,10 +238,10 @@ function updatePreferences(preferences) {
     const updated = { ...current, ...preferences };
     
     store.set('preferences', updated);
-    logInfo('Preferences updated');
+    logInfo('[electron-storage] Preferences updated');
     return true;
   } catch (error) {
-    logError('Failed to update preferences', error);
+    logError('[electron-storage] Failed to update preferences', error);
     return false;
   }
 }
@@ -254,7 +254,7 @@ function getAllData() {
   try {
     return store.store;
   } catch (error) {
-    logError('Failed to get all data', error);
+    logError('[electron-storage] Failed to get all data', error);
     return {};
   }
 }
@@ -266,10 +266,10 @@ function getAllData() {
 function clearAllData() {
   try {
     store.clear();
-    logInfo('All stored data cleared');
+    logInfo('[electron-storage] All stored data cleared');
     return true;
   } catch (error) {
-    logError('Failed to clear all data', error);
+    logError('[electron-storage] Failed to clear all data', error);
     return false;
   }
 }
@@ -301,7 +301,7 @@ function addToConnectionHistory(server) {
     store.set('connectionHistory', trimmed);
     return true;
   } catch (error) {
-    logError('Failed to add to connection history', error);
+    logError('[electron-storage] Failed to add to connection history', error);
     return false;
   }
 }
@@ -314,7 +314,7 @@ function getConnectionHistory() {
   try {
     return store.get('connectionHistory', []);
   } catch (error) {
-    logError('Failed to get connection history', error);
+    logError('[electron-storage] Failed to get connection history', error);
     return [];
   }
 }

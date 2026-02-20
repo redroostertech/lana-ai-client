@@ -1,12 +1,11 @@
 /**
  * drive.js — My Drive page script (SPA lifecycle).
- * Migrated from storage.js.
- * Uses LexRouter.registerView() for onEnter/onLeave lifecycle.
+ * Root view only: matters list, pinned section, recents section, pagination.
+ * Subfolder navigation, file uploads, and file operations live in folder.js.
  *
  * Dependencies (loaded via page descriptor before this file):
  *   - lex.utils.js   (escapeHtml, formatFileSize, formatRelativeDate, getFileType)
  *   - lex.icons.js   (getFileIcon, getFileIconSmall, getFileIconSVG)
- *   - file-viewer.js (openFileViewer)
  */
 (function () {
   'use strict';
@@ -40,11 +39,11 @@
   // ── Page state ──────────────────────────────────────────────────────
   var storageState = {};
 
-  // Temporary state for pending file upload
-  var pendingUploadFiles = null;
-
   // Currently selected matter for the actions modal
   var selectedMatter = null;
+
+  // Search debounce timer — module-level so onLeave can cancel it on SPA navigation
+  var searchTimeout = null;
 
   // ── State reset ─────────────────────────────────────────────────────
 
@@ -54,15 +53,8 @@
    */
   function resetState() {
     storageState = {
-      currentMatterId: null,
-      currentMatterName: null,
-      currentFolderId: null,
-      currentFolderPath: [],
       viewMode: 'list',
       folders: [],
-      files: [],
-      loadingFolders: false,
-      loadingContent: false,
       searchQuery: '',
       sortBy: 'name',
       sortOrder: 'asc',
@@ -76,27 +68,31 @@
   // ── View management ─────────────────────────────────────────────────
 
   /**
-   * Update button state based on current view (root vs matter).
-   * At root: New Folder enabled, Upload disabled (no target matter).
-   * Inside a matter: both enabled (New Folder creates sub-folders).
+   * Update button state for drive.html root view.
+   * Upload button does not exist on drive.html — only New Folder is enabled.
    */
   function updateViewButtons() {
-    var uploadBtn = document.getElementById('uploadBtn');
     var newFolderBtn = document.getElementById('newFolderBtn');
+    if (newFolderBtn) newFolderBtn.disabled = false;
+  }
 
-    if (storageState.currentMatterId) {
-      if (uploadBtn){
-        uploadBtn.disabled = false;
-        uploadBtn.classList.remove('hidden');
+  /**
+   * Fade-hide pinned and recents sections when searching, fade-show when cleared.
+   * @param {string} query - current search input value
+   */
+  function toggleQuickSections(query) {
+    var pinnedSection = document.getElementById('pinnedSection');
+    var recentsSection = document.getElementById('recentsSection');
+    var hasQuery = query.length > 0;
+
+    [pinnedSection, recentsSection].forEach(function (el) {
+      if (!el) return;
+      if (hasQuery) {
+        el.classList.add('drive-fade-out');
+      } else {
+        el.classList.remove('drive-fade-out');
       }
-      if (newFolderBtn) newFolderBtn.disabled = false;
-    } else {
-      if (uploadBtn){
-        uploadBtn.disabled = true;
-        uploadBtn.classList.add('hidden');
-      }
-      if (newFolderBtn) newFolderBtn.disabled = false;
-    }
+    });
   }
 
   // ── Event listeners ─────────────────────────────────────────────────
@@ -106,7 +102,7 @@
    * Uses trackDocListener for document-level events so they are removed on onLeave.
    */
   function setupEventListeners() {
-    // New Folder buttons (lex-btn fires native click events)
+    // New Folder button
     var newFolderBtn = document.getElementById('newFolderBtn');
     newFolderBtn && newFolderBtn.addEventListener('click', showNewFolderModal);
 
@@ -120,44 +116,6 @@
     var newFolderForm = document.getElementById('newFolderForm');
     newFolderForm && newFolderForm.addEventListener('submit', handleCreateFolder);
 
-    // Upload button triggers file picker (lex-btn fires native click)
-    var uploadBtn = document.getElementById('uploadBtn');
-    uploadBtn && uploadBtn.addEventListener('click', function () {
-      var input = document.getElementById('fileUploadInput');
-      input && input.click();
-    });
-
-    // File selection triggers hints modal
-    var fileUploadInput = document.getElementById('fileUploadInput');
-    fileUploadInput && fileUploadInput.addEventListener('change', handleFileSelection);
-
-    // Single file upload modal (lex-btn fires native click)
-    var cancelSingleUploadBtnFooter = document.getElementById('cancelSingleUploadBtnFooter');
-    cancelSingleUploadBtnFooter && cancelSingleUploadBtnFooter.addEventListener('click', hideSingleUploadModal);
-
-    var confirmSingleUploadBtn = document.getElementById('confirmSingleUploadBtn');
-    confirmSingleUploadBtn && confirmSingleUploadBtn.addEventListener('click', handleSingleFileUploadWithHints);
-
-    // Bulk upload modal (lex-btn fires native click)
-    var cancelBulkUploadBtn = document.getElementById('cancelBulkUploadBtn');
-    cancelBulkUploadBtn && cancelBulkUploadBtn.addEventListener('click', hideBulkUploadModal);
-
-    var confirmBulkUploadBtn = document.getElementById('confirmBulkUploadBtn');
-    confirmBulkUploadBtn && confirmBulkUploadBtn.addEventListener('click', handleBulkUploadWithHints);
-
-    // Bulk upload hint apply buttons (lex-btn fires native click)
-    var applyDocTypeBtn = document.getElementById('applyDocTypeBtn');
-    applyDocTypeBtn && applyDocTypeBtn.addEventListener('click', applyDocTypeToAll);
-
-    var applySignaturesBtn = document.getElementById('applySignaturesBtn');
-    applySignaturesBtn && applySignaturesBtn.addEventListener('click', applySignaturesToAll);
-
-    var applyFormsBtn = document.getElementById('applyFormsBtn');
-    applyFormsBtn && applyFormsBtn.addEventListener('click', applyFormsToAll);
-
-    var clearAllHintsBtn = document.getElementById('clearAllHintsBtn');
-    clearAllHintsBtn && clearAllHintsBtn.addEventListener('click', clearAllHints);
-
     // View toggle (plain buttons)
     var gridViewBtn = document.getElementById('gridViewBtn');
     gridViewBtn && gridViewBtn.addEventListener('click', function () { switchView('grid'); });
@@ -165,27 +123,28 @@
     var listViewBtn = document.getElementById('listViewBtn');
     listViewBtn && listViewBtn.addEventListener('click', function () { switchView('list'); });
 
-    // Search with debounce — lex-input fires 'lex-input' event
+    // Search with debounce — lex-input fires 'lex-input' and 'lex-change' events
     var searchLexInput = document.getElementById('searchInput');
-    var searchTimeout;
 
     if (searchLexInput) {
       searchLexInput.addEventListener('lex-input', function (e) {
         var query = e.detail.value || '';
+        toggleQuickSections(query);
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(function () {
           storageState.searchQuery = query;
           storageState.currentPage = 1;
-          loadFolderContents();
+          loadMatters({ silent: true });
         }, 500);
       });
 
-      // lex-change fires on clear
+      // lex-change fires on clear / value commit
       searchLexInput.addEventListener('lex-change', function (e) {
         var query = e.detail.value || '';
+        toggleQuickSections(query);
         storageState.searchQuery = query;
         storageState.currentPage = 1;
-        loadFolderContents();
+        loadMatters({ silent: true });
       });
     }
 
@@ -195,7 +154,7 @@
       sortSelect.addEventListener('lex-change', function (e) {
         storageState.sortBy = e.detail.value || 'name';
         storageState.currentPage = 1;
-        loadFolderContents();
+        loadMatters({ silent: true });
       });
     }
 
@@ -220,7 +179,7 @@
           }
         }
 
-        loadFolderContents();
+        loadMatters({ silent: true });
       });
     }
 
@@ -230,531 +189,165 @@
       sourceFilter.addEventListener('lex-change', function (e) {
         storageState.sourceFilter = e.detail.value || 'all';
         storageState.currentPage = 1;
-        loadFolderContents();
+        loadMatters({ silent: true });
       });
     }
   }
 
-  // ── Folder tree navigation ───────────────────────────────────────────
+  // ── Navigation ───────────────────────────────────────────────────────
 
   /**
-   * Load folder tree sidebar (for matter view).
-   * Shows all matters at root, or subfolders when inside a matter.
-   */
-  async function loadFolderTree() {
-    console.log('[Drive] Loading folder tree for matter:', storageState.currentMatterId);
-    storageState.loadingFolders = true;
-
-    var loadingEl = document.getElementById('folderTreeLoading');
-    var treeEl = document.getElementById('folderTree');
-    var emptyEl = document.getElementById('folderTreeEmpty');
-
-    loadingEl && loadingEl.classList.remove('hidden');
-    treeEl && treeEl.classList.add('hidden');
-    emptyEl && emptyEl.classList.add('hidden');
-
-    try {
-      if (!storageState.currentMatterId) {
-        var response = await api.get('/api/v1/matters?status=active&limit=100');
-
-        if (response.matters) {
-          storageState.folders = response.matters.map(function (matter) {
-            return {
-              id: matter.id,
-              name: matter.name || matter.matter_id,
-              matter_id: matter.matter_id,
-              isMatter: true,
-              document_count: 0,
-              child_folder_count: 0
-            };
-          });
-          renderFolderTree();
-        } else {
-          throw new Error(response.error || 'Failed to load matters');
-        }
-      } else {
-        var response = await api.get('/api/v1/storage/folders?matter_id=' + storageState.currentMatterId);
-
-        if (response.status === 'success' || response.data) {
-          storageState.folders = (response.data && response.data.folders) || response.folders || [];
-          renderFolderTree();
-        } else {
-          throw new Error(response.error || 'Failed to load folders');
-        }
-      }
-    } catch (error) {
-      console.error('[Drive] Failed to load folder tree:', error);
-      Lex.Toast.error('Failed to load folders. Please try again.');
-
-      loadingEl && loadingEl.classList.add('hidden');
-      emptyEl && emptyEl.classList.remove('hidden');
-    } finally {
-      storageState.loadingFolders = false;
-    }
-  }
-
-  /**
-   * Render the folder tree sidebar from storageState.folders.
-   */
-  function renderFolderTree() {
-    var treeEl = document.getElementById('folderTree');
-    var loadingEl = document.getElementById('folderTreeLoading');
-    var emptyEl = document.getElementById('folderTreeEmpty');
-
-    loadingEl && loadingEl.classList.add('hidden');
-
-    if (!storageState.folders || storageState.folders.length === 0) {
-      emptyEl && emptyEl.classList.remove('hidden');
-      treeEl && treeEl.classList.add('hidden');
-      return;
-    }
-
-    emptyEl && emptyEl.classList.add('hidden');
-    treeEl && treeEl.classList.remove('hidden');
-
-    var rootFolders = storageState.folders.filter(function (f) { return !f.parent_folder_id; });
-
-    if (treeEl) {
-      treeEl.innerHTML = rootFolders.map(function (folder) {
-        return renderFolderTreeItem(folder, 0);
-      }).join('');
-    }
-  }
-
-  /**
-   * Render a single item in the folder tree sidebar.
-   * @param {Object} folder
-   * @param {number} depth - Indentation depth
-   * @returns {string} HTML string
-   */
-  function renderFolderTreeItem(folder, depth) {
-    var isActive = folder.id === storageState.currentFolderId;
-    var hasChildren = folder.child_folder_count > 0;
-    var indent = depth * 16;
-
-    var childFolders = storageState.folders.filter(function (f) {
-      return f.parent_folder_id === folder.id;
-    });
-
-    var onclickHandler = folder.isMatter
-      ? 'navigateToMatter(' + JSON.stringify(folder.matter_id) + ', ' + JSON.stringify(folder.name) + ')'
-      : 'navigateToFolder(' + JSON.stringify(folder.id) + ', ' + JSON.stringify(folder.name) + ')';
-
-    return [
-      '<div class="folder-item-container">',
-      '  <div',
-      '    class="folder-item flex items-center py-2 px-3 rounded ' + (isActive ? 'active' : '') + '"',
-      '    data-folder-id="' + escapeHtml(folder.id) + '"',
-      '    data-folder-name="' + escapeHtml(folder.name) + '"',
-      '    onclick="' + onclickHandler + '"',
-      '    style="padding-left: ' + (indent + 12) + 'px"',
-      '  >',
-      hasChildren
-        ? '<button class="folder-toggle mr-1" style="color: var(--lex-text-tertiary)" onclick="event.stopPropagation(); toggleFolder(' + JSON.stringify(folder.id) + ')"><svg class="w-4 h-4 transform transition-transform" data-folder-id="' + escapeHtml(folder.id) + '-arrow"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"></path></svg></button>'
-        : '<span class="w-5"></span>',
-      '    <svg class="w-4 h-4 mr-2" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
-      '      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>',
-      '    </svg>',
-      '    <span class="text-sm font-medium truncate" style="color: var(--lex-text-primary)">' + escapeHtml(folder.name) + '</span>',
-      folder.document_count > 0 ? '<span class="ml-auto text-xs" style="color: var(--lex-text-secondary)">' + folder.document_count + '</span>' : '',
-      '  </div>',
-      hasChildren
-        ? '<div class="folder-children" data-folder-id="' + escapeHtml(folder.id) + '-children">' + childFolders.map(function (child) { return renderFolderTreeItem(child, depth + 1); }).join('') + '</div>'
-        : '',
-      '</div>'
-    ].join('');
-  }
-
-  /**
-   * Toggle expand/collapse of a folder's children in the sidebar.
-   * @param {string} folderId
-   */
-  function toggleFolder(folderId) {
-    var childrenEl = document.querySelector('[data-folder-id="' + folderId + '-children"]');
-    var arrowEl = document.querySelector('[data-folder-id="' + folderId + '-arrow"]');
-
-    if (childrenEl && arrowEl) {
-      childrenEl.classList.toggle('expanded');
-      arrowEl.classList.toggle('rotate-180');
-    }
-  }
-
-  /**
-   * Navigate into a subfolder within the current matter (SPA-compatible).
-   * Updates URL with pushState instead of full reload.
-   * @param {string} folderId
-   * @param {string} folderName
-   */
-  function navigateToFolder(folderId, folderName) {
-    console.log('[Drive] Navigating to folder:', folderId, folderName);
-
-    if (!storageState.currentMatterId) {
-      console.error('[Drive] Cannot navigate to folder without matter_id');
-      Lex.Toast.error('Cannot navigate to folder. Please select a matter first.');
-      return;
-    }
-
-    var urlParams = new URLSearchParams();
-    urlParams.set('matter_id', storageState.currentMatterId);
-    if (storageState.currentMatterName) {
-      urlParams.set('matter_name', storageState.currentMatterName);
-    }
-    if (folderId && folderId !== 'root') {
-      urlParams.set('folder_id', folderId);
-    }
-
-    history.pushState({}, '', 'drive.html?' + urlParams.toString());
-
-    storageState.currentFolderId = folderId === 'root' ? null : folderId;
-
-    buildFolderPath();
-    loadFolderContents();
-  }
-
-  /**
-   * Navigate into a matter from the root grid (SPA-compatible).
-   * Updates state and URL without a full page reload.
+   * Navigate into a matter by transitioning to folder.html via SPA nav.
    * @param {string} matterId
    * @param {string} matterName
    */
   function navigateToMatter(matterId, matterName) {
-    console.log('[Drive] Navigating to matter:', matterId, matterName);
-
-    storageState.currentMatterId = matterId;
-    storageState.currentMatterName = matterName;
-    storageState.currentFolderId = null;
-
     var params = new URLSearchParams({
       matter_id: matterId,
       matter_name: matterName
     });
-    history.pushState({}, '', 'drive.html?' + params.toString());
-
-    updateViewButtons();
-    loadFolderContents();
+    Lex.Nav.go('folder.html?' + params.toString());
   }
 
   /**
-   * Navigate to the root view (clear matter + folder context).
-   * Resets state and reloads pinned/recent sections.
+   * Navigate back to root view — reloads the current page data.
+   * We are already on drive.html so no URL change is needed.
    */
   function navigateToRoot() {
-    storageState.currentMatterId = null;
-    storageState.currentFolderId = null;
-    storageState.currentMatterName = null;
-    storageState.currentFolderPath = [];
-
-    history.pushState({}, '', 'drive.html');
-
-    updateViewButtons();
-    loadFolderContents();
+    storageState.searchQuery = '';
+    storageState.currentPage = 1;
+    loadMatters();
     Promise.all([loadRecentMatters(), loadPinnedMatters()]).catch(function (err) {
-      console.error('[Drive] Failed to reload recents/pinned after navigateToRoot:', err);
+      console.error('[Drive] Failed to reload recents/pinned:', err);
     });
   }
 
-  /**
-   * Navigate to a matter's root from a breadcrumb click (clears folder context).
-   * @param {string} matterId
-   * @param {string} matterName
-   */
-  function navigateToMatterBreadcrumb(matterId, matterName) {
-    storageState.currentMatterId = matterId;
-    storageState.currentMatterName = matterName;
-    storageState.currentFolderId = null;
-    storageState.currentFolderPath = [];
-
-    var params = new URLSearchParams({
-      matter_id: matterId,
-      matter_name: matterName
-    });
-    history.pushState({}, '', 'drive.html?' + params.toString());
-
-    updateViewButtons();
-    loadFolderContents();
-  }
+  // ── Folder/matter click handler ──────────────────────────────────────
 
   /**
-   * Build the breadcrumb folder path array from storageState.folders.
-   * Populates storageState.currentFolderPath and then calls renderBreadcrumbs().
-   */
-  function buildFolderPath() {
-    storageState.currentFolderPath = [];
-
-    if (storageState.currentFolderId) {
-      var currentId = storageState.currentFolderId;
-      while (currentId) {
-        var folder = null;
-        for (var i = 0; i < storageState.folders.length; i++) {
-          if (storageState.folders[i].id === currentId) {
-            folder = storageState.folders[i];
-            break;
-          }
-        }
-        if (folder) {
-          storageState.currentFolderPath.unshift({
-            id: folder.id,
-            name: folder.name
-          });
-          currentId = folder.parent_folder_id;
-        } else {
-          break;
-        }
-      }
-    }
-
-    renderBreadcrumbs();
-  }
-
-  /**
-   * Render the breadcrumb navigation bar.
-   * Home links use navigateToRoot(); matter links use navigateToMatterBreadcrumb().
-   */
-  function renderBreadcrumbs() {
-    var breadcrumbsEl = document.getElementById('breadcrumbs');
-    if (!breadcrumbsEl) return;
-
-    // At root level — hide breadcrumbs (the banner serves as page header)
-    if (!storageState.currentMatterId) {
-      breadcrumbsEl.classList.add('hidden');
-      return;
-    }
-
-    // Inside a matter/folder — show breadcrumbs
-    breadcrumbsEl.classList.remove('hidden');
-
-    var html = '<a href="#" onclick="navigateToRoot(); return false;" class="cursor-pointer" style="color: var(--lex-text-secondary)">Home</a>';
-
-    var matterName = storageState.currentMatterName || storageState.currentMatterId;
-
-    html += '<span class="breadcrumb-separator">/</span>';
-    if (!storageState.currentFolderId) {
-      html += '<span class="font-medium" style="color: var(--lex-text-primary)">' + escapeHtml(matterName) + '</span>';
-    } else {
-      html += '<a href="#" onclick="navigateToMatterBreadcrumb(' + JSON.stringify(storageState.currentMatterId) + ', ' + JSON.stringify(matterName) + '); return false;" class="cursor-pointer" style="color: var(--lex-text-secondary)">' + escapeHtml(matterName) + '</a>';
-    }
-
-    storageState.currentFolderPath.forEach(function (folder, index) {
-      html += '<span class="breadcrumb-separator">/</span>';
-      if (index === storageState.currentFolderPath.length - 1) {
-        html += '<span class="font-medium" style="color: var(--lex-text-primary)">' + escapeHtml(folder.name) + '</span>';
-      } else {
-        html += '<a href="#" style="color: var(--lex-text-secondary)" onclick="navigateToFolder(' + JSON.stringify(folder.id) + ', ' + JSON.stringify(folder.name) + '); return false;">' + escapeHtml(folder.name) + '</a>';
-      }
-    });
-
-    breadcrumbsEl.innerHTML = html;
-  }
-
-  // ── Folder contents (files + subfolders) ────────────────────────────
-
-  /**
-   * Handle a folder/matter card click using data attributes.
-   * Delegates to navigateToMatter or navigateToFolder based on card type.
+   * Handle a matter card click using data attributes.
+   * On drive.html every clickable item is a matter, so we always navigate to matter.
    * @param {HTMLElement} element - The clicked element with data attributes
    */
   function handleFolderClick(element) {
-    console.log('[Drive] handleFolderClick called', {
-      dataset: element.dataset,
-      isMatter: element.dataset.isMatter,
-      matterId: element.dataset.matterId,
-      folderId: element.dataset.folderId,
-      name: element.dataset.name,
-      currentMatterId: storageState.currentMatterId,
-      currentFolderId: storageState.currentFolderId
-    });
-
-    var isMatter = element.dataset.isMatter === 'true';
+    var matterId = element.dataset.matterId;
     var name = element.dataset.name;
 
-    if (isMatter) {
-      var matterId = element.dataset.matterId;
-      if (!matterId) {
-        console.error('[Drive] No matter ID found in dataset');
-        Lex.Toast.error('Cannot navigate: missing matter ID');
-        return;
+    if (!matterId) {
+      console.error('[Drive] No matter ID found in dataset');
+      Lex.Toast.error('Cannot navigate: missing matter ID');
+      return;
+    }
+
+    console.log('[Drive] Navigating to matter:', matterId, name);
+    navigateToMatter(matterId, name);
+  }
+
+  // ── Matters load ─────────────────────────────────────────────────────
+
+  /**
+   * Load all matters for the root view from /api/v1/storage/root.
+   * Supports pagination, search, sort, and source filter.
+   * @param {Object} [opts]
+   * @param {boolean} [opts.silent] - When true, skip the loading spinner
+   */
+  async function loadMatters(opts) {
+    var silent = opts && opts.silent;
+    console.log('[Drive] Loading matters' + (silent ? ' (silent)' : ''));
+
+    var loadingEl = document.getElementById('contentLoading');
+    var gridViewEl = document.getElementById('gridView');
+    var listViewEl = document.getElementById('listView');
+    var emptyEl = document.getElementById('contentEmpty');
+
+    if (!silent) {
+      loadingEl && loadingEl.classList.remove('hidden');
+      gridViewEl && gridViewEl.classList.add('hidden');
+      listViewEl && listViewEl.classList.add('hidden');
+      emptyEl && emptyEl.classList.add('hidden');
+    }
+
+    try {
+      var params = new URLSearchParams({
+        page: storageState.currentPage,
+        limit: 100,
+        sort: storageState.sortBy,
+        order: storageState.sortOrder
+      });
+
+      if (storageState.searchQuery) {
+        params.append('search', storageState.searchQuery);
       }
-      console.log('[Drive] Navigating to matter:', matterId, name);
-      navigateToMatter(matterId, name);
-    } else {
-      var folderId = element.dataset.folderId;
-      if (!folderId) {
-        console.error('[Drive] No folder ID found in dataset');
-        Lex.Toast.error('Cannot navigate: missing folder ID');
-        return;
+
+      if (storageState.sourceFilter !== 'all') {
+        params.append('source', storageState.sourceFilter);
       }
-      console.log('[Drive] Navigating to folder:', folderId, name);
-      navigateToFolder(folderId, name);
+
+      var response = await api.get('/api/v1/storage/root?' + params.toString());
+
+      if (response.success && response.matters) {
+        storageState.folders = response.matters.map(function (matter) {
+          return {
+            id: matter.id,
+            name: matter.name || matter.matter_id,
+            matter_id: matter.matter_id,
+            isMatter: true,
+            is_pinned: matter.is_pinned || false,
+            document_count: matter.document_count || 0,
+            child_folder_count: matter.folder_count || 0,
+            source: matter.source,
+            connector_id: matter.connector_id,
+            created_at: matter.created_at,
+            updated_at: matter.updated_at
+          };
+        });
+
+        if (response.pagination) {
+          storageState.totalResults = response.pagination.total;
+          storageState.totalPages = response.pagination.total_pages;
+        }
+
+        updateResultsCount();
+        renderMatters();
+      } else {
+        throw new Error(response.error || 'Failed to load matters');
+      }
+    } catch (error) {
+      console.error('[Drive] Failed to load matters:', error);
+      Lex.Toast.error('Failed to load files. Please try again.');
+
+      loadingEl && loadingEl.classList.add('hidden');
+      emptyEl && emptyEl.classList.remove('hidden');
     }
   }
 
+  // ── Results count ────────────────────────────────────────────────────
+
   /**
-   * Update the results count text element based on current state.
+   * Update the results count text element based on current pagination state.
    */
   function updateResultsCount() {
     var resultsCountEl = document.getElementById('resultsCount');
     if (!resultsCountEl) return;
 
-    if (!storageState.currentMatterId) {
-      var start = storageState.totalResults > 0 ? (storageState.currentPage - 1) * 100 + 1 : 0;
-      var end = Math.min(storageState.currentPage * 100, storageState.totalResults);
+    var start = storageState.totalResults > 0 ? (storageState.currentPage - 1) * 100 + 1 : 0;
+    var end = Math.min(storageState.currentPage * 100, storageState.totalResults);
 
-      if (storageState.totalResults === 0) {
-        resultsCountEl.textContent = 'No results found';
-      } else if (storageState.searchQuery || storageState.sourceFilter !== 'all') {
-        resultsCountEl.textContent = 'Showing ' + start + '-' + end + ' of ' + storageState.totalResults + ' results';
-      } else {
-        resultsCountEl.textContent = storageState.totalResults + ' matter' + (storageState.totalResults !== 1 ? 's' : '');
-      }
+    if (storageState.totalResults === 0) {
+      resultsCountEl.textContent = 'No results found';
+    } else if (storageState.searchQuery || storageState.sourceFilter !== 'all') {
+      resultsCountEl.textContent = 'Showing ' + start + '-' + end + ' of ' + storageState.totalResults + ' results';
     } else {
-      var folderCount = storageState.folders.length;
-      var fileCount = storageState.files.length;
-      var total = folderCount + fileCount;
-
-      if (total === 0) {
-        resultsCountEl.textContent = 'Empty folder';
-      } else {
-        var parts = [];
-        if (fileCount > 0) parts.push(fileCount + ' file' + (fileCount !== 1 ? 's' : ''));
-        if (folderCount > 0) parts.push(folderCount + ' folder' + (folderCount !== 1 ? 's' : ''));
-        resultsCountEl.textContent = parts.join(' \u2022 ');
-      }
+      resultsCountEl.textContent = storageState.totalResults + ' matter' + (storageState.totalResults !== 1 ? 's' : '');
     }
   }
 
-  /**
-   * Load all folder/file contents for the current state.
-   * Handles both root view (all matters) and matter view (subfolders + files).
-   */
-  async function loadFolderContents() {
-    console.log('[Drive] Loading folder contents:', storageState.currentFolderId);
-    storageState.loadingContent = true;
-
-    var loadingEl = document.getElementById('contentLoading');
-    var gridViewEl = document.getElementById('gridView');
-    var listViewEl = document.getElementById('listView');
-    var emptyEl = document.getElementById('contentEmpty');
-
-    loadingEl && loadingEl.classList.remove('hidden');
-    gridViewEl && gridViewEl.classList.add('hidden');
-    listViewEl && listViewEl.classList.add('hidden');
-    emptyEl && emptyEl.classList.add('hidden');
-
-    try {
-      // ROOT VIEW: Load all matters as folders from /api/v1/storage/root
-      if (!storageState.currentMatterId) {
-        var params = new URLSearchParams({
-          page: storageState.currentPage,
-          limit: 100,
-          sort: storageState.sortBy,
-          order: storageState.sortOrder
-        });
-
-        if (storageState.searchQuery) {
-          params.append('search', storageState.searchQuery);
-        }
-
-        if (storageState.sourceFilter !== 'all') {
-          params.append('source', storageState.sourceFilter);
-        }
-
-        var response = await api.get('/api/v1/storage/root?' + params.toString());
-
-        if (response.success && response.matters) {
-          storageState.folders = response.matters.map(function (matter) {
-            return {
-              id: matter.id,
-              name: matter.name || matter.matter_id,
-              matter_id: matter.matter_id,
-              isMatter: true,
-              is_pinned: matter.is_pinned || false,
-              document_count: matter.document_count || 0,
-              child_folder_count: matter.folder_count || 0,
-              source: matter.source,
-              connector_id: matter.connector_id,
-              created_at: matter.created_at,
-              updated_at: matter.updated_at
-            };
-          });
-          storageState.files = [];
-
-          if (response.pagination) {
-            storageState.totalResults = response.pagination.total;
-            storageState.totalPages = response.pagination.total_pages;
-          }
-
-          updateResultsCount();
-          renderFolderContents();
-        } else {
-          throw new Error(response.error || 'Failed to load matters');
-        }
-        return;
-      }
-
-      // MATTER VIEW: Fetch folders and files from API (matter-scoped)
-      var foldersResponse = await api.get('/api/v1/storage/folders?matter_id=' + storageState.currentMatterId);
-
-      if (foldersResponse.status === 'success' || foldersResponse.data || foldersResponse.folders) {
-        storageState.folders = (foldersResponse.data && foldersResponse.data.folders) || foldersResponse.folders || [];
-      } else {
-        console.warn('[Drive] Failed to load folders:', foldersResponse.error);
-        storageState.folders = [];
-      }
-
-      var fileParams = new URLSearchParams({
-        matter_id: storageState.currentMatterId
-      });
-
-      if (storageState.currentFolderId) {
-        fileParams.append('folder_id', storageState.currentFolderId);
-      }
-
-      if (storageState.searchQuery) {
-        fileParams.append('search', storageState.searchQuery);
-      }
-
-      if (storageState.sourceFilter !== 'all') {
-        fileParams.append('source', storageState.sourceFilter);
-      }
-
-      var filesResponse = await api.get('/api/v1/storage/files?' + fileParams.toString());
-
-      if (filesResponse.files || filesResponse.data || filesResponse.status === 'success') {
-        storageState.files = (filesResponse.data && filesResponse.data.files) || filesResponse.files || [];
-        buildFolderPath();
-        updateResultsCount();
-        renderFolderContents();
-
-        if (storageState.searchQuery && window.FeatureTracker) {
-          try {
-            await window.FeatureTracker.trackFeature(window.Features.SEARCH_PERFORMED, {
-              query_length: storageState.searchQuery.length,
-              result_count: storageState.files.length,
-              matter_id: storageState.currentMatterId,
-              source_filter: storageState.sourceFilter
-            });
-          } catch (trackError) {
-            console.error('[FeatureTracker] Failed to track search:', trackError);
-          }
-        }
-      } else {
-        throw new Error(filesResponse.error || 'Failed to load folder contents');
-      }
-    } catch (error) {
-      console.error('[Drive] Failed to load folder contents:', error);
-      Lex.Toast.error('Failed to load files. Please try again.');
-
-      loadingEl && loadingEl.classList.add('hidden');
-      emptyEl && emptyEl.classList.remove('hidden');
-    } finally {
-      storageState.loadingContent = false;
-    }
-  }
+  // ── Render ───────────────────────────────────────────────────────────
 
   /**
-   * Render folder/file contents into grid or list view based on storageState.viewMode.
+   * Render matter cards/rows into grid or list view based on storageState.viewMode.
    */
-  function renderFolderContents() {
+  function renderMatters() {
     var loadingEl = document.getElementById('contentLoading');
     var gridViewEl = document.getElementById('gridView');
     var listViewEl = document.getElementById('listView');
@@ -762,21 +355,9 @@
 
     loadingEl && loadingEl.classList.add('hidden');
 
-    var foldersToShow = [];
-    if (!storageState.currentMatterId) {
-      foldersToShow = storageState.folders.filter(function (f) { return f.isMatter; });
-    } else {
-      foldersToShow = storageState.folders.filter(function (f) {
-        if (!storageState.currentFolderId) {
-          return !f.parent_folder_id;
-        }
-        return f.parent_folder_id === storageState.currentFolderId;
-      });
-    }
+    var matters = storageState.folders.filter(function (f) { return f.isMatter; });
 
-    var totalItems = foldersToShow.length + storageState.files.length;
-
-    if (totalItems === 0) {
+    if (matters.length === 0) {
       emptyEl && emptyEl.classList.remove('hidden');
       gridViewEl && gridViewEl.classList.add('hidden');
       listViewEl && listViewEl.classList.add('hidden');
@@ -786,19 +367,16 @@
 
     emptyEl && emptyEl.classList.add('hidden');
 
-    var sortedFolders = foldersToShow.slice().sort(function (a, b) {
+    var sorted = matters.slice().sort(function (a, b) {
       return a.name.localeCompare(b.name);
-    });
-    var sortedFiles = storageState.files.slice().sort(function (a, b) {
-      return new Date(b.updated_at) - new Date(a.updated_at);
     });
 
     if (storageState.viewMode === 'grid') {
-      renderGridView(sortedFolders, sortedFiles);
+      renderGridView(sorted);
       gridViewEl && gridViewEl.classList.remove('hidden');
       listViewEl && listViewEl.classList.add('hidden');
     } else {
-      renderListView(sortedFolders, sortedFiles);
+      renderListView(sorted);
       listViewEl && listViewEl.classList.remove('hidden');
       gridViewEl && gridViewEl.classList.add('hidden');
     }
@@ -806,36 +384,24 @@
     updatePaginationUI();
   }
 
-  // ── Rendering (grid + list) ──────────────────────────────────────────
-
   /**
-   * Render the grid view with folder cards and file cards.
-   * @param {Array} folders
-   * @param {Array} files
+   * Render the grid view with matter cards only.
+   * @param {Array} matters
    */
-  function renderGridView(folders, files) {
+  function renderGridView(matters) {
     var gridViewEl = document.getElementById('gridView');
     if (!gridViewEl) return;
 
-    var folderCards = folders.map(function (folder) {
-      var displayHtml = folder.isMatter
-        ? [
-            '<h3 class="text-sm font-medium text-center truncate w-full" style="color: var(--lex-text-primary)">' + escapeHtml(folder.name) + '</h3>',
-            '<p class="text-xs font-mono text-center truncate w-full" style="color: var(--lex-text-secondary)" title="' + escapeHtml(folder.matter_id) + '">' + escapeHtml(folder.matter_id) + '</p>',
-            '<p class="text-xs text-center mt-1" style="color: var(--lex-text-secondary)">' + (folder.document_count || 0) + ' files \u2022 ' + (folder.child_folder_count || 0) + ' folders</p>'
-          ].join('')
-        : [
-            '<h3 class="text-sm font-medium text-center truncate w-full" style="color: var(--lex-text-primary)">' + escapeHtml(folder.name) + '</h3>',
-            '<p class="text-xs text-center mt-1" style="color: var(--lex-text-secondary)">' + (folder.document_count || 0) + ' files</p>'
-          ].join('');
+    var cards = matters.map(function (folder) {
+      var displayHtml = [
+        '<h3 class="text-sm font-medium text-center truncate w-full" style="color: var(--lex-text-primary)">' + escapeHtml(folder.name) + '</h3>',
+        '<p class="text-xs font-mono text-center truncate w-full" style="color: var(--lex-text-secondary)" title="' + escapeHtml(folder.matter_id) + '">' + escapeHtml(folder.matter_id) + '</p>',
+        '<p class="text-xs text-center mt-1" style="color: var(--lex-text-secondary)">' + (folder.document_count || 0) + ' files \u2022 ' + (folder.child_folder_count || 0) + ' folders</p>'
+      ].join('');
 
-      var dataAttrs = folder.isMatter
-        ? 'data-is-matter="true" data-matter-id="' + escapeHtml(folder.matter_id) + '" data-name="' + escapeHtml(folder.name) + '"'
-        : 'data-is-matter="false" data-folder-id="' + escapeHtml(folder.id) + '" data-name="' + escapeHtml(folder.name) + '"';
+      var dataAttrs = 'data-is-matter="true" data-matter-id="' + escapeHtml(folder.matter_id) + '" data-name="' + escapeHtml(folder.name) + '"';
 
-      var menuButtonAttrs = folder.isMatter
-        ? 'data-matter-id="' + escapeHtml(folder.matter_id) + '" data-matter-name="' + escapeHtml(folder.name) + '" data-is-pinned="' + (folder.is_pinned || false) + '" data-source="' + escapeHtml(folder.source || 'lana') + '" onclick="event.stopPropagation(); showMatterActionsModal(event)"'
-        : 'onclick="event.stopPropagation(); showFolderMenu(' + JSON.stringify(folder.id) + ', event)"';
+      var menuButtonAttrs = 'data-matter-id="' + escapeHtml(folder.matter_id) + '" data-matter-name="' + escapeHtml(folder.name) + '" data-is-pinned="' + (folder.is_pinned || false) + '" data-source="' + escapeHtml(folder.source || 'lana') + '" onclick="event.stopPropagation(); showMatterActionsModal(event)"';
 
       return [
         '<div class="grid-item rounded-lg border p-4 cursor-pointer hover:shadow-md transition-shadow relative group" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)" ' + dataAttrs + ' onclick="handleFolderClick(this)">',
@@ -852,67 +418,35 @@
       ].join('');
     }).join('');
 
-    var fileCards = files.map(function (file) {
-      return [
-        '<div class="grid-item rounded-lg border p-4 cursor-pointer hover:shadow-md transition-shadow relative" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)" onclick="openFileViewer(' + JSON.stringify(file.id) + ')">',
-        '  <button class="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity" style="color: var(--lex-text-tertiary); opacity: 1" onclick="event.stopPropagation(); showFileMenu(' + JSON.stringify(file.id) + ', event)">',
-        '    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>',
-        '  </button>',
-        '  <div class="flex flex-col items-center">',
-        '    ' + getFileIcon(file.filename),
-        '    <h3 class="text-sm font-medium text-center truncate w-full mt-2" style="color: var(--lex-text-primary)">' + escapeHtml(file.filename) + '</h3>',
-        '    <p class="text-xs mt-1" style="color: var(--lex-text-secondary)">' + formatFileSize(file.file_size) + '</p>',
-        '    <p class="text-xs" style="color: var(--lex-text-tertiary)">' + formatRelativeDate(file.updated_at) + '</p>',
-        '  </div>',
-        '</div>'
-      ].join('');
-    }).join('');
-
-    gridViewEl.innerHTML = folderCards + fileCards;
+    gridViewEl.innerHTML = cards;
   }
 
   /**
-   * Render the list/table view with folder rows and file rows.
-   * @param {Array} folders
-   * @param {Array} files
+   * Render the list/table view with matter rows only.
+   * @param {Array} matters
    */
-  function renderListView(folders, files) {
+  function renderListView(matters) {
     var listViewBodyEl = document.getElementById('listViewBody');
     if (!listViewBodyEl) return;
 
-    var folderRows = folders.map(function (folder) {
-      var dataAttrs = folder.isMatter
-        ? 'data-is-matter="true" data-matter-id="' + escapeHtml(folder.matter_id) + '" data-name="' + escapeHtml(folder.name) + '"'
-        : 'data-is-matter="false" data-folder-id="' + escapeHtml(folder.id) + '" data-name="' + escapeHtml(folder.name) + '"';
+    var rows = matters.map(function (folder) {
+      var dataAttrs = 'data-is-matter="true" data-matter-id="' + escapeHtml(folder.matter_id) + '" data-name="' + escapeHtml(folder.name) + '"';
 
-      var displayHtml = folder.isMatter
-        ? [
-            '<div class="flex items-center">',
-            '  <svg class="w-5 h-5 mr-3 flex-shrink-0" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
-            '    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>',
-            '  </svg>',
-            '  <div class="min-w-0 flex-1">',
-            '    <div class="text-sm font-medium truncate" style="color: var(--lex-text-primary)">' + escapeHtml(folder.name) + '</div>',
-            '    <div class="text-xs font-mono truncate" style="color: var(--lex-text-secondary)" title="' + escapeHtml(folder.matter_id) + '">' + escapeHtml(folder.matter_id) + '</div>',
-            '  </div>',
-            '</div>'
-          ].join('')
-        : [
-            '<div class="flex items-center">',
-            '  <svg class="w-5 h-5 mr-3" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
-            '    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>',
-            '  </svg>',
-            '  <span class="text-sm font-medium" style="color: var(--lex-text-primary)">' + escapeHtml(folder.name) + '</span>',
-            '</div>'
-          ].join('');
+      var displayHtml = [
+        '<div class="flex items-center">',
+        '  <svg class="w-5 h-5 mr-3 flex-shrink-0" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
+        '    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>',
+        '  </svg>',
+        '  <div class="min-w-0 flex-1">',
+        '    <div class="text-sm font-medium truncate" style="color: var(--lex-text-primary)">' + escapeHtml(folder.name) + '</div>',
+        '    <div class="text-xs font-mono truncate" style="color: var(--lex-text-secondary)" title="' + escapeHtml(folder.matter_id) + '">' + escapeHtml(folder.matter_id) + '</div>',
+        '  </div>',
+        '</div>'
+      ].join('');
 
-      var sizeDisplay = folder.isMatter
-        ? ((folder.document_count || 0) + ' files \u2022 ' + (folder.child_folder_count || 0) + ' folders')
-        : ((folder.document_count || 0) + ' items');
+      var sizeDisplay = (folder.document_count || 0) + ' files \u2022 ' + (folder.child_folder_count || 0) + ' folders';
 
-      var menuButtonAttrs = folder.isMatter
-        ? 'data-matter-id="' + escapeHtml(folder.matter_id) + '" data-matter-name="' + escapeHtml(folder.name) + '" data-is-pinned="' + (folder.is_pinned || false) + '" data-source="' + escapeHtml(folder.source || 'lana') + '" onclick="event.stopPropagation(); showMatterActionsModal(event)"'
-        : 'onclick="event.stopPropagation(); showFolderMenu(' + JSON.stringify(folder.id) + ', event)"';
+      var menuButtonAttrs = 'data-matter-id="' + escapeHtml(folder.matter_id) + '" data-matter-name="' + escapeHtml(folder.name) + '" data-is-pinned="' + (folder.is_pinned || false) + '" data-source="' + escapeHtml(folder.source || 'lana') + '" onclick="event.stopPropagation(); showMatterActionsModal(event)"';
 
       return [
         '<tr class="cursor-pointer" style="background: transparent" onmouseover="this.style.background=\'var(--lex-bg-secondary)\'" onmouseout="this.style.background=\'transparent\'" ' + dataAttrs + ' onclick="handleFolderClick(this)">',
@@ -929,28 +463,7 @@
       ].join('');
     }).join('');
 
-    var fileRows = files.map(function (file) {
-      return [
-        '<tr class="cursor-pointer" style="background: transparent" onmouseover="this.style.background=\'var(--lex-bg-secondary)\'" onmouseout="this.style.background=\'transparent\'" onclick="openFileViewer(' + JSON.stringify(file.id) + ')">',
-        '  <td class="px-6 py-4 whitespace-nowrap">',
-        '    <div class="flex items-center">',
-        '      ' + getFileIconSmall(file.filename),
-        '      <span class="text-sm font-medium" style="color: var(--lex-text-primary)">' + escapeHtml(file.filename) + '</span>',
-        '    </div>',
-        '  </td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + escapeHtml(file.created_by_username || 'Unknown') + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + formatRelativeDate(file.created_at) + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + formatFileSize(file.file_size) + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm">',
-        '    <button style="color: var(--lex-text-tertiary)" onclick="event.stopPropagation(); showFileMenu(' + JSON.stringify(file.id) + ', event)">',
-        '      <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>',
-        '    </button>',
-        '  </td>',
-        '</tr>'
-      ].join('');
-    }).join('');
-
-    listViewBodyEl.innerHTML = folderRows + fileRows;
+    listViewBodyEl.innerHTML = rows;
   }
 
   // ── View toggle ──────────────────────────────────────────────────────
@@ -974,7 +487,7 @@
       gridBtn && (gridBtn.variant = 'ghost');
     }
 
-    renderFolderContents();
+    renderMatters();
   }
 
   // ── New folder modal ─────────────────────────────────────────────────
@@ -1004,7 +517,8 @@
   }
 
   /**
-   * Handle new folder form submission. Creates a folder via API.
+   * Handle new folder form submission. Creates a matter via API at root level.
+   * Uses matter_id: null to signal root creation to the backend.
    * @param {Event} event
    */
   async function handleCreateFolder(event) {
@@ -1026,14 +540,14 @@
     try {
       var response = await api.post('/api/v1/storage/folders', {
         name: folderName,
-        matter_id: storageState.currentMatterId,
-        parent_folder_id: storageState.currentFolderId || null
+        matter_id: null,
+        parent_folder_id: null
       });
 
       if (response.status === 'success') {
         Lex.Toast.success('Folder created successfully');
         hideNewFolderModal();
-        await loadFolderContents();
+        await loadMatters();
       } else {
         console.error('[Drive] API returned error:', response);
         throw new Error(response.error || 'Failed to create folder');
@@ -1042,627 +556,6 @@
       console.error('[Drive] Failed to create folder:', error);
       Lex.Toast.error('Failed to create folder. Please try again.');
     }
-  }
-
-  // ── File upload with hints ───────────────────────────────────────────
-
-  /**
-   * Handle file input change event. Routes to single or bulk upload modal.
-   * @param {Event} event
-   */
-  function handleFileSelection(event) {
-    var files = event.target.files;
-    if (!files || files.length === 0) return;
-
-    pendingUploadFiles = Array.from(files);
-    console.log('[Drive] Files selected:', pendingUploadFiles.length);
-
-    if (pendingUploadFiles.length === 1) {
-      showSingleUploadModal(pendingUploadFiles[0]);
-    } else {
-      showBulkUploadModal(pendingUploadFiles);
-    }
-  }
-
-  /**
-   * Show the single file upload modal and populate file details.
-   * @param {File} file
-   */
-  function showSingleUploadModal(file) {
-    var modal = document.getElementById('uploadSingleFileModal');
-    var fileNameEl = document.getElementById('singleFileName');
-    var fileSizeEl = document.getElementById('singleFileSize');
-    var signaturesCheckbox = document.getElementById('singleHasSignatures');
-    var formsCheckbox = document.getElementById('singleHasForms');
-
-    if (fileNameEl) fileNameEl.textContent = file.name;
-    if (fileSizeEl) fileSizeEl.textContent = formatFileSize(file.size);
-
-    // lex-checkbox: reset via the .checked property on the component element
-    if (signaturesCheckbox) signaturesCheckbox.checked = false;
-    if (formsCheckbox) formsCheckbox.checked = false;
-
-    if (modal) modal.open = true;
-  }
-
-  /**
-   * Hide and reset the single file upload modal.
-   */
-  function hideSingleUploadModal() {
-    var modal = document.getElementById('uploadSingleFileModal');
-    if (modal) modal.open = false;
-
-    pendingUploadFiles = null;
-    var fileInput = document.getElementById('fileUploadInput');
-    if (fileInput) fileInput.value = '';
-  }
-
-  /**
-   * Execute single file upload with user-specified processing hints.
-   */
-  async function handleSingleFileUploadWithHints() {
-    if (!pendingUploadFiles || pendingUploadFiles.length !== 1) {
-      Lex.Toast.error('No file selected');
-      return;
-    }
-
-    var file = pendingUploadFiles[0];
-    var signaturesCheckbox = document.getElementById('singleHasSignatures');
-    var formsCheckbox = document.getElementById('singleHasForms');
-    var hasSignatures = signaturesCheckbox ? signaturesCheckbox.checked : false;
-    var hasForms = formsCheckbox ? formsCheckbox.checked : false;
-
-    console.log('[Drive] Uploading file with hints:', {
-      filename: file.name,
-      hasSignatures: hasSignatures,
-      hasForms: hasForms
-    });
-
-    hideSingleUploadModal();
-    Lex.Toast.info('Uploading file...');
-
-    try {
-      await api._readyPromise;
-
-      var formData = new FormData();
-      formData.append('file', file);
-      formData.append('matter_id', storageState.currentMatterId);
-      if (storageState.currentFolderId) {
-        formData.append('folder_id', storageState.currentFolderId);
-      }
-
-      if (hasSignatures || hasForms) {
-        var hints = {};
-        if (hasSignatures) hints.hasSignatures = true;
-        if (hasForms) hints.hasForms = true;
-        formData.append('hints', JSON.stringify(hints));
-      }
-
-      var response = await fetch(api.baseUrl + '/api/v1/storage/upload', {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Bearer ' + api.token
-        },
-        body: formData
-      });
-
-      if (!response.ok) {
-        throw new Error('Upload failed: ' + response.status);
-      }
-
-      var result = await response.json();
-      console.log('[Drive] Upload successful:', result);
-
-      Lex.Toast.success('File uploaded successfully');
-
-      if (window.FeatureTracker) {
-        try {
-          await window.FeatureTracker.trackFeature(window.Features.DOCUMENT_UPLOADED, {
-            file_type: file.type || 'unknown',
-            file_size: file.size,
-            matter_id: storageState.currentMatterId,
-            folder_id: storageState.currentFolderId || null,
-            has_hints: !!(hasSignatures || hasForms)
-          });
-        } catch (trackError) {
-          console.error('[FeatureTracker] Failed to track upload:', trackError);
-        }
-      }
-
-      await loadFolderContents();
-    } catch (error) {
-      console.error('[Drive] Failed to upload file:', error);
-      Lex.Toast.error('Failed to upload file. Please try again.');
-    }
-  }
-
-  /**
-   * Show the bulk upload modal with a grid of file rows.
-   * @param {File[]} files
-   */
-  function showBulkUploadModal(files) {
-    var modal = document.getElementById('bulkUploadModal');
-    var gridBodyEl = document.getElementById('bulkUploadGridBody');
-
-    var rows = files.map(function (file, index) {
-      return [
-        '<tr>',
-        '  <td class="px-4 py-3 text-sm" style="color: var(--lex-text-primary)">' + escapeHtml(file.name) + '</td>',
-        '  <td class="px-4 py-3 text-sm" style="color: var(--lex-text-secondary)">' + formatFileSize(file.size) + '</td>',
-        '  <td class="px-4 py-3 text-sm bulk-doc-type" style="color: var(--lex-text-secondary)" data-index="' + index + '">' + getFileType(file) + '</td>',
-        '  <td class="px-4 py-3 text-center"><lex-checkbox class="bulk-signatures-checkbox" data-index="' + index + '"></lex-checkbox></td>',
-        '  <td class="px-4 py-3 text-center"><lex-checkbox class="bulk-forms-checkbox" data-index="' + index + '"></lex-checkbox></td>',
-        '</tr>'
-      ].join('');
-    }).join('');
-
-    if (gridBodyEl) gridBodyEl.innerHTML = rows;
-
-    var fileCountEl = document.getElementById('bulkFileCount');
-    if (fileCountEl) fileCountEl.textContent = files.length;
-
-    if (modal) modal.open = true;
-  }
-
-  /**
-   * Hide and reset the bulk upload modal.
-   */
-  function hideBulkUploadModal() {
-    var modal = document.getElementById('bulkUploadModal');
-    if (modal) modal.open = false;
-
-    pendingUploadFiles = null;
-    var fileInput = document.getElementById('fileUploadInput');
-    if (fileInput) fileInput.value = '';
-  }
-
-  /**
-   * Apply the first file's hint checkboxes to all files in the bulk grid.
-   */
-  function applyHintsToAll() {
-    var firstSignatures = document.querySelector('.bulk-signatures-checkbox[data-index="0"]');
-    var firstForms = document.querySelector('.bulk-forms-checkbox[data-index="0"]');
-    var sigChecked = firstSignatures ? firstSignatures.checked : false;
-    var formsChecked = firstForms ? firstForms.checked : false;
-
-    document.querySelectorAll('.bulk-signatures-checkbox').forEach(function (checkbox) {
-      checkbox.checked = sigChecked;
-    });
-    document.querySelectorAll('.bulk-forms-checkbox').forEach(function (checkbox) {
-      checkbox.checked = formsChecked;
-    });
-
-    Lex.Toast.success('Hints applied to all files');
-  }
-
-  /**
-   * Apply the selected document type from the bulk dropdown to all rows.
-   */
-  function applyDocTypeToAll() {
-    var lexSelect = document.getElementById('bulkApplyDocType');
-    var selectedType = lexSelect ? lexSelect.value : '';
-    if (!selectedType) {
-      Lex.Toast.warning('Please select a document type first');
-      return;
-    }
-    // Find the label from the options attribute
-    var label = selectedType;
-    try {
-      var opts = JSON.parse(lexSelect.getAttribute('options') || '[]');
-      for (var i = 0; i < opts.length; i++) {
-        if (opts[i].value === selectedType) { label = opts[i].label; break; }
-      }
-    } catch (e) { /* use selectedType as fallback */ }
-    document.querySelectorAll('.bulk-doc-type').forEach(function (cell) {
-      cell.textContent = label;
-      cell.dataset.docType = selectedType;
-    });
-    Lex.Toast.success('Document type applied to all files');
-  }
-
-  /**
-   * Check all signature hint checkboxes in the bulk upload grid.
-   */
-  function applySignaturesToAll() {
-    document.querySelectorAll('.bulk-signatures-checkbox').forEach(function (checkbox) {
-      checkbox.checked = true;
-    });
-    Lex.Toast.success('Signatures hint checked for all files');
-  }
-
-  /**
-   * Check all forms hint checkboxes in the bulk upload grid.
-   */
-  function applyFormsToAll() {
-    document.querySelectorAll('.bulk-forms-checkbox').forEach(function (checkbox) {
-      checkbox.checked = true;
-    });
-    Lex.Toast.success('Forms hint checked for all files');
-  }
-
-  /**
-   * Clear all hint checkboxes and reset doc types in the bulk upload grid.
-   */
-  function clearAllHints() {
-    document.querySelectorAll('.bulk-signatures-checkbox').forEach(function (checkbox) {
-      checkbox.checked = false;
-    });
-    document.querySelectorAll('.bulk-forms-checkbox').forEach(function (checkbox) {
-      checkbox.checked = false;
-    });
-    var select = document.getElementById('bulkApplyDocType');
-    if (select) select.value = '';
-    Lex.Toast.info('All hints cleared');
-  }
-
-  /**
-   * Execute bulk upload with per-file processing hints.
-   */
-  async function handleBulkUploadWithHints() {
-    if (!pendingUploadFiles || pendingUploadFiles.length === 0) {
-      Lex.Toast.error('No files selected');
-      return;
-    }
-
-    var filesWithHints = pendingUploadFiles.map(function (file, index) {
-      var sigEl = document.querySelector('.bulk-signatures-checkbox[data-index="' + index + '"]');
-      var formsEl = document.querySelector('.bulk-forms-checkbox[data-index="' + index + '"]');
-      var hasSignatures = sigEl ? sigEl.checked : false;
-      var hasForms = formsEl ? formsEl.checked : false;
-
-      var hints = {};
-      if (hasSignatures) hints.hasSignatures = true;
-      if (hasForms) hints.hasForms = true;
-
-      return {
-        file: file,
-        hints: Object.keys(hints).length > 0 ? hints : null
-      };
-    });
-
-    console.log('[Drive] Uploading', filesWithHints.length, 'files with hints');
-
-    hideBulkUploadModal();
-    Lex.Toast.info('Uploading ' + filesWithHints.length + ' file(s)...');
-
-    try {
-      await api._readyPromise;
-
-      var uploadPromises = filesWithHints.map(function (item) {
-        var formData = new FormData();
-        formData.append('file', item.file);
-        formData.append('matter_id', storageState.currentMatterId);
-        if (storageState.currentFolderId) {
-          formData.append('folder_id', storageState.currentFolderId);
-        }
-        if (item.hints) {
-          formData.append('hints', JSON.stringify(item.hints));
-        }
-
-        return fetch(api.baseUrl + '/api/v1/storage/upload', {
-          method: 'POST',
-          headers: {
-            'Authorization': 'Bearer ' + api.token
-          },
-          body: formData
-        });
-      });
-
-      var responses = await Promise.all(uploadPromises);
-      var failedUploads = responses.filter(function (r) { return !r.ok; });
-
-      if (failedUploads.length > 0) {
-        throw new Error(failedUploads.length + ' file(s) failed to upload');
-      }
-
-      var results = await Promise.all(responses.map(function (r) { return r.json(); }));
-      console.log('[Drive] Bulk upload successful:', results);
-
-      Lex.Toast.success('Successfully uploaded ' + filesWithHints.length + ' file(s)');
-
-      if (window.FeatureTracker) {
-        for (var i = 0; i < filesWithHints.length; i++) {
-          var item = filesWithHints[i];
-          try {
-            await window.FeatureTracker.trackFeature(window.Features.DOCUMENT_UPLOADED, {
-              file_type: item.file.type || 'unknown',
-              file_size: item.file.size,
-              matter_id: storageState.currentMatterId,
-              folder_id: storageState.currentFolderId || null,
-              is_bulk_upload: true
-            });
-          } catch (trackError) {
-            console.error('[FeatureTracker] Failed to track bulk upload:', trackError);
-          }
-        }
-      }
-
-      await loadFolderContents();
-    } catch (error) {
-      console.error('[Drive] Failed to upload files:', error);
-      Lex.Toast.error('Failed to upload files. Please try again.');
-    }
-  }
-
-  // ── File operations ──────────────────────────────────────────────────
-
-  /**
-   * Download a file by ID using blob approach (prevents navigation/white screen).
-   * @param {string} fileId
-   */
-  async function downloadFile(fileId) {
-    console.log('[Drive] Downloading file:', fileId);
-
-    try {
-      var fileMetadata = await api.get('/api/v1/storage/files/' + fileId);
-      if (!fileMetadata || !fileMetadata.filename) {
-        throw new Error('Failed to retrieve file metadata');
-      }
-
-      var filename = fileMetadata.filename;
-
-      var response = await fetch(api.baseUrl + '/api/v1/storage/files/' + fileId + '/download', {
-        headers: {
-          'Authorization': 'Bearer ' + api.token
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Download failed: ' + response.status);
-      }
-
-      var blob = await response.blob();
-      var url = URL.createObjectURL(blob);
-
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      console.log('[Drive] Download started:', filename);
-    } catch (error) {
-      console.error('[Drive] Failed to download file:', error);
-      Lex.Toast.error('Failed to download file. Please try again.');
-    }
-  }
-
-  // ── Context menu ─────────────────────────────────────────────────────
-
-  /**
-   * Show the context menu for a file item.
-   * @param {string} fileId
-   * @param {Event} event
-   */
-  function showFileMenu(fileId, event) {
-    console.log('[Drive] Show file menu:', fileId);
-    event && event.stopPropagation();
-
-    var file = null;
-    for (var i = 0; i < storageState.files.length; i++) {
-      if (storageState.files[i].id === fileId) {
-        file = storageState.files[i];
-        break;
-      }
-    }
-    if (!file) return;
-
-    var menuItems = [
-      {
-        icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>',
-        label: 'Download',
-        action: function () { downloadFile(fileId); }
-      },
-      {
-        icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>',
-        label: 'Preview',
-        action: function () {
-          hideContextMenu();
-          Lex.Toast.info('Preview feature coming soon!');
-        }
-      },
-      {
-        icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>',
-        label: 'Rename',
-        action: function () {
-          hideContextMenu();
-          Lex.Toast.info('Rename feature coming soon!');
-        }
-      },
-      { divider: true },
-      {
-        icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>',
-        label: 'Delete',
-        className: 'text-red-600 hover:bg-red-50',
-        action: function () {
-          hideContextMenu();
-          Lex.Toast.info('Delete feature coming soon!');
-        }
-      }
-    ];
-
-    showContextMenu(menuItems, event);
-  }
-
-  /**
-   * Show the context menu for a folder item.
-   * @param {string|Object} folderOrId - Folder object or folder ID string
-   * @param {Event} event
-   */
-  function showFolderMenu(folderOrId, event) {
-    console.log('[Drive] Show folder menu:', folderOrId);
-    if (event && event.stopPropagation) {
-      event.stopPropagation();
-    }
-
-    var folder;
-    if (typeof folderOrId === 'object') {
-      folder = folderOrId;
-    } else {
-      folder = null;
-      for (var i = 0; i < storageState.folders.length; i++) {
-        if (storageState.folders[i].id === folderOrId) {
-          folder = storageState.folders[i];
-          break;
-        }
-      }
-    }
-
-    if (!folder) return;
-
-    var menuItems = [
-      {
-        icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>',
-        label: 'Open',
-        action: function () {
-          hideContextMenu();
-          if (folder.isMatter) {
-            navigateToMatter(folder.matter_id, folder.name);
-          } else {
-            navigateToFolder(folder.id, folder.name);
-          }
-        }
-      },
-      {
-        icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>',
-        label: 'Rename',
-        action: function () {
-          hideContextMenu();
-          Lex.Toast.info('Rename feature coming soon!');
-        }
-      }
-    ];
-
-    console.log('[Drive] Pin check:', {
-      isMatter: folder.isMatter,
-      currentMatterId: storageState.currentMatterId,
-      shouldShowPin: folder.isMatter && !storageState.currentMatterId,
-      folder: folder
-    });
-
-    if (folder.isMatter && !storageState.currentMatterId) {
-      (function (f) {
-        menuItems.push({
-          icon: '<path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/>',
-          label: f.is_pinned ? 'Unpin' : 'Pin',
-          action: async function () {
-            hideContextMenu();
-            await togglePin(f.matter_id, f.source || 'lana', f.is_pinned || false);
-          }
-        });
-      }(folder));
-    }
-
-    menuItems.push(
-      { divider: true },
-      {
-        icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>',
-        label: 'Delete',
-        className: 'text-red-600 hover:bg-red-50',
-        action: function () {
-          hideContextMenu();
-          Lex.Toast.info('Delete feature coming soon!');
-        }
-      }
-    );
-
-    showContextMenu(menuItems, event);
-  }
-
-  /**
-   * Build and position a generic context menu from an array of menu item descriptors.
-   * Actions are stored as temporary window globals (contextMenuAction_N) to support
-   * inline onclick handlers.
-   * @param {Array} menuItems
-   * @param {Event} event
-   */
-  function showContextMenu(menuItems, event) {
-    var menu = document.getElementById('contextMenu');
-    if (!menu) return;
-
-    var menuHTML = menuItems.map(function (item, index) {
-      if (item.divider) {
-        return '<div class="my-1" style="border-top: 1px solid var(--lex-border-default)"></div>';
-      }
-
-      // Danger items keep their semantic color; default items use Lex tokens
-      var isDanger = item.className && item.className.indexOf('red') !== -1;
-      var itemStyle = isDanger
-        ? 'color: var(--lex-status-danger-text)'
-        : 'color: var(--lex-text-primary)';
-      var hoverClass = isDanger ? 'context-menu-item--danger' : 'context-menu-item';
-      return [
-        '<button class="w-full text-left px-4 py-2 text-sm flex items-center gap-3 transition-colors ' + hoverClass + '" style="' + itemStyle + '" onclick="window.contextMenuAction_' + index + '()">',
-        '  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' + item.icon + '</svg>',
-        '  ' + item.label,
-        '</button>'
-      ].join('');
-    }).join('');
-
-    menu.innerHTML = menuHTML;
-
-    menuItems.forEach(function (item, index) {
-      if (!item.divider) {
-        window['contextMenuAction_' + index] = item.action;
-      }
-    });
-
-    menu.style.visibility = 'hidden';
-    menu.classList.remove('hidden');
-
-    var target = (event && event.currentTarget) || (event && event.target);
-    console.log('[Drive] Context menu - event:', event);
-    console.log('[Drive] Context menu - target:', target);
-
-    var rect = target ? target.getBoundingClientRect() : null;
-    console.log('[Drive] Context menu - rect:', rect);
-
-    if (rect) {
-      requestAnimationFrame(function () {
-        var menuWidth = menu.offsetWidth || 200;
-        var menuHeight = menu.offsetHeight || 100;
-        console.log('[Drive] Context menu - dimensions:', { menuWidth: menuWidth, menuHeight: menuHeight });
-
-        var left = rect.left - menuWidth - 10;
-        var top = rect.top;
-
-        if (left < 10) {
-          left = rect.right + 10;
-        }
-        if (top + menuHeight > window.innerHeight - 10) {
-          top = window.innerHeight - menuHeight - 10;
-        }
-
-        console.log('[Drive] Context menu - final position:', { left: left, top: top });
-        menu.style.left = left + 'px';
-        menu.style.top = top + 'px';
-        menu.style.transform = 'none';
-        menu.style.visibility = 'visible';
-      });
-    } else {
-      console.log('[Drive] Context menu - NO RECT, using center fallback');
-      menu.style.left = '50%';
-      menu.style.top = '50%';
-      menu.style.transform = 'translate(-50%, -50%)';
-      menu.style.visibility = 'visible';
-    }
-
-    setTimeout(function () {
-      document.addEventListener('click', hideContextMenu);
-    }, 0);
-  }
-
-  /**
-   * Hide the context menu and remove its document click listener.
-   */
-  function hideContextMenu() {
-    var menu = document.getElementById('contextMenu');
-    if (menu) {
-      menu.classList.add('hidden');
-    }
-    document.removeEventListener('click', hideContextMenu);
   }
 
   // ── Matter actions modal ─────────────────────────────────────────────
@@ -1806,7 +699,7 @@
       await Promise.all([
         loadPinnedMatters(),
         loadRecentMatters(),
-        loadFolderContents()
+        loadMatters()
       ]);
     } catch (error) {
       console.error('[Drive] Failed to delete matter:', error);
@@ -1823,46 +716,40 @@
 
   /**
    * Update pagination UI elements (page numbers, button states).
-   * Pagination is only shown in root view.
    */
   function updatePaginationUI() {
     var paginationControls = document.getElementById('paginationControls');
+    paginationControls && paginationControls.classList.remove('hidden');
 
-    if (!storageState.currentMatterId) {
-      paginationControls && paginationControls.classList.remove('hidden');
+    var limit = 100;
+    var start = (storageState.currentPage - 1) * limit + 1;
+    var end = Math.min(storageState.currentPage * limit, storageState.totalResults);
 
-      var limit = 100;
-      var start = (storageState.currentPage - 1) * limit + 1;
-      var end = Math.min(storageState.currentPage * limit, storageState.totalResults);
+    var startEl = document.getElementById('paginationStart');
+    var endEl = document.getElementById('paginationEnd');
+    var totalEl = document.getElementById('paginationTotal');
+    var currentPageEl = document.getElementById('currentPageNum');
+    var totalPagesEl = document.getElementById('totalPagesNum');
 
-      var startEl = document.getElementById('paginationStart');
-      var endEl = document.getElementById('paginationEnd');
-      var totalEl = document.getElementById('paginationTotal');
-      var currentPageEl = document.getElementById('currentPageNum');
-      var totalPagesEl = document.getElementById('totalPagesNum');
+    if (startEl) startEl.textContent = start;
+    if (endEl) endEl.textContent = end;
+    if (totalEl) totalEl.textContent = storageState.totalResults;
+    if (currentPageEl) currentPageEl.textContent = storageState.currentPage;
+    if (totalPagesEl) totalPagesEl.textContent = storageState.totalPages || 1;
 
-      if (startEl) startEl.textContent = start;
-      if (endEl) endEl.textContent = end;
-      if (totalEl) totalEl.textContent = storageState.totalResults;
-      if (currentPageEl) currentPageEl.textContent = storageState.currentPage;
-      if (totalPagesEl) totalPagesEl.textContent = storageState.totalPages || 1;
+    var isFirstPage = storageState.currentPage === 1;
+    var isLastPage = storageState.currentPage >= storageState.totalPages;
 
-      var isFirstPage = storageState.currentPage === 1;
-      var isLastPage = storageState.currentPage >= storageState.totalPages;
+    // lex-btn: disabled is a reflected property — set it directly on the element
+    var prevBtn = document.getElementById('prevPage');
+    var nextBtn = document.getElementById('nextPage');
+    if (prevBtn) prevBtn.disabled = isFirstPage;
+    if (nextBtn) nextBtn.disabled = isLastPage;
 
-      // lex-btn: disabled is a reflected property — set it directly on the element
-      var prevBtn = document.getElementById('prevPage');
-      var nextBtn = document.getElementById('nextPage');
-      if (prevBtn) prevBtn.disabled = isFirstPage;
-      if (nextBtn) nextBtn.disabled = isLastPage;
-
-      var prevBtnMobile = document.getElementById('prevPageMobile');
-      var nextBtnMobile = document.getElementById('nextPageMobile');
-      if (prevBtnMobile) prevBtnMobile.disabled = isFirstPage;
-      if (nextBtnMobile) nextBtnMobile.disabled = isLastPage;
-    } else {
-      paginationControls && paginationControls.classList.add('hidden');
-    }
+    var prevBtnMobile = document.getElementById('prevPageMobile');
+    var nextBtnMobile = document.getElementById('nextPageMobile');
+    if (prevBtnMobile) prevBtnMobile.disabled = isFirstPage;
+    if (nextBtnMobile) nextBtnMobile.disabled = isLastPage;
   }
 
   /**
@@ -1871,7 +758,7 @@
   async function goToPreviousPage() {
     if (storageState.currentPage > 1) {
       storageState.currentPage--;
-      await loadFolderContents();
+      await loadMatters();
     }
   }
 
@@ -1881,12 +768,12 @@
   async function goToNextPage() {
     if (storageState.currentPage < storageState.totalPages) {
       storageState.currentPage++;
-      await loadFolderContents();
+      await loadMatters();
     }
   }
 
   /**
-   * Refresh all sections: pinned, recent, and main folder contents.
+   * Refresh all sections: pinned, recents, and main matters list.
    */
   async function refreshPage() {
     console.log('[Drive] Refreshing page...');
@@ -1899,7 +786,7 @@
     await Promise.all([
       loadPinnedMatters(),
       loadRecentMatters(),
-      loadFolderContents()
+      loadMatters()
     ]);
 
     console.log('[Drive] Page refreshed successfully');
@@ -1974,12 +861,13 @@
       }
     } catch (error) {
       console.error('[Drive] Failed to load recent items:', error);
-      // Silently fail - recents are not critical
+      // Silently fail — recents are not critical
     }
   }
 
   /**
    * Render a file card for the recents section.
+   * Clicking navigates to folder.html with the file's matter context and an open_file param.
    * @param {Object} file
    * @returns {string} HTML string
    */
@@ -2003,15 +891,17 @@
   }
 
   /**
-   * Open a recently accessed file using the global file viewer.
+   * Open a recently accessed file by navigating to folder.html with open_file param.
    * @param {string} fileId
    * @param {string} clientMatter
    */
   function openRecentFile(fileId, clientMatter) {
-    if (window.openFileViewer) {
-      window.openFileViewer(fileId);
-    } else {
-      console.error('[Drive] openFileViewer not available');
+    if (clientMatter) {
+      var params = new URLSearchParams({
+        matter_id: clientMatter,
+        open_file: fileId
+      });
+      Lex.Nav.go('folder.html?' + params.toString());
     }
   }
 
@@ -2063,7 +953,7 @@
       }
     } catch (error) {
       console.error('[Drive] Failed to load pinned matters:', error);
-      // Silently fail - pinned are not critical
+      // Silently fail — pinned are not critical
     }
   }
 
@@ -2137,7 +1027,7 @@
       await Promise.all([
         loadPinnedMatters(),
         loadRecentMatters(),
-        loadFolderContents()
+        loadMatters()
       ]);
     } catch (error) {
       console.error('[Drive] Failed to toggle pin:', error);
@@ -2196,35 +1086,16 @@
 
   /**
    * Called by LexRouter when navigating to the drive page.
-   * Initializes state, parses URL params, exposes globals, wires events,
-   * and loads initial data.
+   * Initializes state, exposes globals, wires events, and loads initial data.
+   * drive.html is always the root view — no URL params to parse.
    */
   function onEnter() {
     resetState();
 
-    // Parse URL params
-    var urlParams = new URLSearchParams(window.location.search);
-    storageState.currentMatterId = urlParams.get('matter_id') || null;
-    storageState.currentMatterName = urlParams.get('matter_name') || null;
-    storageState.currentFolderId = urlParams.get('folder_id') || null;
-
-    console.log('[Drive] onEnter - state:', {
-      matterId: storageState.currentMatterId,
-      matterName: storageState.currentMatterName,
-      folderId: storageState.currentFolderId,
-      isRootView: !storageState.currentMatterId
-    });
-
     // Expose globals needed by inline onclick handlers in drive.html
     exposeGlobal('handleFolderClick', handleFolderClick);
-    exposeGlobal('navigateToFolder', navigateToFolder);
     exposeGlobal('navigateToMatter', navigateToMatter);
     exposeGlobal('navigateToRoot', navigateToRoot);
-    exposeGlobal('navigateToMatterBreadcrumb', navigateToMatterBreadcrumb);
-    exposeGlobal('toggleFolder', toggleFolder);
-    exposeGlobal('downloadFile', downloadFile);
-    exposeGlobal('showFileMenu', showFileMenu);
-    exposeGlobal('showFolderMenu', showFolderMenu);
     exposeGlobal('showMatterActionsModal', showMatterActionsModal);
     exposeGlobal('closeMatterActionsModal', closeMatterActionsModal);
     exposeGlobal('openMatterFromModal', openMatterFromModal);
@@ -2238,21 +1109,12 @@
     exposeGlobal('goToNextPage', goToNextPage);
     exposeGlobal('refreshPage', refreshPage);
 
-    // Set up event listeners
     setupEventListeners();
-
-    // Load initial data
-    if (storageState.currentMatterId) {
-      loadFolderContents();
-      buildFolderPath();
-    } else {
-      loadFolderContents();
-      Promise.all([loadRecentMatters(), loadPinnedMatters()]).catch(function (err) {
-        console.error('[Drive] Failed to load recents/pinned:', err);
-      });
-    }
-
     updateViewButtons();
+    loadMatters();
+    Promise.all([loadRecentMatters(), loadPinnedMatters()]).catch(function (err) {
+      console.error('[Drive] Failed to load recents/pinned:', err);
+    });
   }
 
   /**
@@ -2278,23 +1140,19 @@
     });
     _documentListeners = [];
 
-    // Reset module-level state
-    pendingUploadFiles = null;
-    selectedMatter = null;
-
-    // Ensure context menu listener is removed (not tracked via trackDocListener)
-    hideContextMenu();
-
-    // Clean up dynamic contextMenuAction_* globals
-    var keysToDelete = [];
-    for (var key in window) {
-      if (key.indexOf('contextMenuAction_') === 0) {
-        keysToDelete.push(key);
-      }
+    // Cancel any pending search debounce timer
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+      searchTimeout = null;
     }
-    keysToDelete.forEach(function (key) {
-      delete window[key];
-    });
+
+    // Reset module-level state
+    selectedMatter = null;
+    resetState();
+
+    // Clear search input so it doesn't persist on re-navigation
+    var searchEl = document.getElementById('searchInput');
+    if (searchEl) searchEl.value = '';
   }
 
   // ── Register with router ─────────────────────────────────────────────

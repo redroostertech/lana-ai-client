@@ -51,7 +51,7 @@
         position: fixed;
         inset: 0;
         background: rgba(0, 0, 0, 0.5);
-        animation: lex-modal-fade-in 0.2s ease;
+        animation: lex-modal-fade-in var(--lex-duration-fade, 200ms) var(--lex-ease-out, ease);
       }
 
       /* ── Panel ───────────────────────────────────────── */
@@ -64,11 +64,17 @@
         background: var(--lex-bg-primary);
         border-radius: var(--lex-radius-xl, 12px);
         box-shadow: var(--lex-shadow-xl, 0 20px 60px rgba(0,0,0,0.15));
-        animation: lex-modal-slide-up 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         overflow: hidden;
       }
 
-      /* Size variants */
+      /* Size variants — slide-up entry for standard sizes */
+      .lex-modal-panel--sm,
+      .lex-modal-panel--md,
+      .lex-modal-panel--lg,
+      .lex-modal-panel--xl {
+        animation: lex-modal-slide-up var(--lex-duration-slide, 300ms) var(--lex-ease-out, ease);
+      }
+
       .lex-modal-panel--sm  { max-width: 380px; }
       .lex-modal-panel--md  { max-width: 480px; }
       .lex-modal-panel--lg  { max-width: 640px; }
@@ -77,6 +83,7 @@
       /* Fullscreen */
       .lex-modal-overlay--full {
         padding: 0;
+        justify-content: flex-end;
       }
 
       .lex-modal-panel--full {
@@ -85,7 +92,7 @@
         height: 100vh;
         height: 100dvh;
         border-radius: 0;
-        animation: lex-modal-fade-in 0.2s ease;
+        animation: lex-modal-slide-in-right var(--lex-duration-slide, 300ms) var(--lex-ease-out, ease);
       }
 
       /* ── Header ──────────────────────────────────────── */
@@ -260,6 +267,46 @@
           transform: translateY(0) scale(1);
         }
       }
+
+      @keyframes lex-modal-slide-in-right {
+        from { transform: translateX(100%); }
+        to   { transform: translateX(0); }
+      }
+
+      /* ── Exit animations ─────────────────────────────── */
+
+      @keyframes lex-modal-fade-out {
+        from { opacity: 1; }
+        to   { opacity: 0; }
+      }
+
+      @keyframes lex-modal-slide-down {
+        from {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+        to {
+          opacity: 0;
+          transform: translateY(12px) scale(0.97);
+        }
+      }
+
+      @keyframes lex-modal-slide-out-right {
+        from { transform: translateX(0); }
+        to   { transform: translateX(100%); }
+      }
+
+      .lex-modal-backdrop--closing {
+        animation: lex-modal-fade-out var(--lex-duration-fade, 200ms) var(--lex-ease-in, ease) forwards;
+      }
+
+      .lex-modal-panel--closing {
+        animation: lex-modal-slide-down var(--lex-duration-slide, 300ms) var(--lex-ease-in, ease) forwards;
+      }
+
+      .lex-modal-panel--full.lex-modal-panel--closing {
+        animation: lex-modal-slide-out-right var(--lex-duration-slide, 300ms) var(--lex-ease-in, ease) forwards;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -342,11 +389,7 @@
     }
 
     updated(changedProps) {
-      // Toggle overlay visibility + body scroll lock
       const overlay = this.querySelector('.lex-modal-overlay');
-      if (overlay) {
-        overlay.style.display = this.open ? '' : 'none';
-      }
 
       // Sync heading text without re-render
       if (changedProps && changedProps.has('heading')) {
@@ -355,9 +398,28 @@
       }
 
       if (!this.open) {
-        document.body.style.overflow = '';
+        // Play exit animation, then hide
+        if (overlay && overlay.style.display !== 'none') {
+          const panel = this.querySelector('.lex-modal-panel');
+          const backdrop = this.querySelector('.lex-modal-backdrop');
+          if (panel && !panel.classList.contains('lex-modal-panel--closing')) {
+            panel.classList.add('lex-modal-panel--closing');
+            if (backdrop) backdrop.classList.add('lex-modal-backdrop--closing');
+            panel.addEventListener('animationend', () => {
+              overlay.style.display = 'none';
+              panel.classList.remove('lex-modal-panel--closing');
+              if (backdrop) backdrop.classList.remove('lex-modal-backdrop--closing');
+              document.body.style.overflow = '';
+            }, { once: true });
+          }
+        } else {
+          document.body.style.overflow = '';
+        }
         return;
       }
+
+      // Opening — show overlay and lock scroll
+      if (overlay) overlay.style.display = '';
       document.body.style.overflow = 'hidden';
 
       this.delegate('click', '[data-action="confirm"]', () => {

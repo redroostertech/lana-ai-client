@@ -615,3 +615,8 @@ const HelpSystem = (function() {
 
 // Export for global access
 window.HelpSystem = HelpSystem;
+
+// SPA: register with router so init runs on every navigation (including re-navigation)
+if (window.LexRouter) {
+  LexRouter.registerPageInit('help.html', function () { HelpSystem.init(); });
+}

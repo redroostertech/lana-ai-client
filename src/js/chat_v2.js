@@ -695,53 +695,64 @@
   }
 
   // =========================================================================
-  // Page lifecycle — LexRouter view hooks
+  // Page lifecycle — onLeave cleanup
   // =========================================================================
 
-  LexRouter.registerView({
-    onEnter: function () {
-      init();
-    },
-    onLeave: function () {
-      // Cancel in-flight API calls
-      if (_abortController) {
-        _abortController.abort();
-        _abortController = null;
-      }
-      // Cancel pending search
-      if (_searchTimer) {
-        clearTimeout(_searchTimer);
-        _searchTimer = null;
-      }
-      // Clear poll interval (I4)
-      if (_pollInterval) {
-        clearInterval(_pollInterval);
-        _pollInterval = null;
-      }
-      // Remove pinned composer listeners (C1)
-      if (_sendBtnHandler && dom.sendBtn) {
-        dom.sendBtn.removeEventListener('click', _sendBtnHandler);
-        _sendBtnHandler = null;
-      }
-      if (_mentionKeydownHandler && dom.mentionInput) {
-        dom.mentionInput.removeEventListener('keydown', _mentionKeydownHandler);
-        _mentionKeydownHandler = null;
-      }
-      // Remove document click handler to prevent listener accumulation (Risk 6)
-      if (_docClickHandler) {
-        document.removeEventListener('click', _docClickHandler);
-        _docClickHandler = null;
-      }
-      // Reset guards
-      _enterActiveInvoked = false;
-      // Clear Lex.state conversation (leaving this page means we are done)
-      if (window.Lex && window.Lex.state) {
-        window.Lex.state.setActiveConversation(null);
-      }
+  function onLeave() {
+    // Cancel in-flight API calls
+    if (_abortController) {
+      _abortController.abort();
+      _abortController = null;
     }
-  });
+    // Cancel pending search
+    if (_searchTimer) {
+      clearTimeout(_searchTimer);
+      _searchTimer = null;
+    }
+    // Clear poll interval (I4)
+    if (_pollInterval) {
+      clearInterval(_pollInterval);
+      _pollInterval = null;
+    }
+    // Remove pinned composer listeners (C1)
+    if (_sendBtnHandler && dom.sendBtn) {
+      dom.sendBtn.removeEventListener('click', _sendBtnHandler);
+      _sendBtnHandler = null;
+    }
+    if (_mentionKeydownHandler && dom.mentionInput) {
+      dom.mentionInput.removeEventListener('keydown', _mentionKeydownHandler);
+      _mentionKeydownHandler = null;
+    }
+    // Remove document click handler to prevent listener accumulation (Risk 6)
+    if (_docClickHandler) {
+      document.removeEventListener('click', _docClickHandler);
+      _docClickHandler = null;
+    }
+    // Reset guards
+    _enterActiveInvoked = false;
+    // Clear Lex.state conversation (leaving this page means we are done)
+    if (window.Lex && window.Lex.state) {
+      window.Lex.state.setActiveConversation(null);
+    }
+    // Clear search input so it doesn't persist on re-navigation
+    if (dom.searchInput) dom.searchInput.value = '';
+  }
 
-  // Also register via page init for first-load compatibility
-  LexRouter.registerPageInit('chat_v2.html', init);
+  // =========================================================================
+  // Page lifecycle — LexRouter registration
+  // registerPageInit ensures init() is called on every navigation
+  // (first load + re-navigation from cached scripts).
+  // registerView only carries onLeave for cleanup — onEnter is handled
+  // by registerPageInit to avoid double-init.
+  // =========================================================================
+
+  if (window.LexRouter) {
+    LexRouter.registerPageInit('chat_v2.html', function () {
+      LexRouter.registerView({ onLeave: onLeave });
+      init();
+    });
+  } else {
+    init();
+  }
 
 })();

@@ -620,14 +620,34 @@
     const isSearchEnabled = false;
 
     // Auth check with retry for race condition on first login
-    function checkAuthWithRetry(retries = 3) {
+    async function checkAuthWithRetry(retries = 3) {
+      // In Electron mode, verify there's a saved server before allowing access
+      // This catches stale localStorage tokens when Electron storage has been cleared
+      if (window.isElectron && window.electronAPI) {
+        try {
+          const savedServer = await window.electronAPI.getSavedServer();
+          if (!savedServer) {
+            console.log('[Index] No saved server in Electron storage, clearing stale session');
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            localStorage.removeItem('lana_saved_server');
+            api.token = null;
+            api.user = null;
+            window.location.href = 'login.html';
+            return;
+          }
+        } catch (err) {
+          console.error('[Index] Failed to check saved server:', err);
+        }
+      }
+
       // Re-read from localStorage in case it wasn't ready when api.js loaded
       const token = localStorage.getItem('token');
       if (token) {
         api.token = token;
         api.user = JSON.parse(localStorage.getItem('user') || 'null');
       }
-      
+
       if (!api.isAuthenticated()) {
         if (retries > 0) {
           // Small delay and retry - handles race condition on first login
@@ -637,7 +657,7 @@
         window.location.href = 'login.html';
         return;
       }
-      
+
       // Auth successful - initialize the page
       initializePage();
 

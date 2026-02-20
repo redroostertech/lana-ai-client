@@ -239,17 +239,40 @@
     }
 
     // Check if already logged in with a valid (non-expired) token
-    if (api.isAuthenticated() && !api.isTokenExpired()) {
-      window.location.href = 'index.html';
-    } else if (api.isAuthenticated() && api.isTokenExpired()) {
-      // Token exists but is expired - clear stale auth data and stay on login
-      console.log('[Login] Token expired, clearing stale auth data');
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      localStorage.removeItem('lana_saved_server');
-      api.token = null;
-      api.user = null;
+    async function checkExistingAuth() {
+      // In Electron mode, verify there's a saved server before auto-redirecting
+      // This prevents stale localStorage tokens from bypassing the login flow
+      if (window.isElectron && window.electronAPI) {
+        try {
+          const savedServer = await window.electronAPI.getSavedServer();
+          if (!savedServer) {
+            console.log('[Login] No saved server in Electron storage, clearing stale auth data');
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            localStorage.removeItem('lana_saved_server');
+            api.token = null;
+            api.user = null;
+            return; // Stay on login page
+          }
+        } catch (err) {
+          console.error('[Login] Failed to check saved server:', err);
+        }
+      }
+
+      if (api.isAuthenticated() && !api.isTokenExpired()) {
+        window.location.href = 'index.html';
+      } else if (api.isAuthenticated() && api.isTokenExpired()) {
+        // Token exists but is expired - clear stale auth data and stay on login
+        console.log('[Login] Token expired, clearing stale auth data');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('lana_saved_server');
+        api.token = null;
+        api.user = null;
+      }
     }
+
+    checkExistingAuth();
 
     // DOM Elements - Step 1 (Discovery)
     const step1 = document.getElementById('step1');

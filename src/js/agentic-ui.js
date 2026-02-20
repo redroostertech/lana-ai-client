@@ -892,7 +892,12 @@ class AgenticUI {
   }
 
   getCurrentMatterId() {
-    // Try multiple sources for matter ID
+    // Lex.state.activeMatterId is the canonical source (synced with localStorage 'activeMatterId')
+    if (window.Lex && window.Lex.state && window.Lex.state.activeMatterId) {
+      return window.Lex.state.activeMatterId;
+    }
+
+    // Legacy: window.api.currentMatterId
     if (window.api && window.api.currentMatterId) {
       return window.api.currentMatterId;
     }
@@ -901,10 +906,6 @@ class AgenticUI {
     const urlParams = new URLSearchParams(window.location.search);
     const matterId = urlParams.get('matter_id');
     if (matterId) return matterId;
-
-    // Try from localStorage
-    const storedMatterId = localStorage.getItem('current_matter_id');
-    if (storedMatterId) return storedMatterId;
 
     return null;
   }

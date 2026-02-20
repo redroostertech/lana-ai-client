@@ -13,10 +13,33 @@
 
   // ── Lifecycle tracking ──────────────────────────────────────────────
   var _windowKeys = [];
+  var _documentListeners = [];
+  var _intervals = [];
+  var _timeouts = [];
 
   // Track window globals for onLeave cleanup
   function _trackGlobal(name) {
     if (_windowKeys.indexOf(name) === -1) _windowKeys.push(name);
+  }
+
+  // Track a document-level listener so onLeave can remove it
+  function trackDocListener(event, handler) {
+    document.addEventListener(event, handler);
+    _documentListeners.push({ event: event, handler: handler });
+  }
+
+  // Track a setInterval so onLeave can clear it
+  function trackInterval(fn, ms) {
+    var id = setInterval(fn, ms);
+    _intervals.push(id);
+    return id;
+  }
+
+  // Track a setTimeout so onLeave can clear it
+  function trackTimeout(fn, ms) {
+    var id = setTimeout(fn, ms);
+    _timeouts.push(id);
+    return id;
   }
 
   // ── Utility bridges (no regex) ──────────────────────────────────────
@@ -48,6 +71,13 @@
     const pinnedPageSize = 20;
     let allPinnedMatters = [];
     let totalPinnedCount = 0;
+
+    // View mode: 'grid' or 'list'
+    let viewMode = 'list';
+
+    // Sort state
+    let sortBy = 'created_at';
+    let sortOrder = 'desc';
 
     // Analytics: Track page view only once on initial load
     let hasTrackedPageView = false;
@@ -135,21 +165,200 @@
             </div>
             <div class="flex items-center justify-between text-xs text-gray-400">
               <span>Created ${formatDate(matter.created_at)}</span>
-              <div class="relative">
-                <button onclick="event.stopPropagation(); toggleMatterCardOptions('${escapedMatterId}')" class="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors" title="More options">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
-                  </svg>
-                </button>
-                <div id="matter-card-options-${escapedMatterId}" class="hidden absolute right-0 top-full mt-1 w-32 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-                  <button onclick="event.stopPropagation(); editMatter('${escapedMatterId}'); closeMatterCardOptions('${escapedMatterId}')" class="w-full px-4 py-2 text-left text-sm lex-text-accent hover:bg-gray-50 transition-colors">Edit</button>
-                  <button onclick="event.stopPropagation(); deleteMatter('${escapedMatterId}'); closeMatterCardOptions('${escapedMatterId}')" class="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors">Delete</button>
-                </div>
-              </div>
+              <button onclick="event.stopPropagation(); showMatterOptions('${escapedMatterId}', this)" class="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors" title="More options">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
+                </svg>
+              </button>
             </div>
           </div>
         </div>
       `;
+    }
+
+    // Helper function to render a single matter as a list/table row
+    function renderMatterListRow(matter) {
+      var escapedMatterId = escapeHtml(matter.matter_id);
+      var escapedMatterName = escapeHtml(matter.name || matter.matter_name || 'Untitled');
+      var escapedDescription = escapeHtml(matter.description || 'No description');
+      var escapedSource = escapeHtml(matter.source || 'lana');
+
+      var typeBadge = matter.matter_type === 'matter'
+        ? '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Matter</span>'
+        : '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Workspace</span>';
+
+      var pinIcon = matter.is_pinned
+        ? '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg>'
+        : '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>';
+
+      return [
+        '<tr class="matter-row cursor-pointer group" data-matter-id="' + escapedMatterId + '" style="background: transparent" onmouseover="this.style.background=\'var(--lex-bg-secondary)\'" onmouseout="this.style.background=\'transparent\'" onclick="viewMatter(\'' + escapedMatterId + '\')">',
+        '  <td class="px-4 py-3 w-10" onclick="event.stopPropagation()">',
+        '    <input type="checkbox" class="matter-checkbox w-4 h-4 lex-text-accent border-gray-300 rounded lex-ring-focus"',
+        '           data-matter-id="' + escapedMatterId + '"',
+        '           ' + (selectedMatters.has(matter.matter_id) ? 'checked' : ''),
+        '           onclick="toggleMatterSelection(\'' + escapedMatterId + '\')">',
+        '  </td>',
+        '  <td class="px-4 py-3 whitespace-nowrap">',
+        '    <div class="flex items-center gap-2">',
+        '      <button onclick="event.stopPropagation(); togglePin(\'' + escapedMatterId + '\', \'' + escapedSource + '\', ' + (matter.is_pinned || false) + ')"',
+        '              class="pin-button flex-shrink-0 ' + (matter.is_pinned ? 'text-yellow-500' : 'text-gray-300 hover:text-yellow-500') + ' transition-colors"',
+        '              data-matter-id="' + escapedMatterId + '" title="' + (matter.is_pinned ? 'Unpin' : 'Pin') + '">',
+        '        ' + pinIcon,
+        '      </button>',
+        '      <span class="text-xs font-mono" style="color: var(--lex-text-tertiary)" title="' + escapedMatterId + '">' + escapedMatterId + '</span>',
+        '    </div>',
+        '  </td>',
+        '  <td class="px-4 py-3">',
+        '    <span class="text-sm font-medium" style="color: var(--lex-text-primary)">' + escapedMatterName + '</span>',
+        '  </td>',
+        '  <td class="px-4 py-3" style="max-width: 300px;">',
+        '    <p class="text-sm line-clamp-2" style="color: var(--lex-text-secondary); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">' + escapedDescription + '</p>',
+        '  </td>',
+        '  <td class="px-4 py-3 whitespace-nowrap">' + statusBadge(matter.status || 'active') + '</td>',
+        '  <td class="px-4 py-3 whitespace-nowrap">' + typeBadge + '</td>',
+        '  <td class="px-4 py-3 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + formatDate(matter.created_at) + '</td>',
+        '  <td class="px-4 py-3 whitespace-nowrap text-sm" onclick="event.stopPropagation()">',
+        '    <button onclick="event.stopPropagation(); showMatterOptions(\'' + escapedMatterId + '\', this)" class="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors" title="More options">',
+        '      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
+        '        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>',
+        '      </svg>',
+        '    </button>',
+        '  </td>',
+        '</tr>'
+      ].join('');
+    }
+
+    // Render a pinned matter as a compact horizontal card (for list view pinned section)
+    function renderPinnedCard(matter) {
+      var escapedMatterId = escapeHtml(matter.matter_id);
+      var escapedMatterName = escapeHtml(matter.name || matter.matter_name || 'Untitled');
+      var escapedClientName = escapeHtml(matter.client_name || '');
+      var escapedSource = escapeHtml(matter.source || 'lana');
+
+      var typeBadge = matter.matter_type === 'matter'
+        ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Matter</span>'
+        : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Workspace</span>';
+
+      return [
+        '<div class="flex-shrink-0 w-56 rounded-lg border p-4 cursor-pointer hover:shadow-md transition-shadow relative group" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)" onclick="viewMatter(\'' + escapedMatterId + '\')">',
+        '  <button onclick="event.stopPropagation(); togglePin(\'' + escapedMatterId + '\', \'' + escapedSource + '\', true)"',
+        '          class="pin-button absolute top-2 right-2 text-yellow-500 hover:text-yellow-600 transition-colors" data-matter-id="' + escapedMatterId + '" title="Unpin">',
+        '    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg>',
+        '  </button>',
+        '  <div class="flex items-start justify-between gap-1">',
+        '    <div class="pr-2 min-w-0">',
+        '      <h3 class="text-sm font-medium truncate" style="color: var(--lex-text-primary)">' + escapedMatterName + '</h3>',
+        '      <p class="text-xs truncate mt-1" style="color: var(--lex-text-secondary)">' + (escapedClientName || escapedMatterId) + '</p>',
+        '      <div class="flex items-center gap-2 mt-2">' + typeBadge + ' ' + statusBadge(matter.status || 'active') + '</div>',
+        '    </div>',
+        '    <button onclick="event.stopPropagation(); showMatterOptions(\'' + escapedMatterId + '\', this)" class="flex-shrink-0 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors opacity-0 group-hover:opacity-100" title="More options">',
+        '      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
+        '        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>',
+        '      </svg>',
+        '    </button>',
+        '  </div>',
+        '</div>'
+      ].join('');
+    }
+
+    // Switch between grid and list view modes
+    function switchView(mode) {
+      viewMode = mode;
+
+      var gridBtn = document.getElementById('gridViewBtn');
+      var listBtn = document.getElementById('listViewBtn');
+
+      if (mode === 'grid') {
+        gridBtn && (gridBtn.variant = 'primary');
+        listBtn && (listBtn.variant = 'ghost');
+      } else {
+        listBtn && (listBtn.variant = 'primary');
+        gridBtn && (gridBtn.variant = 'ghost');
+      }
+
+      // Re-render with current data
+      renderMattersView();
+    }
+
+    // Render matters into the active view (grid or list) using current data
+    function renderMattersView() {
+      var gridEl = document.getElementById('mattersGrid');
+      var listEl = document.getElementById('mattersListView');
+      var listBody = document.getElementById('mattersListBody');
+
+      if (!gridEl || !listEl) return;
+
+      if (viewMode === 'grid') {
+        gridEl.classList.remove('hidden');
+        listEl.classList.add('hidden');
+      } else {
+        listEl.classList.remove('hidden');
+        gridEl.classList.add('hidden');
+
+        // Check if search is active — hide pinned cards during search
+        var searchEl = document.getElementById('searchInput');
+        var isSearching = searchEl && searchEl.value && searchEl.value.trim().length > 0;
+
+        // Pinned cards section (horizontal scroll above table)
+        var pinnedSection = document.getElementById('listPinnedSection');
+        var pinnedCardsEl = document.getElementById('listPinnedCards');
+        var pinnedCountEl = document.getElementById('listPinnedCount');
+
+        if (pinnedSection && pinnedCardsEl) {
+          if (allPinnedMatters.length > 0 && currentPage === 1 && !isSearching) {
+            pinnedSection.classList.remove('hidden');
+            pinnedSection.style.opacity = '1';
+            pinnedSection.style.maxHeight = '';
+            pinnedCardsEl.innerHTML = allPinnedMatters.map(function (m) { return renderPinnedCard(m); }).join('');
+            if (pinnedCountEl) pinnedCountEl.textContent = formatNumber(totalPinnedCount) + ' items';
+          } else {
+            pinnedSection.classList.add('hidden');
+            pinnedSection.style.opacity = '0';
+            pinnedSection.style.maxHeight = '0';
+          }
+        }
+
+        // Table rows (unpinned matters only, or all during search)
+        if (listBody) {
+          var rows;
+          if (isSearching) {
+            rows = currentMatters;
+          } else {
+            var pinnedIds = new Set(allPinnedMatters.map(function (m) { return m.matter_id; }));
+            rows = currentMatters.filter(function (m) { return !pinnedIds.has(m.matter_id); });
+          }
+          listBody.innerHTML = rows.map(function (m) { return renderMatterListRow(m); }).join('');
+
+          // Update section header with count
+          var sectionHeading = document.getElementById('listSectionHeading');
+          var sectionCount = document.getElementById('listSectionCount');
+          if (sectionHeading) {
+            sectionHeading.textContent = isSearching ? 'Search Results' : 'All Matters';
+          }
+          if (sectionCount) {
+            sectionCount.textContent = formatNumber(rows.length) + (rows.length === 1 ? ' matter' : ' matters');
+          }
+        }
+
+        // Sync list select-all checkbox with current selection state
+        var listSelectAll = document.getElementById('listSelectAll');
+        if (listSelectAll) {
+          if (selectedMatters.size === 0) {
+            listSelectAll.checked = false;
+            listSelectAll.indeterminate = false;
+          } else if (selectedMatters.size === currentMatters.length) {
+            listSelectAll.checked = true;
+            listSelectAll.indeterminate = false;
+          } else {
+            listSelectAll.checked = false;
+            listSelectAll.indeterminate = true;
+          }
+        }
+
+        // Update sort indicators after rendering list view
+        updateSortIndicators();
+      }
     }
 
     // Debounce utility function
@@ -304,10 +513,12 @@
         hasTrackedPageView = true;
       }
 
-      // Show loading state
+      // Show loading state — hide both views
       loading.classList.remove('hidden');
       grid.classList.add('hidden');
-      pagination.innerHTML = '';
+      var _listViewLoading = document.getElementById('mattersListView');
+      if (_listViewLoading) _listViewLoading.classList.add('hidden');
+      if (pagination) { pagination.totalPages = 1; pagination.page = 1; }
       
       try {
         const search = document.getElementById('searchInput').value;
@@ -335,12 +546,20 @@
         const [pinnedResult, unpinnedResult] = await Promise.all([
           // Fetch pinned matters with pagination (only on page 1 of unpinned matters)
           currentPage === 1 ? api.getPinnedMatters(pinnedPage, pinnedPageSize, filters) : Promise.resolve({ matters: allPinnedMatters, total: totalPinnedCount }),
-          // Fetch unpinned matters with pagination and exclude_pinned flag
-          api.getMatters(currentPage, pageSize, { ...filters, exclude_pinned: true })
+          // Fetch unpinned matters with pagination, sorting, and exclude_pinned flag
+          api.getMatters(currentPage, pageSize, { ...filters, exclude_pinned: true, sort_by: sortBy, sort_order: sortOrder })
         ]);
 
-        const pinnedMatters = pinnedResult.matters || [];
+        var pinnedMatters = pinnedResult.matters || [];
         const unpinnedMatters = unpinnedResult.matters || [];
+
+        // Client-side filter: ensure pinned results respect matter_type filter
+        // (backend may not support this filter on the pinned endpoint)
+        if (matterTypeFilterValue) {
+          pinnedMatters = pinnedMatters.filter(function (m) {
+            return m.matter_type === matterTypeFilterValue;
+          });
+        }
 
         // Store pinned matters info for "Show More" functionality
         if (currentPage === 1) {
@@ -349,7 +568,9 @@
           } else {
             allPinnedMatters = [...allPinnedMatters, ...pinnedMatters];
           }
-          totalPinnedCount = pinnedResult.total || pinnedMatters.length;
+          totalPinnedCount = matterTypeFilterValue
+            ? allPinnedMatters.length
+            : (pinnedResult.total || pinnedMatters.length);
         }
 
         // Combine for currentMatters (for select all functionality)
@@ -362,9 +583,8 @@
         console.log('[Matters] Unpinned matters:', unpinnedMatters.length);
         console.log('[Matters] Total on page:', matters.length);
 
-        // Hide loading, show grid
+        // Hide loading
         loading.classList.add('hidden');
-        grid.classList.remove('hidden');
 
         // Check if there are NO matters at all (both pinned and unpinned)
         if (allPinnedMatters.length === 0 && unpinnedMatters.length === 0 && currentPage === 1) {
@@ -387,6 +607,10 @@
               </div>
             </div>
           `;
+          // Show grid for empty state (col-span-full layout)
+          grid.classList.remove('hidden');
+          var _listViewEmpty = document.getElementById('mattersListView');
+          if (_listViewEmpty) _listViewEmpty.classList.add('hidden');
           return;
         }
 
@@ -401,7 +625,7 @@
         // Render matters with grouping
         let html = '';
 
-        // Pinned Matters Section (only show on page 1)
+        // Pinned Matters Section (only show on page 1, hidden during search)
         if (allPinnedMatters.length > 0 && currentPage === 1) {
           console.log('[Matters] Rendering pinned matters section');
           // Dynamic heading based on filter
@@ -411,8 +635,12 @@
           } else if (matterTypeFilterValue === 'workspace') {
             pinnedHeading = 'Pinned Workspaces';
           }
+
+          // Determine if search is active — hide pinned section during search
+          var pinnedHidden = search && search.trim().length > 0;
+
           html += `
-            <div class="col-span-full">
+            <div id="pinnedSection" class="col-span-full" style="transition: opacity var(--lex-transition-normal, 200ms) ease, max-height 300ms ease; overflow: hidden;${pinnedHidden ? ' opacity: 0; max-height: 0;' : ' opacity: 1;'}">
               <div class="flex items-center gap-2 mb-4">
                 <svg class="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/>
@@ -420,17 +648,17 @@
                 <h2 class="text-lg font-semibold text-gray-900">${pinnedHeading}</h2>
                 <span class="text-sm text-gray-500">(${totalPinnedCount > allPinnedMatters.length ? `Showing ${formatNumber(allPinnedMatters.length)} of ${formatNumber(totalPinnedCount)}` : formatNumber(allPinnedMatters.length)})</span>
               </div>
-            </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                ${allPinnedMatters.map(matter => renderMatterCard(matter)).join('')}
+              </div>
           `;
-          html += allPinnedMatters.map(matter => renderMatterCard(matter)).join('');
 
           // Show "Show More" button if there are more pinned matters to load
           if (allPinnedMatters.length < totalPinnedCount) {
             html += `
-              <div class="col-span-full">
                 <button
                   id="showMorePinnedBtn"
-                  class="w-full py-3 px-4 bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-400 transition-colors flex items-center justify-center gap-2"
+                  class="w-full py-3 px-4 mt-4 bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-400 transition-colors flex items-center justify-center gap-2"
                   onclick="loadMorePinnedMatters()"
                 >
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -438,9 +666,10 @@
                   </svg>
                   Show More Pinned Matters
                 </button>
-              </div>
             `;
           }
+
+          html += `</div>`;
         }
 
         // All Matters Section
@@ -469,14 +698,19 @@
 
         grid.innerHTML = html;
 
+        // Show the active view (grid or list)
+        renderMattersView();
+
         // Update pagination (based on unpinned matters only)
         const total = unpinnedResult.total || 0;
         const totalPages = Math.ceil(total / pageSize);
-        updatePagination(totalPages);
+        updatePagination(totalPages, total);
       } catch (error) {
         // Hide loading, show grid with error state
         loading.classList.add('hidden');
         grid.classList.remove('hidden');
+        var _listViewErr = document.getElementById('mattersListView');
+        if (_listViewErr) _listViewErr.classList.add('hidden');
         grid.innerHTML = `
           <div class="col-span-full py-16">
             <div class="max-w-md mx-auto text-center">
@@ -553,20 +787,14 @@
       }
     }
 
-    function updatePagination(totalPages) {
-      const pagination = document.getElementById('pagination');
-      if (totalPages <= 1) {
-        pagination.innerHTML = '';
-        return;
-      }
+    function updatePagination(totalPages, totalItems) {
+      var pager = document.getElementById('pagination');
+      if (!pager) return;
 
-      pagination.innerHTML = `
-        <div class="flex gap-2">
-          <button ${currentPage === 1 ? 'disabled' : ''} onclick="goToPage(${currentPage - 1})" class="px-3 py-1 border rounded ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'}">Previous</button>
-          <span class="px-3 py-1 text-gray-600">Page ${formatNumber(currentPage)} of ${formatNumber(totalPages)}</span>
-          <button ${currentPage === totalPages ? 'disabled' : ''} onclick="goToPage(${currentPage + 1})" class="px-3 py-1 border rounded ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'}">Next</button>
-        </div>
-      `;
+      pager.page = currentPage;
+      pager.totalPages = totalPages;
+      pager.total = totalItems || 0;
+      pager.limit = pageSize;
     }
 
     window.goToPage = function(page) {
@@ -574,10 +802,81 @@
       loadMatters();
     }
 
+    // Wire lex-pagination page-change event
+    var _pagerEl = document.getElementById('pagination');
+    if (_pagerEl) {
+      _pagerEl.addEventListener('page-change', function (e) {
+        var page = e.detail && e.detail.page;
+        if (page) goToPage(page);
+      });
+    }
+
+    // Sort matters by column (toggle direction if same column)
+    window.sortMatters = function(column) {
+      if (sortBy === column) {
+        sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+      } else {
+        sortBy = column;
+        sortOrder = column === 'name' ? 'asc' : 'desc';
+      }
+      currentPage = 1;
+      updateSortIndicators();
+      loadMatters();
+    }
+
+    // Update sort arrow indicators on table headers
+    function updateSortIndicators() {
+      var headers = document.querySelectorAll('[data-sort-column]');
+      for (var i = 0; i < headers.length; i++) {
+        var th = headers[i];
+        var col = th.getAttribute('data-sort-column');
+        var arrow = th.querySelector('.sort-arrow');
+        if (!arrow) continue;
+        if (col === sortBy) {
+          arrow.textContent = sortOrder === 'asc' ? ' \u2191' : ' \u2193';
+          arrow.style.opacity = '1';
+        } else {
+          arrow.textContent = ' \u2195';
+          arrow.style.opacity = '0.3';
+        }
+      }
+    }
+
     // Search and filter
     var _searchInput = document.getElementById('searchInput');
+
+    // Immediate pinned section fade on search input (no debounce)
+    if (_searchInput) _searchInput.addEventListener('lex-input', function (e) {
+      var val = (e.detail && e.detail.value !== undefined) ? e.detail.value : (e.detail || '');
+      var query = String(val).trim();
+      // Grid view pinned section
+      var pinned = document.getElementById('pinnedSection');
+      if (pinned) {
+        if (query.length > 0) {
+          pinned.style.opacity = '0';
+          pinned.style.maxHeight = '0';
+        } else {
+          pinned.style.opacity = '1';
+          pinned.style.maxHeight = '';
+        }
+      }
+      // List view pinned section
+      var listPinned = document.getElementById('listPinnedSection');
+      if (listPinned) {
+        if (query.length > 0) {
+          listPinned.style.opacity = '0';
+          listPinned.style.maxHeight = '0';
+        } else {
+          listPinned.style.opacity = '1';
+          listPinned.style.maxHeight = '';
+        }
+      }
+    });
+
+    // Debounced search on typing (lex-input fires on every keystroke)
     if (_searchInput) _searchInput.addEventListener('lex-input', debounce((e) => {
-      const searchQuery = e.detail || document.getElementById('searchInput').value;
+      var rawDetail = (e.detail && e.detail.value !== undefined) ? e.detail.value : (e.detail || '');
+      const searchQuery = String(rawDetail);
 
       // Track matter searched event (truncate query to 200 chars for analytics)
       if (searchQuery && window.analytics) {
@@ -597,9 +896,26 @@
       loadMatters();
     }, 300));
 
+    // Immediate reload when search is cleared (lex-change fires on clear button click)
+    if (_searchInput) _searchInput.addEventListener('lex-change', function (e) {
+      var val = (e.detail && e.detail.value !== undefined) ? e.detail.value : _searchInput.value;
+      if (String(val).trim().length === 0) {
+        // Search was cleared — reset pinned section visibility and reload
+        var pinned = document.getElementById('pinnedSection');
+        if (pinned) { pinned.style.opacity = '1'; pinned.style.maxHeight = ''; }
+        var listPinned = document.getElementById('listPinnedSection');
+        if (listPinned) { listPinned.style.opacity = '1'; listPinned.style.maxHeight = ''; }
+        currentPage = 1;
+        pinnedPage = 1;
+        allPinnedMatters = [];
+        totalPinnedCount = 0;
+        loadMatters();
+      }
+    });
+
     var _statusFilter = document.getElementById('statusFilter');
     if (_statusFilter) _statusFilter.addEventListener('lex-change', (e) => {
-      const filterValue = e.detail || document.getElementById('statusFilter').value;
+      const filterValue = (e.detail && e.detail.value !== undefined) ? e.detail.value : document.getElementById('statusFilter').value;
 
       // Track matter filtered event
       if (window.analytics) {
@@ -619,7 +935,7 @@
 
     var _matterTypeFilter = document.getElementById('matterTypeFilter');
     if (_matterTypeFilter) _matterTypeFilter.addEventListener('lex-change', (e) => {
-      const filterValue = e.detail || document.getElementById('matterTypeFilter').value;
+      const filterValue = (e.detail && e.detail.value !== undefined) ? e.detail.value : document.getElementById('matterTypeFilter').value;
 
       // Track matter type filtered event
       if (window.analytics) {
@@ -636,6 +952,12 @@
       totalPinnedCount = 0;
       loadMatters();
     });
+
+    // View toggle (grid / list)
+    var _gridViewBtn = document.getElementById('gridViewBtn');
+    var _listViewBtn = document.getElementById('listViewBtn');
+    if (_gridViewBtn) _gridViewBtn.addEventListener('click', function () { switchView('grid'); });
+    if (_listViewBtn) _listViewBtn.addEventListener('click', function () { switchView('list'); });
 
     // Modal
     const modal = document.getElementById('matterModal');
@@ -765,7 +1087,7 @@
     }, 200));
 
     // Hide search results when clicking outside
-    document.addEventListener('click', (e) => {
+    trackDocListener('click', function (e) {
       if (userSearchInput && userSearchResults && !userSearchInput.contains(e.target) && !userSearchResults.contains(e.target)) {
         userSearchResults.classList.add('hidden');
       }
@@ -3801,8 +4123,13 @@
       setupCommentComposer(matter.matter_id);
 
       // Start polling for new comments (every 30 seconds)
-      if (commentPollInterval) clearInterval(commentPollInterval);
-      commentPollInterval = setInterval(() => loadComments(matter.matter_id), 30000);
+      if (commentPollInterval) {
+        clearInterval(commentPollInterval);
+        // Remove the old ID from _intervals tracking before replacing
+        var oldIdx = _intervals.indexOf(commentPollInterval);
+        if (oldIdx !== -1) _intervals.splice(oldIdx, 1);
+      }
+      commentPollInterval = trackInterval(function () { loadComments(matter.matter_id); }, 30000);
     }
 
     async function loadMentionableUsers(matterId) {
@@ -7188,9 +7515,9 @@
         if (inner) inner.focus();
       }, 100);
 
-      // Setup click outside handler to close dropdown
+      // Setup click outside handler to close dropdown (tracked for SPA cleanup)
       setTimeout(() => {
-        document.addEventListener('click', handleLinkDropdownClickOutside);
+        trackDocListener('click', handleLinkDropdownClickOutside);
       }, 100);
     }
 
@@ -7237,7 +7564,8 @@
     const linkMatterSearchEl = document.getElementById('linkMatterSearch');
     if (linkMatterSearchEl) {
       linkMatterSearchEl.addEventListener('lex-input', (e) => {
-        const syntheticEvent = { target: { value: e.detail !== undefined ? e.detail : linkMatterSearchEl.value } };
+        var _v = (e.detail && e.detail.value !== undefined) ? e.detail.value : linkMatterSearchEl.value;
+        const syntheticEvent = { target: { value: _v } };
         searchMattersForLink(syntheticEvent);
       });
       // Show dropdown on focus (inner input focus bubbles up)
@@ -8151,30 +8479,69 @@
       updateSelectionUI();
     }
 
-    // Toggle matter card options dropdown (more options button on grid cards)
-    window.toggleMatterCardOptions = function(matterId) {
-      const dropdown = document.getElementById(`matter-card-options-${matterId}`);
+    // Shared matter options dropdown (fixed-position, used by grid, list, and pinned cards)
+    window.showMatterOptions = function(matterId, triggerEl) {
+      var dropdown = document.getElementById('matterOptionsDropdown');
       if (!dropdown) return;
-      const isOpening = dropdown.classList.contains('hidden');
-      document.querySelectorAll('[id^="matter-card-options-"]').forEach(el => el.classList.add('hidden'));
-      dropdown.classList.toggle('hidden', !isOpening);
-      if (isOpening) {
-        setTimeout(() => {
-          const closeOnClickOutside = (ev) => {
-            if (!dropdown.contains(ev.target) && !ev.target.closest('[onclick*="toggleMatterCardOptions"]')) {
-              dropdown.classList.add('hidden');
-              document.removeEventListener('click', closeOnClickOutside);
-            }
-          };
-          document.addEventListener('click', closeOnClickOutside);
-        }, 0);
+
+      var isAlreadyOpen = !dropdown.classList.contains('hidden') && dropdown._currentMatterId === matterId;
+      // Close if already open for this matter
+      if (isAlreadyOpen) {
+        dropdown.classList.add('hidden');
+        dropdown._currentMatterId = null;
+        return;
       }
+
+      // Position relative to the trigger button
+      var rect = triggerEl.getBoundingClientRect();
+      dropdown.style.top = (rect.bottom + 4) + 'px';
+      dropdown.style.left = (rect.right - 128) + 'px'; // 128 = w-32 (8rem)
+
+      // Flip above if not enough room below
+      var dropdownHeight = 80; // approximate height of 2 menu items
+      if (rect.bottom + 4 + dropdownHeight > window.innerHeight) {
+        dropdown.style.top = (rect.top - 4 - dropdownHeight) + 'px';
+      }
+
+      // Clamp left edge so it doesn't go offscreen
+      var left = rect.right - 128;
+      if (left < 8) left = 8;
+      dropdown.style.left = left + 'px';
+
+      // Wire up actions for this matter
+      var editBtn = document.getElementById('matterOptionsEdit');
+      var deleteBtn = document.getElementById('matterOptionsDelete');
+      if (editBtn) {
+        editBtn.onclick = function() { dropdown.classList.add('hidden'); dropdown._currentMatterId = null; editMatter(matterId); };
+      }
+      if (deleteBtn) {
+        deleteBtn.onclick = function() { dropdown.classList.add('hidden'); dropdown._currentMatterId = null; deleteMatter(matterId); };
+      }
+
+      dropdown._currentMatterId = matterId;
+      dropdown.classList.remove('hidden');
+
+      // Close on outside click
+      setTimeout(function() {
+        var closeOnClickOutside = function(ev) {
+          if (!dropdown.contains(ev.target) && ev.target !== triggerEl && !triggerEl.contains(ev.target)) {
+            dropdown.classList.add('hidden');
+            dropdown._currentMatterId = null;
+            document.removeEventListener('click', closeOnClickOutside);
+          }
+        };
+        document.addEventListener('click', closeOnClickOutside);
+      }, 0);
     };
 
-    window.closeMatterCardOptions = function(matterId) {
-      const dropdown = document.getElementById(`matter-card-options-${matterId}`);
-      if (dropdown) dropdown.classList.add('hidden');
-    };
+    // Close shared dropdown on scroll (prevents stale position)
+    window.addEventListener('scroll', function() {
+      var dropdown = document.getElementById('matterOptionsDropdown');
+      if (dropdown && !dropdown.classList.contains('hidden')) {
+        dropdown.classList.add('hidden');
+        dropdown._currentMatterId = null;
+      }
+    }, true);
 
     // Update selection UI (checkboxes, count, bulk actions visibility)
     function updateSelectionUI() {
@@ -8184,28 +8551,47 @@
       const selectedCountEl = document.getElementById('selectedCount');
 
       // Update selected count text
-      selectedCountEl.textContent = `${selectedCount} selected`;
+      if (selectedCountEl) selectedCountEl.textContent = selectedCount + ' selected';
 
       // Show/hide bulk actions
-      if (selectedCount > 0) {
-        bulkActions.classList.remove('hidden');
-      } else {
-        bulkActions.classList.add('hidden');
+      if (bulkActions) {
+        if (selectedCount > 0) {
+          bulkActions.classList.remove('hidden');
+        } else {
+          bulkActions.classList.add('hidden');
+        }
       }
 
-      // Update select all checkbox state
-      if (selectedCount === 0) {
-        selectAllCheckbox.checked = false;
-        selectAllCheckbox.indeterminate = false;
-      } else if (selectedCount === currentMatters.length) {
-        selectAllCheckbox.checked = true;
-        selectAllCheckbox.indeterminate = false;
-      } else {
-        selectAllCheckbox.checked = false;
-        selectAllCheckbox.indeterminate = true;
+      // Update header bar select-all checkbox state (lex-checkbox)
+      if (selectAllCheckbox) {
+        if (selectedCount === 0) {
+          selectAllCheckbox.checked = false;
+          selectAllCheckbox.indeterminate = false;
+        } else if (selectedCount === currentMatters.length) {
+          selectAllCheckbox.checked = true;
+          selectAllCheckbox.indeterminate = false;
+        } else {
+          selectAllCheckbox.checked = false;
+          selectAllCheckbox.indeterminate = true;
+        }
       }
 
-      // Update card highlighting and checkboxes
+      // Update list view select-all checkbox (plain <input>)
+      var listSelectAll = document.getElementById('listSelectAll');
+      if (listSelectAll) {
+        if (selectedCount === 0) {
+          listSelectAll.checked = false;
+          listSelectAll.indeterminate = false;
+        } else if (selectedCount === currentMatters.length) {
+          listSelectAll.checked = true;
+          listSelectAll.indeterminate = false;
+        } else {
+          listSelectAll.checked = false;
+          listSelectAll.indeterminate = true;
+        }
+      }
+
+      // Update grid card highlighting and checkboxes
       document.querySelectorAll('.matter-card').forEach(card => {
         const matterId = card.dataset.matterId;
         const checkbox = card.querySelector('.matter-checkbox');
@@ -8217,20 +8603,35 @@
           if (checkbox) checkbox.checked = false;
         }
       });
+
+      // Update list view row checkboxes
+      document.querySelectorAll('.matter-row').forEach(function (row) {
+        var matterId = row.dataset.matterId;
+        var checkbox = row.querySelector('.matter-checkbox');
+        if (checkbox) checkbox.checked = selectedMatters.has(matterId);
+      });
     }
 
-    // Select all matters on current page
+    // Select all matters on current page (from lex-checkbox in header bar)
     var _selectAll = document.getElementById('selectAllMatters');
     if (_selectAll) _selectAll.addEventListener('lex-change', (e) => {
       if (e.target.checked) {
-        // Select all
         currentMatters.forEach(matter => selectedMatters.add(matter.matter_id));
       } else {
-        // Deselect all
         selectedMatters.clear();
       }
       updateSelectionUI();
     });
+
+    // Select all from list view table header checkbox (plain <input>)
+    window.toggleSelectAllMatters = function(checked) {
+      if (checked) {
+        currentMatters.forEach(function (matter) { selectedMatters.add(matter.matter_id); });
+      } else {
+        selectedMatters.clear();
+      }
+      updateSelectionUI();
+    };
 
     // Clear selection
     var _clearSelBtn = document.getElementById('clearSelectionBtn');
@@ -8494,7 +8895,7 @@
         const shareSection = document.getElementById('modalShareSection');
 
         visibilitySelect.addEventListener('lex-change', function(e) {
-          const val = e.detail !== undefined ? e.detail : visibilitySelect.value;
+          const val = (e.detail && e.detail.value !== undefined) ? e.detail.value : visibilitySelect.value;
           if (val === 'organization') {
             shareSection.style.opacity = '0.5';
             shareSection.style.pointerEvents = 'none';
@@ -8515,7 +8916,8 @@
         // Add search functionality
         const searchInput = document.getElementById('modalShareSearch');
         searchInput.addEventListener('lex-input', function(e) {
-          const searchTerm = (e.detail !== undefined ? e.detail : searchInput.value).toLowerCase().trim();
+          var _sv = (e.detail && e.detail.value !== undefined) ? e.detail.value : searchInput.value;
+          const searchTerm = String(_sv).toLowerCase().trim();
           const userLabels = shareWithContainer.querySelectorAll('label');
 
           userLabels.forEach(label => {
@@ -8943,7 +9345,8 @@
     // User search for workspace matter (lex-input emits lex-input event)
     var _wsUserSearch = document.getElementById('workspaceUserSearchInput');
     if (_wsUserSearch) _wsUserSearch.addEventListener('lex-input', (e) => {
-      const query = (e.detail !== undefined ? e.detail : document.getElementById('workspaceUserSearchInput').value).toLowerCase().trim();
+      var _wv = (e.detail && e.detail.value !== undefined) ? e.detail.value : document.getElementById('workspaceUserSearchInput').value;
+      const query = String(_wv).toLowerCase().trim();
       const resultsDiv = document.getElementById('workspaceUserSearchResults');
 
       if (query.length < 2) {
@@ -9793,7 +10196,35 @@
   }
 
   function onLeave() {
-    // 1. Delete window globals added by initializePage (window.fn = function...)
+    // 1. Close any open lex-modals and lex-drawers in the page content
+    try {
+      document.querySelectorAll('#lex-main-content lex-modal[open], #lex-main-content lex-drawer[open]').forEach(function (el) {
+        el.open = false;
+      });
+    } catch (e) { /* ignore */ }
+
+    // 2. Restore body scroll (modals/drawers set overflow:hidden)
+    document.body.style.overflow = '';
+
+    // 3. Close the shared matter options dropdown
+    var matterDropdown = document.getElementById('matterOptionsDropdown');
+    if (matterDropdown) { matterDropdown.classList.add('hidden'); matterDropdown._currentMatterId = null; }
+
+    // 3a. Remove tracked document-level listeners (catches listeners missed by snapshot approach)
+    _documentListeners.forEach(function (entry) {
+      document.removeEventListener(entry.event, entry.handler);
+    });
+    _documentListeners = [];
+
+    // 3b. Clear tracked intervals (includes commentPollInterval)
+    _intervals.forEach(clearInterval);
+    _intervals = [];
+
+    // 3c. Clear tracked timeouts
+    _timeouts.forEach(clearTimeout);
+    _timeouts = [];
+
+    // 4. Delete window globals added by initializePage (window.fn = function...)
     if (_preInitKeys) {
       var currentKeys = Object.keys(window);
       for (var i = 0; i < currentKeys.length; i++) {
@@ -9804,14 +10235,34 @@
       _preInitKeys = null;
     }
 
-    // 2. Also clean tracked second-block globals
+    // 5. Also clean tracked second-block globals
     _windowKeys.forEach(function (name) { delete window[name]; });
     _windowKeys = [];
 
-    // 3. Destroy external module instances
+    // 6. Destroy external module instances
     if (typeof destroyMatterNotes === 'function') {
       try { destroyMatterNotes(); } catch (e) { /* ignore */ }
     }
+
+    // 7. Clean up persistent window state set by the page
+    try {
+      delete window.currentViewedMatter;
+      delete window.currentMatterData;
+    } catch (e) { /* ignore */ }
+
+    // 8. Clear active matter context — navigating to dashboard etc. should not keep matter scope
+    if (window.Lex && window.Lex.state) {
+      try { window.Lex.state.setActiveMatter(null); } catch (e) { /* ignore */ }
+    }
+
+    // 9. Clear selection, search, and filters so they don't persist on re-navigation
+    selectedMatters.clear();
+    var searchEl = document.getElementById('searchInput');
+    if (searchEl) searchEl.value = '';
+    var statusFilter = document.getElementById('statusFilter');
+    var matterTypeFilter = document.getElementById('matterTypeFilter');
+    if (statusFilter) statusFilter.value = '';
+    if (matterTypeFilter) matterTypeFilter.value = '';
   }
 
   // registerPageInit ensures onEnter() is called on every navigation

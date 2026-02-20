@@ -768,7 +768,11 @@
     };
   }
 
-  // Initialize on load
-  init();
-
+  // SPA: register with router so init runs on every navigation (including re-navigation).
+  // Non-SPA: init runs immediately.
+  if (window.LexRouter) {
+    LexRouter.registerPageInit('skills-marketplace.html', init);
+  } else {
+    init();
+  }
 })();

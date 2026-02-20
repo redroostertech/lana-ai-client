@@ -19,6 +19,9 @@
   var _isLoadingMore = false;
   var _PAGE_SIZE = 20;
 
+  // Stored scroll handler reference — allows removal on onLeave (Finding 5)
+  var _scrollHandler = null;
+
   // =========================================================================
   // DOM references (resolved on init)
   // =========================================================================
@@ -110,20 +113,27 @@
       window.ConversationActionsModal.onRefresh = refreshResults;
     }
 
-    // Infinite scroll — load more when near bottom
+    // Infinite scroll — load more when near bottom.
+    // Store the handler reference so onLeave can remove it from the
+    // persistent #lex-main-content shell element (Finding 5).
     var scrollContainer = document.getElementById('lex-main-content');
     if (scrollContainer) {
-      scrollContainer.addEventListener('scroll', function () {
+      // Remove any previous handler first (safety net for rapid navigation)
+      if (_scrollHandler) {
+        scrollContainer.removeEventListener('scroll', _scrollHandler);
+      }
+      _scrollHandler = function () {
         if (_isLoadingMore || !_hasMore) return;
         var threshold = 200;
         var distanceFromBottom = scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight;
         if (distanceFromBottom < threshold) {
           loadMoreConversations();
         }
-      });
+      };
+      scrollContainer.addEventListener('scroll', _scrollHandler);
     }
 
-    // Register view lifecycle — clear input when navigating away
+    // Register view lifecycle — clean up when navigating away
     if (window.LexRouter && window.LexRouter.registerView) {
       window.LexRouter.registerView({
         onLeave: function () {
@@ -133,6 +143,12 @@
           _page = 1;
           _hasMore = false;
           clearTimeout(_searchTimeout);
+          // Remove scroll listener from the persistent shell element (Finding 5)
+          if (_scrollHandler) {
+            var sc = document.getElementById('lex-main-content');
+            if (sc) sc.removeEventListener('scroll', _scrollHandler);
+            _scrollHandler = null;
+          }
           // Unregister refresh callback
           if (window.ConversationActionsModal) {
             window.ConversationActionsModal.onRefresh = null;

@@ -19,8 +19,8 @@
   foucStyle.id = 'fouc-prevention';
   foucStyle.textContent = `
     /* Hide page content until CSS loads */
-    #app-content { opacity: 0; }
-    #app-content.ready { opacity: 1; transition: opacity 0.3s ease-in; }
+    #lex-main-content { opacity: 0; }
+    #lex-main-content.ready { opacity: 1; transition: opacity 0.3s ease-in; }
   `;
   document.head.appendChild(foucStyle);
 
@@ -42,12 +42,12 @@
           }, 300);
         }
 
-        // Show the main content
-        const appContent = document.getElementById('app-content');
+        // Show the main content — prefer #lex-main-content (SPA shell), fall back to #app-content (legacy)
+        const appContent = document.getElementById('lex-main-content') || document.getElementById('app-content');
         if (appContent) {
           appContent.classList.add('ready');
         } else {
-          // Fallback: show body if no app-content wrapper
+          // Fallback: show body if no content wrapper exists
           document.body.style.opacity = '1';
         }
 
@@ -160,7 +160,6 @@
 
   // Safety net: Show content after 8 seconds regardless
   setTimeout(() => {
-    const appContent = document.getElementById('app-content');
     const preloader = document.getElementById('lana-preloader');
     if (preloader && preloader.style.display !== 'none') {
       console.warn('[TailwindLoader] Safety timeout - showing content');

@@ -532,17 +532,18 @@
         });
       }
 
-      // Close on outside click
+      // Close on outside click — registered synchronously so _eventCleanups
+      // handles removal exclusively. No setTimeout: the toggle click that
+      // opened the dropdown fires on mouseup, so this mousedown listener
+      // won't fire for the same gesture that opened the dropdown.
       if (this._open) {
         const closeHandler = (e) => {
           if (!this.contains(e.target)) {
             this._open = false;
             this._scheduleUpdate();
-            document.removeEventListener('mousedown', closeHandler);
           }
         };
-        // Delay to avoid catching the current click
-        setTimeout(() => document.addEventListener('mousedown', closeHandler), 0);
+        document.addEventListener('mousedown', closeHandler);
         this._eventCleanups.push(() => document.removeEventListener('mousedown', closeHandler));
       }
     }

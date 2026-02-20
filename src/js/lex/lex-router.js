@@ -20,7 +20,7 @@
      });
 
      // In a page entry script (IIFE):
-     LexRouter.registerPageInit('/my-page.html', init);
+     LexRouter.registerPageInit('my-page.html', init);  // No leading slash
      // The router calls init() on every navigation to this page.
 
      // Optional view lifecycle hooks:
@@ -463,14 +463,15 @@
         // Step 5: Extract content
         var content = extractContent(htmlText);
 
-        // Step 6: Inject into content area
-        var main = _app ? _app.getContentEl() : document.getElementById('lex-main-content');
-        if (main) {
-          main.innerHTML = content;
-        }
-
-        // Step 7: Load page-specific stylesheets
-        return loadPageStylesheets(descriptor.stylesheets, path);
+        // Step 6: Load page-specific stylesheets BEFORE injecting content
+        // so the page renders already-styled (prevents FOUC).
+        return loadPageStylesheets(descriptor.stylesheets, path).then(function () {
+          // Step 7: Inject into content area after CSS is ready
+          var main = _app ? _app.getContentEl() : document.getElementById('lex-main-content');
+          if (main) {
+            main.innerHTML = content;
+          }
+        });
       })
       .then(function () {
         // Step 8: Load page-specific scripts (sequential)
@@ -496,13 +497,13 @@
           });
         }
 
-        // Step 10: Push to history
+        // Step 10: Push to history.
+        // NEVER pass the URL (3rd argument) — keep the browser URL at
+        // app.html so CMD+SHIFT+R (hard refresh) reloads the SPA shell
+        // instead of the page fragment. The route is stored in state.path
+        // and read back by app.js on reload.
         if (pushState) {
-          if (window.location.protocol === 'file:') {
-            history.pushState({ path: path }, descriptor.title);
-          } else {
-            history.pushState({ path: path }, descriptor.title, path);
-          }
+          history.pushState({ path: path }, descriptor.title);
         }
 
         // Step 11: Scroll to top
@@ -643,16 +644,12 @@
       _app = document.querySelector('lex-app');
 
       // Set initial history state.
-      // Under file:// protocol, do NOT pass the path as the URL argument —
-      // replaceState('/index.html') would change the URL to file:///index.html,
-      // breaking all relative resolution. Store the path only in state.
+      // NEVER pass the URL (3rd argument) — keep the browser URL at
+      // app.html so CMD+SHIFT+R (hard refresh) reloads the SPA shell
+      // instead of the page fragment. The route is stored in state.path.
       var startPath = initialPath || window.location.pathname || '/index.html';
       if (startPath === '/' || startPath === '') startPath = '/index.html';
-      if (window.location.protocol === 'file:') {
-        history.replaceState({ path: startPath }, '');
-      } else {
-        history.replaceState({ path: startPath }, '', startPath);
-      }
+      history.replaceState({ path: startPath }, '');
 
       // Wire event listeners
       document.addEventListener('click', handleLinkClick, { capture: true });
@@ -704,9 +701,10 @@
     registerView: function (view) {
       _currentView = view;
 
-      // If the page is already loaded (script ran after content was injected),
-      // call onEnter immediately
-      if (view.onEnter && _currentPath) {
+      // Only auto-call onEnter if NOT in the middle of a navigate() sequence.
+      // During navigation, the router calls onEnter at Step 15 after scripts
+      // and page inits have run — calling it here too would cause double-init.
+      if (view.onEnter && _currentPath && !_navigating) {
         var main = _app ? _app.getContentEl() : document.getElementById('lex-main-content');
         try {
           view.onEnter({

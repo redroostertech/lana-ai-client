@@ -23,7 +23,7 @@
     }
 
     render() {
-      if (this.totalPages <= 1) return '';
+      if (this.total === 0) return '';
 
       const pages = this._getPageNumbers();
 

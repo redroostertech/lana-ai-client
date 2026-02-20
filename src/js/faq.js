@@ -616,3 +616,8 @@ const FAQSystem = (function() {
 
 // Export for global access
 window.FAQSystem = FAQSystem;
+
+// SPA: register with router so init runs on every navigation (including re-navigation)
+if (window.LexRouter) {
+  LexRouter.registerPageInit('faq.html', function () { FAQSystem.init(); });
+}

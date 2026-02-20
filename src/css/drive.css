@@ -72,3 +72,17 @@
 .drive-hover-row:hover {
   background-color: var(--lex-bg-secondary);
 }
+
+/* Fade transition for pinned/recents sections */
+.drive-fade-section {
+  transition: opacity 0.25s ease, max-height 0.3s ease;
+  opacity: 1;
+  max-height: 500px;
+  overflow: hidden;
+}
+
+.drive-fade-section.drive-fade-out {
+  opacity: 0;
+  max-height: 0;
+  margin-bottom: 0;
+}

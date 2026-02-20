@@ -26,6 +26,9 @@ window.NotificationPanel = (function() {
   // DOM Elements (cached after init)
   let elements = {};
 
+  // Stored interval handle for badge polling — allows pause/resume (Finding 8)
+  let _badgeInterval = null;
+
   /**
    * Initialize the notification panel
    * @param {Object} options - Configuration options
@@ -66,7 +69,7 @@ window.NotificationPanel = (function() {
     if (autoLoadBadge) {
       loadBadgeCount();
       if (refreshInterval > 0) {
-        setInterval(loadBadgeCount, refreshInterval);
+        _badgeInterval = setInterval(loadBadgeCount, refreshInterval);
       }
     }
 
@@ -641,6 +644,29 @@ window.NotificationPanel = (function() {
     return date.toLocaleDateString();
   }
 
+  /**
+   * Pause the badge polling interval (e.g. when page is hidden or user logs out).
+   * Safe to call multiple times — no-op if already paused.
+   */
+  function pause() {
+    if (_badgeInterval) {
+      clearInterval(_badgeInterval);
+      _badgeInterval = null;
+    }
+  }
+
+  /**
+   * Resume the badge polling interval.
+   * Safe to call multiple times — no-op if already running.
+   * @param {number} [interval] - Override polling interval in ms (default: 60000)
+   */
+  function resume(interval) {
+    if (!_badgeInterval) {
+      var ms = interval || 60000;
+      _badgeInterval = setInterval(loadBadgeCount, ms);
+    }
+  }
+
   // Public API
   return {
     init,
@@ -648,6 +674,8 @@ window.NotificationPanel = (function() {
     open,
     close,
     isOpen,
+    pause,
+    resume,
     loadNotifications,
     loadBadgeCount,
     markAsRead,

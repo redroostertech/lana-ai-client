@@ -374,18 +374,31 @@
       if (!v) return { valid: true, message: '' };
 
       const semanticType = (this.dataset.lexType || this.type || 'text').toLowerCase();
+
       if (semanticType === 'email') {
-        const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRe.test(v)) return { valid: false, message: 'Please enter a valid email address' };
+        // Must have exactly one @ with non-empty local and domain parts.
+        // Domain must contain a dot that is not first or last character.
+        var atIdx = v.indexOf('@');
+        if (atIdx < 1) return { valid: false, message: 'Please enter a valid email address' };
+        var domain = v.substring(atIdx + 1);
+        var dotIdx = domain.lastIndexOf('.');
+        if (dotIdx < 1 || dotIdx === domain.length - 1) return { valid: false, message: 'Please enter a valid email address' };
+        if (v.indexOf(' ') !== -1) return { valid: false, message: 'Please enter a valid email address' };
       } else if (semanticType === 'url') {
         try {
-          new URL(v.startsWith('http') ? v : 'https://' + v);
+          new URL(v.indexOf('http') === 0 ? v : 'https://' + v);
         } catch (e) {
           return { valid: false, message: 'Please enter a valid URL' };
         }
       } else if (semanticType === 'tel') {
-        const telRe = /^[+\d\s\-().]{10,}$/;
-        if (!telRe.test(v)) return { valid: false, message: 'Please enter a valid phone number' };
+        // Only allow digits, +, -, ., (, ), and space. Minimum 10 digits.
+        var allowed = '0123456789+-.() ';
+        var digitCount = 0;
+        for (var i = 0; i < v.length; i++) {
+          if (allowed.indexOf(v[i]) === -1) return { valid: false, message: 'Please enter a valid phone number' };
+          if (v[i] >= '0' && v[i] <= '9') digitCount++;
+        }
+        if (digitCount < 10) return { valid: false, message: 'Please enter a valid phone number' };
       } else if (semanticType === 'number') {
         if (v !== '' && isNaN(Number(v))) return { valid: false, message: 'Please enter a valid number' };
       }
