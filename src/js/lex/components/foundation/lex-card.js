@@ -77,6 +77,7 @@
     style.id = 'lex-card-styles';
     style.textContent = `
       lex-card { display: block; }
+      lex-card > .rounded-xl { height: inherit; }
 
       .lex-card-action-btn {
         display: flex;

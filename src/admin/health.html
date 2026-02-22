@@ -33,24 +33,18 @@
 
       <!-- Page header -->
       <lex-banner
+        id="healthBanner"
         variant="light"
         heading="System Health"
         subtitle="Monitor service status and system resources"
-      ></lex-banner>
+      >
+        <div id="overallStatusBadge"></div>
+      </lex-banner>
 
       <lex-breadcrumb items='[{"label":"Administration","href":"admin/index.html"},{"label":"System Health"}]'></lex-breadcrumb>
 
-      <!-- Overall Status -->
-      <div class="mb-6">
-        <lex-card id="overallStatusCard" heading="Overall System Status">
-          <div class="flex items-center justify-between">
-            <p id="overallStatusMsg" class="text-sm lex-text-secondary">Checking system status...</p>
-            <div id="overallStatusBadge"></div>
-          </div>
-        </lex-card>
-      </div>
-
       <!-- Service Cards Grid -->
+      <style>#serviceCardsGrid > lex-card { height: 100%; }</style>
       <div id="serviceCardsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <!-- Injected by admin-health.js: one lex-card per service -->
       </div>
@@ -304,6 +298,7 @@
 
   <!-- Page-specific Lex components (BEFORE inject) -->
   <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
+  <script src="../js/lex/components/foundation/lex-banner.js"></script>
   <script src="../js/lex/components/foundation/lex-card.js"></script>
   <script src="../js/lex/components/foundation/lex-badge.js"></script>
   <script src="../js/lex/components/foundation/lex-kv.js"></script>

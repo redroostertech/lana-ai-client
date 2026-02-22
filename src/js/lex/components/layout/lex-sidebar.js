@@ -1035,11 +1035,15 @@
         this.userMenuOpen = false;
       });
 
-      // User menu actions (links navigate directly; buttons emit event)
+      // User menu actions — prevent default on <a> tags so the router handles navigation
       this.delegate('click', '[data-user-action]', (e, target) => {
         const action = target.dataset.userAction;
+        const href = target.getAttribute('href') || '';
+        if (href && target.tagName === 'A') {
+          e.preventDefault();
+        }
         this.userMenuOpen = false;
-        this.emit('sidebar-user-action', { action: action });
+        this.emit('sidebar-user-action', { action: action, href: href });
       });
 
       // Sync collapsed CSS variable after a full re-render.

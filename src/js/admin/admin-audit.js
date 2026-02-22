@@ -520,6 +520,11 @@
     if (table._auditRendererAttached) return;
     table._auditRendererAttached = true;
 
+    table.addEventListener('row-click', function (e) {
+      var row = e.detail && e.detail.row;
+      if (row) _viewLogDetails(row);
+    });
+
     new MutationObserver(function () {
       requestAnimationFrame(function () { _applyTableRenderers(table); });
     }).observe(table, { childList: true });
@@ -563,33 +568,6 @@
           '</div>';
       }
 
-      // Actions cell — append "View" button if not already there
-      var logId = escHtml(String(row.id || ''));
-      var actionsCell = tr.querySelector('td.audit-actions-cell');
-      if (!actionsCell) {
-        actionsCell = document.createElement('td');
-        actionsCell.className = 'audit-actions-cell';
-        actionsCell.style.cssText = 'white-space:nowrap;text-align:right;padding-right:0.5rem;';
-        tr.appendChild(actionsCell);
-      }
-      actionsCell.innerHTML =
-        '<button data-log-id="' + logId + '" ' +
-          'style="font-size:var(--lex-body-sm-size,0.875rem);font-weight:500;' +
-          'color:var(--lex-bg-accent,#8B7355);cursor:pointer;background:none;border:none;padding:4px 8px;">' +
-          'View' +
-        '</button>';
-
-      // Wire the view button
-      (function (rowRef) {
-        var viewBtn = actionsCell.querySelector('button');
-        if (viewBtn && !viewBtn._auditWired) {
-          viewBtn._auditWired = true;
-          viewBtn.addEventListener('click', function (e) {
-            e.stopPropagation();
-            _viewLogDetails(rowRef);
-          });
-        }
-      })(row);
     }
   }
 

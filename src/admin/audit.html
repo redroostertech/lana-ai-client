@@ -98,9 +98,11 @@
         </lex-card>
       </div>
 
-      <!-- Filters -->
-      <lex-card class="mb-6">
-        <div class="flex flex-wrap gap-4 items-end">
+      <!-- Audit Logs Table + Filters + Pagination -->
+      <lex-card padding="none">
+
+        <!-- Filters -->
+        <div style="padding:1rem 1.5rem;" class="flex flex-wrap gap-4 items-end">
           <div class="flex-1 min-w-[200px]">
             <lex-select
               id="eventTypeFilter"
@@ -128,23 +130,21 @@
             <lex-btn id="clearFiltersBtn" variant="secondary" size="md">Clear</lex-btn>
           </div>
         </div>
-      </lex-card>
 
-      <!-- Audit Logs Table -->
-      <lex-card padding="none">
         <lex-table
           id="auditTable"
           columns="timestamp,event_type,user_email,ip_address"
           labels="Timestamp,Event Type,User,IP Address"
           empty-text="No audit logs found"
         ></lex-table>
-      </lex-card>
 
-      <!-- Manual Pagination (server-side) -->
-      <div id="paginationRow" class="flex items-center justify-between mt-4">
-        <span id="paginationInfo" class="text-xs lex-text-tertiary"></span>
-        <div id="paginationControls" class="flex gap-2"></div>
-      </div>
+        <!-- Pagination -->
+        <div id="paginationRow" class="flex items-center justify-between" style="padding:0.75rem 1.5rem;">
+          <span id="paginationInfo" class="text-xs lex-text-tertiary"></span>
+          <div id="paginationControls" class="flex gap-2"></div>
+        </div>
+
+      </lex-card>
 
     </main>
 

@@ -367,9 +367,12 @@
 
       // Sidebar user action (sign out, etc.)
       this.delegate('sidebar-user-action', 'lex-sidebar', (e) => {
-        const action = e.detail && e.detail.action;
+        const detail = e.detail || {};
+        const action = detail.action;
         if (action === 'signout') {
           this._handleSignOut();
+        } else if (detail.href && window.Lex && window.Lex.Nav) {
+          window.Lex.Nav.go(detail.href);
         }
       });
 

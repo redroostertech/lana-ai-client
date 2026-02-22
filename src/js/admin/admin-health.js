@@ -158,7 +158,7 @@
 
     // Shimmer only the cards refreshed by loadHealth (not the energy card)
     var HEALTH_CARD_IDS = [
-      'overallStatusCard', 'systemMetricsCard', 'processMetricsCard',
+      'systemMetricsCard', 'processMetricsCard',
       'cpuInfoCard', 'databaseMetricsCard', 'storageInfoCard',
       'dlqCard', 'tokenUsageCard'
     ];
@@ -182,12 +182,22 @@
 
       // -- Overall status -------------------------------------------------------
       var status = String(summary.status || 'unknown').toLowerCase();
-      injectBadge('overallStatusBadge', summary.status || 'Unknown', statusColor(status));
 
       var msg = 'All services are operational';
       if (status === 'degraded')   msg = 'Some services are experiencing issues';
       if (status === 'unhealthy')  msg = 'System is experiencing problems';
-      setText('overallStatusMsg', msg);
+      var banner = document.getElementById('healthBanner');
+      if (banner) banner.subtitle = msg;
+
+      // Badge must be injected AFTER the banner re-render completes.
+      // Setting subtitle triggers a microtask re-render that restores children
+      // from the initial snapshot (cloneNode), wiping any dynamic content.
+      // requestAnimationFrame runs after the microtask, so the badge persists.
+      var badgeLabel = summary.status || 'Unknown';
+      var badgeColor = statusColor(status);
+      requestAnimationFrame(function () {
+        injectBadge('overallStatusBadge', badgeLabel, badgeColor);
+      });
 
       // -- Service cards --------------------------------------------------------
       renderServiceCards(services.services || []);

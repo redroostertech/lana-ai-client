@@ -7,7 +7,7 @@
      <lex-input label="Password" type="password"></lex-input>
      <lex-input label="Amount" trailing-icon="dollar-sign" size="lg"></lex-input>
 
-   Types: text, email, password, number, url, tel, search
+   Types: text, email, password, number, url, tel, search, date
    Sizes: sm (32px), md (40px), lg (48px)
    Events: lex-input (keystroke), lex-change (blur/commit)
 */
@@ -263,10 +263,16 @@
         html += `<span class="lex-input-icon lex-input-icon--lead">${getIcon(leadIcon)}</span>`;
       }
 
-      // Input element — no type attribute (avoids Tailwind form borders); semantic type in data-lex-type
+      // Date-family types require a native type attribute for the browser calendar picker
+      const nativeDateTypes = { date: true, 'datetime-local': true, time: true, month: true, week: true };
+      const nativeTypeAttr = nativeDateTypes[semanticType] ? `type="${semanticType}"` : '';
+
+      // Input element — no type attribute for text-like inputs (avoids Tailwind form borders);
+      // date-family inputs get native type for calendar picker; semantic type in data-lex-type
       html += `<input
         class="${inputCls}"
         style="border: 0 none; border-width: 0; box-shadow: none;"
+        ${nativeTypeAttr}
         ${dataTypeAttr}
         value="${this.escapeHtml(this.value || '')}"
         placeholder="${this.escapeHtml(this.placeholder)}"
