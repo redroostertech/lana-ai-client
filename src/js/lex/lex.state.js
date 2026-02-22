@@ -1,13 +1,12 @@
 /* ==========================================================================
    Lex UI — App State
-   Centralized state management for the LANA AI SPA shell.
+   Centralized state for auth, connection, and active context.
    Extends EventTarget for reactive change notifications.
 
-   Four state slices:
+   Three state slices:
      1. Auth        — token, user, isAuthenticated, isTokenExpired
      2. Connection   — baseUrl, serverInfo, isReachable
-     3. UI           — activeMatterId, activeConversationId, sidebar, theme
-     4. Chat/Agentic — chatMode, persona, streaming, agentic progress
+     3. Context      — activeMatterId, activeConversationId
 
    Usage:
      Lex.state.on('auth:changed', (e) => console.log(e.detail))
@@ -37,21 +36,9 @@
       this._isReachable = true;
       this._lastHealthCheck = null;
 
-      // -- UI slice --
+      // -- Context slice --
       this._activeMatterId = null;
       this._activeConversationId = null;
-      this._sidebarCollapsed = false;
-      this._theme = 'light';
-
-      // -- Chat/Agentic slice --
-      this._chatMode = 'general';
-      this._agentPersona = 'default';
-      this._isStreaming = false;
-      this._isAgenticActive = false;
-      this._agenticPhase = null;
-      this._agenticProgress = null;
-      this._activeDocuments = [];
-      this._forceAgentic = false;
 
       // Saved property descriptors for cleanup
       this._interceptedProps = new Map();
@@ -91,26 +78,11 @@
     get lastHealthCheck() { return this._lastHealthCheck; }
 
     // -----------------------------------------------------------------------
-    // UI getters
+    // Context getters
     // -----------------------------------------------------------------------
 
     get activeMatterId() { return this._activeMatterId; }
     get activeConversationId() { return this._activeConversationId; }
-    get sidebarCollapsed() { return this._sidebarCollapsed; }
-    get theme() { return this._theme; }
-
-    // -----------------------------------------------------------------------
-    // Chat/Agentic getters
-    // -----------------------------------------------------------------------
-
-    get chatMode() { return this._chatMode; }
-    get agentPersona() { return this._agentPersona; }
-    get isStreaming() { return this._isStreaming; }
-    get isAgenticActive() { return this._isAgenticActive; }
-    get agenticPhase() { return this._agenticPhase; }
-    get agenticProgress() { return this._agenticProgress; }
-    get activeDocuments() { return this._activeDocuments; }
-    get forceAgentic() { return this._forceAgentic; }
 
     // -----------------------------------------------------------------------
     // Auth setters
@@ -188,81 +160,19 @@
     }
 
     // -----------------------------------------------------------------------
-    // UI setters
+    // Context setters
     // -----------------------------------------------------------------------
 
     setActiveMatter(matterId) {
       if (this._activeMatterId === matterId) return;
       this._activeMatterId = matterId;
-      // Not persisted to localStorage — transient UI state, not a user preference.
-      // Resets on page navigation and refresh by design.
-      this._emit('ui:changed', { property: 'activeMatterId', value: matterId });
+      this._emit('context:changed', { property: 'activeMatterId', value: matterId });
     }
 
     setActiveConversation(conversationId) {
       if (this._activeConversationId === conversationId) return;
       this._activeConversationId = conversationId;
-      // Not persisted to localStorage — transient UI state, not a user preference.
-      this._emit('ui:changed', { property: 'activeConversationId', value: conversationId });
-    }
-
-    setSidebarCollapsed(collapsed) {
-      if (this._sidebarCollapsed === collapsed) return;
-      this._sidebarCollapsed = collapsed;
-      localStorage.setItem('sidebarCollapsed', collapsed ? 'true' : 'false');
-      this._emit('ui:changed', { property: 'sidebarCollapsed', value: collapsed });
-    }
-
-    setTheme(theme) {
-      if (this._theme === theme) return;
-      this._theme = theme;
-      localStorage.setItem('theme', theme);
-      this._emit('ui:changed', { property: 'theme', value: theme });
-    }
-
-    // -----------------------------------------------------------------------
-    // Chat/Agentic setters
-    // -----------------------------------------------------------------------
-
-    setChatMode(mode) {
-      if (this._chatMode === mode) return;
-      this._chatMode = mode;
-      localStorage.setItem('chatMode', mode);
-      this._emit('chat:changed', { property: 'chatMode', chatMode: mode });
-    }
-
-    setAgentPersona(persona) {
-      if (this._agentPersona === persona) return;
-      this._agentPersona = persona;
-      this._emit('chat:changed', { property: 'agentPersona', agentPersona: persona });
-    }
-
-    setStreaming(active) {
-      if (this._isStreaming === active) return;
-      this._isStreaming = active;
-      this._emit('chat:streaming', { isStreaming: active });
-    }
-
-    setAgenticPhase(phase, progress) {
-      this._agenticPhase = phase;
-      this._agenticProgress = progress || null;
-      this._isAgenticActive = !!phase && phase !== 'complete';
-      this._emit('chat:agentic', {
-        phase: phase,
-        progress: this._agenticProgress,
-        isAgenticActive: this._isAgenticActive
-      });
-    }
-
-    setActiveDocuments(docs) {
-      this._activeDocuments = Array.isArray(docs) ? docs : [];
-      this._emit('chat:changed', { property: 'activeDocuments', activeDocuments: this._activeDocuments });
-    }
-
-    setForceAgentic(enabled) {
-      if (this._forceAgentic === enabled) return;
-      this._forceAgentic = enabled;
-      this._emit('chat:changed', { property: 'forceAgentic', forceAgentic: enabled });
+      this._emit('context:changed', { property: 'activeConversationId', value: conversationId });
     }
 
     // -----------------------------------------------------------------------
@@ -308,14 +218,6 @@
       } catch (e) {
         this._serverInfo = null;
       }
-
-      // UI preferences — activeMatterId and activeConversationId are transient
-      // (not persisted to localStorage). They reset on page load by design.
-      this._sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
-      this._theme = localStorage.getItem('theme') || 'light';
-
-      // Chat/Agentic
-      this._chatMode = localStorage.getItem('chatMode') || 'general';
     }
 
     // -----------------------------------------------------------------------
@@ -324,12 +226,8 @@
 
     /**
      * Uses Object.defineProperty on the api instance to intercept writes
-     * to token, user, baseUrl, and _streamingActive. This fires events
-     * the instant a value changes — no polling timers needed.
-     *
-     * Does NOT modify api.js source. Works because window.api.token etc. are
-     * plain instance properties (not prototype getters), so we can
-     * redefine them on the instance with a getter/setter pair.
+     * to token, user, and baseUrl. This fires events the instant a value
+     * changes — no polling timers needed.
      */
     _interceptApiProperties() {
       if (typeof window.api === 'undefined' || !window.api) return;
@@ -369,14 +267,6 @@
             isReachable: self._isReachable,
             baseUrl: self._baseUrl
           });
-        }
-      });
-
-      this._interceptProperty(window.api, '_streamingActive', function (newVal) {
-        var val = !!newVal;
-        if (val !== self._isStreaming) {
-          self._isStreaming = val;
-          self._emit('chat:streaming', { isStreaming: self._isStreaming });
         }
       });
     }

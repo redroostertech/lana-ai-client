@@ -1,6 +1,4 @@
-/* Organization Details — Page Controller
-   SPA page fragment loaded by lex-router after admin/organizations.html
-   is injected into the content area.
+/* Organization Details — Page Controller (standalone page)
 
    Zones:
      A  Page Banner          — org name, slug, status badge, action slot
@@ -10,7 +8,6 @@
    Rules:
      - NO regex anywhere — string methods only (includes, indexOf, split, etc.)
      - IIFE wrapper — no top-level const/class/let leaking to window scope
-     - registerPageInit before init() — enables SPA re-navigation
      - Lex.Nav.go() for all navigation — never window.location.href
      - Lex.Utils.formatDate() for date formatting
      - Lex.Toast.error() for error notifications
@@ -81,28 +78,31 @@
   }
 
   /**
-   * Produce a display label from a status string.
-   * Capitalizes the first character without regex.
-   * @param {string} status
+   * Capitalize the first character of a string and lowercase the rest.
+   * No regex — uses charAt + slice only.
+   * @param {string} str
+   * @param {string} fallback - Default value if str is falsy
    * @returns {string}
    */
-  function statusLabel(status) {
-    if (!status) return 'Unknown';
-    var s = String(status);
+  function capitalizeFirst(str, fallback) {
+    if (!str) return fallback || '';
+    var s = String(str);
     return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
   }
 
   /**
+   * Produce a display label from an organization status string.
+   * @param {string} status
+   * @returns {string}
+   */
+  function statusLabel(status) { return capitalizeFirst(status, 'Unknown'); }
+
+  /**
    * Produce a display label for a subscription tier.
-   * Capitalizes the first character without regex.
    * @param {string} tier
    * @returns {string}
    */
-  function tierLabel(tier) {
-    if (!tier) return 'Standard';
-    var t = String(tier);
-    return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
-  }
+  function tierLabel(tier) { return capitalizeFirst(tier, 'Standard'); }
 
   /**
    * Calculate the quota fill percentage (capped 0–100).
@@ -183,13 +183,16 @@
    * @param {Object} stats - Stats record (may contain user_count, matter_count)
    */
   function _renderQuotas(org, stats) {
-    // Safely extract counts: prefer stats, fall back to org fields
-    var userCount   = parseInt(String((stats && stats.user_count)   || (org && org.user_count)   || 0), 10);
-    var matterCount = parseInt(String((stats && stats.matter_count) || (org && org.matter_count) || 0), 10);
+    // Unwrap stats: API may return { statistics: {...} } envelope or flat object
+    var statsData = (stats && stats.statistics) ? stats.statistics : stats;
+
+    // Safely extract counts: prefer stats (total_users/total_matters), fall back to org fields
+    var userCount   = parseInt((statsData && (statsData.total_users || statsData.user_count)) || (org && org.user_count) || 0, 10);
+    var matterCount = parseInt((statsData && (statsData.total_matters || statsData.matter_count)) || (org && org.matter_count) || 0, 10);
 
     // Safely extract limits: prefer org fields, fall back to stats
-    var userLimit   = parseInt(String((org && org.max_users)   || (stats && stats.max_users)   || 0), 10) || null;
-    var matterLimit = parseInt(String((org && org.max_matters) || (stats && stats.max_matters) || 0), 10) || null;
+    var userLimit   = parseInt((org && org.max_users) || (statsData && statsData.max_users) || 0, 10) || null;
+    var matterLimit = parseInt((org && org.max_matters) || (statsData && statsData.max_matters) || 0, 10) || null;
 
     // -- Users metric --
     var metricUsers    = el('metricUsers');
@@ -329,8 +332,8 @@
       // Stats endpoint gracefully degrades to empty object on failure so that
       // the rest of the page can still render with the org record data.
       var results = await Promise.all([
-        window.api.getOrganization(orgId),
-        window.api.getOrganizationStats(orgId).catch(function (statsErr) {
+        api.getOrganization(orgId),
+        api.getOrganizationStats(orgId).catch(function (statsErr) {
           console.warn('[Organizations] Stats fetch failed (non-fatal):', statsErr && statsErr.message);
           return {};
         })
@@ -343,18 +346,24 @@
       var org   = (rawOrg && rawOrg.organization) ? rawOrg.organization : rawOrg;
       var stats = rawStats || {};
 
+      // Guard against null/empty org response
+      if (!org || typeof org !== 'object') {
+        throw new Error('Organization data not found');
+      }
+
       // Render all zones
       _renderBanner(org);
       _renderQuotas(org, stats);
       _renderInfo(org);
 
     } catch (err) {
+      // _showError hides the data zones and removes shimmer before showing
+      // the error state, so by the time finally runs, Redact.off is a no-op.
       _showError(err);
-      return; // skip finally Redact.off — _showError handles it
 
     } finally {
-      // Remove shimmer regardless of success or error.
-      // _showError also calls Redact.off, but calling it twice is idempotent.
+      // Remove shimmer on both success and error paths.
+      // Calling Redact.off twice is idempotent — safe even after _showError.
       if (banner)    Lex.Redact.off(banner);
       if (quotaGrid) Lex.Redact.off(quotaGrid);
       if (infoCard)  Lex.Redact.off(infoCard);
@@ -396,34 +405,9 @@
   }
 
   // =========================================================================
-  // Page lifecycle — register with router for SPA re-navigation support
+  // Boot
   // =========================================================================
 
-  // registerPageInit ensures init() is called on every navigation to this page
-  // (first load + re-navigation from cached scripts after the IIFE has run).
-  if (window.LexRouter) {
-    LexRouter.registerPageInit('admin/organizations.html', function () {
-      LexRouter.registerView({ onLeave: onLeave });
-      init();
-    });
-  } else {
-    // Fallback for non-SPA contexts (should not occur in normal operation)
-    init();
-  }
-
-  // =========================================================================
-  // Page lifecycle — onLeave cleanup
-  // =========================================================================
-
-  /**
-   * Clean up when navigating away.
-   * This page has no intervals, globals, or document listeners to remove,
-   * but the hook is registered for future-proofing and consistency.
-   */
-  function onLeave() {
-    // Nothing to clean up for this page currently.
-    // If intervals / globals / document listeners are added later,
-    // remove them here following the dashboard.js onLeave pattern.
-  }
+  init();
 
 })();

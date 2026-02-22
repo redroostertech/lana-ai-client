@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Chat - LanaAI</title>
+  <link rel="stylesheet" href="css/tailwind-output.css">
   <script src="js/tailwind-loader.js"></script>
   <script src="js/error-reporter.js"></script>
   <script>console.log('%c[CHAT.HTML] VERSION LOADED: 2026-02-15 03:40 UTC - TRACE VIEWER WITH MESSAGE IDS', 'background: #22c55e; color: white; padding: 4px 8px; font-weight: bold; font-size: 14px;');</script>
@@ -2818,7 +2819,7 @@
       const routes = {
         matter: () => {
           if (entityId) {
-            Lex.Nav.go('workspace_details.html', { params: { id: entityId }, context: { matterId: entityId } });
+            Lex.Nav.go('workspace-details.html', { params: { id: entityId }, context: { matterId: entityId } });
           } else {
             Lex.Nav.go('workspaces.html');
           }
@@ -3088,7 +3089,7 @@
 
     function navigateToContactInMatter() {
       if (_contactDetailPanelData && _contactDetailPanelData.matterId) {
-        Lex.Nav.go('workspace_details.html', { params: { id: _contactDetailPanelData.matterId }, context: { matterId: _contactDetailPanelData.matterId } });
+        Lex.Nav.go('workspace-details.html', { params: { id: _contactDetailPanelData.matterId }, context: { matterId: _contactDetailPanelData.matterId } });
       } else {
         Lex.Nav.go('workspaces.html');
       }
@@ -8884,7 +8885,7 @@
       }
 
       // Navigate to the dedicated matter details page
-      Lex.Nav.go('workspace_details.html', {
+      Lex.Nav.go('workspace-details.html', {
         params: { id: window.currentMatterId },
         context: { matterId: window.currentMatterId }
       });

@@ -56,7 +56,6 @@
     dom.kvLastName       = document.getElementById('sv2-kv-lastname');
     dom.kvRole           = document.getElementById('sv2-kv-role');
     dom.kvOrg            = document.getElementById('sv2-kv-org');
-    dom.editProfileBtn   = document.getElementById('sv2-edit-profile-btn');
     dom.cancelEditBtn    = document.getElementById('sv2-cancel-edit-btn');
     dom.profileForm      = document.getElementById('sv2-profile-form');
 
@@ -106,14 +105,8 @@
   function showConditionalSections() {
     // Preferences — only if enabled in config
     if (window.LanaConfig && window.LanaConfig.USER_PREFERENCES_EDIT_ENABLED === true) {
-      dom.preferencesSection.classList.remove('sv2-hidden');
+      if (dom.preferencesSection) dom.preferencesSection.classList.remove('sv2-hidden');
       loadPreferences();
-    }
-
-    // VPN — only if vpnManager is available (Electron)
-    if (typeof vpnManager !== 'undefined') {
-      dom.vpnSection.classList.remove('sv2-hidden');
-      loadVpnStatus();
     }
   }
 
@@ -123,7 +116,7 @@
   // =========================================================================
 
   function loadProfile() {
-    Lex.Redact.on(dom.profileCard);
+    if (dom.profileView) Lex.Redact.on(dom.profileView);
 
     api.getProfile().then(function (result) {
       var user = result.profile || result.user || result;
@@ -136,39 +129,39 @@
                      (user.email ? user.email.charAt(0).toUpperCase() : 'U');
 
       // View mode
-      dom.profileName.textContent = name;
-      dom.profileEmail.textContent = user.email || '';
-      dom.avatarInitials.textContent = initials;
-      dom.kvFirstName.setAttribute('value', firstName || '--');
-      dom.kvLastName.setAttribute('value', lastName || '--');
-      dom.kvRole.setAttribute('value', user.role_name || '--');
-      dom.kvOrg.setAttribute('value', user.organization_name || '--');
+      if (dom.profileName) dom.profileName.textContent = name;
+      if (dom.profileEmail) dom.profileEmail.textContent = user.email || '';
+      if (dom.avatarInitials) dom.avatarInitials.textContent = initials;
+      if (dom.kvFirstName) dom.kvFirstName.setAttribute('value', firstName || '--');
+      if (dom.kvLastName) dom.kvLastName.setAttribute('value', lastName || '--');
+      if (dom.kvRole) dom.kvRole.setAttribute('value', user.role_name || '--');
+      if (dom.kvOrg) dom.kvOrg.setAttribute('value', user.organization_name || '--');
 
       // Edit mode pre-fill
-      dom.profileNameEdit.textContent = name;
-      dom.profileEmailEdit.textContent = user.email || '';
-      dom.avatarInitialsEdit.textContent = initials;
+      if (dom.profileNameEdit) dom.profileNameEdit.textContent = name;
+      if (dom.profileEmailEdit) dom.profileEmailEdit.textContent = user.email || '';
+      if (dom.avatarInitialsEdit) dom.avatarInitialsEdit.textContent = initials;
 
-      var firstNameInput = dom.profileForm.querySelector('[name="first_name"]');
-      var lastNameInput = dom.profileForm.querySelector('[name="last_name"]');
-      if (firstNameInput) firstNameInput.value = firstName;
-      if (lastNameInput) lastNameInput.value = lastName;
+      if (dom.profileForm) {
+        var firstNameInput = dom.profileForm.querySelector('[name="first_name"]');
+        var lastNameInput = dom.profileForm.querySelector('[name="last_name"]');
+        if (firstNameInput) firstNameInput.value = firstName;
+        if (lastNameInput) lastNameInput.value = lastName;
+      }
 
-      Lex.Redact.off(dom.profileCard);
+      if (dom.profileView) Lex.Redact.off(dom.profileView);
     }).catch(function () {
-      Lex.Redact.off(dom.profileCard);
+      if (dom.profileView) Lex.Redact.off(dom.profileView);
       Lex.Toast.error('Failed to load profile');
     });
   }
 
   function showEditMode() {
-    dom.profileView.classList.add('sv2-hidden');
-    dom.profileEdit.classList.remove('sv2-hidden');
+    if (dom.profileCard) dom.profileCard.classList.add('sv2-editing');
   }
 
   function showViewMode() {
-    dom.profileEdit.classList.add('sv2-hidden');
-    dom.profileView.classList.remove('sv2-hidden');
+    if (dom.profileCard) dom.profileCard.classList.remove('sv2-editing');
   }
 
   function handleProfileSubmit(e) {
@@ -192,6 +185,7 @@
   // =========================================================================
 
   function renderPasswordRequirements() {
+    if (!dom.pwRequirements) return;
     var html = '';
     for (var i = 0; i < PW_REQS.length; i++) {
       html += '<div class="sv2-pw-req" data-req="' + PW_REQS[i].id + '">' +
@@ -227,6 +221,7 @@
   }
 
   function updatePasswordIndicators(reqs) {
+    if (!dom.pwRequirements) return;
     var keys = ['length', 'upper', 'lower', 'number', 'special'];
     for (var i = 0; i < keys.length; i++) {
       var el = dom.pwRequirements.querySelector('[data-req="' + keys[i] + '"]');
@@ -244,9 +239,9 @@
   }
 
   function validatePasswordForm() {
-    var currentPass = dom.currentPassword.value || '';
-    var newPass = dom.newPassword.value || '';
-    var confirmPass = dom.confirmPassword.value || '';
+    var currentPass = (dom.currentPassword && dom.currentPassword.value) || '';
+    var newPass = (dom.newPassword && dom.newPassword.value) || '';
+    var confirmPass = (dom.confirmPassword && dom.confirmPassword.value) || '';
 
     var reqs = checkPasswordRequirements(newPass);
     updatePasswordIndicators(reqs);
@@ -256,23 +251,27 @@
     var hasCurrentPass = currentPass.length > 0;
 
     // Update confirm password error
-    if (confirmPass.length > 0 && !passwordsMatch) {
-      dom.confirmPassword.error = 'Passwords do not match';
-    } else {
-      dom.confirmPassword.error = '';
+    if (dom.confirmPassword) {
+      if (confirmPass.length > 0 && !passwordsMatch) {
+        dom.confirmPassword.error = 'Passwords do not match';
+      } else {
+        dom.confirmPassword.error = '';
+      }
     }
 
     // Enable/disable submit button
-    dom.updatePasswordBtn.disabled = !(hasCurrentPass && allReqsMet && passwordsMatch);
+    if (dom.updatePasswordBtn) {
+      dom.updatePasswordBtn.disabled = !(hasCurrentPass && allReqsMet && passwordsMatch);
+    }
   }
 
   function handlePasswordSubmit(e) {
     var values = e.detail.values;
 
     // Clear previous errors
-    dom.currentPassword.error = '';
-    dom.newPassword.error = '';
-    dom.confirmPassword.error = '';
+    if (dom.currentPassword) dom.currentPassword.error = '';
+    if (dom.newPassword) dom.newPassword.error = '';
+    if (dom.confirmPassword) dom.confirmPassword.error = '';
 
     // Client-side validation
     var currentPass = values.current_password || '';
@@ -280,18 +279,18 @@
     var confirmPass = values.confirm_password || '';
 
     if (!currentPass) {
-      dom.currentPassword.error = 'Current password is required';
+      if (dom.currentPassword) dom.currentPassword.error = 'Current password is required';
       return;
     }
 
     var reqs = checkPasswordRequirements(newPass);
     if (!allPasswordRequirementsMet(reqs)) {
-      dom.newPassword.error = 'Password does not meet all requirements';
+      if (dom.newPassword) dom.newPassword.error = 'Password does not meet all requirements';
       return;
     }
 
     if (newPass !== confirmPass) {
-      dom.confirmPassword.error = 'Passwords do not match';
+      if (dom.confirmPassword) dom.confirmPassword.error = 'Passwords do not match';
       return;
     }
 
@@ -306,11 +305,11 @@
       var errorMessage = errorData.message || (errorData.error ? errorData.error.message : null) || error.message || 'Password update failed';
 
       if (errorField === 'current_password') {
-        dom.currentPassword.error = errorMessage;
+        if (dom.currentPassword) dom.currentPassword.error = errorMessage;
       } else if (errorField === 'new_password') {
-        dom.newPassword.error = errorMessage;
+        if (dom.newPassword) dom.newPassword.error = errorMessage;
       } else if (errorMessage.toLowerCase().indexOf('current') !== -1 || errorMessage.toLowerCase().indexOf('incorrect') !== -1) {
-        dom.currentPassword.error = errorMessage;
+        if (dom.currentPassword) dom.currentPassword.error = errorMessage;
       } else {
         Lex.Toast.error(errorMessage);
       }
@@ -360,6 +359,7 @@
   // =========================================================================
 
   function loadMfaStatus() {
+    if (!dom.mfaSection) return;
     if (!api.isMfaEnabled()) {
       dom.mfaSection.innerHTML = '';
       return;
@@ -374,6 +374,7 @@
   }
 
   function renderMfaCard(enabled) {
+    if (!dom.mfaSection) return;
     var badgeHtml;
     var buttonLabel;
     var buttonAction;
@@ -518,20 +519,23 @@
   // =========================================================================
 
   function loadSessions() {
-    Lex.Redact.on(dom.sessionsCard);
+    if (dom.sessionsList) Lex.Redact.on(dom.sessionsList);
 
     api.get('/api/v1/auth/session').then(function (result) {
       var data = result.data || result;
       var sessions = data.sessions || [];
       renderSessions(sessions);
-      Lex.Redact.off(dom.sessionsCard);
+      if (dom.sessionsList) Lex.Redact.off(dom.sessionsList);
     }).catch(function () {
-      dom.sessionsList.innerHTML = '<lex-empty message="Failed to load sessions" icon="inbox"></lex-empty>';
-      Lex.Redact.off(dom.sessionsCard);
+      if (dom.sessionsList) {
+        Lex.Redact.off(dom.sessionsList);
+        dom.sessionsList.innerHTML = '<lex-empty message="Failed to load sessions" icon="inbox"></lex-empty>';
+      }
     });
   }
 
   function renderSessions(sessions) {
+    if (!dom.sessionsList) return;
     if (!sessions.length) {
       dom.sessionsList.innerHTML = '<lex-empty message="No active sessions" icon="monitor"></lex-empty>';
       return;
@@ -605,14 +609,17 @@
       });
     }).catch(function (error) {
       console.error('[Settings V2] Failed to load VPN status:', error);
-      dom.vpnContent.innerHTML =
-        '<lex-card heading="VPN Status">' +
-          '<lex-empty message="Failed to load VPN status" icon="inbox"></lex-empty>' +
-        '</lex-card>';
+      if (dom.vpnContent) {
+        dom.vpnContent.innerHTML =
+          '<lex-card heading="VPN Status">' +
+            '<lex-empty message="Failed to load VPN status" icon="inbox"></lex-empty>' +
+          '</lex-card>';
+      }
     });
   }
 
   function renderVpnConfigured(keys, isRegistered) {
+    if (!dom.vpnContent) return;
     var statusBadge = isRegistered
       ? '<lex-badge label="Registered" color="green" size="sm"></lex-badge>'
       : '<lex-badge label="Pending Registration" color="yellow" size="sm"></lex-badge>';
@@ -651,6 +658,7 @@
   }
 
   function renderVpnNotConfigured() {
+    if (!dom.vpnContent) return;
     dom.vpnContent.innerHTML =
       '<lex-card heading="VPN Status">' +
         '<div class="sv2-mfa-header">' +
@@ -753,16 +761,34 @@
     renderPasswordRequirements();
 
     // ── Profile ──
-    dom.editProfileBtn.addEventListener('click', showEditMode);
-    dom.cancelEditBtn.addEventListener('click', showViewMode);
-    dom.profileForm.addEventListener('lex-submit', handleProfileSubmit);
+    if (dom.profileCard) {
+      dom.profileCard.addEventListener('card-action', function (e) {
+        if (e.detail && e.detail.action === 'edit') showEditMode();
+      });
+    }
+    if (dom.cancelEditBtn) {
+      dom.cancelEditBtn.addEventListener('click', showViewMode);
+    }
+    if (dom.profileForm) {
+      dom.profileForm.addEventListener('lex-submit', handleProfileSubmit);
+    }
 
     // ── Password ──
-    dom.passwordForm.addEventListener('lex-submit', handlePasswordSubmit);
-    dom.newPassword.addEventListener('lex-input', validatePasswordForm);
-    dom.confirmPassword.addEventListener('lex-input', validatePasswordForm);
-    dom.currentPassword.addEventListener('lex-input', validatePasswordForm);
-    dom.updatePasswordBtn.disabled = true;
+    if (dom.passwordForm) {
+      dom.passwordForm.addEventListener('lex-submit', handlePasswordSubmit);
+    }
+    if (dom.newPassword) {
+      dom.newPassword.addEventListener('lex-input', validatePasswordForm);
+    }
+    if (dom.confirmPassword) {
+      dom.confirmPassword.addEventListener('lex-input', validatePasswordForm);
+    }
+    if (dom.currentPassword) {
+      dom.currentPassword.addEventListener('lex-input', validatePasswordForm);
+    }
+    if (dom.updatePasswordBtn) {
+      dom.updatePasswordBtn.disabled = true;
+    }
 
     // ── Preferences ──
     if (dom.prefEmail) {
@@ -777,15 +803,19 @@
     }
 
     // ── Sessions ──
-    dom.revokeAllBtn.addEventListener('click', revokeAllSessions);
+    if (dom.revokeAllBtn) {
+      dom.revokeAllBtn.addEventListener('click', revokeAllSessions);
+    }
 
     // Session list — event delegation for individual revoke
-    dom.sessionsList.addEventListener('click', function (e) {
-      var btn = e.target.closest('[data-action="revoke"]');
-      if (btn) {
-        revokeSession(btn.dataset.sessionId);
-      }
-    });
+    if (dom.sessionsList) {
+      dom.sessionsList.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-action="revoke"]');
+        if (btn) {
+          revokeSession(btn.dataset.sessionId);
+        }
+      });
+    }
 
     // ── Load all data ──
     loadProfile();
@@ -794,22 +824,7 @@
     showConditionalSections();
   }
 
-  function onLeave() {
-    _profileData = null;
-    dom = {};
-  }
-
-
-  // =========================================================================
-  // Router Registration
-  // =========================================================================
-
-  if (window.LexRouter) {
-    LexRouter.registerPageInit('settings-v2.html', function () {
-      LexRouter.registerView({ onLeave: onLeave });
-      init();
-    });
-  }
+  // Standalone page — init directly (no SPA router)
   init();
 
 })();

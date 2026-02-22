@@ -124,7 +124,7 @@ const MenuConfig = {
         title: null,
         requiredRoles: [],
         items: [
-          { id: 'connectors', label: 'Data Connectors', href: '/integrations/data_connectors.html', icon: 'connectors' },
+          { id: 'connectors', label: 'Data Connectors', href: '/data-connectors.html', icon: 'connectors' },
           { id: 'insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
         ]
       },
@@ -231,7 +231,7 @@ const MenuConfig = {
         title: null,
         requiredRoles: [],
         items: [
-          { id: 'connectors', label: 'Data Connectors', href: '/integrations/data_connectors.html', icon: 'connectors' },
+          { id: 'connectors', label: 'Data Connectors', href: '/data-connectors.html', icon: 'connectors' },
           { id: 'insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
         ]
       },
@@ -296,7 +296,7 @@ const MenuConfig = {
         title: null,
         requiredRoles: [],
         items: [
-          { id: 'connectors', label: 'Data Connectors', href: '/integrations/data_connectors.html', icon: 'connectors' },
+          { id: 'connectors', label: 'Data Connectors', href: '/data-connectors.html', icon: 'connectors' },
           { id: 'insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
         ]
       },
@@ -361,7 +361,7 @@ const MenuConfig = {
         title: null,
         requiredRoles: [],
         items: [
-          { id: 'connectors', label: 'Data Connectors', href: '/integrations/data_connectors.html', icon: 'connectors' },
+          { id: 'connectors', label: 'Data Connectors', href: '/data-connectors.html', icon: 'connectors' },
           { id: 'insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
         ]
       },
@@ -430,7 +430,7 @@ const MenuConfig = {
         title: null,
         requiredRoles: [],
         items: [
-          { id: 'chat-connectors', label: 'Data Connectors', href: '/integrations/data_connectors.html', icon: 'connectors' },
+          { id: 'chat-connectors', label: 'Data Connectors', href: '/data-connectors.html', icon: 'connectors' },
           { id: 'chat-insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
         ]
       },

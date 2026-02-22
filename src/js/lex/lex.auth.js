@@ -32,7 +32,7 @@
 
     isOrgAdmin: function () { return hasRole('org_admin'); },
 
-    isAdmin: function () { return hasRole('system_admin') || hasRole('org_admin'); },
+    isAdmin: function () { return hasRole('system_admin') || hasRole('org_admin') || hasRole('admin'); },
 
     canViewSystemStatus: function () { return hasRole('system_admin') || hasRole('org_admin'); }
   };

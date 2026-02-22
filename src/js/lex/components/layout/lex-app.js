@@ -252,8 +252,6 @@
           <span>Unable to reach the server. Checking connection\u2026</span>
           <button type="button" id="lex-offline-retry-btn">Retry Now</button>
         </div>
-
-        <!-- Conversation modals moved to search-conversations.html -->
       `;
     }
 
@@ -597,7 +595,7 @@
           {
             id: 'tools',
             items: [
-              { id: 'connectors', label: 'Data Connectors', icon: 'plug', href: 'integrations/data_connectors.html' },
+              { id: 'connectors', label: 'Data Connectors', icon: 'plug', href: 'data-connectors.html' },
               { id: 'reports', label: 'Reports', icon: 'bar-chart-2', href: 'insights/module-execution.html' }
             ]
           },
@@ -607,7 +605,7 @@
             isScrollable: true,
             isConversationList: true,
             items: [
-              { id: 'new-chat', label: 'New Chat', icon: 'plus', href: 'chat_v2.html' }
+              { id: 'new-chat', label: 'New Chat', icon: 'plus', href: 'chat-v2.html' }
             ]
           }
         ]);

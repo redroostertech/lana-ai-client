@@ -1,40 +1,21 @@
 /* Lex UI — Router Page Descriptors
-   Registry of all navigable pages with their titles, nav identifiers,
+   Registry of all SPA-routed pages with their titles, nav identifiers,
    and page-specific scripts/stylesheets.
 
    Loaded before lex-router.js. Calls LexRouter.setPageDescriptors()
-   and LexRouter.setFullReloadPages() once lex-router.js is ready.
+   once lex-router.js is ready.
 
-   To add a new page: add an entry to PAGE_DESCRIPTORS below.
+   Standalone pages (dashboard, workspaces, settings-v2, admin/index,
+   admin/users, admin/health, admin/organizations, admin/roles) have no
+   descriptor — the router naturally ignores links to unknown pages,
+   letting the browser do a full navigation.
+
+   To add a new SPA page: add an entry to PAGE_DESCRIPTORS below.
    Scripts are loaded sequentially in order. Stylesheets are loaded in parallel.
 */
 
 (function () {
   'use strict';
-
-  // =========================================================================
-  // Pages that require a full browser reload (no shell, no routing)
-  // =========================================================================
-
-  var FULL_RELOAD_PAGES = [
-    'login.html',
-    'activate.html',
-    'password-reset.html',
-    'password-reset-request.html',
-    'error.html',
-    'auth_error.html',
-    'logged_out.html',
-    'session_expired.html',
-    'onboarding.html',
-    'demo.html',
-    'update-dialog.html',
-    'blank.html',
-    'app.html',
-    'index.html',
-    'matters.html',
-    'storage.html',
-    'connectors.html'
-  ];
 
   // =========================================================================
   // Page Descriptors
@@ -43,47 +24,7 @@
 
   var PAGE_DESCRIPTORS = {
 
-    // ── Dashboard ──
-    'dashboard.html': {
-      title: 'Dashboard',
-      activeNav: 'dashboard',
-      scripts: [
-        // Additional Lex components used only by the dashboard
-        'js/lex/components/foundation/lex-banner.js',
-        'js/lex/components/foundation/lex-metric.js',
-        'js/lex/components/foundation/lex-action-card.js',
-        'js/lex/components/foundation/lex-badge.js',
-        'js/lex/components/foundation/lex-stack.js',
-        'js/lex/components/foundation/lex-text.js',
-        'js/lex/components/foundation/lex-modal.js',
-        'js/lex/components/foundation/lex-drawer.js',
-        'js/lex/components/foundation/lex-card.js',
-        'js/lex/components/foundation/lex-divider.js',
-        'js/lex/components/foundation/lex-detail-panel.js',
-        'js/lex/components/form/lex-select.js',
-        'js/utils/event-display-names.js',
-        'js/services/feature-tracker.js',
-        'js/activity.js',
-        'js/activity-heatmap.js',
-        'js/vendor/chart.js',
-        'js/dashboard/widget-renderer.js',
-        'js/dashboard/widget-config-modal.js',
-        'js/dashboard/widgets/metric-card.widget.js',
-        'js/dashboard/widgets/data-table.widget.js',
-        'js/dashboard/widgets/chart.widget.js',
-        'js/dashboard/widgets/activity-feed.widget.js',
-        'js/dashboard/widgets/matter-summary.widget.js',
-        'js/dashboard/widgets/connector-status.widget.js',
-        'js/dashboard/widgets/module-metric.widget.js',
-        'js/dashboard/widgets/alert-list.widget.js',
-        'js/services/session-tracking-service.js',
-        'js/dashboard/dashboard.js'
-      ],
-      stylesheets: [
-        'css/session-tracking.css',
-        'css/dashboard-command-center.css'
-      ]
-    },
+    // ── Dashboard ── (standalone page — no descriptor needed)
 
     // ── Chat ──
     'chat.html': {
@@ -98,96 +39,9 @@
       stylesheets: []
     },
 
-    // ── Workspaces ──
-    'workspaces.html': {
-      title: 'Workspaces',
-      activeNav: 'workspaces',
-      scripts: [
-        // Lex components not globally loaded
-        'js/lex/components/foundation/lex-banner.js',
-        'js/lex/components/foundation/lex-metric.js',
-        'js/lex/components/foundation/lex-detail-panel.js',
-        'js/lex/components/foundation/lex-badge.js',
-        'js/lex/components/foundation/lex-modal.js',
-        'js/lex/components/foundation/lex-drawer.js',
-        'js/lex/components/foundation/lex-card.js',
-        'js/lex/components/foundation/lex-tabs.js',
-        'js/lex/components/foundation/lex-accordion.js',
-        'js/lex/components/form/lex-input.js',
-        'js/lex/components/form/lex-select.js',
-        'js/lex/components/form/lex-checkbox.js',
-        'js/lex/components/form/lex-textarea.js',
-        'js/lex/components/data/lex-pagination.js',
-        // Page dependencies
-        'js/services/feature-tracker.js',
-        'js/vendor/mammoth.min.js',
-        'js/conflict-detection.js',
-        'js/similar-matters-widget.js',
-        'js/analytics.js',
-        'js/utils/metadata-formatter.js',
-        'js/services/metadata-service.js',
-        'js/vendor/marked.min.js',
-        'js/components/document-metadata-viewer.js',
-        'js/tiptap-bundle-built.js',
-        'js/api/matter-notes-api.client.js',
-        'js/components/note-list.component.js',
-        'js/components/note-editor.component.js',
-        'js/matter-notes.js',
-        'js/matter-skills.js',
-        'https://cdn.jsdelivr.net/npm/drawflow@0.0.60/dist/drawflow.min.js',
-        'js/workflow-builder.js',
-        'js/workspace.js'
-      ],
-      stylesheets: [
-        'css/components/document-metadata.css',
-        'css/matter-notes.css',
-        'https://cdn.jsdelivr.net/npm/drawflow@0.0.60/dist/drawflow.min.css'
-      ]
-    },
+    // ── Workspaces ── (standalone page — no descriptor needed)
 
-    // ── Workspace Details (single matter/workspace view) ──
-    'workspace_details.html': {
-      title: 'Matter Details',
-      activeNav: 'workspaces',
-      scripts: [
-        // Lex components not globally loaded
-        'js/lex/components/foundation/lex-banner.js',
-        'js/lex/components/foundation/lex-metric.js',
-        'js/lex/components/foundation/lex-detail-panel.js',
-        'js/lex/components/foundation/lex-badge.js',
-        'js/lex/components/foundation/lex-modal.js',
-        'js/lex/components/foundation/lex-card.js',
-        'js/lex/components/foundation/lex-tabs.js',
-        'js/lex/components/foundation/lex-accordion.js',
-        'js/lex/components/form/lex-input.js',
-        'js/lex/components/form/lex-select.js',
-        'js/lex/components/form/lex-checkbox.js',
-        'js/lex/components/form/lex-textarea.js',
-        'js/lex/components/form/lex-segmented.js',
-        'js/lex/components/data/lex-pagination.js',
-        // Page dependencies
-        'js/services/feature-tracker.js',
-        'js/vendor/mammoth.min.js',
-        'js/conflict-detection.js',
-        'js/similar-matters-widget.js',
-        'js/utils/metadata-formatter.js',
-        'js/services/metadata-service.js',
-        'js/vendor/marked.min.js',
-        'js/components/document-metadata-viewer.js',
-        'js/tiptap-bundle-built.js',
-        'js/api/matter-notes-api.client.js',
-        'js/components/note-list.component.js',
-        'js/components/note-editor.component.js',
-        'js/matter-notes.js',
-        'js/matter-skills.js',
-        // Page controller (MUST be last)
-        'js/workspace-details.js'
-      ],
-      stylesheets: [
-        'css/components/document-metadata.css',
-        'css/matter-notes.css'
-      ]
-    },
+    // workspace-details.html — standalone page (not routed)
 
     'matters/timeline.html': {
       title: 'Matter Timeline',
@@ -261,29 +115,7 @@
       stylesheets: []
     },
 
-    // ── Settings V2 (Lex UI migration) ──
-    'settings-v2.html': {
-      title: 'Settings',
-      activeNav: 'settings',
-      scripts: [
-        'js/lex/components/foundation/lex-card.js',
-        'js/lex/components/foundation/lex-badge.js',
-        'js/lex/components/foundation/lex-text.js',
-        'js/lex/components/foundation/lex-stack.js',
-        'js/lex/components/foundation/lex-divider.js',
-        'js/lex/components/foundation/lex-kv.js',
-        'js/lex/components/foundation/lex-empty.js',
-        'js/lex/components/form/lex-input.js',
-        'js/lex/components/form/lex-form.js',
-        'js/lex/components/form/lex-toggle.js',
-        'js/lex/components/form/lex-btn.js',
-        // Page controller (MUST be last)
-        'js/settings-v2.js'
-      ],
-      stylesheets: [
-        'css/settings-v2.css'
-      ]
-    },
+    // ── Settings V2 ── (standalone page — no descriptor needed)
 
     // ── Help & Support ──
     'help.html': {
@@ -314,17 +146,7 @@
     },
 
     // ── Search ──
-    'search-conversations.html': {
-      title: 'Search Conversations',
-      activeNav: 'search',
-      scripts: [
-        'js/lex/components/foundation/lex-banner.js',
-        'js/lex/components/foundation/lex-card.js',
-        'js/lex/components/form/lex-input.js',
-        'js/search-conversations.js'
-      ],
-      stylesheets: []
-    },
+    // search-conversations.html — standalone page (not routed)
 
     'search-results.html': {
       title: 'Search Results',
@@ -346,16 +168,7 @@
     },
 
     // ── Admin ──
-    'admin/index.html': {
-      title: 'Administration',
-      activeNav: 'admin',
-      scripts: [
-        'js/lex/components/foundation/lex-banner.js',
-        'js/lex/components/foundation/lex-action-card.js',
-        'js/admin/admin-index.js'
-      ],
-      stylesheets: []
-    },
+    // admin/index.html — standalone page (not routed)
 
     'admin/dashboard.html': {
       title: 'Admin Dashboard',
@@ -366,12 +179,7 @@
       ]
     },
 
-    'admin/users.html': {
-      title: 'User Management',
-      activeNav: 'admin',
-      scripts: [],
-      stylesheets: []
-    },
+    // admin/users.html — standalone page (not routed)
 
     'admin/audit.html': {
       title: 'Audit Logs',
@@ -400,51 +208,9 @@
       ]
     },
 
-    'admin/health.html': {
-      title: 'System Health',
-      activeNav: 'admin',
-      scripts: [
-        'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js'
-      ],
-      stylesheets: []
-    },
-
-    'admin/organizations.html': {
-      title: 'Organization Details',
-      activeNav: 'admin',
-      scripts: [
-        'js/lex/components/foundation/lex-banner.js',
-        'js/lex/components/foundation/lex-metric.js',
-        'js/lex/components/foundation/lex-card.js',
-        'js/lex/components/foundation/lex-kv.js',
-        'js/lex/components/foundation/lex-badge.js',
-        'js/lex/components/foundation/lex-empty.js',
-        // Page controller (MUST be last)
-        'js/admin/organizations.js'
-      ],
-      stylesheets: [
-        'css/admin/organizations.css'
-      ]
-    },
-
-    'admin/roles.html': {
-      title: 'Roles & Permissions',
-      activeNav: 'admin',
-      scripts: [
-        'js/lex/components/foundation/lex-tabs.js',
-        'js/lex/components/foundation/lex-card.js',
-        'js/lex/components/foundation/lex-badge.js',
-        'js/lex/components/foundation/lex-btn.js',
-        'js/lex/components/foundation/lex-modal.js',
-        'js/lex/components/foundation/lex-empty.js',
-        'js/lex/components/foundation/lex-spinner.js',
-        'js/lex/components/form/lex-form.js',
-        'js/lex/components/form/lex-input.js',
-        'js/lex/components/form/lex-textarea.js',
-        'js/admin/roles.js'
-      ],
-      stylesheets: []
-    },
+    // admin/health.html — standalone page (not routed)
+    // admin/organizations.html — standalone page (not routed)
+    // admin/roles.html — standalone page (not routed)
 
     'admin/roles_manager.html': {
       title: 'Role Manager',
@@ -568,21 +334,7 @@
     },
 
     // ── Integrations ──
-    'integrations/data_connectors.html': {
-      title: 'Data Connectors',
-      activeNav: 'connectors',
-      scripts: [
-        'js/lex/components/foundation/lex-badge.js',
-        'js/lex/components/foundation/lex-btn.js',
-        'js/lex/components/foundation/lex-modal.js',
-        'js/lex/components/foundation/lex-banner.js',
-        'js/lex/components/form/lex-input.js',
-        'js/lex/components/form/lex-select.js',
-        'js/connectors.js',
-        'js/data_connectors.js'
-      ],
-      stylesheets: []
-    },
+    // data-connectors.html — standalone page (not routed)
 
     'integrations/connector-viewer.html': {
       title: 'Connector',
@@ -781,40 +533,7 @@
       stylesheets: []
     },
 
-    'chat_v2.html': {
-      title: 'New Conversation',
-      activeNav: 'chat',
-      scripts: [
-        // Foundation components NOT in shell
-        'js/lex/components/foundation/lex-text.js',
-        'js/lex/components/foundation/lex-action-card.js',
-        'js/lex/components/foundation/lex-badge.js',
-        'js/lex/components/foundation/lex-divider.js',
-        // Form components NOT in shell
-        'js/lex/components/form/lex-input.js',
-        // Chat component chain (dependency order)
-        'js/lex/chat/lex-chat.format.js',
-        'js/lex/chat/lex-chat.source.js',
-        'js/lex/chat/lex-chat.source-llama.js',
-        'js/lex/chat/lex-chat.message.js',
-        'js/lex/chat/lex-chat.activity.js',
-        'js/lex/chat/lex-chat.documents.js',
-        'js/lex/chat/lex-chat.composer.js',
-        'js/lex/chat/lex-chat.thread.js',
-        'js/lex/chat/lex-chat.js',
-        'js/lex/chat/lex-chat.index.js',
-        // Demo responses for demo mode
-        'js/chat-demo-responses.js',
-        // File drawer (uses Lex.Drawer)
-        'js/chat_v2.file-drawer.js',
-        // Page controller (MUST be last)
-        'js/chat_v2.js'
-      ],
-      stylesheets: [
-        'css/lex-chat.css',
-        'css/chat-v2.css'
-      ]
-    },
+    // chat-v2.html — standalone page (not routed)
 
     // ── Lex UI demo pages ──
     'lex-test.html': {
@@ -851,19 +570,16 @@
   // Store on window.Lex for immediate access by lex-router.js
   window.Lex = window.Lex || {};
   window.Lex._pageDescriptors = PAGE_DESCRIPTORS;
-  window.Lex._fullReloadPages = FULL_RELOAD_PAGES;
 
   // If router is already loaded, set immediately
   if (window.LexRouter) {
     window.LexRouter.setPageDescriptors(PAGE_DESCRIPTORS);
-    window.LexRouter.setFullReloadPages(FULL_RELOAD_PAGES);
   } else {
     // Router not loaded yet — defer until it's ready
     // lex-router.js will check window.Lex._pageDescriptors on init
     document.addEventListener('DOMContentLoaded', function () {
       if (window.LexRouter) {
         window.LexRouter.setPageDescriptors(PAGE_DESCRIPTORS);
-        window.LexRouter.setFullReloadPages(FULL_RELOAD_PAGES);
       }
     });
   }

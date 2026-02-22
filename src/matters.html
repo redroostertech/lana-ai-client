@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Matters - LanaAI</title>
+  <link rel="stylesheet" href="css/tailwind-output.css">
   <script src="js/tailwind-loader.js"></script>
   <link rel="stylesheet" href="css/components.css">
   <script src="js/error-reporter.js"></script>
@@ -2403,7 +2404,7 @@
 
     window.viewMatter = async function(matterId, defaultTab = 'activity', options = {}) {
       // Navigate to the dedicated matter details page
-      Lex.Nav.go('workspace_details.html', {
+      Lex.Nav.go('workspace-details.html', {
         params: { id: matterId, tab: defaultTab },
         context: { matterId: matterId, tab: defaultTab }
       });

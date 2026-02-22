@@ -1,12 +1,10 @@
 /**
- * Roles & Permissions — SPA page controller
+ * Roles & Permissions — Standalone page controller
  *
  * Handles role management and permission display for the admin panel.
- * Migrated from V1 legacy inline script to V2 Lex SPA architecture.
  *
  * @requires api.js           - window.api — getRoles, getRole, createRole, updateRole,
  *                               deleteRole, getPermissions, getInheritedPermissions
- * @requires lex-router.js    - LexRouter.registerPageInit, LexRouter.registerView
  * @requires lex.utils.js     - Lex.Utils.escapeHtml
  * @requires lex.auth.js      - Lex.Auth.isAdmin
  * @requires lex-toast.js     - Lex.Toast.success, Lex.Toast.error
@@ -24,8 +22,10 @@
   var _permissions = [];
   var _editingRoleId = null; // null = create mode, string = edit mode
 
-  // Generation counter: guards stale async renders after rapid re-navigation
-  var _gen = 0;
+  // Generation counters per data stream to prevent race conditions
+  // when loadRoles() and loadPermissions() run in parallel from init().
+  var _rolesGen = 0;
+  var _permsGen = 0;
 
   // =========================================================================
   // Entry point — called on every SPA navigation to this page
@@ -36,6 +36,8 @@
     _roles = [];
     _permissions = [];
     _editingRoleId = null;
+    _rolesGen = 0;
+    _permsGen = 0;
 
     _wireTabEvents();
     _wireModalEvents();
@@ -57,10 +59,8 @@
     loadPermissions();
   }
 
-  function onLeave() {
-    // Increment generation to abandon any in-flight renders
-    _gen++;
-  }
+  // Generation counters are incremented by loadRoles/loadPermissions to
+  // abandon stale renders — no explicit cleanup needed for standalone pages.
 
   // =========================================================================
   // Tab switching
@@ -94,7 +94,7 @@
   // =========================================================================
 
   function loadRoles() {
-    var gen = ++_gen;
+    var gen = ++_rolesGen;
     var grid = document.getElementById('rolesGrid');
     var emptyEl = document.getElementById('rolesEmpty');
     if (!grid) return;
@@ -104,13 +104,13 @@
 
     api.getRoles()
       .then(function (result) {
-        if (gen !== _gen) return; // stale — navigated away
+        if (gen !== _rolesGen) return; // stale — navigated away
         _roles = (result && result.roles) ? result.roles : [];
         Lex.Redact.off(grid);
         renderRoleCards(_roles);
       })
       .catch(function (err) {
-        if (gen !== _gen) return;
+        if (gen !== _rolesGen) return;
         Lex.Redact.off(grid);
         if (emptyEl) emptyEl.classList.remove('hidden');
         Lex.Toast.error('Failed to load roles');
@@ -168,7 +168,9 @@
 
     grid.innerHTML = html;
 
-    // Delegate click events on the grid
+    // Re-wire delegated click handler. Remove first to prevent stacking
+    // on repeated loadRoles() calls (e.g. after create/delete).
+    grid.removeEventListener('click', _handleGridClick);
     grid.addEventListener('click', _handleGridClick);
   }
 
@@ -194,7 +196,7 @@
   // =========================================================================
 
   function loadPermissions() {
-    var gen = ++_gen;
+    var gen = ++_permsGen;
     var grid = document.getElementById('permissionsGrid');
     var emptyEl = document.getElementById('permissionsEmpty');
     if (!grid) return;
@@ -203,14 +205,14 @@
 
     api.getPermissions()
       .then(function (result) {
-        if (gen !== _gen) return;
+        if (gen !== _permsGen) return;
         _permissions = (result && result.permissions) ? result.permissions : [];
         Lex.Redact.off(grid);
         renderPermissionGrid(_permissions);
         _populatePermissionCheckboxes(_permissions);
       })
       .catch(function (err) {
-        if (gen !== _gen) return;
+        if (gen !== _permsGen) return;
         Lex.Redact.off(grid);
         if (emptyEl) emptyEl.classList.remove('hidden');
         Lex.Toast.error('Failed to load permissions');
@@ -339,6 +341,7 @@
   }
 
   function openEditModal(roleId) {
+    var gen = _rolesGen; // capture without incrementing — guard against navigation
     var modal = document.getElementById('roleModal');
     if (!modal) return;
 
@@ -346,6 +349,7 @@
 
     api.getRole(roleId)
       .then(function (result) {
+        if (gen !== _rolesGen) return; // navigated away — discard
         var role = result && result.role ? result.role : null;
         if (!role) {
           Lex.Toast.error('Role not found');
@@ -381,6 +385,7 @@
     if (!form) return;
 
     form.addEventListener('lex-submit', function (e) {
+      if (e.detail && !e.detail.valid) return; // respect lex-form validation
       handleFormSubmit(e.detail);
     });
   }
@@ -443,6 +448,7 @@
   // =========================================================================
 
   function viewRole(roleId) {
+    var gen = _rolesGen; // capture without incrementing — guard against navigation
     var modal = document.getElementById('roleDetailsModal');
     var content = document.getElementById('roleDetailsContent');
     if (!modal || !content) return;
@@ -458,6 +464,7 @@
       })
     ])
       .then(function (results) {
+        if (gen !== _rolesGen) return; // navigated away — discard
         var roleResult = results[0];
         var inheritedResult = results[1];
 
@@ -579,38 +586,22 @@
    * @param {string[]} permNames - Array of permission name strings to check.
    */
   function _setCheckedPermissions(permNames) {
+    // Build O(1) lookup to avoid O(n*m) nested loop
+    var lookup = {};
+    for (var k = 0; k < permNames.length; k++) {
+      lookup[permNames[k]] = true;
+    }
+
     var checkboxes = document.querySelectorAll('.roles-perm-cb');
     for (var i = 0; i < checkboxes.length; i++) {
-      var cb = checkboxes[i];
-      cb.checked = _arrayIncludes(permNames, cb.value);
+      checkboxes[i].checked = !!lookup[checkboxes[i].value];
     }
   }
 
-  /**
-   * Array includes polyfill using indexOf (no regex, no Array.prototype.includes).
-   */
-  function _arrayIncludes(arr, value) {
-    for (var i = 0; i < arr.length; i++) {
-      if (arr[i] === value) return true;
-    }
-    return false;
-  }
-
   // =========================================================================
-  // SPA lifecycle registration
+  // Boot
   // =========================================================================
 
-  // registerPageInit ensures init() is called on every navigation to this page
-  // (first load + re-navigation from cached scripts).
-  // registerView only carries onLeave for cleanup — onEnter is handled
-  // by registerPageInit to avoid double-init.
-  if (window.LexRouter) {
-    LexRouter.registerPageInit('admin/roles.html', function () {
-      LexRouter.registerView({ onLeave: onLeave });
-      init();
-    });
-  } else {
-    init();
-  }
+  init();
 
 })();

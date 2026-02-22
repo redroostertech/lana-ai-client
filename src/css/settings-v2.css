@@ -19,27 +19,25 @@
 }
 
 
-/* ── Section Spacing ──────────────────────────────────────────────── */
-
-.sv2-page > main > section {
-  margin-bottom: 24px;
-}
-
-.sv2-page > main > section:last-child {
-  margin-bottom: 0;
-}
-
-.sv2-page > main > section > div {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-
 /* ── Hidden Helper ────────────────────────────────────────────────── */
 
 .sv2-hidden {
   display: none !important;
+}
+
+
+/* ── Profile Edit Mode ───────────────────────────────────────────── */
+
+#sv2-profile-edit {
+  display: none !important;
+}
+
+#sv2-profile-card.sv2-editing #sv2-profile-view {
+  display: none !important;
+}
+
+#sv2-profile-card.sv2-editing #sv2-profile-edit {
+  display: block !important;
 }
 
 

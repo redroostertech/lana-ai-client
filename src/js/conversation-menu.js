@@ -36,11 +36,11 @@ const ConversationMenu = {
     console.log('[ConversationMenu.init] Container found successfully');
 
     // Set up infinite scroll with throttling to prevent duplicate requests
-    // Attach to the actual scrollable parent (.lex-sidebar-scrollable or overflow-y-auto)
-    // rather than the conversation container itself, since overflow lives on the parent
-    const scrollableParent = this.container.closest('.lex-sidebar-scrollable')
-      || this.container.closest('.overflow-y-auto')
-      || this.container;
+    // Prefer the conversation list container when it's the scroll element (lex sidebar),
+    // otherwise use the scrollable parent
+    const scrollableParent = (this.container.id === 'lexConversationListContainer' && this.container.closest('.lex-sidebar-section-has-conversations'))
+      ? this.container
+      : (this.container.closest('.lex-sidebar-scrollable') || this.container.closest('.overflow-y-auto') || this.container);
     this.scrollableEl = scrollableParent;
 
     scrollableParent.addEventListener('scroll', () => {

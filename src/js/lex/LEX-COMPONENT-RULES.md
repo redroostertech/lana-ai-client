@@ -345,21 +345,30 @@ Lex.Toast.warning('Token expires in 5 minutes');
 
 ### `<lex-banner>`
 
-**Purpose:** Persistent page-level status banner with icon, message, optional action link.
+**Purpose:** Hero section header with brand icon, status indicator, corner bracket decoration, and an actions slot. Used for page headers, integration dashboards, and hero sections.
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `message` | String | — | Banner text |
-| `type` | String | `'info'` | `info`, `success`, `warning`, `error` |
-| `dismissible` | Boolean | `false` | Show close button |
-| `action` | String | — | Action link text |
-| `actionHref` | String | — | Action URL |
+| `heading` | String | — | Main title text (renders as `<h1>`) |
+| `subtitle` | String | — | Secondary description below heading |
+| `icon` | String | — | Single letter for the brand circle |
+| `iconSrc` | String | — | Image URL for brand icon (overrides `icon` letter) |
+| `status` | String | `'none'` | `connected`, `warning`, `error`, `offline`, `none` |
+| `variant` | String | `'dark'` | `dark` (brand-950 bg) or `light` (primary bg) |
+| `size` | String | `'default'` | `default` or `compact` (reduced padding) |
+| `corners` | Boolean | `true` | Show decorative corner brackets |
+| `align` | String | `'left'` | `left` or `center` |
 
-**Events:** `lex-dismiss`, `banner-action`
+**Slot:** Place child elements (e.g. `<lex-btn>`) inside for the actions area.
+
+**Events:** `banner-action`
 
 **Rules:**
-- Use for persistent status: "Connection offline", "Trial expires in 3 days"
-- Use `Lex.Toast.*` for transient action results instead
+- Use `variant="light"` + `size="compact"` for in-page section headers (e.g. admin landing, workspace header)
+- Use `variant="dark"` (default) for hero/dashboard banners with brand identity
+- Use `status` for connection/integration status indicators (not for alerts)
+- Use `Lex.Toast.*` for transient action results instead of banners
+- The `heading` renders as `<h1>` — ensure only one banner per page for accessibility
 
 ### `<lex-accordion>`
 

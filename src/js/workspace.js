@@ -1424,7 +1424,7 @@
       // Navigate to the dedicated matter details page.
       // Pass matterId in BOTH params AND context — context survives even if
       // history.state params aren't available to the target page init.
-      Lex.Nav.go('workspace_details.html', {
+      Lex.Nav.go('workspace-details.html', {
         params: { id: matterId, tab: defaultTab },
         context: { matterId: matterId, tab: defaultTab }
       });
@@ -3080,17 +3080,7 @@
     if (matterTypeFilter) matterTypeFilter.value = '';
   }
 
-  // registerPageInit ensures onEnter() is called on every navigation
-  // (first load + re-navigation from cached scripts).
-  // registerView only carries onLeave for cleanup — onEnter is handled
-  // by registerPageInit to avoid double-init.
-  if (window.LexRouter) {
-    LexRouter.registerPageInit('workspaces.html', function () {
-      LexRouter.registerView({ onLeave: onLeave });
-      onEnter();
-    });
-  } else {
-    onEnter();
-  }
+  // Standalone page — init directly (no SPA router)
+  onEnter();
 
 })();

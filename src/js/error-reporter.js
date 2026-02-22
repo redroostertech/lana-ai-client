@@ -55,17 +55,4 @@
     originalConsoleError.apply(console, args);
   };
 
-  // Log when Tailwind loads (or fails)
-  if (window.tailwind) {
-    logInfo?.('Tailwind CSS loaded successfully');
-  } else {
-    // Check again after a delay
-    setTimeout(() => {
-      if (window.tailwind) {
-        logInfo?.('Tailwind CSS loaded successfully (delayed)');
-      } else {
-        logError?.('Tailwind CSS failed to load');
-      }
-    }, 5000);
-  }
 })();

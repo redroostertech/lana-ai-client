@@ -424,7 +424,7 @@
       if (window.FeatureTracker && window.Features) {
         window.FeatureTracker.trackFeature(window.Features.CHAT_MESSAGE_SENT, {
           conversation_id: _conversationId,
-          chat_mode: (window.Lex && window.Lex.state) ? window.Lex.state.chatMode : 'general',
+          chat_mode: localStorage.getItem('chatMode') || 'general',
           source: 'chat_v2'
         });
       }
@@ -842,7 +842,7 @@
 
     // Guard: if required DOM elements are missing, bail out safely
     if (!dom.matterPanel || !dom.cardsWrapper) {
-      console.error('[chat_v2] Required DOM elements not found. Check chat_v2.html.');
+      console.error('[chat_v2] Required DOM elements not found. Check chat-v2.html.');
       return;
     }
 
@@ -940,16 +940,9 @@
   }
 
   // =========================================================================
-  // Page lifecycle — LexRouter registration
+  // Page lifecycle — standalone page, called directly
   // =========================================================================
 
-  if (window.LexRouter) {
-    LexRouter.registerPageInit('chat_v2.html', function () {
-      LexRouter.registerView({ onLeave: onLeave });
-      init();
-    });
-  } else {
-    init();
-  }
+  init();
 
 })();

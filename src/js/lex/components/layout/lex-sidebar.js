@@ -158,7 +158,6 @@
         /* Conversation list fades + collapses height */
         .lex-sidebar-root .lex-sidebar-conversation-list {
           transition: opacity 0.25s ease, max-height var(--lex-transition-slide);
-          max-height: 2000px;
         }
         .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-conversation-list {
           opacity: 0;
@@ -282,13 +281,14 @@
       }
 
       /* ── Body (scrollable menu area) ────────────────────── */
-
+      /* min-height: 0 is critical so grid child can shrink below content size */
       .lex-sidebar-body {
         flex: 1;
         display: flex;
         flex-direction: column;
         overflow: hidden;
         min-height: 0;
+        min-width: 0;
       }
 
       .lex-sidebar-section {
@@ -315,10 +315,11 @@
 
       .lex-sidebar-scrollable {
         flex: 1;
-        overflow-y: auto;
-        overflow-x: hidden;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
         min-height: 0;
-        padding-bottom: 3rem;
+        min-width: 0;
         scrollbar-width: thin;
         scrollbar-color: var(--_sb-border) transparent;
       }
@@ -338,6 +339,42 @@
 
       .lex-sidebar-scrollable::-webkit-scrollbar-thumb:hover {
         background: var(--_sb-text-muted);
+      }
+
+      /* First section (e.g. Tools) stays at natural height */
+      .lex-sidebar-scrollable > .lex-sidebar-section:not(.lex-sidebar-section-has-conversations) {
+        flex-shrink: 0;
+      }
+
+      /* Conversation list section: fills remaining space so the list can scroll */
+      .lex-sidebar-section-has-conversations {
+        flex: 1 1 0;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .lex-sidebar-section-has-conversations .lex-sidebar-conversation-list {
+        flex: 1 1 0;
+        min-height: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding-bottom: 2rem;
+        scroll-padding-bottom: 1rem;
+      }
+
+      .lex-sidebar-section-has-conversations .lex-sidebar-conversation-list::-webkit-scrollbar {
+        width: 4px;
+      }
+
+      .lex-sidebar-section-has-conversations .lex-sidebar-conversation-list::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .lex-sidebar-section-has-conversations .lex-sidebar-conversation-list::-webkit-scrollbar-thumb {
+        background: var(--_sb-border);
+        border-radius: 2px;
       }
 
       /* ── Nav item ───────────────────────────────────────── */
@@ -400,7 +437,9 @@
 
       .lex-sidebar-conversation-list {
         margin-top: 0.25rem;
-        padding-bottom: 1rem;
+        padding-bottom: 2rem;
+        overflow: hidden;
+        min-width: 0;
       }
 
       .lex-sidebar-conversation-list .conversation-item {
@@ -422,6 +461,8 @@
         border-top: 1px solid var(--_sb-border);
         padding: 0.5rem 0.75rem;
         background: var(--_sb-bg);
+        overflow: hidden;
+        min-width: 0;
       }
 
       /* ── User profile trigger ───────────────────────────── */
@@ -809,7 +850,8 @@
     // -----------------------------------------------------------------------
 
     _renderSection(section) {
-      let html = `<div class="lex-sidebar-section">`;
+      const sectionClass = section.isConversationList ? 'lex-sidebar-section lex-sidebar-section-has-conversations' : 'lex-sidebar-section';
+      let html = `<div class="${sectionClass}">`;
       if (section.title) {
         html += `<div class="lex-sidebar-section-title">${this.escapeHtml(section.title)}</div>`;
       }

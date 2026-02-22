@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="css/components.css">
 
   <!-- ── Tailwind (existing loader) ── -->
+  <link rel="stylesheet" href="css/tailwind-output.css">
   <script src="js/tailwind-loader.js"></script>
 
   <!-- ── Universal shell scripts (loaded once, never re-loaded) ── -->
@@ -57,17 +58,6 @@
   <script src="js/lex/lex-router.pages.js"></script>
   <script src="js/lex/lex-router.js"></script>
 
-  <style>
-    /* Ensure body has no flash before shell renders */
-    html { scroll-behavior: smooth; }
-    body {
-      font-family: var(--lex-font-sans);
-      background: var(--lex-bg-secondary);
-      margin: 0;
-      padding: 0;
-      min-height: 100vh;
-    }
-  </style>
 </head>
 <body>
 

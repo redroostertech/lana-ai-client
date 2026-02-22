@@ -1,146 +1,243 @@
-<!-- Roles & Permissions — SPA page fragment loaded by lex-router.
-     Uses #lex-page-content for Strategy 1 extraction (see lex-router.js).
-     Migrated from V1 legacy standalone page. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Roles &amp; Permissions - LANA AI</title>
 
-<div id="lex-page-content">
+  <!-- ── CSS + Tailwind in head — behavioral scripts at end of body ── -->
+  <link rel="stylesheet" href="../css/lex-tokens.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/tailwind-output.css">
+  <script src="../js/tailwind-loader.js"></script>
 
-  <main>
+</head>
+<body>
 
-    <!-- Page header row -->
-    <div class="flex items-center justify-between mb-6">
-      <div>
-        <h1 class="text-2xl font-semibold" style="color: var(--lex-text-primary)">Roles &amp; Permissions</h1>
-        <p class="text-sm mt-1" style="color: var(--lex-text-secondary)">Manage roles and the permissions assigned to them.</p>
+  <!-- Branded loader — shows once lex-loader.js upgrades the element -->
+  <lex-loader theme="light"></lex-loader>
+
+  <!-- App shell -->
+  <lex-app
+    logo-src="../img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="../dashboard.html"
+    active-nav-id="admin"
+    page-title="Roles &amp; Permissions"
+  ></lex-app>
+
+  <!-- Page content as inert <template> -->
+  <template id="page-content">
+
+    <main>
+
+      <!-- Page header -->
+      <lex-banner
+        variant="light"
+        size="compact"
+        heading="Roles &amp; Permissions"
+        subtitle="Manage roles and the permissions assigned to them."
+      >
+        <div id="createRoleBtnContainer" class="hidden">
+          <lex-btn id="createRoleBtn" variant="primary" leading-icon="plus">Create Role</lex-btn>
+        </div>
+      </lex-banner>
+
+      <lex-breadcrumb items='[{"label":"Administration","href":"admin/index.html"},{"label":"Roles &amp; Permissions"}]'></lex-breadcrumb>
+
+      <!-- Tab navigation -->
+      <lex-tabs
+        id="rolesTabs"
+        variant="underline"
+        active="roles"
+        tabs='[{"id":"roles","label":"Roles"},{"id":"permissions","label":"Permissions"}]'
+        class="mb-6"
+      ></lex-tabs>
+
+      <!-- ===================== ROLES TAB ===================== -->
+      <div id="tabPanelRoles">
+
+        <!-- Roles grid — redact target -->
+        <div id="rolesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <!-- Populated by roles.js -->
+        </div>
+
+        <!-- Empty state (hidden until loaded with no data) -->
+        <lex-empty
+          id="rolesEmpty"
+          class="hidden"
+          icon="shield"
+          message="No roles found"
+          description="Create a role to get started."
+        ></lex-empty>
+
       </div>
-      <div id="createRoleBtnContainer" class="hidden">
-        <lex-btn id="createRoleBtn" variant="primary" leading-icon="plus">Create Role</lex-btn>
-      </div>
-    </div>
 
-    <!-- Tab navigation -->
-    <lex-tabs
-      id="rolesTabs"
-      variant="underline"
-      active="roles"
-      tabs='[{"id":"roles","label":"Roles"},{"id":"permissions","label":"Permissions"}]'
-      class="mb-6"
-    ></lex-tabs>
+      <!-- ===================== PERMISSIONS TAB ===================== -->
+      <div id="tabPanelPermissions" class="hidden">
 
-    <!-- ===================== ROLES TAB ===================== -->
-    <div id="tabPanelRoles">
+        <!-- Permissions grid — redact target -->
+        <div id="permissionsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- Populated by roles.js -->
+        </div>
 
-      <!-- Roles grid — redact target -->
-      <div id="rolesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <!-- Populated by roles.js -->
+        <!-- Empty state -->
+        <lex-empty
+          id="permissionsEmpty"
+          class="hidden"
+          icon="key"
+          message="No permissions found"
+          description="System permissions will appear here once loaded."
+        ></lex-empty>
+
       </div>
 
-      <!-- Empty state (hidden until loaded with no data) -->
-      <lex-empty
-        id="rolesEmpty"
-        class="hidden"
-        icon="shield"
-        message="No roles found"
-        description="Create a role to get started."
-      ></lex-empty>
+    </main>
 
-    </div>
+    <!-- ===================== CREATE / EDIT ROLE MODAL ===================== -->
+    <lex-modal
+      id="roleModal"
+      heading="Create Role"
+      size="lg"
+      hide-actions
+      data-hoist
+    >
+      <lex-form id="roleForm" class="p-2">
 
-    <!-- ===================== PERMISSIONS TAB ===================== -->
-    <div id="tabPanelPermissions" class="hidden">
+        <!-- Hidden role ID for edit mode -->
+        <input type="hidden" id="roleId">
 
-      <!-- Permissions grid — redact target -->
-      <div id="permissionsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <!-- Populated by roles.js -->
-      </div>
+        <div class="space-y-4">
 
-      <!-- Empty state -->
-      <lex-empty
-        id="permissionsEmpty"
-        class="hidden"
-        icon="key"
-        message="No permissions found"
-        description="System permissions will appear here once loaded."
-      ></lex-empty>
+          <lex-input
+            id="roleNameInput"
+            name="name"
+            label="Role Name"
+            placeholder="e.g. Senior Associate"
+            required
+          ></lex-input>
 
-    </div>
+          <lex-textarea
+            id="roleDescriptionInput"
+            name="description"
+            label="Description"
+            rows="2"
+            placeholder="Brief description of this role's purpose"
+          ></lex-textarea>
 
-  </main>
+          <lex-input
+            id="roleLevelInput"
+            name="level"
+            type="number"
+            label="Level (1-100, higher = more privileges)"
+            placeholder="1"
+          ></lex-input>
 
-  <!-- ===================== CREATE / EDIT ROLE MODAL =====================
-       data-hoist: router moves this to document.body after injection,
-       escaping the lex-content stacking context. -->
-  <lex-modal
-    id="roleModal"
-    heading="Create Role"
-    size="lg"
-    hide-actions
-    data-hoist
-  >
-    <lex-form id="roleForm" class="p-2">
-
-      <!-- Hidden role ID for edit mode -->
-      <input type="hidden" id="roleId">
-
-      <div class="space-y-4">
-
-        <lex-input
-          id="roleNameInput"
-          name="name"
-          label="Role Name"
-          placeholder="e.g. Senior Associate"
-          required
-        ></lex-input>
-
-        <lex-textarea
-          id="roleDescriptionInput"
-          name="description"
-          label="Description"
-          rows="2"
-          placeholder="Brief description of this role's purpose"
-        ></lex-textarea>
-
-        <lex-input
-          id="roleLevelInput"
-          name="level"
-          type="number"
-          label="Level (1-100, higher = more privileges)"
-          placeholder="1"
-        ></lex-input>
-
-        <!-- Permissions checkbox grid -->
-        <div>
-          <label class="block text-sm font-medium mb-2" style="color: var(--lex-text-primary)">Permissions</label>
-          <div
-            id="permissionCheckboxes"
-            class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto border rounded-lg p-3"
-            style="border-color: var(--lex-border-default)"
-          >
-            <!-- lex-checkbox elements injected by roles.js -->
+          <!-- Permissions checkbox grid -->
+          <div>
+            <label class="block text-sm font-medium mb-2" style="color: var(--lex-text-primary)">Permissions</label>
+            <div
+              id="permissionCheckboxes"
+              class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto border rounded-lg p-3"
+              style="border-color: var(--lex-border-default)"
+            >
+              <!-- lex-checkbox elements injected by roles.js -->
+            </div>
           </div>
+
+          <!-- Form action buttons -->
+          <div class="flex justify-end gap-3 pt-2 border-t" style="border-color: var(--lex-border-default)">
+            <lex-btn id="cancelRoleBtn" type="button" variant="secondary">Cancel</lex-btn>
+            <lex-btn id="saveRoleBtn" type="submit" variant="primary">Save Role</lex-btn>
+          </div>
+
         </div>
 
-        <!-- Form action buttons -->
-        <div class="flex justify-end gap-3 pt-2 border-t" style="border-color: var(--lex-border-default)">
-          <lex-btn id="cancelRoleBtn" type="button" variant="secondary">Cancel</lex-btn>
-          <lex-btn id="saveRoleBtn" type="submit" variant="primary">Save Role</lex-btn>
-        </div>
+      </lex-form>
+    </lex-modal>
 
+    <!-- ===================== ROLE DETAILS MODAL ===================== -->
+    <lex-modal
+      id="roleDetailsModal"
+      heading="Role Details"
+      size="md"
+      hide-actions
+      data-hoist
+    >
+      <div id="roleDetailsContent" class="p-2 space-y-6">
+        <!-- Populated by roles.js viewRole() -->
       </div>
+    </lex-modal>
 
-    </lex-form>
-  </lex-modal>
+  </template>
 
-  <!-- ===================== ROLE DETAILS MODAL ===================== -->
-  <lex-modal
-    id="roleDetailsModal"
-    heading="Role Details"
-    size="md"
-    hide-actions
-    data-hoist
-  >
-    <div id="roleDetailsContent" class="p-2 space-y-6">
-      <!-- Populated by roles.js viewRole() -->
+  <noscript>
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;color:#666;">
+      Please enable JavaScript to use LANA AI.
     </div>
-  </lex-modal>
+  </noscript>
 
-</div>
+  <!-- ══════════════════════════════════════════════════════════════════
+       Scripts at end of body — HTML renders first, scripts load after
+       ══════════════════════════════════════════════════════════════════ -->
+
+  <!-- Universal shell scripts -->
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/version.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/navigation-helpers.js"></script>
+  <script src="../js/new-project-modal.js"></script>
+  <script src="../js/conversation-menu.js"></script>
+  <script src="../js/conversation-search-modal.js"></script>
+  <script src="../js/contact-search-modal.js"></script>
+  <script src="../js/notifications.js"></script>
+
+  <!-- Lex UI core -->
+  <script src="../js/lex/lex.core.js"></script>
+  <script src="../js/lex/lex.icons.js"></script>
+  <script src="../js/lex/lex.data.js"></script>
+  <script src="../js/lex/lex.forms.js"></script>
+  <script src="../js/lex/lex.state.js"></script>
+  <script src="../js/lex/lex.utils.js"></script>
+  <script src="../js/lex/lex.auth.js"></script>
+  <script src="../js/lex/lex-nav.js"></script>
+
+  <!-- Lex UI foundation + layout -->
+  <script src="../js/lex/components/foundation/lex-loader.js"></script>
+  <script src="../js/lex/components/foundation/lex-toast.js"></script>
+  <script src="../js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="../js/lex/components/foundation/lex-btn.js"></script>
+  <script src="../js/lex/components/foundation/lex-empty.js"></script>
+  <script src="../js/lex/components/form/lex-segmented.js"></script>
+  <script src="../js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="../js/lex/components/layout/lex-topbar.js"></script>
+  <script src="../js/lex/components/layout/lex-conversation-item.js"></script>
+  <script src="../js/lex/components/layout/lex-notification-panel.js"></script>
+  <script src="../js/lex/components/layout/lex-app.js"></script>
+
+  <!-- Page-specific Lex components (BEFORE inject) -->
+  <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
+  <script src="../js/lex/components/foundation/lex-tabs.js"></script>
+  <script src="../js/lex/components/foundation/lex-modal.js"></script>
+  <script src="../js/lex/components/foundation/lex-card.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/form/lex-form.js"></script>
+  <script src="../js/lex/components/form/lex-input.js"></script>
+  <script src="../js/lex/components/form/lex-textarea.js"></script>
+  <script src="../js/lex/components/form/lex-checkbox.js"></script>
+
+  <!-- Inject page content + hoist modals -->
+  <script src="../js/lex/lex-page-init.js"></script>
+
+  <!-- Page controller -->
+  <script src="../js/admin/roles.js"></script>
+
+  <!-- Auth guard + loader dismiss (MUST be last) -->
+  <script src="../js/auth-guard.js"></script>
+</body>
+</html>

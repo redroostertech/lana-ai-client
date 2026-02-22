@@ -304,3 +304,9 @@ dist-*/
 # Tiptap bundle (generated from src/js/tiptap-bundle.js)
 src/js/tiptap-bundle-built.js
 src/js/tiptap-bundle-built.js.map
+
+# =============================================================================
+# Tailwind CSS (generated)
+# =============================================================================
+# Built by: npm run css:build
+src/css/tailwind-output.css

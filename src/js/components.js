@@ -638,7 +638,7 @@ const ConversationActionsModal = {
     }
 
     this.close();
-    Lex.Nav.go('workspace_details.html', {
+    Lex.Nav.go('workspace-details.html', {
       params: { id: this.selectedConversationMatterId },
       context: { matterId: this.selectedConversationMatterId }
     });

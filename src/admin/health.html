@@ -1,218 +1,328 @@
-<!-- System Health — Admin monitoring dashboard (V2 SPA fragment) -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>System Health - LANA AI</title>
 
-<div id="lex-page-content">
-  <main class="p-4 lg:p-8">
+  <!-- ── CSS + Tailwind in head — behavioral scripts at end of body ── -->
+  <link rel="stylesheet" href="../css/lex-tokens.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/tailwind-output.css">
+  <script src="../js/tailwind-loader.js"></script>
 
-    <!-- Overall Status -->
-    <div class="mb-6">
-      <lex-card id="overallStatusCard" heading="Overall System Status">
-        <div class="flex items-center justify-between">
-          <p id="overallStatusMsg" class="text-sm lex-text-secondary">Checking system status...</p>
-          <div id="overallStatusBadge"></div>
-        </div>
-      </lex-card>
-    </div>
+</head>
+<body>
 
-    <!-- Service Cards Grid -->
-    <div id="serviceCardsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-      <!-- Injected by health.js: one lex-card per service -->
-    </div>
+  <!-- Branded loader — shows once lex-loader.js upgrades the element -->
+  <lex-loader theme="light"></lex-loader>
 
-    <!-- Row 1: System Metrics | Process Metrics | CPU Information -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+  <!-- App shell -->
+  <lex-app
+    logo-src="../img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="../dashboard.html"
+    active-nav-id="admin"
+    page-title="System Health"
+  ></lex-app>
 
-      <!-- System Metrics -->
-      <lex-card id="systemMetricsCard" heading="System Metrics">
-        <div id="memoryProgress" class="mb-4">
-          <div class="flex items-center justify-between mb-1">
-            <span class="text-xs lex-text-secondary">Memory Usage</span>
-            <span id="memoryPct" class="text-xs font-medium lex-text-primary">0%</span>
+  <!-- Page content as inert <template> -->
+  <template id="page-content">
+
+    <main class="p-4 lg:p-8">
+
+      <!-- Page header -->
+      <lex-banner
+        variant="light"
+        size="compact"
+        heading="System Health"
+        subtitle="Monitor service status and system resources"
+      ></lex-banner>
+
+      <lex-breadcrumb items='[{"label":"Administration","href":"admin/index.html"},{"label":"System Health"}]'></lex-breadcrumb>
+
+      <!-- Overall Status -->
+      <div class="mb-6">
+        <lex-card id="overallStatusCard" heading="Overall System Status">
+          <div class="flex items-center justify-between">
+            <p id="overallStatusMsg" class="text-sm lex-text-secondary">Checking system status...</p>
+            <div id="overallStatusBadge"></div>
           </div>
-          <lex-progress-bar id="memoryBar" value="0" color="info" size="sm"></lex-progress-bar>
-          <p id="memoryDetail" class="text-xs lex-text-tertiary mt-1">-- MB / -- MB</p>
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <lex-kv id="sysKvPlatform"     label="Platform"     value="--"></lex-kv>
-          <lex-kv id="sysKvArch"         label="Architecture" value="--"></lex-kv>
-          <lex-kv id="sysKvHostname"     label="Hostname"     value="--"></lex-kv>
-          <lex-kv id="sysKvUptime"       label="Uptime"       value="--"></lex-kv>
-        </div>
-      </lex-card>
-
-      <!-- Process Metrics -->
-      <lex-card id="processMetricsCard" heading="Process Metrics">
-        <div class="grid grid-cols-2 gap-3">
-          <lex-kv id="procKvPid"        label="PID"             value="--"></lex-kv>
-          <lex-kv id="procKvUptime"     label="Process Uptime"  value="--"></lex-kv>
-          <lex-kv id="procKvHeapUsed"   label="Heap Used"       value="--"></lex-kv>
-          <lex-kv id="procKvHeapTotal"  label="Heap Total"      value="--"></lex-kv>
-          <lex-kv id="procKvRss"        label="RSS Memory"      value="--"></lex-kv>
-          <lex-kv id="procKvExternal"   label="External Memory" value="--"></lex-kv>
-        </div>
-      </lex-card>
-
-      <!-- CPU Information -->
-      <lex-card id="cpuInfoCard" heading="CPU Information">
-        <div class="grid grid-cols-2 gap-3">
-          <div class="col-span-2">
-            <lex-kv id="cpuKvModel"   label="CPU Model"   value="--"></lex-kv>
-          </div>
-          <lex-kv id="cpuKvCores"    label="Cores"       value="--"></lex-kv>
-          <lex-kv id="cpuKvLoad1"    label="Load (1m)"   value="--"></lex-kv>
-          <lex-kv id="cpuKvLoad5"    label="Load (5m)"   value="--"></lex-kv>
-          <lex-kv id="cpuKvLoad15"   label="Load (15m)"  value="--"></lex-kv>
-        </div>
-      </lex-card>
-
-    </div>
-
-    <!-- Row 2: Database Metrics | Storage Information -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-
-      <!-- Database Metrics -->
-      <lex-card id="databaseMetricsCard" heading="Database Metrics">
-        <div class="grid grid-cols-2 gap-3">
-          <lex-kv id="dbKvActiveConn"      label="Active Connections"       value="--"></lex-kv>
-          <lex-kv id="dbKvCacheHit"        label="Cache Hit Ratio"          value="--"></lex-kv>
-          <lex-kv id="dbKvTxCommitted"     label="Transactions Committed"   value="--"></lex-kv>
-          <lex-kv id="dbKvTxRolledBack"    label="Transactions Rolled Back" value="--"></lex-kv>
-        </div>
-      </lex-card>
-
-      <!-- Storage Information -->
-      <lex-card id="storageInfoCard" heading="Storage Information">
-        <div class="grid grid-cols-2 gap-3 mb-4">
-          <lex-kv id="stgKvTotal"      label="Total Storage"    value="--"></lex-kv>
-          <lex-kv id="stgKvUsed"       label="Used Storage"     value="--"></lex-kv>
-          <lex-kv id="stgKvAvailable"  label="Available"        value="--"></lex-kv>
-          <lex-kv id="stgKvPct"        label="Usage %"          value="--"></lex-kv>
-        </div>
-        <div>
-          <div class="flex items-center justify-between mb-1">
-            <span class="text-xs lex-text-secondary">Storage Usage</span>
-            <span id="storageUsagePct" class="text-xs font-medium lex-text-primary">0%</span>
-          </div>
-          <lex-progress-bar id="storageBar" value="0" color="accent" size="sm"></lex-progress-bar>
-        </div>
-      </lex-card>
-
-    </div>
-
-    <!-- Row 3: Connector Sync Failures | LLM Token Usage -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-
-      <!-- Connector DLQ -->
-      <lex-card id="dlqCard" heading="Connector Sync Failures">
-        <div slot="heading-extra" id="dlqStatusBadgeSlot"></div>
-        <div class="flex items-center justify-between mb-4">
-          <div id="dlqStatusBadge"></div>
-        </div>
-        <div class="grid grid-cols-2 gap-3 mb-4">
-          <lex-kv id="dlqKvPending"     label="Pending Retry"       value="--"></lex-kv>
-          <lex-kv id="dlqKvRetrying"    label="Currently Retrying"  value="--"></lex-kv>
-          <lex-kv id="dlqKvFailed"      label="Permanently Failed"  value="--"></lex-kv>
-          <lex-kv id="dlqKvSuccessRate" label="Retry Success Rate"  value="--"></lex-kv>
-        </div>
-        <!-- Queue health multi-segment bar -->
-        <div id="dlqQueueHealth">
-          <div class="flex items-center justify-between mb-1">
-            <span class="text-xs lex-text-secondary">Queue Health</span>
-            <span id="dlqQueueLabel" class="text-xs font-medium lex-text-primary">--</span>
-          </div>
-          <lex-progress-bar id="dlqBar" value="0" color="success" size="sm"></lex-progress-bar>
-          <!-- Legend pills — rendered by JS -->
-          <div id="dlqLegend" class="flex gap-2 mt-2"></div>
-        </div>
-      </lex-card>
-
-      <!-- LLM Token Usage -->
-      <lex-card id="tokenUsageCard" heading="LLM Token Usage">
-        <lex-tabs id="tokenPeriodTabs" active="7days"></lex-tabs>
-        <div class="grid grid-cols-2 gap-3 mt-4">
-          <lex-kv id="tkKvTotal"       label="Total Tokens"          value="--"></lex-kv>
-          <lex-kv id="tkKvInput"       label="Input Tokens"          value="--"></lex-kv>
-          <lex-kv id="tkKvOutput"      label="Output Tokens"         value="--"></lex-kv>
-          <lex-kv id="tkKvRequests"    label="Total Requests"        value="--"></lex-kv>
-          <lex-kv id="tkKvTtft"        label="Avg Time to First Token" value="--"></lex-kv>
-          <lex-kv id="tkKvResponseTime" label="Avg Response Time"   value="--"></lex-kv>
-        </div>
-      </lex-card>
-
-    </div>
-
-    <!-- Energy Consumption — full width -->
-    <lex-card id="energyCard" heading="Energy Consumption">
-      <!-- Card header-right: period selector + status badge -->
-      <div class="flex items-center justify-between mb-6">
-        <div class="flex items-center gap-3">
-          <!-- Left icon -->
-          <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-               style="background:var(--lex-color-success-600)">
-            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z">
-              </path>
-            </svg>
-          </div>
-          <span class="text-sm font-medium lex-text-secondary">Power monitoring over time</span>
-        </div>
-        <div class="flex items-center gap-3">
-          <lex-select id="energyPeriodSelect"
-            options='[{"value":"1hour","label":"Last Hour"},{"value":"6hours","label":"Last 6 Hours"},{"value":"24hours","label":"Last 24 Hours"},{"value":"7days","label":"Last 7 Days"}]'
-            value="24hours">
-          </lex-select>
-          <div id="energyStatusBadge"></div>
-        </div>
+        </lex-card>
       </div>
 
-      <!-- Energy metric cards -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <!-- Service Cards Grid -->
+      <div id="serviceCardsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <!-- Injected by admin-health.js: one lex-card per service -->
+      </div>
 
-        <!-- Energy Consumed -->
-        <div class="rounded-lg p-4 border" style="background:var(--lex-bg-primary);border-color:var(--lex-border-subtle);">
-          <p class="text-xs lex-text-secondary mb-1">Energy Consumed</p>
-          <p id="energyConsumedKwh" class="text-2xl font-bold lex-text-primary">--</p>
-          <p class="text-xs lex-text-tertiary mt-1">kWh this period</p>
-        </div>
+      <!-- Row 1: System Metrics | Process Metrics | CPU Information -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
 
-        <!-- Current Power -->
-        <div class="rounded-lg p-4 border" style="background:var(--lex-bg-primary);border-color:var(--lex-border-subtle);">
-          <p class="text-xs lex-text-secondary mb-1">Current Power</p>
-          <p id="currentPowerWatts" class="text-2xl font-bold" style="color:var(--lex-bg-accent)">-- W</p>
-          <p class="text-xs lex-text-tertiary mt-1">real-time usage</p>
-        </div>
+        <!-- System Metrics -->
+        <lex-card id="systemMetricsCard" heading="System Metrics">
+          <div id="memoryProgress" class="mb-4">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs lex-text-secondary">Memory Usage</span>
+              <span id="memoryPct" class="text-xs font-medium lex-text-primary">0%</span>
+            </div>
+            <lex-progress-bar id="memoryBar" value="0" color="info" size="sm"></lex-progress-bar>
+            <p id="memoryDetail" class="text-xs lex-text-tertiary mt-1">-- MB / -- MB</p>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <lex-kv id="sysKvPlatform"     label="Platform"     value="--"></lex-kv>
+            <lex-kv id="sysKvArch"         label="Architecture" value="--"></lex-kv>
+            <lex-kv id="sysKvHostname"     label="Hostname"     value="--"></lex-kv>
+            <lex-kv id="sysKvUptime"       label="Uptime"       value="--"></lex-kv>
+          </div>
+        </lex-card>
 
-        <!-- Thermal Level -->
-        <div class="rounded-lg p-4 border" style="background:var(--lex-bg-primary);border-color:var(--lex-border-subtle);">
-          <p class="text-xs lex-text-secondary mb-1">Thermal Level</p>
-          <p id="currentThermalLevel" class="text-2xl font-bold" style="color:var(--lex-color-warning-500)">--%</p>
-          <p class="text-xs lex-text-tertiary mt-1">system temperature</p>
-        </div>
+        <!-- Process Metrics -->
+        <lex-card id="processMetricsCard" heading="Process Metrics">
+          <div class="grid grid-cols-2 gap-3">
+            <lex-kv id="procKvPid"        label="PID"             value="--"></lex-kv>
+            <lex-kv id="procKvUptime"     label="Process Uptime"  value="--"></lex-kv>
+            <lex-kv id="procKvHeapUsed"   label="Heap Used"       value="--"></lex-kv>
+            <lex-kv id="procKvHeapTotal"  label="Heap Total"      value="--"></lex-kv>
+            <lex-kv id="procKvRss"        label="RSS Memory"      value="--"></lex-kv>
+            <lex-kv id="procKvExternal"   label="External Memory" value="--"></lex-kv>
+          </div>
+        </lex-card>
+
+        <!-- CPU Information -->
+        <lex-card id="cpuInfoCard" heading="CPU Information">
+          <div class="grid grid-cols-2 gap-3">
+            <div class="col-span-2">
+              <lex-kv id="cpuKvModel"   label="CPU Model"   value="--"></lex-kv>
+            </div>
+            <lex-kv id="cpuKvCores"    label="Cores"       value="--"></lex-kv>
+            <lex-kv id="cpuKvLoad1"    label="Load (1m)"   value="--"></lex-kv>
+            <lex-kv id="cpuKvLoad5"    label="Load (5m)"   value="--"></lex-kv>
+            <lex-kv id="cpuKvLoad15"   label="Load (15m)"  value="--"></lex-kv>
+          </div>
+        </lex-card>
 
       </div>
 
-      <!-- Power Consumption Chart -->
-      <div class="mb-4">
-        <h4 class="text-sm font-medium lex-text-secondary mb-3">Power Consumption Over Time</h4>
-        <lex-chart id="powerChart" type="line" height="300px"></lex-chart>
+      <!-- Row 2: Database Metrics | Storage Information -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+
+        <!-- Database Metrics -->
+        <lex-card id="databaseMetricsCard" heading="Database Metrics">
+          <div class="grid grid-cols-2 gap-3">
+            <lex-kv id="dbKvActiveConn"      label="Active Connections"       value="--"></lex-kv>
+            <lex-kv id="dbKvCacheHit"        label="Cache Hit Ratio"          value="--"></lex-kv>
+            <lex-kv id="dbKvTxCommitted"     label="Transactions Committed"   value="--"></lex-kv>
+            <lex-kv id="dbKvTxRolledBack"    label="Transactions Rolled Back" value="--"></lex-kv>
+          </div>
+        </lex-card>
+
+        <!-- Storage Information -->
+        <lex-card id="storageInfoCard" heading="Storage Information">
+          <div class="grid grid-cols-2 gap-3 mb-4">
+            <lex-kv id="stgKvTotal"      label="Total Storage"    value="--"></lex-kv>
+            <lex-kv id="stgKvUsed"       label="Used Storage"     value="--"></lex-kv>
+            <lex-kv id="stgKvAvailable"  label="Available"        value="--"></lex-kv>
+            <lex-kv id="stgKvPct"        label="Usage %"          value="--"></lex-kv>
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs lex-text-secondary">Storage Usage</span>
+              <span id="storageUsagePct" class="text-xs font-medium lex-text-primary">0%</span>
+            </div>
+            <lex-progress-bar id="storageBar" value="0" color="accent" size="sm"></lex-progress-bar>
+          </div>
+        </lex-card>
+
       </div>
 
-    </lex-card>
+      <!-- Row 3: Connector Sync Failures | LLM Token Usage -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
 
-    <!-- Last Updated footer -->
-    <div class="flex items-center justify-between mt-6">
-      <span id="lastUpdatedText" class="text-xs lex-text-tertiary"></span>
-      <button id="refreshBtn"
-        class="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg transition-colors"
-        style="background:var(--lex-bg-secondary);color:var(--lex-text-secondary);">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
-          </path>
-        </svg>
-        Refresh
-      </button>
+        <!-- Connector DLQ -->
+        <lex-card id="dlqCard" heading="Connector Sync Failures">
+          <div class="flex items-center justify-between mb-4">
+            <div id="dlqStatusBadge"></div>
+          </div>
+          <div class="grid grid-cols-2 gap-3 mb-4">
+            <lex-kv id="dlqKvPending"     label="Pending Retry"       value="--"></lex-kv>
+            <lex-kv id="dlqKvRetrying"    label="Currently Retrying"  value="--"></lex-kv>
+            <lex-kv id="dlqKvFailed"      label="Permanently Failed"  value="--"></lex-kv>
+            <lex-kv id="dlqKvSuccessRate" label="Retry Success Rate"  value="--"></lex-kv>
+          </div>
+          <!-- Queue health multi-segment bar -->
+          <div id="dlqQueueHealth">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs lex-text-secondary">Queue Health</span>
+              <span id="dlqQueueLabel" class="text-xs font-medium lex-text-primary">--</span>
+            </div>
+            <lex-progress-bar id="dlqBar" value="0" color="success" size="sm"></lex-progress-bar>
+            <!-- Legend pills — rendered by JS -->
+            <div id="dlqLegend" class="flex gap-2 mt-2"></div>
+          </div>
+        </lex-card>
+
+        <!-- LLM Token Usage -->
+        <lex-card id="tokenUsageCard" heading="LLM Token Usage">
+          <lex-tabs id="tokenPeriodTabs" active="7days"></lex-tabs>
+          <div class="grid grid-cols-2 gap-3 mt-4">
+            <lex-kv id="tkKvTotal"       label="Total Tokens"          value="--"></lex-kv>
+            <lex-kv id="tkKvInput"       label="Input Tokens"          value="--"></lex-kv>
+            <lex-kv id="tkKvOutput"      label="Output Tokens"         value="--"></lex-kv>
+            <lex-kv id="tkKvRequests"    label="Total Requests"        value="--"></lex-kv>
+            <lex-kv id="tkKvTtft"        label="Avg Time to First Token" value="--"></lex-kv>
+            <lex-kv id="tkKvResponseTime" label="Avg Response Time"   value="--"></lex-kv>
+          </div>
+        </lex-card>
+
+      </div>
+
+      <!-- Energy Consumption — full width -->
+      <lex-card id="energyCard" heading="Energy Consumption">
+        <!-- Card header-right: period selector + status badge -->
+        <div class="flex items-center justify-between mb-6">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                 style="background:var(--lex-color-success-600)">
+              <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z">
+                </path>
+              </svg>
+            </div>
+            <span class="text-sm font-medium lex-text-secondary">Power monitoring over time</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <lex-select id="energyPeriodSelect"
+              options='[{"value":"1hour","label":"Last Hour"},{"value":"6hours","label":"Last 6 Hours"},{"value":"24hours","label":"Last 24 Hours"},{"value":"7days","label":"Last 7 Days"}]'
+              value="24hours">
+            </lex-select>
+            <div id="energyStatusBadge"></div>
+          </div>
+        </div>
+
+        <!-- Energy metric cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+
+          <!-- Energy Consumed -->
+          <div class="rounded-lg p-4 border" style="background:var(--lex-bg-primary);border-color:var(--lex-border-subtle);">
+            <p class="text-xs lex-text-secondary mb-1">Energy Consumed</p>
+            <p id="energyConsumedKwh" class="text-2xl font-bold lex-text-primary">--</p>
+            <p class="text-xs lex-text-tertiary mt-1">kWh this period</p>
+          </div>
+
+          <!-- Current Power -->
+          <div class="rounded-lg p-4 border" style="background:var(--lex-bg-primary);border-color:var(--lex-border-subtle);">
+            <p class="text-xs lex-text-secondary mb-1">Current Power</p>
+            <p id="currentPowerWatts" class="text-2xl font-bold" style="color:var(--lex-bg-accent)">-- W</p>
+            <p class="text-xs lex-text-tertiary mt-1">real-time usage</p>
+          </div>
+
+          <!-- Thermal Level -->
+          <div class="rounded-lg p-4 border" style="background:var(--lex-bg-primary);border-color:var(--lex-border-subtle);">
+            <p class="text-xs lex-text-secondary mb-1">Thermal Level</p>
+            <p id="currentThermalLevel" class="text-2xl font-bold" style="color:var(--lex-color-warning-500)">--%</p>
+            <p class="text-xs lex-text-tertiary mt-1">system temperature</p>
+          </div>
+
+        </div>
+
+        <!-- Power Consumption Chart -->
+        <div class="mb-4">
+          <h4 class="text-sm font-medium lex-text-secondary mb-3">Power Consumption Over Time</h4>
+          <lex-chart id="powerChart" type="line" height="300px"></lex-chart>
+        </div>
+
+      </lex-card>
+
+      <!-- Last Updated footer -->
+      <div class="flex items-center justify-between mt-6">
+        <span id="lastUpdatedText" class="text-xs lex-text-tertiary"></span>
+        <button id="refreshBtn"
+          class="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg transition-colors"
+          style="background:var(--lex-bg-secondary);color:var(--lex-text-secondary);">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+            </path>
+          </svg>
+          Refresh
+        </button>
+      </div>
+
+    </main>
+
+  </template>
+
+  <noscript>
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;color:#666;">
+      Please enable JavaScript to use LANA AI.
     </div>
+  </noscript>
 
-  </main>
-</div>
+  <!-- ══════════════════════════════════════════════════════════════════
+       Scripts at end of body — HTML renders first, scripts load after
+       ══════════════════════════════════════════════════════════════════ -->
+
+  <!-- Universal shell scripts -->
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/version.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/navigation-helpers.js"></script>
+  <script src="../js/new-project-modal.js"></script>
+  <script src="../js/conversation-menu.js"></script>
+  <script src="../js/conversation-search-modal.js"></script>
+  <script src="../js/contact-search-modal.js"></script>
+  <script src="../js/notifications.js"></script>
+
+  <!-- Lex UI core -->
+  <script src="../js/lex/lex.core.js"></script>
+  <script src="../js/lex/lex.icons.js"></script>
+  <script src="../js/lex/lex.data.js"></script>
+  <script src="../js/lex/lex.forms.js"></script>
+  <script src="../js/lex/lex.state.js"></script>
+  <script src="../js/lex/lex.utils.js"></script>
+  <script src="../js/lex/lex.auth.js"></script>
+  <script src="../js/lex/lex-nav.js"></script>
+
+  <!-- Lex UI foundation + layout -->
+  <script src="../js/lex/components/foundation/lex-loader.js"></script>
+  <script src="../js/lex/components/foundation/lex-toast.js"></script>
+  <script src="../js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="../js/lex/components/foundation/lex-btn.js"></script>
+  <script src="../js/lex/components/foundation/lex-empty.js"></script>
+  <script src="../js/lex/components/form/lex-segmented.js"></script>
+  <script src="../js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="../js/lex/components/layout/lex-topbar.js"></script>
+  <script src="../js/lex/components/layout/lex-conversation-item.js"></script>
+  <script src="../js/lex/components/layout/lex-notification-panel.js"></script>
+  <script src="../js/lex/components/layout/lex-app.js"></script>
+
+  <!-- Page-specific Lex components (BEFORE inject) -->
+  <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
+  <script src="../js/lex/components/foundation/lex-card.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/foundation/lex-kv.js"></script>
+  <script src="../js/lex/components/foundation/lex-tabs.js"></script>
+  <script src="../js/lex/components/foundation/lex-progress-bar.js"></script>
+  <script src="../js/lex/components/form/lex-select.js"></script>
+
+  <!-- Chart.js dependency (required by lex-chart) -->
+  <script src="../js/vendor/chart.js"></script>
+  <script src="../js/lex/components/data/lex-chart.js"></script>
+
+  <!-- Inject page content + hoist modals -->
+  <script src="../js/lex/lex-page-init.js"></script>
+
+  <!-- Page controller -->
+  <script src="../js/admin/admin-health.js"></script>
+
+  <!-- Auth guard + loader dismiss (MUST be last) -->
+  <script src="../js/auth-guard.js"></script>
+</body>
+</html>

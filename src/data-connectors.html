@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Data Connectors - LANA AI</title>
+
+  <!-- ── CSS + Tailwind in head — behavioral scripts at end of body ── -->
+  <link rel="stylesheet" href="css/lex-tokens.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/tailwind-output.css">
+  <script src="js/tailwind-loader.js"></script>
+
+</head>
+<body>
+
+  <!-- Branded loader — shows once lex-loader.js upgrades the element -->
+  <lex-loader theme="light"></lex-loader>
+
+  <!-- App shell — sidebar, topbar, empty content area.
+       Page content lives in <template> below and gets injected after
+       the shell renders. This avoids double-rendering of child components. -->
+  <lex-app
+    logo-src="img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="dashboard.html"
+    active-nav-id="connectors"
+    page-title="Data Connectors"
+  ></lex-app>
+
+  <!-- Page content as inert <template> — elements inside are NOT upgraded
+       by the browser until cloned into the live DOM. Zero double-rendering. -->
+  <template id="page-content">
+
+    <main>
+
+      <!-- Info Banner -->
+      <lex-banner
+        id="connectorsBanner"
+        variant="light"
+        corners
+        heading="Connect Your Business Data"
+        subtitle="Connectors bridge your existing business systems with LanaAI, automatically syncing data across CRMs, case management, financial tools, and more. Once connected, your team gets unified access to all your business data while LanaAI gains the context needed to provide intelligent assistance across your entire operation."
+      >
+        <lex-btn id="importConnectorBannerBtn" variant="secondary">
+          Import Connector
+        </lex-btn>
+      </lex-banner>
+
+      <!-- Connector Categories - Loading Skeleton -->
+      <div id="connectorsLoading" class="space-y-8 mb-4 p-4">
+        <!-- CRM Connectors Loading -->
+        <section>
+          <div class="flex items-center justify-between mb-4">
+            <div class="h-6 w-48 rounded animate-pulse" style="background:var(--lex-border-default)"></div>
+            <div class="h-4 w-16 rounded animate-pulse" style="background:var(--lex-border-default)"></div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="p-5 animate-pulse" style="background:var(--lex-card-bg);border:1px solid var(--lex-card-border);border-radius:var(--lex-card-radius)">
+              <div class="flex items-start justify-between mb-4">
+                <div class="w-12 h-12 rounded-lg" style="background:var(--lex-border-default)"></div>
+                <div class="h-6 w-20 rounded-full" style="background:var(--lex-border-default)"></div>
+              </div>
+              <div class="h-5 w-24 rounded mb-2" style="background:var(--lex-border-default)"></div>
+              <div class="h-4 w-full rounded mb-3" style="background:var(--lex-border-default)"></div>
+              <div class="flex justify-between">
+                <div class="h-3 w-20 rounded" style="background:var(--lex-border-default)"></div>
+                <div class="h-3 w-24 rounded" style="background:var(--lex-border-default)"></div>
+              </div>
+            </div>
+            <div class="p-5 animate-pulse" style="background:var(--lex-card-bg);border:1px solid var(--lex-card-border);border-radius:var(--lex-card-radius)">
+              <div class="flex items-start justify-between mb-4">
+                <div class="w-12 h-12 rounded-lg" style="background:var(--lex-border-default)"></div>
+                <div class="h-6 w-20 rounded-full" style="background:var(--lex-border-default)"></div>
+              </div>
+              <div class="h-5 w-20 rounded mb-2" style="background:var(--lex-border-default)"></div>
+              <div class="h-4 w-full rounded mb-3" style="background:var(--lex-border-default)"></div>
+              <div class="h-9 w-full rounded" style="background:var(--lex-border-default)"></div>
+            </div>
+            <div class="p-5 animate-pulse hidden md:block" style="background:var(--lex-card-bg);border:1px solid var(--lex-card-border);border-radius:var(--lex-card-radius)">
+              <div class="flex items-start justify-between mb-4">
+                <div class="w-12 h-12 rounded-lg" style="background:var(--lex-border-default)"></div>
+                <div class="h-6 w-20 rounded-full" style="background:var(--lex-border-default)"></div>
+              </div>
+              <div class="h-5 w-28 rounded mb-2" style="background:var(--lex-border-default)"></div>
+              <div class="h-4 w-full rounded mb-3" style="background:var(--lex-border-default)"></div>
+              <div class="h-9 w-full rounded" style="background:var(--lex-border-default)"></div>
+            </div>
+            <div class="p-5 animate-pulse hidden lg:block" style="background:var(--lex-card-bg);border:1px solid var(--lex-card-border);border-radius:var(--lex-card-radius)">
+              <div class="flex items-start justify-between mb-4">
+                <div class="w-12 h-12 rounded-lg" style="background:var(--lex-border-default)"></div>
+                <div class="h-6 w-20 rounded-full" style="background:var(--lex-border-default)"></div>
+              </div>
+              <div class="h-5 w-24 rounded mb-2" style="background:var(--lex-border-default)"></div>
+              <div class="h-4 w-full rounded mb-3" style="background:var(--lex-border-default)"></div>
+              <div class="h-9 w-full rounded" style="background:var(--lex-border-default)"></div>
+            </div>
+          </div>
+        </section>
+        <!-- Case Management Loading -->
+        <section>
+          <div class="flex items-center justify-between mb-4">
+            <div class="h-6 w-40 rounded animate-pulse" style="background:var(--lex-border-default)"></div>
+            <div class="h-4 w-16 rounded animate-pulse" style="background:var(--lex-border-default)"></div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="p-5 animate-pulse" style="background:var(--lex-card-bg);border:1px solid var(--lex-card-border);border-radius:var(--lex-card-radius)">
+              <div class="flex items-start justify-between mb-4">
+                <div class="w-12 h-12 rounded-lg" style="background:var(--lex-border-default)"></div>
+                <div class="h-6 w-20 rounded-full" style="background:var(--lex-border-default)"></div>
+              </div>
+              <div class="h-5 w-24 rounded mb-2" style="background:var(--lex-border-default)"></div>
+              <div class="h-4 w-full rounded mb-3" style="background:var(--lex-border-default)"></div>
+              <div class="h-9 w-full rounded" style="background:var(--lex-border-default)"></div>
+            </div>
+            <div class="p-5 animate-pulse" style="background:var(--lex-card-bg);border:1px solid var(--lex-card-border);border-radius:var(--lex-card-radius)">
+              <div class="flex items-start justify-between mb-4">
+                <div class="w-12 h-12 rounded-lg" style="background:var(--lex-border-default)"></div>
+                <div class="h-6 w-20 rounded-full" style="background:var(--lex-border-default)"></div>
+              </div>
+              <div class="h-5 w-16 rounded mb-2" style="background:var(--lex-border-default)"></div>
+              <div class="h-4 w-full rounded mb-3" style="background:var(--lex-border-default)"></div>
+              <div class="h-9 w-full rounded" style="background:var(--lex-border-default)"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Connector Categories - Content -->
+      <div id="connectorsContent" class="hidden space-y-8 mb-4 p-4">
+        <!-- Installed Connectors -->
+        <section id="installedConnectorsSection">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="text-lg font-semibold" style="color:var(--lex-text-primary)">Installed Connectors</h2>
+              <p class="text-sm mt-1" style="color:var(--lex-text-secondary)">Active connectors configured for your organization</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="installedConnectors">
+            <!-- Installed connector cards will be rendered here -->
+          </div>
+        </section>
+
+        <!-- Available Connectors from Registry -->
+        <section id="availableConnectorsSection" class="hidden">
+          <div class="mb-4">
+            <h2 class="text-lg font-semibold" style="color:var(--lex-text-primary)">Available to Install</h2>
+            <p class="text-sm mt-1" style="color:var(--lex-text-secondary)">Ready-to-install connectors from the registry</p>
+          </div>
+
+          <!-- Search and Filter Controls -->
+          <div class="mb-6 flex flex-col md:flex-row gap-4">
+            <!-- Search Input -->
+            <div class="flex-1">
+              <lex-input
+                id="connectorSearch"
+                type="search"
+                placeholder="Search connectors by name, vendor, or description..."
+                clearable>
+              </lex-input>
+            </div>
+
+            <!-- Category Filter -->
+            <div class="w-full md:w-48">
+              <lex-select
+                id="categoryFilter"
+                placeholder="All Categories"
+                options='[{"value":"","label":"All Categories"},{"value":"crm","label":"CRM"},{"value":"case","label":"Case Management"},{"value":"documents","label":"Documents"},{"value":"communications","label":"Communications"},{"value":"financial","label":"Financial"}]'>
+              </lex-select>
+            </div>
+
+            <!-- Auth Type Filter -->
+            <div class="w-full md:w-48">
+              <lex-select
+                id="authTypeFilter"
+                placeholder="All Auth Types"
+                options='[{"value":"","label":"All Auth Types"},{"value":"oauth2","label":"OAuth 2.0"},{"value":"api_key","label":"API Key"}]'>
+              </lex-select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="availableConnectors">
+            <!-- Available connector cards from registry will be rendered here -->
+          </div>
+
+          <!-- No Results Message -->
+          <lex-empty
+            id="noResultsMessage"
+            class="hidden"
+            icon="search"
+            message="No connectors found"
+            description="Try adjusting your search or filters">
+          </lex-empty>
+        </section>
+      </div>
+      <!-- End connectorsContent -->
+
+    </main>
+
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <!-- Connector-specific Modals                                        -->
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+
+    <!-- Connector Actions Modal (lex-modal — declarative, custom content) -->
+    <lex-modal id="connectorActionsModal" heading="Connector Actions" size="sm" hide-actions close-on-overlay>
+      <div id="connectorActionsContent">
+        <!-- Header with Icon -->
+        <div class="text-center mb-4 pb-4" style="border-bottom:1px solid var(--lex-border-subtle)">
+          <div id="connectorActionsIcon" class="w-20 h-20 mx-auto mb-4 rounded-2xl flex items-center justify-center" style="background:var(--lex-bg-accent)">
+            <svg class="w-10 h-10" style="color:var(--lex-text-on-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+            </svg>
+          </div>
+          <h3 id="actionsConnectorName" class="text-xl font-semibold" style="color:var(--lex-text-primary)">Connector Actions</h3>
+          <p class="text-sm mt-1" style="color:var(--lex-text-secondary)">Choose an action to perform</p>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="space-y-3">
+          <!-- Navigate to Dashboard -->
+          <button id="actionNavigateDashboard" onclick="navigateToConnectorDashboard()" class="w-full group flex items-center gap-4 px-5 py-4 rounded-xl transition-all duration-200 border-2 hover:opacity-90" style="background:var(--lex-card-bg);border-color:var(--lex-border-default);color:var(--lex-text-primary)">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style="background:var(--lex-bg-accent-muted)">
+              <svg class="w-5 h-5" style="color:var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+              </svg>
+            </div>
+            <div class="text-left flex-1">
+              <div class="font-semibold text-base">Open Dashboard</div>
+              <div class="text-xs" style="color:var(--lex-text-secondary)">Manage connector settings</div>
+            </div>
+            <svg class="w-5 h-5" style="color:var(--lex-text-tertiary)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+          </button>
+
+          <!-- Uninstall -->
+          <button id="actionUninstall" onclick="uninstallConnector()" class="w-full group flex items-center gap-4 px-5 py-4 rounded-xl transition-all duration-200 border-2 hover:opacity-90" style="background:var(--lex-card-bg);border-color:var(--lex-border-default);color:var(--lex-text-primary)">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style="background:var(--lex-status-warning-bg)">
+              <svg class="w-5 h-5" style="color:var(--lex-icon-warning)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
+              </svg>
+            </div>
+            <div class="text-left flex-1">
+              <div class="font-semibold text-base">Uninstall</div>
+              <div class="text-xs" style="color:var(--lex-text-secondary)">Disconnect but keep configuration</div>
+            </div>
+            <svg class="w-5 h-5" style="color:var(--lex-text-tertiary)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+          </button>
+
+          <!-- Delete (only for non-system connectors) -->
+          <button id="actionDelete" onclick="deleteConnector()" class="w-full group flex items-center gap-4 px-5 py-4 rounded-xl transition-all duration-200 border-2 hover:opacity-90" style="background:var(--lex-card-bg);border-color:var(--lex-border-default);color:var(--lex-text-primary)">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style="background:var(--lex-status-danger-bg)">
+              <svg class="w-5 h-5" style="color:var(--lex-icon-danger)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+              </svg>
+            </div>
+            <div class="text-left flex-1">
+              <div class="font-semibold text-base">Delete</div>
+              <div class="text-xs" style="color:var(--lex-text-secondary)">Permanently remove all data</div>
+            </div>
+            <svg class="w-5 h-5" style="color:var(--lex-text-tertiary)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+          </button>
+
+          <!-- Cancel -->
+          <div class="pt-1">
+            <lex-btn variant="secondary" onclick="closeConnectorActionsModal()" style="width:100%">Cancel</lex-btn>
+          </div>
+        </div>
+      </div>
+    </lex-modal>
+
+    <!-- Uninstall Confirmation Modal: handled imperatively via Lex.Modal.confirm() in data_connectors.js -->
+
+    <!-- Delete Confirmation Modal: handled imperatively via Lex.Modal.confirm() in data_connectors.js -->
+
+    <!-- Connector Details Modal (lex-modal — declarative, custom content) -->
+    <lex-modal id="connectorDetailsModal" heading="Connector Details" size="lg" hide-actions>
+      <div class="flex items-center gap-4 mb-4 pb-4" style="border-bottom:1px solid var(--lex-border-default)">
+        <div id="detailsLogo" class="w-16 h-16 rounded-lg flex items-center justify-center flex-shrink-0" style="background:var(--lex-bg-tertiary)"></div>
+        <div>
+          <h3 id="detailsName" class="text-xl font-semibold" style="color:var(--lex-text-primary)"></h3>
+          <p id="detailsVendor" class="text-sm" style="color:var(--lex-text-secondary)"></p>
+        </div>
+      </div>
+      <div id="detailsContent" class="space-y-6">
+        <!-- Content will be dynamically inserted -->
+      </div>
+      <div class="mt-6 pt-4 flex gap-3" style="border-top:1px solid var(--lex-border-default)">
+        <lex-btn variant="primary" id="detailsActionBtn" style="flex:1">Connect</lex-btn>
+        <lex-btn variant="secondary" onclick="closeDetailsModal()">Close</lex-btn>
+      </div>
+    </lex-modal>
+
+    <!-- Import Connector Modal (lex-modal — declarative, custom content) -->
+    <lex-modal id="importConnectorModal" heading="Import Connector Configuration" size="lg" hide-actions>
+      <div class="space-y-6">
+        <!-- Instructions -->
+        <div class="rounded-lg p-4" style="background:var(--lex-status-info-bg);border:1px solid var(--lex-status-info)">
+          <div class="flex gap-3">
+            <svg class="w-5 h-5 flex-shrink-0 mt-0.5" style="color:var(--lex-icon-info)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <div>
+              <h4 class="text-sm font-semibold mb-1" style="color:var(--lex-status-info-text)">Import Custom Connector</h4>
+              <p class="text-sm" style="color:var(--lex-status-info-text)">
+                Upload a ZIP package containing your connector configuration (manifest.json, connector.json) and UI files (HTML/CSS/JS). The package must follow the connector schema with metadata, authentication, API endpoints, and UI assets.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- File Upload Area -->
+        <div id="importDropZone" class="border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer" style="border-color:var(--lex-border-strong)" onclick="document.getElementById('connectorFileInput').click()">
+          <svg class="w-16 h-16 mx-auto mb-4" style="color:var(--lex-text-tertiary)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+          </svg>
+          <p class="font-medium mb-1" style="color:var(--lex-text-primary)">Click to upload or drag and drop</p>
+          <p class="text-sm" style="color:var(--lex-text-secondary)">Connector ZIP package (.zip)</p>
+          <input type="file" id="connectorFileInput" accept=".zip,application/zip" class="hidden" onchange="handleConnectorFileSelect(event)">
+        </div>
+
+        <!-- File Preview -->
+        <div id="filePreviewSection" class="hidden">
+          <h4 class="text-sm font-semibold mb-3" style="color:var(--lex-text-primary)">Selected File</h4>
+          <div class="rounded-lg p-4" style="background:var(--lex-bg-secondary);border:1px solid var(--lex-border-default)">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-3">
+                <svg class="w-8 h-8" style="color:var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <div>
+                  <p id="fileName" class="text-sm font-medium" style="color:var(--lex-text-primary)"></p>
+                  <p id="fileSize" class="text-xs" style="color:var(--lex-text-secondary)"></p>
+                </div>
+              </div>
+              <lex-btn variant="ghost" size="sm" icon="true" onclick="clearConnectorFile()" aria-label="Remove file" style="color:var(--lex-icon-danger)">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </lex-btn>
+            </div>
+
+            <!-- ZIP Package Info -->
+            <div id="connectorInfo" class="space-y-2">
+              <div class="text-sm">
+                <span style="color:var(--lex-text-secondary)">Package Type:</span>
+                <span class="ml-2 font-medium" style="color:var(--lex-text-primary)">Connector ZIP Package</span>
+              </div>
+              <p class="text-sm" style="color:var(--lex-text-secondary)">
+                The package will be validated on the backend. It should contain manifest.json, connector.json, and UI files (HTML/CSS/JS).
+              </p>
+            </div>
+          </div>
+
+          <!-- Validation Status -->
+          <div id="validationStatus" class="mt-4"></div>
+        </div>
+
+        <!-- Modal Footer Actions -->
+        <div class="flex items-center justify-end gap-3 pt-2" style="border-top:1px solid var(--lex-border-default)">
+          <lex-btn variant="secondary" onclick="closeImportConnectorModal()">Cancel</lex-btn>
+          <lex-btn variant="primary" id="importConnectorBtn" onclick="confirmImportConnector()" disabled>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+            </svg>
+            Import Connector
+          </lex-btn>
+        </div>
+      </div>
+    </lex-modal>
+
+  </template>
+
+  <noscript>
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;color:#666;">
+      Please enable JavaScript to use LANA AI.
+    </div>
+  </noscript>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       Scripts at end of body — HTML renders first, scripts load after
+       ══════════════════════════════════════════════════════════════════ -->
+
+  <!-- Universal shell scripts -->
+  <script src="js/error-reporter.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/mock-data.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/components.js"></script>
+  <script src="js/version.js"></script>
+  <script src="js/menu.js"></script>
+  <script src="js/navigation-helpers.js"></script>
+  <script src="js/new-project-modal.js"></script>
+  <script src="js/conversation-menu.js"></script>
+  <script src="js/conversation-search-modal.js"></script>
+  <script src="js/contact-search-modal.js"></script>
+  <script src="js/notifications.js"></script>
+
+  <!-- Lex UI core -->
+  <script src="js/lex/lex.core.js"></script>
+  <script src="js/lex/lex.icons.js"></script>
+  <script src="js/lex/lex.data.js"></script>
+  <script src="js/lex/lex.forms.js"></script>
+  <script src="js/lex/lex.state.js"></script>
+  <script src="js/lex/lex.utils.js"></script>
+  <script src="js/lex/lex.auth.js"></script>
+  <script src="js/lex/lex-nav.js"></script>
+
+  <!-- Lex UI foundation -->
+  <script src="js/lex/components/foundation/lex-loader.js"></script>
+  <script src="js/lex/components/foundation/lex-toast.js"></script>
+  <script src="js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="js/lex/components/foundation/lex-btn.js"></script>
+  <script src="js/lex/components/foundation/lex-empty.js"></script>
+
+  <!-- Lex UI layout -->
+  <script src="js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="js/lex/components/layout/lex-topbar.js"></script>
+  <script src="js/lex/components/layout/lex-conversation-item.js"></script>
+  <script src="js/lex/components/layout/lex-notification-panel.js"></script>
+  <script src="js/lex/components/layout/lex-app.js"></script>
+
+  <!-- Page-specific Lex components — ALL loaded BEFORE inject so custom elements
+       are defined when template content enters the DOM. Tree-order upgrade ensures
+       parents capture un-rendered children (no double-rendering). -->
+  <script src="js/lex/components/foundation/lex-badge.js"></script>
+  <script src="js/lex/components/foundation/lex-banner.js"></script>
+  <script src="js/lex/components/foundation/lex-modal.js"></script>
+  <script src="js/lex/components/form/lex-input.js"></script>
+  <script src="js/lex/components/form/lex-select.js"></script>
+
+  <!-- Inject page content + hoist modals -->
+  <script src="js/lex/lex-page-init.js"></script>
+
+  <!-- Page dependencies -->
+  <script src="js/connectors.js"></script>
+
+  <!-- Page controller (MUST be last before auth-guard) -->
+  <script src="js/data_connectors.js"></script>
+
+  <!-- Auth guard + loader dismiss (MUST be last) -->
+  <script src="js/auth-guard.js"></script>
+</body>
+</html>

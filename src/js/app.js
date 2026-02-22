@@ -7,6 +7,14 @@
   var app = document.querySelector('lex-app');
   if (!app) return;
 
+  // Global safety net: dismiss the branded loader after 6 seconds regardless
+  // of what happens (auth failure, navigation failure, script error, Electron
+  // font crash, etc.). Lex.Loader.hide() is idempotent — calling it after the
+  // loader was already dismissed is a no-op.
+  setTimeout(function () {
+    if (window.Lex && window.Lex.Loader) window.Lex.Loader.hide();
+  }, 4000);
+
   /**
    * Auth guard — verify the user has a valid (non-expired) token before
    * launching the SPA. Retries up to 3 times (300ms total) to handle the
@@ -51,11 +59,26 @@
   }
 
   function startApp() {
+    var loaderDismissed = false;
+    function dismissLoader() {
+      if (loaderDismissed) return;
+      loaderDismissed = true;
+      if (window.Lex && window.Lex.Loader) {
+        window.Lex.Loader.hide();
+      }
+    }
+
     function onShellReady() {
       // Determine initial page: check history.state first (preserves route
       // across refresh — under file:// protocol the URL bar always shows
       // app.html so window.location.pathname is useless for routing).
+      // Fall back to sessionStorage when history.state is cleared on reload.
       var startPath = (history.state && history.state.path)
+        || (function () {
+            try {
+              return sessionStorage.getItem('_lex_last_path');
+            } catch (e) { return null; }
+          }())
         || window.location.pathname
         || '/dashboard.html';
       if (startPath === '/' || startPath === '' || startPath.endsWith('/app.html')) {
@@ -64,42 +87,42 @@
 
       LexRouter.start(startPath);
 
-      // Hide the branded loader after the first page renders AND its
-      // initial data has loaded. We listen for lex-page-ready (content +
-      // scripts injected) then wait for either lex-data-loaded (from
-      // LexDataSource) or a 2-second timeout — whichever comes first.
-      document.addEventListener('lex-page-ready', function onFirstPage() {
+      // Hide the branded loader when lex-page-ready fires (content injected)
+      // or after 2s timeout — whichever comes first.
+      function onFirstPage() {
         document.removeEventListener('lex-page-ready', onFirstPage);
 
-        var dismissed = false;
-        function dismissLoader() {
-          if (dismissed) return;
-          dismissed = true;
-          if (window.Lex && window.Lex.Loader) {
-            window.Lex.Loader.hide();
-          }
-        }
-
-        // If the page fires lex-data-loaded (LexDataSource fetch complete),
-        // dismiss immediately — data is ready.
+        // If the page fires lex-data-loaded, dismiss immediately
         document.addEventListener('lex-data-loaded', function onData() {
           document.removeEventListener('lex-data-loaded', onData);
           dismissLoader();
         });
 
-        // Fallback: dismiss after 2 seconds regardless. Handles pages
-        // with no LexDataSource, or if the API is slow.
+        // Fallback: dismiss after 2 seconds regardless
         setTimeout(dismissLoader, 2000);
-      });
+      }
+
+      document.addEventListener('lex-page-ready', onFirstPage);
+
+      // Belt-and-suspenders: always dismiss loader after 2.5s in case
+      // lex-page-ready never fires (e.g. nav error before dispatch)
+      setTimeout(dismissLoader, 2500);
     }
 
-    // lex-app renders synchronously during HTML parsing, so lex-app-ready
-    // fires before this script runs. Check if the shell already rendered;
-    // if so, proceed immediately. Otherwise wait for the event.
-    if (app._shellRendered) {
+    // lex-app renders during HTML parsing; lex-app-ready may fire before
+    // this script runs. Check _shellRendered first; also use a short timeout
+    // fallback in case the event never fires.
+    var shellStarted = false;
+    function runShellReady() {
+      if (shellStarted) return;
+      shellStarted = true;
       onShellReady();
+    }
+    if (app._shellRendered) {
+      runShellReady();
     } else {
-      app.addEventListener('lex-app-ready', onShellReady);
+      app.addEventListener('lex-app-ready', runShellReady);
+      setTimeout(runShellReady, 1500);
     }
   }
 

@@ -1,696 +1,206 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Active Sessions - Lana AI</title>
-    <script src="../js/tailwind-loader.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Active Sessions - LANA AI</title>
+
+  <!-- ── CSS + Tailwind in head — behavioral scripts at end of body ── -->
+  <link rel="stylesheet" href="../css/lex-tokens.css">
   <link rel="stylesheet" href="../css/components.css">
-  <script src="../js/error-reporter.js"></script>
-    <script src="../js/config.js"></script>
-    <script src="../js/mock-data.js"></script>
-    <script src="../js/api.js"></script>
-    <script src="../js/components.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <script src="../js/menu.js"></script>
-    <script src="../js/navigation-helpers.js"></script>
-    <script src="../js/new-project-modal.js"></script>
-    <script src="../js/conversation-menu.js"></script>
-    <script src="../js/conversation-search-modal.js"></script>
-    <script src="../js/notifications.js"></script>
+  <link rel="stylesheet" href="../css/tailwind-output.css">
+  <script src="../js/tailwind-loader.js"></script>
 
-  <!-- Inline preloader styles - Pure CSS, no dependencies -->
-  <style>
-    /* Preloader shown immediately, before any JS/CSS loads */
-    #lana-preloader {
-      position: fixed;
-      inset: 0;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 99999;
-      transition: opacity 0.3s ease-out;
-    }
-
-    .preloader-logo {
-      width: 80px;
-      height: 80px;
-      margin-bottom: 24px;
-      animation: pulse 2s ease-in-out infinite;
-    }
-
-    .preloader-spinner {
-      width: 48px;
-      height: 48px;
-      border: 4px solid rgba(255, 255, 255, 0.3);
-      border-top-color: white;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-bottom: 16px;
-    }
-
-    .preloader-text {
-      color: white;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      font-size: 16px;
-      font-weight: 500;
-      letter-spacing: 0.5px;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.85; transform: scale(0.96); }
-    }
-  </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body>
 
-  <!-- Pure HTML/CSS Preloader - Shows immediately, hidden by JS when ready -->
-  <div id="lana-preloader">
-    <svg class="preloader-logo" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="50" cy="50" r="45" fill="white" opacity="0.15"/>
-      <circle cx="50" cy="50" r="35" fill="white" opacity="0.3"/>
-      <circle cx="50" cy="50" r="25" fill="white"/>
-      <text x="50" y="58" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#667eea" text-anchor="middle">L</text>
-    </svg>
-    <div class="preloader-spinner"></div>
-    <div class="preloader-text">Loading LanaAI...</div>
-  </div>
+  <!-- Branded loader — shows once lex-loader.js upgrades the element -->
+  <lex-loader theme="light"></lex-loader>
 
-  <!-- App content - wrapped for FOUC prevention -->
-  <div id="app-content">
-    <!-- Sidebar -->
-    <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
-        <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
-            <a href="../index.html"><img src="../img/logo-light.png" alt="LanaAI" class="h-7"></a>
-            <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-            </button>
+  <!-- App shell -->
+  <lex-app
+    logo-src="../img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="../dashboard.html"
+    active-nav-id="admin"
+    page-title="Active Sessions"
+  ></lex-app>
+
+  <!-- Page content as inert <template> -->
+  <template id="page-content">
+
+    <main class="p-4 lg:p-8">
+
+      <!-- Page header -->
+      <lex-banner
+        variant="light"
+        size="compact"
+        heading="Active Sessions"
+        subtitle="Monitor and manage active user sessions across the platform"
+      >
+        <button id="refreshSessionsBtn"
+          class="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg transition-colors"
+          style="background:var(--lex-bg-secondary);color:var(--lex-text-secondary);">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+            </path>
+          </svg>
+          Refresh
+        </button>
+      </lex-banner>
+
+      <lex-breadcrumb items='[{"label":"Administration","href":"admin/index.html"},{"label":"Active Sessions"}]'></lex-breadcrumb>
+
+      <!-- Stats -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <lex-metric id="metricActiveSessions" label="Active Sessions" value="-"></lex-metric>
+        <lex-metric id="metricUniqueUsers"    label="Unique Users"    value="-"></lex-metric>
+        <lex-metric id="metricLocations"      label="Unique Locations" value="-"></lex-metric>
+        <lex-metric id="metricAvgAge"         label="Avg. Session Age" value="-"></lex-metric>
+      </div>
+
+      <!-- Sessions Table -->
+      <lex-card padding="none">
+        <lex-table
+          id="sessionsTable"
+          columns="user_display,device,ip_location,started,last_activity,status"
+          labels="User,Device,IP / Location,Started,Last Activity,Status"
+          searchable
+          empty-text="No active sessions found"
+          sort-by="started"
+          sort-dir="desc"
+        ></lex-table>
+      </lex-card>
+
+    </main>
+
+
+    <!-- ================================================================
+         Session Details Drawer
+         ================================================================ -->
+    <lex-drawer
+      id="sessionDrawer"
+      heading="Session Details"
+      side="right"
+      width="480px"
+    >
+      <div id="sessionDrawerContent">
+        <div id="sessionDrawerLoading" style="text-align:center;padding:2rem;">
+          <lex-spinner label="Loading session..."></lex-spinner>
         </div>
-        <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
-            <!-- Menu will be dynamically rendered by menu.js -->
-        </nav>
-    </aside>
+        <div id="sessionDrawerBody" class="hidden">
 
-    <!-- Main Content -->
-    <div class="lg:ml-64">
-        <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
-            <div class="flex items-center justify-between h-16 px-4 lg:px-8">
-                <button id="sidebarToggle" class="lg:hidden text-gray-500 hover:text-gray-700">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-                    </svg>
-                </button>
-                <div class="flex-1 px-4 lg:px-0">
-                    <h1 class="text-xl font-semibold text-gray-900">Active Sessions</h1>
-                </div>
-                <div class="flex items-center gap-3">
-                    <button onclick="loadSessions()" class="px-4 py-2 text-gray-600 hover:text-gray-900 transition-colors" title="Refresh">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                        </svg>
-                    </button>
-                    <button id="logoutBtn" class="text-gray-500 hover:text-gray-700">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
-                        </svg>
-                    </button>
-                </div>
+          <!-- User header -->
+          <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;">
+            <div id="sessionDrawerAvatar" style="
+              width:3.5rem;height:3.5rem;border-radius:9999px;
+              background:var(--lex-bg-accent);color:var(--lex-text-on-accent);
+              display:flex;align-items:center;justify-content:center;
+              font-size:1.25rem;font-weight:600;flex-shrink:0;
+            "></div>
+            <div style="min-width:0;">
+              <div id="sessionDrawerName" style="font-size:var(--lex-body-base-size,1rem);font-weight:600;color:var(--lex-text-primary);"></div>
+              <div id="sessionDrawerEmail" style="font-size:var(--lex-body-sm-size,0.875rem);color:var(--lex-text-tertiary);"></div>
             </div>
-        </header>
+          </div>
 
-        <main class="p-4 lg:p-8">
-                <!-- Stats -->
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                        <div class="flex items-center">
-                            <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
-                                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-                                </svg>
-                            </div>
-                            <div>
-                                <p class="text-sm font-medium text-gray-500">Active Sessions</p>
-                                <p class="text-2xl font-bold text-gray-900" id="activeSessions">-</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                        <div class="flex items-center">
-                            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mr-4">
-                                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
-                                </svg>
-                            </div>
-                            <div>
-                                <p class="text-sm font-medium text-gray-500">Unique Users</p>
-                                <p class="text-2xl font-bold text-gray-900" id="uniqueUsers">-</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                        <div class="flex items-center">
-                            <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mr-4">
-                                <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                </svg>
-                            </div>
-                            <div>
-                                <p class="text-sm font-medium text-gray-500">Unique Locations</p>
-                                <p class="text-2xl font-bold text-gray-900" id="uniqueLocations">-</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                        <div class="flex items-center">
-                            <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mr-4">
-                                <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                </svg>
-                            </div>
-                            <div>
-                                <p class="text-sm font-medium text-gray-500">Avg. Session Age</p>
-                                <p class="text-2xl font-bold text-gray-900" id="avgSessionAge">-</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+          <lex-divider style="margin-bottom:1rem;"></lex-divider>
 
-                <!-- Filters -->
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
-                    <div class="flex flex-col md:flex-row gap-4">
-                        <div class="flex-1 relative">
-                            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                            </svg>
-                            <input type="text" id="searchInput" placeholder="Search by user, IP, or device..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                        </div>
-                        <select id="deviceFilter" class="select-standard inline-block w-auto pl-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                            <option value="">All Devices</option>
-                            <option value="desktop">Desktop</option>
-                            <option value="mobile">Mobile</option>
-                            <option value="tablet">Tablet</option>
-                        </select>
-                        <select id="activityFilter" class="select-standard inline-block w-auto pl-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                            <option value="">All Activity</option>
-                            <option value="active">Active Now</option>
-                            <option value="idle">Idle</option>
-                        </select>
-                    </div>
-                </div>
+          <!-- Key-value detail pairs -->
+          <lex-stack direction="vertical" gap="sm" style="margin-bottom:1.5rem;">
+            <lex-kv id="drawerKvStatus"     label="Status"></lex-kv>
+            <lex-kv id="drawerKvSessionId"  label="Session ID"></lex-kv>
+            <lex-kv id="drawerKvBrowser"    label="Browser"></lex-kv>
+            <lex-kv id="drawerKvOS"         label="Operating System"></lex-kv>
+            <lex-kv id="drawerKvDeviceType" label="Device Type"></lex-kv>
+            <lex-kv id="drawerKvIP"         label="IP Address"></lex-kv>
+            <lex-kv id="drawerKvLocation"   label="Location"></lex-kv>
+            <lex-kv id="drawerKvStarted"    label="Session Started"></lex-kv>
+            <lex-kv id="drawerKvLastActive" label="Last Activity"></lex-kv>
+            <lex-kv id="drawerKvDuration"   label="Duration"></lex-kv>
+          </lex-stack>
 
-                <!-- Sessions Table -->
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div class="overflow-x-auto">
-                        <table class="w-full">
-                            <thead class="bg-gray-50 border-b border-gray-200">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">User</th>
-                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Device</th>
-                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">IP / Location</th>
-                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Started</th>
-                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Activity</th>
-                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                                    <th class="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="sessionsBody" class="divide-y divide-gray-200">
-                                <tr><td colspan="7" class="px-6 py-8 text-center text-gray-500">Loading sessions...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+          <lex-divider style="margin-bottom:1rem;"></lex-divider>
 
-                <!-- Pagination -->
-                <div class="flex items-center justify-between mt-4">
-                    <p class="text-sm text-gray-500" id="paginationInfo">Showing 0 sessions</p>
-                    <div class="flex space-x-2" id="paginationControls"></div>
-                </div>
-            </main>
+          <!-- Terminate button -->
+          <lex-btn id="drawerTerminateBtn" variant="danger" icon="log-out" style="width:100%;">Terminate Session</lex-btn>
+
         </div>
+      </div>
+    </lex-drawer>
+
+  </template>
+
+  <noscript>
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;color:#666;">
+      Please enable JavaScript to use LANA AI.
     </div>
+  </noscript>
 
-    <script>
-        // Logout handler
-        document.getElementById('logoutBtn').addEventListener('click', async () => {
-            await api.logout();
-            window.location.href = '../login.html';
-        });
-    </script>
+  <!-- ══════════════════════════════════════════════════════════════════
+       Scripts at end of body — HTML renders first, scripts load after
+       ══════════════════════════════════════════════════════════════════ -->
 
-    <!-- Session Details Modal -->
-    <div id="sessionModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-                <h3 class="text-lg font-semibold text-gray-900">Session Details</h3>
-                <button onclick="closeModal('sessionModal')" class="text-gray-400 hover:text-gray-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                </button>
-            </div>
-            <div id="sessionDetails" class="p-6">
-                <!-- Dynamic content -->
-            </div>
-        </div>
-    </div>
+  <!-- Universal shell scripts -->
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/version.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/navigation-helpers.js"></script>
+  <script src="../js/new-project-modal.js"></script>
+  <script src="../js/conversation-menu.js"></script>
+  <script src="../js/conversation-search-modal.js"></script>
+  <script src="../js/contact-search-modal.js"></script>
+  <script src="../js/notifications.js"></script>
 
-    <!-- Terminate Confirmation Modal -->
-    <div id="terminateModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-xl shadow-xl w-full max-w-md">
-            <div class="p-6">
-                <div class="flex items-center mb-4">
-                    <div class="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mr-4">
-                        <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7"></path>
-                        </svg>
-                    </div>
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-900">Terminate Session</h3>
-                        <p class="text-sm text-gray-500">Force logout this user</p>
-                    </div>
-                </div>
-                <p class="text-gray-600 mb-6">Are you sure you want to terminate this session? The user will be logged out immediately.</p>
-                <div class="flex justify-end gap-3">
-                    <button onclick="closeModal('terminateModal')" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Cancel</button>
-                    <button onclick="confirmTerminate()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors">Terminate</button>
-                </div>
-            </div>
-        </div>
-    </div>
+  <!-- Lex UI core -->
+  <script src="../js/lex/lex.core.js"></script>
+  <script src="../js/lex/lex.icons.js"></script>
+  <script src="../js/lex/lex.data.js"></script>
+  <script src="../js/lex/lex.forms.js"></script>
+  <script src="../js/lex/lex.state.js"></script>
+  <script src="../js/lex/lex.utils.js"></script>
+  <script src="../js/lex/lex.auth.js"></script>
+  <script src="../js/lex/lex-nav.js"></script>
 
-    <script>
-        console.log('[SESSIONS] Script starting...');
-        console.log('[SESSIONS] API available:', typeof api);
-        console.log('[SESSIONS] renderMenu available:', typeof renderMenu);
-        
-        console.log('[SESSIONS] ApiClient created');
-        
-        // Auth check
-        if (!api.requireAuth()) throw new Error('Not authenticated');
-        console.log('[SESSIONS] Auth check passed');
-        
-        // Load full user profile with roles before rendering menu
-        (async () => {
-          console.log('[SESSIONS] Loading user profile...');
-          try {
-            await api.loadUserProfile();
-            const user = JSON.parse(localStorage.getItem('user'));
-            console.log('[SESSIONS] User profile loaded:', user);
-            console.log('[SESSIONS] User roles:', user?.roles);
-          } catch (error) {
-            console.error('[SESSIONS] Failed to load user profile:', error);
-          }
-          
-          // Render dynamic menu (will now have access to roles)
-          console.log('[SESSIONS] Rendering menu to #mainNav...');
-          const menuResult = renderMenu('#mainNav');
-          console.log('[SESSIONS] Menu render result:', menuResult);
+  <!-- Lex UI foundation + layout -->
+  <script src="../js/lex/components/foundation/lex-loader.js"></script>
+  <script src="../js/lex/components/foundation/lex-toast.js"></script>
+  <script src="../js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="../js/lex/components/foundation/lex-btn.js"></script>
+  <script src="../js/lex/components/foundation/lex-empty.js"></script>
+  <script src="../js/lex/components/form/lex-segmented.js"></script>
+  <script src="../js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="../js/lex/components/layout/lex-topbar.js"></script>
+  <script src="../js/lex/components/layout/lex-conversation-item.js"></script>
+  <script src="../js/lex/components/layout/lex-notification-panel.js"></script>
+  <script src="../js/lex/components/layout/lex-app.js"></script>
 
-          // Check what was rendered
-          const nav = document.getElementById('mainNav');
-          console.log('[SESSIONS] Nav innerHTML length:', nav?.innerHTML?.length);
-          console.log('[SESSIONS] Nav first 200 chars:', nav?.innerHTML?.substring(0, 200));
+  <!-- Page-specific Lex components (BEFORE inject) -->
+  <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
+  <script src="../js/lex/components/foundation/lex-banner.js"></script>
+  <script src="../js/lex/components/foundation/lex-metric.js"></script>
+  <script src="../js/lex/components/foundation/lex-card.js"></script>
+  <script src="../js/lex/components/foundation/lex-kv.js"></script>
+  <script src="../js/lex/components/foundation/lex-divider.js"></script>
+  <script src="../js/lex/components/foundation/lex-stack.js"></script>
+  <script src="../js/lex/components/foundation/lex-drawer.js"></script>
+  <script src="../js/lex/components/foundation/lex-modal.js"></script>
+  <script src="../js/lex/components/data/lex-table.js"></script>
+  <script src="../js/lex/components/form/lex-dropdown-btn.js"></script>
 
-          // Initialize conversation menu
-          if (typeof ConversationMenu !== 'undefined' && ConversationMenu.init()) {
-              ConversationMenu.loadConversations(true);
-          }
+  <!-- Inject page content + hoist modals -->
+  <script src="../js/lex/lex-page-init.js"></script>
 
-          // Initialize conversation search modal
-          if (typeof ConversationSearchModal !== 'undefined') {
-              ConversationSearchModal.init();
-          }
-        })();
+  <!-- Page controller -->
+  <script src="../js/admin/admin-sessions.js"></script>
 
-        // Sidebar toggle
-        const sidebar = document.getElementById('sidebar');
-        const sidebarToggle = document.getElementById('sidebarToggle');
-        const closeSidebar = document.getElementById('closeSidebar');
-        if (sidebarToggle) sidebarToggle.addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
-        if (closeSidebar) closeSidebar.addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
-        
-        let sessions = [];
-        let terminateSessionId = null;
-        let currentPage = 1;
-        const pageSize = 20;
-
-        document.addEventListener('DOMContentLoaded', function() {
-            loadSessions();
-
-            document.getElementById('searchInput').addEventListener('input', debounce(filterSessions, 300));
-            document.getElementById('deviceFilter').addEventListener('change', filterSessions);
-            document.getElementById('activityFilter').addEventListener('change', filterSessions);
-
-            // Auto-refresh every 30 seconds
-            setInterval(loadSessions, 30000);
-        });
-
-        function checkAuth() {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                window.location.href = '/login.html';
-            }
-        }
-
-        async function loadSessions() {
-            try {
-                const res = await api.getSessions(currentPage, pageSize);
-                sessions = res.sessions || [];
-                updateStats();
-                renderSessions();
-            } catch (error) {
-                Toast.error('Failed to load sessions');
-                console.error(error);
-            }
-        }
-
-        function updateStats() {
-            document.getElementById('activeSessions').textContent = sessions.length;
-
-            const uniqueUsers = new Set(sessions.map(s => s.user_id)).size;
-            document.getElementById('uniqueUsers').textContent = uniqueUsers;
-
-            const uniqueLocations = new Set(sessions.map(s => s.location || s.ip_address)).size;
-            document.getElementById('uniqueLocations').textContent = uniqueLocations;
-
-            // Calculate average session age
-            if (sessions.length > 0) {
-                const now = new Date();
-                const totalAge = sessions.reduce((sum, s) => {
-                    return sum + (now - new Date(s.created_at));
-                }, 0);
-                const avgMs = totalAge / sessions.length;
-                document.getElementById('avgSessionAge').textContent = formatDuration(avgMs);
-            } else {
-                document.getElementById('avgSessionAge').textContent = '-';
-            }
-        }
-
-        function renderSessions() {
-            const tbody = document.getElementById('sessionsBody');
-            const searchQuery = document.getElementById('searchInput').value.toLowerCase();
-            const deviceFilter = document.getElementById('deviceFilter').value;
-            const activityFilter = document.getElementById('activityFilter').value;
-
-            let filtered = sessions.filter(session => {
-                const matchesSearch =
-                    (session.user_email || '').toLowerCase().includes(searchQuery) ||
-                    (session.user_name || '').toLowerCase().includes(searchQuery) ||
-                    (session.ip_address || '').includes(searchQuery) ||
-                    (session.device || '').toLowerCase().includes(searchQuery);
-
-                const matchesDevice = !deviceFilter || (session.device_type || '').toLowerCase() === deviceFilter;
-
-                const isActive = session.last_activity &&
-                    (new Date() - new Date(session.last_activity)) < 5 * 60 * 1000; // 5 minutes
-                const matchesActivity = !activityFilter ||
-                    (activityFilter === 'active' && isActive) ||
-                    (activityFilter === 'idle' && !isActive);
-
-                return matchesSearch && matchesDevice && matchesActivity;
-            });
-
-            // Pagination
-            const totalPages = Math.ceil(filtered.length / pageSize);
-            const start = (currentPage - 1) * pageSize;
-            const paginated = filtered.slice(start, start + pageSize);
-
-            document.getElementById('paginationInfo').textContent =
-                `Showing ${start + 1}-${Math.min(start + pageSize, filtered.length)} of ${filtered.length} sessions`;
-
-            if (paginated.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center text-gray-500">No sessions found</td></tr>';
-                return;
-            }
-
-            tbody.innerHTML = paginated.map(session => {
-                const isActive = session.last_activity &&
-                    (new Date() - new Date(session.last_activity)) < 5 * 60 * 1000;
-                const deviceIcon = getDeviceIcon(session.device_type || session.device);
-
-                return `
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-6 py-4">
-                            <div class="flex items-center">
-                                <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center mr-3">
-                                    <span class="text-gray-600 text-sm font-medium">${(session.user_name?.[0] || session.user_email?.[0] || '?').toUpperCase()}</span>
-                                </div>
-                                <div>
-                                    <p class="font-medium text-gray-900">${session.user_name || session.user_email}</p>
-                                    <p class="text-sm text-gray-500">${session.user_email || ''}</p>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4">
-                            <div class="flex items-center">
-                                <i class="fas ${deviceIcon} text-gray-400 mr-2"></i>
-                                <div>
-                                    <p class="text-sm text-gray-900">${session.browser || 'Unknown'}</p>
-                                    <p class="text-xs text-gray-500">${session.os || session.device || 'Unknown'}</p>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4">
-                            <p class="text-sm text-gray-900">${session.ip_address || '-'}</p>
-                            <p class="text-xs text-gray-500">${session.location || 'Unknown location'}</p>
-                        </td>
-                        <td class="px-6 py-4 text-sm text-gray-500">${formatDateTime(session.created_at)}</td>
-                        <td class="px-6 py-4 text-sm text-gray-500">${session.last_activity ? timeAgo(session.last_activity) : '-'}</td>
-                        <td class="px-6 py-4">
-                            <span class="px-2 py-1 text-xs rounded-full ${isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
-                                ${isActive ? 'Active' : 'Idle'}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 text-right">
-                            <button onclick="viewSession('${session.session_id || session.id}')" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium mr-4">Details</button>
-                            <button onclick="terminateSession('${session.session_id || session.id}')" class="text-red-600 hover:text-red-800 text-sm font-medium">Terminate</button>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-
-            // Render pagination
-            renderPagination(totalPages);
-        }
-
-        function renderPagination(totalPages) {
-            const container = document.getElementById('paginationControls');
-            if (totalPages <= 1) {
-                container.innerHTML = '';
-                return;
-            }
-
-            let html = '';
-            html += `<button onclick="goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''} class="px-3 py-2 rounded-lg border border-gray-300 ${currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white hover:bg-gray-50 text-gray-700'}">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
-            </button>`;
-
-            for (let i = 1; i <= totalPages; i++) {
-                if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
-                    html += `<button onclick="goToPage(${i})" class="px-4 py-2 rounded-lg border ${i === currentPage ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'}">${i}</button>`;
-                } else if (i === currentPage - 2 || i === currentPage + 2) {
-                    html += '<span class="px-2 text-gray-400">...</span>';
-                }
-            }
-
-            html += `<button onclick="goToPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''} class="px-3 py-2 rounded-lg border border-gray-300 ${currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white hover:bg-gray-50 text-gray-700'}">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-            </button>`;
-
-            container.innerHTML = html;
-        }
-
-        function goToPage(page) {
-            currentPage = page;
-            renderSessions();
-        }
-
-        function filterSessions() {
-            currentPage = 1;
-            renderSessions();
-        }
-
-        function viewSession(sessionId) {
-            const session = sessions.find(s => (s.session_id || s.id) === sessionId);
-            if (!session) return;
-
-            const isActive = session.last_activity &&
-                (new Date() - new Date(session.last_activity)) < 5 * 60 * 1000;
-
-            document.getElementById('sessionDetails').innerHTML = `
-                <div class="space-y-4">
-                    <div class="flex items-center mb-4">
-                        <div class="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center mr-4">
-                            <span class="text-gray-600 font-medium">${(session.user_name?.[0] || '?').toUpperCase()}</span>
-                        </div>
-                        <div>
-                            <p class="font-semibold text-gray-900">${session.user_name || session.user_email}</p>
-                            <p class="text-sm text-gray-500">${session.user_email || ''}</p>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="bg-gray-50 rounded-lg p-3">
-                            <p class="text-xs text-gray-500">Status</p>
-                            <span class="px-2 py-1 text-xs rounded-full ${isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
-                                ${isActive ? 'Active' : 'Idle'}
-                            </span>
-                        </div>
-                        <div class="bg-gray-50 rounded-lg p-3">
-                            <p class="text-xs text-gray-500">Session ID</p>
-                            <p class="text-sm text-gray-900 font-mono truncate">${session.session_id || session.id}</p>
-                        </div>
-                    </div>
-
-                    <div class="border-t border-gray-200 pt-4">
-                        <h4 class="font-medium text-gray-900 mb-3">Device Information</h4>
-                        <div class="space-y-2 text-sm">
-                            <div class="flex justify-between">
-                                <span class="text-gray-500">Browser</span>
-                                <span class="text-gray-900">${session.browser || 'Unknown'}</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-500">Operating System</span>
-                                <span class="text-gray-900">${session.os || 'Unknown'}</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-500">Device Type</span>
-                                <span class="text-gray-900">${session.device_type || session.device || 'Unknown'}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="border-t border-gray-200 pt-4">
-                        <h4 class="font-medium text-gray-900 mb-3">Location Information</h4>
-                        <div class="space-y-2 text-sm">
-                            <div class="flex justify-between">
-                                <span class="text-gray-500">IP Address</span>
-                                <span class="text-gray-900">${session.ip_address || '-'}</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-500">Location</span>
-                                <span class="text-gray-900">${session.location || 'Unknown'}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="border-t border-gray-200 pt-4">
-                        <h4 class="font-medium text-gray-900 mb-3">Timeline</h4>
-                        <div class="space-y-2 text-sm">
-                            <div class="flex justify-between">
-                                <span class="text-gray-500">Session Started</span>
-                                <span class="text-gray-900">${formatDateTime(session.created_at)}</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-500">Last Activity</span>
-                                <span class="text-gray-900">${session.last_activity ? formatDateTime(session.last_activity) : '-'}</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-500">Session Duration</span>
-                                <span class="text-gray-900">${formatDuration(new Date() - new Date(session.created_at))}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="pt-4">
-                        <button onclick="closeModal('sessionModal'); terminateSession('${session.session_id || session.id}')" class="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
-                            <i class="fas fa-sign-out-alt mr-2"></i>Terminate Session
-                        </button>
-                    </div>
-                </div>
-            `;
-
-            openModal('sessionModal');
-        }
-
-        function terminateSession(sessionId) {
-            terminateSessionId = sessionId;
-            openModal('terminateModal');
-        }
-
-        async function confirmTerminate() {
-            if (!terminateSessionId) return;
-
-            try {
-                await api.terminateSession(terminateSessionId);
-                Toast.success('Session terminated successfully');
-                closeModal('terminateModal');
-                terminateSessionId = null;
-                loadSessions();
-            } catch (error) {
-                Toast.error(error.message || 'Failed to terminate session');
-            }
-        }
-
-        async function terminateAllSessions() {
-            if (!confirm('Are you sure you want to terminate ALL active sessions in your organization? All users will be logged out.')) {
-                return;
-            }
-
-            try {
-                // Terminate all sessions for the organization (implementation needed)
-                Toast.error('Terminate all sessions not yet implemented');
-                // TODO: Need to add bulk terminate endpoint
-                // await api.terminateAllSessions();
-                // Toast.success('All sessions terminated');
-                // loadSessions();
-            } catch (error) {
-                Toast.error(error.message || 'Failed to terminate sessions');
-            }
-        }
-
-        function openModal(id) {
-            document.getElementById(id).classList.remove('hidden');
-            document.getElementById(id).classList.add('flex');
-        }
-
-        function closeModal(id) {
-            document.getElementById(id).classList.add('hidden');
-            document.getElementById(id).classList.remove('flex');
-        }
-
-        function getDeviceIcon(device) {
-            const d = (device || '').toLowerCase();
-            if (d.includes('mobile') || d.includes('iphone') || d.includes('android')) return 'fa-mobile-alt';
-            if (d.includes('tablet') || d.includes('ipad')) return 'fa-tablet-alt';
-            return 'fa-desktop';
-        }
-
-        function formatDuration(ms) {
-            const seconds = Math.floor(ms / 1000);
-            const minutes = Math.floor(seconds / 60);
-            const hours = Math.floor(minutes / 60);
-            const days = Math.floor(hours / 24);
-
-            if (days > 0) return `${days}d ${hours % 24}h`;
-            if (hours > 0) return `${hours}h ${minutes % 60}m`;
-            if (minutes > 0) return `${minutes}m`;
-            return `${seconds}s`;
-        }
-
-        function debounce(func, wait) {
-            let timeout;
-            return function executedFunction(...args) {
-                const later = () => {
-                    clearTimeout(timeout);
-                    func(...args);
-                };
-                clearTimeout(timeout);
-                timeout = setTimeout(later, wait);
-            };
-        }
-
-    </script>
-
-  </div>
+  <!-- Auth guard + loader dismiss (MUST be last) -->
+  <script src="../js/auth-guard.js"></script>
 </body>
 </html>

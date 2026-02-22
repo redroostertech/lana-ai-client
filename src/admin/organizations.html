@@ -1,120 +1,211 @@
-<!-- Organization Details — SPA page fragment.
-     Loaded by lex-router into the lex-app content area.
-     NOT a full HTML document — no <html>, <head>, <body>, or <script> tags.
-     Controller: js/admin/organizations.js -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Organization Details - LANA AI</title>
 
-<div id="lex-page-content">
+  <!-- ── CSS + Tailwind in head — behavioral scripts at end of body ── -->
+  <link rel="stylesheet" href="../css/lex-tokens.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/admin/organizations.css">
+  <link rel="stylesheet" href="../css/tailwind-output.css">
+  <script src="../js/tailwind-loader.js"></script>
 
-  <main>
+</head>
+<body>
 
-    <!-- ================================================================
-         Zone A — Page Banner
-         Populated by organizations.js:_renderBanner()
-         ================================================================ -->
-    <lex-banner
-      id="orgBanner"
-      variant="light"
-      corners
-      heading="Loading..."
-      subtitle=""
-    >
-      <div id="orgBannerActions"></div>
-    </lex-banner>
+  <!-- Branded loader — shows once lex-loader.js upgrades the element -->
+  <lex-loader theme="light"></lex-loader>
+
+  <!-- App shell -->
+  <lex-app
+    logo-src="../img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="../dashboard.html"
+    active-nav-id="admin"
+    page-title="Organization Details"
+  ></lex-app>
+
+  <!-- Page content as inert <template> -->
+  <template id="page-content">
+
+    <main>
+
+      <!-- ================================================================
+           Zone A — Page Banner
+           ================================================================ -->
+      <lex-banner
+        id="orgBanner"
+        variant="light"
+        corners
+        heading="Loading..."
+        subtitle=""
+      >
+        <div id="orgBannerActions"></div>
+      </lex-banner>
+
+      <lex-breadcrumb items='[{"label":"Administration","href":"admin/index.html"},{"label":"Organization Details"}]'></lex-breadcrumb>
 
 
-    <!-- ================================================================
-         Zone B — Quota Metrics (2 cards with progress bars)
-         Populated by organizations.js:_renderQuotas()
-         ================================================================ -->
-    <div class="org-quota-grid" id="orgQuotaGrid">
+      <!-- ================================================================
+           Zone B — Quota Metrics (2 cards with progress bars)
+           ================================================================ -->
+      <div class="org-quota-grid" id="orgQuotaGrid">
 
-      <!-- Users quota card -->
-      <lex-card variant="default" padding="normal">
-        <lex-metric
-          id="metricUsers"
-          label="Users"
-          value="-"
-          status="blue"
-        ></lex-metric>
-        <div class="org-quota-bar">
-          <div
-            class="org-quota-bar__track"
-            role="progressbar"
-            aria-valuenow="0"
-            aria-valuemin="0"
-            aria-valuemax="100"
-            aria-label="Users quota"
-          >
+        <!-- Users quota card -->
+        <lex-card variant="default" padding="normal">
+          <lex-metric
+            id="metricUsers"
+            label="Users"
+            value="-"
+            status="blue"
+          ></lex-metric>
+          <div class="org-quota-bar">
             <div
-              class="org-quota-bar__fill"
-              id="userQuotaFill"
-              style="width:0%"
-            ></div>
+              class="org-quota-bar__track"
+              role="progressbar"
+              aria-valuenow="0"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              aria-label="Users quota"
+            >
+              <div
+                class="org-quota-bar__fill"
+                id="userQuotaFill"
+                style="width:0%"
+              ></div>
+            </div>
+            <span class="org-quota-label" id="userQuotaLabel"></span>
           </div>
-          <span class="org-quota-label" id="userQuotaLabel"></span>
-        </div>
-      </lex-card>
+        </lex-card>
 
-      <!-- Matters quota card -->
-      <lex-card variant="default" padding="normal">
-        <lex-metric
-          id="metricMatters"
-          label="Matters"
-          value="-"
-          status="blue"
-        ></lex-metric>
-        <div class="org-quota-bar">
-          <div
-            class="org-quota-bar__track"
-            role="progressbar"
-            aria-valuenow="0"
-            aria-valuemin="0"
-            aria-valuemax="100"
-            aria-label="Matters quota"
-          >
+        <!-- Matters quota card -->
+        <lex-card variant="default" padding="normal">
+          <lex-metric
+            id="metricMatters"
+            label="Matters"
+            value="-"
+            status="blue"
+          ></lex-metric>
+          <div class="org-quota-bar">
             <div
-              class="org-quota-bar__fill"
-              id="matterQuotaFill"
-              style="width:0%"
-            ></div>
+              class="org-quota-bar__track"
+              role="progressbar"
+              aria-valuenow="0"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              aria-label="Matters quota"
+            >
+              <div
+                class="org-quota-bar__fill"
+                id="matterQuotaFill"
+                style="width:0%"
+              ></div>
+            </div>
+            <span class="org-quota-label" id="matterQuotaLabel"></span>
           </div>
-          <span class="org-quota-label" id="matterQuotaLabel"></span>
-        </div>
-      </lex-card>
+        </lex-card>
 
-    </div>
-
-
-    <!-- ================================================================
-         Zone C — Organization Information (key-value pairs)
-         Populated by organizations.js:_renderInfo()
-         ================================================================ -->
-    <lex-card
-      id="orgInfoCard"
-      heading="Organization Information"
-      variant="default"
-    >
-      <div class="org-kv-grid">
-        <lex-kv id="kvOrgId"      label="Organization ID"   value="-" copyable="true"></lex-kv>
-        <lex-kv id="kvOrgTier"    label="Subscription Tier" value="-"></lex-kv>
-        <lex-kv id="kvOrgCreated" label="Created"           value="-"></lex-kv>
-        <lex-kv id="kvOrgUpdated" label="Last Updated"      value="-"></lex-kv>
       </div>
-    </lex-card>
 
 
-    <!-- ================================================================
-         Error State (hidden by default)
-         Shown by organizations.js:_showError() on API failure
-         ================================================================ -->
-    <div id="orgErrorState" class="hidden">
-      <lex-empty
-        icon="folder"
-        message="Unable to load organization"
-        description="Please try again later"
-      ></lex-empty>
+      <!-- ================================================================
+           Zone C — Organization Information (key-value pairs)
+           ================================================================ -->
+      <lex-card
+        id="orgInfoCard"
+        heading="Organization Information"
+        variant="default"
+      >
+        <div class="org-kv-grid">
+          <lex-kv id="kvOrgId"      label="Organization ID"   value="-" copyable="true"></lex-kv>
+          <lex-kv id="kvOrgTier"    label="Subscription Tier" value="-"></lex-kv>
+          <lex-kv id="kvOrgCreated" label="Created"           value="-"></lex-kv>
+          <lex-kv id="kvOrgUpdated" label="Last Updated"      value="-"></lex-kv>
+        </div>
+      </lex-card>
+
+
+      <!-- ================================================================
+           Error State (hidden by default)
+           ================================================================ -->
+      <div id="orgErrorState" class="hidden">
+        <lex-empty
+          icon="folder"
+          message="Unable to load organization"
+          description="Please try again later"
+        ></lex-empty>
+      </div>
+
+    </main>
+
+  </template>
+
+  <noscript>
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;color:#666;">
+      Please enable JavaScript to use LANA AI.
     </div>
+  </noscript>
 
-  </main>
+  <!-- ══════════════════════════════════════════════════════════════════
+       Scripts at end of body — HTML renders first, scripts load after
+       ══════════════════════════════════════════════════════════════════ -->
 
-</div>
+  <!-- Universal shell scripts -->
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/version.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/navigation-helpers.js"></script>
+  <script src="../js/new-project-modal.js"></script>
+  <script src="../js/conversation-menu.js"></script>
+  <script src="../js/conversation-search-modal.js"></script>
+  <script src="../js/contact-search-modal.js"></script>
+  <script src="../js/notifications.js"></script>
+
+  <!-- Lex UI core -->
+  <script src="../js/lex/lex.core.js"></script>
+  <script src="../js/lex/lex.icons.js"></script>
+  <script src="../js/lex/lex.data.js"></script>
+  <script src="../js/lex/lex.forms.js"></script>
+  <script src="../js/lex/lex.state.js"></script>
+  <script src="../js/lex/lex.utils.js"></script>
+  <script src="../js/lex/lex.auth.js"></script>
+  <script src="../js/lex/lex-nav.js"></script>
+
+  <!-- Lex UI foundation + layout -->
+  <script src="../js/lex/components/foundation/lex-loader.js"></script>
+  <script src="../js/lex/components/foundation/lex-toast.js"></script>
+  <script src="../js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="../js/lex/components/foundation/lex-btn.js"></script>
+  <script src="../js/lex/components/foundation/lex-empty.js"></script>
+  <script src="../js/lex/components/form/lex-segmented.js"></script>
+  <script src="../js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="../js/lex/components/layout/lex-topbar.js"></script>
+  <script src="../js/lex/components/layout/lex-conversation-item.js"></script>
+  <script src="../js/lex/components/layout/lex-notification-panel.js"></script>
+  <script src="../js/lex/components/layout/lex-app.js"></script>
+
+  <!-- Page-specific Lex components (BEFORE inject) -->
+  <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
+  <script src="../js/lex/components/foundation/lex-banner.js"></script>
+  <script src="../js/lex/components/foundation/lex-metric.js"></script>
+  <script src="../js/lex/components/foundation/lex-card.js"></script>
+  <script src="../js/lex/components/foundation/lex-kv.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+
+  <!-- Inject page content + hoist modals -->
+  <script src="../js/lex/lex-page-init.js"></script>
+
+  <!-- Page controller -->
+  <script src="../js/admin/organizations.js"></script>
+
+  <!-- Auth guard + loader dismiss (MUST be last) -->
+  <script src="../js/auth-guard.js"></script>
+</body>
+</html>

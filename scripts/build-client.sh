@@ -404,6 +404,13 @@ clean_build() {
     fi
 }
 
+build_css() {
+    print_step "Building Tailwind CSS..."
+    cd "$PROJECT_ROOT"
+    NODE_ENV=production npx postcss src/css/tailwind-input.css -o src/css/tailwind-output.css
+    print_success "Tailwind CSS compiled"
+}
+
 build_app() {
     print_step "Building application for platform: $PLATFORM, arch: $ARCH..."
     cd "$PROJECT_ROOT"
@@ -828,6 +835,7 @@ main() {
     update_config
     clean_build
     install_dependencies
+    build_css
     bundle_electron
     build_app
     organize_output

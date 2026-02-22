@@ -410,7 +410,7 @@
     var askBtn = document.getElementById('askMatterBtn');
     if (askBtn) {
       askBtn.onclick = function () {
-        Lex.Nav.go('chat_v2.html', { params: { matter: matterId } });
+        Lex.Nav.go('chat-v2.html', { params: { matter: matterId } });
       };
     }
 
@@ -836,7 +836,7 @@
   // =========================================================================
 
   function navigateToMatter(matterId) {
-    Lex.Nav.go('workspace_details.html', {
+    Lex.Nav.go('workspace-details.html', {
       params: { id: matterId, tab: 'activity' },
       context: { matterId: matterId, tab: 'activity' }
     });
@@ -7185,14 +7185,7 @@
     api = null;
   }
 
-  // Register with router
-  if (window.LexRouter) {
-    LexRouter.registerPageInit('workspace_details.html', function () {
-      LexRouter.registerView({ onLeave: onLeave });
-      onEnter();
-    });
-  } else {
-    onEnter();
-  }
+  // ── Init — standalone page, called directly ────────────────────────
+  onEnter();
 
 })();

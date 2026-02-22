@@ -1,6 +1,6 @@
 /* Search Conversations Page
    Full-page search experience for finding and navigating to conversations.
-   Loaded as a SPA page via lex-router.
+   Standalone page with <lex-app> shell.
 
    Uses: lex-input, lex-empty, lex-spinner, lex-card, Lex.Nav
 */
@@ -19,7 +19,6 @@
   var _isLoadingMore = false;
   var _PAGE_SIZE = 20;
 
-  // Stored scroll handler reference — allows removal on onLeave (Finding 5)
   var _scrollHandler = null;
 
   // =========================================================================
@@ -114,14 +113,8 @@
     }
 
     // Infinite scroll — load more when near bottom.
-    // Store the handler reference so onLeave can remove it from the
-    // persistent #lex-main-content shell element (Finding 5).
     var scrollContainer = document.getElementById('lex-main-content');
     if (scrollContainer) {
-      // Remove any previous handler first (safety net for rapid navigation)
-      if (_scrollHandler) {
-        scrollContainer.removeEventListener('scroll', _scrollHandler);
-      }
       _scrollHandler = function () {
         if (_isLoadingMore || !_hasMore) return;
         var threshold = 200;
@@ -133,31 +126,7 @@
       scrollContainer.addEventListener('scroll', _scrollHandler);
     }
 
-    // Register view lifecycle — clean up when navigating away
-    if (window.LexRouter && window.LexRouter.registerView) {
-      window.LexRouter.registerView({
-        onLeave: function () {
-          // Clear input and closure state
-          if (_els.input) _els.input.value = '';
-          _currentQuery = '';
-          _page = 1;
-          _hasMore = false;
-          clearTimeout(_searchTimeout);
-          // Remove scroll listener from the persistent shell element (Finding 5)
-          if (_scrollHandler) {
-            var sc = document.getElementById('lex-main-content');
-            if (sc) sc.removeEventListener('scroll', _scrollHandler);
-            _scrollHandler = null;
-          }
-          // Unregister refresh callback
-          if (window.ConversationActionsModal) {
-            window.ConversationActionsModal.onRefresh = null;
-          }
-        }
-      });
-    }
-
-    // Always start fresh — load recent conversations
+    // Load recent conversations on page load
     loadRecentConversations();
   }
 
@@ -385,7 +354,7 @@
     if (matterId) params.matter = matterId;
 
     if (window.Lex && window.Lex.Nav) {
-      window.Lex.Nav.go('chat_v2.html', { params: params });
+      window.Lex.Nav.go('chat-v2.html', { params: params });
     } else if (window.NavigationHelpers) {
       window.NavigationHelpers.navigateToConversation(threadId, matterId);
     } else {
@@ -530,11 +499,9 @@
   }
 
   // =========================================================================
-  // Register with router
+  // Init — standalone page, called directly
   // =========================================================================
 
-  if (window.LexRouter && window.LexRouter.registerPageInit) {
-    window.LexRouter.registerPageInit('search-conversations.html', initSearchConversationsPage);
-  }
+  initSearchConversationsPage();
 
 })();

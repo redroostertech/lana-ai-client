@@ -1,12 +1,11 @@
 /**
- * data_connectors.js — Data Connectors page script (SPA lifecycle).
- * Migrated from public_html/integrations/connectors.html inline script.
- * Uses LexRouter.registerView() for onEnter/onLeave lifecycle.
+ * data_connectors.js — Data Connectors page script.
+ * Standalone page with <lex-app> shell.
  *
- * Dependencies (loaded via page descriptor before this file):
+ * Dependencies (loaded before this file in data-connectors.html):
  *   - connectors.js  (Lex.Connectors, Lex.ConnectorRegistry, Lex.ConnectorsMockData)
  *
- * Available from shell (loaded by app.html):
+ * Available from shell scripts:
  *   - Lex.Toast      (toast notifications)
  *   - Lex.Utils      (timeAgo, escapeHtml, etc.)
  *   - api            (HTTP client, auth, baseUrl)
@@ -1205,7 +1204,7 @@
   function onEnter() {
     resetState();
 
-    // Expose globals needed by inline onclick handlers in data_connectors.html
+    // Expose globals needed by inline onclick handlers in data-connectors.html
     exposeGlobal('openImportConnectorModal', openImportConnectorModal);
     exposeGlobal('closeImportConnectorModal', closeImportConnectorModal);
     exposeGlobal('handleConnectorFileSelect', handleConnectorFileSelect);
@@ -1270,18 +1269,7 @@
     if (searchEl) searchEl.value = '';
   }
 
-  // ── Register with router ────────────────────────────────────────────
-  // registerPageInit ensures onEnter() is called on every navigation
-  // (first load + re-navigation from cached scripts).
-  // registerView only carries onLeave for cleanup — onEnter is handled
-  // by registerPageInit to avoid double-init.
-  if (window.LexRouter) {
-    LexRouter.registerPageInit('integrations/data_connectors.html', function () {
-      LexRouter.registerView({ onLeave: onLeave });
-      onEnter();
-    });
-  } else {
-    onEnter();
-  }
+  // ── Init — standalone page, called directly ────────────────────────
+  onEnter();
 
 })();

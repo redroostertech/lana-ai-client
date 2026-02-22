@@ -1,237 +1,355 @@
-<!-- Admin Users — User Management page.
-     SPA page fragment loaded by lex-router into lex-app content area.
-     Uses #lex-page-content for Strategy 1 extraction (see lex-router.js).
-     All behaviour is in js/admin/admin-users.js. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Management - LANA AI</title>
 
-<div id="lex-page-content">
+  <!-- ── CSS + Tailwind in head — behavioral scripts at end of body ── -->
+  <link rel="stylesheet" href="../css/lex-tokens.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/tailwind-output.css">
+  <script src="../js/tailwind-loader.js"></script>
 
-  <main>
+</head>
+<body>
 
-    <!-- ================================================================
-         Page Header — Title + primary action
-         ================================================================ -->
-    <div class="admin-users-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;">
-      <div>
-        <lex-text id="usersPageTitle" tag="h1" variant="heading" weight="semibold">User Management</lex-text>
-        <lex-text id="usersPageSubtitle" tag="p" variant="secondary" size="sm" style="margin-top:0.25rem;">Manage team members, roles, and access</lex-text>
-      </div>
-      <div style="display:flex;align-items:center;gap:0.5rem;">
+  <!-- Branded loader — shows once lex-loader.js upgrades the element -->
+  <lex-loader theme="light"></lex-loader>
+
+  <!-- App shell -->
+  <lex-app
+    logo-src="../img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="../dashboard.html"
+    active-nav-id="admin"
+    page-title="User Management"
+  ></lex-app>
+
+  <!-- Page content as inert <template> -->
+  <template id="page-content">
+
+    <main>
+
+      <!-- Page header -->
+      <lex-banner
+        variant="light"
+        heading="User Management"
+        subtitle="Manage team members, roles, and access"
+      >
         <lex-btn id="addUserBtn" variant="primary" icon="user-plus">Add User</lex-btn>
-      </div>
-    </div>
+      </lex-banner>
+
+      <lex-breadcrumb items='[{"label":"Administration","href":"admin/index.html"},{"label":"User Management"}]'></lex-breadcrumb>
+
+
+      <!-- ================================================================
+           Users Table — Tier 3 (setData) for custom column rendering.
+           Columns: user_display (avatar+name+email), username, role_name,
+                    status (pill), created_at (formatted date), Actions (injected).
+           ================================================================ -->
+      <lex-card padding="none">
+        <lex-table
+          id="usersTable"
+          columns="user_display,username,role_name,status,created_at"
+          labels="User,Username,Role,Status,Created"
+          searchable
+          empty-text="No users found"
+          sort-by="created_at"
+          sort-dir="desc"
+        ></lex-table>
+      </lex-card>
+
+
+    </main>
 
 
     <!-- ================================================================
-         Users Table — Tier 3 (setData) for custom column rendering
+         Create / Edit User Modal
+         hide-actions: the form has its own Save button so we suppress the
+         modal footer. data-hoist: moved to document.body so it is not
+         clipped by lex-content's overflow stacking context.
          ================================================================ -->
-    <lex-card padding="none">
-      <lex-table
-        id="usersTable"
-        columns="user_display,username,role_name,status,created_at"
-        labels="User,Username,Role,Status,Created"
-        searchable
-        empty-text="No users found"
-        sort-by="created_at"
-        sort-dir="desc"
-      ></lex-table>
-    </lex-card>
-
-
-  </main>
-
-
-  <!-- ================================================================
-       Create / Edit User Modal
-       data-hoist: router moves this to document.body so it is not
-       clipped by lex-content's overflow stacking context.
-       ================================================================ -->
-  <lex-modal
-    id="userModal"
-    heading="Add User"
-    size="md"
-    confirm-text="Save"
-    cancel-text="Cancel"
-    data-hoist
-  >
-    <lex-form id="userForm">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+    <lex-modal
+      id="userModal"
+      heading="Add User"
+      size="md"
+      hide-actions
+      data-hoist
+    >
+      <lex-form id="userForm">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+          <lex-input
+            id="userFirstName"
+            name="first_name"
+            label="First Name"
+            placeholder="Jane"
+            required
+          ></lex-input>
+          <lex-input
+            id="userLastName"
+            name="last_name"
+            label="Last Name"
+            placeholder="Smith"
+            required
+          ></lex-input>
+        </div>
         <lex-input
-          id="userFirstName"
-          name="first_name"
-          label="First Name"
-          placeholder="Jane"
+          id="userEmail"
+          name="email"
+          type="email"
+          label="Email Address"
+          placeholder="jane.smith@example.com"
           required
+          style="margin-bottom:1rem;"
         ></lex-input>
         <lex-input
-          id="userLastName"
-          name="last_name"
-          label="Last Name"
-          placeholder="Smith"
+          id="userUsername"
+          name="username"
+          label="Username"
+          placeholder="jsmith"
           required
+          style="margin-bottom:1rem;"
         ></lex-input>
-      </div>
-      <lex-input
-        id="userEmail"
-        name="email"
-        type="email"
-        label="Email Address"
-        placeholder="jane.smith@example.com"
-        required
-        style="margin-bottom:1rem;"
-      ></lex-input>
-      <lex-input
-        id="userUsername"
-        name="username"
-        label="Username"
-        placeholder="jsmith"
-        required
-        style="margin-bottom:1rem;"
-      ></lex-input>
-      <div id="userPasswordGroup" style="margin-bottom:1rem;">
+        <div id="userPasswordGroup" style="margin-bottom:1rem;">
+          <lex-input
+            id="userPassword"
+            name="password"
+            type="password"
+            label="Password"
+            placeholder="Minimum 8 characters"
+            required
+          ></lex-input>
+          <div
+            id="userPasswordHint"
+            class="lex-text-tertiary"
+            style="font-size:var(--lex-body-xs-size,0.75rem);margin-top:0.25rem;"
+          ></div>
+        </div>
+        <lex-select
+          id="userRole"
+          name="role_id"
+          label="Role"
+          placeholder="Select a role..."
+          required
+          options='[]'
+          style="margin-bottom:1.25rem;"
+        ></lex-select>
+        <!-- Form footer: Cancel + Save buttons inside the form -->
+        <div style="display:flex;justify-content:flex-end;gap:0.5rem;padding-top:0.75rem;border-top:1px solid var(--lex-border-subtle);">
+          <lex-btn id="userModalCancelBtn" variant="secondary" size="md">Cancel</lex-btn>
+          <lex-btn id="userModalSaveBtn"   variant="primary"   size="md" type="submit">Save</lex-btn>
+        </div>
+      </lex-form>
+    </lex-modal>
+
+
+    <!-- ================================================================
+         Reset Password Modal
+         hide-actions: the form has its own Reset button.
+         variant="danger" used only on the submit button inside the form.
+         data-hoist: same stacking context fix as above.
+         ================================================================ -->
+    <lex-modal
+      id="resetPasswordModal"
+      heading="Reset Password"
+      size="sm"
+      hide-actions
+      data-hoist
+    >
+      <lex-form id="resetPasswordForm">
+        <p class="lex-text-secondary" style="font-size:var(--lex-body-sm-size,0.875rem);margin-bottom:1rem;">
+          Set a new temporary password for this user. They will be prompted to change it on next login.
+        </p>
         <lex-input
-          id="userPassword"
-          name="password"
+          id="resetPasswordNew"
+          name="new_password"
           type="password"
-          label="Password"
+          label="New Password"
           placeholder="Minimum 8 characters"
           required
+          style="margin-bottom:1rem;"
         ></lex-input>
-        <div id="userPasswordHint" class="lex-text-tertiary" style="font-size:var(--lex-body-xs-size,0.75rem);margin-top:0.25rem;"></div>
+        <lex-input
+          id="resetPasswordConfirm"
+          name="confirm_password"
+          type="password"
+          label="Confirm Password"
+          placeholder="Re-enter new password"
+          required
+        ></lex-input>
+        <div
+          id="resetPasswordHint"
+          class="lex-text-tertiary"
+          style="font-size:var(--lex-body-xs-size,0.75rem);margin-top:0.5rem;margin-bottom:1.25rem;"
+        ></div>
+        <!-- Form footer -->
+        <div style="display:flex;justify-content:flex-end;gap:0.5rem;padding-top:0.75rem;border-top:1px solid var(--lex-border-subtle);">
+          <lex-btn id="resetPasswordCancelBtn" variant="secondary" size="md">Cancel</lex-btn>
+          <lex-btn id="resetPasswordSubmitBtn" variant="danger"    size="md" type="submit">Reset Password</lex-btn>
+        </div>
+      </lex-form>
+    </lex-modal>
+
+
+    <!-- ================================================================
+         Sessions Modal — view and revoke user sessions.
+         hide-actions: custom footer buttons are rendered inside the body.
+         data-hoist: same stacking context fix.
+         ================================================================ -->
+    <lex-modal
+      id="sessionsModal"
+      heading="User Sessions"
+      size="lg"
+      hide-actions
+      data-hoist
+    >
+      <div id="sessionsModalContent">
+        <div id="sessionsLoading" style="text-align:center;padding:2rem;">
+          <lex-spinner label="Loading sessions..."></lex-spinner>
+        </div>
+        <div id="sessionsListContainer" class="hidden"></div>
       </div>
-      <lex-select
-        id="userRole"
-        name="role_id"
-        label="Role"
-        placeholder="Select a role..."
-        required
-        options='[]'
-      ></lex-select>
-    </lex-form>
-  </lex-modal>
-
-
-  <!-- ================================================================
-       Reset Password Modal
-       variant="danger" so confirm button renders in red.
-       data-hoist: same stacking context fix as above.
-       ================================================================ -->
-  <lex-modal
-    id="resetPasswordModal"
-    heading="Reset Password"
-    size="sm"
-    variant="danger"
-    confirm-text="Reset Password"
-    cancel-text="Cancel"
-    data-hoist
-  >
-    <lex-form id="resetPasswordForm">
-      <p class="lex-text-secondary" style="font-size:var(--lex-body-sm-size,0.875rem);margin-bottom:1rem;">
-        Set a new temporary password for this user. They will be prompted to change it on next login.
-      </p>
-      <lex-input
-        id="resetPasswordNew"
-        name="new_password"
-        type="password"
-        label="New Password"
-        placeholder="Minimum 8 characters"
-        required
-        style="margin-bottom:1rem;"
-      ></lex-input>
-      <lex-input
-        id="resetPasswordConfirm"
-        name="confirm_password"
-        type="password"
-        label="Confirm Password"
-        placeholder="Re-enter new password"
-        required
-      ></lex-input>
-      <div id="resetPasswordHint" class="lex-text-tertiary" style="font-size:var(--lex-body-xs-size,0.75rem);margin-top:0.5rem;"></div>
-    </lex-form>
-  </lex-modal>
-
-
-  <!-- ================================================================
-       Sessions Modal — view and revoke user sessions
-       data-hoist: same stacking context fix.
-       ================================================================ -->
-  <lex-modal
-    id="sessionsModal"
-    heading="User Sessions"
-    size="lg"
-    hide-actions
-    data-hoist
-  >
-    <div id="sessionsModalContent">
-      <div id="sessionsLoading" style="text-align:center;padding:2rem;">
-        <lex-spinner label="Loading sessions..."></lex-spinner>
+      <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1rem;padding-top:1rem;border-top:1px solid var(--lex-border-subtle);">
+        <lex-btn id="revokeAllSessionsBtn" variant="danger"     size="sm">Revoke All Sessions</lex-btn>
+        <lex-btn id="closeSessionsModalBtn" variant="secondary" size="sm">Close</lex-btn>
       </div>
-      <div id="sessionsListContainer" class="hidden"></div>
-    </div>
-    <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1rem;padding-top:1rem;border-top:1px solid var(--lex-border-subtle);">
-      <lex-btn id="revokeAllSessionsBtn" variant="danger" size="sm">Revoke All Sessions</lex-btn>
-      <lex-btn id="closeSessionsModalBtn" variant="secondary" size="sm">Close</lex-btn>
-    </div>
-  </lex-modal>
+    </lex-modal>
 
 
-  <!-- ================================================================
-       User Details Drawer — slides in from the right
-       Shows full user profile with quick-action buttons.
-       NOTE: Drawer confirm does NOT auto-close — must set open = false.
-       ================================================================ -->
-  <lex-drawer
-    id="userDrawer"
-    heading="User Details"
-    side="right"
-    width="480px"
-  >
-    <div id="userDrawerContent">
-      <div id="userDrawerLoading" style="text-align:center;padding:2rem;">
-        <lex-spinner label="Loading user..."></lex-spinner>
-      </div>
-      <div id="userDrawerBody" class="hidden">
+    <!-- ================================================================
+         User Details Drawer — slides in from the right.
+         Shows full user profile with quick-action buttons.
+         ================================================================ -->
+    <lex-drawer
+      id="userDrawer"
+      heading="User Details"
+      side="right"
+      width="480px"
+    >
+      <div id="userDrawerContent">
+        <div id="userDrawerLoading" style="text-align:center;padding:2rem;">
+          <lex-spinner label="Loading user..."></lex-spinner>
+        </div>
+        <div id="userDrawerBody" class="hidden">
 
-        <!-- Avatar + name header -->
-        <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;">
-          <div id="userDrawerAvatar" style="
-            width:3.5rem;height:3.5rem;border-radius:9999px;
-            background:var(--lex-bg-accent);color:var(--lex-text-on-accent);
-            display:flex;align-items:center;justify-content:center;
-            font-size:1.25rem;font-weight:600;flex-shrink:0;
-          "></div>
-          <div style="min-width:0;">
-            <div id="userDrawerName" style="font-size:var(--lex-body-base-size,1rem);font-weight:600;color:var(--lex-text-primary);"></div>
-            <div id="userDrawerEmail" style="font-size:var(--lex-body-sm-size,0.875rem);color:var(--lex-text-tertiary);"></div>
+          <!-- Avatar + name header -->
+          <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;">
+            <div id="userDrawerAvatar" style="
+              width:3.5rem;height:3.5rem;border-radius:9999px;
+              background:var(--lex-bg-accent);color:var(--lex-text-on-accent);
+              display:flex;align-items:center;justify-content:center;
+              font-size:1.25rem;font-weight:600;flex-shrink:0;
+            "></div>
+            <div style="min-width:0;">
+              <div id="userDrawerName" style="font-size:var(--lex-body-base-size,1rem);font-weight:600;color:var(--lex-text-primary);"></div>
+              <div id="userDrawerEmail" style="font-size:var(--lex-body-sm-size,0.875rem);color:var(--lex-text-tertiary);"></div>
+            </div>
           </div>
+
+          <lex-divider style="margin-bottom:1rem;"></lex-divider>
+
+          <!-- Key-value detail pairs -->
+          <lex-stack direction="vertical" gap="sm" style="margin-bottom:1.5rem;">
+            <lex-kv id="drawerKvUsername"  label="Username"></lex-kv>
+            <lex-kv id="drawerKvRole"      label="Role"></lex-kv>
+            <lex-kv id="drawerKvStatus"    label="Status"></lex-kv>
+            <lex-kv id="drawerKvCreated"   label="Created"></lex-kv>
+            <lex-kv id="drawerKvLastLogin" label="Last Login"></lex-kv>
+            <lex-kv id="drawerKvOrgId"     label="Organisation ID"></lex-kv>
+          </lex-stack>
+
+          <lex-divider label="Actions" style="margin-bottom:1rem;"></lex-divider>
+
+          <!-- Quick actions -->
+          <div style="display:flex;flex-direction:column;gap:0.5rem;">
+            <lex-btn id="drawerEditBtn"     variant="secondary" icon="edit-2"     style="width:100%;justify-content:flex-start;">Edit User</lex-btn>
+            <lex-btn id="drawerStatusBtn"   variant="secondary" icon="toggle-left" style="width:100%;justify-content:flex-start;"></lex-btn>
+            <lex-btn id="drawerResetPwBtn"  variant="secondary" icon="key"        style="width:100%;justify-content:flex-start;">Reset Password</lex-btn>
+            <lex-btn id="drawerSessionsBtn" variant="secondary" icon="monitor"    style="width:100%;justify-content:flex-start;">View Sessions</lex-btn>
+            <lex-btn id="drawerRegenKeyBtn" variant="secondary" icon="refresh-cw" style="width:100%;justify-content:flex-start;">Regenerate Activation Key</lex-btn>
+            <lex-btn id="drawerDeleteBtn"   variant="danger"    icon="trash-2"    style="width:100%;justify-content:flex-start;">Delete User</lex-btn>
+          </div>
+
         </div>
-
-        <lex-divider style="margin-bottom:1rem;"></lex-divider>
-
-        <!-- Key-value detail pairs -->
-        <lex-stack direction="vertical" gap="sm" style="margin-bottom:1.5rem;">
-          <lex-kv id="drawerKvUsername"  label="Username"></lex-kv>
-          <lex-kv id="drawerKvRole"      label="Role"></lex-kv>
-          <lex-kv id="drawerKvStatus"    label="Status"></lex-kv>
-          <lex-kv id="drawerKvCreated"   label="Created"></lex-kv>
-          <lex-kv id="drawerKvLastLogin" label="Last Login"></lex-kv>
-          <lex-kv id="drawerKvOrgId"     label="Organisation ID"></lex-kv>
-        </lex-stack>
-
-        <lex-divider label="Actions" style="margin-bottom:1rem;"></lex-divider>
-
-        <!-- Quick actions -->
-        <div style="display:flex;flex-direction:column;gap:0.5rem;">
-          <lex-btn id="drawerEditBtn"        variant="secondary" icon="edit-2"   style="width:100%;justify-content:flex-start;">Edit User</lex-btn>
-          <lex-btn id="drawerStatusBtn"      variant="secondary" icon="toggle-left" style="width:100%;justify-content:flex-start;"></lex-btn>
-          <lex-btn id="drawerResetPwBtn"     variant="secondary" icon="key"      style="width:100%;justify-content:flex-start;">Reset Password</lex-btn>
-          <lex-btn id="drawerSessionsBtn"    variant="secondary" icon="monitor"  style="width:100%;justify-content:flex-start;">View Sessions</lex-btn>
-          <lex-btn id="drawerRegenKeyBtn"    variant="secondary" icon="refresh-cw" style="width:100%;justify-content:flex-start;">Regenerate Activation Key</lex-btn>
-          <lex-btn id="drawerDeleteBtn"      variant="danger"    icon="trash-2"  style="width:100%;justify-content:flex-start;">Delete User</lex-btn>
-        </div>
-
       </div>
+    </lex-drawer>
+
+  </template>
+
+  <noscript>
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;color:#666;">
+      Please enable JavaScript to use LANA AI.
     </div>
-  </lex-drawer>
+  </noscript>
 
+  <!-- ══════════════════════════════════════════════════════════════════
+       Scripts at end of body — HTML renders first, scripts load after
+       ══════════════════════════════════════════════════════════════════ -->
 
-</div>
+  <!-- Universal shell scripts -->
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/version.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/navigation-helpers.js"></script>
+  <script src="../js/new-project-modal.js"></script>
+  <script src="../js/conversation-menu.js"></script>
+  <script src="../js/conversation-search-modal.js"></script>
+  <script src="../js/contact-search-modal.js"></script>
+  <script src="../js/notifications.js"></script>
+
+  <!-- Lex UI core -->
+  <script src="../js/lex/lex.core.js"></script>
+  <script src="../js/lex/lex.icons.js"></script>
+  <script src="../js/lex/lex.data.js"></script>
+  <script src="../js/lex/lex.forms.js"></script>
+  <script src="../js/lex/lex.state.js"></script>
+  <script src="../js/lex/lex.utils.js"></script>
+  <script src="../js/lex/lex.auth.js"></script>
+  <script src="../js/lex/lex-nav.js"></script>
+
+  <!-- Lex UI foundation + layout -->
+  <script src="../js/lex/components/foundation/lex-loader.js"></script>
+  <script src="../js/lex/components/foundation/lex-toast.js"></script>
+  <script src="../js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="../js/lex/components/foundation/lex-btn.js"></script>
+  <script src="../js/lex/components/foundation/lex-empty.js"></script>
+  <script src="../js/lex/components/form/lex-segmented.js"></script>
+  <script src="../js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="../js/lex/components/layout/lex-topbar.js"></script>
+  <script src="../js/lex/components/layout/lex-conversation-item.js"></script>
+  <script src="../js/lex/components/layout/lex-notification-panel.js"></script>
+  <script src="../js/lex/components/layout/lex-app.js"></script>
+
+  <!-- Page-specific Lex components (BEFORE inject) -->
+  <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
+  <script src="../js/lex/components/foundation/lex-banner.js"></script>
+  <script src="../js/lex/components/foundation/lex-card.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/foundation/lex-text.js"></script>
+  <script src="../js/lex/components/foundation/lex-stack.js"></script>
+  <script src="../js/lex/components/foundation/lex-divider.js"></script>
+  <script src="../js/lex/components/foundation/lex-kv.js"></script>
+  <script src="../js/lex/components/foundation/lex-modal.js"></script>
+  <script src="../js/lex/components/foundation/lex-drawer.js"></script>
+  <script src="../js/lex/components/data/lex-table.js"></script>
+  <script src="../js/lex/components/form/lex-form.js"></script>
+  <script src="../js/lex/components/form/lex-input.js"></script>
+  <script src="../js/lex/components/form/lex-select.js"></script>
+  <script src="../js/lex/components/form/lex-dropdown-btn.js"></script>
+
+  <!-- Inject page content + hoist modals -->
+  <script src="../js/lex/lex-page-init.js"></script>
+
+  <!-- Page controller -->
+  <script src="../js/admin/admin-users.js"></script>
+
+  <!-- Auth guard + loader dismiss (MUST be last) -->
+  <script src="../js/auth-guard.js"></script>
+</body>
+</html>

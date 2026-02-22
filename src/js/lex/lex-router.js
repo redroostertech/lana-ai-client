@@ -29,7 +29,7 @@
        onLeave() { ... }
      });
 
-   Depends on: lex-router.pages.js (PAGE_DESCRIPTORS, FULL_RELOAD_PAGES)
+   Depends on: lex-router.pages.js (PAGE_DESCRIPTORS)
 */
 
 (function (global) {
@@ -134,7 +134,6 @@
   // ---------------------------------------------------------------------------
 
   let _pageDescriptors = {};
-  let _fullReloadPages = new Set();
 
   const DEFAULT_DESCRIPTOR = {
     title: 'LANA AI',
@@ -154,11 +153,6 @@
     return DEFAULT_DESCRIPTOR;
   }
 
-  function isFullReloadPage(path) {
-    var key = pathKey(path);
-    var filename = key.indexOf('/') !== -1 ? key.substring(key.lastIndexOf('/') + 1) : key;
-    return _fullReloadPages.has(filename) || _fullReloadPages.has(key);
-  }
 
   // ---------------------------------------------------------------------------
   // Content extraction from fetched HTML
@@ -425,15 +419,19 @@
     // Same path — skip unless forced
     if (path === _currentPath && !options.force) return Promise.resolve();
 
-    // Full reload page — let browser handle it
-    if (isFullReloadPage(path)) {
-      window.location.href = path;
-      return Promise.resolve();
-    }
-
     _navigating = true;
     var previousPath = _currentPath;
     var descriptor = getDescriptor(path);
+
+    // Standalone page (no descriptor registered) — do a full browser navigation.
+    // Strip leading slash so the path is relative (works under file:// protocol).
+    var key = pathKey(path);
+    if (!_pageDescriptors[key]) {
+      _navigating = false;
+      var relativePath = path.indexOf('/') === 0 ? path.substring(1) : path;
+      window.location.href = relativePath;
+      return Promise.resolve();
+    }
 
     // Step 1: Check if active streaming should block navigation
     var state = (global.Lex && global.Lex.state) ? global.Lex.state : null;
@@ -541,6 +539,11 @@
           // history.state.path is current so getParams() works.
           history.replaceState({ path: path }, '');
         }
+        // Persist path to sessionStorage so refresh restores the current page
+        // when history.state is cleared (e.g. some browsers/devices).
+        try {
+          sessionStorage.setItem('_lex_last_path', path);
+        } catch (e) { /* ignore */ }
 
         // Step 8d: Call registered page init (supports SPA re-navigation).
         // On first load the IIFE registers init via registerPageInit();
@@ -548,7 +551,10 @@
         var initKey = pathKey(path);
         if (_pageInits[initKey]) {
           try { _pageInits[initKey](); } catch (e) {
-            console.warn('[LexRouter] Page init error:', e);
+            console.error('[LexRouter] Page init error for', initKey + ':', e);
+            if (window.Lex && window.Lex.Toast) {
+              Lex.Toast.show('Page failed to initialize. Some features may not work.', 'error');
+            }
           }
         }
 
@@ -605,6 +611,21 @@
           _app.setContentLoading(false);
         }
 
+        // If this was the initial navigation (no previous page), dismiss the
+        // full-screen branded loader so the user isn't permanently stuck.
+        // Fire lex-page-ready so app.js picks it up, and hide directly as
+        // a belt-and-suspenders approach.
+        if (!previousPath && path !== '/dashboard.html') {
+          if (window.Lex && window.Lex.Loader) window.Lex.Loader.hide();
+          return navigate('/dashboard.html', { pushState: false });
+        }
+        if (!previousPath) {
+          document.dispatchEvent(new CustomEvent('lex-page-ready', {
+            detail: { path: path, title: 'Error', error: true }
+          }));
+          if (window.Lex && window.Lex.Loader) window.Lex.Loader.hide();
+        }
+
         // Show error via toast (preserves current page view)
         if (window.Lex && window.Lex.Toast) {
           window.Lex.Toast.show('Page could not be loaded. Please try again.', 'error');
@@ -635,9 +656,6 @@
     // Resolve to normalized path
     var path = normalizePath(href);
     if (!path) return; // external, hash, or unparseable
-
-    // Skip full-reload pages
-    if (isFullReloadPage(path)) return;
 
     // Only intercept pages with a known descriptor — unknown .html gets full reload
     var key = pathKey(path);
@@ -679,9 +697,6 @@
       // Pick up page descriptors if lex-router.pages.js loaded before us
       if (window.Lex && window.Lex._pageDescriptors && !Object.keys(_pageDescriptors).length) {
         _pageDescriptors = window.Lex._pageDescriptors;
-      }
-      if (window.Lex && window.Lex._fullReloadPages && _fullReloadPages.size === 0) {
-        _fullReloadPages = new Set(window.Lex._fullReloadPages);
       }
 
       _app = document.querySelector('lex-app');
@@ -769,13 +784,6 @@
       _pageDescriptors = descriptors || {};
     },
 
-    /**
-     * Set pages that require full browser reload (login, error, etc.)
-     * @param {string[]} pages - array of filenames
-     */
-    setFullReloadPages: function (pages) {
-      _fullReloadPages = new Set(pages || []);
-    },
 
     /** Get the current route path */
     getCurrentPath: function () {

@@ -40,7 +40,7 @@
 
   var _deepLinks = {
     'chat.html':                              { session: 'string', matter: 'string', openModal: 'string' },
-    'chat_v2.html':                           { matter: 'string', session: 'string' },
+    'chat-v2.html':                            { matter: 'string', session: 'string' },
     'matters.html':                           { matter_id: 'string', open: 'string', tab: 'string', action: 'string' },
     'drive.html':                             { matter_id: 'string', matter_name: 'string', folder_id: 'string', tab: 'string' },
     'storage.html':                           { matter_id: 'string', matter_name: 'string', folder_id: 'string', tab: 'string' },
@@ -54,7 +54,7 @@
     'integrations/integration-config.html':   { id: 'string', connector_id: 'string' },
     'integrations/connector-viewer.html':     { ui: 'string', name: 'string', tab: 'string' },
     'admin/roles_manager.html':               { id: 'string' },
-    'workspace_details.html':                 { id: 'string', tab: 'string' },
+    'workspace-details.html':                 { id: 'string', tab: 'string' },
     'matters/timeline.html':                  { id: 'string' },
     'password-reset.html':                    { token: 'string' },
     'onboarding.html':                        { token: 'string' },

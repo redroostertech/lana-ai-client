@@ -752,12 +752,34 @@ lex-dropdown-btn input,
 
 
 /* ==========================================================================
+   Global body base — applied to every standalone page via lex-tokens.css.
+   Individual pages no longer need inline <style> blocks for body setup.
+   ========================================================================== */
+
+body {
+  font-family: var(--lex-font-sans);
+  background: #fff;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+/* Prevent FOUC on standalone pages: hide everything until JS upgrades
+   the components. Body stays #fff; once the shell renders its sidebar,
+   topbar, and content area cover the viewport entirely — the white body
+   is never visible after that. */
+lex-app:not(:defined) {
+  display: none;
+}
+
+
+/* ==========================================================================
    Global <main> layout — consistent page content container
    ========================================================================== */
 
 main {
-  padding: 1.5rem 2rem;
-  max-width: 1400px;
+  padding: 2rem;
+  /* max-width: 1400px; */
   margin-left: auto;
   margin-right: auto;
 }

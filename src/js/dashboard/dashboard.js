@@ -585,7 +585,7 @@
     var navBtn = contentEl.querySelector('.cc-connector-nav-btn');
     if (navBtn) {
       navBtn.addEventListener('click', function () {
-        Lex.Nav.go('integrations/data_connectors.html');
+        Lex.Nav.go('data-connectors.html');
       });
     }
 
@@ -1421,7 +1421,7 @@
     var addWidgetBtn = el('addWidgetBtn');
     if (addWidgetBtn) {
       addWidgetBtn.addEventListener('click', function () {
-        Lex.Nav.go('integrations/data_connectors.html');
+        Lex.Nav.go('data-connectors.html');
       });
     }
 
@@ -1490,18 +1490,7 @@
   // Run — register with router for SPA re-navigation support
   // =========================================================================
 
-  // registerPageInit ensures initDashboard() is called on every navigation
-  // to this page (first load + re-navigation from cached scripts).
-  // registerView only carries onLeave for cleanup — onEnter is handled
-  // by registerPageInit to avoid double-init.
-  if (window.LexRouter) {
-    LexRouter.registerPageInit('dashboard.html', function () {
-      LexRouter.registerView({ onLeave: onLeave });
-      initDashboard();
-    });
-  } else {
-    // Fallback for non-SPA contexts (should not happen in normal flow)
-    initDashboard();
-  }
+  // Standalone page — init directly (no SPA router)
+  initDashboard();
 
 })();
