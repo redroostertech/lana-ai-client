@@ -1000,10 +1000,25 @@ class MenuSystem {
       });
       overlay.querySelector('#sidebarUserMenuSignOut').addEventListener('click', () => {
         overlay.classList.add('hidden');
-        if (window.api && typeof window.api.logout === 'function') {
-          window.api.logout().then(() => { window.location.href = this._resolveHref('/login.html'); }).catch(() => { window.location.href = this._resolveHref('/login.html'); });
+        var resolveHref = this._resolveHref.bind(this);
+        var doLogout = function () {
+          if (window.api && typeof window.api.logout === 'function') {
+            window.api.logout()
+              .then(function () { window.location.href = resolveHref('/login.html'); })
+              .catch(function () { window.location.href = resolveHref('/login.html'); });
+          } else {
+            window.location.href = resolveHref('/login.html');
+          }
+        };
+        if (window.Lex && window.Lex.Modal && typeof window.Lex.Modal.confirm === 'function') {
+          window.Lex.Modal.confirm(
+            'Sign Out',
+            'Are you sure you want to sign out? Any unsaved changes will be lost.',
+            doLogout,
+            { confirmText: 'Sign Out', variant: 'danger' }
+          );
         } else {
-          window.location.href = this._resolveHref('/login.html');
+          doLogout();
         }
       });
     }

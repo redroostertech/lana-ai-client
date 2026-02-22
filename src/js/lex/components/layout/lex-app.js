@@ -386,6 +386,18 @@
       this.delegate('topbar-notification-click', 'lex-topbar', () => {
         if (this._notificationPanel) this._notificationPanel.open();
       });
+
+      // Topbar settings menu actions (sign out, settings)
+      this.delegate('topbar-menu-action', 'lex-topbar', (e) => {
+        var actionId = e.detail && e.detail.actionId;
+        if (actionId === 'logout') {
+          this._handleSignOut();
+        } else if (actionId === 'settings') {
+          if (window.Lex && window.Lex.Nav) {
+            window.Lex.Nav.go('settings-v2.html');
+          }
+        }
+      });
     }
 
     // -----------------------------------------------------------------------
@@ -605,7 +617,7 @@
         if (showAdmin) {
           menuItems.push({ id: 'admin', label: 'Administration', icon: 'users', href: 'admin/index.html' });
         }
-        menuItems.push({ id: 'settings', label: 'Settings', icon: 'settings', href: 'settings.html' });
+        menuItems.push({ id: 'settings', label: 'Settings', icon: 'settings', href: 'settings-v2.html' });
         menuItems.push({ id: 'help', label: 'Help & Support', icon: 'help-circle', href: 'help.html' });
         menuItems.push({ id: 'signout', label: 'Sign Out', icon: 'log-out', action: 'signout', danger: true });
         this.setUserMenuItems(menuItems);
@@ -614,7 +626,7 @@
         this.setTopbarMenuItems([
           { id: 'settings', label: 'Settings', icon: 'settings' },
           { divider: true },
-          { id: 'logout', label: 'Sign out', variant: 'danger' }
+          { id: 'logout', label: 'Sign out', icon: 'log-out', variant: 'danger' }
         ]);
       }
     }
@@ -672,10 +684,24 @@
     // -----------------------------------------------------------------------
 
     _handleSignOut() {
+      if (window.Lex && window.Lex.Modal && typeof window.Lex.Modal.confirm === 'function') {
+        var self = this;
+        window.Lex.Modal.confirm(
+          'Sign Out',
+          'Are you sure you want to sign out? Any unsaved changes will be lost.',
+          function () { self._performSignOut(); },
+          { confirmText: 'Sign Out', variant: 'danger' }
+        );
+      } else {
+        this._performSignOut();
+      }
+    }
+
+    _performSignOut() {
       if (window.api && typeof window.api.logout === 'function') {
         window.api.logout()
-          .then(() => { window.location.href = 'login.html'; })
-          .catch(() => { window.location.href = 'login.html'; });
+          .then(function () { window.location.href = 'login.html'; })
+          .catch(function () { window.location.href = 'login.html'; });
       } else {
         window.location.href = 'login.html';
       }
