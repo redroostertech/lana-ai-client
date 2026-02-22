@@ -1,1255 +1,218 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>System Health - LanaAI</title>
-  <script src="../js/tailwind-loader.js"></script>
-  <script src="../js/error-reporter.js"></script>
-  <script src="../js/config.js"></script>
-  <script src="../js/mock-data.js"></script>
-  <script src="../js/api.js"></script>
-  <script src="../js/components.js"></script>
-  <script src="../js/menu.js"></script>
-  <script src="../js/navigation-helpers.js"></script>
-  <script src="../js/new-project-modal.js"></script>
-  <script src="../js/conversation-menu.js"></script>
-  <script src="../js/conversation-search-modal.js"></script>
-  <script src="../js/notifications.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<!-- System Health — Admin monitoring dashboard (V2 SPA fragment) -->
 
-  <!-- Inline preloader styles - Pure CSS, no dependencies -->
-  <style>
-    #lana-preloader {
-      position: fixed;
-      inset: 0;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 99999;
-      transition: opacity 0.3s ease-out;
-    }
-    #lana-preloader.fade-out {
-      opacity: 0;
-      pointer-events: none;
-    }
-    .preloader-logo {
-      width: 80px;
-      height: 80px;
-      margin-bottom: 24px;
-      animation: pulse 2s ease-in-out infinite;
-    }
-    .preloader-spinner {
-      width: 48px;
-      height: 48px;
-      border: 4px solid rgba(255, 255, 255, 0.3);
-      border-top-color: white;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-bottom: 16px;
-    }
-    .preloader-text {
-      color: white;
-      font-size: 16px;
-      font-weight: 500;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.85; transform: scale(0.96); }
-    }
-  </style>
-</head>
-<body class="bg-gray-50 min-h-screen">
-  <div id="lana-preloader">
-    <svg class="preloader-logo" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="50" cy="50" r="45" fill="white" opacity="0.15"/>
-      <circle cx="50" cy="50" r="35" fill="white" opacity="0.3"/>
-      <circle cx="50" cy="50" r="25" fill="white"/>
-      <text x="50" y="58" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#667eea" text-anchor="middle">L</text>
-    </svg>
-    <div class="preloader-spinner"></div>
-    <div class="preloader-text">Loading LanaAI...</div>
-  </div>
+<div id="lex-page-content">
+  <main class="p-4 lg:p-8">
 
-  <div id="app-content">
-  <!-- Sidebar -->
-  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
-    <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
-      <a href="../index.html"><img src="../img/logo-light.png" alt="LanaAI" class="h-7"></a>
-      <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+    <!-- Overall Status -->
+    <div class="mb-6">
+      <lex-card id="overallStatusCard" heading="Overall System Status">
+        <div class="flex items-center justify-between">
+          <p id="overallStatusMsg" class="text-sm lex-text-secondary">Checking system status...</p>
+          <div id="overallStatusBadge"></div>
+        </div>
+      </lex-card>
+    </div>
+
+    <!-- Service Cards Grid -->
+    <div id="serviceCardsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <!-- Injected by health.js: one lex-card per service -->
+    </div>
+
+    <!-- Row 1: System Metrics | Process Metrics | CPU Information -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+
+      <!-- System Metrics -->
+      <lex-card id="systemMetricsCard" heading="System Metrics">
+        <div id="memoryProgress" class="mb-4">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs lex-text-secondary">Memory Usage</span>
+            <span id="memoryPct" class="text-xs font-medium lex-text-primary">0%</span>
+          </div>
+          <lex-progress-bar id="memoryBar" value="0" color="info" size="sm"></lex-progress-bar>
+          <p id="memoryDetail" class="text-xs lex-text-tertiary mt-1">-- MB / -- MB</p>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <lex-kv id="sysKvPlatform"     label="Platform"     value="--"></lex-kv>
+          <lex-kv id="sysKvArch"         label="Architecture" value="--"></lex-kv>
+          <lex-kv id="sysKvHostname"     label="Hostname"     value="--"></lex-kv>
+          <lex-kv id="sysKvUptime"       label="Uptime"       value="--"></lex-kv>
+        </div>
+      </lex-card>
+
+      <!-- Process Metrics -->
+      <lex-card id="processMetricsCard" heading="Process Metrics">
+        <div class="grid grid-cols-2 gap-3">
+          <lex-kv id="procKvPid"        label="PID"             value="--"></lex-kv>
+          <lex-kv id="procKvUptime"     label="Process Uptime"  value="--"></lex-kv>
+          <lex-kv id="procKvHeapUsed"   label="Heap Used"       value="--"></lex-kv>
+          <lex-kv id="procKvHeapTotal"  label="Heap Total"      value="--"></lex-kv>
+          <lex-kv id="procKvRss"        label="RSS Memory"      value="--"></lex-kv>
+          <lex-kv id="procKvExternal"   label="External Memory" value="--"></lex-kv>
+        </div>
+      </lex-card>
+
+      <!-- CPU Information -->
+      <lex-card id="cpuInfoCard" heading="CPU Information">
+        <div class="grid grid-cols-2 gap-3">
+          <div class="col-span-2">
+            <lex-kv id="cpuKvModel"   label="CPU Model"   value="--"></lex-kv>
+          </div>
+          <lex-kv id="cpuKvCores"    label="Cores"       value="--"></lex-kv>
+          <lex-kv id="cpuKvLoad1"    label="Load (1m)"   value="--"></lex-kv>
+          <lex-kv id="cpuKvLoad5"    label="Load (5m)"   value="--"></lex-kv>
+          <lex-kv id="cpuKvLoad15"   label="Load (15m)"  value="--"></lex-kv>
+        </div>
+      </lex-card>
+
+    </div>
+
+    <!-- Row 2: Database Metrics | Storage Information -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+
+      <!-- Database Metrics -->
+      <lex-card id="databaseMetricsCard" heading="Database Metrics">
+        <div class="grid grid-cols-2 gap-3">
+          <lex-kv id="dbKvActiveConn"      label="Active Connections"       value="--"></lex-kv>
+          <lex-kv id="dbKvCacheHit"        label="Cache Hit Ratio"          value="--"></lex-kv>
+          <lex-kv id="dbKvTxCommitted"     label="Transactions Committed"   value="--"></lex-kv>
+          <lex-kv id="dbKvTxRolledBack"    label="Transactions Rolled Back" value="--"></lex-kv>
+        </div>
+      </lex-card>
+
+      <!-- Storage Information -->
+      <lex-card id="storageInfoCard" heading="Storage Information">
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <lex-kv id="stgKvTotal"      label="Total Storage"    value="--"></lex-kv>
+          <lex-kv id="stgKvUsed"       label="Used Storage"     value="--"></lex-kv>
+          <lex-kv id="stgKvAvailable"  label="Available"        value="--"></lex-kv>
+          <lex-kv id="stgKvPct"        label="Usage %"          value="--"></lex-kv>
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs lex-text-secondary">Storage Usage</span>
+            <span id="storageUsagePct" class="text-xs font-medium lex-text-primary">0%</span>
+          </div>
+          <lex-progress-bar id="storageBar" value="0" color="accent" size="sm"></lex-progress-bar>
+        </div>
+      </lex-card>
+
+    </div>
+
+    <!-- Row 3: Connector Sync Failures | LLM Token Usage -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+
+      <!-- Connector DLQ -->
+      <lex-card id="dlqCard" heading="Connector Sync Failures">
+        <div slot="heading-extra" id="dlqStatusBadgeSlot"></div>
+        <div class="flex items-center justify-between mb-4">
+          <div id="dlqStatusBadge"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <lex-kv id="dlqKvPending"     label="Pending Retry"       value="--"></lex-kv>
+          <lex-kv id="dlqKvRetrying"    label="Currently Retrying"  value="--"></lex-kv>
+          <lex-kv id="dlqKvFailed"      label="Permanently Failed"  value="--"></lex-kv>
+          <lex-kv id="dlqKvSuccessRate" label="Retry Success Rate"  value="--"></lex-kv>
+        </div>
+        <!-- Queue health multi-segment bar -->
+        <div id="dlqQueueHealth">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs lex-text-secondary">Queue Health</span>
+            <span id="dlqQueueLabel" class="text-xs font-medium lex-text-primary">--</span>
+          </div>
+          <lex-progress-bar id="dlqBar" value="0" color="success" size="sm"></lex-progress-bar>
+          <!-- Legend pills — rendered by JS -->
+          <div id="dlqLegend" class="flex gap-2 mt-2"></div>
+        </div>
+      </lex-card>
+
+      <!-- LLM Token Usage -->
+      <lex-card id="tokenUsageCard" heading="LLM Token Usage">
+        <lex-tabs id="tokenPeriodTabs" active="7days"></lex-tabs>
+        <div class="grid grid-cols-2 gap-3 mt-4">
+          <lex-kv id="tkKvTotal"       label="Total Tokens"          value="--"></lex-kv>
+          <lex-kv id="tkKvInput"       label="Input Tokens"          value="--"></lex-kv>
+          <lex-kv id="tkKvOutput"      label="Output Tokens"         value="--"></lex-kv>
+          <lex-kv id="tkKvRequests"    label="Total Requests"        value="--"></lex-kv>
+          <lex-kv id="tkKvTtft"        label="Avg Time to First Token" value="--"></lex-kv>
+          <lex-kv id="tkKvResponseTime" label="Avg Response Time"   value="--"></lex-kv>
+        </div>
+      </lex-card>
+
+    </div>
+
+    <!-- Energy Consumption — full width -->
+    <lex-card id="energyCard" heading="Energy Consumption">
+      <!-- Card header-right: period selector + status badge -->
+      <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center gap-3">
+          <!-- Left icon -->
+          <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+               style="background:var(--lex-color-success-600)">
+            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z">
+              </path>
+            </svg>
+          </div>
+          <span class="text-sm font-medium lex-text-secondary">Power monitoring over time</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <lex-select id="energyPeriodSelect"
+            options='[{"value":"1hour","label":"Last Hour"},{"value":"6hours","label":"Last 6 Hours"},{"value":"24hours","label":"Last 24 Hours"},{"value":"7days","label":"Last 7 Days"}]'
+            value="24hours">
+          </lex-select>
+          <div id="energyStatusBadge"></div>
+        </div>
+      </div>
+
+      <!-- Energy metric cards -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+
+        <!-- Energy Consumed -->
+        <div class="rounded-lg p-4 border" style="background:var(--lex-bg-primary);border-color:var(--lex-border-subtle);">
+          <p class="text-xs lex-text-secondary mb-1">Energy Consumed</p>
+          <p id="energyConsumedKwh" class="text-2xl font-bold lex-text-primary">--</p>
+          <p class="text-xs lex-text-tertiary mt-1">kWh this period</p>
+        </div>
+
+        <!-- Current Power -->
+        <div class="rounded-lg p-4 border" style="background:var(--lex-bg-primary);border-color:var(--lex-border-subtle);">
+          <p class="text-xs lex-text-secondary mb-1">Current Power</p>
+          <p id="currentPowerWatts" class="text-2xl font-bold" style="color:var(--lex-bg-accent)">-- W</p>
+          <p class="text-xs lex-text-tertiary mt-1">real-time usage</p>
+        </div>
+
+        <!-- Thermal Level -->
+        <div class="rounded-lg p-4 border" style="background:var(--lex-bg-primary);border-color:var(--lex-border-subtle);">
+          <p class="text-xs lex-text-secondary mb-1">Thermal Level</p>
+          <p id="currentThermalLevel" class="text-2xl font-bold" style="color:var(--lex-color-warning-500)">--%</p>
+          <p class="text-xs lex-text-tertiary mt-1">system temperature</p>
+        </div>
+
+      </div>
+
+      <!-- Power Consumption Chart -->
+      <div class="mb-4">
+        <h4 class="text-sm font-medium lex-text-secondary mb-3">Power Consumption Over Time</h4>
+        <lex-chart id="powerChart" type="line" height="300px"></lex-chart>
+      </div>
+
+    </lex-card>
+
+    <!-- Last Updated footer -->
+    <div class="flex items-center justify-between mt-6">
+      <span id="lastUpdatedText" class="text-xs lex-text-tertiary"></span>
+      <button id="refreshBtn"
+        class="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg transition-colors"
+        style="background:var(--lex-bg-secondary);color:var(--lex-text-secondary);">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+          </path>
+        </svg>
+        Refresh
       </button>
     </div>
-    <nav id="mainNav" class="flex-1 mt-6 px-3 overflow-hidden">
-      <!-- Menu will be dynamically rendered by menu.js -->
-    </nav>
-  </aside>
 
-  <!-- Main Content -->
-  <div class="lg:ml-64">
-    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
-      <div class="flex items-center justify-between h-16 px-4 lg:px-8">
-        <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-        </button>
-        <div class="flex-1 px-4 lg:px-0">
-          <h1 class="text-xl font-semibold text-gray-900">System Health</h1>
-        </div>
-        <div class="flex items-center gap-4">
-          <span id="lastUpdated" class="text-sm text-gray-500"></span>
-          <!-- Refresh Button -->
-          <button id="refreshBtn" class="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-            Refresh
-          </button>
-
-          <!-- Notifications -->
-          <button id="notificationBtn" class="relative text-gray-500 hover:text-gray-700">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
-            </svg>
-            <span id="notificationBadge" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">0</span>
-          </button>
-
-          <!-- User Menu -->
-          <div class="relative" id="userMenu">
-            <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900 p-1" title="Settings">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-              </svg>
-            </button>
-            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-              <a href="../settings.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
-              <hr class="my-1">
-              <button id="logoutBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sign out</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </header>
-
-    <!-- Notification Panel Overlay -->
-    <div id="notificationOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
-
-    <!-- Notification Slide-out Panel -->
-    <div id="notificationPanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
-      <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
-        <h2 class="text-lg font-semibold text-gray-900">Notifications</h2>
-        <div class="flex items-center gap-3">
-          <button id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium hidden">Mark all read</button>
-          <button id="refreshNotificationsBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-          </button>
-          <button id="closeNotificationPanel" class="text-gray-400 hover:text-gray-600">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-          </button>
-        </div>
-      </div>
-      <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
-        <button id="filterAll" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">All</button>
-        <button id="filterUnread" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Unread</button>
-      </div>
-      <div id="notificationList" class="flex-1 overflow-y-auto">
-        <div id="notificationLoading" class="p-8 text-center">
-          <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
-          <p class="text-gray-500 mt-3 text-sm">Loading notifications...</p>
-        </div>
-      </div>
-      <div id="notificationLoadingMore" class="hidden p-4 border-t border-gray-100 text-center flex-shrink-0">
-        <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
-      </div>
-    </div>
-
-    <main class="p-4 lg:p-8">
-      <!-- Overall Status -->
-      <div id="overallStatus" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-        <div class="flex items-center justify-between">
-          <div>
-            <h2 class="text-lg font-semibold text-gray-900">Overall System Status</h2>
-            <p class="text-gray-500 mt-1">All services are operational</p>
-          </div>
-          <div id="statusBadge"></div>
-        </div>
-      </div>
-
-      <!-- Services Grid -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        <div id="serviceCards">
-          <!-- Service cards will be loaded here -->
-        </div>
-      </div>
-
-      <!-- Metrics -->
-      <!-- Row 1: System Metrics | Process Metrics | CPU Information -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <!-- System Metrics -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 class="text-lg font-semibold text-gray-900 mb-4">System Metrics</h3>
-          <div id="systemMetrics" class="space-y-4">
-            <!-- System metrics will be loaded here -->
-          </div>
-        </div>
-
-        <!-- Process Metrics -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 class="text-lg font-semibold text-gray-900 mb-4">Process Metrics</h3>
-          <div id="processMetrics" class="space-y-4">
-            <!-- Process metrics will be loaded here -->
-          </div>
-        </div>
-
-        <!-- CPU Info -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 class="text-lg font-semibold text-gray-900 mb-4">CPU Information</h3>
-          <div id="cpuInfo" class="space-y-4">
-            <!-- CPU info will be loaded here -->
-          </div>
-        </div>
-      </div>
-
-      <!-- Row 2: Database Metrics | Storage Information -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <!-- Database Metrics -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 class="text-lg font-semibold text-gray-900 mb-4">Database Metrics</h3>
-          <div id="databaseMetrics" class="space-y-4">
-            <!-- Database metrics will be loaded here -->
-          </div>
-        </div>
-
-        <!-- Storage Information -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 class="text-lg font-semibold text-gray-900 mb-4">Storage Information</h3>
-          <div id="storageInfo" class="space-y-4">
-            <!-- Storage info will be loaded here -->
-          </div>
-        </div>
-      </div>
-
-      <!-- Row 3: Connector Sync Failures | LLM Token Usage -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Connector DLQ (Dead Letter Queue) -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-semibold text-gray-900">Connector Sync Failures</h3>
-            <div id="dlqStatusBadge"></div>
-          </div>
-          <div id="dlqMetrics" class="space-y-4">
-            <!-- DLQ metrics will be loaded here -->
-          </div>
-        </div>
-
-        <!-- LLM Token Usage -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 class="text-lg font-semibold text-gray-900 mb-4">LLM Token Usage</h3>
-
-          <!-- Time Period Tabs -->
-          <div class="flex gap-2 mb-4 border-b border-gray-200">
-            <button id="tab7days" class="px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600" onclick="switchTokenPeriod('7days')">
-              Last 7 Days
-            </button>
-            <button id="tab3months" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchTokenPeriod('3months')">
-              Last 3 Months
-            </button>
-            <button id="taballtime" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700" onclick="switchTokenPeriod('alltime')">
-              All Time
-            </button>
-          </div>
-
-          <div id="tokenUsageInfo" class="space-y-4">
-            <!-- Token usage info will be loaded here -->
-          </div>
-        </div>
-      </div>
-
-        <!-- Energy Consumption & Efficiency -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 col-span-full mt-8">
-          <div class="flex items-center justify-between mb-6">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center flex-shrink-0">
-                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-              </div>
-              <div>
-                <h3 class="text-lg font-semibold text-gray-900">Energy Consumptiont</h3>
-              </div>
-            </div>
-            <div class="flex items-center gap-3">
-              <!-- Period Selector -->
-              <select id="energyPeriodSelector" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                <option value="1hour">Last Hour</option>
-                <option value="6hours">Last 6 Hours</option>
-                <option value="24hours" selected>Last 24 Hours</option>
-                <option value="7days">Last 7 Days</option>
-              </select>
-              <div id="energyStatusBadge"></div>
-            </div>
-          </div>
-
-          <!-- Energy metric cards -->
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <!-- Energy Consumed -->
-            <div class="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
-              <div class="flex items-center gap-1.5 mb-1">
-                <p class="text-xs text-gray-500">Energy Consumed</p>
-                <div class="group relative">
-                  <svg class="w-4 h-4 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                  </svg>
-                  <div class="invisible group-hover:visible absolute z-50 w-72 p-3 -mt-2 left-0 bg-gray-900 text-white text-xs rounded-lg shadow-lg">
-                    <div class="font-semibold mb-2">Energy Consumed</div>
-                    <p class="text-gray-300">
-                      Total electricity used by the system over the selected period (1 hour to 7 days). Measured in kilowatt-hours (kWh)—the same unit used on utility bills. Helps you understand environmental impact and compare usage over time.
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <p id="energyConsumedKwh" class="text-2xl font-bold text-gray-900">--</p>
-              <p class="text-xs text-gray-500 mt-1">kWh this period</p>
-            </div>
-
-            <!-- Current Power -->
-            <div class="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
-              <div class="flex items-center gap-1.5 mb-1">
-                <p class="text-xs text-gray-500">Current Power</p>
-                <div class="group relative">
-                  <svg class="w-4 h-4 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                  </svg>
-                  <div class="invisible group-hover:visible absolute z-50 w-72 p-3 -mt-2 left-0 bg-gray-900 text-white text-xs rounded-lg shadow-lg">
-                    <div class="font-semibold mb-2">Current Power</div>
-                    <p class="text-gray-300">
-                      Instantaneous power draw in watts (W) right now. Higher values mean the system is working harder (e.g., during LLM inference or indexing). Idle systems typically use less; this updates with each refresh.
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <p id="currentPowerWatts2" class="text-2xl font-bold text-indigo-600">-- W</p>
-              <p class="text-xs text-gray-500 mt-1">real-time usage</p>
-            </div>
-
-            <!-- Thermal Level -->
-            <div class="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
-              <div class="flex items-center gap-1.5 mb-1">
-                <p class="text-xs text-gray-500">Thermal Level</p>
-                <div class="group relative">
-                  <svg class="w-4 h-4 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                  </svg>
-                  <div class="invisible group-hover:visible absolute z-50 w-72 p-3 -mt-2 -ml-36 bg-gray-900 text-white text-xs rounded-lg shadow-lg">
-                    <div class="font-semibold mb-2">Thermal Level Guide:</div>
-                    <div class="space-y-1">
-                      <div class="flex items-center gap-2">
-                        <span class="w-16 text-green-400">0-25%</span>
-                        <span class="text-gray-300">Nominal - System running optimally</span>
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <span class="w-16 text-yellow-400">25-50%</span>
-                        <span class="text-gray-300">Fair - Normal operation under load</span>
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <span class="w-16 text-orange-400">50-75%</span>
-                        <span class="text-gray-300">Elevated - System warming up</span>
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <span class="w-16 text-red-400">75-100%</span>
-                        <span class="text-gray-300">Critical - Thermal throttling active</span>
-                      </div>
-                    </div>
-                    <div class="mt-2 pt-2 border-t border-gray-700 text-gray-400">
-                      Lower is better. 0% indicates optimal cooling and efficiency.
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <p id="currentThermalLevel2" class="text-2xl font-bold text-orange-600">--%</p>
-              <p class="text-xs text-gray-500 mt-1">system temperature</p>
-            </div>
-          </div>
-
-          <!-- Power Consumption Chart -->
-          <div class="mb-6">
-            <h4 class="text-sm font-medium text-gray-700 mb-3">Power Consumption Over Time</h4>
-            <div class="bg-gray-50 rounded-lg p-4" style="height: 300px;">
-              <canvas id="powerChart"></canvas>
-            </div>
-          </div>
-
-          <!-- Process Energy Breakdown (hidden) -->
-          <div class="hidden">
-            <h4 class="text-sm font-medium text-gray-700 mb-3">Energy Impact by Process</h4>
-            <div id="processEnergyBreakdown" class="space-y-3">
-              <!-- Process breakdown will be loaded here -->
-            </div>
-          </div>
-        </div>
-      </div>
-    </main>
-  </div>
-
-  <script>
-    if (!api.requireAuth()) throw new Error('Not authenticated');
-
-    // Cache configuration
-    const CACHE_DURATION = {
-      summary: 30000,      // 30 seconds - overall status changes frequently
-      services: 30000,     // 30 seconds - service status changes frequently
-      metrics: 60000,      // 1 minute - system metrics change but not critical
-      storage: 300000,     // 5 minutes - storage changes slowly
-      tokenUsage: 300000,  // 5 minutes - token usage is historical data
-      dlq: 60000           // 1 minute - DLQ metrics change frequently
-    };
-
-    // Cache storage
-    const healthCache = {
-      summary: null,
-      services: null,
-      metrics: null,
-      storage: null,
-      tokenUsage: {},  // Keyed by period (7days, 3months, alltime)
-      dlq: null
-    };
-
-    // Helper to check if cache is valid
-    function isCacheValid(cacheEntry, duration) {
-      if (!cacheEntry) return false;
-      return (Date.now() - cacheEntry.timestamp) < duration;
-    }
-
-    // Helper to get cached data or fetch fresh
-    async function getCachedOrFetch(cacheKey, fetchFn, duration) {
-      if (isCacheValid(healthCache[cacheKey], duration)) {
-        console.log(`[HealthCache] Using cached ${cacheKey}`);
-        return healthCache[cacheKey].data;
-      }
-
-      console.log(`[HealthCache] Fetching fresh ${cacheKey}`);
-      const data = await fetchFn();
-      healthCache[cacheKey] = {
-        data,
-        timestamp: Date.now()
-      };
-      return data;
-    }
-
-    // Load full user profile with roles before rendering menu
-    (async () => {
-      try {
-        await api.loadUserProfile();
-      } catch (error) {
-        console.error('Failed to load user profile:', error);
-      }
-
-      // Render dynamic menu (will now have access to roles)
-      renderMenu('#mainNav');
-
-      // Initialize conversation menu
-      if (typeof ConversationMenu !== 'undefined' && ConversationMenu.init()) {
-          ConversationMenu.loadConversations(true);
-      }
-
-      // Initialize conversation search modal
-      if (typeof ConversationSearchModal !== 'undefined') {
-          ConversationSearchModal.init();
-      }
-    })();
-
-    // Initialize notifications panel
-    NotificationPanel.init();
-
-    // Load user info
-    function loadUserInfo() {
-      const user = api.user;
-      if (user) {
-        const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
-        const initials = (user.firstName?.[0] || '') + (user.lastName?.[0] || '') || user.email[0].toUpperCase();
-        const uNameEl = document.getElementById('userName');
-        const uInitEl = document.getElementById('userInitials');
-        if (uNameEl) uNameEl.textContent = name;
-        if (uInitEl) uInitEl.textContent = initials;
-      }
-    }
-    loadUserInfo();
-
-    // User menu toggle
-    const userMenu = document.getElementById('userMenu');
-    const userDropdown = document.getElementById('userDropdown');
-    userMenu.addEventListener('click', (e) => {
-      e.stopPropagation();
-      userDropdown.classList.toggle('hidden');
-    });
-    document.addEventListener('click', (e) => {
-      if (!userMenu.contains(e.target)) userDropdown.classList.add('hidden');
-    });
-
-    // Logout
-    document.getElementById('logoutBtn').addEventListener('click', async () => {
-      await api.logout();
-      window.location.href = '../login.html';
-    });
-
-    // Sidebar toggle
-    const sidebar = document.getElementById('sidebar');
-    document.getElementById('openSidebar').addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
-    document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
-
-    // Load health data
-    async function loadHealth() {
-      try {
-        const [summary, services, metrics] = await Promise.all([
-          getCachedOrFetch('summary', () => api.getHealthSummary(), CACHE_DURATION.summary),
-          getCachedOrFetch('services', () => api.getHealthServices(), CACHE_DURATION.services),
-          getCachedOrFetch('metrics', () => api.getHealthMetrics(), CACHE_DURATION.metrics)
-        ]);
-
-        // Overall status
-        const statusEl = document.getElementById('statusBadge');
-        const statusColors = {
-          healthy: 'bg-green-100 text-green-800',
-          degraded: 'bg-yellow-100 text-yellow-800',
-          unhealthy: 'bg-red-100 text-red-800'
-        };
-        statusEl.innerHTML = `<span class="px-4 py-2 text-lg font-semibold rounded-full ${statusColors[summary.status] || 'bg-gray-100 text-gray-800'}">${summary.status?.toUpperCase()}</span>`;
-
-        document.getElementById('overallStatus').querySelector('p').textContent =
-          summary.status === 'healthy' ? 'All services are operational' :
-          summary.status === 'degraded' ? 'Some services are experiencing issues' :
-          'System is experiencing problems';
-
-        // Service cards
-        const serviceCardsEl = document.getElementById('serviceCards');
-        const servicesList = services.services || [];
-        serviceCardsEl.innerHTML = servicesList.map(service => `
-          <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 col-span-1">
-            <div class="flex items-center justify-between mb-2">
-              <span class="font-medium text-gray-900">${service.name}</span>
-              ${statusBadge(service.status)}
-            </div>
-            <div class="text-sm text-gray-500">
-              <p>Type: ${service.type || 'Unknown'}</p>
-              ${service.latency_ms ? `<p>Latency: ${service.latency_ms}ms</p>` : ''}
-              ${service.version ? `<p>Version: ${service.version}</p>` : ''}
-              ${service.error ? `<p class="text-red-600">Error: ${service.error}</p>` : ''}
-            </div>
-          </div>
-        `).join('');
-
-        // Update service cards grid
-        serviceCardsEl.className = 'col-span-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4';
-
-        // System metrics
-        const sys = metrics.system || {};
-        const mem = sys.memory || {};
-        document.getElementById('systemMetrics').innerHTML = `
-          <div>
-            <div class="flex justify-between text-sm mb-1">
-              <span class="text-gray-500">Memory Usage</span>
-              <span class="font-medium">${mem.usage_percent || 0}%</span>
-            </div>
-            <div class="w-full bg-gray-200 rounded-full h-2">
-              <div class="bg-blue-600 h-2 rounded-full" style="width: ${mem.usage_percent || 0}%"></div>
-            </div>
-            <p class="text-xs text-gray-400 mt-1">${mem.used_mb || 0} MB / ${mem.total_mb || 0} MB</p>
-          </div>
-          <div class="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p class="text-gray-500">Platform</p>
-              <p class="font-medium">${sys.platform || '-'}</p>
-            </div>
-            <div>
-              <p class="text-gray-500">Architecture</p>
-              <p class="font-medium">${sys.arch || '-'}</p>
-            </div>
-            <div>
-              <p class="text-gray-500">Hostname</p>
-              <p class="font-medium">${sys.hostname || '-'}</p>
-            </div>
-            <div>
-              <p class="text-gray-500">Uptime</p>
-              <p class="font-medium">${formatUptime(sys.uptime_seconds)}</p>
-            </div>
-          </div>
-        `;
-
-        // Process metrics
-        const proc = metrics.process || {};
-        const procMem = proc.memory || {};
-        document.getElementById('processMetrics').innerHTML = `
-          <div class="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p class="text-gray-500">PID</p>
-              <p class="font-medium">${proc.pid || '-'}</p>
-            </div>
-            <div>
-              <p class="text-gray-500">Process Uptime</p>
-              <p class="font-medium">${formatUptime(proc.uptime_seconds)}</p>
-            </div>
-            <div>
-              <p class="text-gray-500">Heap Used</p>
-              <p class="font-medium">${procMem.heap_used_mb || 0} MB</p>
-            </div>
-            <div>
-              <p class="text-gray-500">Heap Total</p>
-              <p class="font-medium">${procMem.heap_total_mb || 0} MB</p>
-            </div>
-            <div>
-              <p class="text-gray-500">RSS Memory</p>
-              <p class="font-medium">${procMem.rss_mb || 0} MB</p>
-            </div>
-            <div>
-              <p class="text-gray-500">External Memory</p>
-              <p class="font-medium">${procMem.external_mb || 0} MB</p>
-            </div>
-          </div>
-        `;
-
-        // Database metrics
-        const db = metrics.database || {};
-        document.getElementById('databaseMetrics').innerHTML = `
-          <div class="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p class="text-gray-500">Active Connections</p>
-              <p class="font-medium">${db.active_connections || 0}</p>
-            </div>
-            <div>
-              <p class="text-gray-500">Cache Hit Ratio</p>
-              <p class="font-medium">${db.cache_hit_ratio || 'N/A'}</p>
-            </div>
-            <div>
-              <p class="text-gray-500">Transactions Committed</p>
-              <p class="font-medium">${(db.transactions_committed || 0).toLocaleString()}</p>
-            </div>
-            <div>
-              <p class="text-gray-500">Transactions Rolled Back</p>
-              <p class="font-medium">${(db.transactions_rolled_back || 0).toLocaleString()}</p>
-            </div>
-          </div>
-        `;
-
-        // CPU info
-        const cpu = sys.cpu || {};
-        document.getElementById('cpuInfo').innerHTML = `
-          <div class="grid grid-cols-2 gap-4 text-sm">
-            <div class="col-span-2">
-              <p class="text-gray-500">CPU Model</p>
-              <p class="font-medium text-xs">${cpu.model || '-'}</p>
-            </div>
-            <div>
-              <p class="text-gray-500">Cores</p>
-              <p class="font-medium">${cpu.cores || '-'}</p>
-            </div>
-            <div>
-              <p class="text-gray-500">Load (1m)</p>
-              <p class="font-medium">${cpu.load_avg_1min || '-'}</p>
-            </div>
-            <div>
-              <p class="text-gray-500">Load (5m)</p>
-              <p class="font-medium">${cpu.load_avg_5min || '-'}</p>
-            </div>
-            <div>
-              <p class="text-gray-500">Load (15m)</p>
-              <p class="font-medium">${cpu.load_avg_15min || '-'}</p>
-            </div>
-          </div>
-        `;
-
-        // Storage information
-        await loadStorageInfo();
-
-        // Token usage (default to 7 days)
-        await loadTokenUsage('7days');
-
-        // DLQ metrics
-        await loadDLQMetrics();
-
-        // Last updated
-        document.getElementById('lastUpdated').textContent = `Updated: ${formatDateTime(new Date())}`;
-
-      } catch (error) {
-        Toast.error('Failed to load health data');
-      }
-    }
-
-    // Load storage information
-    async function loadStorageInfo() {
-      try {
-        const response = await getCachedOrFetch(
-          'storage',
-          () => api.get('/api/v1/admin/health/storage'),
-          CACHE_DURATION.storage
-        );
-        const storage = response.storage || {};
-
-        document.getElementById('storageInfo').innerHTML = `
-          <div class="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p class="text-gray-500">Total Storage</p>
-              <p class="font-medium">${formatBytes(storage.total_bytes || 0)}</p>
-            </div>
-            <div>
-              <p class="text-gray-500">Used Storage</p>
-              <p class="font-medium">${formatBytes(storage.used_bytes || 0)}</p>
-            </div>
-            <div>
-              <p class="text-gray-500">Available Storage</p>
-              <p class="font-medium">${formatBytes(storage.available_bytes || 0)}</p>
-            </div>
-            <div>
-              <p class="text-gray-500">Usage Percentage</p>
-              <p class="font-medium">${storage.usage_percent || 0}%</p>
-            </div>
-          </div>
-          <div class="mt-4">
-            <div class="flex justify-between text-sm mb-1">
-              <span class="text-gray-500">Storage Usage</span>
-              <span class="font-medium">${storage.usage_percent || 0}%</span>
-            </div>
-            <div class="w-full bg-gray-200 rounded-full h-2">
-              <div class="bg-indigo-600 h-2 rounded-full" style="width: ${storage.usage_percent || 0}%"></div>
-            </div>
-          </div>
-        `;
-      } catch (error) {
-        console.error('Failed to load storage info:', error);
-        document.getElementById('storageInfo').innerHTML = `
-          <p class="text-sm text-gray-500">Storage information unavailable</p>
-        `;
-      }
-    }
-
-    // Load token usage for a specific period
-    let currentTokenPeriod = '7days';
-    async function loadTokenUsage(period) {
-      try {
-        currentTokenPeriod = period;
-
-        // Check period-specific cache
-        const cacheKey = `tokenUsage_${period}`;
-        if (isCacheValid(healthCache.tokenUsage[period], CACHE_DURATION.tokenUsage)) {
-          console.log(`[HealthCache] Using cached token usage for ${period}`);
-          var response = healthCache.tokenUsage[period].data;
-        } else {
-          console.log(`[HealthCache] Fetching fresh token usage for ${period}`);
-          var response = await api.get(`/api/v1/admin/health/token-usage?period=${period}`);
-          healthCache.tokenUsage[period] = {
-            data: response,
-            timestamp: Date.now()
-          };
-        }
-
-        const usage = response.usage || {};
-
-        document.getElementById('tokenUsageInfo').innerHTML = `
-          <div class="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p class="text-gray-500">Total Tokens</p>
-              <p class="font-medium">${(usage.total_tokens || 0).toLocaleString()}</p>
-            </div>
-            <div>
-              <p class="text-gray-500">Input Tokens</p>
-              <p class="font-medium">${(usage.input_tokens || 0).toLocaleString()}</p>
-            </div>
-            <div>
-              <p class="text-gray-500">Output Tokens</p>
-              <p class="font-medium">${(usage.output_tokens || 0).toLocaleString()}</p>
-            </div>
-            <div>
-              <p class="text-gray-500">Total Requests</p>
-              <p class="font-medium">${(usage.total_requests || 0).toLocaleString()}</p>
-            </div>
-            <div>
-              <p class="text-gray-500">Avg Time to First Token</p>
-              <p class="font-medium">${formatMilliseconds(usage.avg_time_to_first_token_ms || 0)}</p>
-            </div>
-            <div>
-              <p class="text-gray-500">Avg Response Time</p>
-              <p class="font-medium">${formatMilliseconds(usage.avg_response_time_ms || 0)}</p>
-            </div>
-          </div>
-        `;
-      } catch (error) {
-        console.error('Failed to load token usage:', error);
-        document.getElementById('tokenUsageInfo').innerHTML = `
-          <p class="text-sm text-gray-500">Token usage information unavailable</p>
-        `;
-      }
-    }
-
-    // Switch token period tabs
-    window.switchTokenPeriod = function(period) {
-      // Update tab styling
-      const tabs = ['7days', '3months', 'alltime'];
-      tabs.forEach(tab => {
-        const btn = document.getElementById(`tab${tab}`);
-        if (tab === period) {
-          btn.className = 'px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600';
-        } else {
-          btn.className = 'px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700';
-        }
-      });
-
-      // Load data for the selected period
-      loadTokenUsage(period);
-    }
-
-    function formatBytes(bytes) {
-      if (!bytes || bytes === 0) return '0 B';
-      const k = 1024;
-      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-      const i = Math.floor(Math.log(bytes) / Math.log(k));
-      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
-
-    function formatMilliseconds(ms) {
-      if (!ms || ms === 0) return '0ms';
-      if (ms < 1000) return `${Math.round(ms)}ms`;
-      return `${(ms / 1000).toFixed(2)}s`;
-    }
-
-    function formatUptime(seconds) {
-      if (!seconds) return '-';
-      const days = Math.floor(seconds / 86400);
-      const hours = Math.floor((seconds % 86400) / 3600);
-      const minutes = Math.floor((seconds % 3600) / 60);
-      const parts = [];
-      if (days > 0) parts.push(`${days}d`);
-      if (hours > 0) parts.push(`${hours}h`);
-      if (minutes > 0) parts.push(`${minutes}m`);
-      return parts.join(' ') || '< 1m';
-    }
-
-    // Load DLQ (Dead Letter Queue) metrics
-    async function loadDLQMetrics() {
-      try {
-        const response = await getCachedOrFetch(
-          'dlq',
-          () => api.get('/api/v1/dlq/stats'),
-          CACHE_DURATION.dlq
-        );
-
-        const stats = response.stats || {};
-        const pending = stats.pending || 0;
-        const retrying = stats.retrying || 0;
-        const permanentlyFailed = stats.permanently_failed || 0;
-        const successRate = stats.retry_success_rate || 0;
-        const total = pending + retrying + permanentlyFailed;
-
-        // Status badge based on queue health
-        const dlqStatusBadge = document.getElementById('dlqStatusBadge');
-        let badgeClass = 'bg-green-100 text-green-800';
-        let badgeText = 'HEALTHY';
-
-        if (permanentlyFailed > 50 || pending > 100) {
-          badgeClass = 'bg-red-100 text-red-800';
-          badgeText = 'CRITICAL';
-        } else if (permanentlyFailed > 10 || pending > 50 || successRate < 80) {
-          badgeClass = 'bg-yellow-100 text-yellow-800';
-          badgeText = 'WARNING';
-        }
-
-        dlqStatusBadge.innerHTML = `<span class="px-3 py-1 text-sm font-semibold rounded-full ${badgeClass}">${badgeText}</span>`;
-
-        // DLQ metrics display
-        document.getElementById('dlqMetrics').innerHTML = `
-          <div class="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p class="text-gray-500">Pending Retry</p>
-              <p class="font-medium text-lg">${pending.toLocaleString()}</p>
-            </div>
-            <div>
-              <p class="text-gray-500">Currently Retrying</p>
-              <p class="font-medium text-lg">${retrying.toLocaleString()}</p>
-            </div>
-            <div>
-              <p class="text-gray-500">Permanently Failed</p>
-              <p class="font-medium text-lg ${permanentlyFailed > 0 ? 'text-red-600' : ''}">${permanentlyFailed.toLocaleString()}</p>
-            </div>
-            <div>
-              <p class="text-gray-500">Retry Success Rate</p>
-              <p class="font-medium text-lg ${successRate >= 90 ? 'text-green-600' : successRate >= 80 ? 'text-yellow-600' : 'text-red-600'}">${successRate.toFixed(1)}%</p>
-            </div>
-          </div>
-          <div class="mt-4">
-            <div class="flex justify-between text-sm mb-1">
-              <span class="text-gray-500">Queue Health</span>
-              <span class="font-medium">${total === 0 ? 'No Failed Records' : `${total.toLocaleString()} Total`}</span>
-            </div>
-            ${total > 0 ? `
-              <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                ${pending > 0 ? `<div class="bg-yellow-500 h-2 float-left" style="width: ${(pending / total * 100).toFixed(1)}%" title="Pending: ${pending}"></div>` : ''}
-                ${retrying > 0 ? `<div class="bg-blue-500 h-2 float-left" style="width: ${(retrying / total * 100).toFixed(1)}%" title="Retrying: ${retrying}"></div>` : ''}
-                ${permanentlyFailed > 0 ? `<div class="bg-red-500 h-2 float-left" style="width: ${(permanentlyFailed / total * 100).toFixed(1)}%" title="Failed: ${permanentlyFailed}"></div>` : ''}
-              </div>
-              <div class="flex justify-between text-xs text-gray-400 mt-1">
-                <span>🟡 Pending</span>
-                <span>🔵 Retrying</span>
-                <span>🔴 Failed</span>
-              </div>
-            ` : ''}
-          </div>
-        `;
-      } catch (error) {
-        console.error('Failed to load DLQ metrics:', error);
-        // Show "No Data" state instead of error to avoid alarming users
-        document.getElementById('dlqStatusBadge').innerHTML = `<span class="px-3 py-1 text-sm font-semibold rounded-full bg-gray-100 text-gray-800">N/A</span>`;
-        document.getElementById('dlqMetrics').innerHTML = `
-          <p class="text-sm text-gray-500">DLQ metrics unavailable. This feature will be available in Phase 3.</p>
-        `;
-      }
-    }
-
-    // Clear all health caches
-    function clearHealthCache() {
-      console.log('[HealthCache] Clearing all caches');
-      healthCache.summary = null;
-      healthCache.services = null;
-      healthCache.metrics = null;
-      healthCache.storage = null;
-      healthCache.tokenUsage = {};
-      healthCache.dlq = null;
-    }
-
-    // Refresh button - force refresh by clearing cache first
-    document.getElementById('refreshBtn').addEventListener('click', () => {
-      clearHealthCache();
-      loadHealth();
-    });
-
-    // Initialize
-    loadHealth();
-
-    // Auto-refresh every 30 seconds (cache will prevent unnecessary API calls)
-    setInterval(loadHealth, 30000);
-
-    // ========================================
-    // ENERGY MONITORING
-    // ========================================
-
-    let powerChart = null;
-    let currentEnergyPeriod = '24hours';
-
-    // Parse numeric value from API (may be string or number)
-    function parseEnergyValue(val) {
-      if (val == null) return null;
-      const n = typeof val === 'string' ? parseFloat(val) : val;
-      return Number.isFinite(n) ? n : null;
-    }
-
-    // Load energy metrics
-    async function loadEnergyMetrics() {
-      try {
-        const period = currentEnergyPeriod;
-
-        // Fetch energy data with energy_unit parameter (default: kwh)
-        const energyData = await api.get(`/api/v1/admin/health/energy?period=${period}&energy_unit=kwh`);
-
-        // Update Energy Consumption section (API: current.total_power_watts, thermal_level, etc.)
-        if (energyData.current) {
-          const totalWatts = parseEnergyValue(energyData.current.total_power_watts);
-          const wattsDisplay = totalWatts != null ? `${totalWatts.toFixed(2)} W` : '-- W';
-          document.getElementById('currentPowerWatts2').textContent = wattsDisplay;
-
-          const thermalLevel = energyData.current.thermal_level;
-          const thermalDisplay = thermalLevel != null ? `${thermalLevel}%` : '--%';
-          document.getElementById('currentThermalLevel2').textContent = thermalDisplay;
-        }
-
-        // Update status badge (use thermal_state from API when available, else derive from thermal_level)
-        const statusBadge = document.getElementById('energyStatusBadge');
-        if (energyData.current) {
-          const thermalLevel = energyData.current.thermal_level ?? 0;
-          const thermalState = (energyData.current.thermal_state || '').toLowerCase();
-          let badgeClass = 'bg-green-100 text-green-800';
-          let badgeText = thermalState === 'nominal' ? 'NOMINAL' : 'NOMINAL';
-
-          if (thermalState === 'critical' || thermalLevel > 75) {
-            badgeClass = 'bg-red-100 text-red-800';
-            badgeText = 'CRITICAL';
-          } else if (thermalState === 'elevated' || thermalLevel > 50) {
-            badgeClass = 'bg-orange-100 text-orange-800';
-            badgeText = 'ELEVATED';
-          } else if (thermalState === 'fair' || thermalLevel > 25) {
-            badgeClass = 'bg-yellow-100 text-yellow-800';
-            badgeText = 'FAIR';
-          } else if (thermalState) {
-            badgeText = thermalState.toUpperCase();
-          }
-
-          statusBadge.innerHTML = `<span class="px-3 py-1 text-sm font-semibold rounded-full ${badgeClass}">${badgeText}</span>`;
-        }
-
-        // Calculate environmental impact metrics (API: summary.total_energy in kWh by default)
-        if (energyData.summary) {
-          // Energy consumed: use API total_energy (in kWh when energy_unit=kwh)
-          // If energy_unit is 'wh', convert to kWh
-          const energyUnit = energyData.energy_unit || 'kwh';
-          const totalEnergy = parseEnergyValue(energyData.summary.total_energy);
-
-          let kWhConsumed;
-          if (totalEnergy != null) {
-            // Use total_energy from API, converting to kWh if needed
-            kWhConsumed = energyUnit === 'wh' ? totalEnergy / 1000 : totalEnergy;
-          } else {
-            // Fallback: derive from avg_power_watts * hours
-            const periodHours = {
-              '1hour': 1,
-              '6hours': 6,
-              '24hours': 24,
-              '7days': 168  // 7 * 24
-            };
-            const hours = periodHours[period] || 1;
-            const avgWatts = parseEnergyValue(energyData.summary.avg_power_watts) || 0;
-            kWhConsumed = (avgWatts * hours) / 1000;
-          }
-
-          // Format kWh for display (more decimals for small values)
-          const formatKwh = (k) => (k < 0.01 && k > 0 ? k.toFixed(4) : k.toFixed(2));
-
-          // Update Energy Consumption card
-          document.getElementById('energyConsumedKwh').textContent = formatKwh(kWhConsumed);
-        }
-
-        // Render power chart (timeseries: total_watts, cpu_watts, thermal_level, llm_requests, *_impact)
-        renderPowerChart(energyData.timeseries || []);
-
-        // Process breakdown: use /energy/processes if available, else derive from timeseries (llamacpp_impact, backend_impact, postgres_impact, minio_impact)
-        let processList = [];
-        try {
-          const processData = await api.get('/api/v1/admin/health/energy/processes');
-          processList = processData.processes || [];
-        } catch (_) {
-          // Processes endpoint not available – breakdown will be derived from timeseries in renderProcessBreakdown
-        }
-        renderProcessBreakdown(processList, energyData.timeseries || []);
-
-      } catch (error) {
-        console.error('Failed to load energy metrics:', error);
-        document.getElementById('energyStatusBadge').innerHTML =
-          '<span class="px-3 py-1 text-sm font-semibold rounded-full bg-gray-100 text-gray-800">N/A</span>';
-      }
-    }
-
-    // Render power consumption chart
-    function renderPowerChart(timeseries) {
-      const ctx = document.getElementById('powerChart');
-      if (!ctx) return;
-
-      // Destroy existing chart
-      if (powerChart) {
-        powerChart.destroy();
-      }
-
-      // Prepare data
-      const labels = timeseries.map(d => new Date(d.timestamp).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-        month: 'short',
-        day: 'numeric'
-      }));
-
-      // API returns total_watts, cpu_watts as strings; parse for chart
-      const powerData = timeseries.map(d => parseEnergyValue(d.total_watts) ?? 0);
-      const thermalData = timeseries.map(d => d.thermal_level ?? 0);
-      const llmActivity = timeseries.map(d => d.llm_requests ?? 0);
-
-      // Create chart
-      powerChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [
-            {
-              label: 'Power (Watts)',
-              data: powerData,
-              borderColor: 'rgb(79, 70, 229)',
-              backgroundColor: 'rgba(79, 70, 229, 0.1)',
-              borderWidth: 2,
-              tension: 0.3,
-              yAxisID: 'y',
-              fill: true
-            },
-            {
-              label: 'Thermal Level (%)',
-              data: thermalData,
-              borderColor: 'rgb(249, 115, 22)',
-              backgroundColor: 'rgba(249, 115, 22, 0.1)',
-              borderWidth: 2,
-              tension: 0.3,
-              yAxisID: 'y1',
-              fill: false
-            },
-            {
-              label: 'LLM Activity',
-              data: llmActivity,
-              borderColor: 'rgb(34, 197, 94)',
-              backgroundColor: 'rgba(34, 197, 94, 0.3)',
-              borderWidth: 0,
-              type: 'bar',
-              yAxisID: 'y2',
-              barThickness: 4
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          interaction: {
-            mode: 'index',
-            intersect: false,
-          },
-          plugins: {
-            legend: {
-              display: true,
-              position: 'top',
-            },
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  let label = context.dataset.label || '';
-                  if (label) {
-                    label += ': ';
-                  }
-                  if (context.parsed.y !== null) {
-                    if (context.dataset.label === 'Power (Watts)') {
-                      label += context.parsed.y.toFixed(1) + ' W';
-                    } else if (context.dataset.label === 'Thermal Level (%)') {
-                      label += context.parsed.y.toFixed(0) + '%';
-                    } else {
-                      label += context.parsed.y;
-                    }
-                  }
-                  return label;
-                }
-              }
-            }
-          },
-          scales: {
-            y: {
-              type: 'linear',
-              display: true,
-              position: 'left',
-              title: {
-                display: true,
-                text: 'Power (Watts)'
-              },
-              beginAtZero: true
-            },
-            y1: {
-              type: 'linear',
-              display: true,
-              position: 'right',
-              title: {
-                display: true,
-                text: 'Thermal (%)'
-              },
-              beginAtZero: true,
-              max: 100,
-              grid: {
-                drawOnChartArea: false,
-              },
-            },
-            y2: {
-              type: 'linear',
-              display: false,
-              position: 'right',
-              beginAtZero: true,
-              grid: {
-                drawOnChartArea: false,
-              },
-            }
-          }
-        }
-      });
-    }
-
-    // Render process energy breakdown (processes from API or derived from timeseries *_impact)
-    function renderProcessBreakdown(processes, timeseries) {
-      const container = document.getElementById('processEnergyBreakdown');
-      if (!container) return;
-
-      if (processes.length === 0) {
-        // Derive from latest timeseries impact fields (API: llamacpp_impact, backend_impact, postgres_impact, minio_impact)
-        const latest = (timeseries || []).length > 0 ? timeseries[timeseries.length - 1] : null;
-        if (latest) {
-          const items = [
-            { name: 'LlamaCPP', impact: parseEnergyValue(latest.llamacpp_impact) },
-            { name: 'Backend', impact: parseEnergyValue(latest.backend_impact) },
-            { name: 'Postgres', impact: parseEnergyValue(latest.postgres_impact) },
-            { name: 'MinIO', impact: parseEnergyValue(latest.minio_impact) }
-          ];
-          container.innerHTML = items.map(p => `
-            <div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
-              <span class="font-medium text-gray-900">${p.name}</span>
-              <span class="text-lg font-bold text-gray-900">${(p.impact || 0).toFixed(2)} W</span>
-            </div>
-          `).join('');
-          return;
-        }
-        container.innerHTML = '<p class="text-sm text-gray-500">No process data available yet.</p>';
-        return;
-      }
-
-      container.innerHTML = processes.map(process => {
-        const statusColors = {
-          high: 'bg-red-100 text-red-800 border-red-300',
-          medium: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-          low: 'bg-green-100 text-green-800 border-green-300'
-        };
-
-        const statusColor = statusColors[process.status] || 'bg-gray-100 text-gray-800 border-gray-300';
-        const watts = typeof process.estimated_watts === 'number' ? process.estimated_watts : parseEnergyValue(process.estimated_watts) ?? 0;
-        const impact = typeof process.energy_impact === 'number' ? process.energy_impact : parseEnergyValue(process.energy_impact) ?? 0;
-
-        return `
-          <div class="flex items-center justify-between p-3 border-2 ${statusColor} rounded-lg">
-            <div class="flex-1">
-              <div class="flex items-center gap-2">
-                <span class="font-medium text-gray-900">${process.name}</span>
-                <span class="px-2 py-0.5 text-xs font-semibold rounded ${statusColor}">
-                  ${(process.status || 'low').toUpperCase()}
-                </span>
-              </div>
-              <div class="flex gap-4 mt-1 text-sm text-gray-600">
-                ${process.cpu_percent != null ? `<span>CPU: ${Number(process.cpu_percent).toFixed(1)}%</span>` : ''}
-                ${process.memory_mb != null ? `<span>Memory: ${process.memory_mb} MB</span>` : ''}
-                ${process.threads != null ? `<span>Threads: ${process.threads}</span>` : ''}
-              </div>
-            </div>
-            <div class="text-right">
-              <div class="text-lg font-bold text-gray-900">
-                ${watts.toFixed(2)} W
-              </div>
-              <div class="text-xs text-gray-500">
-                Impact: ${impact.toFixed(2)}
-              </div>
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    // Period selector change handler
-    document.getElementById('energyPeriodSelector').addEventListener('change', (e) => {
-      currentEnergyPeriod = e.target.value;
-      loadEnergyMetrics();
-    });
-
-    // Load energy metrics on page load
-    loadEnergyMetrics();
-
-    // Refresh energy metrics every minute
-    setInterval(loadEnergyMetrics, 60000);
-
-  </script>
-
-  </div>
-</body>
-</html>
+  </main>
+</div>

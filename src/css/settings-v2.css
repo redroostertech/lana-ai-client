@@ -1,0 +1,208 @@
+/* ==========================================================================
+   Settings V2 — Page-specific styles
+   All values use Lex design tokens from lex-tokens.css.
+   Do not add colours or spacing that are not from the token system.
+   ========================================================================== */
+
+
+/* ── Page Root ────────────────────────────────────────────────────── */
+
+.sv2-page {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - var(--lex-topbar-height, 64px));
+  background: var(--lex-bg-secondary);
+}
+
+.sv2-page > main {
+  max-width: 760px;
+}
+
+
+/* ── Section Spacing ──────────────────────────────────────────────── */
+
+.sv2-page > main > section {
+  margin-bottom: 24px;
+}
+
+.sv2-page > main > section:last-child {
+  margin-bottom: 0;
+}
+
+.sv2-page > main > section > div {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+
+/* ── Hidden Helper ────────────────────────────────────────────────── */
+
+.sv2-hidden {
+  display: none !important;
+}
+
+
+/* ── Avatar ───────────────────────────────────────────────────────── */
+
+.sv2-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--lex-radius-full);
+  background: var(--lex-bg-accent-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sv2-avatar-text {
+  font-size: var(--lex-h2-size);
+  font-weight: var(--lex-weight-bold);
+  color: var(--lex-text-accent);
+  line-height: 1;
+}
+
+
+/* ── Profile KV Grid ──────────────────────────────────────────────── */
+
+.sv2-kv-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 540px) {
+  .sv2-kv-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* ── Password Requirements ────────────────────────────────────────── */
+
+.sv2-pw-requirements {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sv2-pw-req {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--lex-body-xs-size);
+  color: var(--lex-text-tertiary);
+  transition: color var(--lex-transition-normal);
+}
+
+.sv2-pw-req-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--lex-radius-full);
+  background: var(--lex-color-gray-300);
+  flex-shrink: 0;
+  transition: background var(--lex-transition-normal);
+}
+
+.sv2-pw-req--met {
+  color: var(--lex-status-success-text);
+}
+
+.sv2-pw-req--met .sv2-pw-req-dot {
+  background: var(--lex-status-success);
+}
+
+
+/* ── Session Rows ─────────────────────────────────────────────────── */
+
+.sv2-session-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--lex-border-subtle);
+}
+
+.sv2-session-row:last-child {
+  border-bottom: none;
+}
+
+.sv2-session-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+
+/* ── VPN Status Banners ───────────────────────────────────────────── */
+
+.sv2-vpn-banner {
+  padding: 16px;
+  border-radius: var(--lex-radius-lg);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.sv2-vpn-banner--ok {
+  background: var(--lex-status-success-bg);
+  border: 1px solid var(--lex-color-success-100);
+}
+
+.sv2-vpn-banner--warn {
+  background: var(--lex-status-warning-bg);
+  border: 1px solid var(--lex-color-warning-100);
+}
+
+
+/* ── VPN Device Grid ──────────────────────────────────────────────── */
+
+.sv2-vpn-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  background: var(--lex-bg-secondary);
+  border-radius: var(--lex-radius-lg);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+
+/* ── MFA Section Spacing ──────────────────────────────────────────── */
+
+.sv2-mfa-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.sv2-mfa-desc {
+  margin-bottom: 16px;
+}
+
+
+/* ── Password Success Modal ───────────────────────────────────────── */
+
+.sv2-countdown {
+  font-size: var(--lex-h1-size);
+  font-weight: var(--lex-weight-bold);
+  color: var(--lex-text-accent);
+  margin: 16px 0 8px;
+}
+
+
+/* ── Form Action Bar ──────────────────────────────────────────────── */
+
+.sv2-form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--lex-border-subtle);
+}

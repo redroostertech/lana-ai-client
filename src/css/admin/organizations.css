@@ -1,0 +1,88 @@
+/* Organization Details — Page-specific styles.
+   Uses Lex design tokens (--lex-*) exclusively.
+   No hardcoded Tailwind colors or pixel values outside of established defaults.
+   Loaded and unloaded by lex-router per navigation. */
+
+
+/* ==========================================================================
+   Quota Grid (Zone B)
+   ========================================================================== */
+
+.org-quota-grid {
+  display: grid;
+  grid-template-columns: repeat(1, 1fr);
+  gap: var(--lex-spacing-lg, 1.5rem);
+  margin-top: var(--lex-spacing-lg, 1.5rem);
+}
+
+@media (min-width: 768px) {
+  .org-quota-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+
+/* ==========================================================================
+   Quota Progress Bar
+   ========================================================================== */
+
+.org-quota-bar {
+  margin-top: var(--lex-spacing-md, 0.75rem);
+}
+
+.org-quota-bar__track {
+  width: 100%;
+  height: 6px;
+  background: var(--lex-border-default, #e5e5e5);
+  border-radius: var(--lex-radius-full, 9999px);
+  overflow: hidden;
+}
+
+.org-quota-bar__fill {
+  height: 100%;
+  border-radius: var(--lex-radius-full, 9999px);
+  background: var(--lex-color-info-500, #3b82f6);
+  transition: width var(--lex-transition-slow, 500ms) ease;
+}
+
+/* Warning threshold: 75–90% used */
+.org-quota-bar__fill--warning {
+  background: var(--lex-color-warning-500, #f59e0b);
+}
+
+/* Danger threshold: >90% used */
+.org-quota-bar__fill--danger {
+  background: var(--lex-color-danger-500, #ef4444);
+}
+
+.org-quota-label {
+  display: block;
+  margin-top: var(--lex-spacing-xs, 0.25rem);
+  font-size: var(--lex-form-help-size, 0.75rem);
+  color: var(--lex-text-secondary);
+}
+
+
+/* ==========================================================================
+   Organization Info Key-Value Grid (Zone C)
+   ========================================================================== */
+
+.org-kv-grid {
+  display: grid;
+  grid-template-columns: repeat(1, 1fr);
+  gap: var(--lex-spacing-lg, 1.5rem);
+}
+
+@media (min-width: 768px) {
+  .org-kv-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Mono font for the Organization ID value */
+#kvOrgId .lex-kv__value,
+#kvOrgId dd {
+  font-family: var(--lex-font-mono, ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace);
+  font-size: var(--lex-form-help-size, 0.75rem);
+  letter-spacing: 0.02em;
+}

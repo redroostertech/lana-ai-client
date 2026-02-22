@@ -140,7 +140,6 @@
           <div class="flex items-center justify-between">
             <div>
               <p class="text-sm font-medium text-indigo-900" id="connectedOrgName">Organization Name</p>
-              <p class="text-xs text-indigo-600" id="connectedServerUrl">server.url:8080</p>
             </div>
             <button type="button" id="changeOrgBtn" class="text-xs text-indigo-600 hover:text-indigo-500 font-medium">
               Change
@@ -295,7 +294,6 @@
     const rememberMeCheckbox = document.getElementById('rememberMe');
     const changeOrgBtn = document.getElementById('changeOrgBtn');
     const connectedOrgName = document.getElementById('connectedOrgName');
-    const connectedServerUrl = document.getElementById('connectedServerUrl');
 
     // State
     let mfaRequired = false;
@@ -364,7 +362,6 @@
 
       // Update the organization banner
       connectedOrgName.textContent = serverInfo.orgName || serverInfo.orgId;
-      connectedServerUrl.textContent = `${serverInfo.staticIp}:${serverInfo.port}`;
 
       // Focus on email input
       emailInput.focus();

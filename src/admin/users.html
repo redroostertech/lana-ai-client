@@ -1,994 +1,237 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>User Management - LanaAI</title>
-  <script src="../js/tailwind-loader.js"></script>
-  <link rel="stylesheet" href="../css/components.css">
-  <script src="../js/error-reporter.js"></script>
-  <script src="../js/config.js"></script>
-  <script src="../js/mock-data.js"></script>
-  <script src="../js/api.js"></script>
-  <script src="../js/components.js"></script>
-  <script src="../js/menu.js"></script>
-  <script src="../js/navigation-helpers.js"></script>
-  <script src="../js/new-project-modal.js"></script>
-  <script src="../js/conversation-menu.js"></script>
-  <script src="../js/conversation-search-modal.js"></script>
-  <script src="../js/notifications.js"></script>
+<!-- Admin Users — User Management page.
+     SPA page fragment loaded by lex-router into lex-app content area.
+     Uses #lex-page-content for Strategy 1 extraction (see lex-router.js).
+     All behaviour is in js/admin/admin-users.js. -->
 
-  <!-- Inline preloader styles - Pure CSS, no dependencies -->
-  <style>
-    /* Preloader shown immediately, before any JS/CSS loads */
-    #lana-preloader {
-      position: fixed;
-      inset: 0;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 99999;
-      transition: opacity 0.3s ease-out;
-    }
+<div id="lex-page-content">
 
-    .preloader-logo {
-      width: 80px;
-      height: 80px;
-      margin-bottom: 24px;
-      animation: pulse 2s ease-in-out infinite;
-    }
+  <main>
 
-    .preloader-spinner {
-      width: 48px;
-      height: 48px;
-      border: 4px solid rgba(255, 255, 255, 0.3);
-      border-top-color: white;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-bottom: 16px;
-    }
-
-    .preloader-text {
-      color: white;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      font-size: 16px;
-      font-weight: 500;
-      letter-spacing: 0.5px;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.85; transform: scale(0.96); }
-    }
-  </style>
-</head>
-<body class="bg-gray-50 min-h-screen">
-
-  <!-- Pure HTML/CSS Preloader - Shows immediately, hidden by JS when ready -->
-  <div id="lana-preloader">
-    <svg class="preloader-logo" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="50" cy="50" r="45" fill="white" opacity="0.15"/>
-      <circle cx="50" cy="50" r="35" fill="white" opacity="0.3"/>
-      <circle cx="50" cy="50" r="25" fill="white"/>
-      <text x="50" y="58" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#667eea" text-anchor="middle">L</text>
-    </svg>
-    <div class="preloader-spinner"></div>
-    <div class="preloader-text">Loading LanaAI...</div>
-  </div>
-
-  <!-- App content - wrapped for FOUC prevention -->
-  <div id="app-content">
-  <!-- Sidebar -->
-  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
-    <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
-      <a href="../index.html"><img src="../img/logo-light.png" alt="LanaAI" class="h-7"></a>
-      <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-        </svg>
-      </button>
-    </div>
-    <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
-      <!-- Menu will be dynamically rendered by menu.js -->
-    </nav>
-  </aside>
-
-  <!-- Main Content -->
-  <div class="lg:ml-64">
-    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
-      <div class="flex items-center justify-between h-16 px-4 lg:px-8">
-        <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-        </button>
-        <div class="flex-1 px-4 lg:px-0">
-          <h1 class="text-xl font-semibold text-gray-900">User Management</h1>
-        </div>
-        <div class="flex items-center gap-4">
-          <!-- Notifications -->
-          <button id="notificationBtn" class="relative text-gray-500 hover:text-gray-700">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
-            </svg>
-            <span id="notificationBadge" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">0</span>
-          </button>
-
-          <!-- User Menu -->
-          <div class="relative" id="userMenu">
-            <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900 p-1" title="Settings">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-              </svg>
-            </button>
-            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-              <a href="../settings.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
-              <hr class="my-1">
-              <button id="logoutBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sign out</button>
-            </div>
-          </div>
-        </div>
+    <!-- ================================================================
+         Page Header — Title + primary action
+         ================================================================ -->
+    <div class="admin-users-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;">
+      <div>
+        <lex-text id="usersPageTitle" tag="h1" variant="heading" weight="semibold">User Management</lex-text>
+        <lex-text id="usersPageSubtitle" tag="p" variant="secondary" size="sm" style="margin-top:0.25rem;">Manage team members, roles, and access</lex-text>
       </div>
-    </header>
-
-    <!-- Notification Panel Overlay -->
-    <div id="notificationOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
-
-    <!-- Notification Slide-out Panel -->
-    <div id="notificationPanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
-      <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
-        <h2 class="text-lg font-semibold text-gray-900">Notifications</h2>
-        <div class="flex items-center gap-3">
-          <button id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium hidden">Mark all read</button>
-          <button id="refreshNotificationsBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-            </svg>
-          </button>
-          <button id="closeNotificationPanel" class="text-gray-400 hover:text-gray-600">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
-        </div>
-      </div>
-      <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
-        <button id="filterAll" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">All</button>
-        <button id="filterUnread" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Unread</button>
-      </div>
-      <div id="notificationList" class="flex-1 overflow-y-auto">
-        <div id="notificationLoading" class="p-8 text-center">
-          <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
-          <p class="text-gray-500 mt-3 text-sm">Loading notifications...</p>
-        </div>
-      </div>
-      <div id="notificationLoadingMore" class="hidden p-4 border-t border-gray-100 text-center flex-shrink-0">
-        <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
+      <div style="display:flex;align-items:center;gap:0.5rem;">
+        <lex-btn id="addUserBtn" variant="primary" icon="user-plus">Add User</lex-btn>
       </div>
     </div>
 
-    <main class="p-4 lg:p-8">
-      <!-- Header Actions -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div class="flex-1 max-w-md">
-          <div class="relative">
-            <input type="text" id="searchInput" placeholder="Search users..."
-              class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-            </svg>
-          </div>
-        </div>
-        <div class="flex gap-3">
-          <select id="statusFilter" class="select-standard inline-block w-auto pl-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-            <option value="">All Status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-            <option value="pending">Pending</option>
-          </select>
-          <button id="createUserBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-            </svg>
-            Add User
-          </button>
-        </div>
-      </div>
 
-      <!-- Users Table Loading Skeleton -->
-      <div id="tableLoading" class="bg-white rounded-xl shadow-sm border border-gray-100">
-        <div class="p-6 space-y-4">
-          <div class="flex items-center gap-3 animate-pulse">
-            <div class="w-10 h-10 bg-gray-200 rounded-full"></div>
-            <div class="flex-1"><div class="h-4 bg-gray-200 rounded w-32 mb-2"></div><div class="h-3 bg-gray-200 rounded w-48"></div></div>
-            <div class="h-4 bg-gray-200 rounded w-24"></div>
-            <div class="h-6 bg-gray-200 rounded-full w-16"></div>
-            <div class="h-4 bg-gray-200 rounded w-20"></div>
-            <div class="flex gap-2"><div class="w-8 h-8 bg-gray-200 rounded"></div><div class="w-8 h-8 bg-gray-200 rounded"></div><div class="w-8 h-8 bg-gray-200 rounded"></div></div>
-          </div>
-          <div class="flex items-center gap-3 animate-pulse">
-            <div class="w-10 h-10 bg-gray-200 rounded-full"></div>
-            <div class="flex-1"><div class="h-4 bg-gray-200 rounded w-40 mb-2"></div><div class="h-3 bg-gray-200 rounded w-52"></div></div>
-            <div class="h-4 bg-gray-200 rounded w-24"></div>
-            <div class="h-6 bg-gray-200 rounded-full w-16"></div>
-            <div class="h-4 bg-gray-200 rounded w-20"></div>
-            <div class="flex gap-2"><div class="w-8 h-8 bg-gray-200 rounded"></div><div class="w-8 h-8 bg-gray-200 rounded"></div><div class="w-8 h-8 bg-gray-200 rounded"></div></div>
-          </div>
-          <div class="flex items-center gap-3 animate-pulse">
-            <div class="w-10 h-10 bg-gray-200 rounded-full"></div>
-            <div class="flex-1"><div class="h-4 bg-gray-200 rounded w-36 mb-2"></div><div class="h-3 bg-gray-200 rounded w-44"></div></div>
-            <div class="h-4 bg-gray-200 rounded w-24"></div>
-            <div class="h-6 bg-gray-200 rounded-full w-16"></div>
-            <div class="h-4 bg-gray-200 rounded w-20"></div>
-            <div class="flex gap-2"><div class="w-8 h-8 bg-gray-200 rounded"></div><div class="w-8 h-8 bg-gray-200 rounded"></div><div class="w-8 h-8 bg-gray-200 rounded"></div></div>
-          </div>
-          <div class="flex items-center gap-3 animate-pulse">
-            <div class="w-10 h-10 bg-gray-200 rounded-full"></div>
-            <div class="flex-1"><div class="h-4 bg-gray-200 rounded w-28 mb-2"></div><div class="h-3 bg-gray-200 rounded w-40"></div></div>
-            <div class="h-4 bg-gray-200 rounded w-24"></div>
-            <div class="h-6 bg-gray-200 rounded-full w-16"></div>
-            <div class="h-4 bg-gray-200 rounded w-20"></div>
-            <div class="flex gap-2"><div class="w-8 h-8 bg-gray-200 rounded"></div><div class="w-8 h-8 bg-gray-200 rounded"></div><div class="w-8 h-8 bg-gray-200 rounded"></div></div>
-          </div>
-          <div class="flex items-center gap-3 animate-pulse">
-            <div class="w-10 h-10 bg-gray-200 rounded-full"></div>
-            <div class="flex-1"><div class="h-4 bg-gray-200 rounded w-44 mb-2"></div><div class="h-3 bg-gray-200 rounded w-56"></div></div>
-            <div class="h-4 bg-gray-200 rounded w-24"></div>
-            <div class="h-6 bg-gray-200 rounded-full w-16"></div>
-            <div class="h-4 bg-gray-200 rounded w-20"></div>
-            <div class="flex gap-2"><div class="w-8 h-8 bg-gray-200 rounded"></div><div class="w-8 h-8 bg-gray-200 rounded"></div><div class="w-8 h-8 bg-gray-200 rounded"></div></div>
-          </div>
-        </div>
-      </div>
+    <!-- ================================================================
+         Users Table — Tier 3 (setData) for custom column rendering
+         ================================================================ -->
+    <lex-card padding="none">
+      <lex-table
+        id="usersTable"
+        columns="user_display,username,role_name,status,created_at"
+        labels="User,Username,Role,Status,Created"
+        searchable
+        empty-text="No users found"
+        sort-by="created_at"
+        sort-dir="desc"
+      ></lex-table>
+    </lex-card>
 
-      <!-- Users Table -->
-      <div id="tableContent" class="bg-white rounded-xl shadow-sm border border-gray-100 hidden">
-        <div id="usersTable"></div>
-      </div>
-    </main>
-  </div>
 
-  <!-- Create/Edit User Modal -->
-  <div id="userModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-        <h3 id="modalTitle" class="text-lg font-semibold text-gray-900">Add User</h3>
-        <button id="closeModal" class="text-gray-400 hover:text-gray-600">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
+  </main>
+
+
+  <!-- ================================================================
+       Create / Edit User Modal
+       data-hoist: router moves this to document.body so it is not
+       clipped by lex-content's overflow stacking context.
+       ================================================================ -->
+  <lex-modal
+    id="userModal"
+    heading="Add User"
+    size="md"
+    confirm-text="Save"
+    cancel-text="Cancel"
+    data-hoist
+  >
+    <lex-form id="userForm">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+        <lex-input
+          id="userFirstName"
+          name="first_name"
+          label="First Name"
+          placeholder="Jane"
+          required
+        ></lex-input>
+        <lex-input
+          id="userLastName"
+          name="last_name"
+          label="Last Name"
+          placeholder="Smith"
+          required
+        ></lex-input>
       </div>
-      <form id="userForm" class="p-6 space-y-4">
-        <input type="hidden" id="userId" name="userId">
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-            <input type="text" id="firstName" name="first_name" required
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-            <input type="text" id="lastName" name="last_name" required
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-          </div>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-          <input type="email" id="email" name="email" required
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-          <p id="emailError" class="text-red-500 text-sm mt-1 hidden"></p>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
-          <input type="text" id="username" name="username" required
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-          <p id="usernameError" class="text-red-500 text-sm mt-1 hidden"></p>
-        </div>
-        <div id="passwordField">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-          <input type="password" id="password" name="password" required
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            minlength="8"
-            placeholder="Min. 8 characters with uppercase, lowercase, number, and special character">
-          <p id="passwordError" class="text-red-500 text-sm mt-1 hidden"></p>
-          <p class="text-xs text-gray-500 mt-1">Must be at least 8 characters with uppercase, lowercase, number, and special character</p>
-        </div>
-        <div id="roleSelection">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
-          <select id="roleId" name="role_id" required
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-            <option value="">Select a role</option>
-          </select>
-        </div>
-        <div class="flex justify-end gap-3 pt-4">
-          <button type="button" id="cancelBtn" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Cancel</button>
-          <button type="submit" id="submitBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">Save User</button>
-        </div>
-      </form>
+      <lex-input
+        id="userEmail"
+        name="email"
+        type="email"
+        label="Email Address"
+        placeholder="jane.smith@example.com"
+        required
+        style="margin-bottom:1rem;"
+      ></lex-input>
+      <lex-input
+        id="userUsername"
+        name="username"
+        label="Username"
+        placeholder="jsmith"
+        required
+        style="margin-bottom:1rem;"
+      ></lex-input>
+      <div id="userPasswordGroup" style="margin-bottom:1rem;">
+        <lex-input
+          id="userPassword"
+          name="password"
+          type="password"
+          label="Password"
+          placeholder="Minimum 8 characters"
+          required
+        ></lex-input>
+        <div id="userPasswordHint" class="lex-text-tertiary" style="font-size:var(--lex-body-xs-size,0.75rem);margin-top:0.25rem;"></div>
+      </div>
+      <lex-select
+        id="userRole"
+        name="role_id"
+        label="Role"
+        placeholder="Select a role..."
+        required
+        options='[]'
+      ></lex-select>
+    </lex-form>
+  </lex-modal>
+
+
+  <!-- ================================================================
+       Reset Password Modal
+       variant="danger" so confirm button renders in red.
+       data-hoist: same stacking context fix as above.
+       ================================================================ -->
+  <lex-modal
+    id="resetPasswordModal"
+    heading="Reset Password"
+    size="sm"
+    variant="danger"
+    confirm-text="Reset Password"
+    cancel-text="Cancel"
+    data-hoist
+  >
+    <lex-form id="resetPasswordForm">
+      <p class="lex-text-secondary" style="font-size:var(--lex-body-sm-size,0.875rem);margin-bottom:1rem;">
+        Set a new temporary password for this user. They will be prompted to change it on next login.
+      </p>
+      <lex-input
+        id="resetPasswordNew"
+        name="new_password"
+        type="password"
+        label="New Password"
+        placeholder="Minimum 8 characters"
+        required
+        style="margin-bottom:1rem;"
+      ></lex-input>
+      <lex-input
+        id="resetPasswordConfirm"
+        name="confirm_password"
+        type="password"
+        label="Confirm Password"
+        placeholder="Re-enter new password"
+        required
+      ></lex-input>
+      <div id="resetPasswordHint" class="lex-text-tertiary" style="font-size:var(--lex-body-xs-size,0.75rem);margin-top:0.5rem;"></div>
+    </lex-form>
+  </lex-modal>
+
+
+  <!-- ================================================================
+       Sessions Modal — view and revoke user sessions
+       data-hoist: same stacking context fix.
+       ================================================================ -->
+  <lex-modal
+    id="sessionsModal"
+    heading="User Sessions"
+    size="lg"
+    hide-actions
+    data-hoist
+  >
+    <div id="sessionsModalContent">
+      <div id="sessionsLoading" style="text-align:center;padding:2rem;">
+        <lex-spinner label="Loading sessions..."></lex-spinner>
+      </div>
+      <div id="sessionsListContainer" class="hidden"></div>
     </div>
-  </div>
-
-  <!-- Reset Password Modal -->
-  <div id="resetPasswordModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-xl shadow-xl max-w-md w-full">
-      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-        <h3 class="text-lg font-semibold text-gray-900">Reset Password</h3>
-        <button id="closeResetModal" class="text-gray-400 hover:text-gray-600">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-      <form id="resetPasswordForm" class="p-6 space-y-4">
-        <input type="hidden" id="resetUserId">
-        <p id="resetUserName" class="text-sm text-gray-600 mb-4"></p>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-          <input type="password" id="newPassword" required
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            minlength="8"
-            placeholder="Min. 8 characters">
-          <p id="newPasswordError" class="text-red-500 text-sm mt-1 hidden"></p>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
-          <input type="password" id="confirmPassword" required
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            minlength="8"
-            placeholder="Re-enter password">
-          <p id="confirmPasswordError" class="text-red-500 text-sm mt-1 hidden"></p>
-        </div>
-        <p class="text-xs text-gray-500">Password must be at least 8 characters with uppercase, lowercase, number, and special character.</p>
-        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-4">
-          <p class="text-sm text-yellow-800">
-            <strong>Note:</strong> After resetting the password, you will need to manually notify the user of their new password.
-          </p>
-        </div>
-        <div class="flex justify-end gap-3 pt-4">
-          <button type="button" id="cancelResetBtn" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Cancel</button>
-          <button type="submit" id="submitResetBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">Reset Password</button>
-        </div>
-      </form>
+    <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1rem;padding-top:1rem;border-top:1px solid var(--lex-border-subtle);">
+      <lex-btn id="revokeAllSessionsBtn" variant="danger" size="sm">Revoke All Sessions</lex-btn>
+      <lex-btn id="closeSessionsModalBtn" variant="secondary" size="sm">Close</lex-btn>
     </div>
-  </div>
+  </lex-modal>
 
-  <!-- User Details Drawer -->
-  <div id="userDrawer" class="hidden fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-xl z-40 transform translate-x-full transition-transform">
-    <div class="h-full flex flex-col">
-      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-        <h3 class="text-lg font-semibold text-gray-900">User Details</h3>
-        <button id="closeDrawer" class="text-gray-400 hover:text-gray-600">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
+
+  <!-- ================================================================
+       User Details Drawer — slides in from the right
+       Shows full user profile with quick-action buttons.
+       NOTE: Drawer confirm does NOT auto-close — must set open = false.
+       ================================================================ -->
+  <lex-drawer
+    id="userDrawer"
+    heading="User Details"
+    side="right"
+    width="480px"
+  >
+    <div id="userDrawerContent">
+      <div id="userDrawerLoading" style="text-align:center;padding:2rem;">
+        <lex-spinner label="Loading user..."></lex-spinner>
       </div>
-      <div id="userDetails" class="flex-1 overflow-y-auto p-6">
-        <!-- User details will be loaded here -->
+      <div id="userDrawerBody" class="hidden">
+
+        <!-- Avatar + name header -->
+        <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;">
+          <div id="userDrawerAvatar" style="
+            width:3.5rem;height:3.5rem;border-radius:9999px;
+            background:var(--lex-bg-accent);color:var(--lex-text-on-accent);
+            display:flex;align-items:center;justify-content:center;
+            font-size:1.25rem;font-weight:600;flex-shrink:0;
+          "></div>
+          <div style="min-width:0;">
+            <div id="userDrawerName" style="font-size:var(--lex-body-base-size,1rem);font-weight:600;color:var(--lex-text-primary);"></div>
+            <div id="userDrawerEmail" style="font-size:var(--lex-body-sm-size,0.875rem);color:var(--lex-text-tertiary);"></div>
+          </div>
+        </div>
+
+        <lex-divider style="margin-bottom:1rem;"></lex-divider>
+
+        <!-- Key-value detail pairs -->
+        <lex-stack direction="vertical" gap="sm" style="margin-bottom:1.5rem;">
+          <lex-kv id="drawerKvUsername"  label="Username"></lex-kv>
+          <lex-kv id="drawerKvRole"      label="Role"></lex-kv>
+          <lex-kv id="drawerKvStatus"    label="Status"></lex-kv>
+          <lex-kv id="drawerKvCreated"   label="Created"></lex-kv>
+          <lex-kv id="drawerKvLastLogin" label="Last Login"></lex-kv>
+          <lex-kv id="drawerKvOrgId"     label="Organisation ID"></lex-kv>
+        </lex-stack>
+
+        <lex-divider label="Actions" style="margin-bottom:1rem;"></lex-divider>
+
+        <!-- Quick actions -->
+        <div style="display:flex;flex-direction:column;gap:0.5rem;">
+          <lex-btn id="drawerEditBtn"        variant="secondary" icon="edit-2"   style="width:100%;justify-content:flex-start;">Edit User</lex-btn>
+          <lex-btn id="drawerStatusBtn"      variant="secondary" icon="toggle-left" style="width:100%;justify-content:flex-start;"></lex-btn>
+          <lex-btn id="drawerResetPwBtn"     variant="secondary" icon="key"      style="width:100%;justify-content:flex-start;">Reset Password</lex-btn>
+          <lex-btn id="drawerSessionsBtn"    variant="secondary" icon="monitor"  style="width:100%;justify-content:flex-start;">View Sessions</lex-btn>
+          <lex-btn id="drawerRegenKeyBtn"    variant="secondary" icon="refresh-cw" style="width:100%;justify-content:flex-start;">Regenerate Activation Key</lex-btn>
+          <lex-btn id="drawerDeleteBtn"      variant="danger"    icon="trash-2"  style="width:100%;justify-content:flex-start;">Delete User</lex-btn>
+        </div>
+
       </div>
     </div>
-  </div>
-  <div id="drawerOverlay" class="hidden fixed inset-0 bg-black bg-opacity-50 z-30"></div>
+  </lex-drawer>
 
-  <script>
-    // Auth check
-    if (!api.requireAuth()) throw new Error('Not authenticated');
 
-    // Load full user profile with roles before rendering menu
-    (async () => {
-      try {
-        await api.loadUserProfile();
-      } catch (error) {
-        console.error('Failed to load user profile:', error);
-      }
-      
-      // Render dynamic menu (will now have access to roles)
-      renderMenu('#mainNav');
-
-      // Initialize conversation menu
-      if (typeof ConversationMenu !== 'undefined' && ConversationMenu.init()) {
-        ConversationMenu.loadConversations(true);
-      }
-
-      // Initialize conversation search modal
-      if (typeof ConversationSearchModal !== 'undefined') {
-        ConversationSearchModal.init();
-      }
-    })();
-
-    // Initialize notifications panel
-    NotificationPanel.init();
-
-    // Load user info
-    function loadUserInfo() {
-      const user = api.user;
-      if (user) {
-        const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
-        const initials = (user.firstName?.[0] || '') + (user.lastName?.[0] || '') || user.email[0].toUpperCase();
-        const uNameEl = document.getElementById('userName');
-        const uInitEl = document.getElementById('userInitials');
-        if (uNameEl) uNameEl.textContent = name;
-        if (uInitEl) uInitEl.textContent = initials;
-      }
-    }
-    loadUserInfo();
-
-    // User menu toggle
-    const userMenu = document.getElementById('userMenu');
-    const userDropdown = document.getElementById('userDropdown');
-    userMenu.addEventListener('click', (e) => {
-      e.stopPropagation();
-      userDropdown.classList.toggle('hidden');
-    });
-    document.addEventListener('click', (e) => {
-      if (!userMenu.contains(e.target)) userDropdown.classList.add('hidden');
-    });
-
-    // Logout
-    document.getElementById('logoutBtn').addEventListener('click', async () => {
-      await api.logout();
-      window.location.href = '../login.html';
-    });
-
-    // Sidebar toggle
-    const sidebar = document.getElementById('sidebar');
-    document.getElementById('openSidebar').addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
-    document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
-
-    // State
-    let currentPage = 1;
-    const pageSize = 20;
-    let users = [];
-    let roles = [];
-
-    // Users Table
-    const table = new DataTable('#usersTable', {
-      columns: [
-        {
-          key: 'name',
-          label: 'User',
-          render: (_, user) => `
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
-                <span class="text-sm font-medium text-indigo-600">${(user.first_name?.[0] || '') + (user.last_name?.[0] || '') || user.email[0].toUpperCase()}</span>
-              </div>
-              <div>
-                <p class="font-medium text-gray-900">${user.first_name || ''} ${user.last_name || ''}</p>
-                <p class="text-sm text-gray-500">${user.email}</p>
-              </div>
-            </div>
-          `
-        },
-        { key: 'username', label: 'Username' },
-        {
-          key: 'status',
-          label: 'Status',
-          render: (status) => statusBadge(status)
-        },
-        {
-          key: 'created_at',
-          label: 'Created',
-          render: (date) => formatDate(date)
-        },
-        {
-          key: 'actions',
-          label: '',
-          cellClass: 'text-right',
-          render: (_, user) => `
-            <div class="flex justify-end gap-2">
-              <button onclick="viewUser('${user.id}')" class="p-2 text-gray-400 hover:text-indigo-600 transition-colors" title="View">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-              </button>
-              <button onclick="editUser('${user.id}')" class="p-2 text-gray-400 hover:text-indigo-600 transition-colors" title="Edit">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-              </button>
-              <button onclick="deleteUser('${user.id}')" class="p-2 text-gray-400 hover:text-red-600 transition-colors" title="Delete">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-              </button>
-            </div>
-          `
-        }
-      ],
-      pageSize,
-      onPageChange: (page) => {
-        currentPage = page;
-        loadUsers();
-      }
-    });
-
-    // Loading states
-    function showLoadingStates() {
-      document.getElementById('tableLoading').classList.remove('hidden');
-      document.getElementById('tableContent').classList.add('hidden');
-    }
-
-    function hideLoadingStates() {
-      document.getElementById('tableLoading').classList.add('hidden');
-      document.getElementById('tableContent').classList.remove('hidden');
-    }
-
-    // Load users
-    async function loadUsers() {
-      showLoadingStates();
-      try {
-        const search = document.getElementById('searchInput').value;
-        const status = document.getElementById('statusFilter').value;
-        const filters = {};
-        if (search) filters.search = search;
-        if (status) filters.status_filter = status;
-        const result = await api.getUsers(currentPage, pageSize, filters);
-        users = result.users || [];
-        const total = result.pagination?.total_count || result.total || users.length;
-        hideLoadingStates();
-        table.setData(users, total);
-      } catch (error) {
-        hideLoadingStates();
-        Toast.error('Failed to load users');
-      }
-    }
-
-    // Load roles for dropdown
-    async function loadRoles() {
-      try {
-        const result = await api.getRoles();
-        roles = result.roles || [];
-        const select = document.getElementById('roleId');
-        select.innerHTML = '<option value="">Select a role</option>' +
-          roles.map(role => `<option value="${role.id}">${role.name}</option>`).join('');
-      } catch (error) {
-        console.error('Failed to load roles:', error);
-      }
-    }
-
-    // Search and filter
-    document.getElementById('searchInput').addEventListener('input', debounce(() => {
-      currentPage = 1;
-      loadUsers();
-    }, 300));
-
-    document.getElementById('statusFilter').addEventListener('change', () => {
-      currentPage = 1;
-      loadUsers();
-    });
-
-    // Modal handling
-    const modal = document.getElementById('userModal');
-    const form = document.getElementById('userForm');
-
-    document.getElementById('createUserBtn').addEventListener('click', () => {
-      document.getElementById('modalTitle').textContent = 'Add User';
-      document.getElementById('userId').value = '';
-      form.reset();
-      // Show password field for new users
-      document.getElementById('passwordField').classList.remove('hidden');
-      document.getElementById('password').required = true;
-      modal.classList.remove('hidden');
-    });
-
-    function closeModal() {
-      modal.classList.add('hidden');
-      form.reset();
-      document.getElementById('emailError').classList.add('hidden');
-      document.getElementById('usernameError').classList.add('hidden');
-      document.getElementById('passwordError').classList.add('hidden');
-    }
-
-    document.getElementById('closeModal').addEventListener('click', closeModal);
-    document.getElementById('cancelBtn').addEventListener('click', closeModal);
-
-    // Edit user
-    async function editUser(userId) {
-      try {
-        const result = await api.getUser(userId);
-        const user = result.user;
-        document.getElementById('modalTitle').textContent = 'Edit User';
-        document.getElementById('userId').value = user.id;
-        document.getElementById('firstName').value = user.first_name || '';
-        document.getElementById('lastName').value = user.last_name || '';
-        document.getElementById('email').value = user.email;
-        document.getElementById('username').value = user.username || '';
-        // Hide password field when editing (password changes handled separately)
-        document.getElementById('passwordField').classList.add('hidden');
-        document.getElementById('password').required = false;
-        document.getElementById('password').value = '';
-        modal.classList.remove('hidden');
-      } catch (error) {
-        Toast.error('Failed to load user details');
-      }
-    }
-
-    // View user details
-    async function viewUser(userId) {
-      const drawer = document.getElementById('userDrawer');
-      const overlay = document.getElementById('drawerOverlay');
-      const details = document.getElementById('userDetails');
-
-      try {
-        const result = await api.getUser(userId);
-        const user = result.user;
-
-        // Get user roles
-        let userRoles = [];
-        try {
-          const rolesResult = await api.getUserRoles(userId);
-          userRoles = rolesResult.roles || [];
-        } catch (e) {}
-
-        details.innerHTML = `
-          <div class="text-center mb-6">
-            <div class="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span class="text-2xl font-bold text-indigo-600">${(user.first_name?.[0] || '') + (user.last_name?.[0] || '') || user.email[0].toUpperCase()}</span>
-            </div>
-            <h4 class="text-xl font-semibold text-gray-900">${user.first_name || ''} ${user.last_name || ''}</h4>
-            <p class="text-gray-500">${user.email}</p>
-            <div class="mt-2">${statusBadge(user.status)}</div>
-          </div>
-
-          <div class="space-y-4">
-            <div class="bg-gray-50 rounded-lg p-4">
-              <h5 class="text-sm font-medium text-gray-700 mb-2">Account Information</h5>
-              <dl class="space-y-2 text-sm">
-                <div class="flex justify-between">
-                  <dt class="text-gray-500">Username</dt>
-                  <dd class="text-gray-900">${user.username || '-'}</dd>
-                </div>
-                <div class="flex justify-between">
-                  <dt class="text-gray-500">Created</dt>
-                  <dd class="text-gray-900">${formatDate(user.created_at)}</dd>
-                </div>
-                <div class="flex justify-between">
-                  <dt class="text-gray-500">Last Login</dt>
-                  <dd class="text-gray-900">${user.last_login ? formatDateTime(user.last_login) : 'Never'}</dd>
-                </div>
-              </dl>
-            </div>
-
-            <div class="bg-gray-50 rounded-lg p-4">
-              <h5 class="text-sm font-medium text-gray-700 mb-2">Roles</h5>
-              ${user.role_id ?
-                `<span class="inline-block px-2 py-1 bg-indigo-100 text-indigo-800 text-xs rounded-full mr-2 mb-2">${user.role_display_name || user.role_name || 'Unknown Role'}</span>` :
-                '<p class="text-sm text-gray-500">No roles assigned</p>'
-              }
-            </div>
-
-            <div class="space-y-2">
-              <h5 class="text-sm font-medium text-gray-700">Quick Actions</h5>
-              <div class="grid grid-cols-2 gap-2">
-                ${user.status === 'active' ?
-                  `<button onclick="deactivateUser('${user.id}')" class="px-3 py-2 text-sm bg-yellow-100 text-yellow-700 hover:bg-yellow-200 rounded-lg">Deactivate</button>` :
-                  `<button onclick="activateUser('${user.id}')" class="px-3 py-2 text-sm bg-green-100 text-green-700 hover:bg-green-200 rounded-lg">Activate</button>`
-                }
-                <button onclick="resetPassword('${user.id}')" class="px-3 py-2 text-sm bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg">Reset Password</button>
-                <button onclick="viewSessions('${user.id}')" class="px-3 py-2 text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg">View Sessions</button>
-                <button onclick="regenerateKey('${user.id}')" class="px-3 py-2 text-sm bg-purple-100 text-purple-700 hover:bg-purple-200 rounded-lg">New Activation Key</button>
-              </div>
-            </div>
-          </div>
-        `;
-
-        drawer.classList.remove('hidden', 'translate-x-full');
-        overlay.classList.remove('hidden');
-      } catch (error) {
-        Toast.error('Failed to load user details');
-      }
-    }
-
-    // Close drawer
-    document.getElementById('closeDrawer').addEventListener('click', closeDrawer);
-    document.getElementById('drawerOverlay').addEventListener('click', closeDrawer);
-
-    function closeDrawer() {
-      document.getElementById('userDrawer').classList.add('translate-x-full');
-      setTimeout(() => {
-        document.getElementById('userDrawer').classList.add('hidden');
-        document.getElementById('drawerOverlay').classList.add('hidden');
-      }, 300);
-    }
-
-    // User actions
-    async function activateUser(userId) {
-      try {
-        await api.activateUser(userId);
-        Toast.success('User activated');
-        loadUsers();
-        closeDrawer();
-      } catch (error) {
-        Toast.error(error.message);
-      }
-    }
-
-    async function deactivateUser(userId) {
-      try {
-        await api.deactivateUser(userId);
-        Toast.success('User deactivated');
-        loadUsers();
-        closeDrawer();
-      } catch (error) {
-        Toast.error(error.message);
-      }
-    }
-
-    async function resetPassword(userId) {
-      try {
-        const result = await api.getUser(userId);
-        const user = result.user;
-        const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email;
-
-        document.getElementById('resetUserId').value = userId;
-        document.getElementById('resetUserName').textContent = `Reset password for: ${userName}`;
-        document.getElementById('newPassword').value = '';
-        document.getElementById('confirmPassword').value = '';
-        document.getElementById('newPasswordError').classList.add('hidden');
-        document.getElementById('confirmPasswordError').classList.add('hidden');
-        document.getElementById('resetPasswordModal').classList.remove('hidden');
-      } catch (error) {
-        Toast.error('Failed to load user details');
-      }
-    }
-
-    // Reset Password Modal handlers
-    function closeResetPasswordModal() {
-      document.getElementById('resetPasswordModal').classList.add('hidden');
-      document.getElementById('resetPasswordForm').reset();
-      document.getElementById('newPasswordError').classList.add('hidden');
-      document.getElementById('confirmPasswordError').classList.add('hidden');
-    }
-
-    document.getElementById('closeResetModal').addEventListener('click', closeResetPasswordModal);
-    document.getElementById('cancelResetBtn').addEventListener('click', closeResetPasswordModal);
-
-    // Password validation for reset modal
-    function validateResetPassword(password) {
-      const errors = [];
-      if (password.length < 8) errors.push('at least 8 characters');
-      if (!/[A-Z]/.test(password)) errors.push('uppercase letter');
-      if (!/[a-z]/.test(password)) errors.push('lowercase letter');
-      if (!/[0-9]/.test(password)) errors.push('number');
-      if (!/[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]/.test(password)) errors.push('special character');
-      return errors;
-    }
-
-    document.getElementById('newPassword').addEventListener('input', (e) => {
-      const password = e.target.value;
-      const errorEl = document.getElementById('newPasswordError');
-
-      if (password.length === 0) {
-        errorEl.classList.add('hidden');
-        return;
-      }
-
-      const errors = validateResetPassword(password);
-      if (errors.length > 0) {
-        errorEl.textContent = `Password must contain: ${errors.join(', ')}`;
-        errorEl.classList.remove('hidden');
-      } else {
-        errorEl.classList.add('hidden');
-      }
-    });
-
-    document.getElementById('confirmPassword').addEventListener('input', (e) => {
-      const confirmPassword = e.target.value;
-      const newPassword = document.getElementById('newPassword').value;
-      const errorEl = document.getElementById('confirmPasswordError');
-
-      if (confirmPassword.length === 0) {
-        errorEl.classList.add('hidden');
-        return;
-      }
-
-      if (confirmPassword !== newPassword) {
-        errorEl.textContent = 'Passwords do not match';
-        errorEl.classList.remove('hidden');
-      } else {
-        errorEl.classList.add('hidden');
-      }
-    });
-
-    // Reset Password Form submission
-    document.getElementById('resetPasswordForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-
-      const userId = document.getElementById('resetUserId').value;
-      const newPassword = document.getElementById('newPassword').value;
-      const confirmPassword = document.getElementById('confirmPassword').value;
-
-      // Validate password requirements
-      const errors = validateResetPassword(newPassword);
-      if (errors.length > 0) {
-        document.getElementById('newPasswordError').textContent = `Password must contain: ${errors.join(', ')}`;
-        document.getElementById('newPasswordError').classList.remove('hidden');
-        return;
-      }
-
-      // Validate passwords match
-      if (newPassword !== confirmPassword) {
-        document.getElementById('confirmPasswordError').textContent = 'Passwords do not match';
-        document.getElementById('confirmPasswordError').classList.remove('hidden');
-        return;
-      }
-
-      try {
-        await api.setTemporaryPassword(userId, newPassword);
-        Toast.success('Password has been reset. Please notify the user of their new password.');
-        closeResetPasswordModal();
-        closeDrawer();
-      } catch (error) {
-        Toast.error(error.message || 'Failed to reset password');
-      }
-    });
-
-    async function regenerateKey(userId) {
-      try {
-        const result = await api.regenerateActivationKey(userId);
-        Toast.success('New activation key generated');
-        Modal.alert('Activation Key', `New activation key: ${result.activation_key}`);
-      } catch (error) {
-        Toast.error(error.message);
-      }
-    }
-
-    async function viewSessions(userId) {
-      try {
-        const result = await api.getUserSessions(userId);
-        const sessions = result.sessions || [];
-        const content = document.createElement('div');
-        content.innerHTML = sessions.length > 0 ?
-          sessions.map(s => `
-            <div class="border-b py-2">
-              <p class="text-sm"><strong>IP:</strong> ${s.ip_address || 'Unknown'}</p>
-              <p class="text-sm text-gray-500">Created: ${formatDateTime(s.created_at)}</p>
-            </div>
-          `).join('') :
-          '<p class="text-gray-500">No active sessions</p>';
-
-        Modal.show({
-          title: 'Active Sessions',
-          content,
-          cancelText: 'Close',
-          confirmText: 'Revoke All',
-          type: 'danger',
-          onConfirm: async () => {
-            await api.revokeUserSessions(userId);
-            Toast.success('All sessions revoked');
-          }
-        });
-      } catch (error) {
-        Toast.error(error.message);
-      }
-    }
-
-    async function deleteUser(userId) {
-      Modal.confirm('Delete User', 'Are you sure you want to delete this user? This action cannot be undone.', async () => {
-        try {
-          await api.deleteUser(userId);
-          Toast.success('User deleted');
-          loadUsers();
-        } catch (error) {
-          Toast.error(error.message);
-        }
-      });
-    }
-
-    // Form submission
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const userId = document.getElementById('userId').value;
-      const data = Form.serialize(form);
-      delete data.userId;
-
-      try {
-        if (userId) {
-          await api.updateUser(userId, data);
-          Toast.success('User updated');
-        } else {
-          await api.createUser(data);
-          Toast.success('User created');
-        }
-        closeModal();
-        loadUsers();
-      } catch (error) {
-        // Extract the most specific error message available
-        let errorMessage = 'Request failed';
-
-        if (error.message) {
-          errorMessage = error.message;
-        } else if (error.data?.error?.message) {
-          errorMessage = error.data.error.message;
-        } else if (error.data?.detail) {
-          errorMessage = error.data.detail;
-        } else if (error.data?.message) {
-          errorMessage = error.data.message;
-        }
-
-        console.error('User creation/update failed:', {
-          errorMessage,
-          error,
-          errorData: error.data
-        });
-
-        Toast.error(errorMessage);
-      }
-    });
-
-    // Email/username validation
-    document.getElementById('email').addEventListener('input', (e) => {
-      // Clear error when user starts typing
-      const errorEl = document.getElementById('emailError');
-      errorEl.classList.add('hidden');
-    });
-
-    document.getElementById('email').addEventListener('blur', async (e) => {
-      const email = e.target.value;
-      const errorEl = document.getElementById('emailError');
-      if (email && !document.getElementById('userId').value) {
-        try {
-          const result = await api.checkEmail(email);
-          if (!result.available) {
-            errorEl.textContent = 'Email already in use';
-            errorEl.classList.remove('hidden');
-          } else {
-            errorEl.classList.add('hidden');
-          }
-        } catch (error) {
-          // On error, assume available
-          errorEl.classList.add('hidden');
-        }
-      }
-    });
-
-    document.getElementById('username').addEventListener('blur', async (e) => {
-      const username = e.target.value;
-      const errorEl = document.getElementById('usernameError');
-      if (username && !document.getElementById('userId').value) {
-        try {
-          const result = await api.checkUsername(username);
-          if (!result.available) {
-            errorEl.textContent = 'Username already in use';
-            errorEl.classList.remove('hidden');
-          } else {
-            errorEl.classList.add('hidden');
-          }
-        } catch (error) {}
-      }
-    });
-
-    // Password validation
-    document.getElementById('password').addEventListener('input', (e) => {
-      const password = e.target.value;
-      const errorEl = document.getElementById('passwordError');
-      
-      if (password.length === 0) {
-        errorEl.classList.add('hidden');
-        return;
-      }
-
-      const errors = [];
-      if (password.length < 8) errors.push('at least 8 characters');
-      if (!/[A-Z]/.test(password)) errors.push('uppercase letter');
-      if (!/[a-z]/.test(password)) errors.push('lowercase letter');
-      if (!/[0-9]/.test(password)) errors.push('number');
-      if (!/[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]/.test(password)) errors.push('special character');
-
-      if (errors.length > 0) {
-        errorEl.textContent = `Password must contain: ${errors.join(', ')}`;
-        errorEl.classList.remove('hidden');
-      } else {
-        errorEl.classList.add('hidden');
-      }
-    });
-
-    // Initialize
-    loadUsers();
-    loadRoles();
-
-  </script>
-
-  </div>
-</body>
-</html>
+</div>

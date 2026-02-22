@@ -261,6 +261,30 @@
       stylesheets: []
     },
 
+    // ── Settings V2 (Lex UI migration) ──
+    'settings-v2.html': {
+      title: 'Settings',
+      activeNav: 'settings',
+      scripts: [
+        'js/lex/components/foundation/lex-card.js',
+        'js/lex/components/foundation/lex-badge.js',
+        'js/lex/components/foundation/lex-text.js',
+        'js/lex/components/foundation/lex-stack.js',
+        'js/lex/components/foundation/lex-divider.js',
+        'js/lex/components/foundation/lex-kv.js',
+        'js/lex/components/foundation/lex-empty.js',
+        'js/lex/components/form/lex-input.js',
+        'js/lex/components/form/lex-form.js',
+        'js/lex/components/form/lex-toggle.js',
+        'js/lex/components/form/lex-btn.js',
+        // Page controller (MUST be last)
+        'js/settings-v2.js'
+      ],
+      stylesheets: [
+        'css/settings-v2.css'
+      ]
+    },
+
     // ── Help & Support ──
     'help.html': {
       title: 'Help & Support',
@@ -325,10 +349,12 @@
     'admin/index.html': {
       title: 'Administration',
       activeNav: 'admin',
-      scripts: [],
-      stylesheets: [
-        'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
-      ]
+      scripts: [
+        'js/lex/components/foundation/lex-banner.js',
+        'js/lex/components/foundation/lex-action-card.js',
+        'js/admin/admin-index.js'
+      ],
+      stylesheets: []
     },
 
     'admin/dashboard.html': {
@@ -386,14 +412,37 @@
     'admin/organizations.html': {
       title: 'Organization Details',
       activeNav: 'admin',
-      scripts: [],
-      stylesheets: []
+      scripts: [
+        'js/lex/components/foundation/lex-banner.js',
+        'js/lex/components/foundation/lex-metric.js',
+        'js/lex/components/foundation/lex-card.js',
+        'js/lex/components/foundation/lex-kv.js',
+        'js/lex/components/foundation/lex-badge.js',
+        'js/lex/components/foundation/lex-empty.js',
+        // Page controller (MUST be last)
+        'js/admin/organizations.js'
+      ],
+      stylesheets: [
+        'css/admin/organizations.css'
+      ]
     },
 
     'admin/roles.html': {
       title: 'Roles & Permissions',
       activeNav: 'admin',
-      scripts: [],
+      scripts: [
+        'js/lex/components/foundation/lex-tabs.js',
+        'js/lex/components/foundation/lex-card.js',
+        'js/lex/components/foundation/lex-badge.js',
+        'js/lex/components/foundation/lex-btn.js',
+        'js/lex/components/foundation/lex-modal.js',
+        'js/lex/components/foundation/lex-empty.js',
+        'js/lex/components/foundation/lex-spinner.js',
+        'js/lex/components/form/lex-form.js',
+        'js/lex/components/form/lex-input.js',
+        'js/lex/components/form/lex-textarea.js',
+        'js/admin/roles.js'
+      ],
       stylesheets: []
     },
 

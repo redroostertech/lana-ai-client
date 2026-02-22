@@ -1,0 +1,163 @@
+<!-- Settings V2 — User Settings Page
+     Rendered inside <lex-app> by LexRouter.
+     All Lex framework scripts are already loaded by the shell.
+     This file only declares the page content container.
+     Stylesheet loaded via page descriptor in lex-router.pages.js. -->
+
+<div id="lex-page-content" class="sv2-page">
+  <main>
+
+    <!-- ══════════════════════════════════════════════════════════════
+         Profile
+         ══════════════════════════════════════════════════════════════ -->
+    <section id="sv2-section-profile">
+      <lex-card id="sv2-profile-card" heading="Profile Information">
+
+        <!-- Read-only profile view -->
+        <div id="sv2-profile-view">
+          <lex-stack direction="horizontal" gap="6" align="center">
+            <div class="sv2-avatar">
+              <span id="sv2-avatar-initials" class="sv2-avatar-text">U</span>
+            </div>
+            <lex-stack direction="vertical" gap="1">
+              <lex-text id="sv2-profile-name" variant="primary" size="h4" tag="h3">Loading...</lex-text>
+              <lex-text id="sv2-profile-email" variant="secondary" size="body-sm" tag="p"></lex-text>
+            </lex-stack>
+          </lex-stack>
+
+          <lex-divider spacing="md"></lex-divider>
+
+          <div class="sv2-kv-grid">
+            <lex-kv id="sv2-kv-firstname" label="First Name" value="--"></lex-kv>
+            <lex-kv id="sv2-kv-lastname" label="Last Name" value="--"></lex-kv>
+            <lex-kv id="sv2-kv-role" label="Role" value="--"></lex-kv>
+            <lex-kv id="sv2-kv-org" label="Organization" value="--"></lex-kv>
+          </div>
+
+          <div class="sv2-form-actions">
+            <lex-btn id="sv2-edit-profile-btn" variant="secondary" size="sm" icon="edit">Edit Profile</lex-btn>
+          </div>
+        </div>
+
+        <!-- Edit profile form -->
+        <div id="sv2-profile-edit" class="sv2-hidden">
+          <lex-stack direction="horizontal" gap="6" align="center">
+            <div class="sv2-avatar">
+              <span id="sv2-avatar-initials-edit" class="sv2-avatar-text">U</span>
+            </div>
+            <lex-stack direction="vertical" gap="1">
+              <lex-text id="sv2-profile-name-edit" variant="primary" size="h4" tag="h3">Loading...</lex-text>
+              <lex-text id="sv2-profile-email-edit" variant="secondary" size="body-sm" tag="p"></lex-text>
+            </lex-stack>
+          </lex-stack>
+
+          <lex-divider spacing="md"></lex-divider>
+
+          <lex-form id="sv2-profile-form">
+            <lex-stack direction="horizontal" gap="4" wrap="true">
+              <lex-input name="first_name" label="First Name" placeholder="Enter first name"></lex-input>
+              <lex-input name="last_name" label="Last Name" placeholder="Enter last name"></lex-input>
+            </lex-stack>
+            <div class="sv2-form-actions">
+              <lex-btn type="submit" variant="primary" size="sm">Save Changes</lex-btn>
+              <lex-btn id="sv2-cancel-edit-btn" variant="ghost" size="sm">Cancel</lex-btn>
+            </div>
+          </lex-form>
+        </div>
+
+      </lex-card>
+    </section>
+
+
+    <!-- ══════════════════════════════════════════════════════════════
+         Security
+         ══════════════════════════════════════════════════════════════ -->
+    <section id="sv2-section-security">
+
+      <!-- Password Change Card -->
+      <lex-card heading="Change Password" subtitle="Update your account password">
+        <lex-form id="sv2-password-form">
+          <lex-stack direction="vertical" gap="4">
+            <lex-input id="sv2-current-password" name="current_password"
+              label="Current Password" type="password" required="true"></lex-input>
+
+            <div>
+              <lex-input id="sv2-new-password" name="new_password"
+                label="New Password" type="password" required="true"></lex-input>
+              <div id="sv2-pw-requirements" class="sv2-pw-requirements">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+
+            <lex-input id="sv2-confirm-password" name="confirm_password"
+              label="Confirm New Password" type="password" required="true"></lex-input>
+          </lex-stack>
+
+          <div class="sv2-form-actions">
+            <lex-btn id="sv2-update-password-btn" type="submit" variant="primary" size="sm" disabled>
+              Update Password
+            </lex-btn>
+          </div>
+        </lex-form>
+      </lex-card>
+
+      <!-- MFA Card (conditionally rendered by JS) -->
+      <div id="sv2-mfa-section"></div>
+
+    </section>
+
+
+    <!-- ══════════════════════════════════════════════════════════════
+         Preferences (conditionally shown by JS)
+         ══════════════════════════════════════════════════════════════ -->
+    <section id="sv2-section-preferences" class="sv2-hidden">
+      <lex-card heading="Preferences" subtitle="Customize your experience">
+        <lex-stack direction="vertical" gap="5" divider="true">
+
+          <lex-stack direction="horizontal" gap="4" justify="between" align="center">
+            <lex-stack direction="vertical" gap="1">
+              <lex-text variant="primary" size="body" weight="medium">Email Notifications</lex-text>
+              <lex-text variant="tertiary" size="body-sm">Receive email notifications for important updates</lex-text>
+            </lex-stack>
+            <lex-toggle id="sv2-pref-email" name="email_notifications"></lex-toggle>
+          </lex-stack>
+
+          <lex-stack direction="horizontal" gap="4" justify="between" align="center">
+            <lex-stack direction="vertical" gap="1">
+              <lex-text variant="primary" size="body" weight="medium">Dark Mode</lex-text>
+              <lex-text variant="tertiary" size="body-sm">Use dark theme for the interface</lex-text>
+            </lex-stack>
+            <lex-toggle id="sv2-pref-dark" name="dark_mode"></lex-toggle>
+          </lex-stack>
+
+        </lex-stack>
+      </lex-card>
+    </section>
+
+
+    <!-- ══════════════════════════════════════════════════════════════
+         Sessions
+         ══════════════════════════════════════════════════════════════ -->
+    <section id="sv2-section-sessions">
+      <lex-card id="sv2-sessions-card" heading="Active Sessions">
+        <div id="sv2-sessions-list">
+          <!-- Session rows rendered by JS -->
+        </div>
+        <div class="sv2-form-actions">
+          <lex-btn id="sv2-revoke-all-btn" variant="danger" size="sm" icon="trash-2">Revoke All Other Sessions</lex-btn>
+        </div>
+      </lex-card>
+    </section>
+
+
+    <!-- ══════════════════════════════════════════════════════════════
+         VPN (conditionally shown by JS — Electron only)
+         ══════════════════════════════════════════════════════════════ -->
+    <section id="sv2-section-vpn" class="sv2-hidden">
+      <div id="sv2-vpn-content">
+        <!-- Entire VPN content rendered by JS (configured vs. not-configured states) -->
+      </div>
+    </section>
+
+  </main>
+</div>

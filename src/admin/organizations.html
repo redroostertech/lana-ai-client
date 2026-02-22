@@ -1,449 +1,120 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Organization Details - Lana AI</title>
-    <script src="../js/tailwind-loader.js"></script>
-  <script src="../js/error-reporter.js"></script>
-    <script src="../js/config.js"></script>
-    <script src="../js/mock-data.js"></script>
-    <script src="../js/api.js"></script>
-    <script src="../js/components.js"></script>
-    <script src="../js/menu.js"></script>
-    <script src="../js/navigation-helpers.js"></script>
-    <script src="../js/new-project-modal.js"></script>
-    <script src="../js/conversation-menu.js"></script>
-    <script src="../js/conversation-search-modal.js"></script>
-    <script src="../js/notifications.js"></script>
+<!-- Organization Details — SPA page fragment.
+     Loaded by lex-router into the lex-app content area.
+     NOT a full HTML document — no <html>, <head>, <body>, or <script> tags.
+     Controller: js/admin/organizations.js -->
 
-  <!-- Inline preloader styles - Pure CSS, no dependencies -->
-  <style>
-    /* Preloader shown immediately, before any JS/CSS loads */
-    #lana-preloader {
-      position: fixed;
-      inset: 0;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 99999;
-      transition: opacity 0.3s ease-out;
-    }
+<div id="lex-page-content">
 
-    .preloader-logo {
-      width: 80px;
-      height: 80px;
-      margin-bottom: 24px;
-      animation: pulse 2s ease-in-out infinite;
-    }
+  <main>
 
-    .preloader-spinner {
-      width: 48px;
-      height: 48px;
-      border: 4px solid rgba(255, 255, 255, 0.3);
-      border-top-color: white;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-bottom: 16px;
-    }
+    <!-- ================================================================
+         Zone A — Page Banner
+         Populated by organizations.js:_renderBanner()
+         ================================================================ -->
+    <lex-banner
+      id="orgBanner"
+      variant="light"
+      corners
+      heading="Loading..."
+      subtitle=""
+    >
+      <div id="orgBannerActions"></div>
+    </lex-banner>
 
-    .preloader-text {
-      color: white;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      font-size: 16px;
-      font-weight: 500;
-      letter-spacing: 0.5px;
-    }
 
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
+    <!-- ================================================================
+         Zone B — Quota Metrics (2 cards with progress bars)
+         Populated by organizations.js:_renderQuotas()
+         ================================================================ -->
+    <div class="org-quota-grid" id="orgQuotaGrid">
 
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.85; transform: scale(0.96); }
-    }
-  </style>
-</head>
-<body class="bg-gray-50 min-h-screen">
-
-  <!-- Pure HTML/CSS Preloader - Shows immediately, hidden by JS when ready -->
-  <div id="lana-preloader">
-    <svg class="preloader-logo" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="50" cy="50" r="45" fill="white" opacity="0.15"/>
-      <circle cx="50" cy="50" r="35" fill="white" opacity="0.3"/>
-      <circle cx="50" cy="50" r="25" fill="white"/>
-      <text x="50" y="58" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#667eea" text-anchor="middle">L</text>
-    </svg>
-    <div class="preloader-spinner"></div>
-    <div class="preloader-text">Loading LanaAI...</div>
-  </div>
-
-  <!-- App content - wrapped for FOUC prevention -->
-  <div id="app-content">
-    <!-- Sidebar -->
-    <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
-        <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
-            <a href="../index.html"><img src="../img/logo-light.png" alt="LanaAI" class="h-7"></a>
-            <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-            </button>
+      <!-- Users quota card -->
+      <lex-card variant="default" padding="normal">
+        <lex-metric
+          id="metricUsers"
+          label="Users"
+          value="-"
+          status="blue"
+        ></lex-metric>
+        <div class="org-quota-bar">
+          <div
+            class="org-quota-bar__track"
+            role="progressbar"
+            aria-valuenow="0"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-label="Users quota"
+          >
+            <div
+              class="org-quota-bar__fill"
+              id="userQuotaFill"
+              style="width:0%"
+            ></div>
+          </div>
+          <span class="org-quota-label" id="userQuotaLabel"></span>
         </div>
-        <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
-            <!-- Menu will be dynamically rendered by menu.js -->
-        </nav>
-    </aside>
+      </lex-card>
 
-    <!-- Main Content -->
-    <div class="lg:ml-64">
-        <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
-            <div class="flex items-center justify-between h-16 px-4 lg:px-8">
-                <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-                </button>
-                <div class="flex-1 px-4 lg:px-0">
-                    <h1 class="text-xl font-semibold text-gray-900">Organization Details</h1>
-                </div>
-                <div class="flex items-center gap-4">
-                    <!-- Notifications -->
-                    <button id="notificationBtn" class="relative text-gray-500 hover:text-gray-700">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
-                        </svg>
-                        <span id="notificationBadge" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">0</span>
-                    </button>
-
-                    <!-- User Menu -->
-                    <div class="relative" id="userMenu">
-                        <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900 p-1" title="Settings">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                            </svg>
-                        </button>
-                        <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-                            <a href="../settings.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
-                            <hr class="my-1">
-                            <button id="logoutBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sign out</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </header>
-
-        <!-- Notification Panel Overlay -->
-        <div id="notificationOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
-
-        <!-- Notification Slide-out Panel -->
-        <div id="notificationPanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
-            <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
-                <h2 class="text-lg font-semibold text-gray-900">Notifications</h2>
-                <div class="flex items-center gap-3">
-                    <button id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium hidden">Mark all read</button>
-                    <button id="refreshNotificationsBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                    </button>
-                    <button id="closeNotificationPanel" class="text-gray-400 hover:text-gray-600">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                    </button>
-                </div>
-            </div>
-            <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
-                <button id="filterAll" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">All</button>
-                <button id="filterUnread" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Unread</button>
-            </div>
-            <div id="notificationList" class="flex-1 overflow-y-auto">
-                <div id="notificationLoading" class="p-8 text-center">
-                    <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
-                    <p class="text-gray-500 mt-3 text-sm">Loading notifications...</p>
-                </div>
-            </div>
-            <div id="notificationLoadingMore" class="hidden p-4 border-t border-gray-100 text-center flex-shrink-0">
-                <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
-            </div>
+      <!-- Matters quota card -->
+      <lex-card variant="default" padding="normal">
+        <lex-metric
+          id="metricMatters"
+          label="Matters"
+          value="-"
+          status="blue"
+        ></lex-metric>
+        <div class="org-quota-bar">
+          <div
+            class="org-quota-bar__track"
+            role="progressbar"
+            aria-valuenow="0"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-label="Matters quota"
+          >
+            <div
+              class="org-quota-bar__fill"
+              id="matterQuotaFill"
+              style="width:0%"
+            ></div>
+          </div>
+          <span class="org-quota-label" id="matterQuotaLabel"></span>
         </div>
+      </lex-card>
 
-        <main class="p-4 lg:p-8">
-            <!-- Loading Skeleton -->
-            <div id="pageLoading" class="space-y-6">
-                <!-- Organization Header Skeleton -->
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 animate-pulse">
-                    <div class="flex items-start gap-4">
-                        <div class="w-16 h-16 bg-gray-200 rounded-xl"></div>
-                        <div class="flex-1">
-                            <div class="h-6 bg-gray-200 rounded w-48 mb-2"></div>
-                            <div class="h-4 bg-gray-200 rounded w-32 mb-3"></div>
-                            <div class="h-4 bg-gray-200 rounded w-64"></div>
-                        </div>
-                        <div class="h-6 bg-gray-200 rounded-full w-16"></div>
-                    </div>
-                </div>
-
-                <!-- Stats Skeleton -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 animate-pulse">
-                        <div class="h-4 bg-gray-200 rounded w-20 mb-2"></div>
-                        <div class="h-8 bg-gray-200 rounded w-16 mb-3"></div>
-                        <div class="h-2 bg-gray-200 rounded w-full"></div>
-                    </div>
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 animate-pulse">
-                        <div class="h-4 bg-gray-200 rounded w-20 mb-2"></div>
-                        <div class="h-8 bg-gray-200 rounded w-16 mb-3"></div>
-                        <div class="h-2 bg-gray-200 rounded w-full"></div>
-                    </div>
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 animate-pulse">
-                        <div class="h-4 bg-gray-200 rounded w-20 mb-2"></div>
-                        <div class="h-8 bg-gray-200 rounded w-16 mb-3"></div>
-                        <div class="h-2 bg-gray-200 rounded w-full"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Page Content (hidden until loaded) -->
-            <div id="pageContent" class="space-y-6 hidden">
-                <!-- Organization Header -->
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                    <div class="flex items-start gap-4">
-                        <div class="w-16 h-16 bg-indigo-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                            <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-                            </svg>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <h2 id="orgName" class="text-xl font-semibold text-gray-900">Loading...</h2>
-                            <p id="orgSlug" class="text-sm text-gray-500 mt-1"></p>
-                            <p id="orgDescription" class="text-gray-600 mt-2"></p>
-                        </div>
-                        <span id="orgStatus" class="px-3 py-1 text-sm font-medium rounded-full"></span>
-                    </div>
-                </div>
-
-                <!-- Usage Statistics -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <!-- Users -->
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-sm font-medium text-gray-500">Users</span>
-                            <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
-                            </svg>
-                        </div>
-                        <div class="flex items-baseline gap-2">
-                            <span id="userCount" class="text-2xl font-bold text-gray-900">0</span>
-                            <span id="userLimit" class="text-sm text-gray-500"></span>
-                        </div>
-                        <div class="mt-3 w-full bg-gray-200 rounded-full h-2">
-                            <div id="userProgress" class="bg-blue-500 h-2 rounded-full transition-all" style="width: 0%"></div>
-                        </div>
-                    </div>
-
-                    <!-- Matters -->
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-sm font-medium text-gray-500">Matters</span>
-                            <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
-                            </svg>
-                        </div>
-                        <div class="flex items-baseline gap-2">
-                            <span id="matterCount" class="text-2xl font-bold text-gray-900">0</span>
-                            <span id="matterLimit" class="text-sm text-gray-500"></span>
-                        </div>
-                        <div class="mt-3 w-full bg-gray-200 rounded-full h-2">
-                            <div id="matterProgress" class="bg-purple-500 h-2 rounded-full transition-all" style="width: 0%"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Organization Information -->
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100">
-                    <div class="px-6 py-4 border-b border-gray-100">
-                        <h3 class="text-lg font-semibold text-gray-900">Organization Information</h3>
-                    </div>
-                    <div class="p-6">
-                        <dl class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <dt class="text-sm font-medium text-gray-500">Organization ID</dt>
-                                <dd id="orgId" class="mt-1 text-sm text-gray-900 font-mono">-</dd>
-                            </div>
-                            <div>
-                                <dt class="text-sm font-medium text-gray-500">Subscription Tier</dt>
-                                <dd id="orgTier" class="mt-1 text-sm text-gray-900">-</dd>
-                            </div>
-                            <div>
-                                <dt class="text-sm font-medium text-gray-500">Created</dt>
-                                <dd id="orgCreated" class="mt-1 text-sm text-gray-900">-</dd>
-                            </div>
-                            <div>
-                                <dt class="text-sm font-medium text-gray-500">Last Updated</dt>
-                                <dd id="orgUpdated" class="mt-1 text-sm text-gray-900">-</dd>
-                            </div>
-                        </dl>
-                    </div>
-                </div>
-            </div>
-        </main>
     </div>
 
-    <script>
-        if (!api.requireAuth()) throw new Error('Not authenticated');
 
-        // Load user profile and render menu
-        (async () => {
-            try {
-                await api.loadUserProfile();
-            } catch (error) {
-                console.error('Failed to load user profile:', error);
-            }
-            renderMenu('#mainNav');
+    <!-- ================================================================
+         Zone C — Organization Information (key-value pairs)
+         Populated by organizations.js:_renderInfo()
+         ================================================================ -->
+    <lex-card
+      id="orgInfoCard"
+      heading="Organization Information"
+      variant="default"
+    >
+      <div class="org-kv-grid">
+        <lex-kv id="kvOrgId"      label="Organization ID"   value="-" copyable="true"></lex-kv>
+        <lex-kv id="kvOrgTier"    label="Subscription Tier" value="-"></lex-kv>
+        <lex-kv id="kvOrgCreated" label="Created"           value="-"></lex-kv>
+        <lex-kv id="kvOrgUpdated" label="Last Updated"      value="-"></lex-kv>
+      </div>
+    </lex-card>
 
-            // Initialize conversation menu
-            if (typeof ConversationMenu !== 'undefined' && ConversationMenu.init()) {
-                ConversationMenu.loadConversations(true);
-            }
 
-            // Initialize conversation search modal
-            if (typeof ConversationSearchModal !== 'undefined') {
-                ConversationSearchModal.init();
-            }
-        })();
+    <!-- ================================================================
+         Error State (hidden by default)
+         Shown by organizations.js:_showError() on API failure
+         ================================================================ -->
+    <div id="orgErrorState" class="hidden">
+      <lex-empty
+        icon="folder"
+        message="Unable to load organization"
+        description="Please try again later"
+      ></lex-empty>
+    </div>
 
-        // Initialize notifications
-        NotificationPanel.init();
+  </main>
 
-        // Load user info for header
-        function loadUserInfo() {
-            const user = api.user;
-            if (user) {
-                const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
-                const initials = (user.firstName?.[0] || '') + (user.lastName?.[0] || '') || user.email?.[0]?.toUpperCase() || 'U';
-                const uNameEl = document.getElementById('userName');
-                const uInitEl = document.getElementById('userInitials');
-                if (uNameEl) uNameEl.textContent = name;
-                if (uInitEl) uInitEl.textContent = initials;
-            }
-        }
-        loadUserInfo();
-
-        // User menu toggle
-        const userMenu = document.getElementById('userMenu');
-        const userDropdown = document.getElementById('userDropdown');
-        userMenu.addEventListener('click', (e) => {
-            e.stopPropagation();
-            userDropdown.classList.toggle('hidden');
-        });
-        document.addEventListener('click', (e) => {
-            if (!userMenu.contains(e.target)) userDropdown.classList.add('hidden');
-        });
-
-        // Logout
-        document.getElementById('logoutBtn').addEventListener('click', async () => {
-            await api.logout();
-            window.location.href = '../login.html';
-        });
-
-        // Sidebar toggle
-        const sidebar = document.getElementById('sidebar');
-        document.getElementById('openSidebar').addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
-        document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
-
-        // Load organization details
-        async function loadOrganization() {
-            try {
-                // Get user's organization ID
-                const user = api.user;
-                const orgId = user?.organizationId || user?.organization_id;
-
-                if (!orgId) {
-                    throw new Error('No organization found');
-                }
-
-                // Fetch organization details and stats
-                const [orgResult, statsResult] = await Promise.all([
-                    api.getOrganization(orgId),
-                    api.getOrganizationStats(orgId).catch(() => ({}))
-                ]);
-
-                const org = orgResult.organization || orgResult;
-                const stats = statsResult;
-
-                // Populate header
-                document.getElementById('orgName').textContent = org.name || 'Organization';
-                document.getElementById('orgSlug').textContent = org.slug ? `@${org.slug}` : '';
-                document.getElementById('orgDescription').textContent = org.description || 'No description provided';
-
-                const statusEl = document.getElementById('orgStatus');
-                const status = org.status || 'active';
-                statusEl.textContent = status.charAt(0).toUpperCase() + status.slice(1);
-                statusEl.className = `px-3 py-1 text-sm font-medium rounded-full ${getStatusClass(status)}`;
-
-                // Populate stats
-                const userCount = stats.user_count || org.user_count || 0;
-                const userLimit = org.max_users || stats.max_users;
-                document.getElementById('userCount').textContent = userCount;
-                document.getElementById('userLimit').textContent = userLimit ? `/ ${userLimit}` : '';
-                document.getElementById('userProgress').style.width = userLimit ? `${Math.min((userCount / userLimit) * 100, 100)}%` : '0%';
-
-                const matterCount = stats.matter_count || org.matter_count || 0;
-                const matterLimit = org.max_matters || stats.max_matters;
-                document.getElementById('matterCount').textContent = matterCount;
-                document.getElementById('matterLimit').textContent = matterLimit ? `/ ${matterLimit}` : '';
-                document.getElementById('matterProgress').style.width = matterLimit ? `${Math.min((matterCount / matterLimit) * 100, 100)}%` : '0%';
-
-                // Populate info
-                document.getElementById('orgId').textContent = org.id || '-';
-                document.getElementById('orgTier').textContent = (org.tier || 'standard').charAt(0).toUpperCase() + (org.tier || 'standard').slice(1);
-                document.getElementById('orgCreated').textContent = org.created_at ? formatDate(org.created_at) : '-';
-                document.getElementById('orgUpdated').textContent = org.updated_at ? formatDate(org.updated_at) : '-';
-
-                // Show content, hide loading
-                document.getElementById('pageLoading').classList.add('hidden');
-                document.getElementById('pageContent').classList.remove('hidden');
-
-            } catch (error) {
-                console.error('Failed to load organization:', error);
-                Toast.error('Failed to load organization details');
-                document.getElementById('pageLoading').innerHTML = `
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
-                        <svg class="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                        </svg>
-                        <h3 class="text-lg font-medium text-gray-900 mb-2">Unable to load organization</h3>
-                        <p class="text-gray-500">${error.message || 'Please try again later'}</p>
-                    </div>
-                `;
-            }
-        }
-
-        function getStatusClass(status) {
-            switch (status) {
-                case 'active': return 'bg-green-100 text-green-800';
-                case 'inactive': return 'bg-gray-100 text-gray-800';
-                case 'suspended': return 'bg-red-100 text-red-800';
-                case 'trial': return 'bg-yellow-100 text-yellow-800';
-                default: return 'bg-green-100 text-green-800';
-            }
-        }
-
-        function formatDate(dateString) {
-            if (!dateString) return '-';
-            const date = new Date(dateString);
-            return date.toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric'
-            });
-        }
-
-        // Initialize
-        loadOrganization();
-
-    </script>
-
-  </div>
-</body>
-</html>
+</div>

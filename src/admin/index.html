@@ -1,398 +1,66 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Administration - LanaAI</title>
-  <script src="../js/tailwind-loader.js"></script>
-  <script src="../js/error-reporter.js"></script>
-  <script src="../js/config.js"></script>
-  <script src="../js/mock-data.js"></script>
-  <script src="../js/api.js"></script>
-  <script src="../js/components.js"></script>
-  <script src="../js/menu.js"></script>
-  <script src="../js/navigation-helpers.js"></script>
-  <script src="../js/new-project-modal.js"></script>
-  <script src="../js/conversation-menu.js"></script>
-  <script src="../js/conversation-search-modal.js"></script>
-  <script src="../js/notifications.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<!-- Administration — Navigation hub for admin console sections.
+     SPA page fragment loaded by lex-router into lex-app content area.
+     Uses #lex-page-content for Strategy 1 extraction (see lex-router.js). -->
 
-  <!-- Inline preloader styles - Pure CSS, no dependencies -->
-  <style>
-    /* Preloader shown immediately, before any JS/CSS loads */
-    #lana-preloader {
-      position: fixed;
-      inset: 0;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 99999;
-      transition: opacity 0.3s ease-out;
-    }
+<div id="lex-page-content">
 
-    .preloader-logo {
-      width: 80px;
-      height: 80px;
-      margin-bottom: 24px;
-      animation: pulse 2s ease-in-out infinite;
-    }
+  <main>
 
-    .preloader-spinner {
-      width: 48px;
-      height: 48px;
-      border: 4px solid rgba(255, 255, 255, 0.3);
-      border-top-color: white;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-bottom: 16px;
-    }
+    <!-- Page header -->
+    <lex-banner
+      variant="light"
+      size="compact"
+      heading="Administration"
+      subtitle="Manage users, roles, organizations, and system settings"
+    ></lex-banner>
 
-    .preloader-text {
-      color: white;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      font-size: 16px;
-      font-weight: 500;
-      letter-spacing: 0.5px;
-    }
+    <!-- Admin navigation cards grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
+      <lex-action-card
+        title="Users"
+        description="Manage user accounts, permissions, and access"
+        tag="Identity"
+        data-href="admin/users.html"
+      ></lex-action-card>
 
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.85; transform: scale(0.96); }
-    }
+      <lex-action-card
+        title="Roles &amp; Permissions"
+        description="Configure roles and permission levels"
+        tag="Identity"
+        data-href="admin/roles.html"
+      ></lex-action-card>
 
-    .admin-card {
-      transition: all 0.2s ease;
-    }
+      <lex-action-card
+        title="Organizations"
+        description="Manage organizational structure and settings"
+        tag="Structure"
+        data-href="admin/organizations.html"
+      ></lex-action-card>
 
-    .admin-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
-    }
-  </style>
-</head>
-<body class="bg-gray-50 min-h-screen">
+      <lex-action-card
+        title="Sessions"
+        description="Monitor active user sessions and connections"
+        tag="Security"
+        data-href="admin/sessions.html"
+      ></lex-action-card>
 
-  <!-- Pure HTML/CSS Preloader - Shows immediately, hidden by JS when ready -->
-  <div id="lana-preloader">
-    <svg class="preloader-logo" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="50" cy="50" r="45" fill="white" opacity="0.15"/>
-      <circle cx="50" cy="50" r="35" fill="white" opacity="0.3"/>
-      <circle cx="50" cy="50" r="25" fill="white"/>
-      <text x="50" y="58" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#667eea" text-anchor="middle">L</text>
-    </svg>
-    <div class="preloader-spinner"></div>
-    <div class="preloader-text">Loading LanaAI...</div>
-  </div>
+      <lex-action-card
+        title="Audit Logs"
+        description="View system activity and security logs"
+        tag="Security"
+        data-href="admin/audit.html"
+      ></lex-action-card>
 
-  <!-- App content - wrapped for FOUC prevention -->
-  <div id="app-content">
-    <!-- Sidebar -->
-    <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
-      <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
-        <a href="../index.html"><img src="../img/logo-light.png" alt="LanaAI" class="h-7"></a>
-        <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-      <nav id="mainNav" class="flex-1 overflow-hidden pt-6 px-3">
-        <!-- Menu will be dynamically rendered by menu.js -->
-      </nav>
-    </aside>
+      <lex-action-card
+        title="System Health"
+        description="Monitor system status and performance"
+        tag="Operations"
+        data-href="admin/health.html"
+      ></lex-action-card>
 
-    <!-- Main Content -->
-    <div class="lg:ml-64">
-      <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
-        <div class="flex items-center justify-between h-16 px-4 lg:px-8">
-          <div class="flex items-center">
-            <button id="sidebarToggle" class="lg:hidden mr-4 text-gray-600 hover:text-gray-900">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-              </svg>
-            </button>
-            <h1 class="text-xl font-semibold text-gray-900">Administration</h1>
-          </div>
-          <div class="flex items-center gap-4">
-            <!-- Notification Button -->
-            <button id="notificationBtn" class="relative text-gray-500 hover:text-gray-700">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
-              </svg>
-              <span id="notificationBadge" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">0</span>
-            </button>
-            <!-- User Menu -->
-            <div class="relative" id="userMenu">
-              <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900 p-1" title="Settings">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                </svg>
-              </button>
-              <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-                <a href="../settings.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
-                <hr class="my-1">
-                <button id="logoutBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sign out</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <!-- Notification Panel Overlay -->
-      <div id="notificationOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
-
-      <!-- Notification Slide-out Panel -->
-      <div id="notificationPanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
-        <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
-          <h2 class="text-lg font-semibold text-gray-900">Notifications</h2>
-          <div class="flex items-center gap-3">
-            <button id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium hidden">Mark all read</button>
-            <button id="refreshNotificationsBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-            </button>
-            <button id="closeNotificationPanel" class="text-gray-400 hover:text-gray-600">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-            </button>
-          </div>
-        </div>
-        <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
-          <button id="filterAll" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">All</button>
-          <button id="filterUnread" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Unread</button>
-        </div>
-        <div id="notificationList" class="flex-1 overflow-y-auto">
-          <div id="notificationLoading" class="p-8 text-center">
-            <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
-            <p class="text-gray-500 mt-3 text-sm">Loading notifications...</p>
-          </div>
-        </div>
-        <div id="notificationLoadingMore" class="hidden p-4 border-t border-gray-100 text-center flex-shrink-0">
-          <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
-        </div>
-      </div>
-
-      <!-- Main Content Area -->
-      <main class="p-4 lg:p-8">
-        <!-- Page Description -->
-        <div class="mb-8">
-          <p class="text-gray-600">Manage users, roles, organizations, and system settings</p>
-        </div>
-
-        <!-- Admin Cards Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-
-          <!-- Users Card -->
-          <a href="./users.html" class="admin-card block bg-white rounded-lg shadow-sm p-6 hover:shadow-md border border-gray-200">
-            <div class="flex items-start">
-              <div class="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
-                </svg>
-              </div>
-              <div class="ml-4 flex-1">
-                <h3 class="text-lg font-semibold text-gray-900 mb-1">Users</h3>
-                <p class="text-sm text-gray-600">Manage user accounts, permissions, and access</p>
-              </div>
-            </div>
-          </a>
-
-          <!-- Roles & Permissions Card -->
-          <a href="./roles.html" class="admin-card block bg-white rounded-lg shadow-sm p-6 hover:shadow-md border border-gray-200">
-            <div class="flex items-start">
-              <div class="flex-shrink-0 w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
-                </svg>
-              </div>
-              <div class="ml-4 flex-1">
-                <h3 class="text-lg font-semibold text-gray-900 mb-1">Roles & Permissions</h3>
-                <p class="text-sm text-gray-600">Configure roles and permission levels</p>
-              </div>
-            </div>
-          </a>
-
-          <!-- Organizations Card -->
-          <a href="./organizations.html" class="admin-card block bg-white rounded-lg shadow-sm p-6 hover:shadow-md border border-gray-200">
-            <div class="flex items-start">
-              <div class="flex-shrink-0 w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-                </svg>
-              </div>
-              <div class="ml-4 flex-1">
-                <h3 class="text-lg font-semibold text-gray-900 mb-1">Organizations</h3>
-                <p class="text-sm text-gray-600">Manage organizational structure and settings</p>
-              </div>
-            </div>
-          </a>
-
-          <!-- Management Boards Card - TEMPORARILY HIDDEN -->
-          <!--
-          <a href="./management-boards.html" class="admin-card block bg-white rounded-lg shadow-sm p-6 hover:shadow-md border border-gray-200">
-            <div class="flex items-start">
-              <div class="flex-shrink-0 w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center">
-                <svg class="w-6 h-6 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                </svg>
-              </div>
-              <div class="ml-4 flex-1">
-                <h3 class="text-lg font-semibold text-gray-900 mb-1">Management Boards</h3>
-                <p class="text-sm text-gray-600">Track KPIs, metrics, and team performance</p>
-              </div>
-            </div>
-          </a>
-          -->
-
-          <!-- Sessions Card -->
-          <a href="./sessions.html" class="admin-card block bg-white rounded-lg shadow-sm p-6 hover:shadow-md border border-gray-200">
-            <div class="flex items-start">
-              <div class="flex-shrink-0 w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
-                <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-                </svg>
-              </div>
-              <div class="ml-4 flex-1">
-                <h3 class="text-lg font-semibold text-gray-900 mb-1">Sessions</h3>
-                <p class="text-sm text-gray-600">Monitor active user sessions and connections</p>
-              </div>
-            </div>
-          </a>
-
-          <!-- Audit Logs Card -->
-          <a href="./audit.html" class="admin-card block bg-white rounded-lg shadow-sm p-6 hover:shadow-md border border-gray-200">
-            <div class="flex items-start">
-              <div class="flex-shrink-0 w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
-                </svg>
-              </div>
-              <div class="ml-4 flex-1">
-                <h3 class="text-lg font-semibold text-gray-900 mb-1">Audit Logs</h3>
-                <p class="text-sm text-gray-600">View system activity and security logs</p>
-              </div>
-            </div>
-          </a>
-
-          <!-- System Health Card -->
-          <a href="./health.html" class="admin-card block bg-white rounded-lg shadow-sm p-6 hover:shadow-md border border-gray-200">
-            <div class="flex items-start">
-              <div class="flex-shrink-0 w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                </svg>
-              </div>
-              <div class="ml-4 flex-1">
-                <h3 class="text-lg font-semibold text-gray-900 mb-1">System Health</h3>
-                <p class="text-sm text-gray-600">Monitor system status and performance</p>
-              </div>
-            </div>
-          </a>
-
-        </div>
-      </main>
     </div>
-  </div>
 
-  <script>
-    document.addEventListener('DOMContentLoaded', async function() {
-      // Check authentication
-      checkAuth();
+  </main>
 
-      // Load full user profile with roles before rendering menu
-      try {
-        await api.loadUserProfile();
-      } catch (error) {
-        console.error('Failed to load user profile:', error);
-      }
-
-      // Render dynamic menu
-      renderMenu('#mainNav', { menuType: 'portal' });
-
-      // Initialize conversation menu
-      if (typeof ConversationMenu !== 'undefined' && ConversationMenu.init()) {
-        ConversationMenu.loadConversations(true);
-      }
-
-      // Initialize conversation search modal
-      if (typeof ConversationSearchModal !== 'undefined') {
-        ConversationSearchModal.init();
-      }
-
-      // Initialize notifications panel
-      NotificationPanel.init();
-
-      // Load user info for header
-      loadUserInfo();
-
-      // Setup UI event listeners
-      setupEventListeners();
-    });
-
-    function checkAuth() {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        window.location.href = '../login.html';
-        return;
-      }
-    }
-
-    function loadUserInfo() {
-      const user = api.user;
-      if (user) {
-        const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
-        const initials = (user.firstName?.[0] || '') + (user.lastName?.[0] || '') || user.email[0].toUpperCase();
-        const uNameEl = document.getElementById('userName');
-        const uInitEl = document.getElementById('userInitials');
-        if (uNameEl) uNameEl.textContent = name;
-        if (uInitEl) uInitEl.textContent = initials;
-      }
-    }
-
-    function setupEventListeners() {
-      // User menu toggle
-      const userMenu = document.getElementById('userMenu');
-      const userDropdown = document.getElementById('userDropdown');
-      userMenu.addEventListener('click', (e) => {
-        e.stopPropagation();
-        userDropdown.classList.toggle('hidden');
-      });
-      document.addEventListener('click', (e) => {
-        if (!userMenu.contains(e.target)) userDropdown.classList.add('hidden');
-      });
-
-      // Logout handler
-      document.getElementById('logoutBtn').addEventListener('click', async () => {
-        await api.logout();
-        window.location.href = '../login.html';
-      });
-
-      // Sidebar toggle for mobile
-      const sidebar = document.getElementById('sidebar');
-      const sidebarToggle = document.getElementById('sidebarToggle');
-      const closeSidebar = document.getElementById('closeSidebar');
-
-      if (sidebarToggle) {
-        sidebarToggle.addEventListener('click', () => {
-          sidebar.classList.remove('-translate-x-full');
-        });
-      }
-
-      if (closeSidebar) {
-        closeSidebar.addEventListener('click', () => {
-          sidebar.classList.add('-translate-x-full');
-        });
-      }
-    }
-
-  </script>
-
-  </div>
-</body>
-</html>
+</div>

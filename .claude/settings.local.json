@@ -69,7 +69,12 @@
       "WebFetch(domain:github.com)",
       "Bash(npm info:*)",
       "Bash(npm install:*)",
-      "Bash(ollama list:*)"
+      "Bash(ollama list:*)",
+      "Bash(git -C /Users/redroostertechnologies/Desktop/LANA-AI status -u)",
+      "Bash(git -C /Users/redroostertechnologies/Desktop/LANA-AI diff --stat)",
+      "Bash(git -C /Users/redroostertechnologies/Desktop/LANA-AI log --oneline -3)",
+      "Bash(git rm:*)",
+      "Bash(git -C /Users/redroostertechnologies/Desktop/LANA-AI status)"
     ],
     "deny": [],
     "ask": []
