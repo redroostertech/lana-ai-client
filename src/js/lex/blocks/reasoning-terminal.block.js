@@ -184,7 +184,30 @@
     return div.innerHTML;
   }
 
+  /**
+   * Sanitise a string for safe use as a CSS class-name suffix.
+   * Retains only ASCII letters (a-z, A-Z), digits (0-9), underscores, and hyphens.
+   * Uses charAt-based iteration — no regex.
+   * @param {string} text
+   * @returns {string}
+   */
   function escapeAttr(text) {
-    return (text || '').replace(/[^a-zA-Z0-9_-]/g, '');
+    var src = text || '';
+    var out = '';
+    for (var i = 0; i < src.length; i++) {
+      var c = src.charAt(i);
+      var code = src.charCodeAt(i);
+      // Allow: a-z (97-122), A-Z (65-90), 0-9 (48-57), _ (95), - (45)
+      if (
+        (code >= 97 && code <= 122) ||   // a-z
+        (code >= 65 && code <= 90)  ||   // A-Z
+        (code >= 48 && code <= 57)  ||   // 0-9
+        code === 95 ||                    // _
+        code === 45                       // -
+      ) {
+        out += c;
+      }
+    }
+    return out;
   }
 })();

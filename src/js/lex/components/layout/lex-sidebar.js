@@ -657,6 +657,43 @@
       };
     }
 
+    constructor() {
+      super();
+
+      // Generation counters for structural Array properties.
+      // Incremented each time sections or userMenuItems is assigned so that the
+      // render fast-path can detect structural changes with a simple integer
+      // comparison instead of JSON.stringify() on every render cycle.
+      this._sectionsGen = 0;
+      this._menuItemsGen = 0;
+
+      // Wrap the reactive setters installed by LexElement so that each
+      // assignment bumps the corresponding generation counter.
+      const sectionsDesc = Object.getOwnPropertyDescriptor(this, 'sections');
+      if (sectionsDesc && sectionsDesc.set) {
+        const baseSetter = sectionsDesc.set;
+        Object.defineProperty(this, 'sections', {
+          get: sectionsDesc.get,
+          set: (val) => { this._sectionsGen++; baseSetter.call(this, val); },
+          configurable: true
+        });
+      }
+
+      const menuDesc = Object.getOwnPropertyDescriptor(this, 'userMenuItems');
+      if (menuDesc && menuDesc.set) {
+        const baseSetter = menuDesc.set;
+        Object.defineProperty(this, 'userMenuItems', {
+          get: menuDesc.get,
+          set: (val) => { this._menuItemsGen++; baseSetter.call(this, val); },
+          configurable: true
+        });
+      }
+
+      // Track the last-emitted collapsed value so _emitCollapsedState() is
+      // a no-op when the collapsed state has not actually changed.
+      this._lastEmittedCollapsed = null;
+    }
+
     render() {
       injectStyles();
 
@@ -676,22 +713,24 @@
           el.dataset.active = String(el.dataset.id === this.activeId);
         });
 
-        // Check if we need a full re-render (structural props changed)
-        if (this._lastSectionsJson === JSON.stringify(this.sections || [])
+        // Check if we need a full re-render (structural props changed).
+        // Use generation counters instead of JSON.stringify() to avoid O(n)
+        // serialization on every property change.
+        if (this._lastSectionsGen === this._sectionsGen
             && this._lastUserName === this.userName
             && this._lastUserEmail === this.userEmail
             && this._lastVersion === this.version
-            && this._lastMenuItemsJson === JSON.stringify(this.userMenuItems || [])) {
+            && this._lastMenuItemsGen === this._menuItemsGen) {
           return null; // Skip innerHTML, preserve conversation list DOM
         }
       }
 
       // ── Full render ──
-      this._lastSectionsJson = JSON.stringify(this.sections || []);
+      this._lastSectionsGen = this._sectionsGen;
       this._lastUserName = this.userName;
       this._lastUserEmail = this.userEmail;
       this._lastVersion = this.version;
-      this._lastMenuItemsJson = JSON.stringify(this.userMenuItems || []);
+      this._lastMenuItemsGen = this._menuItemsGen;
 
       const sections = this.sections || [];
       const footerSections = sections.filter(s => s.isFooter);
@@ -750,6 +789,13 @@
 
 
     _emitCollapsedState() {
+      // Guard: only update the CSS variable and fire the event when the
+      // collapsed state has actually changed since the last emission.
+      // Previously this ran unconditionally on every fast-path render cycle,
+      // causing unnecessary CSS variable writes and event dispatches.
+      if (this._lastEmittedCollapsed === this.collapsed) return;
+      this._lastEmittedCollapsed = this.collapsed;
+
       // Update the CSS variable so lex-shell-main can adjust its margin
       document.documentElement.style.setProperty(
         '--lex-sidebar-current-width',
@@ -954,7 +1000,9 @@
         this.emit('sidebar-user-action', { action: action });
       });
 
-      // Ensure collapsed CSS variable is set on every render
+      // Sync collapsed CSS variable after a full re-render.
+      // _emitCollapsedState() is guarded internally — it is a no-op when the
+      // collapsed value has not changed since the last emission.
       this._emitCollapsedState();
     }
   }

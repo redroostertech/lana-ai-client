@@ -280,14 +280,56 @@
 
   // -----------------------------------------------------------------------
   // Humanize a field key: "first_name" -> "First Name", "createdAt" -> "Created At"
+  // Uses string methods only — no regex.
   // -----------------------------------------------------------------------
 
   function humanize(key) {
-    return key
-      .replace(/([A-Z])/g, ' $1')
-      .replace(/[_-]/g, ' ')
-      .replace(/\b\w/g, c => c.toUpperCase())
-      .trim();
+    // Expand camelCase: insert a space before each uppercase letter
+    var expanded = '';
+    for (var i = 0; i < key.length; i++) {
+      var ch = key.charAt(i);
+      var code = ch.charCodeAt(0);
+      if (i > 0 && code >= 65 && code <= 90) {
+        expanded += ' ' + ch;
+      } else {
+        expanded += ch;
+      }
+    }
+
+    // Replace underscores and hyphens with spaces
+    var spaced = '';
+    for (var j = 0; j < expanded.length; j++) {
+      var c = expanded.charAt(j);
+      if (c === '_' || c === '-') {
+        spaced += ' ';
+      } else {
+        spaced += c;
+      }
+    }
+
+    // Title-case: capitalize first character of each space-separated word
+    var words = spaced.split(' ');
+    var titled = words.map(function (w) {
+      if (!w) return w;
+      return w.charAt(0).toUpperCase() + w.slice(1);
+    });
+    return titled.join(' ').trim();
+  }
+
+  // -----------------------------------------------------------------------
+  // Detect whether a string value looks like an ISO date (YYYY-MM-DD...).
+  // Uses string-method character checks instead of regex — no regex allowed.
+  // Requires length >= 10, positions 4 and 7 to be '-', and the three
+  // numeric segments (year, month, day) to parse as finite integers.
+  // -----------------------------------------------------------------------
+
+  function _isDateString(val) {
+    if (typeof val !== 'string' || val.length < 10) return false;
+    if (val.charAt(4) !== '-' || val.charAt(7) !== '-') return false;
+    var year  = parseInt(val.substring(0, 4), 10);
+    var month = parseInt(val.substring(5, 7), 10);
+    var day   = parseInt(val.substring(8, 10), 10);
+    return isFinite(year) && isFinite(month) && isFinite(day);
   }
 
   // -----------------------------------------------------------------------
@@ -379,12 +421,12 @@
         const sample = data.find(row => row[col] != null)?.[col];
         let type = 'string';
         if (typeof sample === 'number') type = 'number';
-        else if (sample instanceof Date || (typeof sample === 'string' && /^\d{4}-\d{2}-\d{2}/.test(sample))) type = 'date';
+        else if (sample instanceof Date || (typeof sample === 'string' && _isDateString(sample))) type = 'date';
         const unique = [...new Set(data.map(r => r[col]).filter(v => v != null))];
         if (unique.length <= 10 && unique.length < data.length * 0.3) type = 'enum';
         return {
           key: col,
-          label: col.replace(/([A-Z])/g, ' $1').replace(/[_-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim(),
+          label: humanize(col),
           type,
           options: type === 'enum' ? unique.sort() : undefined
         };
@@ -562,7 +604,7 @@
         const filterColumns = this._getFilterColumns();
         html += `
           <div style="padding: 4px 12px 8px">
-            <lex-filter-bar columns='${JSON.stringify(filterColumns).replace(/'/g, "&#39;")}'></lex-filter-bar>
+            <lex-filter-bar columns='${JSON.stringify(filterColumns).split("'").join("&#39;")}'></lex-filter-bar>
           </div>
         `;
       }
@@ -802,10 +844,49 @@
           e.target.checked ? this.selectAll() : this.deselectAll();
         });
 
-        // Individual item checkbox
+        // Individual item checkbox — use targeted DOM updates to avoid full re-render.
+        // A full re-render is only needed when the bulk-action bar must appear or
+        // disappear (transition between 0 and 1 selected items, or N to 0).
         this.delegate('change', '[data-select-item]', (e, el) => {
           const id = el.dataset.selectItem;
-          el.checked ? this.select(id) : this.deselect(id);
+          const wasEmpty = this._selectedIds.size === 0;
+
+          if (el.checked) {
+            this._selectedIds.add(String(id));
+          } else {
+            this._selectedIds.delete(String(id));
+          }
+
+          const nowEmpty = this._selectedIds.size === 0;
+
+          // Bulk bar needs to appear/disappear — requires a full re-render.
+          if (wasEmpty !== nowEmpty) {
+            this._emitSelectionChange();
+            this._scheduleUpdate();
+            return;
+          }
+
+          // Fast path: update the bulk bar count label and select-all checkbox
+          // without touching innerHTML at all.
+          const bulkCount = this.$('.lex-bulk-count');
+          if (bulkCount) {
+            bulkCount.textContent = this._selectedIds.size + ' selected';
+          }
+
+          // Sync the select-all header checkbox state
+          const data = this.dataSource?.data;
+          if (Array.isArray(data)) {
+            const allIds = data.map((item, idx) => String(item[this.idKey] || item.id || idx));
+            const allSelected = allIds.length > 0 && allIds.every(id2 => this._selectedIds.has(id2));
+            const someSelected = !allSelected && allIds.some(id2 => this._selectedIds.has(id2));
+            const selectAllCb = this.$('[data-action="select-all"]');
+            if (selectAllCb) {
+              selectAllCb.checked = allSelected;
+              selectAllCb.indeterminate = someSelected;
+            }
+          }
+
+          this._emitSelectionChange();
         });
 
         // Deselect all button

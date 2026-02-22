@@ -193,16 +193,23 @@
 
     /**
      * Try to parse a value as a Date. Returns timestamp or null.
+     * Uses string-method character checks instead of regex — no regex allowed.
+     * Detects ISO date patterns: YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss.
+     * Requires length >= 10, dashes at positions 4 and 7, and the year/month/day
+     * segments to each parse as finite integers.
      */
     static _tryParseDate(val) {
       if (val instanceof Date) return val.getTime();
-      if (typeof val !== 'string' || val.length < 8) return null;
-      // Match ISO date patterns: YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss
-      if (/^\d{4}-\d{2}-\d{2}/.test(val)) {
-        const ts = Date.parse(val);
-        return isNaN(ts) ? null : ts;
-      }
-      return null;
+      if (typeof val !== 'string' || val.length < 10) return null;
+      // Check structural markers: '-' at positions 4 and 7
+      if (val.charAt(4) !== '-' || val.charAt(7) !== '-') return null;
+      // Verify each numeric segment is a finite integer
+      const year  = parseInt(val.substring(0, 4), 10);
+      const month = parseInt(val.substring(5, 7), 10);
+      const day   = parseInt(val.substring(8, 10), 10);
+      if (!isFinite(year) || !isFinite(month) || !isFinite(day)) return null;
+      const ts = Date.parse(val);
+      return isNaN(ts) ? null : ts;
     }
 
     /**

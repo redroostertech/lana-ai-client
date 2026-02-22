@@ -395,6 +395,9 @@
       this._searchHadFocus = false;
       this._selectedIds = new Set();
       this._colFilterOpen = null;  // Which column's filter dropdown is open
+      // Column-type detection cache — invalidated when the raw data reference changes
+      this._filterCacheDataRef = null;
+      this._cachedFilterColumns = null;
     }
 
     connected() {
@@ -440,9 +443,17 @@
     _getFilterColumns() {
       const data = this.dataSource?._rawData || this.dataSource?.data;
       if (!Array.isArray(data) || data.length === 0) return [];
+
+      // Return cached result when the data array reference has not changed.
+      // Column types are a structural property of the dataset — they only need
+      // recomputation when the caller loads a new dataset, not on every render.
+      if (data === this._filterCacheDataRef && this._cachedFilterColumns !== null) {
+        return this._cachedFilterColumns;
+      }
+
       const columns = this._getColumns();
       const labels = this._getLabels();
-      return columns.map((col, colIdx) => {
+      const result = columns.map((col, colIdx) => {
         // Detect type from first non-null value
         const sample = data.find(row => row[col] != null)?.[col];
         let type = 'string';
@@ -462,6 +473,10 @@
           options: type === 'enum' ? unique.sort() : undefined
         };
       });
+
+      this._filterCacheDataRef = data;
+      this._cachedFilterColumns = result;
+      return result;
     }
 
     // -------------------------------------------------------------------------
@@ -941,16 +956,60 @@
         this._eventCleanups.push(() => document.removeEventListener('mousedown', closeColFilter));
       }
 
-      // Selection: row checkbox
+      // Selection: row checkbox — use targeted DOM updates to avoid full re-render.
+      // A full re-render is only needed when the bulk-action bar must appear or
+      // disappear (transition between 0 and 1 selected items, or N to 0).
       this.delegate('change', '[data-select-row]', (e, el) => {
         const id = el.dataset.selectRow;
+        const wasEmpty = this._selectedIds.size === 0;
+
         if (el.checked) {
           this._selectedIds.add(id);
         } else {
           this._selectedIds.delete(id);
         }
+
+        const nowEmpty = this._selectedIds.size === 0;
+
+        // Bulk bar needs to appear/disappear — requires a full re-render.
+        if (wasEmpty !== nowEmpty) {
+          this._emitSelectionChange();
+          this._scheduleUpdate();
+          return;
+        }
+
+        // Fast path: toggle row highlight and update select-all checkbox state
+        // without touching innerHTML at all.
+        const row = this.querySelector('tr[data-row-id="' + id + '"]');
+        if (row) {
+          if (el.checked) {
+            row.classList.add('lex-row-selected');
+          } else {
+            row.classList.remove('lex-row-selected');
+          }
+        }
+
+        // Update the bulk bar count label in-place
+        const bulkCount = this.$('.lex-bulk-count');
+        if (bulkCount) {
+          bulkCount.textContent = this._selectedIds.size + ' selected';
+        }
+
+        // Sync the select-all header checkbox state
+        const idKey = this.idKey || 'id';
+        const data = this.dataSource?.data;
+        if (Array.isArray(data)) {
+          const allIds = data.map((r, i) => String(r[idKey] !== undefined ? r[idKey] : i));
+          const allSelected = allIds.length > 0 && allIds.every(id2 => this._selectedIds.has(id2));
+          const someSelected = allIds.some(id2 => this._selectedIds.has(id2));
+          const selectAllCb = this.$('[data-action="select-all"]');
+          if (selectAllCb) {
+            selectAllCb.checked = allSelected;
+            selectAllCb.indeterminate = someSelected && !allSelected;
+          }
+        }
+
         this._emitSelectionChange();
-        this._scheduleUpdate();
       });
 
       // Selection: select-all
