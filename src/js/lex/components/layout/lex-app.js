@@ -194,6 +194,7 @@
       this._topbarMenuItems = [];
       this._notificationCount = 0;
       this._notificationInterval = null;
+      this._lastShowAdmin = undefined;
     }
 
     // -----------------------------------------------------------------------
@@ -293,7 +294,14 @@
 
       // Subscribe to auth changes to refresh user display
       if (window.Lex && window.Lex.state) {
-        this._authChangeHandler = () => { this._hydrateUser(); };
+        this._authChangeHandler = () => {
+          this._hydrateUser();
+          // Re-init ConversationMenu: _hydrateUser() may trigger a full
+          // sidebar re-render (if userName/userEmail/version changed),
+          // which destroys #lexConversationListContainer. Re-init ensures
+          // ConversationMenu gets the new container reference.
+          this._initConversationMenu();
+        };
         window.Lex.state.on('auth:changed', this._authChangeHandler);
       }
 
@@ -528,13 +536,19 @@
       sidebar.userInitials = initials;
       sidebar.userEmail = handle;
 
-      // Version from app or Electron
-      if (window.APP_VERSION && window.APP_VERSION.getVersion) {
-        sidebar.version = window.APP_VERSION.getVersion();
-      } else if (window.electronAPI && window.electronAPI.getVersion) {
-        window.electronAPI.getVersion().then((v) => {
-          sidebar.version = 'v' + v;
-        }).catch(() => {});
+      // Version — set once only (avoid async re-render destroying conversation list)
+      if (!this._versionSet) {
+        this._versionSet = true;
+        if (window.APP_VERSION && window.APP_VERSION.getVersion) {
+          sidebar.version = window.APP_VERSION.getVersion();
+        } else if (window.electronAPI && window.electronAPI.getVersion) {
+          var self = this;
+          window.electronAPI.getVersion().then(function (v) {
+            sidebar.version = 'v' + v;
+            // Re-init ConversationMenu since version change triggers full sidebar re-render
+            self._initConversationMenu();
+          }).catch(function () {});
+        }
       }
 
       // Build sidebar sections with role-gated admin link
@@ -549,51 +563,60 @@
       ]);
       const showAdmin = adminRoles.some(function (r) { return allRoles.has(r); });
 
-      // Sidebar sections
-      this.setSections([
-        {
-          id: 'main',
-          isStaticTop: true,
-          items: [
-            { id: 'dashboard', label: 'Dashboard', icon: 'home', href: 'dashboard.html' },
-            { id: 'search', label: 'Search Conversations', icon: 'search', href: 'search-conversations.html' },
-            { id: 'workspaces', label: 'Workspaces', icon: 'briefcase', href: 'workspaces.html' }
-          ]
-        },
-        {
-          id: 'tools',
-          items: [
-            { id: 'connectors', label: 'Data Connectors', icon: 'plug', href: 'integrations/data_connectors.html' },
-            { id: 'reports', label: 'Reports', icon: 'bar-chart-2', href: 'insights/module-execution.html' }
-          ]
-        },
-        {
-          id: 'chats',
-          title: 'Your Chats',
-          isScrollable: true,
-          isConversationList: true,
-          items: [
-            { id: 'new-chat', label: 'New Chat', icon: 'plus', href: 'chat_v2.html' }
-          ]
+      // Only rebuild sidebar sections and menus when admin visibility changes.
+      // Both setSections() and setUserMenuItems() create new arrays which
+      // increment the sidebar's generation counters, triggering a full re-render
+      // that destroys #lexConversationListContainer. Since the only structural
+      // difference between hydrations is whether the admin link is shown,
+      // skip the rebuild when admin visibility is unchanged.
+      if (this._lastShowAdmin !== showAdmin) {
+        this._lastShowAdmin = showAdmin;
+
+        this.setSections([
+          {
+            id: 'main',
+            isStaticTop: true,
+            items: [
+              { id: 'dashboard', label: 'Dashboard', icon: 'home', href: 'dashboard.html' },
+              { id: 'search', label: 'Search Conversations', icon: 'search', href: 'search-conversations.html' },
+              { id: 'workspaces', label: 'Workspaces', icon: 'briefcase', href: 'workspaces.html' }
+            ]
+          },
+          {
+            id: 'tools',
+            items: [
+              { id: 'connectors', label: 'Data Connectors', icon: 'plug', href: 'integrations/data_connectors.html' },
+              { id: 'reports', label: 'Reports', icon: 'bar-chart-2', href: 'insights/module-execution.html' }
+            ]
+          },
+          {
+            id: 'chats',
+            title: 'Your Chats',
+            isScrollable: true,
+            isConversationList: true,
+            items: [
+              { id: 'new-chat', label: 'New Chat', icon: 'plus', href: 'chat_v2.html' }
+            ]
+          }
+        ]);
+
+        // User menu items (role-gated)
+        const menuItems = [];
+        if (showAdmin) {
+          menuItems.push({ id: 'admin', label: 'Administration', icon: 'users', href: 'admin/index.html' });
         }
-      ]);
+        menuItems.push({ id: 'settings', label: 'Settings', icon: 'settings', href: 'settings.html' });
+        menuItems.push({ id: 'help', label: 'Help & Support', icon: 'help-circle', href: 'help.html' });
+        menuItems.push({ id: 'signout', label: 'Sign Out', icon: 'log-out', action: 'signout', danger: true });
+        this.setUserMenuItems(menuItems);
 
-      // User menu items (role-gated)
-      const menuItems = [];
-      if (showAdmin) {
-        menuItems.push({ id: 'admin', label: 'Administration', icon: 'users', href: 'admin/index.html' });
+        // Topbar settings menu
+        this.setTopbarMenuItems([
+          { id: 'settings', label: 'Settings', icon: 'settings' },
+          { divider: true },
+          { id: 'logout', label: 'Sign out', variant: 'danger' }
+        ]);
       }
-      menuItems.push({ id: 'settings', label: 'Settings', icon: 'settings', href: 'settings.html' });
-      menuItems.push({ id: 'help', label: 'Help & Support', icon: 'help-circle', href: 'help.html' });
-      menuItems.push({ id: 'signout', label: 'Sign Out', icon: 'log-out', action: 'signout', danger: true });
-      this.setUserMenuItems(menuItems);
-
-      // Topbar settings menu
-      this.setTopbarMenuItems([
-        { id: 'settings', label: 'Settings', icon: 'settings' },
-        { divider: true },
-        { id: 'logout', label: 'Sign out', variant: 'danger' }
-      ]);
     }
 
     // -----------------------------------------------------------------------
@@ -602,10 +625,16 @@
 
     _initConversationMenu() {
       requestAnimationFrame(() => {
-        if (typeof window.ConversationMenu !== 'undefined') {
-          if (window.ConversationMenu.init('#lexConversationListContainer')) {
-            window.ConversationMenu.loadConversations(true);
-          }
+        if (typeof window.ConversationMenu === 'undefined') return;
+
+        // Skip if ConversationMenu's container is still in the DOM —
+        // avoids a visible flash + unnecessary API call on auth:changed
+        // when the sidebar fast-path preserved the container.
+        var existing = window.ConversationMenu.container;
+        if (existing && existing.isConnected) return;
+
+        if (window.ConversationMenu.init('#lexConversationListContainer')) {
+          window.ConversationMenu.loadConversations(true);
         }
       });
     }
