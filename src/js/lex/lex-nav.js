@@ -54,6 +54,7 @@
     'integrations/integration-config.html':   { id: 'string', connector_id: 'string' },
     'integrations/connector-viewer.html':     { ui: 'string', name: 'string', tab: 'string' },
     'admin/roles_manager.html':               { id: 'string' },
+    'workspace_details.html':                 { id: 'string', tab: 'string' },
     'matters/timeline.html':                  { id: 'string' },
     'password-reset.html':                    { token: 'string' },
     'onboarding.html':                        { token: 'string' },
@@ -244,6 +245,15 @@
     // 1. Normalize path and split any inline query params
     var normalized = normalizePath(path);
 
+    // Block dangerous protocol URLs before any fallback navigation.
+    // Check the original path (before normalization) because normalizePath()
+    // returns null for both external (http/https) and dangerous (javascript:)
+    // URLs, and we must not allow the latter to reach window.location.href.
+    var lowerPath = path ? path.toLowerCase() : '';
+    if (lowerPath.indexOf('javascript:') === 0 || lowerPath.indexOf('data:') === 0) {
+      return;
+    }
+
     // External or unparseable URL — fall back to browser navigation
     if (!normalized) {
       window.location.href = path;
@@ -302,17 +312,22 @@
    * @returns {URLSearchParams}
    */
   function getParams() {
-    // Standard: read from URL
-    var search = global.location.search;
-    if (search) return new URLSearchParams(search);
-
-    // file:// fallback: router stores the full path in history.state.path
+    // The SPA router stores the canonical route (with query params) in
+    // history.state.path — the browser URL bar always shows app.html and
+    // its location.search may be stale or only partially updated by
+    // updateParams(). Always prefer history.state.path as the source of truth.
     if (global.history && global.history.state && global.history.state.path) {
       var statePath = global.history.state.path;
       var qIdx = statePath.indexOf('?');
       if (qIdx !== -1) {
         return new URLSearchParams(statePath.substring(qIdx));
       }
+    }
+
+    // Fallback: read from browser URL (pre-router or non-SPA contexts)
+    var search = global.location.search;
+    if (search) {
+      return new URLSearchParams(search);
     }
 
     return new URLSearchParams();
@@ -324,7 +339,15 @@
    * @param {Object} params - key/value pairs; null values remove the key
    */
   function updateParams(params) {
-    var urlParams = new URLSearchParams(global.location.search);
+    // Read current params from the canonical route in history.state.path
+    // (not location.search, which belongs to the SPA shell URL).
+    var currentState = global.history.state || {};
+    var statePath = currentState.path || '';
+    var qIdx = statePath.indexOf('?');
+    var basePath = qIdx !== -1 ? statePath.substring(0, qIdx) : statePath;
+    var existingSearch = qIdx !== -1 ? statePath.substring(qIdx) : '';
+
+    var urlParams = new URLSearchParams(existingSearch);
     var keys = Object.keys(params);
     for (var i = 0; i < keys.length; i++) {
       var key = keys[i];
@@ -337,12 +360,18 @@
     }
 
     var qs = urlParams.toString();
-    var newUrl = qs
-      ? global.location.pathname + '?' + qs
-      : global.location.pathname;
+    var newStatePath = qs ? basePath + '?' + qs : basePath;
+
+    // Update the canonical route in history.state.path
+    var newState = {};
+    var stateKeys = Object.keys(currentState);
+    for (var si = 0; si < stateKeys.length; si++) {
+      newState[stateKeys[si]] = currentState[stateKeys[si]];
+    }
+    newState.path = newStatePath;
 
     // replaceState avoids back-button clutter
-    global.history.replaceState(global.history.state, '', newUrl);
+    global.history.replaceState(newState, '');
   }
 
   // =========================================================================

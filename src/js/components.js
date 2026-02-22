@@ -638,7 +638,10 @@ const ConversationActionsModal = {
     }
 
     this.close();
-    window.location.href = `/matters.html?matter_id=${this.selectedConversationMatterId}`;
+    Lex.Nav.go('workspace_details.html', {
+      params: { id: this.selectedConversationMatterId },
+      context: { matterId: this.selectedConversationMatterId }
+    });
   },
 
   // Delete conversation

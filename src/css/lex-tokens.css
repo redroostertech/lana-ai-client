@@ -354,6 +354,10 @@
   --lex-btn-radius-lg:   13px;
   --lex-btn-font-weight: var(--lex-weight-medium);
 
+  /* Focus rings */
+  --lex-focus-ring-color: rgba(89, 82, 70, 0.3);
+  --lex-focus-ring:       0 0 0 3px var(--lex-focus-ring-color);
+
   /* Input */
   --lex-input-radius:     var(--lex-radius-md);
   --lex-input-border:     var(--lex-border-default);
@@ -398,6 +402,9 @@
 
   /* Badge */
   --lex-badge-radius: var(--lex-radius-full);
+  --lex-badge-count-size: 0.625rem;           /* 10px — btn badge, topbar badge */
+  --lex-badge-notification-bg:  var(--lex-color-danger-500);
+  --lex-badge-notification-text: var(--lex-color-white);
 
   /* Modal */
   --lex-modal-radius:    var(--lex-radius-xl);
@@ -556,37 +563,45 @@
   letter-spacing: var(--lex-display-lg-tracking);
 }
 
-.lex-h1 {
+/* Compound selectors (h1.lex-h1 etc.) ensure Lex typography overrides Tailwind Preflight,
+   which resets h1–h6 to font-size/weight: inherit. Class-only .lex-h1 still works for spans. */
+.lex-h1,
+h1.lex-h1 {
   font-size: var(--lex-h1-size);
   line-height: var(--lex-h1-height);
   font-weight: var(--lex-h1-weight);
   letter-spacing: var(--lex-h1-tracking);
 }
-.lex-h2 {
+.lex-h2,
+h2.lex-h2 {
   font-size: var(--lex-h2-size);
   line-height: var(--lex-h2-height);
   font-weight: var(--lex-h2-weight);
   letter-spacing: var(--lex-h2-tracking);
 }
-.lex-h3 {
+.lex-h3,
+h3.lex-h3 {
   font-size: var(--lex-h3-size);
   line-height: var(--lex-h3-height);
   font-weight: var(--lex-h3-weight);
   letter-spacing: var(--lex-h3-tracking);
 }
-.lex-h4 {
+.lex-h4,
+h4.lex-h4 {
   font-size: var(--lex-h4-size);
   line-height: var(--lex-h4-height);
   font-weight: var(--lex-h4-weight);
   letter-spacing: var(--lex-h4-tracking);
 }
-.lex-h5 {
+.lex-h5,
+h5.lex-h5 {
   font-size: var(--lex-h5-size);
   line-height: var(--lex-h5-height);
   font-weight: var(--lex-h5-weight);
   letter-spacing: var(--lex-h5-tracking);
 }
-.lex-h6 {
+.lex-h6,
+h6.lex-h6 {
   font-size: var(--lex-h6-size);
   line-height: var(--lex-h6-height);
   font-weight: var(--lex-h6-weight);

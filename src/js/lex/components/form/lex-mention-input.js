@@ -177,6 +177,8 @@
       this._pickerPos = { top: 0, left: 0 };
       this._mentions = [];
       this._firstRender = true;
+      // Unique IDs for aria-controls / aria-activedescendant linking.
+      this._pickerId = 'lex-mention-picker-' + Math.random().toString(36).slice(2, 8);
     }
 
     render() {
@@ -189,8 +191,10 @@
 
       const errorCls = this.error ? ' lex-mention-editor--error' : '';
 
-      let html = `<div class="lex-mention-editor${errorCls}" contenteditable="true" data-placeholder="${this.escapeHtml(this.placeholder)}" role="textbox"></div>`;
-      html += `<div class="lex-mention-picker" style="position:absolute;"></div>`;
+      // aria-autocomplete="list" indicates suggestions are shown in a listbox popup.
+      // aria-controls links the editor to the picker listbox.
+      let html = `<div class="lex-mention-editor${errorCls}" contenteditable="true" data-placeholder="${this.escapeHtml(this.placeholder)}" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="${this._pickerId}" aria-multiline="true"></div>`;
+      html += `<div id="${this._pickerId}" class="lex-mention-picker" role="listbox" style="position:absolute;"></div>`;
 
       return this._renderFieldWrapper(`<div style="position:relative;">${html}</div>`);
     }
@@ -331,19 +335,34 @@
     _renderPicker(picker, filtered) {
       if (!picker) return;
 
+      const editor = this.querySelector('.lex-mention-editor');
+
       let html = '';
       if (filtered.length === 0) {
         html = '<div class="lex-mention-picker-empty">No matches</div>';
       } else {
         filtered.forEach((item, idx) => {
           const focusedCls = idx === this._focusedIdx ? ' lex-mention-picker-item--focused' : '';
-          const iconHtml = item.icon ? `<span class="lex-mention-picker-item-icon">${DOC_ICON}</span>` : `<span class="lex-mention-picker-item-icon">${DOC_ICON}</span>`;
-          html += `<div class="lex-mention-picker-item${focusedCls}" data-id="${this.escapeHtml(item.id)}">${iconHtml}<span>${this.escapeHtml(item.label)}</span></div>`;
+          const isFocused = idx === this._focusedIdx;
+          // Each item gets a stable id for aria-activedescendant on the editor.
+          const optId = this._pickerId + '-opt-' + idx;
+          const iconHtml = item.icon ? `<span class="lex-mention-picker-item-icon" aria-hidden="true">${item.icon}</span>` : `<span class="lex-mention-picker-item-icon" aria-hidden="true">${DOC_ICON}</span>`;
+          html += `<div id="${optId}" class="lex-mention-picker-item${focusedCls}" data-id="${this.escapeHtml(item.id)}" role="option" aria-selected="${isFocused ? 'true' : 'false'}">${iconHtml}<span>${this.escapeHtml(item.label)}</span></div>`;
         });
       }
 
       picker.innerHTML = html;
       picker.classList.add('lex-mention-picker--open');
+
+      // Update aria-expanded and aria-activedescendant on the editor element.
+      if (editor) {
+        editor.setAttribute('aria-expanded', 'true');
+        if (this._focusedIdx >= 0) {
+          editor.setAttribute('aria-activedescendant', this._pickerId + '-opt-' + this._focusedIdx);
+        } else {
+          editor.removeAttribute('aria-activedescendant');
+        }
+      }
     }
 
     _closePicker(picker) {
@@ -352,6 +371,12 @@
       this._focusedIdx = -1;
       if (picker) {
         picker.classList.remove('lex-mention-picker--open');
+      }
+      // Reset aria state on the editor when picker closes.
+      const editor = this.querySelector('.lex-mention-editor');
+      if (editor) {
+        editor.setAttribute('aria-expanded', 'false');
+        editor.removeAttribute('aria-activedescendant');
       }
     }
 
@@ -379,7 +404,7 @@
       pill.className = 'lex-mention-pill';
       pill.contentEditable = 'false';
       pill.dataset.mentionId = item.id;
-      pill.innerHTML = `${DOC_ICON}<span>${this.escapeHtml(item.label)}</span><span class="lex-mention-pill-x">&times;</span>`;
+      pill.innerHTML = `${item.icon || DOC_ICON}<span>${this.escapeHtml(item.label)}</span><span class="lex-mention-pill-x">&times;</span>`;
 
       // Replace text node
       const parent = node.parentNode;

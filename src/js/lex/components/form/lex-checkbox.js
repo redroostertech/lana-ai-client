@@ -109,7 +109,7 @@
       }
 
       .lex-checkbox-row:focus-within .lex-checkbox-box {
-        box-shadow: 0 0 0 3px rgba(89, 82, 70, var(--lex-input-focus-ring-alpha, 0.2));
+        box-shadow: var(--lex-focus-ring, 0 0 0 3px rgba(89, 82, 70, 0.3));
       }
     `;
     document.head.appendChild(style);

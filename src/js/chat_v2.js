@@ -1,36 +1,49 @@
 /* ==========================================================================
-   Chat V2 — New Conversation Page Controller
-   Single IIFE. 4-stage state machine: LOADING -> LANDING -> SELECTED -> ACTIVE.
-   No regex. No classes. Under 400 lines.
+   Chat V2 — Page Controller
+   Single IIFE. Two conceptual states with 4 internal sub-stages:
+
+     EMPTY (no matter scoped — user must select one)
+       ├── LOADING   — skeleton shimmer, API call in flight
+       └── LANDING   — matter cards + search visible
+
+     READY (matter locked in — conversation active)
+       ├── SELECTED  — intent composer visible, session POST in flight
+       └── ACTIVE    — lex-chat mounted (owns its own composer)
+
+   The <lex-chat> component handles all chat UI internally:
+     - lex-chat-thread    (messages)
+     - lex-chat-activity  (thinking indicator)
+     - lex-chat-composer  (input, tools, send/stop, # doc picker)
+     - lex-chat-documents (document mode banner)
+
+   No regex. No classes.
    ========================================================================== */
 
 (function () {
   'use strict';
 
   // =========================================================================
-  // Stage state (module-level, 4 variables only)
+  // Stage state
   // =========================================================================
 
   var _stage = 'LOADING';
   var _matter = null;            // full matter object once selected
   var _conversationId = null;
-  var _abortController = null;
 
   // Search debounce timer
   var _searchTimer = null;
 
-  // Document click handler stored for cleanup on leave (Risk 6)
+  // Document click handler stored for cleanup on leave
   var _docClickHandler = null;
 
-  // Pinned composer handler refs for cleanup (C1)
-  var _sendBtnHandler = null;
-  var _mentionKeydownHandler = null;
-
-  // Poll interval for waiting on conversation creation (I4)
+  // Poll interval for waiting on conversation creation
   var _pollInterval = null;
 
-  // Guard against double enterActive() calls (C2)
+  // Guard against double enterActive() calls
   var _enterActiveInvoked = false;
+
+  // lex-chat event listener refs for cleanup
+  var _chatEventListeners = [];
 
   // Intent definitions (hardcoded for V1; V2 will pull from org config)
   var INTENTS = [
@@ -60,11 +73,6 @@
     dom.matterBadge       = document.getElementById('cv2-matter-badge');
     dom.intents           = document.getElementById('cv2-intents');
     dom.messagesArea      = document.getElementById('cv2-messages-area');
-    dom.composerPinned    = document.getElementById('cv2-composer-pinned');
-    dom.pinnedBadgeRow    = document.getElementById('cv2-pinned-badge-row');
-    dom.pinnedMatterBadge = document.getElementById('cv2-pinned-matter-badge');
-    dom.mentionInput      = document.getElementById('cv2-mention-input');
-    dom.sendBtn           = document.getElementById('cv2-send-btn');
     dom.stageCenterEl     = document.getElementById('cv2-stage-center');
   }
 
@@ -89,7 +97,7 @@
   }
 
   // =========================================================================
-  // Stage: LOADING -> LANDING
+  // Stage: LOADING -> LANDING (Empty state)
   // =========================================================================
 
   function enterLanding(recentMatters) {
@@ -126,7 +134,7 @@
   }
 
   // =========================================================================
-  // Stage: LANDING -> SELECTED
+  // Stage: LANDING -> SELECTED (Empty -> Ready transition)
   // =========================================================================
 
   function onMatterSelected(matter) {
@@ -147,9 +155,6 @@
     dom.matterPanel.classList.add('cv2-collapsing');
 
     // After opacity transition: show inline composer
-    // NOTE: cannot use { once: true } here because transitionend fires per-property.
-    // If transform fires before opacity, { once: true } would remove the handler
-    // before opacity fires. Manual removeEventListener handles cleanup instead.
     dom.matterPanel.addEventListener('transitionend', function onPanelCollapsed(e) {
       if (e.propertyName !== 'opacity') return;
       dom.matterPanel.removeEventListener('transitionend', onPanelCollapsed);
@@ -165,7 +170,7 @@
     // Guard: if returnToLanding() already cleared state, bail out
     if (!_matter) return;
 
-    // Set matter badge — use setAttribute('label', ...) per correction #7
+    // Set matter badge
     if (dom.matterBadge) {
       dom.matterBadge.setAttribute('label', _matter.name || _matter.matter_number || 'Matter');
     }
@@ -197,8 +202,6 @@
   // =========================================================================
 
   function createConversation(matterId) {
-    _abortController = new AbortController();
-
     api.post('/api/v1/chat/sessions', { matter_id: matterId })
       .then(function (response) {
         var session = response && response.session;
@@ -218,18 +221,24 @@
         if (_stage === 'ACTIVE') {
           enterActive(null);
         }
-        // Otherwise wait for user to pick an intent
 
       }).catch(function (err) {
-        if (err && err.name === 'AbortError') return;  // page navigation, ignore
+        if (err && err.name === 'AbortError') return;
         console.error('[chat_v2] Failed to create conversation:', err);
+
+        // Clear poll interval FIRST to prevent double toast
+        if (_pollInterval) {
+          clearInterval(_pollInterval);
+          _pollInterval = null;
+        }
+
         showErrorToast('Could not start a new conversation. Please try again.');
         returnToLanding();
       });
   }
 
   // =========================================================================
-  // Stage: SELECTED -> ACTIVE (intent chosen)
+  // Stage: SELECTED -> ACTIVE (intent chosen — Ready state)
   // =========================================================================
 
   function onIntentSelected(intent) {
@@ -241,7 +250,6 @@
 
     // Guard: if conversation not yet created, wait — disable intents momentarily
     if (!_conversationId) {
-      // Disable intent buttons while POST is still in flight
       var buttons = dom.intents.querySelectorAll('lex-btn');
       buttons.forEach(function (b) { b.setAttribute('disabled', ''); });
 
@@ -268,17 +276,18 @@
   }
 
   function enterActive(initialMessage) {
-    if (_enterActiveInvoked) return;  // C2: prevent double entry from race
+    if (_enterActiveInvoked) return;
     _enterActiveInvoked = true;
     _stage = 'ACTIVE';
 
     // Hide inline composer
     dom.composerInline.classList.remove('cv2-entered');
-    dom.composerInline.addEventListener('transitionend', function hide() {
+    dom.composerInline.addEventListener('transitionend', function hide(e) {
+      if (e.propertyName !== 'opacity') return;
       dom.composerInline.removeEventListener('transitionend', hide);
       dom.composerInline.classList.remove('cv2-visible');
       dom.composerInline.classList.add('cv2-hidden');
-    }, { once: true });
+    });
 
     // Dim the greeting
     if (dom.stageCenterEl) {
@@ -288,28 +297,19 @@
     // Show messages area
     dom.messagesArea.classList.add('cv2-visible');
 
-    // Mount lex-chat
+    // Mount lex-chat (includes its own composer)
     mountLexChat(_conversationId, initialMessage);
 
-    // Slide up pinned composer
-    dom.composerPinned.classList.add('cv2-visible');
-    requestAnimationFrame(function () {
-      requestAnimationFrame(function () {
-        dom.composerPinned.classList.add('cv2-entered');
-      });
-    });
-
-    // Set badge in pinned composer — use setAttribute('label', ...) per correction #7
-    if (dom.pinnedMatterBadge) {
-      dom.pinnedMatterBadge.setAttribute('label', _matter.name || _matter.matter_number || 'Matter');
+    // Update URL params so state is bookmarkable
+    if (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.updateParams === 'function') {
+      var urlParams = { session: _conversationId };
+      if (_matter && _matter.id) urlParams.matter = _matter.id;
+      window.Lex.Nav.updateParams(urlParams);
     }
-
-    // Wire send button
-    wirePinnedComposer();
   }
 
   // =========================================================================
-  // lex-chat mounting (only after conversation ID exists)
+  // lex-chat mounting + event wiring
   // =========================================================================
 
   function mountLexChat(conversationId, initialMessage) {
@@ -322,14 +322,20 @@
     var chatEl = document.createElement('lex-chat');
     chatEl.setAttribute('conversation-id', conversationId);
     chatEl.setAttribute('matter-id', _matter.id);
-    chatEl.setAttribute('show-composer', 'false');  // we use the pinned composer
-    chatEl.style.height = '100%';
+    chatEl.setAttribute('placeholder', 'Ask about this matter...');
+
+    // Demo mode support
+    if (window.LanaConfig && window.LanaConfig.DEMO_MODE) {
+      chatEl.setAttribute('source', 'demo');
+    }
 
     dom.messagesArea.appendChild(chatEl);
 
+    // Wire all lex-chat events
+    wireChatEvents(chatEl);
+
     // Send initial intent message if provided
     if (initialMessage) {
-      // Small delay to let lex-chat connect its source
       setTimeout(function () {
         if (chatEl && typeof chatEl.send === 'function') {
           chatEl.send(initialMessage);
@@ -338,56 +344,210 @@
     }
   }
 
-  // =========================================================================
-  // Pinned composer wiring
-  // =========================================================================
+  /**
+   * Wire event listeners on the lex-chat element.
+   * All listeners are tracked in _chatEventListeners for cleanup.
+   */
+  function wireChatEvents(chatEl) {
+    _chatEventListeners = [];
 
-  function wirePinnedComposer() {
-    if (!dom.sendBtn || !dom.mentionInput) return;
+    function listen(eventName, handler) {
+      chatEl.addEventListener(eventName, handler);
+      _chatEventListeners.push({ el: chatEl, event: eventName, handler: handler });
+    }
 
-    // Remove any previous listeners from a prior activation (C1/V4)
-    if (_sendBtnHandler) dom.sendBtn.removeEventListener('click', _sendBtnHandler);
-    if (_mentionKeydownHandler) dom.mentionInput.removeEventListener('keydown', _mentionKeydownHandler);
+    // Citation click — open PDF at cited page
+    listen('lex-chat-citation-click', function (e) {
+      var detail = e.detail || {};
+      var docId = detail.documentId;
+      var page = detail.page || 1;
+      if (!docId) return;
 
-    _sendBtnHandler = function () {
-      sendFromPinnedComposer();
-    };
+      var token = localStorage.getItem('token') || '';
+      var baseUrl = (window.api && window.api.baseUrl) ? window.api.baseUrl : '';
+      var url = baseUrl + '/api/v1/documents/' + encodeURIComponent(docId) + '/download?token=' + encodeURIComponent(token) + '#page=' + page;
+      window.open(url, '_blank');
+    });
 
-    _mentionKeydownHandler = function (e) {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        // Do not intercept Enter when the mention picker is open —
-        // lex-mention-input handles item selection internally
-        var pickerOpen = dom.mentionInput &&
-          dom.mentionInput.querySelector('.lex-mention-picker.lex-mention-picker--open');
-        if (pickerOpen) return;
+    // Artifact click — route by action type
+    listen('lex-chat-artifact-click', function (e) {
+      var detail = e.detail || {};
+      var entityId = detail.entityId;
+      var artifactType = detail.artifactType;
 
-        e.preventDefault();
-        sendFromPinnedComposer();
+      if (!entityId) return;
+
+      if (artifactType === 'copy' && detail.content) {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          navigator.clipboard.writeText(detail.content).then(function () {
+            showSuccessToast('Copied to clipboard');
+          });
+        }
+      } else if (artifactType === 'version_history') {
+        if (window.api) {
+          window.api.get('/api/v1/agentic/artifacts?entity_id=' + encodeURIComponent(entityId))
+            .then(function (data) {
+              var versions = (data && data.artifacts) || [];
+              showVersionHistoryDrawer(versions);
+            })
+            .catch(function (err) {
+              console.error('[chat_v2] Failed to load version history:', err);
+              showErrorToast('Failed to load version history');
+            });
+        }
+      } else if (artifactType === 'download' || !artifactType) {
+        var token = localStorage.getItem('token') || '';
+        var baseUrl = (window.api && window.api.baseUrl) ? window.api.baseUrl : '';
+        var url = baseUrl + '/api/v1/documents/' + encodeURIComponent(entityId) + '/download?token=' + encodeURIComponent(token);
+        window.open(url, '_blank');
       }
-    };
+    });
 
-    dom.sendBtn.addEventListener('click', _sendBtnHandler);
-    dom.mentionInput.addEventListener('keydown', _mentionKeydownHandler);
+    // Title generated — update sidebar conversation
+    listen('lex-chat-title-generated', function (e) {
+      var detail = e.detail || {};
+      var title = detail.title;
+      var convId = detail.conversationId || _conversationId;
+      if (title && convId && window.ConversationMenu) {
+        window.ConversationMenu.updateConversation(convId, { title: title });
+      }
+    });
+
+    // Context usage — log for V1
+    listen('lex-chat-context-usage', function (e) {
+      var detail = e.detail || {};
+      console.log('[chat_v2] Context usage:', detail.percentUsed + '% used');
+    });
+
+    // Response end — feature tracking
+    listen('lex-chat-response-end', function () {
+      if (window.FeatureTracker && window.Features) {
+        window.FeatureTracker.trackFeature(window.Features.CHAT_MESSAGE_SENT, {
+          conversation_id: _conversationId,
+          chat_mode: (window.Lex && window.Lex.state) ? window.Lex.state.chatMode : 'general',
+          source: 'chat_v2'
+        });
+      }
+    });
+
+    // Conversation created — add to sidebar
+    listen('lex-chat-conversation-created', function (e) {
+      var detail = e.detail || {};
+      var convId = detail.conversationId;
+      if (convId && window.ConversationMenu) {
+        window.ConversationMenu.addConversation({
+          thread_id: convId,
+          title: 'New Chat',
+          matter_id: _matter ? _matter.id : null,
+          matter_name: _matter ? _matter.name : '',
+          updated_at: new Date().toISOString()
+        });
+      }
+    });
+
+    // Manage documents — open file drawer
+    listen('lex-chat-manage-documents', function () {
+      if (window.ChatFileDrawer && _conversationId) {
+        window.ChatFileDrawer.open(_conversationId, _matter ? _matter.id : null);
+      }
+    });
+
+    // Composer # document search — fetch documents for picker
+    listen('lex-composer-document-search', function (e) {
+      var query = (e.detail && e.detail.query) || '';
+      var composerEl = chatEl.querySelector('lex-chat-composer');
+      if (!composerEl) return;
+
+      if (!_conversationId || !window.api) {
+        composerEl.setDocumentResults([]);
+        return;
+      }
+
+      window.api.get('/api/v1/chat/sessions/' + _conversationId + '/files?search=' + encodeURIComponent(query) + '&limit=10')
+        .then(function (data) {
+          var files = (data && data.files) || [];
+          composerEl.setDocumentResults(files);
+        })
+        .catch(function () {
+          composerEl.setDocumentResults([]);
+        });
+    });
+
+    // Agentic followup — display followup suggestions in thread
+    listen('lex-chat-agentic-followup', function (e) {
+      var detail = e.detail || {};
+      var followups = detail.followups || [];
+      var message = detail.message || '';
+      if (followups.length === 0 && !message) return;
+
+      // Build a system-level message with followup buttons
+      var html = '';
+      if (message) {
+        html += '<div style="margin-bottom: 8px; color: var(--lex-text-secondary); font-size: var(--lex-body-sm-size);">' + escapeHtml(message) + '</div>';
+      }
+
+      for (var i = 0; i < followups.length; i++) {
+        var f = followups[i];
+        html += '<lex-btn variant="outline" size="sm" style="margin: 4px 4px 4px 0;" data-followup-idx="' + i + '">';
+        html += escapeHtml(f.description || f.label || f.entity_type || 'Follow up');
+        html += '</lex-btn>';
+      }
+
+      // Add the followup card as a system message in the thread
+      var threadEl = chatEl.querySelector('lex-chat-thread');
+      if (threadEl && typeof threadEl.addMessage === 'function') {
+        threadEl.addMessage('system', html);
+      }
+
+      // Wire followup button clicks to send as new message
+      var followupBtns = chatEl.querySelectorAll('[data-followup-idx]');
+      for (var j = 0; j < followupBtns.length; j++) {
+        followupBtns[j].addEventListener('click', function (evt) {
+          var idx = parseInt(evt.currentTarget.getAttribute('data-followup-idx'), 10);
+          var fu = followups[idx];
+          if (fu && typeof chatEl.send === 'function') {
+            var prompt = fu.description || fu.label || 'Yes, proceed';
+            chatEl.send(prompt);
+          }
+        });
+      }
+    });
+
   }
 
-  function sendFromPinnedComposer() {
-    var chatEl = dom.messagesArea.querySelector('lex-chat');
-    if (!chatEl || typeof chatEl.send !== 'function') return;
-
-    var mentionEl = dom.mentionInput;
-    // Correction #1: use getTextContent() to read, not .value
-    var text = mentionEl && typeof mentionEl.getTextContent === 'function'
-      ? mentionEl.getTextContent().trim()
-      : '';
-    if (!text) return;
-
-    chatEl.send(text);
-
-    // Correction #1: clear via querySelector('.lex-mention-editor').innerHTML
-    if (mentionEl) {
-      var editor = mentionEl.querySelector('.lex-mention-editor');
-      if (editor) editor.innerHTML = '';
+  function showVersionHistoryDrawer(versions) {
+    if (!versions || versions.length === 0) {
+      showErrorToast('No version history found');
+      return;
     }
+
+    var html = '';
+    for (var i = 0; i < versions.length; i++) {
+      var v = versions[i];
+      var isCurrent = i === 0;
+      html += '<div style="padding: 12px; border: 1px solid var(--lex-border-subtle); border-radius: var(--lex-radius-md); margin-bottom: 8px; background: var(--lex-bg-primary);">';
+      html += '<div style="display: flex; justify-content: space-between; align-items: center;">';
+      html += '<span style="font-size: var(--lex-body-sm-size); font-weight: var(--lex-weight-medium, 500); color: var(--lex-text-primary);">Version ' + (versions.length - i) + '</span>';
+      if (isCurrent) {
+        html += '<lex-badge color="green" label="Current"></lex-badge>';
+      }
+      html += '</div>';
+      if (v.created_at) {
+        html += '<div style="font-size: var(--lex-body-xs-size); color: var(--lex-text-tertiary); margin-top: 4px;">' + new Date(v.created_at).toLocaleString() + '</div>';
+      }
+      if (v.summary) {
+        html += '<div style="font-size: var(--lex-body-sm-size); color: var(--lex-text-secondary); margin-top: 8px;">' + escapeHtml(v.summary) + '</div>';
+      }
+      html += '</div>';
+    }
+
+    window.Lex.Drawer.open({
+      heading: 'Version History',
+      subtitle: versions.length + ' version' + (versions.length !== 1 ? 's' : ''),
+      side: 'right',
+      width: 'md',
+      content: html
+    });
   }
 
   // =========================================================================
@@ -412,7 +572,7 @@
       }, 300);
     });
 
-    // Close results when clicking outside — stored for cleanup in onLeave (Risk 6)
+    // Close results when clicking outside
     _docClickHandler = function (e) {
       if (!dom.searchResults || !dom.searchResults.contains(e.target)) {
         dom.searchResults.classList.remove('cv2-visible');
@@ -439,6 +599,8 @@
     if (matters.length === 0) {
       var empty = document.createElement('div');
       empty.className = 'cv2-search-result-item';
+      empty.setAttribute('role', 'option');
+      empty.setAttribute('aria-disabled', 'true');
       empty.textContent = 'No matters found';
       dom.searchResults.appendChild(empty);
       dom.searchResults.classList.add('cv2-visible');
@@ -469,7 +631,6 @@
   // =========================================================================
 
   function showErrorToast(message) {
-    // Correction #2: use Lex.Toast.error(message), not Lex.Toast.show({...})
     if (window.Lex && window.Lex.Toast && typeof window.Lex.Toast.error === 'function') {
       window.Lex.Toast.error(message);
     } else {
@@ -477,22 +638,51 @@
     }
   }
 
+  function showSuccessToast(message) {
+    if (window.Lex && window.Lex.Toast && typeof window.Lex.Toast.success === 'function') {
+      window.Lex.Toast.success(message);
+    }
+  }
+
+  // =========================================================================
+  // Cleanup helpers
+  // =========================================================================
+
+  /**
+   * Clean up ACTIVE stage DOM and listeners without resetting to LANDING.
+   * Shared by returnToLanding() and selectConversation().
+   */
+  function cleanupActiveStage() {
+    // Remove all lex-chat event listeners
+    _chatEventListeners.forEach(function (entry) {
+      entry.el.removeEventListener(entry.event, entry.handler);
+    });
+    _chatEventListeners = [];
+
+    // Remove lex-chat from DOM (triggers disconnected() for SSE cleanup)
+    dom.messagesArea.innerHTML = '';
+    dom.messagesArea.classList.remove('cv2-visible');
+
+    // Reset guards
+    _enterActiveInvoked = false;
+  }
+
   function returnToLanding() {
+    // Clean up ACTIVE stage if we were in it
+    if (_stage === 'ACTIVE' || _stage === 'SELECTED') {
+      cleanupActiveStage();
+    }
+
     _stage = 'LANDING';
     _matter = null;
     _conversationId = null;
-    _enterActiveInvoked = false;  // C2: reset guard
+    _enterActiveInvoked = false;
 
-    // Clear any pending intent-wait poll (prevents double toast on POST failure race)
+    // Clear any pending intent-wait poll
     if (_pollInterval) {
       clearInterval(_pollInterval);
       _pollInterval = null;
     }
-
-    // Clean up ACTIVE-stage DOM (I1)
-    dom.messagesArea.innerHTML = '';
-    dom.messagesArea.classList.remove('cv2-visible');
-    dom.composerPinned.classList.remove('cv2-visible', 'cv2-entered');
 
     // Reset inline composer + matter panel
     dom.composerInline.classList.remove('cv2-visible', 'cv2-entered', 'cv2-hidden');
@@ -500,6 +690,17 @@
     dom.cardsWrapper.style.pointerEvents = '';
     if (dom.stageCenterEl) {
       dom.stageCenterEl.classList.remove('cv2-greeting-dimmed', 'cv2-hidden');
+    }
+
+    // Clear search results and input
+    if (dom.searchResults) {
+      dom.searchResults.innerHTML = '';
+      dom.searchResults.classList.remove('cv2-visible');
+    }
+    if (dom.searchInput) {
+      dom.searchInput.value = '';
+      var innerInput = dom.searchInput.querySelector('input');
+      if (innerInput) innerInput.value = '';
     }
   }
 
@@ -518,12 +719,10 @@
   }
 
   // =========================================================================
-  // Load existing session (deep-link with ?session=xxx)
+  // Load existing session (deep-link with ?session=xxx or sidebar click)
   // =========================================================================
 
   function loadExistingSession(sessionId) {
-    _abortController = new AbortController();
-
     api.get('/api/v1/chat/sessions/' + sessionId)
       .then(function (response) {
         var session = response && response.session;
@@ -539,7 +738,7 @@
           window.Lex.state.setActiveConversation(_conversationId);
         }
 
-        // If session has a matter, fetch it for the badge
+        // If session has a matter, fetch it for context
         if (session.matter_id) {
           api.get('/api/v1/matters/' + session.matter_id)
             .then(function (matterResp) {
@@ -553,12 +752,10 @@
               enterActiveFromSession();
             })
             .catch(function () {
-              // Matter fetch failed — still proceed with minimal matter info
               _matter = { id: session.matter_id, name: 'Matter' };
               enterActiveFromSession();
             });
         } else {
-          // No matter — general workspace chat
           _matter = { id: '', name: 'General' };
           enterActiveFromSession();
         }
@@ -573,8 +770,7 @@
 
   /**
    * Enter ACTIVE stage directly from a loaded session.
-   * Skips the LANDING → SELECTED animation flow since we never showed the
-   * matter panel or inline composer.
+   * Skips the LANDING -> SELECTED animation flow.
    */
   function enterActiveFromSession() {
     _enterActiveInvoked = true;
@@ -593,42 +789,53 @@
     // Show messages area
     dom.messagesArea.classList.add('cv2-visible');
 
-    // Mount lex-chat
+    // Mount lex-chat (includes its own composer)
     mountLexChat(_conversationId, null);
 
-    // Slide up pinned composer
-    dom.composerPinned.classList.add('cv2-visible');
-    requestAnimationFrame(function () {
-      requestAnimationFrame(function () {
-        dom.composerPinned.classList.add('cv2-entered');
-      });
-    });
-
-    // Set badge in pinned composer
-    if (dom.pinnedMatterBadge && _matter) {
-      dom.pinnedMatterBadge.setAttribute('label', _matter.name || _matter.matter_number || 'Matter');
+    // Update URL params
+    if (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.updateParams === 'function') {
+      var urlParams = { session: _conversationId };
+      if (_matter && _matter.id) urlParams.matter = _matter.id;
+      window.Lex.Nav.updateParams(urlParams);
     }
-
-    // Wire send button
-    wirePinnedComposer();
   }
 
   // =========================================================================
-  // Page initialisation (called by LexRouter on every navigation to this page)
+  // Conversation switching — called by ConversationMenu in the sidebar
+  // =========================================================================
+
+  function selectConversation(threadId, matterId) {
+    // If already in ACTIVE stage, tear down current lex-chat
+    if (_stage === 'ACTIVE') {
+      cleanupActiveStage();
+    }
+
+    // Reset state for new conversation
+    _conversationId = null;
+    _matter = null;
+    _enterActiveInvoked = false;
+
+    // Load the selected session
+    loadExistingSession(threadId);
+  }
+
+  // =========================================================================
+  // Page initialisation
   // =========================================================================
 
   function init() {
-    // Reset module state on every page enter (handles re-navigation)
+    // Reset module state on every page enter
     _stage = 'LOADING';
     _matter = null;
     _conversationId = null;
     _searchTimer = null;
     _enterActiveInvoked = false;
+    _chatEventListeners = [];
 
-    // Abort any lingering requests from a previous visit
-    if (_abortController) {
-      _abortController.abort();
-      _abortController = null;
+    // Guard: check api is available
+    if (typeof api === 'undefined' || !api) {
+      console.error('[chat_v2] API client not loaded. Chat cannot initialize.');
+      return;
     }
 
     cacheDom();
@@ -642,6 +849,9 @@
     setGreeting();
     setupSearch();
 
+    // Register selectConversation for sidebar integration
+    window.selectConversation = selectConversation;
+
     // Activate skeleton shimmer for the cards area
     if (window.Lex && window.Lex.Redact) {
       window.Lex.Redact.on(dom.cardsWrapper);
@@ -653,10 +863,8 @@
     var deepLinkMatterId = params && params.get ? params.get('matter') : null;
 
     if (deepLinkSessionId) {
-      // Load existing conversation — skip matter selection flow entirely
       loadExistingSession(deepLinkSessionId);
     } else if (deepLinkMatterId) {
-      // Fetch the specific matter, then jump to SELECTED
       api.get('/api/v1/matters/' + deepLinkMatterId)
         .then(function (response) {
           var matter = (response && response.matter) ? response.matter : null;
@@ -664,7 +872,7 @@
             if (window.Lex && window.Lex.Redact) {
               window.Lex.Redact.off(dom.cardsWrapper);
             }
-            _stage = 'LANDING';  // C3: set stage before guard check in onMatterSelected
+            _stage = 'LANDING';
             onMatterSelected(matter);
           } else {
             loadRecentMatters();
@@ -679,8 +887,6 @@
   }
 
   function loadRecentMatters() {
-    _abortController = new AbortController();
-
     api.get('/api/v1/matters/recent?limit=3')
       .then(function (response) {
         var matters = (response && response.matters) ? response.matters : [];
@@ -690,7 +896,7 @@
       .catch(function (err) {
         if (err && err.name === 'AbortError') return;
         console.error('[chat_v2] Failed to load recent matters:', err);
-        enterLanding([]);  // Enter LANDING with empty state — search still works
+        enterLanding([]);
       });
   }
 
@@ -699,51 +905,42 @@
   // =========================================================================
 
   function onLeave() {
-    // Cancel in-flight API calls
-    if (_abortController) {
-      _abortController.abort();
-      _abortController = null;
-    }
     // Cancel pending search
     if (_searchTimer) {
       clearTimeout(_searchTimer);
       _searchTimer = null;
     }
-    // Clear poll interval (I4)
+    // Clear poll interval
     if (_pollInterval) {
       clearInterval(_pollInterval);
       _pollInterval = null;
     }
-    // Remove pinned composer listeners (C1)
-    if (_sendBtnHandler && dom.sendBtn) {
-      dom.sendBtn.removeEventListener('click', _sendBtnHandler);
-      _sendBtnHandler = null;
-    }
-    if (_mentionKeydownHandler && dom.mentionInput) {
-      dom.mentionInput.removeEventListener('keydown', _mentionKeydownHandler);
-      _mentionKeydownHandler = null;
-    }
-    // Remove document click handler to prevent listener accumulation (Risk 6)
+    // Clean up ACTIVE stage (lex-chat, event listeners)
+    cleanupActiveStage();
+    // Remove document click handler
     if (_docClickHandler) {
       document.removeEventListener('click', _docClickHandler);
       _docClickHandler = null;
     }
     // Reset guards
     _enterActiveInvoked = false;
-    // Clear Lex.state conversation (leaving this page means we are done)
+    // Clear Lex.state
     if (window.Lex && window.Lex.state) {
       window.Lex.state.setActiveConversation(null);
+      window.Lex.state.setActiveMatter(null);
     }
-    // Clear search input so it doesn't persist on re-navigation
-    if (dom.searchInput) dom.searchInput.value = '';
+    // Remove global selectConversation
+    if (window.selectConversation === selectConversation) {
+      delete window.selectConversation;
+    }
+    // Close file drawer if open
+    if (window.ChatFileDrawer && typeof window.ChatFileDrawer.close === 'function') {
+      window.ChatFileDrawer.close();
+    }
   }
 
   // =========================================================================
   // Page lifecycle — LexRouter registration
-  // registerPageInit ensures init() is called on every navigation
-  // (first load + re-navigation from cached scripts).
-  // registerView only carries onLeave for cleanup — onEnter is handled
-  // by registerPageInit to avoid double-init.
   // =========================================================================
 
   if (window.LexRouter) {

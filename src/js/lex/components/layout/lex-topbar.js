@@ -35,7 +35,7 @@
       lex-topbar {
         display: block;
         position: relative;
-        z-index: 50;
+        z-index: var(--lex-z-sticky, 20);
       }
 
       lex-topbar[data-sticky="true"] {
@@ -164,7 +164,7 @@
         justify-content: center;
         background: var(--lex-topbar-badge-bg);
         color: var(--lex-topbar-badge-text);
-        font-size: 0.625rem;
+        font-size: var(--lex-badge-count-size, 0.625rem);
         font-weight: var(--lex-weight-bold);
         border-radius: var(--lex-radius-full);
         line-height: 1;
@@ -184,7 +184,7 @@
         background: var(--lex-bg-primary, #FFFFFF);
         border: 1px solid var(--lex-border-default, #E8E5E1);
         border-radius: var(--lex-radius-lg, 8px);
-        box-shadow: 0 8px 24px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08);
+        box-shadow: var(--lex-shadow-lg);
         padding: 4px;
         z-index: var(--lex-z-dropdown, 100);
         opacity: 0;
@@ -209,7 +209,7 @@
         background: none;
         cursor: pointer;
         font-family: var(--lex-font-sans);
-        font-size: 14px;
+        font-size: var(--lex-body-sm-size, 0.875rem);
         font-weight: 500;
         color: var(--lex-text-primary, #26211C);
         border-radius: var(--lex-radius-md, 6px);

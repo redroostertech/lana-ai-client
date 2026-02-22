@@ -298,6 +298,8 @@
       this._searchTerm = '';
       this._focusedIdx = -1;
       this._selectedValues = new Set();
+      // Unique per-instance prefix for option element IDs (used by aria-activedescendant).
+      this._instanceId = Math.random().toString(36).slice(2, 8);
     }
 
     render() {
@@ -310,6 +312,12 @@
       const sz = this.size || 'md';
       const triggerCls = `lex-select-trigger lex-select-trigger--${sz}${this._open ? ' lex-select-trigger--open' : ''}${this.error ? ' lex-select-trigger--error' : ''}`;
       const disabledAttr = this.disabled ? 'disabled' : '';
+      const ariaExpanded = this._open ? 'true' : 'false';
+      // aria-activedescendant points to the currently keyboard-focused option.
+      const activeFocusId = (this._open && this._focusedIdx >= 0)
+        ? `lex-select-opt-${this._instanceId}-${this._focusedIdx}`
+        : '';
+      const activeDescendant = activeFocusId ? ` aria-activedescendant="${activeFocusId}"` : '';
 
       // Display text
       const displayHtml = this._renderDisplay();
@@ -317,18 +325,18 @@
       // Clear button
       const showClear = this.clearable && this._selectedValues.size > 0;
       const clearHtml = showClear
-        ? `<button type="button" class="lex-select-clear" data-action="clear" tabindex="-1">${CLEAR_SVG}</button>`
+        ? `<button type="button" class="lex-select-clear" data-action="clear" tabindex="-1" aria-label="Clear selection">${CLEAR_SVG}</button>`
         : '';
 
       let html = `<div class="lex-select-wrap">`;
-      html += `<button type="button" class="${triggerCls}" ${disabledAttr} data-action="toggle">`;
+      html += `<button type="button" class="${triggerCls}" ${disabledAttr} data-action="toggle" aria-haspopup="listbox" aria-expanded="${ariaExpanded}"${activeDescendant}>`;
       html += displayHtml;
       html += clearHtml;
       html += CHEVRON_SVG;
       html += `</button>`;
 
-      // Dropdown
-      html += `<div class="lex-select-dropdown${this._open ? ' lex-select-dropdown--open' : ''}">`;
+      // Dropdown — role="listbox" for screen-reader semantics
+      html += `<div class="lex-select-dropdown${this._open ? ' lex-select-dropdown--open' : ''}" role="listbox"${this.multiple ? ' aria-multiselectable="true"' : ''}>`;
 
       if (this.searchable) {
         html += `<div class="lex-select-search"><input type="text" placeholder="Search..." value="${this._escHtml(this._searchTerm)}" /></div>`;
@@ -342,7 +350,7 @@
           // Group header
           if (opt.group && opt.group !== currentGroup) {
             currentGroup = opt.group;
-            html += `<div class="lex-select-group-label">${this._escHtml(opt.group)}</div>`;
+            html += `<div class="lex-select-group-label" role="group" aria-label="${this._escHtml(opt.group)}">${this._escHtml(opt.group)}</div>`;
           }
 
           const isSelected = this._selectedValues.has(opt.value);
@@ -350,8 +358,9 @@
           let optCls = 'lex-select-option';
           if (isSelected) optCls += ' lex-select-option--selected';
           if (isFocused) optCls += ' lex-select-option--focused';
+          const optId = `lex-select-opt-${this._instanceId}-${idx}`;
 
-          html += `<div class="${optCls}" data-value="${this._escHtml(opt.value)}" data-idx="${idx}">`;
+          html += `<div class="${optCls}" data-value="${this._escHtml(opt.value)}" data-idx="${idx}" id="${optId}" role="option" aria-selected="${isSelected ? 'true' : 'false'}">`;
           if (this.multiple) html += CHECK_SVG;
           html += `<div class="lex-select-option-label">${this._escHtml(opt.label)}`;
           if (opt.description) html += `<div class="lex-select-option-desc">${this._escHtml(opt.description)}</div>`;

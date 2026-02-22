@@ -469,15 +469,48 @@
       const sidebar = this._sidebar;
       if (!sidebar) return;
 
-      // Read user from Lex.state (centralized) with localStorage fallback
+      // Read user from Lex.state (centralized) with localStorage fallback.
+      // When reading from localStorage, validate the parsed object to prevent
+      // manipulated role fields from elevating UI privileges.
       let user = null;
       if (window.Lex && window.Lex.state && window.Lex.state.user) {
         user = window.Lex.state.user;
       } else {
         try {
           const userJson = localStorage.getItem('user');
-          if (userJson) user = JSON.parse(userJson);
-        } catch (e) { /* ignore */ }
+          if (userJson) {
+            const parsed = JSON.parse(userJson);
+            // Basic schema validation: must be a plain object with at least
+            // one expected string field. Reject anything that looks tampered.
+            if (
+              parsed !== null &&
+              typeof parsed === 'object' &&
+              !Array.isArray(parsed) &&
+              (typeof parsed.email === 'string' ||
+               typeof parsed.firstName === 'string' ||
+               typeof parsed.first_name === 'string')
+            ) {
+              // Ensure role fields, if present, are strings or arrays of strings
+              const roleOk =
+                parsed.role_name === undefined || typeof parsed.role_name === 'string';
+              const rolesOk =
+                parsed.roles === undefined ||
+                (Array.isArray(parsed.roles) &&
+                  parsed.roles.every(function (r) {
+                    return typeof r === 'string' || (typeof r === 'object' && r !== null);
+                  }));
+              if (roleOk && rolesOk) {
+                user = parsed;
+              } else {
+                // Tampered role data — discard and treat as unauthenticated
+                localStorage.removeItem('user');
+              }
+            } else {
+              // Unexpected structure — discard
+              localStorage.removeItem('user');
+            }
+          }
+        } catch (e) { /* ignore parse errors */ }
       }
 
       const fullName = user
@@ -524,8 +557,7 @@
           items: [
             { id: 'dashboard', label: 'Dashboard', icon: 'home', href: 'dashboard.html' },
             { id: 'search', label: 'Search Conversations', icon: 'search', href: 'search-conversations.html' },
-            { id: 'workspaces', label: 'Workspaces', icon: 'briefcase', href: 'workspaces.html' },
-            { id: 'storage', label: 'My Drive', icon: 'folder', href: 'drive.html' }
+            { id: 'workspaces', label: 'Workspaces', icon: 'briefcase', href: 'workspaces.html' }
           ]
         },
         {
@@ -593,9 +625,9 @@
     }
 
     _checkNotifications() {
-      if (!api || typeof api.getNotifications !== 'function') return;
+      if (!window.api || typeof window.api.getNotifications !== 'function') return;
 
-      api.getNotifications({ unread: true, limit: 1 })
+      window.api.getNotifications({ unread: true, limit: 1 })
         .then((result) => {
           const count = (result && result.pagination && result.pagination.total) || 0;
           const topbar = this.$('lex-topbar');
@@ -611,8 +643,8 @@
     // -----------------------------------------------------------------------
 
     _handleSignOut() {
-      if (api && typeof api.logout === 'function') {
-        api.logout()
+      if (window.api && typeof window.api.logout === 'function') {
+        window.api.logout()
           .then(() => { window.location.href = 'login.html'; })
           .catch(() => { window.location.href = 'login.html'; });
       } else {
@@ -688,9 +720,9 @@
      * distinguish "server down" from "token expired".
      */
     _checkReachability() {
-      if (!api || !api.baseUrl) return;
+      if (!window.api || !window.api.baseUrl) return;
 
-      var healthUrl = api.baseUrl + '/api/health/discovery';
+      var healthUrl = window.api.baseUrl + '/api/health/discovery';
       var wasReachable = this._reachable;
       var self = this;
 
@@ -716,10 +748,7 @@
 
             // If we were offline and now back, show a recovery toast
             if (!wasReachable && window.Lex && window.Lex.Toast) {
-              window.Lex.Toast.show({
-                message: 'Connection restored',
-                variant: 'success'
-              });
+              window.Lex.Toast.show('Connection restored', 'success');
             }
           } else {
             self._reachable = false;

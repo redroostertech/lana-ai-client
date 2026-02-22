@@ -50,6 +50,10 @@
   // including the first load and re-navigation from cached scripts.
   var _pageInits = {};
 
+  // Hoisted modals — lex-modal elements moved from lex-content to document.body
+  // so they escape the stacking context created by overflow-y: auto.
+  var _hoistedModals = [];
+
   // Capture the real document URL before history.replaceState can change it.
   // Under file:// protocol, replaceState('/index.html') would change the URL
   // to file:///index.html, breaking all relative URL resolution.
@@ -192,6 +196,41 @@
     // Strategy 4: entire body
     var body = doc.querySelector('body');
     return body ? body.innerHTML : htmlText;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Modal hoisting — escape lex-content stacking context
+  // ---------------------------------------------------------------------------
+  // lex-content uses overflow-y: auto for page scrolling, which creates a new
+  // stacking context. position: fixed modals (lex-modal) rendered inside it are
+  // clipped to its bounds. We move them to document.body after content injection.
+
+  function _hoistPageModals(contentEl) {
+    if (!contentEl) return;
+
+    // Hoist all lex-modal web components
+    var modals = contentEl.querySelectorAll('lex-modal');
+    for (var i = 0; i < modals.length; i++) {
+      document.body.appendChild(modals[i]);
+      _hoistedModals.push(modals[i]);
+    }
+
+    // Hoist any element marked with data-hoist (plain div modals)
+    var extras = contentEl.querySelectorAll('[data-hoist]');
+    for (var j = 0; j < extras.length; j++) {
+      document.body.appendChild(extras[j]);
+      _hoistedModals.push(extras[j]);
+    }
+  }
+
+  function _unhoistPageModals() {
+    for (var i = 0; i < _hoistedModals.length; i++) {
+      var m = _hoistedModals[i];
+      if (m.parentNode === document.body) {
+        document.body.removeChild(m);
+      }
+    }
+    _hoistedModals = [];
   }
 
   // ---------------------------------------------------------------------------
@@ -353,17 +392,14 @@
    * If refresh fails, redirect to login.
    */
   function _attemptRefreshThenNavigate(path, options) {
-    if (!api || typeof api.performTokenRefresh !== 'function') {
+    if (!window.api || typeof window.api.performTokenRefresh !== 'function') {
       window.location.href = 'login.html';
       return Promise.resolve();
     }
 
-    console.log('[LexRouter] Token expired, attempting refresh before navigation...');
-
-    return api.performTokenRefresh()
+    return window.api.performTokenRefresh()
       .then(function () {
-        if (api.isAuthenticated() && !api.isTokenExpired()) {
-          console.log('[LexRouter] Token refreshed, resuming navigation');
+        if (window.api.isAuthenticated() && !window.api.isTokenExpired()) {
           return navigate(path, options);
         }
         window.location.href = 'login.html';
@@ -401,7 +437,7 @@
 
     // Step 1: Check if active streaming should block navigation
     var state = (global.Lex && global.Lex.state) ? global.Lex.state : null;
-    if (state ? state.isStreaming : (api && api._streamingActive)) {
+    if (state ? state.isStreaming : (window.api && window.api._streamingActive)) {
       _navigating = false;
       console.warn('[LexRouter] Navigation blocked: AI streaming is active');
       return Promise.resolve();
@@ -423,21 +459,22 @@
         _navigating = false;
         return _attemptRefreshThenNavigate(path, options);
       }
-    } else if (api) {
-      if (!api.isAuthenticated()) {
+    } else if (window.api) {
+      if (!window.api.isAuthenticated()) {
         _navigating = false;
         console.warn('[LexRouter] Navigation blocked: not authenticated');
         window.location.href = 'login.html';
         return Promise.resolve();
       }
 
-      if (api.isTokenExpired()) {
+      if (window.api.isTokenExpired()) {
         _navigating = false;
         return _attemptRefreshThenNavigate(path, options);
       }
     }
 
     // Step 2: Tear down previous view
+    _unhoistPageModals();
     if (previousPath) {
       unloadPageScripts(previousPath);
       unloadPageStylesheets(previousPath);
@@ -470,6 +507,10 @@
           var main = _app ? _app.getContentEl() : document.getElementById('lex-main-content');
           if (main) {
             main.innerHTML = content;
+
+            // Step 7b: Hoist lex-modal elements to document.body so they
+            // escape lex-content's stacking context (overflow-y: auto).
+            _hoistPageModals(main);
           }
         });
       })
@@ -478,17 +519,7 @@
         return loadPageScripts(descriptor.scripts, path);
       })
       .then(function () {
-        // Step 8b: Call registered page init (supports SPA re-navigation).
-        // On first load the IIFE registers init via registerPageInit();
-        // on re-navigation cached scripts skip, but the router calls it.
-        var initKey = pathKey(path);
-        if (_pageInits[initKey]) {
-          try { _pageInits[initKey](); } catch (e) {
-            console.warn('[LexRouter] Page init error:', e);
-          }
-        }
-
-        // Step 9: Update shell
+        // Step 8b: Update shell state
         _currentPath = path;
         if (_app) {
           _app.setPage({
@@ -497,13 +528,28 @@
           });
         }
 
-        // Step 10: Push to history.
+        // Step 8c: Push to history BEFORE page init so Lex.Nav.getParams()
+        // can read the route's query params from history.state.path.
         // NEVER pass the URL (3rd argument) — keep the browser URL at
         // app.html so CMD+SHIFT+R (hard refresh) reloads the SPA shell
         // instead of the page fragment. The route is stored in state.path
         // and read back by app.js on reload.
         if (pushState) {
           history.pushState({ path: path }, descriptor.title);
+        } else {
+          // Even without pushState (startup, back nav), ensure
+          // history.state.path is current so getParams() works.
+          history.replaceState({ path: path }, '');
+        }
+
+        // Step 8d: Call registered page init (supports SPA re-navigation).
+        // On first load the IIFE registers init via registerPageInit();
+        // on re-navigation cached scripts skip, but the router calls it.
+        var initKey = pathKey(path);
+        if (_pageInits[initKey]) {
+          try { _pageInits[initKey](); } catch (e) {
+            console.warn('[LexRouter] Page init error:', e);
+          }
         }
 
         // Step 11: Scroll to top
@@ -561,10 +607,7 @@
 
         // Show error via toast (preserves current page view)
         if (window.Lex && window.Lex.Toast) {
-          window.Lex.Toast.show({
-            message: 'Page could not be loaded. Please try again.',
-            variant: 'danger'
-          });
+          window.Lex.Toast.show('Page could not be loaded. Please try again.', 'error');
         }
       });
   }

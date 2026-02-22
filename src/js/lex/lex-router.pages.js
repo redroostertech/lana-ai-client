@@ -145,6 +145,50 @@
       ]
     },
 
+    // ── Workspace Details (single matter/workspace view) ──
+    'workspace_details.html': {
+      title: 'Matter Details',
+      activeNav: 'workspaces',
+      scripts: [
+        // Lex components not globally loaded
+        'js/lex/components/foundation/lex-banner.js',
+        'js/lex/components/foundation/lex-metric.js',
+        'js/lex/components/foundation/lex-detail-panel.js',
+        'js/lex/components/foundation/lex-badge.js',
+        'js/lex/components/foundation/lex-modal.js',
+        'js/lex/components/foundation/lex-card.js',
+        'js/lex/components/foundation/lex-tabs.js',
+        'js/lex/components/foundation/lex-accordion.js',
+        'js/lex/components/form/lex-input.js',
+        'js/lex/components/form/lex-select.js',
+        'js/lex/components/form/lex-checkbox.js',
+        'js/lex/components/form/lex-textarea.js',
+        'js/lex/components/form/lex-segmented.js',
+        'js/lex/components/data/lex-pagination.js',
+        // Page dependencies
+        'js/services/feature-tracker.js',
+        'js/vendor/mammoth.min.js',
+        'js/conflict-detection.js',
+        'js/similar-matters-widget.js',
+        'js/utils/metadata-formatter.js',
+        'js/services/metadata-service.js',
+        'js/vendor/marked.min.js',
+        'js/components/document-metadata-viewer.js',
+        'js/tiptap-bundle-built.js',
+        'js/api/matter-notes-api.client.js',
+        'js/components/note-list.component.js',
+        'js/components/note-editor.component.js',
+        'js/matter-notes.js',
+        'js/matter-skills.js',
+        // Page controller (MUST be last)
+        'js/workspace-details.js'
+      ],
+      stylesheets: [
+        'css/components/document-metadata.css',
+        'css/matter-notes.css'
+      ]
+    },
+
     'matters/timeline.html': {
       title: 'Matter Timeline',
       activeNav: 'workspaces',
@@ -699,7 +743,6 @@
         'js/lex/components/foundation/lex-divider.js',
         // Form components NOT in shell
         'js/lex/components/form/lex-input.js',
-        'js/lex/components/form/lex-mention-input.js',
         // Chat component chain (dependency order)
         'js/lex/chat/lex-chat.format.js',
         'js/lex/chat/lex-chat.source.js',
@@ -713,10 +756,13 @@
         'js/lex/chat/lex-chat.index.js',
         // Demo responses for demo mode
         'js/chat-demo-responses.js',
+        // File drawer (uses Lex.Drawer)
+        'js/chat_v2.file-drawer.js',
         // Page controller (MUST be last)
         'js/chat_v2.js'
       ],
       stylesheets: [
+        'css/lex-chat.css',
         'css/chat-v2.css'
       ]
     },

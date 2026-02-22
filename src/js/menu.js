@@ -116,7 +116,6 @@ const MenuConfig = {
             icon: 'search'
           },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
-          { id: 'storage', label: 'My Drive', href: '/drive.html', icon: 'folder' },
         ]
       },
       // Section 2: Infinite scrolling – Your Chats, New Chat, {{conversations}} (Data Connectors + Reports scroll with this)
@@ -225,7 +224,6 @@ const MenuConfig = {
             icon: 'search'
           },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
-          { id: 'storage', label: 'My Drive', href: '/drive.html', icon: 'folder' },
         ]
       },
       {
@@ -291,7 +289,6 @@ const MenuConfig = {
             icon: 'search'
           },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
-          { id: 'storage', label: 'My Drive', href: '/drive.html', icon: 'folder' },
         ]
       },
       {
@@ -357,7 +354,6 @@ const MenuConfig = {
             icon: 'search'
           },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
-          { id: 'storage', label: 'My Drive', href: '/drive.html', icon: 'folder' },
         ]
       },
       {
@@ -426,7 +422,6 @@ const MenuConfig = {
             onClick: 'openConversationSearchModal'
           },
           { id: 'chat-matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
-          { id: 'chat-storage', label: 'My Drive', href: '/drive.html', icon: 'folder' },
         ]
       },
       // Section 2: Infinite scrolling – Your Chats, New Chat, {{conversations}} (Data Connectors + Reports scroll with this)

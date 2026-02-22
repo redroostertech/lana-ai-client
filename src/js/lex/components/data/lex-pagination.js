@@ -30,7 +30,7 @@
       return `
         <div class="flex items-center justify-between py-3 text-sm">
           <span class="lex-text-secondary">
-            ${this.total > 0 ? `${(this.page - 1) * this.limit + 1}-${Math.min(this.page * this.limit, this.total)} of ${this.total}` : `Page ${this.page} of ${this.totalPages}`}
+            ${this.total > 0 ? `Showing ${(this.page - 1) * this.limit + 1} to ${Math.min(this.page * this.limit, this.total)} of ${this.total} results` : `Page ${this.page} of ${this.totalPages}`}
           </span>
           <div class="flex items-center gap-1">
             <button class="px-2 py-1 rounded lex-text-secondary lex-hover-bg disabled:opacity-40 disabled:cursor-not-allowed" data-action="prev" ${this.page <= 1 ? 'disabled' : ''}>

@@ -202,13 +202,14 @@
       const disabledAttr = this.disabled ? 'disabled' : '';
 
       const filtered = this._getFiltered();
+      const ariaExpanded = this._open ? 'true' : 'false';
 
-      let html = `<button type="button" class="lex-ddbtn-trigger${openCls}" style="${cssVars}" ${disabledAttr} data-action="toggle">`;
+      let html = `<button type="button" class="lex-ddbtn-trigger${openCls}" style="${cssVars}" ${disabledAttr} data-action="toggle" aria-haspopup="menu" aria-expanded="${ariaExpanded}">`;
       html += this.escapeHtml(this.buttonLabel);
       html += CHEVRON_SVG;
       html += `</button>`;
 
-      html += `<div class="lex-ddbtn-dropdown${this._open ? ' lex-ddbtn-dropdown--open' : ''}">`;
+      html += `<div class="lex-ddbtn-dropdown${this._open ? ' lex-ddbtn-dropdown--open' : ''}" role="menu">`;
 
       if (this.searchable) {
         html += `<div class="lex-ddbtn-search"><input type="text" placeholder="Search..." value="${this.escapeHtml(this._searchTerm)}" /></div>`;
@@ -219,8 +220,8 @@
       } else {
         filtered.forEach((item, idx) => {
           const focusedCls = idx === this._focusedIdx ? ' lex-ddbtn-item--focused' : '';
-          const iconHtml = item.icon ? `<span class="lex-ddbtn-item-icon">${getIcon(item.icon)}</span>` : '';
-          html += `<div class="lex-ddbtn-item${focusedCls}" data-value="${this.escapeHtml(item.value)}" data-idx="${idx}">`;
+          const iconHtml = item.icon ? `<span class="lex-ddbtn-item-icon" aria-hidden="true">${getIcon(item.icon)}</span>` : '';
+          html += `<div class="lex-ddbtn-item${focusedCls}" data-value="${this.escapeHtml(item.value)}" data-idx="${idx}" role="menuitem" tabindex="-1">`;
           html += iconHtml;
           html += `<div><div>${this.escapeHtml(item.label)}</div>`;
           if (item.description) html += `<div class="lex-ddbtn-item-desc">${this.escapeHtml(item.description)}</div>`;

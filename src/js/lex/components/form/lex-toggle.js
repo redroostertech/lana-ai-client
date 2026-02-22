@@ -79,7 +79,7 @@
         left: 2px;
         border-radius: 50%;
         background: var(--lex-toggle-knob, var(--lex-color-white));
-        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+        box-shadow: var(--lex-shadow-sm);
         transition: transform 0.2s ease;
       }
 
@@ -115,7 +115,7 @@
       }
 
       .lex-toggle-track:focus-within {
-        box-shadow: 0 0 0 3px rgba(89, 82, 70, var(--lex-input-focus-ring-alpha, 0.2));
+        box-shadow: var(--lex-focus-ring, 0 0 0 3px rgba(89, 82, 70, 0.3));
       }
     `;
     document.head.appendChild(style);

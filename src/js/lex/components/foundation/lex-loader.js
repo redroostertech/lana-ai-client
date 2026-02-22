@@ -13,12 +13,13 @@
 (function () {
   'use strict';
 
-  const { LexElement, defineLex } = window.Lex;
+  const { LexElement, defineLex, ScrollLock } = window.Lex;
 
   const BRAND_NAME = 'LANA';
 
   // Singleton reference
   let overlay = null;
+  let hideTimer = null;
   let stylesInjected = false;
 
   // -----------------------------------------------------------------------
@@ -204,6 +205,11 @@
     const el = document.createElement('div');
     el.id = 'lex-loader-overlay';
     el.className = `lex-loader-${theme}`;
+    // Accessibility: announce as a status region so screen readers read the label
+    // when the overlay appears without interrupting the user's current task.
+    el.setAttribute('role', 'status');
+    el.setAttribute('aria-live', 'polite');
+    el.setAttribute('aria-label', 'Loading');
 
     // Build ripples
     const rippleSizes = [250, 450, 650];
@@ -262,19 +268,26 @@
     static show(theme = 'light') {
       injectStyles();
 
-      // Remove existing if present
+      // Cancel pending hide timer to prevent race condition
+      if (hideTimer) {
+        clearTimeout(hideTimer);
+        hideTimer = null;
+      }
+
+      // Remove existing if present (unlock its ScrollLock to avoid count leak)
       if (overlay) {
         overlay.remove();
         overlay = null;
+        ScrollLock.unlock();
       }
 
       overlay = buildOverlay(theme);
       document.body.appendChild(overlay);
-      document.body.style.overflow = 'hidden';
+      ScrollLock.lock();
 
       // Trigger fade-in on next frame
       requestAnimationFrame(() => {
-        overlay.classList.add('lex-loader-visible');
+        if (overlay) overlay.classList.add('lex-loader-visible');
       });
 
       return overlay;
@@ -286,12 +299,13 @@
       overlay.classList.remove('lex-loader-visible');
 
       // Wait for fade-out transition, then remove
-      setTimeout(() => {
+      hideTimer = setTimeout(() => {
         if (overlay) {
           overlay.remove();
           overlay = null;
         }
-        document.body.style.overflow = '';
+        hideTimer = null;
+        ScrollLock.unlock();
       }, 300);
     }
   }

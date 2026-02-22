@@ -87,7 +87,7 @@
         border-radius: var(--lex-radius-md, 6px);
         background: var(--lex-bg-accent-soft, #F5F0EA);
         color: var(--lex-text-primary);
-        font-size: 12px;
+        font-size: var(--lex-body-xs-size, 0.75rem);
         line-height: 1.4;
         white-space: nowrap;
       }
@@ -126,7 +126,7 @@
         border: 1px dashed var(--lex-border-default, #E8E5E1);
         background: transparent;
         color: var(--lex-text-secondary);
-        font-size: 12px;
+        font-size: var(--lex-body-xs-size, 0.75rem);
         cursor: pointer;
         transition: all 0.15s;
       }
@@ -135,7 +135,7 @@
         color: var(--lex-text-primary);
       }
       lex-filter-bar .lex-fb-clear {
-        font-size: 11px;
+        font-size: var(--lex-form-help-size, 0.6875rem);
         color: var(--lex-text-tertiary);
         cursor: pointer;
         margin-left: 4px;
@@ -144,8 +144,8 @@
         transition: all 0.15s;
       }
       lex-filter-bar .lex-fb-clear:hover {
-        color: var(--lex-text-danger, #C53030);
-        background: var(--lex-bg-danger, #FFF5F5);
+        color: var(--lex-status-danger-text, #B42318);
+        background: var(--lex-status-danger-bg, #FEF3F2);
       }
 
       /* Dropdown */
@@ -158,13 +158,13 @@
         background: var(--lex-bg-elevated, #FFFFFF);
         border: 1px solid var(--lex-border-default, #E8E5E1);
         border-radius: var(--lex-radius-lg, 8px);
-        box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-        z-index: 50;
+        box-shadow: var(--lex-shadow-lg);
+        z-index: var(--lex-z-dropdown, 10);
         padding: 4px;
       }
       lex-filter-bar .lex-fb-dd-item {
         padding: 7px 10px;
-        font-size: 13px;
+        font-size: var(--lex-form-font-size, 0.8125rem);
         color: var(--lex-text-primary);
         border-radius: 4px;
         cursor: pointer;
@@ -175,7 +175,7 @@
       }
       lex-filter-bar .lex-fb-dd-header {
         padding: 6px 10px 4px;
-        font-size: 11px;
+        font-size: var(--lex-form-help-size, 0.6875rem);
         font-weight: 600;
         color: var(--lex-text-tertiary);
         text-transform: uppercase;
@@ -194,7 +194,7 @@
         border: 1px solid var(--lex-border-default, #E8E5E1);
         border-radius: var(--lex-radius-md, 6px);
         padding: 0 8px;
-        font-size: 13px;
+        font-size: var(--lex-form-font-size, 0.8125rem);
         background: var(--lex-bg-primary);
         color: var(--lex-text-primary);
         outline: none;
@@ -210,7 +210,7 @@
       }
       lex-filter-bar .lex-fb-dd-apply {
         padding: 4px 14px;
-        font-size: 12px;
+        font-size: var(--lex-body-xs-size, 0.75rem);
         font-weight: 500;
         border-radius: var(--lex-radius-md, 6px);
         background: var(--lex-bg-accent, #8B7355);
@@ -224,7 +224,7 @@
       }
       lex-filter-bar .lex-fb-dd-cancel {
         padding: 4px 10px;
-        font-size: 12px;
+        font-size: var(--lex-body-xs-size, 0.75rem);
         border-radius: var(--lex-radius-md, 6px);
         background: transparent;
         color: var(--lex-text-secondary);
@@ -241,7 +241,7 @@
         flex: 1;
       }
       lex-filter-bar .lex-fb-dd-between span {
-        font-size: 12px;
+        font-size: var(--lex-body-xs-size, 0.75rem);
         color: var(--lex-text-tertiary);
       }
       /* Multi-select for enum 'in' operator */
@@ -257,7 +257,7 @@
         align-items: center;
         gap: 6px;
         padding: 4px 6px;
-        font-size: 13px;
+        font-size: var(--lex-form-font-size, 0.8125rem);
         color: var(--lex-text-primary);
         border-radius: 4px;
         cursor: pointer;

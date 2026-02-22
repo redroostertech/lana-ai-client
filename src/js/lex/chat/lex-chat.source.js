@@ -130,6 +130,49 @@
       return { conversationId: this._conversationId, sessionId: null, model: null };
     }
 
+    /** Load message history for the current conversation. */
+    async loadHistory(page, limit) {
+      if (!this._conversationId) return { messages: [], pagination: null, hasMore: false };
+
+      try {
+        const baseUrl = await this._resolveBaseUrl();
+        const token = this._getToken();
+
+        const res = await fetch(
+          `${baseUrl}/api/v1/chat/sessions/${this._conversationId}/messages?page=${page}&limit=${limit}&order=desc`,
+          {
+            headers: { 'Authorization': `Bearer ${token}` }
+          }
+        );
+
+        if (!res.ok) return { messages: [], pagination: null, hasMore: false };
+
+        const data = await res.json();
+        const rawMessages = data.messages || [];
+
+        // Reverse from desc order to chronological
+        const messages = rawMessages.reverse().map(function (m) {
+          return {
+            id: m.id || m.message_id,
+            role: m.role,
+            content: m.content,
+            timestamp: m.created_at || m.timestamp,
+            citations: m.citations || [],
+            artifacts: m.artifacts || []
+          };
+        });
+
+        return {
+          messages: messages,
+          pagination: data.pagination || null,
+          hasMore: data.hasMore === true || (data.pagination && data.pagination.hasMore === true)
+        };
+      } catch (err) {
+        console.error('[SSEChatSource] Failed to load history:', err);
+        return { messages: [], pagination: null, hasMore: false };
+      }
+    }
+
     async *send(content, options = {}) {
       this._generating = true;
       this._abortController = new AbortController();
@@ -373,6 +416,15 @@
 
         case 'agentic_artifacts':
           return { type: 'agentic_artifacts', artifacts: data.artifacts || [] };
+
+        case 'agentic_followup':
+          return {
+            type: 'agentic_followup',
+            followups: data.followups || [],
+            message: data.message || '',
+            matterId: data.matter_id || data.matterId || null,
+            options: data.options || []
+          };
 
         case 'iteration_summary':
           return {

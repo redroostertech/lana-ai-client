@@ -2818,9 +2818,9 @@
       const routes = {
         matter: () => {
           if (entityId) {
-            window.location.href = `matters.html?matter_id=${encodeURIComponent(entityId)}`;
+            Lex.Nav.go('workspace_details.html', { params: { id: entityId }, context: { matterId: entityId } });
           } else {
-            window.location.href = 'matters.html';
+            Lex.Nav.go('workspaces.html');
           }
         },
         contact: () => {
@@ -3088,9 +3088,9 @@
 
     function navigateToContactInMatter() {
       if (_contactDetailPanelData && _contactDetailPanelData.matterId) {
-        window.location.href = `matters.html?matter_id=${encodeURIComponent(_contactDetailPanelData.matterId)}&tab=contacts`;
+        Lex.Nav.go('workspace_details.html', { params: { id: _contactDetailPanelData.matterId }, context: { matterId: _contactDetailPanelData.matterId } });
       } else {
-        window.location.href = 'matters.html';
+        Lex.Nav.go('workspaces.html');
       }
     }
 
@@ -8883,37 +8883,11 @@
         return;
       }
 
-      const drawer = document.getElementById('matterDrawer');
-      const overlay = document.getElementById('matterDrawerOverlay');
-
-      try {
-        // Show loading state
-        drawer.classList.remove('hidden', 'translate-x-full');
-        overlay.classList.remove('hidden');
-
-        // Fetch matter details
-        const matterResult = await api.getMatter(window.currentMatterId);
-        const matter = matterResult.matter;
-
-        // Update drawer header
-        document.getElementById('drawerMatterId').textContent = matter.matter_id;
-        document.getElementById('drawerMatterName').textContent = matter.matter_name || 'Untitled';
-        document.getElementById('drawerClientName').textContent = matter.client_name || '';
-
-        // Update "View Full Details" link with matter ID
-        const viewFullDetailsLink = document.getElementById('viewFullDetailsLink');
-        if (viewFullDetailsLink) {
-          viewFullDetailsLink.href = `matters.html?matter_id=${encodeURIComponent(matter.matter_id)}`;
-        }
-
-        // Render matter details
-        renderMatterDetails(matter);
-
-      } catch (error) {
-        console.error('Failed to load matter details:', error);
-        Toast.error('Failed to load matter details');
-        closeMatterDrawer();
-      }
+      // Navigate to the dedicated matter details page
+      Lex.Nav.go('workspace_details.html', {
+        params: { id: window.currentMatterId },
+        context: { matterId: window.currentMatterId }
+      });
     }
 
     // Close matter details drawer

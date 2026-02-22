@@ -167,6 +167,8 @@
     if (!container || !document.body.contains(container)) {
       container = document.createElement('div');
       container.id = 'lex-toast-container';
+      // The container itself is presentational; individual toasts carry role/live.
+      container.setAttribute('aria-label', 'Notifications');
       document.body.appendChild(container);
     }
     return container;
@@ -268,12 +270,21 @@
         ? `<div class="lex-toast-progress" style="animation:lex-toast-countdown ${duration}ms linear forwards;"></div>`
         : '';
 
-      // Create toast element
+      // Create toast element.
+      // Errors use role="alert" (assertive) so screen readers interrupt immediately.
+      // All other types use role="status" (polite) to announce without interruption.
       const toast = document.createElement('div');
       toast.className = 'lex-toast';
       toast.style.setProperty('--_toast-accent', typeConfig.accent);
       toast.style.position = 'relative';
       toast.style.overflow = 'hidden';
+      if (type === 'error') {
+        toast.setAttribute('role', 'alert');
+        toast.setAttribute('aria-live', 'assertive');
+      } else {
+        toast.setAttribute('role', 'status');
+        toast.setAttribute('aria-live', 'polite');
+      }
 
       toast.innerHTML = `
         ${iconSvg}
@@ -317,24 +328,29 @@
         timer = setTimeout(() => dismissToast(toast, null), duration);
       }
 
-      // Pause timer on hover
+      // Pause timer on hover — track remaining time
       if (duration > 0) {
+        let startTime = Date.now();
+        let remaining = duration;
+
         toast.addEventListener('mouseenter', () => {
           if (timer) {
             clearTimeout(timer);
             timer = null;
+            remaining = Math.max(0, remaining - (Date.now() - startTime));
           }
           const progress = toast.querySelector('.lex-toast-progress');
           if (progress) progress.style.animationPlayState = 'paused';
         });
 
         toast.addEventListener('mouseleave', () => {
-          timer = setTimeout(() => dismissToast(toast, null), 2000);
+          startTime = Date.now();
+          timer = setTimeout(() => dismissToast(toast, null), remaining);
           const progress = toast.querySelector('.lex-toast-progress');
           if (progress) {
             progress.style.animation = 'none';
             progress.offsetHeight; // force reflow
-            progress.style.animation = `lex-toast-countdown 2000ms linear forwards`;
+            progress.style.animation = `lex-toast-countdown ${remaining}ms linear forwards`;
             progress.style.animationPlayState = 'running';
           }
         });

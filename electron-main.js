@@ -1028,16 +1028,16 @@ app.whenReady().then(async () => {
     const isReachable = await verifyServer(savedServer.url);
 
     if (isReachable) {
-      logInfo('Saved server is reachable, loading main app...');
+      logInfo('[electron-main] Saved server is reachable, loading main app...');
       updateLastVerified();
       createWindow(savedServer.url);
       return;
     } else {
-      logInfo('Saved server is not reachable, clearing saved server and showing login...');
+      logInfo('[electron-main] Saved server is not reachable, clearing saved server and showing login...');
       clearSavedServer();
     }
   } else {
-    logInfo('No saved server found, showing login...');
+    logInfo('[electron-main] No saved server found, showing login...');
   }
 
   // No saved server or unreachable - show login page
@@ -1066,12 +1066,12 @@ app.on('window-all-closed', () => {
 // Handle application quit
 app.on('before-quit', async () => {
   // Cleanup operations before quitting
-  console.log('Application is quitting...');
+  console.log('[electron-main] Application is quitting...');
 
   // End session tracking
   if (sessionTracker) {
     await sessionTracker.shutdown();
-    logInfo('Session tracker shut down');
+    logInfo('[electron-main] Session tracker shut down');
   }
 });
 
@@ -1087,8 +1087,8 @@ app.on('web-contents-created', (event, contents) => {
       // Decode the pathname (handles %3A for : etc.)
       let pathname = decodeURIComponent(parsedUrl.pathname);
 
-      logInfo(`[Navigation] Original URL: ${navigationUrl}`);
-      logInfo(`[Navigation] Decoded pathname: ${pathname}`);
+      logInfo(`[electron-main] [Navigation] Original URL: ${navigationUrl}`);
+      logInfo(`[electron-main] [Navigation] Decoded pathname: ${pathname}`);
 
       // Check if this path needs to be fixed to point to public_html
       // A path is "correct" if it already includes public_html AND doesn't have a drive letter after it
@@ -1107,7 +1107,7 @@ app.on('web-contents-created', (event, contents) => {
           const driveMatch = pathname.match(/public_html\/[A-Za-z]:(\/[^?#]*)/);
           if (driveMatch) {
             pagePath = driveMatch[1];
-            logInfo(`[Navigation] Extracted page from malformed path: ${pagePath}`);
+            logInfo(`[electron-main] [Navigation] Extracted page from malformed path: ${pagePath}`);
           }
         } else {
           // On Windows, file:// URLs resolve root-relative paths like /matters.html to /C:/matters.html
@@ -1116,7 +1116,7 @@ app.on('web-contents-created', (event, contents) => {
           const windowsDriveMatch = pathname.match(/^\/?[A-Za-z]:(\/[^?#]*)/);
           if (windowsDriveMatch) {
             pagePath = windowsDriveMatch[1];
-            logInfo(`[Navigation] Windows drive letter stripped: ${pathname} -> ${pagePath}`);
+            logInfo(`[electron-main] [Navigation] Windows drive letter stripped: ${pathname} -> ${pagePath}`);
           }
         }
 
@@ -1137,26 +1137,26 @@ app.on('web-contents-created', (event, contents) => {
         let correctPath = createFileUrl(fullPath);
 
         // Preserve query string and hash from original URL
-        logInfo(`[Navigation] parsedUrl.search: ${parsedUrl.search}`);
-        logInfo(`[Navigation] parsedUrl.hash: ${parsedUrl.hash}`);
+        logInfo(`[electron-main] [Navigation] parsedUrl.search: ${parsedUrl.search}`);
+        logInfo(`[electron-main] [Navigation] parsedUrl.hash: ${parsedUrl.hash}`);
 
         if (parsedUrl.search) {
           correctPath += parsedUrl.search;
-          logInfo(`[Navigation] Added search: ${correctPath}`);
+          logInfo(`[electron-main] [Navigation] Added search: ${correctPath}`);
         }
         if (parsedUrl.hash) {
           correctPath += parsedUrl.hash;
-          logInfo(`[Navigation] Added hash: ${correctPath}`);
+          logInfo(`[electron-main] [Navigation] Added hash: ${correctPath}`);
         }
 
-        logInfo(`[Navigation] Final path: ${navigationUrl} -> ${correctPath}`);
+        logInfo(`[electron-main] [Navigation] Final path: ${navigationUrl} -> ${correctPath}`);
         navigationEvent.preventDefault();
         contents.loadURL(correctPath);
         return;
       }
 
       // Allow local file navigation - this is how the app navigates between pages
-      logInfo(`[Navigation] Path OK, allowing: ${pathname}`);
+      logInfo(`[electron-main] [Navigation] Path OK, allowing: ${pathname}`);
       return;
     }
 
@@ -1168,7 +1168,7 @@ app.on('web-contents-created', (event, contents) => {
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
-  console.error('Uncaught exception:', error);
+  console.error('[electron-main] Uncaught exception:', error);
   dialog.showErrorBox('Application Error', error.message);
 });
 

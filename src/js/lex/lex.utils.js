@@ -58,7 +58,7 @@
   function formatDate(dateString, options) {
     if (!dateString) return '-';
     var defaults = { year: 'numeric', month: 'short', day: 'numeric' };
-    var merged = defaults;
+    var merged = Object.assign({}, defaults);
     if (options) {
       var keys = Object.keys(options);
       for (var i = 0; i < keys.length; i++) {
@@ -130,23 +130,26 @@
 
   // ── Status badge ──────────────────────────────────────────────────────
 
-  var STATUS_STYLES = {
-    active:    'bg-green-100 text-green-800',
-    inactive:  'bg-gray-100 text-gray-800',
-    pending:   'bg-yellow-100 text-yellow-800',
-    disabled:  'bg-red-100 text-red-800',
-    healthy:   'bg-green-100 text-green-800',
-    unhealthy: 'bg-red-100 text-red-800',
-    degraded:  'bg-yellow-100 text-yellow-800',
-    installed: 'bg-blue-100 text-blue-800',
-    running:   'bg-green-100 text-green-800',
-    stopped:   'bg-gray-100 text-gray-800'
+  var STATUS_TOKEN_STYLES = {
+    active:    { bg: 'var(--lex-status-success-bg, #ECFDF3)',   text: 'var(--lex-status-success-text, #067647)' },
+    inactive:  { bg: 'var(--lex-status-neutral-bg, #F5F3F0)',   text: 'var(--lex-status-neutral-text, #423F3A)' },
+    pending:   { bg: 'var(--lex-status-warning-bg, #FFFAEB)',   text: 'var(--lex-status-warning-text, #B54708)' },
+    disabled:  { bg: 'var(--lex-status-danger-bg, #FEF3F2)',    text: 'var(--lex-status-danger-text, #B42318)' },
+    healthy:   { bg: 'var(--lex-status-success-bg, #ECFDF3)',   text: 'var(--lex-status-success-text, #067647)' },
+    unhealthy: { bg: 'var(--lex-status-danger-bg, #FEF3F2)',    text: 'var(--lex-status-danger-text, #B42318)' },
+    degraded:  { bg: 'var(--lex-status-warning-bg, #FFFAEB)',   text: 'var(--lex-status-warning-text, #B54708)' },
+    installed: { bg: 'var(--lex-status-info-bg, #EFF4FF)',      text: 'var(--lex-status-info-text, #175CD3)' },
+    running:   { bg: 'var(--lex-status-success-bg, #ECFDF3)',   text: 'var(--lex-status-success-text, #067647)' },
+    stopped:   { bg: 'var(--lex-status-neutral-bg, #F5F3F0)',   text: 'var(--lex-status-neutral-text, #423F3A)' }
   };
+
+  var STATUS_DEFAULT_TOKEN = { bg: 'var(--lex-status-neutral-bg, #F5F3F0)', text: 'var(--lex-status-neutral-text, #423F3A)' };
 
   function statusBadge(status) {
     var escaped = escapeHtml(status);
-    var style = STATUS_STYLES[status] || 'bg-gray-100 text-gray-800';
-    return '<span class="px-2 py-1 text-xs font-medium rounded-full ' + style + '">' + escaped + '</span>';
+    var tokens = STATUS_TOKEN_STYLES[status] || STATUS_DEFAULT_TOKEN;
+    var inlineStyle = 'background:' + tokens.bg + ';color:' + tokens.text + ';';
+    return '<span style="display:inline-flex;align-items:center;padding:2px 8px;font-size:var(--lex-body-xs-size,0.75rem);font-weight:500;border-radius:var(--lex-radius-full,9999px);' + inlineStyle + '">' + escaped + '</span>';
   }
 
   // ── Relative date formatter ──────────────────────────────────────────

@@ -192,6 +192,15 @@
         loadMatters({ silent: true });
       });
     }
+
+    // Pagination — lex-pagination fires 'page-change'
+    var drivePagination = document.getElementById('drivePagination');
+    if (drivePagination) {
+      drivePagination.addEventListener('page-change', function (e) {
+        storageState.currentPage = e.detail.page;
+        loadMatters();
+      });
+    }
   }
 
   // ── Navigation ───────────────────────────────────────────────────────
@@ -330,15 +339,22 @@
     var resultsCountEl = document.getElementById('resultsCount');
     if (!resultsCountEl) return;
 
-    var start = storageState.totalResults > 0 ? (storageState.currentPage - 1) * 100 + 1 : 0;
-    var end = Math.min(storageState.currentPage * 100, storageState.totalResults);
+    var total = storageState.totalResults;
+    var start = total > 0 ? (storageState.currentPage - 1) * 100 + 1 : 0;
+    var end = Math.min(storageState.currentPage * 100, total);
 
-    if (storageState.totalResults === 0) {
+    if (total === 0) {
       resultsCountEl.textContent = 'No results found';
     } else if (storageState.searchQuery || storageState.sourceFilter !== 'all') {
-      resultsCountEl.textContent = 'Showing ' + start + '-' + end + ' of ' + storageState.totalResults + ' results';
+      resultsCountEl.textContent = 'Showing ' + start + '-' + end + ' of ' + total + ' results';
     } else {
-      resultsCountEl.textContent = storageState.totalResults + ' matter' + (storageState.totalResults !== 1 ? 's' : '');
+      resultsCountEl.textContent = total + ' matter' + (total !== 1 ? 's' : '');
+    }
+
+    // Section header count
+    var sectionCount = document.getElementById('driveSectionCount');
+    if (sectionCount) {
+      sectionCount.textContent = total + ' folder' + (total !== 1 ? 's' : '');
     }
   }
 
@@ -715,61 +731,16 @@
   // ── Pagination ────────────────────────────────────────────────────────
 
   /**
-   * Update pagination UI elements (page numbers, button states).
+   * Update pagination UI via <lex-pagination> component.
    */
   function updatePaginationUI() {
-    var paginationControls = document.getElementById('paginationControls');
-    paginationControls && paginationControls.classList.remove('hidden');
+    var pager = document.getElementById('drivePagination');
+    if (!pager) return;
 
-    var limit = 100;
-    var start = (storageState.currentPage - 1) * limit + 1;
-    var end = Math.min(storageState.currentPage * limit, storageState.totalResults);
-
-    var startEl = document.getElementById('paginationStart');
-    var endEl = document.getElementById('paginationEnd');
-    var totalEl = document.getElementById('paginationTotal');
-    var currentPageEl = document.getElementById('currentPageNum');
-    var totalPagesEl = document.getElementById('totalPagesNum');
-
-    if (startEl) startEl.textContent = start;
-    if (endEl) endEl.textContent = end;
-    if (totalEl) totalEl.textContent = storageState.totalResults;
-    if (currentPageEl) currentPageEl.textContent = storageState.currentPage;
-    if (totalPagesEl) totalPagesEl.textContent = storageState.totalPages || 1;
-
-    var isFirstPage = storageState.currentPage === 1;
-    var isLastPage = storageState.currentPage >= storageState.totalPages;
-
-    // lex-btn: disabled is a reflected property — set it directly on the element
-    var prevBtn = document.getElementById('prevPage');
-    var nextBtn = document.getElementById('nextPage');
-    if (prevBtn) prevBtn.disabled = isFirstPage;
-    if (nextBtn) nextBtn.disabled = isLastPage;
-
-    var prevBtnMobile = document.getElementById('prevPageMobile');
-    var nextBtnMobile = document.getElementById('nextPageMobile');
-    if (prevBtnMobile) prevBtnMobile.disabled = isFirstPage;
-    if (nextBtnMobile) nextBtnMobile.disabled = isLastPage;
-  }
-
-  /**
-   * Navigate to the previous page of results.
-   */
-  async function goToPreviousPage() {
-    if (storageState.currentPage > 1) {
-      storageState.currentPage--;
-      await loadMatters();
-    }
-  }
-
-  /**
-   * Navigate to the next page of results.
-   */
-  async function goToNextPage() {
-    if (storageState.currentPage < storageState.totalPages) {
-      storageState.currentPage++;
-      await loadMatters();
-    }
+    pager.page = storageState.currentPage;
+    pager.totalPages = storageState.totalPages || 1;
+    pager.total = storageState.totalResults || 0;
+    pager.limit = 100;
   }
 
   /**
@@ -1105,8 +1076,6 @@
     exposeGlobal('confirmDeleteMatter', confirmDeleteMatter);
     exposeGlobal('togglePin', togglePin);
     exposeGlobal('openRecentFile', openRecentFile);
-    exposeGlobal('goToPreviousPage', goToPreviousPage);
-    exposeGlobal('goToNextPage', goToNextPage);
     exposeGlobal('refreshPage', refreshPage);
 
     setupEventListeners();

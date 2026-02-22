@@ -8,7 +8,7 @@
       heading="My Drive"
       subtitle="Manage your matters, folders, and documents"
     >
-      <lex-btn id="newFolderBtn" variant="primary" leading-icon="folder-plus">
+      <lex-btn id="newFolderBtn" variant="primary">
         New Folder
       </lex-btn>
     </lex-banner>
@@ -110,6 +110,12 @@
       <p class="text-sm" style="color: var(--lex-text-secondary)">Loading...</p>
     </div>
 
+    <!-- Section Header -->
+    <div class="flex items-center justify-between mb-3">
+      <h2 id="driveSectionHeading" class="text-lg font-semibold" style="color: var(--lex-text-primary)">All Folders</h2>
+      <span id="driveSectionCount" class="text-sm" style="color: var(--lex-text-secondary)"></span>
+    </div>
+
     <!-- Grid View -->
     <div id="gridView" class="hidden grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
 
@@ -141,38 +147,7 @@
     </div>
 
     <!-- Pagination Controls -->
-    <div id="paginationControls" class="hidden mt-6 flex items-center justify-between px-4 py-3 bg-white border rounded-lg" style="border-color: var(--lex-border-default)">
-      <div class="flex-1 flex justify-between sm:hidden">
-        <lex-btn id="prevPageMobile" variant="secondary" onclick="goToPreviousPage()">Previous</lex-btn>
-        <lex-btn id="nextPageMobile" variant="secondary" onclick="goToNextPage()">Next</lex-btn>
-      </div>
-      <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-        <div>
-          <p class="text-sm" style="color: var(--lex-text-primary)">
-            Showing <span class="font-medium" id="paginationStart">1</span> to <span class="font-medium" id="paginationEnd">100</span> of <span class="font-medium" id="paginationTotal">0</span> results
-          </p>
-        </div>
-        <div>
-          <nav class="relative z-0 inline-flex items-center gap-1" aria-label="Pagination">
-            <lex-btn id="prevPage" variant="ghost" icon="true" onclick="goToPreviousPage()" title="Previous page">
-              <span class="sr-only">Previous</span>
-              <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
-              </svg>
-            </lex-btn>
-            <span class="relative inline-flex items-center px-4 py-2 text-sm font-medium" style="color: var(--lex-text-primary)">
-              Page <span id="currentPageNum" class="mx-1">1</span> of <span id="totalPagesNum" class="ml-1">1</span>
-            </span>
-            <lex-btn id="nextPage" variant="ghost" icon="true" onclick="goToNextPage()" title="Next page">
-              <span class="sr-only">Next</span>
-              <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
-              </svg>
-            </lex-btn>
-          </nav>
-        </div>
-      </div>
-    </div>
+    <lex-pagination id="drivePagination" class="mt-6"></lex-pagination>
   </main>
 
   <!-- ══════════════════════════════════════════════════════════════════

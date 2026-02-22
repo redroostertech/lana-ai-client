@@ -73,7 +73,6 @@
 
       .lex-conv-item:hover {
         background: var(--lex-sidebar-hover-bg, #2D2B27);
-        transform: translateX(2px);
       }
 
       .lex-conv-item:hover::before {

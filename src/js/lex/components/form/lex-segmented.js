@@ -51,7 +51,7 @@
         left: 0;
         border-radius: calc(var(--lex-radius-lg) - 2px);
         background: var(--lex-bg-primary);
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+        box-shadow: var(--lex-shadow-sm);
         transition: left 0.25s cubic-bezier(0.4, 0, 0.2, 1), width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         z-index: 0;
       }
@@ -89,7 +89,7 @@
       }
 
       .lex-seg-item:focus-visible {
-        box-shadow: 0 0 0 2px rgba(89, 82, 70, 0.2);
+        box-shadow: var(--lex-focus-ring, 0 0 0 3px rgba(89, 82, 70, 0.3));
       }
 
       .lex-seg-item svg {

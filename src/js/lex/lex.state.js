@@ -53,6 +53,9 @@
       this._activeDocuments = [];
       this._forceAgentic = false;
 
+      // Saved property descriptors for cleanup
+      this._interceptedProps = new Map();
+
       // Hydrate from api + localStorage
       this._hydrate();
 
@@ -72,8 +75,8 @@
     }
 
     get isTokenExpired() {
-      if (typeof api !== 'undefined' && api && typeof api.isTokenExpired === 'function') {
-        return api.isTokenExpired();
+      if (typeof window.api !== 'undefined' && window.api && typeof window.api.isTokenExpired === 'function') {
+        return window.api.isTokenExpired();
       }
       return false;
     }
@@ -121,9 +124,9 @@
       // Sync back to api and localStorage. The interceptor will see
       // the same value we already set on _token/_user, so the
       // !== check in the interceptor callback prevents double-firing.
-      if (typeof api !== 'undefined' && api) {
-        api.token = token;
-        api.user = user;
+      if (typeof window.api !== 'undefined' && window.api) {
+        window.api.token = token;
+        window.api.user = user;
       }
       if (token) {
         localStorage.setItem('token', token);
@@ -142,9 +145,9 @@
 
       // Interceptor won't double-fire: _token is already null before
       // api.token is set, so the !== check in the callback is a no-op.
-      if (typeof api !== 'undefined' && api) {
-        api.token = null;
-        api.user = null;
+      if (typeof window.api !== 'undefined' && window.api) {
+        window.api.token = null;
+        window.api.user = null;
       }
       localStorage.removeItem('token');
       localStorage.removeItem('user');
@@ -280,10 +283,10 @@
 
     _hydrate() {
       // Auth — read from api first, fallback to localStorage
-      if (typeof api !== 'undefined' && api) {
-        this._token = api.token || null;
-        this._user = api.user || null;
-        this._baseUrl = api.baseUrl || '';
+      if (typeof window.api !== 'undefined' && window.api) {
+        this._token = window.api.token || null;
+        this._user = window.api.user || null;
+        this._baseUrl = window.api.baseUrl || '';
       } else {
         this._token = localStorage.getItem('token') || null;
         try {
@@ -324,20 +327,20 @@
      * to token, user, baseUrl, and _streamingActive. This fires events
      * the instant a value changes — no polling timers needed.
      *
-     * Does NOT modify api.js source. Works because api.token etc. are
+     * Does NOT modify api.js source. Works because window.api.token etc. are
      * plain instance properties (not prototype getters), so we can
      * redefine them on the instance with a getter/setter pair.
      */
     _interceptApiProperties() {
-      if (typeof api === 'undefined' || !api) return;
+      if (typeof window.api === 'undefined' || !window.api) return;
 
       var self = this;
 
-      this._interceptProperty(api, 'token', function (newVal) {
+      this._interceptProperty(window.api, 'token', function (newVal) {
         var val = newVal || null;
         if (val !== self._token) {
           self._token = val;
-          self._user = api.user || null;
+          self._user = window.api.user || null;
           self._emit('auth:changed', {
             token: self._token,
             user: self._user,
@@ -346,7 +349,7 @@
         }
       });
 
-      this._interceptProperty(api, 'user', function (newVal) {
+      this._interceptProperty(window.api, 'user', function (newVal) {
         var val = newVal || null;
         if (val !== self._user) {
           self._user = val;
@@ -358,7 +361,7 @@
         }
       });
 
-      this._interceptProperty(api, 'baseUrl', function (newVal) {
+      this._interceptProperty(window.api, 'baseUrl', function (newVal) {
         var val = newVal || '';
         if (val !== self._baseUrl) {
           self._baseUrl = val;
@@ -369,7 +372,7 @@
         }
       });
 
-      this._interceptProperty(api, '_streamingActive', function (newVal) {
+      this._interceptProperty(window.api, '_streamingActive', function (newVal) {
         var val = !!newVal;
         if (val !== self._isStreaming) {
           self._isStreaming = val;
@@ -384,6 +387,10 @@
      */
     _interceptProperty(obj, prop, onChange) {
       var currentValue = obj[prop];
+
+      // Save original descriptor for restoration in destroy()
+      var originalDescriptor = Object.getOwnPropertyDescriptor(obj, prop);
+      this._interceptedProps.set(prop, { obj: obj, descriptor: originalDescriptor, value: currentValue });
 
       Object.defineProperty(obj, prop, {
         get: function () { return currentValue; },
@@ -409,7 +416,16 @@
     // -----------------------------------------------------------------------
 
     destroy() {
-      // No timers to clean up — interception is passive
+      // Restore intercepted api properties to their original descriptors
+      this._interceptedProps.forEach(function (entry, prop) {
+        if (entry.descriptor) {
+          Object.defineProperty(entry.obj, prop, entry.descriptor);
+        } else {
+          // Property was a simple value (no prior descriptor)
+          entry.obj[prop] = entry.value;
+        }
+      });
+      this._interceptedProps.clear();
     }
   }
 

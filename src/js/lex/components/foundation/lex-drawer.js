@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const { LexElement, defineLex } = window.Lex;
+  const { LexElement, defineLex, ScrollLock } = window.Lex;
 
   let stylesInjected = false;
 
@@ -108,6 +108,9 @@
         color: var(--lex-text-primary);
         line-height: 1.4;
         margin: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
       .lex-drawer-subtitle {
@@ -252,6 +255,9 @@
 
   const CLOSE_SVG = '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
 
+  // Monotonically increasing counter to generate unique aria-labelledby IDs.
+  let _drawerIdCounter = 0;
+
   class LexDrawer extends LexElement {
     static get properties() {
       return {
@@ -267,10 +273,23 @@
       };
     }
 
+    constructor() {
+      super();
+      // Unique ID used for the aria-labelledby / title element pair.
+      this._titleId = 'lex-drawer-title-' + (++_drawerIdCounter);
+      // Element focused before the drawer opened — restored on close.
+      this._previousFocus = null;
+      // Cleanup function returned by FocusTrap.activate().
+      this._focusTrapCleanup = null;
+    }
+
     connected() {
       // Prevent _restoreContent() from re-cloning children on subsequent
       // updates — preserves live DOM and event listeners bound by page scripts.
       this._originalChildren = null;
+      // Tracks whether this instance currently holds the ScrollLock.
+      // Prevents double-unlock when the component re-renders while open.
+      this._scrollLocked = false;
     }
 
     render() {
@@ -283,21 +302,23 @@
       const sideCls = this.side === 'left' ? 'lex-drawer-overlay--left' : 'lex-drawer-overlay--right';
       const widthCls = `lex-drawer-panel--${this.width || 'md'}`;
 
+      // aria-labelledby points to the heading element when a heading is provided.
+      const labelledBy = this.heading ? ` aria-labelledby="${this._titleId}"` : '';
+
       // Always render full structure; starts hidden.
       let html = `<div class="lex-drawer-overlay ${sideCls}" style="display:none">`;
       html += `<div class="lex-drawer-backdrop" data-action="overlay"></div>`;
-      html += `<div class="lex-drawer-panel ${widthCls}">`;
+      html += `<div class="lex-drawer-panel ${widthCls}" role="dialog" aria-modal="true"${labelledBy}>`;
 
       // Header
       if (this.heading) {
         html += `<div class="lex-drawer-header">`;
-        html += `<div>`;
-        html += `<h3 class="lex-drawer-title">${this.escapeHtml(this.heading)}</h3>`;
-        if (this.subtitle) {
-          html += `<div class="lex-drawer-subtitle">${this.escapeHtml(this.subtitle)}</div>`;
-        }
+        html += `<div style="flex:1;min-width:0">`;
+        html += `<h3 id="${this._titleId}" class="lex-drawer-title">${this.escapeHtml(this.heading)}</h3>`;
+        html += `<div class="lex-drawer-subtitle"${this.subtitle ? '' : ' style="display:none"'}>${this.subtitle ? this.escapeHtml(this.subtitle) : ''}</div>`;
         html += `</div>`;
-        html += `<button type="button" class="lex-drawer-close" data-action="close">${CLOSE_SVG}</button>`;
+        html += `<div class="lex-drawer-header-actions" style="display:flex;align-items:center;gap:4px"></div>`;
+        html += `<button type="button" class="lex-drawer-close" data-action="close" aria-label="Close drawer">${CLOSE_SVG}</button>`;
         html += `</div>`;
       }
 
@@ -322,17 +343,39 @@
     updated(changedProps) {
       const overlay = this.querySelector('.lex-drawer-overlay');
 
-      // Sync heading/subtitle without re-render
+      // Sync heading/subtitle without re-render.
+      // Also keep aria-labelledby on the panel in sync when heading changes.
       if (changedProps && changedProps.has('heading')) {
         const titleEl = this.querySelector('.lex-drawer-title');
         if (titleEl) titleEl.textContent = this.heading;
+        const panel = this.querySelector('.lex-drawer-panel');
+        if (panel) {
+          if (this.heading) {
+            panel.setAttribute('aria-labelledby', this._titleId);
+          } else {
+            panel.removeAttribute('aria-labelledby');
+          }
+        }
       }
       if (changedProps && changedProps.has('subtitle')) {
         const subEl = this.querySelector('.lex-drawer-subtitle');
-        if (subEl) subEl.textContent = this.subtitle;
+        if (subEl) {
+          subEl.textContent = this.subtitle;
+          subEl.style.display = this.subtitle ? '' : 'none';
+        }
       }
 
       if (!this.open) {
+        // Deactivate focus trap and restore previously focused element.
+        if (this._focusTrapCleanup) {
+          this._focusTrapCleanup();
+          this._focusTrapCleanup = null;
+        }
+        if (this._previousFocus && typeof this._previousFocus.focus === 'function') {
+          this._previousFocus.focus();
+          this._previousFocus = null;
+        }
+
         // Play exit animation, then hide
         if (overlay && overlay.style.display !== 'none') {
           const panel = this.querySelector('.lex-drawer-panel');
@@ -340,22 +383,63 @@
           if (panel && !panel.classList.contains('lex-drawer-panel--closing')) {
             panel.classList.add('lex-drawer-panel--closing');
             if (backdrop) backdrop.classList.add('lex-drawer-backdrop--closing');
-            panel.addEventListener('animationend', () => {
+            const onEnd = () => {
+              panel.removeEventListener('animationend', onEnd);
               overlay.style.display = 'none';
               panel.classList.remove('lex-drawer-panel--closing');
               if (backdrop) backdrop.classList.remove('lex-drawer-backdrop--closing');
-              document.body.style.overflow = '';
-            }, { once: true });
+              if (this._scrollLocked) {
+                ScrollLock.unlock();
+                this._scrollLocked = false;
+              }
+            };
+            panel.addEventListener('animationend', onEnd);
+            this._animEndCleanup = () => {
+              panel.removeEventListener('animationend', onEnd);
+              if (this._scrollLocked) {
+                ScrollLock.unlock();
+                this._scrollLocked = false;
+              }
+            };
           }
         } else {
-          document.body.style.overflow = '';
+          if (this._scrollLocked) {
+            ScrollLock.unlock();
+            this._scrollLocked = false;
+          }
         }
         return;
       }
 
-      // Opening — show overlay and lock scroll
+      // Opening — store previous focus, show overlay, lock scroll, activate trap.
+      this._previousFocus = document.activeElement;
       if (overlay) overlay.style.display = '';
-      document.body.style.overflow = 'hidden';
+      if (!this._scrollLocked) {
+        ScrollLock.lock();
+        this._scrollLocked = true;
+      }
+
+      // Activate focus trap and move initial focus to first focusable element.
+      const panel = this.querySelector('.lex-drawer-panel');
+      if (panel) {
+        const focusable = window.Lex.FocusTrap.getFocusable(panel);
+        queueMicrotask(() => {
+          if (focusable.length > 0) {
+            focusable[0].focus();
+          } else {
+            // Fallback: make the panel itself focusable so focus is not lost.
+            panel.setAttribute('tabindex', '-1');
+            panel.focus();
+          }
+        });
+        this._focusTrapCleanup = window.Lex.FocusTrap.activate(panel);
+        this._eventCleanups.push(() => {
+          if (this._focusTrapCleanup) {
+            this._focusTrapCleanup();
+            this._focusTrapCleanup = null;
+          }
+        });
+      }
 
       this.delegate('click', '[data-action="close"]', () => {
         this.emit('lex-close');
@@ -388,10 +472,57 @@
       document.addEventListener('keydown', escHandler);
       this._eventCleanups.push(() => document.removeEventListener('keydown', escHandler));
 
-      // Unlock body scroll on cleanup
+      // Unlock body scroll on cleanup — only if this instance locked it
       this._eventCleanups.push(() => {
-        document.body.style.overflow = '';
+        if (this._animEndCleanup) {
+          this._animEndCleanup();
+          this._animEndCleanup = null;
+        } else if (this._scrollLocked) {
+          ScrollLock.unlock();
+          this._scrollLocked = false;
+        }
       });
+    }
+
+    // --- Instance API ---
+
+    /**
+     * Set action buttons in the drawer header (between title and close button).
+     *   drawer.setHeaderActions([
+     *     { icon: '<svg>...</svg>', title: 'Refresh', onclick: () => { ... } },
+     *     { icon: '<svg>...</svg>', title: 'More',    onclick: (btn) => { ... } }
+     *   ]);
+     * Each entry renders a small icon button. Pass `html` instead of `icon`
+     * to inject arbitrary markup (e.g. a dropdown wrapper).
+     */
+    setHeaderActions(actions) {
+      const slot = this.querySelector('.lex-drawer-header-actions');
+      if (!slot) return;
+      slot.innerHTML = '';
+      if (!actions || !actions.length) return;
+
+      for (const action of actions) {
+        if (action.html) {
+          // action.html is TRUSTED pre-built markup supplied by internal callers
+          // (e.g. icon SVGs, dropdown wrappers). It is never sourced from
+          // user-entered data or external content. Do NOT pass raw user strings
+          // here — use the icon/title path below for user-supplied text.
+          const wrapper = document.createElement('div');
+          wrapper.innerHTML = action.html;
+          while (wrapper.firstChild) slot.appendChild(wrapper.firstChild);
+        } else {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'lex-drawer-close';  // reuse same icon-button style
+          // action.title is user-provided text — set via textContent, not innerHTML
+          btn.title = action.title || '';
+          // action.icon is trusted pre-built SVG markup (same as action.html)
+          btn.innerHTML = action.icon || '';
+          if (action.onclick) btn.addEventListener('click', (e) => action.onclick(btn, e));
+          if (action.id) btn.id = action.id;
+          slot.appendChild(btn);
+        }
+      }
     }
 
     // --- Static API ---

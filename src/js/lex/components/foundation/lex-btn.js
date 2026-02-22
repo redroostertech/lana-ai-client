@@ -136,9 +136,9 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background: var(--lex-color-danger-500, #F04438);
-        color: #fff;
-        font-size: 10px;
+        background: var(--lex-badge-notification-bg, var(--lex-color-danger-500, #F04438));
+        color: var(--lex-badge-notification-text, var(--lex-color-white, #FFFFFF));
+        font-size: var(--lex-badge-count-size, 0.625rem);
         font-weight: var(--lex-weight-bold, 700);
         border-radius: var(--lex-radius-full, 9999px);
         line-height: 1;
@@ -160,7 +160,7 @@
         min-width: 20px;
         height: 20px;
         padding: 0 6px;
-        font-size: 11px;
+        font-size: var(--lex-body-xs-size, 0.75rem);
         top: -5px;
         right: -5px;
       }
@@ -287,6 +287,29 @@
     }
 
     updated() {
+      // Auto-generate aria-label for icon-only buttons so screen readers have
+      // an accessible name. We check the inner button's visible text content:
+      // if it is empty (or only contains SVG content with no text nodes), and
+      // a leading icon name is available, derive a human-readable label from it
+      // by replacing hyphens with spaces (e.g. "chevron-left" → "chevron left").
+      const btn = this.querySelector('button.lex-btn-inner');
+      if (btn && !btn.hasAttribute('aria-label')) {
+        // Check for visible text in slot-content (ignores SVG child nodes).
+        const slotContent = btn.querySelector('slot-content');
+        const slotText = slotContent ? slotContent.textContent.trim() : '';
+        const isIconOnly = this.icon || slotText === '';
+
+        if (isIconOnly) {
+          // Prefer leadingIcon name, then trailingIcon name.
+          const iconName = this.leadingIcon || this.trailingIcon;
+          if (iconName) {
+            // Convert kebab-case to readable words: "chevron-left" → "chevron left"
+            const readable = iconName.split('-').join(' ');
+            btn.setAttribute('aria-label', readable);
+          }
+        }
+      }
+
       this.delegate('click', 'button', (e) => {
         if (this.disabled || this.loading) {
           e.preventDefault();
@@ -295,9 +318,9 @@
         }
 
         // Ripple effect
-        const btn = e.target.closest('button');
-        if (!btn) return;
-        const rect = btn.getBoundingClientRect();
+        const clickedBtn = e.target.closest('button');
+        if (!clickedBtn) return;
+        const rect = clickedBtn.getBoundingClientRect();
         const size = Math.max(rect.width, rect.height);
         const ripple = document.createElement('span');
         ripple.className = 'lex-btn-ripple';
@@ -305,7 +328,7 @@
         ripple.style.height = size + 'px';
         ripple.style.left = (e.clientX - rect.left - size / 2) + 'px';
         ripple.style.top = (e.clientY - rect.top - size / 2) + 'px';
-        btn.appendChild(ripple);
+        clickedBtn.appendChild(ripple);
         setTimeout(() => ripple.remove(), 500);
       });
     }

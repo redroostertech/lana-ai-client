@@ -497,6 +497,15 @@
           this.emit('lex-chat-error', { error: event.error, type: 'agentic' });
           break;
 
+        case 'agentic_followup':
+          this.emit('lex-chat-agentic-followup', {
+            followups: event.followups,
+            message: event.message,
+            matterId: event.matterId,
+            options: event.options
+          });
+          break;
+
         case 'agentic_artifacts':
           if (event.artifacts) {
             this._artifacts.push(...event.artifacts);
@@ -609,7 +618,37 @@
 
     async _loadMoreHistory() {
       if (!this._source || !this.conversationId) return;
-      // Could implement paged history loading here
+      if (!this._threadEl || !this._threadEl.hasMore) return;
+      if (this._loadingMore) return;
+
+      this._loadingMore = true;
+      this._currentPage = (this._currentPage || 1) + 1;
+
+      try {
+        const result = await this._source.loadHistory(this._currentPage, this.maxHistory);
+
+        if (result && result.messages && result.messages.length > 0) {
+          // Format messages for prependMessages — expects [{ role, content, messageId, timestamp }]
+          const formatted = result.messages.map(function (m) {
+            return {
+              role: m.role,
+              content: m.content,
+              messageId: m.id,
+              timestamp: m.timestamp,
+              citations: m.citations,
+              artifacts: m.artifacts
+            };
+          });
+          this._threadEl.prependMessages(formatted);
+          this._threadEl.hasMore = result.hasMore || false;
+        } else {
+          this._threadEl.hasMore = false;
+        }
+      } catch (err) {
+        console.error('[lex-chat] Failed to load more history:', err);
+      } finally {
+        this._loadingMore = false;
+      }
     }
 
     disconnected() {

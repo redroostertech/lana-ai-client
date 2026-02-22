@@ -73,8 +73,8 @@
         width: var(--lex-sidebar-width);
         background: var(--_sb-bg);
         color: var(--_sb-text);
-        display: flex;
-        flex-direction: column;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
         z-index: var(--lex-z-overlay);
         transform: translateX(-100%);
         transition: transform var(--lex-transition-slide), width var(--lex-transition-slide);
@@ -84,6 +84,7 @@
       @media (min-width: 1024px) {
         .lex-sidebar-root {
           transform: translateX(0);
+          overflow: hidden;
         }
       }
 
@@ -97,39 +98,60 @@
          Layout stays the same — no justify-content or display:none snaps. */
 
       @media (min-width: 1024px) {
-        .lex-sidebar-root {
+        .lex-sidebar-root[data-collapsed="true"] {
+          width: var(--lex-sidebar-collapsed-width, 64px);
           overflow: hidden;
         }
 
-        .lex-sidebar-root[data-collapsed="true"] {
-          width: var(--lex-sidebar-collapsed-width, 64px);
-        }
-
-        /* Keep header layout — just let overflow clip the logo */
+        /* Collapse logo + its <a> wrapper so they take no layout space */
         .lex-sidebar-root .lex-sidebar-logo {
-          transition: opacity 0.3s ease 0.05s;
+          transition: opacity 0.3s ease 0.05s, width 0.3s ease;
+        }
+        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-header > a {
+          width: 0;
+          overflow: hidden;
+          flex-shrink: 1;
         }
         .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-logo {
           opacity: 0;
+          width: 0;
+          overflow: hidden;
           pointer-events: none;
         }
 
-        /* Fade out all text elements together */
+        /* Center the header (collapse button only) when collapsed */
+        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-header {
+          justify-content: center;
+          padding: 0 0.5rem;
+        }
+
+        /* Fade out + collapse text elements so they take no layout space */
         .lex-sidebar-root .lex-sidebar-section-title,
         .lex-sidebar-root .lex-sidebar-nav-label,
         .lex-sidebar-root .lex-sidebar-nav-badge,
         .lex-sidebar-root .lex-sidebar-user-name,
         .lex-sidebar-root .lex-sidebar-user-chevron {
-          transition: opacity 0.25s ease;
+          transition: opacity 0.25s ease, width 0.25s ease, margin 0.25s ease;
           white-space: nowrap;
         }
 
-        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-section-title,
+        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-section-title {
+          opacity: 0;
+          height: 0;
+          overflow: hidden;
+          padding: 0;
+          margin: 0;
+          pointer-events: none;
+        }
+
         .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-nav-label,
         .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-nav-badge,
         .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-user-name,
         .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-user-chevron {
           opacity: 0;
+          width: 0;
+          flex: 0 0 0px;
+          overflow: hidden;
           pointer-events: none;
         }
 
@@ -137,7 +159,6 @@
         .lex-sidebar-root .lex-sidebar-conversation-list {
           transition: opacity 0.25s ease, max-height var(--lex-transition-slide);
           max-height: 2000px;
-          overflow: hidden;
         }
         .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-conversation-list {
           opacity: 0;
@@ -145,9 +166,33 @@
           pointer-events: none;
         }
 
-        /* Tooltips on collapsed nav items */
+        /* Icon-only nav items when collapsed */
+        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-section {
+          padding: 0.5rem;
+          align-items: center;
+        }
+
         .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-nav-item {
+          width: auto;
+          gap: 0;
+          justify-content: center;
+          padding: 0.5rem;
           position: relative;
+        }
+
+        /* Center avatar in footer when collapsed */
+        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-footer {
+          padding: 0.5rem;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+        }
+
+        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-user {
+          width: auto;
+          gap: 0;
+          justify-content: center;
+          padding: 0.5rem;
         }
 
         .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-nav-item:hover::after {
@@ -271,7 +316,28 @@
       .lex-sidebar-scrollable {
         flex: 1;
         overflow-y: auto;
+        overflow-x: hidden;
         min-height: 0;
+        padding-bottom: 3rem;
+        scrollbar-width: thin;
+        scrollbar-color: var(--_sb-border) transparent;
+      }
+
+      .lex-sidebar-scrollable::-webkit-scrollbar {
+        width: 4px;
+      }
+
+      .lex-sidebar-scrollable::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .lex-sidebar-scrollable::-webkit-scrollbar-thumb {
+        background: var(--_sb-border);
+        border-radius: 2px;
+      }
+
+      .lex-sidebar-scrollable::-webkit-scrollbar-thumb:hover {
+        background: var(--_sb-text-muted);
       }
 
       /* ── Nav item ───────────────────────────────────────── */
@@ -334,6 +400,7 @@
 
       .lex-sidebar-conversation-list {
         margin-top: 0.25rem;
+        padding-bottom: 1rem;
       }
 
       .lex-sidebar-conversation-list .conversation-item {
@@ -354,6 +421,7 @@
         flex-shrink: 0;
         border-top: 1px solid var(--_sb-border);
         padding: 0.5rem 0.75rem;
+        background: var(--_sb-bg);
       }
 
       /* ── User profile trigger ───────────────────────────── */

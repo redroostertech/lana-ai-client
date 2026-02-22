@@ -10,6 +10,11 @@
        ...body...
      </lex-card>
 
+     <!-- Expandable (collapsible body with smooth animation) -->
+     <lex-card heading="Section" expandable expanded>
+       ...collapsible content...
+     </lex-card>
+
      <!-- With footer -->
      <lex-card heading="Title">
        <p>Body content here</p>
@@ -22,10 +27,11 @@
    Variants: default | elevated | outlined | flat
    Backgrounds: light (default) | dark
    Actions: Array of { icon, label } — emits "card-action" event
+   Expandable: When true, heading row becomes clickable toggle with chevron
    Footer: Child elements with data-slot="footer" render in a separated footer area
 
    Built-in icons: edit, delete, more, settings, download, share, link,
-                   copy, pin, star, close, archive, eye, refresh
+                   copy, pin, star, close, archive, eye, refresh, plus
 */
 
 (function () {
@@ -53,8 +59,11 @@
     close:    '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
     archive:  '<polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/>',
     eye:      '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
-    refresh:  '<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>'
+    refresh:  '<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>',
+    plus:     '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>'
   };
+
+  const CHEVRON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
 
   // -----------------------------------------------------------------------
   // Inject styles once
@@ -67,6 +76,8 @@
     const style = document.createElement('style');
     style.id = 'lex-card-styles';
     style.textContent = `
+      lex-card { display: block; }
+
       .lex-card-action-btn {
         display: flex;
         align-items: center;
@@ -100,7 +111,7 @@
         min-width: 200px;
         border-radius: 0;
         border: 1px solid var(--_card-border-color);
-        box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+        box-shadow: var(--lex-shadow-lg);
         overflow: hidden;
         z-index: var(--lex-z-dropdown, 10);
         opacity: 0;
@@ -187,6 +198,56 @@
         margin-top: 1rem;
         border-top: 1px solid var(--_card-border-color);
       }
+
+      /* ── Expandable (collapsible body) ───────────────────── */
+
+      .lex-card-expand-trigger {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        width: 100%;
+        border: none;
+        background: none;
+        cursor: pointer;
+        text-align: left;
+        font-family: inherit;
+        color: inherit;
+        padding: 0;
+        outline: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .lex-card-expand-trigger:hover {
+        opacity: 0.85;
+      }
+
+      .lex-card-chevron {
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
+        color: var(--lex-text-tertiary, #9ca3af);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .lex-card-chevron svg {
+        width: 16px;
+        height: 16px;
+      }
+      .lex-card-chevron--open {
+        transform: rotate(180deg);
+      }
+
+      .lex-card-collapsible {
+        overflow: hidden;
+        max-height: 0;
+        opacity: 0;
+        transition:
+          max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+          opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .lex-card-collapsible--open {
+        max-height: 9999px;
+        opacity: 1;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -208,12 +269,14 @@
   class LexCard extends LexElement {
     static get properties() {
       return {
-        heading:  { type: String },
-        subtitle: { type: String },
-        variant:  { type: String, default: 'default' },
-        padding:  { type: String, default: 'normal' },
-        bg:       { type: String, default: 'light' },
-        actions:  { type: Array, default: [] }
+        heading:    { type: String },
+        subtitle:   { type: String },
+        variant:    { type: String,  default: 'default' },
+        padding:    { type: String,  default: 'normal' },
+        bg:         { type: String,  default: 'light' },
+        actions:    { type: Array,   default: [] },
+        expandable: { type: Boolean, default: false },
+        expanded:   { type: Boolean, default: false, reflect: true }
       };
     }
 
@@ -222,6 +285,8 @@
 
       const isDark = this.bg === 'dark';
       const actions = this.actions || [];
+      const isExpandable = !!this.expandable;
+      const isExpanded = !!this.expanded;
 
       const variants = {
         default:  `${isDark ? '' : 'border lex-border-subtle'} shadow-sm`,
@@ -305,14 +370,32 @@
           </div>
         ` : '<div class="flex-1"></div>';
 
-        headerHtml = `<div class="flex items-start justify-between gap-3 mb-4">${titleBlock}${actionsHtml}</div>`;
+        if (isExpandable) {
+          // Expandable: heading is a clickable toggle with chevron.
+          // aria-expanded reflects the current open/closed state for screen readers.
+          const chevronCls = 'lex-card-chevron' + (isExpanded ? ' lex-card-chevron--open' : '');
+          headerHtml = `<button type="button" class="lex-card-expand-trigger" data-action="toggle" aria-expanded="${isExpanded ? 'true' : 'false'}">
+            <div class="flex items-start justify-between gap-3 flex-1">${titleBlock}${actionsHtml}</div>
+            <span class="${chevronCls}" aria-hidden="true">${CHEVRON_SVG}</span>
+          </button>`;
+        } else {
+          headerHtml = `<div class="flex items-start justify-between gap-3 mb-4">${titleBlock}${actionsHtml}</div>`;
+        }
+      }
+
+      // Body — wrap in collapsible div when expandable
+      let bodyHtml;
+      if (isExpandable) {
+        const collapseCls = 'lex-card-collapsible' + (isExpanded ? ' lex-card-collapsible--open' : '');
+        bodyHtml = `<div class="${collapseCls}"><div style="padding-top:1rem;"><slot-content></slot-content></div><div class="lex-card-footer"></div></div>`;
+      } else {
+        bodyHtml = `<slot-content></slot-content><div class="lex-card-footer"></div>`;
       }
 
       return `
         <div class="rounded-xl ${variantClass} ${paddingClass}" style="${bgStyle}${cardVars}">
           ${headerHtml}
-          <slot-content></slot-content>
-          <div class="lex-card-footer"></div>
+          ${bodyHtml}
         </div>
       `;
     }
@@ -366,6 +449,16 @@
         // Close on outside click
         this.listen(document, 'click', () => {
           dropdown.classList.remove('lex-card-overflow-open');
+        });
+      }
+
+      // --- Wire up expandable toggle ---
+      if (this.expandable) {
+        this.delegate('click', '[data-action="toggle"]', (e) => {
+          // Don't toggle when clicking action buttons inside the trigger
+          if (e.target.closest('.lex-card-action-btn')) return;
+          this.expanded = !this.expanded;
+          this.emit('card-toggle', { expanded: this.expanded });
         });
       }
     }

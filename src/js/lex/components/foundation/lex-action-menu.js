@@ -63,14 +63,14 @@
       }
 
       .lex-action-menu-heading {
-        font-size: 12px;
+        font-size: var(--lex-body-xs-size, 0.75rem);
         font-weight: 500;
         color: var(--lex-text-tertiary, #7A756D);
         margin-bottom: 4px;
       }
 
       .lex-action-menu-description {
-        font-size: 14px;
+        font-size: var(--lex-body-sm-size, 0.875rem);
         font-weight: 500;
         color: var(--lex-text-primary, #26211C);
         line-height: 1.4;
@@ -170,7 +170,7 @@
       }
 
       .lex-action-menu-label {
-        font-size: 14px;
+        font-size: var(--lex-body-sm-size, 0.875rem);
         font-weight: 500;
         color: var(--lex-text-primary, #26211C);
         line-height: 1.3;
@@ -188,7 +188,7 @@
       }
 
       .lex-action-menu-desc {
-        font-size: 12px;
+        font-size: var(--lex-body-xs-size, 0.75rem);
         color: var(--lex-text-tertiary, #7A756D);
         margin-top: 2px;
         line-height: 1.4;
@@ -242,20 +242,20 @@
         const variant = a.variant || 'default';
         const icon = getIcon(a.icon || 'file-text');
         return `
-          <button class="lex-action-menu-item" data-action="${this._esc(a.id)}" data-variant="${variant}" type="button">
-            <div class="lex-action-menu-icon lex-action-menu-icon--${variant}">${icon}</div>
+          <button class="lex-action-menu-item" data-action="${this._esc(a.id)}" data-variant="${variant}" type="button" role="menuitem">
+            <div class="lex-action-menu-icon lex-action-menu-icon--${variant}" aria-hidden="true">${icon}</div>
             <div class="lex-action-menu-content">
               <div class="lex-action-menu-label">${this._esc(a.label)}</div>
               ${a.description ? `<div class="lex-action-menu-desc">${this._esc(a.description)}</div>` : ''}
             </div>
-            <span class="lex-action-menu-chevron">${ICON_CHEVRON}</span>
+            <span class="lex-action-menu-chevron" aria-hidden="true">${ICON_CHEVRON}</span>
           </button>`;
       }).join('');
 
       return `
         <div class="lex-action-menu">
           ${headerHtml}
-          <div class="lex-action-menu-list">${rows}</div>
+          <div class="lex-action-menu-list" role="menu">${rows}</div>
         </div>`;
     }
 

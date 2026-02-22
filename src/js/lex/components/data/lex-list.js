@@ -50,7 +50,7 @@
         border: 1px solid var(--lex-border-default);
         padding-left: 30px;
         padding-right: 28px;
-        font-size: 13px;
+        font-size: var(--lex-form-font-size, 0.8125rem);
         background: var(--lex-bg-primary);
         color: var(--lex-text-primary);
         outline: none;
@@ -104,7 +104,7 @@
 
       .lex-list-sort select {
         height: 28px;
-        font-size: 12px;
+        font-size: var(--lex-body-xs-size, 0.75rem);
         border: 1px solid var(--lex-border-default);
         border-radius: var(--lex-radius-sm, 4px);
         padding: 0 24px 0 8px;
@@ -141,7 +141,7 @@
       }
 
       .lex-list-count {
-        font-size: 11px;
+        font-size: var(--lex-form-help-size, 0.6875rem);
         color: var(--lex-text-tertiary);
         padding: 0 12px 4px;
       }
@@ -158,7 +158,7 @@
         appearance: none;
         -webkit-appearance: none;
         padding: 3px 22px 3px 8px;
-        font-size: 12px;
+        font-size: var(--lex-body-xs-size, 0.75rem);
         line-height: 1.4;
         border-radius: var(--lex-radius-md, 6px);
         border: 1px solid var(--lex-border-default, #E8E5E1);
@@ -180,7 +180,7 @@
       }
       .lex-list-page-btn {
         padding: 3px 12px;
-        font-size: 12px;
+        font-size: var(--lex-body-xs-size, 0.75rem);
         border-radius: var(--lex-radius-md, 6px);
         border: 1px solid var(--lex-border-default, #E8E5E1);
         background: var(--lex-bg-primary, #fff);
@@ -220,7 +220,7 @@
         background: var(--lex-bg-accent-soft, #F5F0EA);
         border-radius: var(--lex-radius-md, 6px);
         margin-bottom: 8px;
-        font-size: 13px;
+        font-size: var(--lex-form-font-size, 0.8125rem);
       }
       .lex-bulk-count {
         font-weight: 600;
@@ -232,7 +232,7 @@
       }
       .lex-bulk-btn {
         padding: 3px 10px;
-        font-size: 12px;
+        font-size: var(--lex-body-xs-size, 0.75rem);
         border-radius: var(--lex-radius-md, 6px);
         border: 1px solid var(--lex-border-default);
         background: var(--lex-bg-primary);
@@ -244,15 +244,15 @@
         border-color: var(--lex-text-secondary);
       }
       .lex-bulk-btn-danger {
-        color: var(--lex-text-danger, #C53030);
-        border-color: var(--lex-text-danger, #C53030);
+        color: var(--lex-status-danger-text, #B42318);
+        border-color: var(--lex-status-danger-text, #B42318);
       }
       .lex-bulk-btn-danger:hover {
-        background: var(--lex-bg-danger, #FFF5F5);
+        background: var(--lex-status-danger-bg, #FEF3F2);
       }
       .lex-bulk-clear {
         margin-left: auto;
-        font-size: 11px;
+        font-size: var(--lex-form-help-size, 0.6875rem);
         color: var(--lex-text-tertiary);
         cursor: pointer;
         background: none;

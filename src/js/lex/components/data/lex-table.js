@@ -68,7 +68,7 @@
         border-radius: var(--lex-radius-md, 6px);
         border: 1px solid var(--lex-border-default);
         padding: 0 28px 0 30px;
-        font-size: 13px;
+        font-size: var(--lex-form-font-size, 0.8125rem);
         line-height: 32px;
         background: var(--lex-bg-primary);
         color: var(--lex-text-primary);
@@ -123,7 +123,7 @@
       }
 
       .lex-table-count {
-        font-size: 12px;
+        font-size: var(--lex-body-xs-size, 0.75rem);
         color: var(--lex-text-tertiary);
         margin-left: auto;
         white-space: nowrap;
@@ -134,7 +134,7 @@
         appearance: none;
         -webkit-appearance: none;
         padding: 3px 22px 3px 8px;
-        font-size: 12px;
+        font-size: var(--lex-body-xs-size, 0.75rem);
         line-height: 1.4;
         border-radius: var(--lex-radius-md, 6px);
         border: 1px solid var(--lex-border-default, #E8E5E1);
@@ -162,7 +162,7 @@
         justify-content: space-between;
         padding: 8px 16px;
         border-top: 1px solid var(--lex-border-default, #E8E5E1);
-        font-size: 13px;
+        font-size: var(--lex-form-font-size, 0.8125rem);
       }
       .lex-pagination-controls {
         display: flex;
@@ -174,11 +174,11 @@
         align-items: center;
         gap: 6px;
         color: var(--lex-text-secondary, #6B6B6B);
-        font-size: 12px;
+        font-size: var(--lex-body-xs-size, 0.75rem);
       }
       .lex-page-btn {
         padding: 3px 12px;
-        font-size: 12px;
+        font-size: var(--lex-body-xs-size, 0.75rem);
         border-radius: var(--lex-radius-md, 6px);
         border: 1px solid var(--lex-border-default, #E8E5E1);
         background: var(--lex-bg-primary, #fff);
@@ -224,8 +224,8 @@
         background: var(--lex-bg-elevated, #FFFFFF);
         border: 1px solid var(--lex-border-default);
         border-radius: var(--lex-radius-lg, 8px);
-        box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-        z-index: 50;
+        box-shadow: var(--lex-shadow-lg);
+        z-index: var(--lex-z-dropdown, 10);
         padding: 6px;
         display: flex;
         flex-direction: column;
@@ -239,7 +239,7 @@
         align-items: center;
         gap: 6px;
         padding: 4px 6px;
-        font-size: 12px;
+        font-size: var(--lex-body-xs-size, 0.75rem);
         font-weight: 400;
         text-transform: none;
         letter-spacing: 0;
@@ -265,7 +265,7 @@
       }
       .lex-th-filter-dropdown button {
         padding: 3px 10px;
-        font-size: 11px;
+        font-size: var(--lex-body-xs-size, 0.75rem);
         border-radius: 4px;
         cursor: pointer;
         border: none;
@@ -297,7 +297,7 @@
         background: var(--lex-bg-accent-soft, #F5F0EA);
         border-radius: var(--lex-radius-md, 6px);
         margin-bottom: 8px;
-        font-size: 13px;
+        font-size: var(--lex-form-font-size, 0.8125rem);
       }
       .lex-bulk-count {
         font-weight: 600;
@@ -309,7 +309,7 @@
       }
       .lex-bulk-btn {
         padding: 3px 10px;
-        font-size: 12px;
+        font-size: var(--lex-body-xs-size, 0.75rem);
         border-radius: var(--lex-radius-md, 6px);
         border: 1px solid var(--lex-border-default, #E8E5E1);
         background: var(--lex-bg-primary);
@@ -321,15 +321,15 @@
         border-color: var(--lex-text-secondary);
       }
       .lex-bulk-btn-danger {
-        color: var(--lex-text-danger, #C53030);
-        border-color: var(--lex-text-danger, #C53030);
+        color: var(--lex-status-danger-text, #B42318);
+        border-color: var(--lex-status-danger-text, #B42318);
       }
       .lex-bulk-btn-danger:hover {
-        background: var(--lex-bg-danger, #FFF5F5);
+        background: var(--lex-status-danger-bg, #FEF3F2);
       }
       .lex-bulk-clear {
         margin-left: auto;
-        font-size: 11px;
+        font-size: var(--lex-form-help-size, 0.6875rem);
         color: var(--lex-text-tertiary);
         cursor: pointer;
         background: none;
@@ -346,6 +346,27 @@
       }
     `;
     document.head.appendChild(style);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Helper utilities (module-scoped)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Detect whether a string value looks like an ISO date (YYYY-MM-DD...).
+   * Uses string-method character checks instead of regex — NO regex allowed.
+   * Requires length >= 10, positions 4 and 7 to be '-', and the three
+   * numeric segments (year, month, day) to parse as finite integers.
+   * @param {string} val
+   * @returns {boolean}
+   */
+  function _isDateString(val) {
+    if (typeof val !== 'string' || val.length < 10) return false;
+    if (val.charAt(4) !== '-' || val.charAt(7) !== '-') return false;
+    var year  = parseInt(val.substring(0, 4), 10);
+    var month = parseInt(val.substring(5, 7), 10);
+    var day   = parseInt(val.substring(8, 10), 10);
+    return isFinite(year) && isFinite(month) && isFinite(day);
   }
 
   // ---------------------------------------------------------------------------
@@ -374,7 +395,6 @@
       this._searchHadFocus = false;
       this._selectedIds = new Set();
       this._colFilterOpen = null;  // Which column's filter dropdown is open
-      this._colFilterChecked = {}; // Temp state for column filter checkboxes
     }
 
     connected() {
@@ -427,7 +447,7 @@
         const sample = data.find(row => row[col] != null)?.[col];
         let type = 'string';
         if (typeof sample === 'number') type = 'number';
-        else if (sample instanceof Date || (typeof sample === 'string' && /^\d{4}-\d{2}-\d{2}/.test(sample))) type = 'date';
+        else if (sample instanceof Date || (typeof sample === 'string' && _isDateString(sample))) type = 'date';
 
         // Check if it's an enum (few unique values relative to data size)
         const unique = [...new Set(data.map(r => r[col]).filter(v => v != null))];
@@ -690,7 +710,10 @@
         </div>`;
       }
 
-      html += `<div class="overflow-x-auto" style="min-height: 200px"><table class="w-full text-sm">`;
+      // aria-label provides an accessible name for the table.
+      // Prefer an explicit aria-label attribute on the element; fall back to a generic label.
+      const tableLabel = this.getAttribute('aria-label') || this.getAttribute('label') || 'Data table';
+      html += `<div class="overflow-x-auto" style="min-height: 200px"><table class="w-full text-sm" aria-label="${this.escapeHtml(tableLabel)}">`;
       html += `<thead><tr class="border-b lex-border lex-bg-secondary">`;
 
       // Select-all checkbox column
@@ -699,8 +722,8 @@
         const allSelected = allIds.length > 0 && allIds.every(id => this._selectedIds.has(id));
         const someSelected = allIds.some(id => this._selectedIds.has(id));
         const indeterminate = someSelected && !allSelected;
-        html += `<th class="px-2 py-2 w-10">
-          <input type="checkbox" data-action="select-all"${allSelected ? ' checked' : ''}${indeterminate ? ' data-indeterminate="true"' : ''} class="lex-select-check" />
+        html += `<th scope="col" class="px-2 py-2 w-10">
+          <input type="checkbox" data-action="select-all"${allSelected ? ' checked' : ''}${indeterminate ? ' data-indeterminate="true"' : ''} class="lex-select-check" aria-label="Select all rows" />
         </th>`;
       }
 
@@ -714,12 +737,12 @@
         if (this.columnFilters) {
           const hasFilter = this.dataSource?._filters?.has(col);
           filterIcon = `<span class="lex-th-filter ${hasFilter ? 'lex-th-filter--active' : ''}" data-col-filter="${col}" style="position:relative">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
             ${this._colFilterOpen === col ? this._renderColFilterDropdown(col) : ''}
           </span>`;
         }
 
-        html += `<th class="text-left ${cellPad} text-xs font-medium lex-text-secondary uppercase tracking-wider cursor-pointer select-none" data-sort-col="${col}">
+        html += `<th scope="col" class="text-left ${cellPad} text-xs font-medium lex-text-secondary uppercase tracking-wider cursor-pointer select-none" data-sort-col="${col}">
           ${this.escapeHtml(labels[i] || col)}${sortIcon}${filterIcon}
         </th>`;
       });
@@ -906,17 +929,16 @@
 
       // Close column filter dropdown on outside click
       if (this._colFilterOpen) {
+        let skipFirst = true;
         const closeColFilter = (ev) => {
+          if (skipFirst) { skipFirst = false; return; }
           if (!ev.target.closest('[data-col-filter-dropdown]') && !ev.target.closest('[data-col-filter]')) {
             this._colFilterOpen = null;
             this._scheduleUpdate();
-            document.removeEventListener('mousedown', closeColFilter);
           }
         };
-        setTimeout(() => {
-          document.addEventListener('mousedown', closeColFilter);
-          this._eventCleanups.push(() => document.removeEventListener('mousedown', closeColFilter));
-        }, 0);
+        document.addEventListener('mousedown', closeColFilter);
+        this._eventCleanups.push(() => document.removeEventListener('mousedown', closeColFilter));
       }
 
       // Selection: row checkbox

@@ -2401,185 +2401,12 @@
     // Store current matter data globally for tab switching
     let currentMatterData = null;
 
-    window.viewMatter = async function(matterId, defaultTab = 'details', options = {}) {
-      const drawer = document.getElementById('matterDrawer');
-      const overlay = document.getElementById('drawerOverlay');
-
-      // Log the matter_id being used to fetch conversations
-      console.log('[viewMatter] Loading matter details:', {
-        matterId,
-        format: matterId.startsWith('MATT-') ? 'MATT-XXXXX' : 'other',
-        defaultTab,
-        bustCache: options.bustCache || false
+    window.viewMatter = async function(matterId, defaultTab = 'activity', options = {}) {
+      // Navigate to the dedicated matter details page
+      Lex.Nav.go('workspace_details.html', {
+        params: { id: matterId, tab: defaultTab },
+        context: { matterId: matterId, tab: defaultTab }
       });
-
-      try {
-        // Fetch all matter data in parallel
-        const [matterResult, permissionsResult, activityResult, chatsResult, docsResult, orphanedResult, tasksResult, commentsResult] = await Promise.all([
-          api.getMatter(matterId, { bustCache: options.bustCache }),
-          api.getMatterPermissions(matterId).catch(() => ({ permissions: [] })),
-          api.getMatterActivity(matterId, 20, 0).catch(() => ({ activities: [], pagination: { total: 0, limit: 20, offset: 0 } })), // Get first page for activity tab
-          api.getMatterConversations(matterId, 25, 0).catch((err) => {
-            console.error('[viewMatter] Failed to fetch conversations:', err);
-            return { sessions: [], pagination: { total: 0, limit: 25, offset: 0 } };
-          }), // Get first page of conversations
-          api.getMatterFiles(matterId).catch((err) => {
-            console.error('[viewMatter] Failed to fetch documents:', err);
-            return { files: [], pagination: { total_count: 0 } };
-          }), // Get documents
-          api.getOrphanedFiles(matterId).catch((err) => {
-            console.error('[viewMatter] Failed to fetch orphaned files:', err);
-            return { orphaned_files: [], total_count: 0 };
-          }), // Get orphaned files
-          api.getMatterTasks(matterId).catch((err) => {
-            console.error('[viewMatter] Failed to fetch tasks:', err);
-            return { tasks: [], total_count: 0 };
-          }), // Get tasks
-          api.getComments(matterId, { limit: 0 }).catch((err) => {
-            console.error('[viewMatter] Failed to fetch comment count:', err);
-            return { data: [], pagination: { total: 0 } };
-          }) // Get comment count only
-        ]);
-
-        const matter = matterResult.matter;
-        const permissions = permissionsResult.permissions || [];
-        const activities = activityResult.activities || [];
-        const activityPagination = activityResult.pagination || { total: 0, limit: 20, offset: 0 };
-        const chats = chatsResult.sessions || [];
-        const chatsPagination = chatsResult.pagination || { total: 0, limit: 25, offset: 0 };
-        const documents = docsResult.files || [];
-        const documentsPagination = docsResult.pagination || { total_count: 0 };
-        const orphanedFiles = orphanedResult.orphaned_files || [];
-        const tasks = tasksResult.tasks || [];
-        const commentCount = commentsResult.pagination?.total || 0;
-
-        // Extract shadow table data from matter object (when full_details=true)
-        const contacts = matter.contacts || [];
-        const notes = matter.notes || [];
-
-        // Log conversation results for debugging
-        console.log('[viewMatter] Conversations loaded:', {
-          matterId,
-          matterUUID: matter?.id,
-          conversationCount: chats.length,
-          conversations: chats.map(c => ({
-            thread_id: c.thread_id,
-            matter_id: c.matter_id,
-            title: c.title || c.metadata?.title
-          }))
-        });
-
-        console.log('[viewMatter] Documents loaded:', {
-          matterId,
-          documentCount: documents.length,
-          totalDocuments: documentsPagination.total_count,
-          orphanedCount: orphanedFiles.length
-        });
-
-        console.log('[viewMatter] Shadow tables loaded:', {
-          matterId,
-          tasksCount: tasks.length,
-          contactsCount: contacts.length,
-          notesCount: notes.length
-        });
-
-        // Store data globally for tab switching
-        currentMatterData = { matter, permissions, activities, activityPagination, chats, chatsPagination, documents, documentsPagination, orphanedFiles, tasks, contacts, notes };
-
-        // Track matter opened event (with defensive null checks)
-        if (window.analytics && matter) {
-          window.analytics.trackEvent('matter.opened', 'matter', matter.matter_id, {
-            resource_name: matter?.matter_name || 'Unknown',
-            status: matter?.status || 'unknown',
-            default_tab: defaultTab
-          });
-        }
-
-        // Update drawer header
-        const drawerMatterIdEl = document.getElementById('drawerMatterId');
-        drawerMatterIdEl.textContent = matter.matter_id;
-        drawerMatterIdEl.title = matter.matter_id; // Show full ID on hover
-        document.getElementById('drawerMatterName').textContent = matter.matter_name || 'Untitled';
-        document.getElementById('drawerClientName').textContent = matter.client_name || '';
-
-        // Update status badge with matter type badge
-        const matterTypeBadge = matter.matter_type === 'matter' ? `
-          <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-2" title="Client Matter - Included in analytics">
-            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
-              <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
-            </svg>
-            Matter
-          </span>
-        ` : `
-          <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 mr-2" title="Workspace - Excluded from analytics">
-            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/>
-            </svg>
-            Workspace
-          </span>
-        `;
-
-        document.getElementById('drawerStatusBadge').innerHTML = matterTypeBadge + statusBadge(matter.status || 'active');
-
-        // Tab count badges removed from UI
-        // Counts are now only visible within the tab content itself
-
-        // Hide Skills tab for workspaces (skills only apply to client matters)
-        const skillsTab = document.getElementById('tabSkills');
-        if (skillsTab) {
-          const isWorkspace = matter.matter_type === 'workspace';
-          skillsTab.style.display = isWorkspace ? 'none' : 'block';
-        }
-
-        // Hide Contacts tab for workspaces
-        const contactsTab = document.getElementById('tabContacts');
-        if (contactsTab) {
-          const isWorkspace = matter.matter_type === 'workspace';
-          contactsTab.style.display = isWorkspace ? 'none' : 'block';
-        }
-
-        // Set up more options dropdown actions
-        const moreOptionsBtn = document.getElementById('drawerMoreOptionsBtn');
-        const optionsDropdown = document.getElementById('drawerOptionsDropdown');
-        const optionsEditBtn = document.getElementById('drawerOptionsEdit');
-        const optionsDeleteBtn = document.getElementById('drawerOptionsDelete');
-
-        const closeMatterOptionsDropdown = () => { if (optionsDropdown) optionsDropdown.classList.add('hidden'); };
-
-        if (moreOptionsBtn && optionsDropdown) {
-          moreOptionsBtn.onclick = (e) => {
-            e.stopPropagation();
-            const isOpening = optionsDropdown.classList.contains('hidden');
-            optionsDropdown.classList.toggle('hidden');
-            if (isOpening) {
-              setTimeout(() => {
-                const closeOnClickOutside = (ev) => {
-                  if (!optionsDropdown.contains(ev.target) && !moreOptionsBtn.contains(ev.target)) {
-                    closeMatterOptionsDropdown();
-                    document.removeEventListener('click', closeOnClickOutside);
-                  }
-                };
-                document.addEventListener('click', closeOnClickOutside);
-              }, 0);
-            }
-          };
-        }
-        if (optionsEditBtn) {
-          optionsEditBtn.onclick = () => { editMatter(matter.matter_id); closeDrawer(); closeMatterOptionsDropdown(); };
-        }
-        if (optionsDeleteBtn) {
-          optionsDeleteBtn.onclick = () => { deleteMatter(matter.matter_id); closeMatterOptionsDropdown(); };
-        }
-
-        // Render the specified tab (default is 'details')
-        switchMatterTab(defaultTab);
-
-        drawer.classList.remove('hidden', 'translate-x-full');
-        overlay.classList.remove('hidden');
-      } catch (error) {
-        Toast.error('Failed to load matter details');
-      }
     }
 
     // Switch between tabs in matter drawer
@@ -10415,9 +10242,9 @@
         // Check for matter_id or open URL parameter and auto-open drawer
         const urlParams = new URLSearchParams(window.location.search);
         const matterId = urlParams.get('matter_id') || urlParams.get('open');
-        const defaultTab = urlParams.get('tab') || 'details';
+        const defaultTab = urlParams.get('tab') || 'activity';
         if (matterId) {
-          // Matters are now loaded, open the drawer immediately
+          // Navigate to dedicated matter details page
           viewMatter(matterId, defaultTab);
         }
       })();

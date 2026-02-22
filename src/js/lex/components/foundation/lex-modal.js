@@ -20,7 +20,7 @@
 (function () {
   'use strict';
 
-  const { LexElement, defineLex } = window.Lex;
+  const { LexElement, defineLex, ScrollLock } = window.Lex;
 
   let stylesInjected = false;
 
@@ -59,6 +59,7 @@
       .lex-modal-panel {
         position: relative;
         width: 100%;
+        max-height: calc(100vh - 32px);
         display: flex;
         flex-direction: column;
         background: var(--lex-bg-primary);
@@ -313,6 +314,9 @@
 
   const CLOSE_SVG = '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
 
+  // Monotonically increasing counter to generate unique aria-labelledby IDs.
+  let _modalIdCounter = 0;
+
   class LexModal extends LexElement {
     static get properties() {
       return {
@@ -327,6 +331,16 @@
       };
     }
 
+    constructor() {
+      super();
+      // Unique ID used for the aria-labelledby / title element pair.
+      this._titleId = 'lex-modal-title-' + (++_modalIdCounter);
+      // Element focused before the modal opened — restored on close.
+      this._previousFocus = null;
+      // Cleanup function returned by FocusTrap.activate().
+      this._focusTrapCleanup = null;
+    }
+
     connected() {
       // connectedCallback already ran _performUpdate() synchronously,
       // so children have been captured and restored into <slot-content>.
@@ -334,6 +348,9 @@
       // re-cloning on subsequent updates — this preserves live DOM nodes
       // and any event listeners bound to them by page scripts.
       this._originalChildren = null;
+      // Tracks whether this instance currently holds the ScrollLock.
+      // Prevents double-unlock when the component re-renders while open.
+      this._scrollLocked = false;
     }
 
     render() {
@@ -357,16 +374,19 @@
       };
       const confirmBtnCls = btnVariantMap[this.variant] || btnVariantMap.default;
 
+      // aria-labelledby points to the heading element when a heading is provided.
+      const labelledBy = this.heading ? ` aria-labelledby="${this._titleId}"` : '';
+
       // Always render the full structure; starts hidden.
       let html = `<div class="${overlayCls}" style="display:none">`;
       html += `<div class="lex-modal-backdrop" data-action="overlay"></div>`;
-      html += `<div class="${panelCls}">`;
+      html += `<div class="${panelCls}" role="dialog" aria-modal="true"${labelledBy}>`;
 
       // Header
       if (this.heading) {
         html += `<div class="lex-modal-header">`;
-        html += `<h3 class="lex-modal-title">${this.escapeHtml(this.heading)}</h3>`;
-        html += `<button type="button" class="lex-modal-close" data-action="close">${CLOSE_SVG}</button>`;
+        html += `<h3 id="${this._titleId}" class="lex-modal-title">${this.escapeHtml(this.heading)}</h3>`;
+        html += `<button type="button" class="lex-modal-close" data-action="close" aria-label="Close dialog">${CLOSE_SVG}</button>`;
         html += `</div>`;
       }
 
@@ -391,13 +411,32 @@
     updated(changedProps) {
       const overlay = this.querySelector('.lex-modal-overlay');
 
-      // Sync heading text without re-render
+      // Sync heading text without re-render.
+      // Also keep aria-labelledby on the panel in sync when heading changes.
       if (changedProps && changedProps.has('heading')) {
         const titleEl = this.querySelector('.lex-modal-title');
         if (titleEl) titleEl.textContent = this.heading;
+        const panel = this.querySelector('.lex-modal-panel');
+        if (panel) {
+          if (this.heading) {
+            panel.setAttribute('aria-labelledby', this._titleId);
+          } else {
+            panel.removeAttribute('aria-labelledby');
+          }
+        }
       }
 
       if (!this.open) {
+        // Deactivate focus trap and restore previously focused element.
+        if (this._focusTrapCleanup) {
+          this._focusTrapCleanup();
+          this._focusTrapCleanup = null;
+        }
+        if (this._previousFocus && typeof this._previousFocus.focus === 'function') {
+          this._previousFocus.focus();
+          this._previousFocus = null;
+        }
+
         // Play exit animation, then hide
         if (overlay && overlay.style.display !== 'none') {
           const panel = this.querySelector('.lex-modal-panel');
@@ -405,22 +444,64 @@
           if (panel && !panel.classList.contains('lex-modal-panel--closing')) {
             panel.classList.add('lex-modal-panel--closing');
             if (backdrop) backdrop.classList.add('lex-modal-backdrop--closing');
-            panel.addEventListener('animationend', () => {
+            const onEnd = () => {
+              panel.removeEventListener('animationend', onEnd);
               overlay.style.display = 'none';
               panel.classList.remove('lex-modal-panel--closing');
               if (backdrop) backdrop.classList.remove('lex-modal-backdrop--closing');
-              document.body.style.overflow = '';
-            }, { once: true });
+              if (this._scrollLocked) {
+                ScrollLock.unlock();
+                this._scrollLocked = false;
+              }
+            };
+            panel.addEventListener('animationend', onEnd);
+            // Store for cleanup if disconnected during animation
+            this._animEndCleanup = () => {
+              panel.removeEventListener('animationend', onEnd);
+              if (this._scrollLocked) {
+                ScrollLock.unlock();
+                this._scrollLocked = false;
+              }
+            };
           }
         } else {
-          document.body.style.overflow = '';
+          if (this._scrollLocked) {
+            ScrollLock.unlock();
+            this._scrollLocked = false;
+          }
         }
         return;
       }
 
-      // Opening — show overlay and lock scroll
+      // Opening — store previous focus, show overlay, lock scroll, activate trap.
+      this._previousFocus = document.activeElement;
       if (overlay) overlay.style.display = '';
-      document.body.style.overflow = 'hidden';
+      if (!this._scrollLocked) {
+        ScrollLock.lock();
+        this._scrollLocked = true;
+      }
+
+      // Activate focus trap and move initial focus to first focusable element.
+      const panel = this.querySelector('.lex-modal-panel');
+      if (panel) {
+        const focusable = window.Lex.FocusTrap.getFocusable(panel);
+        queueMicrotask(() => {
+          if (focusable.length > 0) {
+            focusable[0].focus();
+          } else {
+            // Fallback: make the panel itself focusable so focus is not lost.
+            panel.setAttribute('tabindex', '-1');
+            panel.focus();
+          }
+        });
+        this._focusTrapCleanup = window.Lex.FocusTrap.activate(panel);
+        this._eventCleanups.push(() => {
+          if (this._focusTrapCleanup) {
+            this._focusTrapCleanup();
+            this._focusTrapCleanup = null;
+          }
+        });
+      }
 
       this.delegate('click', '[data-action="confirm"]', () => {
         this.emit('lex-confirm');
@@ -454,9 +535,15 @@
       document.addEventListener('keydown', escHandler);
       this._eventCleanups.push(() => document.removeEventListener('keydown', escHandler));
 
-      // Unlock body scroll on close
+      // Unlock body scroll on close — only if this instance locked it
       this._eventCleanups.push(() => {
-        document.body.style.overflow = '';
+        if (this._animEndCleanup) {
+          this._animEndCleanup();
+          this._animEndCleanup = null;
+        } else if (this._scrollLocked) {
+          ScrollLock.unlock();
+          this._scrollLocked = false;
+        }
       });
     }
 

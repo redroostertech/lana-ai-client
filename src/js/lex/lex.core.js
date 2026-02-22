@@ -191,8 +191,18 @@
       switch (type) {
         case Number:  return Number(val);
         case Boolean: return val !== 'false' && val !== false && val !== null && val !== '0';
+        case Array:
+          if (typeof val === 'string') {
+            try { return JSON.parse(val); }
+            catch (e) { return []; }
+          }
+          return val;
         case Object:
-        case Array:   return typeof val === 'string' ? JSON.parse(val) : val;
+          if (typeof val === 'string') {
+            try { return JSON.parse(val); }
+            catch (e) { return {}; }
+          }
+          return val;
         default:      return String(val);
       }
     }
@@ -352,6 +362,22 @@
   };
 
   // =========================================================================
+  // ScrollLock — Reference-counted body scroll lock for overlays
+  // =========================================================================
+
+  const ScrollLock = {
+    _count: 0,
+    lock() {
+      this._count++;
+      if (this._count === 1) document.body.style.overflow = 'hidden';
+    },
+    unlock() {
+      this._count = Math.max(0, this._count - 1);
+      if (this._count === 0) document.body.style.overflow = '';
+    }
+  };
+
+  // =========================================================================
   // Registration helper
   // =========================================================================
 
@@ -366,9 +392,91 @@
   // Export
   // =========================================================================
 
+  // =========================================================================
+  // FocusTrap — shared focus trap utility for modal/drawer overlays
+  // =========================================================================
+  //
+  // Usage:
+  //   const cleanup = Lex.FocusTrap.activate(panelElement);
+  //   // When the overlay closes:
+  //   cleanup();
+  //
+  // activate() returns a cleanup function that removes the keydown listener.
+  // The caller is responsible for restoring focus to the previously-focused
+  // element after calling cleanup().
+  //
+
+  const FOCUSABLE_SELECTORS = [
+    'a[href]',
+    'button:not([disabled])',
+    'input:not([disabled])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])'
+  ].join(',');
+
+  const FocusTrap = {
+    /**
+     * Return all focusable elements within a container, in DOM order.
+     * @param {Element} container
+     * @returns {Element[]}
+     */
+    getFocusable: function (container) {
+      if (!container) return [];
+      return Array.from(container.querySelectorAll(FOCUSABLE_SELECTORS)).filter(function (el) {
+        return !el.closest('[hidden]') && el.offsetParent !== null;
+      });
+    },
+
+    /**
+     * Activate a focus trap on a container element.
+     * Tab / Shift+Tab wrap within the focusable children.
+     * @param {Element} container
+     * @returns {Function} cleanup — call to deactivate the trap
+     */
+    activate: function (container) {
+      if (!container) return function () {};
+
+      var handler = function (e) {
+        if (e.key !== 'Tab') return;
+
+        var focusable = FocusTrap.getFocusable(container);
+        if (focusable.length === 0) {
+          e.preventDefault();
+          return;
+        }
+
+        var first = focusable[0];
+        var last  = focusable[focusable.length - 1];
+
+        if (e.shiftKey) {
+          // Shift+Tab: if focus is on/before first, wrap to last
+          if (document.activeElement === first || !container.contains(document.activeElement)) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          // Tab: if focus is on/after last, wrap to first
+          if (document.activeElement === last || !container.contains(document.activeElement)) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      };
+
+      document.addEventListener('keydown', handler);
+
+      return function () {
+        document.removeEventListener('keydown', handler);
+      };
+    }
+  };
+
   global.Lex = global.Lex || {};
   global.Lex.LexElement = LexElement;
   global.Lex.defineLex = defineLex;
+  global.Lex.ScrollLock = ScrollLock;
+  global.Lex.FocusTrap = FocusTrap;
   global.Lex.version = LEX_VERSION;
 
   // =========================================================================
