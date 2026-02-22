@@ -429,6 +429,12 @@
     }
   }
 
+  // Topbar refresh button
+  document.addEventListener('lex-refresh', function (e) {
+    e.preventDefault();
+    refreshResults();
+  });
+
   // =========================================================================
   // Utilities (NO regex — string methods only)
   // =========================================================================

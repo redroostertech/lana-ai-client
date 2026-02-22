@@ -817,6 +817,14 @@
       });
     }
 
+    // Topbar refresh button
+    document.addEventListener('lex-refresh', function (e) {
+      e.preventDefault();
+      loadProfile();
+      loadMfaStatus();
+      loadSessions();
+    });
+
     // ── Load all data ──
     loadProfile();
     loadMfaStatus();

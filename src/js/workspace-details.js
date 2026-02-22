@@ -318,44 +318,61 @@
       };
     }
 
-    // Title
-    var title = document.getElementById('matterTitle');
-    if (title) title.textContent = matter.matter_name || matter.name || 'Untitled';
+    // Banner heading
+    var banner = document.getElementById('matterBanner');
+    if (!banner) return;
 
-    // Matter ID badge
-    var idBadge = document.getElementById('matterIdBadge');
-    if (idBadge) idBadge.textContent = matter.matter_id || '';
+    var name = matter.matter_name || matter.name || 'Untitled';
+    banner.heading = name;
 
-    // Type badge
-    var typeBadge = document.getElementById('matterTypeBadge');
-    if (typeBadge) {
-      var matterType = matter.matter_type || 'matter';
-      var typeLabel = matterType === 'workspace' ? 'Workspace' : 'Matter';
-      var typeColor = matterType === 'workspace' ? 'bg-gray-100 text-gray-700' : 'bg-blue-100 text-blue-800';
-      typeBadge.innerHTML = '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ' + typeColor + '">' + typeLabel + '</span>';
+    // Setting heading triggers an async re-render (queueMicrotask) that rebuilds
+    // the entire banner DOM. We must inject badges AFTER that re-render completes.
+    requestAnimationFrame(function () {
+      _injectBannerMeta(banner, matter);
+    });
+  }
+
+
+  function _injectBannerMeta(banner, matter) {
+    var textEl = banner.querySelector('.lex-banner-text');
+    if (!textEl) return;
+
+    // Remove empty subtitle <p> if lex-banner rendered one
+    var subtitleP = textEl.querySelector('.lex-banner-subtitle');
+    if (subtitleP && !subtitleP.textContent.trim()) subtitleP.remove();
+
+    var metaRow = textEl.querySelector('.matter-meta-row');
+    if (!metaRow) {
+      metaRow = document.createElement('div');
+      metaRow.className = 'matter-meta-row';
+      metaRow.style.cssText = 'display:flex;align-items:center;gap:0.5rem;margin-top:4px;font-size:0.8125rem;color:var(--lex-text-secondary);flex-wrap:wrap;';
+      textEl.appendChild(metaRow);
     }
 
-    // Status badge
-    var statusBadge = document.getElementById('matterStatusBadge');
-    if (statusBadge) {
-      var status = matter.status || 'active';
-      var statusColors = {
-        active: 'bg-green-100 text-green-800',
-        pending: 'bg-yellow-100 text-yellow-800',
-        closed: 'bg-gray-100 text-gray-800',
-        archived: 'bg-purple-100 text-purple-800'
-      };
-      var statusColor = statusColors[status] || 'bg-gray-100 text-gray-800';
-      var statusLabel = status.charAt(0).toUpperCase() + status.substring(1);
-      statusBadge.innerHTML = '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ' + statusColor + '">' + statusLabel + '</span>';
-    }
+    var matterType = matter.matter_type || 'matter';
+    var typeLabel = matterType === 'workspace' ? 'Workspace' : 'Matter';
+    var typeColor = matterType === 'workspace' ? 'bg-gray-100 text-gray-700' : 'bg-blue-100 text-blue-800';
 
-    // Last edited
-    var lastEdited = document.getElementById('matterLastEdited');
-    if (lastEdited) {
-      var editDate = matter.updated_at || matter.created_at;
-      lastEdited.textContent = editDate ? 'Last edited ' + timeAgo(editDate) : '';
-    }
+    var status = matter.status || 'active';
+    var statusColors = {
+      active: 'bg-green-100 text-green-800',
+      pending: 'bg-yellow-100 text-yellow-800',
+      closed: 'bg-gray-100 text-gray-800',
+      archived: 'bg-purple-100 text-purple-800'
+    };
+    var statusColor = statusColors[status] || 'bg-gray-100 text-gray-800';
+    var statusLabel = status.charAt(0).toUpperCase() + status.substring(1);
+
+    var editDate = matter.updated_at || matter.created_at;
+    var editText = editDate ? 'Last edited ' + timeAgo(editDate) : '';
+
+    metaRow.innerHTML =
+      '<span class="font-mono text-xs">' + escapeHtml(matter.matter_id || '') + '</span>' +
+      '<span class="opacity-40">&middot;</span>' +
+      '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ' + typeColor + '">' + escapeHtml(typeLabel) + '</span>' +
+      '<span class="opacity-40">&middot;</span>' +
+      '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ' + statusColor + '">' + escapeHtml(statusLabel) + '</span>' +
+      (editText ? '<span class="opacity-40">&middot;</span><span class="text-xs">' + escapeHtml(editText) + '</span>' : '');
   }
 
 
@@ -400,11 +417,11 @@
   function setupHeaderActions(matter) {
     var matterId = matter.matter_id;
 
-    // Refresh button
-    var refreshBtn = document.getElementById('headerRefreshBtn');
-    if (refreshBtn) {
-      refreshBtn.onclick = function () { refreshCurrentMatter(); };
-    }
+    // Refresh via topbar (global refresh button in navbar)
+    trackDocListener('lex-refresh', function (e) {
+      e.preventDefault();
+      refreshCurrentMatter();
+    });
 
     // Ask Matter button
     var askBtn = document.getElementById('askMatterBtn');

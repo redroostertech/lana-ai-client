@@ -137,6 +137,13 @@
     _wireDrawer();
     _setDefaultDates();
 
+    // Topbar refresh button
+    document.addEventListener('lex-refresh', function (e) {
+      e.preventDefault();
+      loadStatistics();
+      loadLogs();
+    });
+
     loadEventTypes();
     loadStatistics();
     loadLogs();

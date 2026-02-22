@@ -122,6 +122,13 @@
       _currentPage = 1;
       loadSessions();
     });
+
+    // Topbar refresh button
+    document.addEventListener('lex-refresh', function (e) {
+      e.preventDefault();
+      _currentPage = 1;
+      loadSessions();
+    });
   }
 
   // =========================================================================

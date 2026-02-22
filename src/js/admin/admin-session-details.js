@@ -93,6 +93,13 @@
     }
 
     _wireTerminateButton();
+
+    // Topbar refresh button
+    document.addEventListener('lex-refresh', function (e) {
+      e.preventDefault();
+      _loadSession(_sessionId);
+    });
+
     _loadSession(_sessionId);
   }
 

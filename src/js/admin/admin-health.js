@@ -743,6 +743,14 @@
       loadHealth();
       loadEnergyMetrics();
     });
+
+    // Topbar refresh button
+    document.addEventListener('lex-refresh', function (e) {
+      e.preventDefault();
+      clearCache();
+      loadHealth();
+      loadEnergyMetrics();
+    });
   }
 
   // -------------------------------------------------------------------------

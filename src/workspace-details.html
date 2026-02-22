@@ -28,54 +28,36 @@
   <main>
     <div class="flex flex-col h-full">
       <!-- Banner -->
-      <div id="bannerSection" class="px-6 pt-4 pb-2">
-        <div class="flex items-start justify-between">
-          <div class="min-w-0 flex-1">
-            <h1 id="matterTitle" class="text-2xl font-semibold truncate" style="color: var(--lex-text-primary)">Loading...</h1>
-            <div class="flex items-center gap-2 mt-1.5 text-sm flex-wrap" style="color: var(--lex-text-secondary)">
-              <span id="matterIdBadge" class="font-mono text-xs">MATT-00000</span>
-              <span class="opacity-40">&middot;</span>
-              <span id="matterTypeBadge">Matter</span>
-              <span class="opacity-40">&middot;</span>
-              <span id="matterStatusBadge">Active</span>
-              <span class="opacity-40">&middot;</span>
-              <span id="matterLastEdited" class="text-xs">Loading...</span>
-            </div>
-          </div>
-          <div class="flex items-center gap-2 flex-shrink-0 ml-4">
-            <!-- Ask Matter -->
-            <button id="askMatterBtn" class="px-4 py-2 rounded-lg font-medium text-sm transition-colors text-white flex items-center gap-2"
-                    style="background: var(--lex-bg-accent)">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
-              </svg>
-              Ask Matter
-            </button>
-            <!-- Refresh -->
-            <button id="headerRefreshBtn" class="p-2 rounded-lg transition-colors" style="color: var(--lex-text-secondary)" title="Refresh"
-                    onmouseover="this.style.background='var(--lex-bg-hover)'" onmouseout="this.style.background='transparent'">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-              </svg>
-            </button>
-            <!-- More Options -->
-            <div class="relative">
-              <button id="headerMenuBtn" class="p-2 rounded-lg transition-colors" style="color: var(--lex-text-secondary)" title="More actions"
-                      onmouseover="this.style.background='var(--lex-bg-hover)'" onmouseout="this.style.background='transparent'">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
-                </svg>
-              </button>
-              <div id="headerOptionsDropdown" class="hidden absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-                <button id="headerOptionsEdit" class="w-full px-4 py-2 text-left text-sm transition-colors" style="color: var(--lex-text-accent)" onmouseover="this.style.background='var(--lex-bg-accent-muted)'" onmouseout="this.style.background='transparent'">Edit Matter</button>
-                <button id="headerOptionsStatus" class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors">Change Status</button>
-                <div class="border-t border-gray-100 my-1"></div>
-                <button id="headerOptionsDelete" class="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors">Delete</button>
-              </div>
-            </div>
+      <lex-banner
+        id="matterBanner"
+        variant="light"
+        heading="Loading..."
+        subtitle=""
+      >
+        <!-- Ask Matter -->
+        <button id="askMatterBtn" class="px-4 py-2 rounded-lg font-medium text-sm transition-colors text-white flex items-center gap-2"
+                style="background: var(--lex-bg-accent)">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
+          </svg>
+          Ask Matter
+        </button>
+        <!-- More Options -->
+        <div class="relative">
+          <button id="headerMenuBtn" class="p-2 rounded-lg transition-colors" style="color: var(--lex-text-secondary)" title="More actions"
+                  onmouseover="this.style.background='var(--lex-bg-hover)'" onmouseout="this.style.background='transparent'">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
+            </svg>
+          </button>
+          <div id="headerOptionsDropdown" class="hidden absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+            <button id="headerOptionsEdit" class="w-full px-4 py-2 text-left text-sm transition-colors" style="color: var(--lex-text-accent)" onmouseover="this.style.background='var(--lex-bg-accent-muted)'" onmouseout="this.style.background='transparent'">Edit Matter</button>
+            <button id="headerOptionsStatus" class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors">Change Status</button>
+            <div class="border-t border-gray-100 my-1"></div>
+            <button id="headerOptionsDelete" class="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors">Delete</button>
           </div>
         </div>
-      </div>
+      </lex-banner>
 
       <!-- Breadcrumbs -->
       <nav id="breadcrumbSection" class="px-6 pb-3 text-sm" style="color: var(--lex-text-secondary)">

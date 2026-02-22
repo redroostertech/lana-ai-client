@@ -2265,6 +2265,13 @@
 
       // Initialize - use async IIFE to handle promise-based flow
       (async function init() {
+        // Topbar refresh button
+        document.addEventListener('lex-refresh', function (e) {
+          e.preventDefault();
+          loadSummaryMetrics();
+          loadMatters();
+        });
+
         // Set up metric interactions and load summary + matters in parallel
         setupMetricInteractions();
         loadSummaryMetrics(); // fire-and-forget (non-blocking)

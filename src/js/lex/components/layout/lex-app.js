@@ -388,6 +388,30 @@
         if (this._notificationPanel) this._notificationPanel.open();
       });
 
+      // Topbar refresh button — spin icon, dispatch cancelable event, fallback to reload
+      this.delegate('topbar-refresh-click', 'lex-topbar', () => {
+        var refreshBtn = this.$('[data-action="refresh"]');
+
+        // Spin animation
+        if (refreshBtn) refreshBtn.dataset.spinning = 'true';
+        var stopSpin = function () {
+          if (refreshBtn) refreshBtn.dataset.spinning = 'false';
+        };
+
+        // Dispatch cancelable event — page controllers call preventDefault() to
+        // signal they handle refresh themselves (prevents the reload fallback).
+        var evt = new CustomEvent('lex-refresh', { bubbles: true, cancelable: true });
+        var handled = !document.dispatchEvent(evt); // true if preventDefault() was called
+
+        if (handled) {
+          // Page handled it — stop spin after a short delay
+          setTimeout(stopSpin, 800);
+        } else {
+          // No page handler — full page reload
+          window.location.reload();
+        }
+      });
+
       // Topbar settings menu actions (sign out, settings)
       this.delegate('topbar-menu-action', 'lex-topbar', (e) => {
         var actionId = e.detail && e.detail.actionId;

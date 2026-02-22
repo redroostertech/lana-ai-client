@@ -1280,6 +1280,12 @@
    */
   async function initDashboard() {
 
+    // Topbar refresh button — full dashboard reload
+    trackDocListener('lex-refresh', function (e) {
+      e.preventDefault();
+      initDashboard();
+    });
+
     // ── 0. Reset detail panel state on re-navigation ────────────────────
     activeDetailKey = null;
     var detailPanelReset = el('ccDetailPanel');

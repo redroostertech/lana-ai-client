@@ -239,6 +239,17 @@
         background: var(--lex-border-subtle, #E8E5E1);
         margin: 4px 8px;
       }
+
+      /* ── Refresh button spin animation ───────────────── */
+
+      [data-action="refresh"][data-spinning="true"] svg {
+        animation: lex-topbar-spin 0.8s linear infinite;
+      }
+
+      @keyframes lex-topbar-spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
     `;
     document.head.appendChild(style);
   }
@@ -341,6 +352,9 @@
       // ── Right ──
       html += `<div class="lex-topbar-right">`;
 
+      // Refresh button (always present)
+      html += `<lex-btn data-action="refresh" variant="primary" leading-icon="refresh-cw" size="sm">Refresh</lex-btn>`;
+
       if (this.showNotifications) {
         const count = this.notificationCount;
         const badgeHtml = count > 0
@@ -370,6 +384,10 @@
     updated() {
       this.delegate('click', '[data-action="menu-toggle"]', () => {
         this.emit('topbar-menu-toggle');
+      });
+
+      this.delegate('click', '[data-action="refresh"]', () => {
+        this.emit('topbar-refresh-click');
       });
 
       this.delegate('click', '[data-action="notifications"]', () => {

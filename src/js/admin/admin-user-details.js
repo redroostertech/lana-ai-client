@@ -141,6 +141,13 @@
     _wireRevokeAll();
     _wireSessionsPagination();
 
+    // Topbar refresh button
+    document.addEventListener('lex-refresh', function (e) {
+      e.preventDefault();
+      _loadUser(_userId);
+      _loadSessions(_userId);
+    });
+
     _loadRoles();
     _loadUser(_userId);
     _loadSessions(_userId);

@@ -773,6 +773,12 @@
     loadConnectors();
   }
 
+  // Topbar refresh button
+  document.addEventListener('lex-refresh', function (e) {
+    e.preventDefault();
+    refreshConnectorsPage();
+  });
+
   // ── Main data loader ────────────────────────────────────────────────
 
   function loadConnectors() {

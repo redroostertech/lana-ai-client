@@ -55,6 +55,13 @@
     _wireUserModal();
     _wirePagination();
 
+    // Topbar refresh button
+    document.addEventListener('lex-refresh', function (e) {
+      e.preventDefault();
+      _currentPage = 1;
+      loadUsers();
+    });
+
     loadRoles();
     loadUsers();
   }

@@ -280,6 +280,10 @@
         gap: var(--lex-radius-xl);
         flex-shrink: 0;
       }
+
+      .lex-banner-actions slot-content {
+        display: contents;
+      }
     `;
     document.head.appendChild(style);
   }
