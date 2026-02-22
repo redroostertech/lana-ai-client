@@ -89,10 +89,12 @@
 
       .lex-modal-panel--full {
         max-width: 100%;
+        max-height: none;
         width: 100%;
         height: 100vh;
         height: 100dvh;
         border-radius: 0;
+        box-shadow: none;
         animation: lex-modal-slide-in-right var(--lex-duration-slide, 300ms) var(--lex-ease-out, ease);
       }
 

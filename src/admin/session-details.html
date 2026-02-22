@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Active Sessions - LANA AI</title>
+  <title>Session Details - LANA AI</title>
 
   <!-- ── CSS + Tailwind in head — behavioral scripts at end of body ── -->
   <link rel="stylesheet" href="../css/lex-tokens.css">
@@ -23,7 +23,7 @@
     logo-alt="LANA AI"
     logo-href="../dashboard.html"
     active-nav-id="admin"
-    page-title="Active Sessions"
+    page-title="Session Details"
   ></lex-app>
 
   <!-- Page content as inert <template> -->
@@ -33,26 +33,44 @@
 
       <!-- Page header -->
       <lex-banner
+        id="sessionBanner"
         variant="light"
-        heading="Active Sessions"
-        subtitle="Monitor and manage active user sessions across the platform"
+        heading="Loading..."
+        subtitle=""
       >
+        <lex-btn id="terminateSessionBtn" variant="danger" icon="log-out">Terminate Session</lex-btn>
       </lex-banner>
 
-      <lex-breadcrumb items='[{"label":"Administration","href":"admin/index.html"},{"label":"Active Sessions"}]'></lex-breadcrumb>
+      <lex-breadcrumb id="sessionBreadcrumb" items='[{"label":"Administration","href":"admin/index.html"},{"label":"Active Sessions","href":"admin/sessions.html"},{"label":"Loading..."}]'></lex-breadcrumb>
 
-      <!-- Sessions Table -->
-      <lex-card padding="none">
-        <lex-table
-          id="sessionsTable"
-          columns="user_display,device,ip_location,started,last_activity,status"
-          labels="User,Device,IP / Location,Started,Last Activity,Status"
-          searchable
-          empty-text="No active sessions found"
-          sort-by="started"
-          sort-dir="desc"
-        ></lex-table>
-        <lex-pagination id="sessionsPagination" style="padding:0 1rem;"></lex-pagination>
+
+      <!-- ================================================================
+           Section 1: Session Information
+           ================================================================ -->
+      <lex-card heading="Session Information" style="margin-bottom:1.5rem;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem 2rem;">
+          <lex-kv id="kvSessionId"  label="Session ID" copyable="true"></lex-kv>
+          <lex-kv id="kvStatus"     label="Status"></lex-kv>
+          <lex-kv id="kvBrowser"    label="Browser"></lex-kv>
+          <lex-kv id="kvOS"         label="Operating System"></lex-kv>
+          <lex-kv id="kvDeviceType" label="Device Type"></lex-kv>
+          <lex-kv id="kvIP"        label="IP Address"></lex-kv>
+          <lex-kv id="kvLocation"   label="Location"></lex-kv>
+          <lex-kv id="kvStarted"    label="Session Started"></lex-kv>
+          <lex-kv id="kvLastActive" label="Last Activity"></lex-kv>
+          <lex-kv id="kvDuration"   label="Duration"></lex-kv>
+        </div>
+      </lex-card>
+
+
+      <!-- ================================================================
+           Section 2: User Information
+           ================================================================ -->
+      <lex-card heading="User Information">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem 2rem;">
+          <lex-kv id="kvUserName"  label="Name"></lex-kv>
+          <lex-kv id="kvUserEmail" label="Email"></lex-kv>
+        </div>
       </lex-card>
 
     </main>
@@ -112,15 +130,15 @@
   <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
   <script src="../js/lex/components/foundation/lex-banner.js"></script>
   <script src="../js/lex/components/foundation/lex-card.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/foundation/lex-kv.js"></script>
   <script src="../js/lex/components/foundation/lex-modal.js"></script>
-  <script src="../js/lex/components/data/lex-table.js"></script>
-  <script src="../js/lex/components/data/lex-pagination.js"></script>
 
   <!-- Inject page content + hoist modals -->
   <script src="../js/lex/lex-page-init.js"></script>
 
   <!-- Page controller -->
-  <script src="../js/admin/admin-sessions.js"></script>
+  <script src="../js/admin/admin-session-details.js"></script>
 
   <!-- Auth guard + loader dismiss (MUST be last) -->
   <script src="../js/auth-guard.js"></script>

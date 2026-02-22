@@ -1,14 +1,14 @@
 /**
  * Admin Active Sessions — standalone page controller.
  *
- * Handles session listing, stats, detail drawer, and session termination
- * for the admin/sessions.html page.
+ * Handles session listing with pagination. Row-click navigates to
+ * the session-details page.
  *
- * @requires api.js          - window.api — getSessions, terminateSession
+ * @requires api.js          - window.api — getSessions
  * @requires lex.utils.js    - Lex.Utils.escapeHtml, Lex.Utils.formatDateTime
- * @requires lex-modal.js    - Lex.Modal.confirm
- * @requires lex-toast.js    - Lex.Toast.success, Lex.Toast.error
+ * @requires lex-toast.js    - Lex.Toast.error
  * @requires lex-table.js    - table.setData()
+ * @requires lex-nav.js      - Lex.Nav.go
  */
 
 (function () {
@@ -28,14 +28,9 @@
   /** Generation counter — incremented on every loadSessions() call. */
   var _gen = 0;
 
-  /** All sessions from the last fetch (for drawer lookups). */
-  var _sessions = [];
-
-  /** Auto-refresh interval ID. */
-  var _refreshInterval = null;
-
-  /** Session currently displayed in the drawer. */
-  var _drawerSessionId = null;
+  /** Pagination state. */
+  var _currentPage = 1;
+  var _pageSize    = 20;
 
   // =========================================================================
   // Entry point
@@ -43,11 +38,8 @@
 
   function init() {
     _wireRefreshButton();
-    _wireDrawer();
+    _wirePagination();
     loadSessions();
-
-    // Auto-refresh every 30 seconds
-    _refreshInterval = setInterval(loadSessions, 30000);
   }
 
   // =========================================================================
@@ -58,16 +50,6 @@
     return document.getElementById(id);
   }
 
-  function show(target) {
-    var elem = typeof target === 'string' ? el(target) : target;
-    if (elem) elem.classList.remove('hidden');
-  }
-
-  function hide(target) {
-    var elem = typeof target === 'string' ? el(target) : target;
-    if (elem) elem.classList.add('hidden');
-  }
-
   /**
    * Get first character initial from a name or email.
    * @param {string} name
@@ -76,25 +58,6 @@
   function getInitial(name) {
     if (!name) return '?';
     return name.charAt(0).toUpperCase();
-  }
-
-  /**
-   * Format a duration in milliseconds to a human-readable string.
-   * Uses string methods — no regex.
-   * @param {number} ms
-   * @returns {string}
-   */
-  function formatDuration(ms) {
-    if (!ms || ms < 0) return '-';
-    var seconds = Math.floor(ms / 1000);
-    var minutes = Math.floor(seconds / 60);
-    var hours   = Math.floor(minutes / 60);
-    var days    = Math.floor(hours / 24);
-
-    if (days > 0) return days + 'd ' + (hours % 24) + 'h';
-    if (hours > 0) return hours + 'h ' + (minutes % 60) + 'm';
-    if (minutes > 0) return minutes + 'm';
-    return seconds + 's';
   }
 
   /**
@@ -156,29 +119,36 @@
     if (!btn || btn._sessionsWired) return;
     btn._sessionsWired = true;
     btn.addEventListener('click', function () {
+      _currentPage = 1;
       loadSessions();
     });
   }
 
-  function _wireDrawer() {
-    var drawer = el('sessionDrawer');
-    if (!drawer || drawer._sessionsCloseWired) return;
-    drawer._sessionsCloseWired = true;
+  // =========================================================================
+  // Pagination
+  // =========================================================================
 
-    drawer.addEventListener('lex-close', function () {
-      _drawerSessionId = null;
+  function _wirePagination() {
+    var pager = el('sessionsPagination');
+    if (!pager || pager._sessionsWired) return;
+    pager._sessionsWired = true;
+    pager.addEventListener('page-change', function (e) {
+      var page = e.detail && e.detail.page;
+      if (page && page !== _currentPage) {
+        _currentPage = page;
+        loadSessions();
+      }
     });
+  }
 
-    // Terminate button
-    var termBtn = el('drawerTerminateBtn');
-    if (termBtn && !termBtn._sessionsWired) {
-      termBtn._sessionsWired = true;
-      termBtn.addEventListener('click', function () {
-        if (_drawerSessionId) {
-          _terminateSession(_drawerSessionId);
-        }
-      });
-    }
+  function _updatePagination(total) {
+    var pager = el('sessionsPagination');
+    if (!pager) return;
+    var totalPages = Math.max(1, Math.ceil(total / _pageSize));
+    pager.page       = _currentPage;
+    pager.totalPages = totalPages;
+    pager.total      = total;
+    pager.limit      = _pageSize;
   }
 
   // =========================================================================
@@ -192,20 +162,22 @@
 
     Lex.Redact.on(table);
 
-    api.getSessions(1, 100)
+    api.getSessions(_currentPage, _pageSize)
       .then(function (result) {
         if (gen !== _gen) return;
 
         var sessions = [];
+        var total = 0;
         if (Array.isArray(result)) {
           sessions = result;
+          total = result.length;
         } else if (result && Array.isArray(result.sessions)) {
           sessions = result.sessions;
+          total = result.total || result.count || sessions.length;
         } else if (result && Array.isArray(result.data)) {
           sessions = result.data;
+          total = result.total || result.count || sessions.length;
         }
-
-        _sessions = sessions;
 
         var rows = sessions.map(function (s) {
           var active = isSessionActive(s);
@@ -230,7 +202,7 @@
         Lex.Redact.off(table);
         _ensureTableObserver(table);
         table.setData(rows);
-        _updateStats(sessions);
+        _updatePagination(total);
       })
       .catch(function (err) {
         if (gen !== _gen) return;
@@ -250,7 +222,12 @@
 
     table.addEventListener('row-click', function (e) {
       var row = e.detail && e.detail.row;
-      if (row) openDrawer(row._id, row._raw);
+      if (row) {
+        Lex.Nav.go('admin/session-details.html', {
+          params: { sessionId: row._id },
+          context: { session: row._raw }
+        });
+      }
     });
 
     new MutationObserver(function () {
@@ -326,192 +303,7 @@
       if (tds[5]) {
         tds[5].innerHTML = statusPill(row._active);
       }
-
-      // Actions cell — append if not already there
-      var sessionId = escHtml(row._id || '');
-      var actionsCell = tr.querySelector('td.sessions-actions-cell');
-      if (!actionsCell) {
-        actionsCell = document.createElement('td');
-        actionsCell.className = 'sessions-actions-cell';
-        actionsCell.style.cssText = 'white-space:nowrap;text-align:right;padding-right:0.5rem;';
-        tr.appendChild(actionsCell);
-      }
-      actionsCell.innerHTML =
-        '<lex-dropdown-btn ' +
-          'data-session-id="' + sessionId + '" ' +
-          'label="Actions" ' +
-          'size="sm" ' +
-          'variant="secondary" ' +
-          'items=\'[' +
-            '{"value":"view","label":"View Details"},' +
-            '{"value":"terminate","label":"Terminate","variant":"danger"}' +
-          ']\'' +
-        '></lex-dropdown-btn>';
-
-      // Wire the dropdown
-      (function (rowRef) {
-        var ddBtn = tr.querySelector('lex-dropdown-btn');
-        if (ddBtn && !ddBtn._sessionsWired) {
-          ddBtn._sessionsWired = true;
-          ddBtn.addEventListener('item-click', function (e) {
-            var action = e.detail && e.detail.value;
-            var sid = ddBtn.getAttribute('data-session-id');
-            if (action === 'view')      openDrawer(sid, rowRef._raw);
-            if (action === 'terminate') _terminateSession(sid);
-          });
-        }
-      })(row);
     }
-  }
-
-  // =========================================================================
-  // Stats
-  // =========================================================================
-
-  function _updateStats(sessions) {
-    var metricActive = el('metricActiveSessions');
-    var metricUsers  = el('metricUniqueUsers');
-    var metricLocs   = el('metricLocations');
-    var metricAge    = el('metricAvgAge');
-
-    if (metricActive) metricActive.value = String(sessions.length);
-
-    // Unique users
-    var userSet = {};
-    for (var i = 0; i < sessions.length; i++) {
-      var uid = sessions[i].user_id || sessions[i].user_email || '';
-      if (uid) userSet[uid] = true;
-    }
-    var uniqueUserCount = Object.keys(userSet).length;
-    if (metricUsers) metricUsers.value = String(uniqueUserCount);
-
-    // Unique locations
-    var locSet = {};
-    for (var j = 0; j < sessions.length; j++) {
-      var loc = sessions[j].location || sessions[j].ip_address || '';
-      if (loc) locSet[loc] = true;
-    }
-    var uniqueLocCount = Object.keys(locSet).length;
-    if (metricLocs) metricLocs.value = String(uniqueLocCount);
-
-    // Average session age
-    if (sessions.length > 0) {
-      var now = Date.now();
-      var totalAge = 0;
-      for (var k = 0; k < sessions.length; k++) {
-        totalAge += (now - new Date(sessions[k].created_at).getTime());
-      }
-      var avgMs = totalAge / sessions.length;
-      if (metricAge) metricAge.value = formatDuration(avgMs);
-    } else {
-      if (metricAge) metricAge.value = '-';
-    }
-  }
-
-  // =========================================================================
-  // Session Details Drawer
-  // =========================================================================
-
-  function openDrawer(sessionId, rawSession) {
-    var drawer = el('sessionDrawer');
-    if (!drawer) return;
-
-    _drawerSessionId = sessionId;
-
-    // If we don't have the raw session, find it
-    if (!rawSession) {
-      for (var i = 0; i < _sessions.length; i++) {
-        var s = _sessions[i];
-        if ((s.session_id || s.id) === sessionId) {
-          rawSession = s;
-          break;
-        }
-      }
-    }
-
-    if (!rawSession) {
-      Lex.Toast.error('Session not found');
-      return;
-    }
-
-    _renderDrawerBody(rawSession);
-    drawer.open = true;
-  }
-
-  function _renderDrawerBody(session) {
-    var active = isSessionActive(session);
-    var userName  = String(session.user_name || session.user_email || '');
-    var userEmail = String(session.user_email || '');
-
-    // Avatar
-    var avatarEl = el('sessionDrawerAvatar');
-    if (avatarEl) avatarEl.textContent = getInitial(userName || userEmail);
-
-    // Name + email header
-    var nameEl  = el('sessionDrawerName');
-    var emailEl = el('sessionDrawerEmail');
-    if (nameEl)  nameEl.textContent  = userName || userEmail;
-    if (emailEl) emailEl.textContent = userEmail && userEmail !== userName ? userEmail : '';
-
-    // KV pairs
-    var kvStatus     = el('drawerKvStatus');
-    var kvSessionId  = el('drawerKvSessionId');
-    var kvBrowser    = el('drawerKvBrowser');
-    var kvOS         = el('drawerKvOS');
-    var kvDeviceType = el('drawerKvDeviceType');
-    var kvIP         = el('drawerKvIP');
-    var kvLocation   = el('drawerKvLocation');
-    var kvStarted    = el('drawerKvStarted');
-    var kvLastActive = el('drawerKvLastActive');
-    var kvDuration   = el('drawerKvDuration');
-
-    if (kvStatus)     kvStatus.value     = active ? 'Active' : 'Idle';
-    if (kvSessionId)  kvSessionId.value  = String(session.session_id || session.id || '\u2014');
-    if (kvBrowser)    kvBrowser.value    = String(session.browser || 'Unknown');
-    if (kvOS)         kvOS.value         = String(session.os || 'Unknown');
-    if (kvDeviceType) kvDeviceType.value = String(session.device_type || session.device || 'Unknown');
-    if (kvIP)         kvIP.value         = String(session.ip_address || '\u2014');
-    if (kvLocation)   kvLocation.value   = String(session.location || 'Unknown');
-    if (kvStarted)    kvStarted.value    = session.created_at ? fmtDateTime(session.created_at) : '\u2014';
-    if (kvLastActive) kvLastActive.value = session.last_activity ? fmtDateTime(session.last_activity) : '\u2014';
-    if (kvDuration)   kvDuration.value   = session.created_at
-      ? formatDuration(Date.now() - new Date(session.created_at).getTime())
-      : '\u2014';
-
-    hide('sessionDrawerLoading');
-    show('sessionDrawerBody');
-  }
-
-  // =========================================================================
-  // Terminate Session
-  // =========================================================================
-
-  function _terminateSession(sessionId) {
-    Lex.Modal.confirm(
-      'Terminate Session',
-      'Are you sure you want to terminate this session? The user will be logged out immediately.',
-      function () {
-        api.terminateSession(sessionId)
-          .then(function () {
-            Lex.Toast.success('Session terminated successfully');
-
-            // Close drawer if showing this session
-            if (_drawerSessionId === sessionId) {
-              var drawer = el('sessionDrawer');
-              if (drawer) drawer.open = false;
-              _drawerSessionId = null;
-            }
-
-            loadSessions();
-          })
-          .catch(function (err) {
-            console.error('[admin-sessions] terminateSession error:', err);
-            var msg = (err && err.message) ? err.message : 'Failed to terminate session';
-            Lex.Toast.error(msg);
-          });
-      },
-      { variant: 'danger', confirmText: 'Terminate' }
-    );
   }
 
   // =========================================================================

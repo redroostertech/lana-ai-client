@@ -107,6 +107,11 @@
         }
         this._initialized = true;
         this._performUpdate();
+      } else {
+        // Re-run update to re-attach event listeners that were removed in
+        // disconnectedCallback (e.g., after a DOM hoist moves this element
+        // from one parent to another like lex-page-init modal hoisting).
+        this._performUpdate();
       }
       this.connected();
     }

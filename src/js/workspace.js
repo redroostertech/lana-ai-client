@@ -285,28 +285,30 @@
     function renderMattersView() {
       var gridEl = document.getElementById('mattersGrid');
       var listEl = document.getElementById('mattersListView');
-      var listBody = document.getElementById('mattersListBody');
 
       if (!gridEl || !listEl) return;
+
+      // Hide pinned section in grid view (pinned is list-only)
+      var pinnedSection = document.getElementById('listPinnedSection');
 
       if (viewMode === 'grid') {
         gridEl.classList.remove('hidden');
         listEl.classList.add('hidden');
+        if (pinnedSection) {
+          pinnedSection.classList.add('hidden');
+          pinnedSection.style.opacity = '0';
+          pinnedSection.style.maxHeight = '0';
+        }
       } else {
         listEl.classList.remove('hidden');
         gridEl.classList.add('hidden');
 
-        // Check if search is active — hide pinned cards during search
-        var searchEl = document.getElementById('searchInput');
-        var isSearching = searchEl && searchEl.value && searchEl.value.trim().length > 0;
-
         // Pinned cards section (horizontal scroll above table)
-        var pinnedSection = document.getElementById('listPinnedSection');
         var pinnedCardsEl = document.getElementById('listPinnedCards');
         var pinnedCountEl = document.getElementById('listPinnedCount');
 
         if (pinnedSection && pinnedCardsEl) {
-          if (allPinnedMatters.length > 0 && currentPage === 1 && !isSearching) {
+          if (allPinnedMatters.length > 0 && currentPage === 1) {
             pinnedSection.classList.remove('hidden');
             pinnedSection.style.opacity = '1';
             pinnedSection.style.maxHeight = '';
@@ -319,45 +321,22 @@
           }
         }
 
-        // Table rows (unpinned matters only, or all during search)
-        if (listBody) {
-          var rows;
-          if (isSearching) {
-            rows = currentMatters;
-          } else {
-            var pinnedIds = new Set(allPinnedMatters.map(function (m) { return m.matter_id; }));
-            rows = currentMatters.filter(function (m) { return !pinnedIds.has(m.matter_id); });
-          }
-          listBody.innerHTML = rows.map(function (m) { return renderMatterListRow(m); }).join('');
-
-          // Update section header with count
-          var sectionHeading = document.getElementById('listSectionHeading');
-          var sectionCount = document.getElementById('listSectionCount');
-          if (sectionHeading) {
-            sectionHeading.textContent = isSearching ? 'Search Results' : 'All Matters';
-          }
-          if (sectionCount) {
-            sectionCount.textContent = formatNumber(rows.length) + (rows.length === 1 ? ' matter' : ' matters');
-          }
+        // Populate lex-table via setData() (unpinned matters only)
+        var pinnedIds = new Set(allPinnedMatters.map(function (m) { return m.matter_id; }));
+        var rows = currentMatters.filter(function (m) { return !pinnedIds.has(m.matter_id); });
+        if (typeof listEl.setData === 'function') {
+          listEl.setData(rows);
         }
 
-        // Sync list select-all checkbox with current selection state
-        var listSelectAll = document.getElementById('listSelectAll');
-        if (listSelectAll) {
-          if (selectedMatters.size === 0) {
-            listSelectAll.checked = false;
-            listSelectAll.indeterminate = false;
-          } else if (selectedMatters.size === currentMatters.length) {
-            listSelectAll.checked = true;
-            listSelectAll.indeterminate = false;
-          } else {
-            listSelectAll.checked = false;
-            listSelectAll.indeterminate = true;
-          }
+        // Update section header with count
+        var sectionHeading = document.getElementById('listSectionHeading');
+        var sectionCount = document.getElementById('listSectionCount');
+        if (sectionHeading) {
+          sectionHeading.textContent = 'All Matters';
         }
-
-        // Update sort indicators after rendering list view
-        updateSortIndicators();
+        if (sectionCount) {
+          sectionCount.textContent = formatNumber(rows.length) + (rows.length === 1 ? ' matter' : ' matters');
+        }
       }
     }
 
@@ -527,9 +506,12 @@
       }
       
       try {
-        const search = document.getElementById('searchInput').value;
-        const statusFilterValue = document.getElementById('statusFilter').value;
-        const matterTypeFilterValue = document.getElementById('matterTypeFilter').value;
+        var _searchEl = document.getElementById('searchInput');
+        var _statusEl = document.getElementById('statusFilter');
+        var _typeEl = document.getElementById('matterTypeFilter');
+        const search = _searchEl ? _searchEl.value : '';
+        const statusFilterValue = _statusEl ? _statusEl.value : '';
+        const matterTypeFilterValue = _typeEl ? _typeEl.value : '';
 
         // Handle "shared" filter separately
         let filters = { search };
@@ -759,15 +741,6 @@
         // Increment pinned page
         pinnedPage++;
 
-        // Build filters
-        const filters = {};
-        const searchValue = searchInput.value.trim();
-        if (searchValue) filters.search = searchValue;
-        const statusValue = statusFilter.value;
-        if (statusValue) filters.status = statusValue;
-        const sourceValue = sourceFilter.value;
-        if (sourceValue) filters.source_filter = sourceValue;
-
         // Fetch next batch of pinned matters by re-rendering
         // loadMatters() will handle fetching the next page and accumulating
         await loadMatters();
@@ -866,10 +839,10 @@
           pinned.style.maxHeight = '';
         }
       }
-      // List view pinned section
+      // List view pinned section (only visible in list mode)
       var listPinned = document.getElementById('listPinnedSection');
       if (listPinned) {
-        if (query.length > 0) {
+        if (query.length > 0 || viewMode === 'grid') {
           listPinned.style.opacity = '0';
           listPinned.style.maxHeight = '0';
         } else {
@@ -910,7 +883,7 @@
         var pinned = document.getElementById('pinnedSection');
         if (pinned) { pinned.style.opacity = '1'; pinned.style.maxHeight = ''; }
         var listPinned = document.getElementById('listPinnedSection');
-        if (listPinned) { listPinned.style.opacity = '1'; listPinned.style.maxHeight = ''; }
+        if (listPinned && viewMode !== 'grid') { listPinned.style.opacity = '1'; listPinned.style.maxHeight = ''; }
         currentPage = 1;
         pinnedPage = 1;
         allPinnedMatters = [];
@@ -964,6 +937,30 @@
     var _listViewBtn = document.getElementById('listViewBtn');
     if (_gridViewBtn) _gridViewBtn.addEventListener('click', function () { switchView('grid'); });
     if (_listViewBtn) _listViewBtn.addEventListener('click', function () { switchView('list'); });
+
+    // lex-table row click → navigate to matter
+    var _mattersTable = document.getElementById('mattersListView');
+    if (_mattersTable) {
+      _mattersTable.addEventListener('row-click', function (e) {
+        var row = e.detail && e.detail.row;
+        if (row && row.matter_id) {
+          viewMatter(row.matter_id);
+        }
+      });
+      _mattersTable.addEventListener('bulk-action', function (e) {
+        var action = e.detail && e.detail.action;
+        if (action === 'delete' && e.detail.items) {
+          var ids = e.detail.items.map(function (m) { return m.matter_id; });
+          if (ids.length > 0 && confirm('Delete ' + ids.length + ' matter(s)? This cannot be undone.')) {
+            Promise.all(ids.map(function (id) { return api.deleteMatter(id); })).then(function () {
+              Lex.Toast.success(ids.length + ' matter(s) deleted');
+              _mattersTable.deselectAll();
+              loadMatters();
+            });
+          }
+        }
+      });
+    }
 
     // Modal
     const modal = document.getElementById('matterModal');

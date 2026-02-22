@@ -71,7 +71,7 @@
     if (!tabs) return;
 
     tabs.addEventListener('tab-change', function (e) {
-      switchTab(e.detail.id);
+      switchTab(e.detail.tab);
     });
   }
 
@@ -131,6 +131,10 @@
 
     if (emptyEl) emptyEl.classList.add('hidden');
 
+    // SVG for vertical dots (more) icon
+    var moreIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>';
+
+    var isAdmin = Lex.Auth.isAdmin();
     var html = '';
     for (var i = 0; i < roles.length; i++) {
       var role = roles[i];
@@ -140,12 +144,7 @@
       var roleLevel = Lex.Utils.escapeHtml(String(role.level || 1));
       var permCount = role.permissions ? role.permissions.length : (role.permission_count || 0);
 
-      var deleteAction = '';
-      if (!role.is_system) {
-        deleteAction = '<button class="text-red-600 hover:text-red-800 text-sm" data-action="delete-role" data-role-id="' + roleId + '">Delete</button>';
-      }
-
-      html += '<div class="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow" style="border-color: var(--lex-border-default)">';
+      html += '<div class="role-card" data-role-id="' + roleId + '" style="background:var(--lex-bg-primary);border-radius:var(--lex-radius-lg,0.75rem);border:1px solid var(--lex-border-default);padding:1.5rem;cursor:pointer;transition:box-shadow 0.15s;position:relative;">';
       html += '  <div class="flex items-start justify-between mb-4">';
       html += '    <div class="flex-1 min-w-0">';
       html += '      <h3 class="text-lg font-semibold truncate" style="color: var(--lex-text-primary)">' + roleName + '</h3>';
@@ -155,13 +154,21 @@
       html += '  </div>';
       html += '  <div class="flex items-center justify-between text-sm">';
       html += '    <span style="color: var(--lex-text-secondary)">' + permCount + ' permission' + (permCount === 1 ? '' : 's') + '</span>';
-      html += '    <div class="flex gap-3">';
-      html += '      <button class="hover:opacity-70 text-sm font-medium" style="color: var(--lex-accent)" data-action="view-role" data-role-id="' + roleId + '">View</button>';
-      if (Lex.Auth.isAdmin()) {
-        html += '      <button class="hover:opacity-70 text-sm font-medium" style="color: var(--lex-accent)" data-action="edit-role" data-role-id="' + roleId + '">Edit</button>';
-        html += '      ' + deleteAction;
+
+      if (isAdmin) {
+        html += '    <div style="position:relative;">';
+        html += '      <button class="role-more-btn" data-role-id="' + roleId + '" title="More options" style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border:none;background:none;cursor:pointer;border-radius:var(--lex-radius-md,0.375rem);color:var(--lex-text-tertiary);transition:background 0.15s,color 0.15s;">';
+        html += '        ' + moreIcon;
+        html += '      </button>';
+        html += '      <div class="role-dropdown" style="display:none;position:absolute;right:0;top:100%;margin-top:4px;min-width:140px;background:var(--lex-bg-primary);border:1px solid var(--lex-border-default);border-radius:var(--lex-radius-md,0.375rem);box-shadow:var(--lex-shadow-lg);z-index:10;overflow:hidden;">';
+        html += '        <button class="role-dropdown-item" data-action="edit-role" data-role-id="' + roleId + '" style="display:flex;align-items:center;gap:0.5rem;width:100%;padding:0.5rem 0.75rem;border:none;background:none;cursor:pointer;font-size:0.8125rem;color:var(--lex-text-primary);text-align:left;transition:background 0.15s;">Edit</button>';
+        if (!role.is_system) {
+          html += '        <button class="role-dropdown-item" data-action="delete-role" data-role-id="' + roleId + '" style="display:flex;align-items:center;gap:0.5rem;width:100%;padding:0.5rem 0.75rem;border:none;background:none;cursor:pointer;font-size:0.8125rem;color:var(--lex-text-danger,#dc2626);text-align:left;transition:background 0.15s;">Delete</button>';
+        }
+        html += '      </div>';
+        html += '    </div>';
       }
-      html += '    </div>';
+
       html += '  </div>';
       html += '</div>';
     }
@@ -174,20 +181,56 @@
     grid.addEventListener('click', _handleGridClick);
   }
 
+  /** Close all open role dropdowns */
+  function _closeAllDropdowns() {
+    var openDropdowns = document.querySelectorAll('.role-dropdown');
+    for (var i = 0; i < openDropdowns.length; i++) {
+      openDropdowns[i].style.display = 'none';
+    }
+  }
+
+  // Close dropdowns on outside click
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.role-more-btn') && !e.target.closest('.role-dropdown')) {
+      _closeAllDropdowns();
+    }
+  });
+
   function _handleGridClick(e) {
-    var btn = e.target;
-    if (btn.tagName !== 'BUTTON') return;
+    var target = e.target;
 
-    var action = btn.getAttribute('data-action');
-    var roleId = btn.getAttribute('data-role-id');
-    if (!action || !roleId) return;
+    // --- More button: toggle dropdown ---
+    var moreBtn = target.closest('.role-more-btn');
+    if (moreBtn) {
+      e.stopPropagation();
+      var dropdown = moreBtn.nextElementSibling;
+      if (!dropdown) return;
+      var isOpen = dropdown.style.display !== 'none';
+      _closeAllDropdowns();
+      if (!isOpen) dropdown.style.display = '';
+      return;
+    }
 
-    if (action === 'view-role') {
-      viewRole(roleId);
-    } else if (action === 'edit-role') {
-      openEditModal(roleId);
-    } else if (action === 'delete-role') {
-      deleteRole(roleId, btn);
+    // --- Dropdown item: edit or delete ---
+    var dropdownItem = target.closest('.role-dropdown-item');
+    if (dropdownItem) {
+      e.stopPropagation();
+      _closeAllDropdowns();
+      var action = dropdownItem.getAttribute('data-action');
+      var roleId = dropdownItem.getAttribute('data-role-id');
+      if (action === 'edit-role') {
+        openEditModal(roleId);
+      } else if (action === 'delete-role') {
+        deleteRole(roleId, dropdownItem);
+      }
+      return;
+    }
+
+    // --- Card click: view role ---
+    var card = target.closest('.role-card');
+    if (card) {
+      var cardRoleId = card.getAttribute('data-role-id');
+      if (cardRoleId) viewRole(cardRoleId);
     }
   }
 

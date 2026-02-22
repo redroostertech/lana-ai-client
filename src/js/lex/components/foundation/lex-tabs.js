@@ -126,7 +126,6 @@
 
       .lex-tabs-list--underline .lex-tab-btn--active {
         color: var(--lex-text-accent);
-        border-bottom-color: var(--lex-border-accent);
       }
 
       /* ── Pills variant tab ──────────────────────────────── */
@@ -144,8 +143,38 @@
 
       .lex-tabs-list--pills .lex-tab-btn--active {
         color: var(--lex-text-primary);
+      }
+
+      /* ── Sliding indicator ────────────────────────────────── */
+
+      .lex-tabs-indicator {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        height: 2px;
+        background: var(--lex-border-accent);
+        border-radius: 1px;
+        pointer-events: none;
+        will-change: transform, width;
+      }
+
+      .lex-tabs-indicator--pills {
+        height: calc(100% - 6px);
+        top: 3px;
+        bottom: auto;
         background: var(--lex-bg-primary);
         box-shadow: var(--lex-shadow-sm);
+        border-radius: var(--lex-radius-md);
+      }
+
+      .lex-tabs-indicator--hidden {
+        opacity: 0;
+      }
+
+      /* Ensure pill buttons sit above the sliding pill background */
+      .lex-tabs-list--pills .lex-tab-btn {
+        position: relative;
+        z-index: 1;
       }
 
       /* ── Tab icon ───────────────────────────────────────── */
@@ -177,6 +206,8 @@
       super();
       // _tabs is the resolved internal list — set in render from this.tabs
       this._tabs = [];
+      // FLIP animation state for the sliding indicator
+      this._indicatorPos = null; // { left, width }
     }
 
     render() {
@@ -213,6 +244,11 @@
           + '</button>';
       }
 
+      const indicatorCls = variant === 'pills'
+        ? 'lex-tabs-indicator lex-tabs-indicator--pills'
+        : 'lex-tabs-indicator';
+
+      html += '<div class="' + indicatorCls + ' lex-tabs-indicator--hidden"></div>';
       html += '</div>';
 
       return html;
@@ -229,6 +265,9 @@
 
         this.emit('tab-change', { tab: newTabId, previous: previous });
       });
+
+      // Position the sliding indicator
+      this._positionIndicator();
 
       // Keyboard navigation within the tab list
       const list = this.$('.lex-tabs-list');
@@ -257,6 +296,56 @@
           buttons[nextIdx].click();
         });
       }
+    }
+
+    // -----------------------------------------------------------------------
+    // Sliding indicator — FLIP animation
+    // -----------------------------------------------------------------------
+
+    _positionIndicator() {
+      const activeBtn = this.$('.lex-tab-btn--active');
+      const indicator = this.$('.lex-tabs-indicator');
+      const list = this.$('.lex-tabs-list');
+
+      if (!indicator || !list) return;
+
+      if (!activeBtn) {
+        indicator.classList.add('lex-tabs-indicator--hidden');
+        return;
+      }
+
+      const listRect = list.getBoundingClientRect();
+      const btnRect = activeBtn.getBoundingClientRect();
+      const left = btnRect.left - listRect.left + list.scrollLeft;
+      const width = btnRect.width;
+
+      const prev = this._indicatorPos;
+
+      if (prev && (prev.left !== left || prev.width !== width)) {
+        // FLIP: snap to previous position, then animate to new
+        indicator.style.transition = 'none';
+        indicator.style.transform = 'translateX(' + prev.left + 'px)';
+        indicator.style.width = prev.width + 'px';
+        indicator.classList.remove('lex-tabs-indicator--hidden');
+
+        // Force layout so the snap takes effect
+        indicator.offsetHeight; // eslint-disable-line no-unused-expressions
+
+        // Animate to new position using the soft-closing easing
+        indicator.style.transition =
+          'transform var(--lex-duration-slide, 300ms) var(--lex-ease-out, cubic-bezier(0.16, 1, 0.3, 1)), '
+          + 'width var(--lex-duration-slide, 300ms) var(--lex-ease-out, cubic-bezier(0.16, 1, 0.3, 1))';
+        indicator.style.transform = 'translateX(' + left + 'px)';
+        indicator.style.width = width + 'px';
+      } else {
+        // First render — snap to position immediately
+        indicator.style.transition = 'none';
+        indicator.style.transform = 'translateX(' + left + 'px)';
+        indicator.style.width = width + 'px';
+        indicator.classList.remove('lex-tabs-indicator--hidden');
+      }
+
+      this._indicatorPos = { left: left, width: width };
     }
   }
 

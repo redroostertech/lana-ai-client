@@ -34,7 +34,6 @@
       <!-- Page header -->
       <lex-banner
         variant="light"
-        size="compact"
         heading="Roles &amp; Permissions"
         subtitle="Manage roles and the permissions assigned to them."
       >
@@ -45,52 +44,52 @@
 
       <lex-breadcrumb items='[{"label":"Administration","href":"admin/index.html"},{"label":"Roles &amp; Permissions"}]'></lex-breadcrumb>
 
-      <!-- Tab navigation -->
-      <lex-tabs
-        id="rolesTabs"
-        variant="underline"
-        active="roles"
-        tabs='[{"id":"roles","label":"Roles"},{"id":"permissions","label":"Permissions"}]'
-        class="mb-6"
-      ></lex-tabs>
+      <lex-card padding="none">
 
-      <!-- ===================== ROLES TAB ===================== -->
-      <div id="tabPanelRoles">
+        <!-- Tab navigation -->
+        <lex-tabs
+          id="rolesTabs"
+          variant="underline"
+          active="roles"
+          tabs='[{"id":"roles","label":"Roles"},{"id":"permissions","label":"Permissions"}]'
+          style="padding:0 1.5rem;"
+        ></lex-tabs>
 
-        <!-- Roles grid — redact target -->
-        <div id="rolesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <!-- Populated by roles.js -->
+        <!-- ===================== ROLES TAB ===================== -->
+        <div id="tabPanelRoles" style="padding:1.5rem;">
+          <!-- Roles grid — redact target -->
+          <div id="rolesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Populated by roles.js -->
+          </div>
+
+          <!-- Empty state (hidden until loaded with no data) -->
+          <lex-empty
+            id="rolesEmpty"
+            class="hidden"
+            icon="shield"
+            message="No roles found"
+            description="Create a role to get started."
+          ></lex-empty>
         </div>
 
-        <!-- Empty state (hidden until loaded with no data) -->
-        <lex-empty
-          id="rolesEmpty"
-          class="hidden"
-          icon="shield"
-          message="No roles found"
-          description="Create a role to get started."
-        ></lex-empty>
+        <!-- ===================== PERMISSIONS TAB ===================== -->
+        <div id="tabPanelPermissions" class="hidden" style="padding:1.5rem;">
+          <!-- Permissions grid — redact target -->
+          <div id="permissionsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Populated by roles.js -->
+          </div>
 
-      </div>
-
-      <!-- ===================== PERMISSIONS TAB ===================== -->
-      <div id="tabPanelPermissions" class="hidden">
-
-        <!-- Permissions grid — redact target -->
-        <div id="permissionsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <!-- Populated by roles.js -->
+          <!-- Empty state -->
+          <lex-empty
+            id="permissionsEmpty"
+            class="hidden"
+            icon="key"
+            message="No permissions found"
+            description="System permissions will appear here once loaded."
+          ></lex-empty>
         </div>
 
-        <!-- Empty state -->
-        <lex-empty
-          id="permissionsEmpty"
-          class="hidden"
-          icon="key"
-          message="No permissions found"
-          description="System permissions will appear here once loaded."
-        ></lex-empty>
-
-      </div>
+      </lex-card>
 
     </main>
 
@@ -222,6 +221,7 @@
 
   <!-- Page-specific Lex components (BEFORE inject) -->
   <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
+  <script src="../js/lex/components/foundation/lex-banner.js"></script>
   <script src="../js/lex/components/foundation/lex-tabs.js"></script>
   <script src="../js/lex/components/foundation/lex-modal.js"></script>
   <script src="../js/lex/components/foundation/lex-card.js"></script>

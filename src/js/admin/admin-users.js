@@ -1,20 +1,17 @@
 /**
  * Admin User Management — standalone page controller.
  *
- * Handles user listing, creation, editing, deletion, password reset,
- * session management, and activation-key regeneration for the admin panel.
+ * Handles user listing and creation for the admin panel.
+ * Row-click navigates to admin/user-details.html for full profile,
+ * sessions, and management actions.
  *
  * @requires api.js          - window.api — getUsers, getUser, createUser, updateUser,
- *                              deleteUser, activateUser, deactivateUser,
- *                              setTemporaryPassword, checkEmail, checkUsername,
- *                              getUserSessions, revokeUserSessions,
- *                              regenerateActivationKey, getRoles
- * @requires lex.utils.js    - Lex.Utils.escapeHtml, Lex.Utils.formatDate,
- *                              Lex.Utils.formatDateTime
- * @requires lex-modal.js    - Lex.Modal.confirm, Lex.Modal.open
+ *                              checkEmail, checkUsername, getRoles
+ * @requires lex.utils.js    - Lex.Utils.escapeHtml, Lex.Utils.formatDate
  * @requires lex-toast.js    - Lex.Toast.success, Lex.Toast.error
  * @requires lex-table.js    - table.setData()
  * @requires lex-form.js     - form.getValues(), form.reset(), form.validate()
+ * @requires lex-nav.js      - Lex.Nav.go
  */
 
 (function () {
@@ -26,7 +23,6 @@
 
   var escHtml    = Lex.Utils.escapeHtml;
   var fmtDate    = Lex.Utils.formatDate;
-  var fmtDateTime = Lex.Utils.formatDateTime;
 
   // =========================================================================
   // Module-level state
@@ -42,11 +38,9 @@
   /** null = create mode, string ID = edit mode. */
   var _editingUserId = null;
 
-  /** User ID whose drawer is currently showing (for quick-action buttons). */
-  var _drawerUserId = null;
-
-  /** Full user object for the currently open drawer (refreshed on every open). */
-  var _drawerUser = null;
+  /** Pagination state */
+  var _currentPage = 1;
+  var _pageSize    = 20;
 
 
   // =========================================================================
@@ -59,9 +53,7 @@
   function init() {
     _wireHeaderButtons();
     _wireUserModal();
-    _wireResetPasswordModal();
-    _wireDrawerActions();
-    _wireSessionsModal();
+    _wirePagination();
 
     loadRoles();
     loadUsers();
@@ -239,19 +231,21 @@
     // Apply redacted shimmer while loading
     Lex.Redact.on(table);
 
-    // Fetches up to 100 users — sufficient for current ICP (small-mid law firms).
-    // TODO: Add server-side pagination when platform serves larger enterprise customers.
-    api.getUsers(1, 100, {})
+    api.getUsers(_currentPage, _pageSize, {})
       .then(function (result) {
         if (gen !== _gen) return; // stale response — discard
 
         var users = [];
+        var total = 0;
         if (Array.isArray(result)) {
           users = result;
+          total = result.length;
         } else if (result && Array.isArray(result.users)) {
           users = result.users;
+          total = result.total || result.count || users.length;
         } else if (result && Array.isArray(result.data)) {
           users = result.data;
+          total = result.total || result.count || users.length;
         }
 
         var rows = users.map(function (u) {
@@ -270,6 +264,7 @@
         Lex.Redact.off(table);
         _ensureTableObserver(table);
         table.setData(rows);
+        _updatePagination(total);
       })
       .catch(function (err) {
         if (gen !== _gen) return;
@@ -295,7 +290,9 @@
 
     table.addEventListener('row-click', function (e) {
       var row = e.detail && e.detail.row;
-      if (row) openDrawer(row._id || row.id, row._raw);
+      if (row) {
+        Lex.Nav.go('admin/user-details.html', { params: { userId: row._id } });
+      }
     });
 
     new MutationObserver(function () {
@@ -367,48 +364,6 @@
         tds[statusIndex].innerHTML = statusPill(statusVal);
       }
 
-      // Actions cell — append if not already there (last column)
-      var userId = escHtml(row._id || '');
-      var actionsCell = tr.querySelector('td.users-actions-cell');
-      if (!actionsCell) {
-        actionsCell = document.createElement('td');
-        actionsCell.className = 'users-actions-cell';
-        actionsCell.style.cssText = 'white-space:nowrap;text-align:right;padding-right:0.5rem;';
-        tr.appendChild(actionsCell);
-      }
-      actionsCell.innerHTML =
-        '<lex-dropdown-btn ' +
-          'data-user-id="' + userId + '" ' +
-          'label="Actions" ' +
-          'size="sm" ' +
-          'variant="secondary" ' +
-          'items=\'[' +
-            '{"value":"edit","label":"Edit"},' +
-            '{"value":"view","label":"View Details"},' +
-            '{"value":"reset-pw","label":"Reset Password"},' +
-            '{"value":"sessions","label":"View Sessions"},' +
-            '{"value":"regen-key","label":"Regenerate Key"},' +
-            '{"value":"delete","label":"Delete","variant":"danger"}' +
-          ']\'' +
-        '></lex-dropdown-btn>';
-
-      // Wire the dropdown items (event delegation on the tr)
-      (function (rowRef) {
-        var ddBtn = tr.querySelector('lex-dropdown-btn');
-        if (ddBtn && !ddBtn._usersWired) {
-          ddBtn._usersWired = true;
-          ddBtn.addEventListener('item-click', function (e) {
-            var action = e.detail && e.detail.value;
-            var uid = ddBtn.getAttribute('data-user-id');
-            if (action === 'edit')      openUserModalEdit(uid, rowRef._raw);
-            if (action === 'view')      openDrawer(uid, rowRef._raw);
-            if (action === 'reset-pw')  openResetPasswordModal(uid, rowRef._raw);
-            if (action === 'sessions')  openSessionsModal(uid, rowRef._raw);
-            if (action === 'regen-key') regenActivationKey(uid);
-            if (action === 'delete')    deleteUser(uid, rowRef._raw);
-          });
-        }
-      })(row);
     }
   }
 
@@ -760,588 +715,39 @@
   }
 
   // =========================================================================
-  // F. Delete User
+  // Pagination
   // =========================================================================
 
   /**
-   * Prompt to confirm deletion, then call the API.
-   * @param {string} userId
-   * @param {Object} [user] - User data for display name in prompt.
+   * Update the lex-pagination component with current state.
+   * @param {number} total - Total number of users from the API.
    */
-  function deleteUser(userId, user) {
-    var name = user ? escHtml(userDisplayName(user)) : 'this user';
+  function _updatePagination(total) {
+    var pager = el('pagination');
+    if (!pager) return;
 
-    Lex.Modal.confirm(
-      'Delete User',
-      'Are you sure you want to delete ' + name + '? This action cannot be undone.',
-      function () {
-        api.deleteUser(userId)
-          .then(function () {
-            loadUsers();
-            // Close drawer if it was showing this user
-            if (_drawerUserId === userId) {
-              var drawer = el('userDrawer');
-              if (drawer) drawer.open = false;
-              _drawerUserId = null;
-            }
-            Lex.Toast.success('User deleted');
-          })
-          .catch(function (err) {
-            console.error('[admin-users] deleteUser error:', err);
-            var msg = (err && err.message) ? err.message : 'Failed to delete user';
-            Lex.Toast.error(msg);
-          });
-      },
-      { variant: 'danger', confirmText: 'Delete User' }
-    );
-  }
-
-  // =========================================================================
-  // G. User Details Drawer
-  // =========================================================================
-
-  /**
-   * Open the user details drawer, showing a loading state first.
-   * If `knownData` is provided it renders immediately and then fetches fresh data.
-   * @param {string} userId
-   * @param {Object} [knownData] - Optional pre-fetched user data.
-   */
-  function openDrawer(userId, knownData) {
-    var drawer = el('userDrawer');
-    if (!drawer) return;
-
-    _drawerUserId = userId;
-
-    // Show drawer in loading state
-    show('userDrawerLoading');
-    hide('userDrawerBody');
-    drawer.open = true;
-
-    // If we have data, render it immediately (better UX)
-    if (knownData) {
-      _renderDrawerBody(userId, knownData);
-    }
-
-    // Always re-fetch for freshest data
-    api.getUser(userId)
-      .then(function (result) {
-        var user = (result && result.user) ? result.user : result;
-        _renderDrawerBody(userId, user);
-      })
-      .catch(function (err) {
-        console.error('[admin-users] getUser (drawer) error:', err);
-        hide('userDrawerLoading');
-        Lex.Toast.error('Failed to load user details');
-      });
+    var totalPages = Math.ceil(total / _pageSize) || 1;
+    pager.page       = _currentPage;
+    pager.totalPages = totalPages;
+    pager.total      = total;
+    pager.limit      = _pageSize;
   }
 
   /**
-   * Render the drawer body fields for the given user.
-   * @param {string} userId
-   * @param {Object} user
+   * Wire the page-change event from lex-pagination.
    */
-  function _renderDrawerBody(userId, user) {
-    if (!user) return;
+  function _wirePagination() {
+    var pager = el('pagination');
+    if (!pager || pager._usersWired) return;
+    pager._usersWired = true;
 
-    var drawer = el('userDrawer');
-    if (!drawer) return;
-
-    // Update module-level user reference so drawer action buttons use latest data
-    _drawerUser   = user;
-    _drawerUserId = userId;
-
-    var name    = userDisplayName(user);
-    var email   = String(user.email || '');
-    var status  = String(user.status || (user.is_active ? 'active' : 'inactive'));
-    var isActive = status === 'active';
-
-    // Avatar
-    var avatarEl = el('userDrawerAvatar');
-    if (avatarEl) avatarEl.textContent = getInitials(name);
-
-    // Name + email header
-    var nameEl  = el('userDrawerName');
-    var emailEl = el('userDrawerEmail');
-    if (nameEl)  nameEl.textContent  = name;
-    if (emailEl) emailEl.textContent = email;
-
-    // KV pairs — set the .value property on lex-kv elements
-    // lex-kv.value is set as textContent internally, so do NOT escHtml
-    var kvUsername  = el('drawerKvUsername');
-    var kvRole      = el('drawerKvRole');
-    var kvStatus    = el('drawerKvStatus');
-    var kvCreated   = el('drawerKvCreated');
-    var kvLastLogin = el('drawerKvLastLogin');
-    var kvOrgId     = el('drawerKvOrgId');
-
-    if (kvUsername)  kvUsername.value  = String(user.username || '\u2014');
-    if (kvRole)      kvRole.value     = userRoleName(user) || 'No role';
-    if (kvStatus)    kvStatus.value   = status.charAt(0).toUpperCase() + status.substring(1);
-    if (kvCreated)   kvCreated.value  = user.created_at ? fmtDateTime(user.created_at) : '\u2014';
-    if (kvLastLogin) kvLastLogin.value = user.last_login_at ? fmtDateTime(user.last_login_at) : 'Never';
-    if (kvOrgId)     kvOrgId.value    = String(user.organization_id || user.org_id || '\u2014');
-
-    // Activate/Deactivate button label
-    var statusBtn = el('drawerStatusBtn');
-    if (statusBtn) {
-      if (isActive) {
-        statusBtn.textContent = 'Deactivate User';
-        statusBtn.icon = 'toggle-left';
-        statusBtn.variant = 'secondary';
-      } else {
-        statusBtn.textContent = 'Activate User';
-        statusBtn.icon = 'toggle-right';
-        statusBtn.variant = 'secondary';
+    pager.addEventListener('page-change', function (e) {
+      var page = e.detail && e.detail.page;
+      if (page && page !== _currentPage) {
+        _currentPage = page;
+        loadUsers();
       }
-    }
-
-    // Wire quick action buttons (idempotent — check flag before wiring)
-    if (!drawer._drawerActionsWired) {
-      _wireDrawerActionButtons(userId);
-    }
-
-    hide('userDrawerLoading');
-    show('userDrawerBody');
-  }
-
-  /**
-   * Lazy-wire the quick-action buttons inside the drawer.
-   * Uses a flag to prevent duplicate listener attachment.
-   * All handlers read _drawerUserId and _drawerUser at call time
-   * so they always reference the currently-displayed user.
-   * @param {string} userId - Initial user ID (fallback only).
-   */
-  function _wireDrawerActionButtons(userId) {
-    var drawer = el('userDrawer');
-    if (!drawer || drawer._drawerActionsWired) return;
-    drawer._drawerActionsWired = true;
-
-    var editBtn    = el('drawerEditBtn');
-    var statusBtn  = el('drawerStatusBtn');
-    var resetPwBtn = el('drawerResetPwBtn');
-    var sessionsBtn= el('drawerSessionsBtn');
-    var regenBtn   = el('drawerRegenKeyBtn');
-    var deleteBtn  = el('drawerDeleteBtn');
-
-    if (editBtn) {
-      editBtn.addEventListener('click', function () {
-        var uid = _drawerUserId || userId;
-        drawer.open = false;
-        _drawerUserId = null;
-        _drawerUser   = null;
-        openUserModalEdit(uid, null); // fetch fresh user data from API
-      });
-    }
-
-    if (statusBtn) {
-      statusBtn.addEventListener('click', function () {
-        _toggleUserStatus(_drawerUserId || userId, _drawerUser);
-      });
-    }
-
-    if (resetPwBtn) {
-      resetPwBtn.addEventListener('click', function () {
-        var uid = _drawerUserId || userId;
-        openResetPasswordModal(uid, _drawerUser);
-      });
-    }
-
-    if (sessionsBtn) {
-      sessionsBtn.addEventListener('click', function () {
-        var uid = _drawerUserId || userId;
-        openSessionsModal(uid, _drawerUser);
-      });
-    }
-
-    if (regenBtn) {
-      regenBtn.addEventListener('click', function () {
-        var uid = _drawerUserId || userId;
-        regenActivationKey(uid);
-      });
-    }
-
-    if (deleteBtn) {
-      deleteBtn.addEventListener('click', function () {
-        var uid = _drawerUserId || userId;
-        deleteUser(uid, _drawerUser);
-      });
-    }
-  }
-
-  /**
-   * Wire the drawer close event to clear state.
-   */
-  function _wireDrawerActions() {
-    var drawer = el('userDrawer');
-    if (!drawer || drawer._usersCloseWired) return;
-    drawer._usersCloseWired = true;
-    drawer.addEventListener('lex-close', function () {
-      _drawerUserId = null;
-      _drawerUser   = null;
     });
-  }
-
-  // =========================================================================
-  // H. Reset Password Modal
-  // =========================================================================
-
-  /** User ID associated with the currently open reset-password modal. */
-  var _resetPasswordUserId = null;
-
-  /**
-   * Open the reset password modal for a user.
-   * @param {string} userId
-   * @param {Object} [user] - User data for the modal heading.
-   */
-  function openResetPasswordModal(userId, user) {
-    _resetPasswordUserId = userId;
-
-    var modal = el('resetPasswordModal');
-    if (!modal) return;
-
-    var name = user ? userDisplayName(user) : '';
-    // lex-modal.heading is set as textContent internally — do NOT escHtml
-    modal.heading = name ? 'Reset Password \u2014 ' + name : 'Reset Password';
-
-    var form = el('resetPasswordForm');
-    if (form) form.reset();
-
-    var hintEl = el('resetPasswordHint');
-    if (hintEl) hintEl.textContent = '';
-
-    modal.open = true;
-  }
-
-  /**
-   * Wire the reset-password modal's form and confirm button.
-   */
-  function _wireResetPasswordModal() {
-    var modal = el('resetPasswordModal');
-    var form  = el('resetPasswordForm');
-    if (!modal || !form) return;
-    if (form._usersWired) return;
-    form._usersWired = true;
-
-    // Password strength hint
-    var pwInput  = el('resetPasswordNew');
-    var hintEl   = el('resetPasswordHint');
-    if (pwInput && hintEl) {
-      pwInput.addEventListener('lex-input', function () {
-        var pw = pwInput.value || '';
-        if (!pw) { hintEl.textContent = ''; return; }
-        var result = validatePassword(pw);
-        if (result.valid) {
-          hintEl.textContent = 'Password meets all requirements.';
-          hintEl.style.color = 'var(--lex-status-success-text,#027A48)';
-        } else {
-          hintEl.textContent = 'Missing: ' + result.missing.join(', ') + '.';
-          hintEl.style.color = 'var(--lex-status-danger-text,#B42318)';
-        }
-      });
-    }
-
-    // Form submit
-    form.addEventListener('lex-submit', function (e) {
-      if (!e.detail.valid) {
-        Lex.Toast.error('Please fill in both password fields');
-        return;
-      }
-      _handleResetPasswordSubmit(e.detail.values);
-    });
-
-    // Cancel button inside the form (modal uses hide-actions)
-    var cancelBtn = el('resetPasswordCancelBtn');
-    if (cancelBtn) {
-      cancelBtn.addEventListener('click', function () {
-        modal.open = false;
-        _resetPasswordUserId = null;
-      });
-    }
-
-    // Modal close event — clear state
-    modal.addEventListener('lex-close', function () { _resetPasswordUserId = null; });
-  }
-
-  /**
-   * Validate and submit the reset-password form.
-   * @param {Object} values - { new_password, confirm_password }
-   */
-  function _handleResetPasswordSubmit(values) {
-    var newPw     = values.new_password     || '';
-    var confirmPw = values.confirm_password || '';
-
-    // Validate password strength without regex
-    var pwResult = validatePassword(newPw);
-    if (!pwResult.valid) {
-      var pwInput = el('resetPasswordNew');
-      if (pwInput) pwInput.error = 'Password must have ' + pwResult.missing.join(', ') + '.';
-      Lex.Toast.error('Password does not meet requirements');
-      return;
-    }
-
-    // Cross-field match check
-    if (newPw !== confirmPw) {
-      var confirmInput = el('resetPasswordConfirm');
-      if (confirmInput) confirmInput.error = 'Passwords do not match';
-      Lex.Toast.error('Passwords do not match');
-      return;
-    }
-
-    var modal     = el('resetPasswordModal');
-    var submitBtn = modal ? modal.querySelector('lex-btn[type="submit"]') : null;
-    if (submitBtn) submitBtn.loading = true;
-
-    var uid = _resetPasswordUserId;
-
-    api.setTemporaryPassword(uid, newPw)
-      .then(function () {
-        if (submitBtn) submitBtn.loading = false;
-        if (modal) modal.open = false;
-        _resetPasswordUserId = null;
-        Lex.Toast.success('Password reset successfully. The user will be prompted to change it on next login.');
-      })
-      .catch(function (err) {
-        if (submitBtn) submitBtn.loading = false;
-        console.error('[admin-users] setTemporaryPassword error:', err);
-        var msg = (err && err.message) ? err.message : 'Failed to reset password';
-        Lex.Toast.error(msg);
-      });
-  }
-
-  // =========================================================================
-  // I. Activate / Deactivate User
-  // =========================================================================
-
-  /**
-   * Toggle the active state of a user.
-   * @param {string} userId
-   * @param {Object} [user] - User object to determine current status.
-   */
-  function _toggleUserStatus(userId, user) {
-    var status   = user ? String(user.status || (user.is_active ? 'active' : 'inactive')) : '';
-    var isActive = status === 'active';
-
-    var action     = isActive ? 'deactivate' : 'activate';
-    var actionLabel = isActive ? 'Deactivate' : 'Activate';
-    var name       = user ? escHtml(userDisplayName(user)) : 'this user';
-
-    Lex.Modal.confirm(
-      actionLabel + ' User',
-      'Are you sure you want to ' + action + ' ' + name + '?',
-      function () {
-        var apiCall = isActive ? api.deactivateUser(userId) : api.activateUser(userId);
-
-        apiCall
-          .then(function () {
-            loadUsers();
-            var drawer = el('userDrawer');
-            if (drawer && drawer.open) {
-              drawer.open = false;
-              _drawerUserId = null;
-            }
-            Lex.Toast.success('User ' + (isActive ? 'deactivated' : 'activated') + ' successfully');
-          })
-          .catch(function (err) {
-            console.error('[admin-users] toggleUserStatus error:', err);
-            var msg = (err && err.message) ? err.message : 'Failed to update user status';
-            Lex.Toast.error(msg);
-          });
-      },
-      { variant: isActive ? 'danger' : 'default', confirmText: actionLabel }
-    );
-  }
-
-  // =========================================================================
-  // J. Sessions Modal
-  // =========================================================================
-
-  /** User ID associated with the currently open sessions modal. */
-  var _sessionsUserId = null;
-
-  /**
-   * Open the sessions modal and load sessions for the given user.
-   * @param {string} userId
-   * @param {Object} [user]
-   */
-  function openSessionsModal(userId, user) {
-    _sessionsUserId = userId;
-
-    var modal   = el('sessionsModal');
-    var loading = el('sessionsLoading');
-    var listEl  = el('sessionsListContainer');
-
-    if (!modal) return;
-
-    // lex-modal.heading is set as textContent internally — do NOT escHtml
-    var name = user ? userDisplayName(user) : '';
-    modal.heading = name ? 'Sessions \u2014 ' + name : 'User Sessions';
-
-    if (loading)  show(loading);
-    if (listEl)   { hide(listEl); listEl.innerHTML = ''; }
-
-    modal.open = true;
-
-    api.getUserSessions(userId)
-      .then(function (result) {
-        var sessions = [];
-        if (Array.isArray(result)) {
-          sessions = result;
-        } else if (result && Array.isArray(result.sessions)) {
-          sessions = result.sessions;
-        } else if (result && Array.isArray(result.data)) {
-          sessions = result.data;
-        }
-
-        if (loading) hide(loading);
-        if (!listEl) return;
-
-        if (sessions.length === 0) {
-          listEl.innerHTML =
-            '<lex-empty icon="monitor-off" message="No active sessions" ' +
-            'description="This user has no active sessions"></lex-empty>';
-          show(listEl);
-          return;
-        }
-
-        var html = '<div style="display:flex;flex-direction:column;gap:0.5rem;">';
-        for (var i = 0; i < sessions.length; i++) {
-          var s = sessions[i];
-          var device  = escHtml(String(s.device_info || s.user_agent || 'Unknown device'));
-          var ip      = escHtml(String(s.ip_address || s.ip || ''));
-          var created = s.created_at ? escHtml(fmtDateTime(s.created_at)) : '—';
-          var expires = s.expires_at ? escHtml(fmtDate(s.expires_at)) : '—';
-
-          html +=
-            '<div style="padding:0.75rem;border-radius:var(--lex-radius-md,6px);' +
-              'background:var(--lex-bg-secondary,#F5F5F0);border:1px solid var(--lex-border-default);">' +
-              '<div style="font-size:var(--lex-body-sm-size,0.875rem);font-weight:500;' +
-                'color:var(--lex-text-primary);margin-bottom:0.25rem;">' + device + '</div>' +
-              '<div style="font-size:var(--lex-body-xs-size,0.75rem);color:var(--lex-text-tertiary);' +
-                'display:flex;flex-wrap:wrap;gap:0.5rem 1rem;">' +
-                (ip ? '<span>IP: ' + ip + '</span>' : '') +
-                '<span>Created: ' + created + '</span>' +
-                '<span>Expires: ' + expires + '</span>' +
-              '</div>' +
-            '</div>';
-        }
-        html += '</div>';
-        listEl.innerHTML = html;
-        show(listEl);
-      })
-      .catch(function (err) {
-        console.error('[admin-users] getUserSessions error:', err);
-        if (loading) hide(loading);
-        if (listEl) {
-          listEl.innerHTML =
-            '<lex-empty icon="alert-circle" message="Failed to load sessions" ' +
-            'description="' + escHtml((err && err.message) || 'Unknown error') + '"></lex-empty>';
-          show(listEl);
-        }
-      });
-  }
-
-  /**
-   * Wire the sessions modal's "Revoke All" and "Close" buttons.
-   */
-  function _wireSessionsModal() {
-    var revokeBtn = el('revokeAllSessionsBtn');
-    var closeBtn  = el('closeSessionsModalBtn');
-    var modal     = el('sessionsModal');
-    if (modal && modal._usersWired) return;
-    if (modal) modal._usersWired = true;
-
-    if (revokeBtn) {
-      revokeBtn.addEventListener('click', function () {
-        var uid = _sessionsUserId;
-        if (!uid) return;
-
-        Lex.Modal.confirm(
-          'Revoke All Sessions',
-          'Are you sure you want to revoke all sessions for this user? They will be signed out of all devices.',
-          function () {
-            api.revokeUserSessions(uid)
-              .then(function () {
-                if (modal) modal.open = false;
-                _sessionsUserId = null;
-                Lex.Toast.success('All sessions revoked');
-                loadUsers();
-              })
-              .catch(function (err) {
-                console.error('[admin-users] revokeUserSessions error:', err);
-                var msg = (err && err.message) ? err.message : 'Failed to revoke sessions';
-                Lex.Toast.error(msg);
-              });
-          },
-          { variant: 'danger', confirmText: 'Revoke All' }
-        );
-      });
-    }
-
-    if (closeBtn) {
-      closeBtn.addEventListener('click', function () {
-        var m = el('sessionsModal');
-        if (m) m.open = false;
-        _sessionsUserId = null;
-      });
-    }
-
-    if (modal) {
-      modal.addEventListener('lex-close', function () {
-        _sessionsUserId = null;
-      });
-    }
-  }
-
-  // =========================================================================
-  // K. Regenerate Activation Key
-  // =========================================================================
-
-  /**
-   * Regenerate the activation key for a user and show the result.
-   * @param {string} userId
-   */
-  function regenActivationKey(userId) {
-    Lex.Modal.confirm(
-      'Regenerate Activation Key',
-      'This will invalidate the existing key and generate a new one. Continue?',
-      function () {
-        api.regenerateActivationKey(userId)
-          .then(function (result) {
-            var key = (result && (result.activation_key || result.key || result.token)) || null;
-            if (key) {
-              Lex.Modal.open({
-                heading:     'New Activation Key',
-                content:     '<p style="font-size:var(--lex-body-sm-size,0.875rem);color:var(--lex-text-secondary);margin:0 0 1rem;">' +
-                               'Share this key with the user to activate their account. ' +
-                               'It will only be shown once.' +
-                             '</p>' +
-                             '<div style="' +
-                               'background:var(--lex-bg-secondary,#F5F5F0);' +
-                               'border:1px solid var(--lex-border-default);' +
-                               'border-radius:var(--lex-radius-md,6px);' +
-                               'padding:0.75rem 1rem;' +
-                               'font-family:monospace;' +
-                               'font-size:var(--lex-body-sm-size,0.875rem);' +
-                               'word-break:break-all;' +
-                             '">' +
-                               escHtml(String(key)) +
-                             '</div>',
-                size:        'sm',
-                hideActions: true
-              });
-            } else {
-              Lex.Toast.success('Activation key regenerated successfully');
-            }
-            loadUsers();
-          })
-          .catch(function (err) {
-            console.error('[admin-users] regenerateActivationKey error:', err);
-            var msg = (err && err.message) ? err.message : 'Failed to regenerate key';
-            Lex.Toast.error(msg);
-          });
-      },
-      { confirmText: 'Regenerate' }
-    );
   }
 
   // =========================================================================

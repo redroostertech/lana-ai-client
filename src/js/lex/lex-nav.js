@@ -53,6 +53,8 @@
     'workflows/document-generation.html':     { matterId: 'string', temp_doc: 'string', save: 'string' },
     'integrations/integration-config.html':   { id: 'string', connector_id: 'string' },
     'integrations/connector-viewer.html':     { ui: 'string', name: 'string', tab: 'string' },
+    'admin/user-details.html':                { userId: 'string' },
+    'admin/session-details.html':             { sessionId: 'string' },
     'admin/roles_manager.html':               { id: 'string' },
     'workspace-details.html':                 { id: 'string', tab: 'string' },
     'matters/timeline.html':                  { id: 'string' },
