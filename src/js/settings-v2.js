@@ -79,9 +79,10 @@
     dom.prefDark  = document.getElementById('sv2-pref-dark');
 
     // Sessions
-    dom.sessionsCard = document.getElementById('sv2-sessions-card');
-    dom.sessionsList = document.getElementById('sv2-sessions-list');
-    dom.revokeAllBtn = document.getElementById('sv2-revoke-all-btn');
+    dom.sessionsCard      = document.getElementById('sv2-sessions-card');
+    dom.sessionsTable     = document.getElementById('sv2-sessions-table');
+    dom.sessionsPagination = document.getElementById('sv2-sessions-pagination');
+    dom.revokeAllBtn      = document.getElementById('sv2-revoke-all-btn');
 
     // VPN
     dom.vpnContent = document.getElementById('sv2-vpn-content');
@@ -518,57 +519,44 @@
   // Sessions
   // =========================================================================
 
+  var fmtDate     = Lex.Utils.formatDate;
+  var fmtDateTime = Lex.Utils.formatDateTime;
+
   function loadSessions() {
-    if (dom.sessionsList) Lex.Redact.on(dom.sessionsList);
+    var table = dom.sessionsTable;
+    if (!table) return;
+
+    Lex.Redact.on(table);
 
     api.get('/api/v1/auth/session').then(function (result) {
       var data = result.data || result;
       var sessions = data.sessions || [];
-      renderSessions(sessions);
-      if (dom.sessionsList) Lex.Redact.off(dom.sessionsList);
+
+      var rows = sessions.map(function (s) {
+        return {
+          id:         String(s.id || ''),
+          device:     String(s.user_agent || s.device_info || 'Unknown device'),
+          ip_address: String(s.ip_address || s.ip || '\u2014'),
+          created_at: s.created_at ? fmtDateTime(s.created_at) : '\u2014',
+          expires_at: s.expires_at ? fmtDate(s.expires_at)     : '\u2014'
+        };
+      });
+
+      Lex.Redact.off(table);
+      table.setData(rows);
+      _updateSessionsPagination(sessions.length);
     }).catch(function () {
-      if (dom.sessionsList) {
-        Lex.Redact.off(dom.sessionsList);
-        dom.sessionsList.innerHTML = '<lex-empty message="Failed to load sessions" icon="inbox"></lex-empty>';
-      }
+      Lex.Redact.off(table);
+      table.setData([]);
     });
   }
 
-  function renderSessions(sessions) {
-    if (!dom.sessionsList) return;
-    if (!sessions.length) {
-      dom.sessionsList.innerHTML = '<lex-empty message="No active sessions" icon="monitor"></lex-empty>';
-      return;
-    }
-
-    var html = '';
-    for (var i = 0; i < sessions.length; i++) {
-      var s = sessions[i];
-      var ip = esc(s.ip_address || 'Unknown IP');
-      var ua = s.user_agent ? esc(s.user_agent.substring(0, 60)) + '...' : 'Unknown device';
-      var lastActive = Lex.Utils.timeAgo(s.last_accessed || s.created_at);
-
-      html +=
-        '<div class="sv2-session-row">' +
-          '<div class="sv2-session-info">' +
-            '<lex-text variant="primary" size="body-sm" weight="medium">' + ip + '</lex-text>' +
-            '<lex-text variant="tertiary" size="body-xs">' + ua + '</lex-text>' +
-            '<lex-text variant="tertiary" size="body-xs">Last active: ' + esc(lastActive) + '</lex-text>' +
-          '</div>' +
-          '<lex-btn variant="ghost" size="sm" data-action="revoke" data-session-id="' + esc(s.id) + '">Revoke</lex-btn>' +
-        '</div>';
-    }
-
-    dom.sessionsList.innerHTML = html;
-  }
-
-  function revokeSession(sessionId) {
-    api.delete('/api/v1/auth/session/' + sessionId).then(function () {
-      Lex.Toast.success('Session revoked');
-      loadSessions();
-    }).catch(function (error) {
-      Lex.Toast.error(error.message || 'Failed to revoke session');
-    });
+  function _updateSessionsPagination(total) {
+    var pager = dom.sessionsPagination;
+    if (!pager) return;
+    pager.page  = 1;
+    pager.total = total || 0;
+    pager.limit = 20;
   }
 
   function revokeAllSessions() {
@@ -807,15 +795,7 @@
       dom.revokeAllBtn.addEventListener('click', revokeAllSessions);
     }
 
-    // Session list — event delegation for individual revoke
-    if (dom.sessionsList) {
-      dom.sessionsList.addEventListener('click', function (e) {
-        var btn = e.target.closest('[data-action="revoke"]');
-        if (btn) {
-          revokeSession(btn.dataset.sessionId);
-        }
-      });
-    }
+    // Session table — no per-row revoke in settings (user revokes all or none)
 
     // Topbar refresh button
     document.addEventListener('lex-refresh', function (e) {

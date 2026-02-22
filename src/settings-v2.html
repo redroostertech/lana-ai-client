@@ -160,13 +160,24 @@
       <!-- Sessions
            ══════════════════════════════════════════════════════════════ -->
       <section id="sv2-section-sessions" style="margin-bottom:0.5rem">
-        <lex-card id="sv2-sessions-card" heading="Active Sessions">
-          <div id="sv2-sessions-list">
-            <!-- Session rows rendered by JS -->
+        <lex-card id="sv2-sessions-card">
+
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+            <h3 style="font-size:var(--lex-h4-size,1.125rem);font-weight:var(--lex-h4-weight,600);color:var(--lex-text-primary);margin:0;">Active Sessions</h3>
+            <lex-btn id="sv2-revoke-all-btn" variant="danger" size="sm" icon="log-out">Revoke All Other Sessions</lex-btn>
           </div>
-          <div class="sv2-form-actions">
-            <lex-btn id="sv2-revoke-all-btn" variant="danger" size="sm" icon="trash-2">Revoke All Other Sessions</lex-btn>
-          </div>
+
+          <lex-table
+            id="sv2-sessions-table"
+            columns="device,ip_address,created_at,expires_at"
+            labels="Device,IP Address,Created,Expires"
+            empty-text="No active sessions"
+            sort-by="created_at"
+            sort-dir="desc"
+          ></lex-table>
+
+          <lex-pagination id="sv2-sessions-pagination" style="margin-top:1rem;"></lex-pagination>
+
         </lex-card>
       </section>
 
@@ -246,6 +257,8 @@
   <script src="js/lex/components/form/lex-input.js"></script>
   <script src="js/lex/components/form/lex-form.js"></script>
   <script src="js/lex/components/form/lex-toggle.js"></script>
+  <script src="js/lex/components/data/lex-table.js"></script>
+  <script src="js/lex/components/data/lex-pagination.js"></script>
 
   <!-- Inject page content + hoist modals -->
   <script src="js/lex/lex-page-init.js"></script>

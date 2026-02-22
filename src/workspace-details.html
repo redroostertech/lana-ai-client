@@ -60,22 +60,18 @@
       </lex-banner>
 
       <!-- Breadcrumbs -->
-      <nav id="breadcrumbSection" class="px-6 pb-3 text-sm" style="color: var(--lex-text-secondary)">
-        <a href="#" id="breadcrumbBack" class="hover:underline" style="color: var(--lex-text-accent)">Workspaces &amp; Matters</a>
-        <span class="mx-1 opacity-40">/</span>
-        <span id="breadcrumbMatterName" class="font-medium" style="color: var(--lex-text-primary)">Loading...</span>
-      </nav>
+      <lex-breadcrumb id="matterBreadcrumb" style="margin:8px 0;" items='[{"label":"Workspaces & Matters","href":"workspaces.html"},{"label":"Loading..."}]'></lex-breadcrumb>
 
       <!-- Collapsible Description -->
-      <div id="descriptionArea" class="px-6 pb-4 hidden">
-        <p id="descriptionText" class="text-sm line-clamp-2" style="color: var(--lex-text-secondary)"></p>
+      <lex-card id="descriptionArea" heading="Description" class="hidden" style="margin:0 1.5rem 0.75rem;">
+        <p id="descriptionText" class="text-sm line-clamp-2" style="color: var(--lex-text-secondary); margin:0;"></p>
         <button id="descriptionToggle" class="text-sm mt-1 hidden" style="color: var(--lex-text-accent)">Show more</button>
-      </div>
+      </lex-card>
 
       <!-- Two-panel: Tabs + Right Dock -->
-      <div class="flex-1 flex flex-col min-h-0 border-t border-gray-200">
+      <div class="flex-1 flex flex-col min-h-0">
         <!-- Tab bar + Dock toggle -->
-        <div class="flex flex-shrink-0 border-b border-gray-200">
+        <div class="flex flex-shrink-0">
           <!-- Left: Primary tabs -->
           <div id="tabBar" class="flex-1 flex px-6 overflow-x-auto relative">
             <button id="tabActivity" data-tab="activity" class="px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors" style="color: var(--lex-text-accent)">
@@ -100,7 +96,7 @@
             <div id="tabIndicator" class="absolute bottom-0 h-0.5" style="background: var(--lex-border-accent); transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);"></div>
           </div>
           <!-- Right: Dock toggle -->
-          <div class="flex items-center border-l border-gray-200 w-[340px] flex-shrink-0 px-4">
+          <div class="flex items-center w-[340px] flex-shrink-0 px-4">
             <lex-segmented id="dockToggle" value="details" size="sm"
               options='[{"value":"details","label":"Details"},{"value":"context","label":"Context"}]'>
             </lex-segmented>
@@ -961,6 +957,7 @@
   <!-- Page-specific Lex components — ALL loaded BEFORE inject so custom elements
        are defined when template content enters the DOM. Tree-order upgrade ensures
        parents capture un-rendered children (no double-rendering). -->
+  <script src="js/lex/components/foundation/lex-breadcrumb.js"></script>
   <script src="js/lex/components/foundation/lex-banner.js"></script>
   <script src="js/lex/components/foundation/lex-metric.js"></script>
   <script src="js/lex/components/foundation/lex-detail-panel.js"></script>

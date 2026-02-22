@@ -142,7 +142,7 @@
 
   var _redactIds = [
     'bannerSection',
-    'breadcrumbSection',
+    'matterBreadcrumb',
     'tabContentActivity',
     'tabContentNotes',
     'tabContentTasks',
@@ -307,15 +307,13 @@
 
   function renderBanner(matter) {
     // Breadcrumb
-    var breadcrumb = document.getElementById('breadcrumbMatterName');
-    if (breadcrumb) breadcrumb.textContent = matter.matter_name || matter.name || 'Untitled';
-
-    var breadcrumbBack = document.getElementById('breadcrumbBack');
-    if (breadcrumbBack) {
-      breadcrumbBack.onclick = function (e) {
-        e.preventDefault();
-        Lex.Nav.go('workspaces.html');
-      };
+    var name = matter.matter_name || matter.name || 'Untitled';
+    var breadcrumb = document.getElementById('matterBreadcrumb');
+    if (breadcrumb) {
+      breadcrumb.items = [
+        { label: 'Workspaces & Matters', href: 'workspaces.html' },
+        { label: name }
+      ];
     }
 
     // Banner heading
@@ -423,58 +421,62 @@
       refreshCurrentMatter();
     });
 
-    // Ask Matter button
-    var askBtn = document.getElementById('askMatterBtn');
-    if (askBtn) {
-      askBtn.onclick = function () {
-        Lex.Nav.go('chat-v2.html', { params: { matter: matterId } });
-      };
-    }
+    // ── Banner action buttons (delegated on banner to survive re-renders) ──
+    // lex-banner's _restoreContent() clones children on every re-render,
+    // so direct onclick handlers get lost. Event delegation on the banner
+    // element itself is immune to this.
+    var banner = document.getElementById('matterBanner');
+    if (banner) {
+      banner.addEventListener('click', function (e) {
+        var target = e.target.closest('[id]');
+        if (!target) return;
 
-    // More options dropdown
-    var menuBtn = document.getElementById('headerMenuBtn');
-    var dropdown = document.getElementById('headerOptionsDropdown');
-    if (menuBtn && dropdown) {
-      menuBtn.onclick = function (e) {
-        e.stopPropagation();
-        dropdown.classList.toggle('hidden');
-      };
-      // Close on click outside
-      trackDocListener('click', function (e) {
-        if (!dropdown.contains(e.target) && e.target !== menuBtn) {
-          dropdown.classList.add('hidden');
+        var id = target.id;
+
+        // Ask Matter
+        if (id === 'askMatterBtn') {
+          Lex.Nav.go('chat-v2.html', { params: { matter: matterId } });
+          return;
+        }
+
+        // More options toggle
+        if (id === 'headerMenuBtn') {
+          e.stopPropagation();
+          var dd = banner.querySelector('#headerOptionsDropdown');
+          if (dd) dd.classList.toggle('hidden');
+          return;
+        }
+
+        // Dropdown actions
+        var dropdown = banner.querySelector('#headerOptionsDropdown');
+
+        if (id === 'headerOptionsEdit') {
+          if (dropdown) dropdown.classList.add('hidden');
+          openEditMatterModal(matter);
+          return;
+        }
+        if (id === 'headerOptionsStatus') {
+          if (dropdown) dropdown.classList.add('hidden');
+          openStatusChangeModal(matter);
+          return;
+        }
+        if (id === 'headerOptionsDelete') {
+          if (dropdown) dropdown.classList.add('hidden');
+          deleteMatter(matterId);
+          return;
         }
       });
-    }
 
-    // Edit button
-    var editBtn = document.getElementById('headerOptionsEdit');
-    if (editBtn) {
-      editBtn.onclick = function () {
-        console.info('[headerOptionsEdit] Edit button clicked, matter:', matter && matter.matter_id);
-        dropdown.classList.add('hidden');
-        openEditMatterModal(matter);
-      };
-    } else {
-      console.warn('[setupHeaderActions] #headerOptionsEdit button not found in DOM');
-    }
-
-    // Status change button
-    var statusBtn = document.getElementById('headerOptionsStatus');
-    if (statusBtn) {
-      statusBtn.onclick = function () {
-        dropdown.classList.add('hidden');
-        openStatusChangeModal(matter);
-      };
-    }
-
-    // Delete button
-    var deleteBtn = document.getElementById('headerOptionsDelete');
-    if (deleteBtn) {
-      deleteBtn.onclick = function () {
-        dropdown.classList.add('hidden');
-        deleteMatter(matterId);
-      };
+      // Close dropdown on click outside
+      trackDocListener('click', function (e) {
+        var dd = banner.querySelector('#headerOptionsDropdown');
+        if (dd && !dd.classList.contains('hidden')) {
+          var menuBtn = banner.querySelector('#headerMenuBtn');
+          if (!dd.contains(e.target) && e.target !== menuBtn) {
+            dd.classList.add('hidden');
+          }
+        }
+      });
     }
 
     // Tab bar — event delegation (avoids inline onclick before script loads)
@@ -1138,10 +1140,9 @@
           '</div>';
       }
       groupHtml +=
-        '<div>' +
-          '<h6 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 sticky top-0 bg-white py-2">' + escapeHtml(dateKey) + '</h6>' +
+        '<lex-card heading="' + escapeHtml(dateKey) + '">' +
           '<div class="space-y-3">' + itemsHtml + '</div>' +
-        '</div>';
+        '</lex-card>';
     }
 
     var paginationHtml = '';
