@@ -196,6 +196,7 @@
         if (this._conversationId) body.conversation_id = this._conversationId;
         if (options.forceAgentic) body.force_agentic = true;
         if (options.attachments) body.attachments = options.attachments;
+        if (options.contextType) body.context_type = options.contextType;
 
         const response = await fetch(`${baseUrl}/api/v1/streaming/chat/stream`, {
           method: 'POST',

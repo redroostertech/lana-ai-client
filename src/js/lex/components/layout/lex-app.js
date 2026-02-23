@@ -161,8 +161,26 @@
         cursor: pointer;
         transition: background 0.15s;
       }
-      .lex-app-offline-banner button:hover {
+      .lex-app-offline-banner button:hover:not(:disabled) {
         background: rgba(255,255,255,0.35);
+      }
+      .lex-app-offline-banner button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      @keyframes lex-retry-spin {
+        to { transform: rotate(360deg); }
+      }
+      .lex-app-offline-banner button .lex-retry-spinner {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border: 2px solid rgba(255,255,255,0.3);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: lex-retry-spin 0.6s linear infinite;
+        vertical-align: middle;
+        margin-right: 0.35rem;
       }
     `;
     document.head.appendChild(style);
@@ -691,17 +709,34 @@
     }
 
     _checkNotifications() {
-      if (!window.api || typeof window.api.getNotifications !== 'function') return;
+      if (!window.api) return;
 
-      window.api.getNotifications({ unread: true, limit: 1 })
-        .then((result) => {
-          const count = (result && result.pagination && result.pagination.total) || 0;
-          const topbar = this.$('lex-topbar');
-          if (topbar) topbar.notificationCount = count;
-        })
-        .catch(() => {
-          // Silently ignore notification fetch errors
-        });
+      // Use the dedicated unread-count endpoint (O(1) denormalized counter)
+      if (typeof window.api.getUnreadNotificationCount === 'function') {
+        window.api.getUnreadNotificationCount()
+          .then((result) => {
+            const count = (result && result.unread_count) || 0;
+            const topbar = this.$('lex-topbar');
+            if (topbar) topbar.notificationCount = count;
+          })
+          .catch(() => {
+            // Silently ignore notification fetch errors
+          });
+        return;
+      }
+
+      // Fallback: fetch notifications and read unread_count from response
+      if (typeof window.api.getNotifications === 'function') {
+        window.api.getNotifications(true, 1, 0)
+          .then((result) => {
+            const count = (result && result.unread_count) || 0;
+            const topbar = this.$('lex-topbar');
+            if (topbar) topbar.notificationCount = count;
+          })
+          .catch(() => {
+            // Silently ignore notification fetch errors
+          });
+      }
     }
 
     // -----------------------------------------------------------------------
@@ -787,7 +822,8 @@
       var retryBtn = banner.querySelector('#lex-offline-retry-btn');
       if (retryBtn) {
         retryBtn.addEventListener('click', function () {
-          self._checkReachability();
+          if (retryBtn.disabled) return;
+          self._checkReachability(true);
         });
       }
 
@@ -795,16 +831,67 @@
     }
 
     /**
+     * Resolve the backend base URL from all available sources.
+     * Returns the URL string or empty string if none found.
+     */
+    _resolveBaseUrl() {
+      // 1. window.api.baseUrl (most common — already resolved)
+      if (window.api && window.api.baseUrl) return window.api.baseUrl;
+
+      // 2. Electron saved server in localStorage
+      try {
+        var saved = localStorage.getItem('lana_saved_server');
+        if (saved) {
+          var info = JSON.parse(saved);
+          if (info && info.url) {
+            // Also fix up the api instance so future calls work
+            if (window.api) window.api.baseUrl = info.url;
+            return info.url;
+          }
+        }
+      } catch (e) { /* ignore */ }
+
+      // 3. Browser origin fallback (non-Electron, non-file)
+      if (!window.electronAPI) {
+        var origin = window.location.origin;
+        if (window.location.protocol !== 'file:' && origin && origin !== 'null') {
+          if (window.api) window.api.baseUrl = origin;
+          return origin;
+        }
+      }
+
+      return '';
+    }
+
+    /**
      * Perform a single health check against /api/health/discovery.
      * This endpoint is public (no auth header needed), so we can
      * distinguish "server down" from "token expired".
+     *
+     * @param {boolean} manual - true when triggered by the Retry button
      */
-    _checkReachability() {
-      if (!window.api || !window.api.baseUrl) return;
+    _checkReachability(manual) {
+      var baseUrl = this._resolveBaseUrl();
+      if (!baseUrl) {
+        // Last resort: wait for the api ready promise then retry once
+        if (manual && window.api && window.api._readyPromise) {
+          var self = this;
+          this._setRetryLoading(true);
+          window.api._readyPromise.then(function () {
+            self._checkReachability(false);
+            self._setRetryLoading(false);
+          }).catch(function () {
+            self._setRetryLoading(false);
+          });
+        }
+        return;
+      }
 
-      var healthUrl = window.api.baseUrl + '/api/health/discovery';
+      var healthUrl = baseUrl + '/api/health/discovery';
       var wasReachable = this._reachable;
       var self = this;
+
+      if (manual) this._setRetryLoading(true);
 
       // Build fetch options with an 8-second timeout
       var fetchOptions = {
@@ -817,6 +904,8 @@
 
       fetch(healthUrl, fetchOptions)
         .then(function (response) {
+          if (manual) self._setRetryLoading(false);
+
           if (response.ok) {
             self._reachable = true;
             self._hideOfflineBanner();
@@ -839,12 +928,31 @@
           }
         })
         .catch(function () {
+          if (manual) self._setRetryLoading(false);
+
           self._reachable = false;
           self._showOfflineBanner();
           if (window.Lex && window.Lex.state) {
             window.Lex.state.setReachability(false);
           }
         });
+    }
+
+    /**
+     * Toggle the retry button between loading and idle states.
+     */
+    _setRetryLoading(loading) {
+      var btn = this._reachabilityBanner &&
+        this._reachabilityBanner.querySelector('#lex-offline-retry-btn');
+      if (!btn) return;
+
+      if (loading) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="lex-retry-spinner"></span>Retrying\u2026';
+      } else {
+        btn.disabled = false;
+        btn.textContent = 'Retry Now';
+      }
     }
 
     /**

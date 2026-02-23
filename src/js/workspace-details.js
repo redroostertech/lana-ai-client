@@ -1388,7 +1388,7 @@
         var actionButtons = '';
         if (doc.status === 'active' || doc.status === 'completed') {
           actionButtons =
-            '<button onclick="viewDocument(\'' + doc.id + '\', \'' + matter.matter_id + '\', \'' + escapeHtml(doc.filename || '') + '\', \'' + escapeHtml(doc.content_type || '') + '\', \'' + (doc.file_size || '') + '\')" class="text-xs text-emerald-600 hover:text-emerald-800 font-medium flex items-center gap-1">' +
+            '<button onclick="openFileViewer(\'' + doc.id + '\')" class="text-xs text-emerald-600 hover:text-emerald-800 font-medium flex items-center gap-1">' +
               '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>' +
               'View' +
             '</button>' +
@@ -6018,115 +6018,105 @@
         profile = matter.profile || matter.matter_profile || null;
       }
 
-      if (!profile) {
-        container.innerHTML =
-          '<div class="bg-gradient-to-r lex-bg-accent-muted border border-gray-200 rounded-lg p-5">' +
-            '<div class="flex items-center gap-3">' +
-              '<div class="w-9 h-9 bg-gradient-to-br from-stone-100 to-stone-200 rounded-lg flex items-center justify-center flex-shrink-0">' +
-                '<svg class="w-5 h-5 lex-text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-                  '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>' +
-                '</svg>' +
-              '</div>' +
-              '<div>' +
-                '<h5 class="text-sm font-semibold text-gray-900">Matter Profile Intelligence</h5>' +
-                '<p class="text-xs text-gray-500 mt-0.5">Analyze this matter\'s documents and data to generate insights, key entities, and themes.</p>' +
-              '</div>' +
-            '</div>' +
-            '<div class="mt-3">' +
-              '<button onclick="generateMatterIntelligence(\'' + matter.matter_id + '\')"' +
-                ' class="inline-flex items-center gap-1.5 px-4 py-2 lex-bg-accent hover:lex-bg-accent text-white text-sm rounded-lg font-medium transition-colors shadow-sm">' +
-                '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-                  '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>' +
-                '</svg>' +
-                'Generate' +
-              '</button>' +
-            '</div>' +
-          '</div>';
-        return;
-      }
-
       // Check for meaningful content
-      var brandVoiceItems = (profile.brand_voice && typeof profile.brand_voice === 'object')
+      var brandVoiceItems = (profile && profile.brand_voice && typeof profile.brand_voice === 'object')
         ? Object.entries(profile.brand_voice).slice(0, 3)
         : [];
 
-      var themes = Array.isArray(profile.document_themes)
+      var themes = (profile && Array.isArray(profile.document_themes))
         ? profile.document_themes.slice(0, 5)
         : [];
 
-      if (brandVoiceItems.length === 0 && themes.length === 0) {
-        container.innerHTML =
-          '<div class="bg-gradient-to-r lex-bg-accent-muted border border-gray-200 rounded-lg p-5">' +
-            '<div class="flex items-center gap-3">' +
-              '<div class="w-9 h-9 bg-gradient-to-br from-stone-100 to-stone-200 rounded-lg flex items-center justify-center flex-shrink-0">' +
-                '<svg class="w-5 h-5 lex-text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-                  '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>' +
-                '</svg>' +
-              '</div>' +
-              '<div>' +
-                '<h5 class="text-sm font-semibold text-gray-900">Matter Profile Intelligence</h5>' +
-                '<p class="text-xs text-gray-500 mt-0.5">Not enough data to generate insights yet. Add documents or notes, then regenerate.</p>' +
-              '</div>' +
+      var hasContent = brandVoiceItems.length > 0 || themes.length > 0;
+
+      // Build card body
+      var cardBody = '';
+
+      if (!profile) {
+        // No profile yet
+        cardBody =
+          '<div class="flex items-center gap-3">' +
+            '<div class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style="background: var(--lex-bg-tertiary)">' +
+              '<svg class="w-5 h-5" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>' +
+              '</svg>' +
             '</div>' +
-            '<div class="mt-3">' +
-              '<button onclick="generateMatterIntelligence(\'' + matter.matter_id + '\')"' +
-                ' class="inline-flex items-center gap-1.5 px-4 py-2 lex-bg-accent hover:lex-bg-accent text-white text-sm rounded-lg font-medium transition-colors shadow-sm">' +
-                '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-                  '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>' +
-                '</svg>' +
-                'Regenerate' +
-              '</button>' +
+            '<div>' +
+              '<p class="text-sm" style="color: var(--lex-text-secondary)">Analyze this matter\'s documents and data to generate insights, key entities, and themes.</p>' +
             '</div>' +
+          '</div>' +
+          '<div class="mt-3">' +
+            '<lex-btn onclick="generateMatterIntelligence(\'' + matter.matter_id + '\')" variant="primary" size="sm" leading-icon="zap">Generate</lex-btn>' +
           '</div>';
-        return;
+      } else if (!hasContent) {
+        // Profile exists but empty
+        cardBody =
+          '<div class="flex items-center gap-3">' +
+            '<div class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style="background: var(--lex-bg-tertiary)">' +
+              '<svg class="w-5 h-5" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>' +
+              '</svg>' +
+            '</div>' +
+            '<div>' +
+              '<p class="text-sm" style="color: var(--lex-text-secondary)">Not enough data to generate insights yet. Add documents or notes, then regenerate.</p>' +
+            '</div>' +
+          '</div>' +
+          '<div class="mt-3">' +
+            '<lex-btn onclick="generateMatterIntelligence(\'' + matter.matter_id + '\')" variant="primary" size="sm" leading-icon="refresh">Regenerate</lex-btn>' +
+          '</div>';
+      } else {
+        // Has content — render brand voice + themes
+        if (brandVoiceItems.length > 0) {
+          cardBody +=
+            '<div class="mb-4">' +
+              '<h6 class="text-xs font-semibold uppercase tracking-wider mb-2" style="color: var(--lex-text-tertiary)">Brand Voice</h6>' +
+              '<div class="space-y-1.5">';
+          brandVoiceItems.forEach(function (entry) {
+            cardBody +=
+              '<div class="flex items-start text-sm">' +
+                '<span class="font-medium min-w-[80px]" style="color: var(--lex-text-secondary)">' + escapeHtml(formatFieldName(entry[0])) + ':</span>' +
+                '<span class="ml-2" style="color: var(--lex-text-primary)">' + escapeHtml(String(entry[1])) + '</span>' +
+              '</div>';
+          });
+          cardBody += '</div></div>';
+        }
+
+        if (themes.length > 0) {
+          cardBody +=
+            '<div>' +
+              '<h6 class="text-xs font-semibold uppercase tracking-wider mb-2" style="color: var(--lex-text-tertiary)">Document Themes</h6>' +
+              '<div class="flex flex-wrap gap-2">';
+          themes.forEach(function (theme) {
+            cardBody +=
+              '<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium" style="background: var(--lex-bg-accent-muted); color: var(--lex-text-accent)">' +
+                escapeHtml(String(theme)) +
+              '</span>';
+          });
+          cardBody += '</div></div>';
+        }
       }
 
-      // Build profile content using expandable lex-card
-      var profileBody = '';
+      // Wrap everything in a single lex-card
+      var refreshAction = hasContent
+        ? JSON.stringify([{icon:'refresh',label:'Regenerate'}]).split('"').join('&quot;')
+        : '';
+      var actionsAttr = refreshAction ? ' actions=\'' + refreshAction + '\'' : '';
 
-      if (brandVoiceItems.length > 0) {
-        profileBody +=
-          '<div class="mb-4">' +
-            '<h6 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Brand Voice</h6>' +
-            '<div class="space-y-1.5">';
-        brandVoiceItems.forEach(function (entry) {
-          profileBody +=
-            '<div class="flex items-start text-sm">' +
-              '<span class="text-gray-500 font-medium min-w-[80px]">' + escapeHtml(formatFieldName(entry[0])) + ':</span>' +
-              '<span class="text-gray-900 ml-2">' + escapeHtml(String(entry[1])) + '</span>' +
-            '</div>';
-        });
-        profileBody += '</div></div>';
-      }
-
-      if (themes.length > 0) {
-        profileBody +=
-          '<div>' +
-            '<h6 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Document Themes</h6>' +
-            '<div class="flex flex-wrap gap-2">';
-        themes.forEach(function (theme) {
-          profileBody +=
-            '<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium lex-bg-accent-soft lex-text-accent">' +
-              escapeHtml(String(theme)) +
-            '</span>';
-        });
-        profileBody += '</div></div>';
-      }
-
-      var refreshAction = JSON.stringify([{icon:'refresh',label:'Regenerate'}]).split('"').join('&quot;');
       container.innerHTML =
-        '<lex-card id="matterProfileCard" heading="Matter Profile Intelligence" variant="flat" padding="compact" expandable expanded actions=\'' + refreshAction + '\'>' +
-          profileBody +
+        '<lex-card id="matterProfileCard" heading="Matter Intelligence" variant="outlined" padding="compact"' + actionsAttr + '>' +
+          cardBody +
         '</lex-card>';
 
-      // Wire refresh action directly
-      var mpCard = document.getElementById('matterProfileCard');
-      if (mpCard) {
-        mpCard.addEventListener('card-action', function (e) {
-          if (e.detail && e.detail.action === 'refresh' && matter && matter.matter_id) {
-            generateMatterIntelligence(matter.matter_id);
-          }
-        });
+      // Wire refresh action
+      if (hasContent) {
+        var mpCard = document.getElementById('matterProfileCard');
+        if (mpCard) {
+          mpCard.addEventListener('card-action', function (e) {
+            if (e.detail && e.detail.action === 'refresh' && matter && matter.matter_id) {
+              generateMatterIntelligence(matter.matter_id);
+            }
+          });
+        }
       }
 
     } catch (error) {
@@ -6227,156 +6217,6 @@
   // Document Viewer
   // (adapted from workspace.js lines 3594-3823)
   // =========================================================================
-
-  /**
-   * Open the document viewer modal and stream a stored document into it.
-   * Supports PDF (iframe), images, text, CSV, and DOCX (via Mammoth.js).
-   * @param {string} fileId - Document record ID
-   * @param {string} fileName - Display file name
-   * @param {string} contentType - MIME type
-   * @param {number} fileSize - File size in bytes
-   */
-  async function viewDocument(fileId, fileName, contentType, fileSize) {
-    var matterId = currentMatterData ? currentMatterData.matter_id : null;
-
-    var viewerModal = document.getElementById('documentViewerModal');
-    var viewerLoading = document.getElementById('viewerLoading');
-    var viewerError = document.getElementById('viewerError');
-    var viewerIframe = document.getElementById('viewerIframe');
-    var viewerText = document.getElementById('viewerText');
-    var viewerTable = document.getElementById('viewerTable');
-    var viewerImage = document.getElementById('viewerImage');
-    var viewerDocx = document.getElementById('viewerDocx');
-
-    if (!viewerModal) return;
-
-    // Show modal with loading state
-    viewerModal.open = true;
-    if (viewerLoading) viewerLoading.classList.remove('hidden');
-    if (viewerError) viewerError.classList.add('hidden');
-    if (viewerIframe) viewerIframe.classList.add('hidden');
-    if (viewerText) viewerText.classList.add('hidden');
-    if (viewerTable) viewerTable.classList.add('hidden');
-    if (viewerImage) viewerImage.classList.add('hidden');
-    if (viewerDocx) viewerDocx.classList.add('hidden');
-
-    var fileNameEl = document.getElementById('viewerFileName');
-    var fileInfoEl = document.getElementById('viewerFileInfo');
-    var downloadBtn = document.getElementById('viewerDownloadBtn');
-    var errorDownloadBtn = document.getElementById('viewerErrorDownload');
-
-    if (fileNameEl) fileNameEl.textContent = fileName || '';
-    if (fileInfoEl) fileInfoEl.textContent = (contentType || 'Unknown type') + ' - ' + formatSize(fileSize || 0);
-    if (downloadBtn) downloadBtn.onclick = function () { downloadDocument(fileId, fileName); };
-    if (errorDownloadBtn) errorDownloadBtn.onclick = function () { downloadDocument(fileId, fileName); };
-
-    try {
-      var fetchUrl = api.getFileViewUrl(fileId, matterId);
-      var fetchResponse = await fetch(fetchUrl, {
-        headers: { 'Authorization': 'Bearer ' + api.token }
-      });
-
-      if (!fetchResponse.ok) {
-        if (fetchResponse.status === 401) {
-          if (window.api && typeof window.api.showSessionExpiredModal === 'function') {
-            window.api.showSessionExpiredModal();
-          } else {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            Lex.Toast.error('Session expired. Redirecting to login...');
-            trackTimeout(setTimeout(function () { window.location.href = 'login.html'; }, 1500));
-          }
-          throw new Error('Session expired');
-        }
-        throw new Error('Failed to load document: ' + fetchResponse.status);
-      }
-
-      var blob = await fetchResponse.blob();
-      var objectUrl = URL.createObjectURL(blob);
-
-      if (viewerLoading) viewerLoading.classList.add('hidden');
-
-      var type = (contentType || '').toLowerCase();
-      var lowerName = (fileName || '').toLowerCase();
-
-      if (type.indexOf('image/') === 0) {
-        if (viewerImage) { viewerImage.src = objectUrl; viewerImage.classList.remove('hidden'); }
-      } else if (type === 'application/pdf') {
-        if (viewerIframe) { viewerIframe.src = objectUrl; viewerIframe.classList.remove('hidden'); }
-      } else if (type.indexOf('csv') !== -1 || lowerName.indexOf('.csv') !== -1) {
-        var csvText = await blob.text();
-        if (typeof renderCSVTable === 'function') renderCSVTable(csvText);
-        if (viewerTable) viewerTable.classList.remove('hidden');
-      } else if (
-        type.indexOf('text/') === 0 ||
-        type === 'application/json' ||
-        type === 'application/xml' ||
-        lowerName.indexOf('.txt') !== -1 ||
-        lowerName.indexOf('.md') !== -1 ||
-        lowerName.indexOf('.json') !== -1 ||
-        lowerName.indexOf('.xml') !== -1 ||
-        lowerName.indexOf('.log') !== -1 ||
-        lowerName.indexOf('.js') !== -1 ||
-        lowerName.indexOf('.ts') !== -1 ||
-        lowerName.indexOf('.py') !== -1 ||
-        lowerName.indexOf('.html') !== -1 ||
-        lowerName.indexOf('.css') !== -1 ||
-        lowerName.indexOf('.yaml') !== -1 ||
-        lowerName.indexOf('.yml') !== -1
-      ) {
-        var textContent = await blob.text();
-        if (viewerText) { viewerText.textContent = textContent; viewerText.classList.remove('hidden'); }
-      } else if (lowerName.indexOf('.docx') !== -1 || type.indexOf('wordprocessingml') !== -1) {
-        try {
-          var arrayBuffer = await blob.arrayBuffer();
-          // mammoth may not always be present — guard gracefully
-          if (typeof mammoth !== 'undefined') {
-            var result = await mammoth.convertToHtml({
-              arrayBuffer: arrayBuffer,
-              convertImage: mammoth.images.imgElement(function (image) {
-                return image.read('base64').then(function (imageBuffer) {
-                  return { src: 'data:' + image.contentType + ';base64,' + imageBuffer };
-                });
-              }),
-              styleMap: [
-                "p[style-name='Heading 1'] => h1:fresh",
-                "p[style-name='Heading 2'] => h2:fresh",
-                "p[style-name='Heading 3'] => h3:fresh",
-                "p[style-name='Title'] => h1.document-title:fresh",
-                "r[style-name='Strong'] => strong",
-                "r[style-name='Emphasis'] => em",
-                "table => table.docx-table"
-              ]
-            });
-            if (viewerDocx) { viewerDocx.innerHTML = result.value; viewerDocx.classList.remove('hidden'); }
-            if (result.messages && result.messages.length > 0) {
-              console.log('Mammoth conversion messages:', result.messages);
-            }
-          } else {
-            if (viewerError) viewerError.classList.remove('hidden');
-            var errMsg = document.getElementById('viewerErrorMsg');
-            if (errMsg) errMsg.textContent = 'Mammoth.js not available for .docx preview';
-          }
-        } catch (mammothError) {
-          console.error('Failed to convert .docx:', mammothError);
-          if (viewerError) viewerError.classList.remove('hidden');
-          var errMsg = document.getElementById('viewerErrorMsg');
-          if (errMsg) errMsg.textContent = 'Failed to preview .docx file';
-        }
-      } else {
-        if (viewerError) viewerError.classList.remove('hidden');
-        var errMsg = document.getElementById('viewerErrorMsg');
-        if (errMsg) errMsg.textContent = 'Preview not available for ' + (contentType || 'this file type');
-      }
-
-    } catch (error) {
-      console.error('[viewDocument] Failed to load document:', error);
-      if (viewerLoading) viewerLoading.classList.add('hidden');
-      if (viewerError) viewerError.classList.remove('hidden');
-      var errMsg = document.getElementById('viewerErrorMsg');
-      if (errMsg) errMsg.textContent = error.message || 'Failed to load document';
-    }
-  }
 
   /**
    * Download a stored document via authenticated fetch.
@@ -6606,11 +6446,10 @@
     }
   }
 
-  window.viewDocument = viewDocument;
   window.downloadDocument = downloadDocument;
   window.viewOrphanedDocument = viewOrphanedDocument;
   window.downloadOrphanedDocument = downloadOrphanedDocument;
-  ['viewDocument', 'downloadDocument', 'viewOrphanedDocument', 'downloadOrphanedDocument'].forEach(_trackGlobal);
+  ['downloadDocument', 'viewOrphanedDocument', 'downloadOrphanedDocument'].forEach(_trackGlobal);
 
   // =========================================================================
   // Edit Matter Modal (NEW — specific to workspace_details.html)

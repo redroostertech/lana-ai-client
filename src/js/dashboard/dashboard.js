@@ -227,7 +227,110 @@
   // =========================================================================
 
   /**
+   * Determine if an action queue item has a Lana-type suggested action.
+   * Checks context.suggested_action.type === 'lana'.
+   * @param {Object} item
+   * @returns {boolean}
+   */
+  function isLanaAction(item) {
+    var ctx = item.context;
+    if (!ctx) return false;
+    // context may be a string (JSON) or an object
+    if (typeof ctx === 'string') {
+      try { ctx = JSON.parse(ctx); } catch (e) { return false; }
+    }
+    return ctx.suggested_action && ctx.suggested_action.type === 'lana';
+  }
+
+  /**
+   * Extract the suggested_action from an item's context.
+   * @param {Object} item
+   * @returns {Object|null}
+   */
+  function getSuggestedAction(item) {
+    var ctx = item.context;
+    if (!ctx) return null;
+    if (typeof ctx === 'string') {
+      try { ctx = JSON.parse(ctx); } catch (e) { return null; }
+    }
+    return ctx.suggested_action || null;
+  }
+
+  /**
+   * Get the first matter_id from a suggested action (could be matter_id or matter_ids[0]).
+   * @param {Object} action
+   * @returns {string|null}
+   */
+  function getActionMatterId(action) {
+    if (!action) return null;
+    if (action.matter_id) return action.matter_id;
+    if (action.matter_ids && action.matter_ids.length > 0) return action.matter_ids[0];
+    return null;
+  }
+
+  /**
+   * Build an enriched description from suggested_action.items for entity-level
+   * drill-down display. Falls back to null if no items are available.
+   * @param {Object} sa - suggested_action object
+   * @param {string} matter - fallback matter name
+   * @param {string|null} ts - timestamp for timeAgo
+   * @returns {string|null} enriched description or null
+   */
+  function buildEnrichedDescription(sa, matter, ts) {
+    if (!sa || !sa.items || sa.items.length === 0) return null;
+    var items = sa.items;
+    var parts = [];
+    var maxPreview = 2;
+
+    for (var k = 0; k < items.length && k < maxPreview; k++) {
+      var it = items[k];
+      if (it.title) {
+        // task_health: task title + due date
+        var taskDesc = escHtml(it.title);
+        if (it.due_date) taskDesc += ' (due ' + escHtml(formatShortDate(it.due_date)) + ')';
+        parts.push(taskDesc);
+      } else if (it.filename) {
+        // unreviewed_docs: filename
+        parts.push(escHtml(it.filename));
+      } else if (it.missing_fields) {
+        // matter_completeness: matter name + completeness
+        parts.push(escHtml(it.matter_name || '') + ' (' + (it.completeness_pct || 0) + '% complete)');
+      } else if (it.matter_name) {
+        // staleness/engagement: matter name
+        parts.push(escHtml(it.matter_name));
+      }
+    }
+
+    var totalCount = sa.total_count || items.length;
+    if (totalCount > maxPreview) {
+      parts.push('+ ' + (totalCount - maxPreview) + ' more');
+    }
+
+    if (ts) parts.push(escHtml(timeAgo(ts)));
+    return parts.join(' \u00b7 ');
+  }
+
+  /**
+   * Format a date string as a short date (e.g. "Feb 20").
+   * @param {string} dateStr
+   * @returns {string}
+   */
+  function formatShortDate(dateStr) {
+    try {
+      var d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return months[d.getMonth()] + ' ' + d.getDate();
+    } catch (e) {
+      return dateStr;
+    }
+  }
+
+  /**
    * Render the top-5 action queue items, sorted by severity.
+   * Distinguishes between human actions and Lana-suggested actions.
+   * - Human actions: click navigates to the matter page
+   * - Lana actions: click queues an agentic task, marks acted-on, shows toast
    * @returns {Promise<void>}
    */
   async function renderZoneC() {
@@ -263,16 +366,55 @@
       var meta     = [];
       if (matter) meta.push(matter);
       if (ts)     meta.push(escHtml(timeAgo(ts)));
-      var metaStr  = meta.join(' \u00b7 ');
       var priority = (sev === 'critical' || sev === 'high') ? 'high' : (sev === 'medium' ? 'medium' : 'low');
 
-      html +=
-        '<lex-action-card' +
-          ' title="' + title + '"' +
-          ' description="' + escHtml(metaStr) + '"' +
-          ' priority="' + priority + '"' +
-          ' data-action-id="' + escHtml(String(item.id || '')) + '"' +
-        '></lex-action-card>';
+      var lana = isLanaAction(item);
+      var actionAttr = '';
+      var sa = getSuggestedAction(item);
+
+      if (lana) {
+        // Encode the action config as a data attribute for the click handler
+        actionAttr = ' data-lana-action="' + escHtml(JSON.stringify(sa)) + '"';
+        // Append "Let Lana handle this" to the description
+        var metaParts = [];
+        if (matter) metaParts.push(matter);
+        metaParts.push('Let Lana handle this');
+        if (ts) metaParts.push(escHtml(timeAgo(ts)));
+        var metaStr = metaParts.join(' \u00b7 ');
+
+        html +=
+          '<lex-action-card' +
+            ' title="' + title + '"' +
+            ' description="' + escHtml(metaStr) + '"' +
+            ' priority="' + priority + '"' +
+            ' data-action-id="' + escHtml(String(item.id || '')) + '"' +
+            ' data-entity-id="' + escHtml(String(item.entity_id || item.id || '')) + '"' +
+            actionAttr +
+          '></lex-action-card>';
+      } else {
+        // Try enriched description from entity-level items
+        var enrichedDesc = buildEnrichedDescription(sa, matter, ts);
+        var metaStr2;
+        if (enrichedDesc) {
+          metaStr2 = enrichedDesc;
+        } else {
+          if (ts) meta.push(escHtml(timeAgo(ts)));
+          metaStr2 = meta.join(' \u00b7 ');
+        }
+
+        // For human actions, store the matter_id for navigation
+        var humanMatterId = getActionMatterId(sa) || item.matter_id || '';
+
+        html +=
+          '<lex-action-card' +
+            ' title="' + title + '"' +
+            ' description="' + escHtml(metaStr2) + '"' +
+            ' priority="' + priority + '"' +
+            ' data-action-id="' + escHtml(String(item.id || '')) + '"' +
+            ' data-entity-id="' + escHtml(String(item.entity_id || item.id || '')) + '"' +
+            (humanMatterId ? ' data-matter-id="' + escHtml(String(humanMatterId)) + '"' : '') +
+          '></lex-action-card>';
+      }
     }
     contentEl.innerHTML = html;
     show(contentEl);
@@ -1337,6 +1479,64 @@
         WidgetRenderer.init();
       }
     }, 500));
+
+    // ── 9. Heartbeat indicator in topbar ──────────────────────────────────
+    _timeouts.push(setTimeout(function () {
+      if (typeof LanaHeartbeat !== 'undefined') {
+        LanaHeartbeat.inject();
+        LanaHeartbeat.start(_intervals);
+      }
+    }, 300));
+  }
+
+  // =========================================================================
+  // Lana action handler (Zone C)
+  // =========================================================================
+
+  /**
+   * Handle click on a Lana-suggested action card.
+   * 1. POST /api/v1/action-queue/alert/:entityId/acted-on — mark interaction
+   * 2. POST /api/v1/agentic/tasks — queue the agentic task
+   * 3. Show toast confirmation
+   *
+   * @param {string} entityId       - Alert entity ID for interaction tracking
+   * @param {string} lanaActionStr  - JSON string of the suggested_action config
+   */
+  async function handleLanaActionClick(entityId, lanaActionStr) {
+    var action;
+    try {
+      action = JSON.parse(lanaActionStr);
+    } catch (parseErr) {
+      console.warn('[Dashboard] Failed to parse Lana action config:', parseErr && parseErr.message);
+      return;
+    }
+
+    try {
+      // Mark the action queue item as acted-on
+      await api.post('/api/v1/action-queue/alert/' + encodeURIComponent(entityId) + '/acted-on', {});
+    } catch (markErr) {
+      // Non-fatal — continue to queue the task even if marking fails
+      console.warn('[Dashboard] Failed to mark action as acted-on:', markErr && markErr.message);
+    }
+
+    try {
+      // Queue the agentic task
+      await api.post('/api/v1/agentic/tasks', {
+        type: action.action || 'generic',
+        matterId: action.matter_id || (action.matter_ids && action.matter_ids[0]) || null,
+        params: action.params || {}
+      });
+
+      // Show toast confirmation
+      if (typeof Lex !== 'undefined' && Lex.Toast) {
+        Lex.Toast.show({ message: 'Queued — Lana is working on it', variant: 'success' });
+      }
+    } catch (queueErr) {
+      console.warn('[Dashboard] Failed to queue agentic task:', queueErr && queueErr.message);
+      if (typeof Lex !== 'undefined' && Lex.Toast) {
+        Lex.Toast.show({ message: 'Could not queue task — try again', variant: 'error' });
+      }
+    }
   }
 
   // =========================================================================
@@ -1450,15 +1650,25 @@
       });
     }
 
-    // Zone C — action card click
+    // Zone C — action card click (Lana vs human action routing)
     var zoneCContent = el('ccZoneCContent');
     if (zoneCContent) {
       zoneCContent.addEventListener('action-click', function (e) {
         var card = e.target.closest('lex-action-card[data-action-id]');
-        if (card) {
-          var actionId = card.getAttribute('data-action-id');
-          // TODO: navigate to action detail when page exists
-          console.log('[Dashboard] Zone C action clicked:', actionId);
+        if (!card) return;
+
+        var lanaActionStr = card.getAttribute('data-lana-action');
+        var entityId      = card.getAttribute('data-entity-id') || card.getAttribute('data-action-id');
+
+        if (lanaActionStr) {
+          // Lana action: mark acted-on + queue agentic task
+          handleLanaActionClick(entityId, lanaActionStr);
+        } else {
+          // Human action: navigate to matter page
+          var matterId = card.getAttribute('data-matter-id');
+          if (matterId) {
+            Lex.Nav.go('matters.html', { params: { id: matterId } });
+          }
         }
       });
     }
@@ -1473,6 +1683,9 @@
    * Clears timeouts, intervals, document listeners, and window globals.
    */
   function onLeave() {
+    // Stop heartbeat polling
+    if (typeof LanaHeartbeat !== 'undefined') LanaHeartbeat.stop();
+
     // Clear tracked timeouts and intervals
     _timeouts.forEach(clearTimeout);
     _intervals.forEach(clearInterval);

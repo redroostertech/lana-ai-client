@@ -12,7 +12,7 @@ const viewerState = {
   originalMetadata: {},
   metadataChanged: false,
   metadataMode: 'view', // 'view' or 'edit'
-  documentMetadataViewer: null // DocumentMetadataViewer component instance
+  documentMetadataViewer: null
 };
 
 // ============================================================
@@ -20,14 +20,28 @@ const viewerState = {
 // ============================================================
 function escapeHtml(text) {
   if (!text) return '';
-  const map = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#039;'
-  };
-  return String(text).replace(/[&<>"']/g, m => map[m]);
+  var str = String(text);
+  var out = '';
+  for (var i = 0; i < str.length; i++) {
+    var ch = str[i];
+    if (ch === '&') out += '&amp;';
+    else if (ch === '<') out += '&lt;';
+    else if (ch === '>') out += '&gt;';
+    else if (ch === '"') out += '&quot;';
+    else if (ch === "'") out += '&#039;';
+    else out += ch;
+  }
+  return out;
+}
+
+function _viewerNotify(message, type) {
+  if (typeof Lex !== 'undefined' && Lex.Toast && typeof Lex.Toast[type] === 'function') {
+    Lex.Toast[type](message);
+  } else if (type === 'success' && typeof showSuccessNotification === 'function') {
+    showSuccessNotification(message);
+  } else if (type === 'error' && typeof showErrorNotification === 'function') {
+    showErrorNotification(message);
+  }
 }
 
 // ============================================================
@@ -43,7 +57,7 @@ async function openFileViewer(fileId) {
   }
 
   // Show modal
-  modal.classList.remove('hidden');
+  modal.open = true;
 
   // Show loading state
   showViewerLoading();
@@ -82,8 +96,6 @@ async function openFileViewer(fileId) {
     // Load metadata
     loadMetadata(response);
 
-    // Initialize and load AI-generated metadata (summary, entities, etc.)
-    initializeDocumentMetadataViewer(fileId);
 
   } catch (error) {
     console.error('[FileViewer] Failed to load file:', error);
@@ -292,10 +304,10 @@ async function downloadFile(fileId, filename) {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    showSuccessNotification('Download started');
+    _viewerNotify('Download started', 'success');
   } catch (error) {
     console.error('[FileViewer] Download error:', error);
-    showErrorNotification(error.message || 'Failed to download file');
+    _viewerNotify(error.message || 'Failed to download file', 'error');
   }
 }
 
@@ -305,14 +317,13 @@ async function downloadFile(fileId, filename) {
 function loadMetadata(file) {
   // File info (read-only)
   document.getElementById('metaFileSize').textContent = formatFileSize(file.file_size);
-  document.getElementById('metaFileType').textContent = formatMimeType(file.content_type);
   document.getElementById('metaUploadedAt').textContent = new Date(file.created_at).toLocaleDateString();
   document.getElementById('metaChunkCount').textContent = file.chunk_count !== undefined ? file.chunk_count.toLocaleString() : '0';
 
   const metadata = file.metadata || {};
 
-  // Populate View Mode (readonly)
-  document.getElementById('metaDocTypeView').textContent = formatDocumentType(metadata.document_type) || 'Not specified';
+  // Populate View Mode (readonly) — fall back to MIME type when no manual document type
+  document.getElementById('metaDocTypeView').textContent = formatDocumentType(metadata.document_type) || formatMimeType(file.content_type) || 'Not specified';
 
   // Render tags as capsules
   const tagsView = document.getElementById('metaTagsView');
@@ -320,7 +331,7 @@ function loadMetadata(file) {
     const tags = metadata.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
     if (tags.length > 0) {
       tagsView.innerHTML = tags.map(tag =>
-        `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 mr-1 mb-1">${escapeHtml(tag)}</span>`
+        `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium lex-bg-accent-muted lex-text-accent mr-1 mb-1">${escapeHtml(tag)}</span>`
       ).join('');
     } else {
       tagsView.textContent = 'No tags';
@@ -336,14 +347,18 @@ function loadMetadata(file) {
   document.getElementById('metaTags').value = metadata.tags || '';
   document.getElementById('metaNotes').value = metadata.notes || '';
 
-  // Update character count
-  updateNotesCount();
-
   // Track changes
   trackMetadataChanges();
 
   // Initialize in view mode
   setMetadataMode('view');
+
+  // Reposition segmented indicator after modal is visible (getBoundingClientRect
+  // returns zeros while the element is hidden, so defer until next paint)
+  var toggle = document.getElementById('metaModeToggle');
+  if (toggle && typeof toggle._positionIndicator === 'function') {
+    requestAnimationFrame(function () { toggle._positionIndicator(); });
+  }
 }
 
 function formatDocumentType(type) {
@@ -366,31 +381,21 @@ function formatDocumentType(type) {
 function setMetadataMode(mode) {
   viewerState.metadataMode = mode;
 
-  const viewModeBtn = document.getElementById('viewModeBtn');
-  const editModeBtn = document.getElementById('editModeBtn');
+  const toggle = document.getElementById('metaModeToggle');
   const viewModePanel = document.getElementById('metaViewMode');
   const editModePanel = document.getElementById('metaEditMode');
   const actionsFooter = document.getElementById('metaActionsFooter');
 
-  if (mode === 'view') {
-    // Update button states
-    viewModeBtn.classList.add('bg-indigo-100', 'text-indigo-700');
-    viewModeBtn.classList.remove('text-gray-600', 'hover:bg-gray-100');
-    editModeBtn.classList.remove('bg-indigo-100', 'text-indigo-700');
-    editModeBtn.classList.add('text-gray-600', 'hover:bg-gray-100');
+  // Keep segmented control in sync (e.g. when called from cancelMetadataChanges)
+  if (toggle && toggle.value !== mode) {
+    toggle.value = mode;
+  }
 
-    // Show view mode, hide edit mode
+  if (mode === 'view') {
     viewModePanel.classList.remove('hidden');
     editModePanel.classList.add('hidden');
     actionsFooter.classList.add('hidden');
   } else {
-    // Update button states
-    editModeBtn.classList.add('bg-indigo-100', 'text-indigo-700');
-    editModeBtn.classList.remove('text-gray-600', 'hover:bg-gray-100');
-    viewModeBtn.classList.remove('bg-indigo-100', 'text-indigo-700');
-    viewModeBtn.classList.add('text-gray-600', 'hover:bg-gray-100');
-
-    // Show edit mode, hide view mode
     viewModePanel.classList.add('hidden');
     editModePanel.classList.remove('hidden');
     actionsFooter.classList.remove('hidden');
@@ -398,24 +403,18 @@ function setMetadataMode(mode) {
 }
 
 function trackMetadataChanges() {
-  const docType = document.getElementById('metaDocType');
-  const tags = document.getElementById('metaTags');
-  const notes = document.getElementById('metaNotes');
+  var docType = document.getElementById('metaDocType');
+  var tags = document.getElementById('metaTags');
+  var notes = document.getElementById('metaNotes');
 
-  [docType, tags, notes].forEach(el => {
-    el.addEventListener('input', () => {
+  // Lex form components fire 'lex-change'; fall back to 'input' for plain elements
+  [docType, tags, notes].forEach(function (el) {
+    if (!el) return;
+    var evt = (el.tagName && el.tagName.indexOf('LEX-') === 0) ? 'lex-change' : 'input';
+    el.addEventListener(evt, function () {
       viewerState.metadataChanged = true;
     });
   });
-
-  // Character count for notes
-  notes.addEventListener('input', updateNotesCount);
-}
-
-function updateNotesCount() {
-  const notes = document.getElementById('metaNotes');
-  const count = document.getElementById('metaNotesCount');
-  count.textContent = notes.value.length;
 }
 
 async function saveMetadata() {
@@ -452,7 +451,7 @@ async function saveMetadata() {
         const tags = metadata.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
         if (tags.length > 0) {
           tagsView.innerHTML = tags.map(tag =>
-            `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 mr-1 mb-1">${escapeHtml(tag)}</span>`
+            `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium lex-bg-accent-muted lex-text-accent mr-1 mb-1">${escapeHtml(tag)}</span>`
           ).join('');
         } else {
           tagsView.textContent = 'No tags';
@@ -463,7 +462,7 @@ async function saveMetadata() {
 
       document.getElementById('metaNotesView').textContent = metadata.notes || 'No notes';
 
-      showSuccessNotification('Metadata saved successfully');
+      _viewerNotify('Metadata saved successfully', 'success');
 
       // Switch back to view mode
       setMetadataMode('view');
@@ -472,7 +471,7 @@ async function saveMetadata() {
     }
   } catch (error) {
     console.error('[FileViewer] Save metadata error:', error);
-    showErrorNotification('Failed to save metadata: ' + error.message);
+    _viewerNotify('Failed to save metadata: ' + error.message, 'error');
   } finally {
     saveBtn.disabled = false;
     saveBtn.textContent = originalText;
@@ -486,53 +485,9 @@ function cancelMetadataChanges() {
   document.getElementById('metaNotes').value = viewerState.originalMetadata.notes;
 
   viewerState.metadataChanged = false;
-  updateNotesCount();
 
   // Switch back to view mode
   setMetadataMode('view');
-}
-
-// ============================================================
-// DOCUMENT METADATA VIEWER (AI SUMMARY)
-// ============================================================
-function initializeDocumentMetadataViewer(fileId) {
-  try {
-    // Check if DocumentMetadataViewer is available
-    if (typeof DocumentMetadataViewer === 'undefined') {
-      console.warn('[FileViewer] DocumentMetadataViewer not available');
-      return;
-    }
-
-    // Initialize viewer if not already done
-    if (!viewerState.documentMetadataViewer) {
-      viewerState.documentMetadataViewer = new DocumentMetadataViewer('viewerMetadataContainer', {
-        showLayoutToggle: false,
-        defaultLayout: 'split',
-        collapseSections: true,
-        showEmptySections: false,
-        truncateSummary: true,
-        summaryMaxLength: 300,
-        entitiesMaxItems: 10,
-        autoRefreshInterval: null,
-        onMetadataLoaded: (metadata) => {
-          console.log('[FileViewer] AI metadata loaded:', metadata);
-        },
-        onError: (error) => {
-          console.error('[FileViewer] AI metadata error:', error);
-        }
-      });
-    }
-
-    // Load metadata for this document
-    viewerState.documentMetadataViewer.loadMetadata(fileId).catch(err => {
-      console.error('[FileViewer] Failed to load AI metadata:', err);
-      // Don't show error to user - AI metadata is optional enhancement
-    });
-
-  } catch (error) {
-    console.error('[FileViewer] Error initializing DocumentMetadataViewer:', error);
-    // Don't break the viewer if AI metadata fails
-  }
 }
 
 // ============================================================
@@ -570,6 +525,8 @@ function hideAllViewers() {
   document.getElementById('viewerText').classList.add('hidden');
   document.getElementById('viewerImage').classList.add('hidden');
   document.getElementById('viewerDocx').classList.add('hidden');
+  var tableEl = document.getElementById('viewerTable');
+  if (tableEl) tableEl.classList.add('hidden');
 }
 
 function closeFileViewer() {
@@ -581,7 +538,7 @@ function closeFileViewer() {
   }
 
   const modal = document.getElementById('documentViewerModal');
-  modal.classList.add('hidden');
+  modal.open = false;
 
   // Destroy DocumentMetadataViewer instance
   if (viewerState.documentMetadataViewer) {
@@ -681,9 +638,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // Close button
   document.getElementById('closeDocumentViewer')?.addEventListener('click', closeFileViewer);
 
-  // View/Edit mode toggle
-  document.getElementById('viewModeBtn')?.addEventListener('click', () => setMetadataMode('view'));
-  document.getElementById('editModeBtn')?.addEventListener('click', () => setMetadataMode('edit'));
+  // View/Edit mode toggle (lex-segmented)
+  document.getElementById('metaModeToggle')?.addEventListener('lex-change', (e) => setMetadataMode(e.detail.value));
 
   // Save metadata
   document.getElementById('metaSaveBtn')?.addEventListener('click', saveMetadata);
@@ -695,7 +651,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       const modal = document.getElementById('documentViewerModal');
-      if (!modal.classList.contains('hidden')) {
+      if (modal && modal.open) {
         closeFileViewer();
       }
     }

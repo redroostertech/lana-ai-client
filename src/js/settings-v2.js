@@ -530,7 +530,7 @@
 
     api.get('/api/v1/auth/session').then(function (result) {
       var data = result.data || result;
-      var sessions = data.sessions || [];
+      var sessions = Array.isArray(data) ? data : (data.sessions || []);
 
       var rows = sessions.map(function (s) {
         return {

@@ -258,7 +258,7 @@
       ? '<div class="text-xs mb-3" style="color:var(--lex-text-tertiary)"><span>Last sync: ' + timeAgoStr + '</span></div>'
       : '';
 
-    return '<div class="p-5 ' +
+    return '<div class="p-5 flex flex-col ' +
       (isComingSoon ? 'opacity-60' : 'hover:shadow-md') + ' transition-shadow ' +
       (isComingSoon ? '' : 'cursor-pointer') + '" style="background:var(--lex-card-bg);border:1px solid var(--lex-card-border);border-radius:var(--lex-card-radius);box-shadow:var(--lex-card-shadow)" ' + cardClick + '>' +
       '<div class="flex items-start justify-between mb-4">' +
@@ -268,8 +268,10 @@
       '<h3 class="font-semibold mb-1" style="color:var(--lex-text-primary)">' + normalizedConnector.name + '</h3>' +
       (normalizedConnector.vendor ? '<p class="text-xs mb-2" style="color:var(--lex-text-tertiary)">' + normalizedConnector.vendor + '</p>' : '') +
       '<p class="text-sm mb-3 line-clamp-2" style="color:var(--lex-text-secondary)">' + normalizedConnector.description + '</p>' +
-      syncInfoHtml +
-      buttonsHtml +
+      '<div class="mt-auto">' +
+        syncInfoHtml +
+        buttonsHtml +
+      '</div>' +
     '</div>';
   }
 
@@ -309,7 +311,7 @@
         '</div>';
     }
 
-    return '<div class="p-5 ' + (isComingSoon ? 'opacity-75' : 'hover:shadow-md') + ' transition-shadow" style="background:var(--lex-card-bg);border:1px solid var(--lex-card-border);border-radius:var(--lex-card-radius);box-shadow:var(--lex-card-shadow)">' +
+    return '<div class="p-5 flex flex-col ' + (isComingSoon ? 'opacity-75' : 'hover:shadow-md') + ' transition-shadow" style="background:var(--lex-card-bg);border:1px solid var(--lex-card-border);border-radius:var(--lex-card-radius);box-shadow:var(--lex-card-shadow)">' +
       '<div class="flex items-start justify-between mb-4">' +
         '<div class="w-12 h-12 rounded-lg flex items-center justify-center" style="background:var(--lex-bg-accent-muted)">' + logoHtml + '</div>' +
         statusBadge +
@@ -317,11 +319,13 @@
       '<h3 class="font-semibold mb-1" style="color:var(--lex-text-primary)">' + connector.name + '</h3>' +
       (connector.vendor ? '<p class="text-xs mb-2" style="color:var(--lex-text-tertiary)">' + connector.vendor + '</p>' : '') +
       '<p class="text-sm mb-3 line-clamp-2" style="color:var(--lex-text-secondary)">' + connector.description + '</p>' +
-      '<div class="flex items-center justify-between text-xs mb-3" style="color:var(--lex-text-tertiary)">' +
-        '<span class="inline-flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>' + formatText(connector.category) + '</span>' +
-        (connector.version ? '<span>v' + connector.version + '</span>' : '') +
+      '<div class="mt-auto">' +
+        '<div class="flex items-center justify-between text-xs mb-3" style="color:var(--lex-text-tertiary)">' +
+          '<span class="inline-flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>' + formatText(connector.category) + '</span>' +
+          (connector.version ? '<span>v' + connector.version + '</span>' : '') +
+        '</div>' +
+        actionButton +
       '</div>' +
-      actionButton +
     '</div>';
   }
 
@@ -342,6 +346,12 @@
       } else {
         window.location.href = specialPages[connectorType] + '?id=' + connectorId;
       }
+      return;
+    }
+
+    // Connector with custom UI — open in connector-viewer
+    if (connector && connector.ui_entry_point) {
+      openCustomConnectorUI(connector.ui_entry_point, connector.name || 'Connector');
       return;
     }
 
@@ -1065,7 +1075,7 @@
     }
 
     var formData = new FormData();
-    formData.append('file', selectedConnectorFile);
+    formData.append('connector_zip', selectedConnectorFile);
 
     api.post('/api/v1/generic-connectors/import', formData).then(function (result) {
       if (result && result.success) {

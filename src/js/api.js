@@ -2259,6 +2259,10 @@ class ApiClient {
     return this.post('/api/v1/notifications/mark-all-read');
   }
 
+  async getUnreadNotificationCount() {
+    return this.get('/api/v1/notifications/unread-count');
+  }
+
   async createAdminNotification(type, title, body, actionUrl = null) {
     return this.post('/api/v1/notifications/admin', {
       type,

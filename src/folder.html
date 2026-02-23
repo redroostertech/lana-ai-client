@@ -199,17 +199,13 @@
           <div class="px-4 py-3 border-b" style="border-color: var(--lex-border-default); background-color: var(--lex-bg-secondary)">
             <div class="flex items-center justify-between">
               <h4 class="text-sm font-semibold" style="color: var(--lex-text-primary)">Document Details</h4>
-              <div class="flex items-center gap-1 bg-white rounded-lg p-1 border" style="border-color: var(--lex-border-default)">
-                <button id="viewModeBtn" class="px-3 py-1 text-xs font-medium rounded transition-colors" style="background-color: var(--lex-bg-accent-muted); color: var(--lex-text-accent)">View</button>
-                <button id="editModeBtn" class="px-3 py-1 text-xs font-medium rounded transition-colors" style="color: var(--lex-text-secondary)">Edit</button>
-              </div>
+              <lex-segmented id="metaModeToggle" value="view" size="sm"
+                options='[{"value":"view","label":"View"},{"value":"edit","label":"Edit"}]'>
+              </lex-segmented>
             </div>
           </div>
 
           <div class="flex-1 overflow-y-auto p-4 space-y-4">
-            <!-- AI-Generated Metadata -->
-            <div id="viewerMetadataContainer" class="mb-4"></div>
-
             <!-- File Info -->
             <div class="rounded-lg p-4 border shadow-sm" style="background: linear-gradient(to bottom right, var(--lex-bg-accent-soft), var(--lex-bg-accent-muted)); border-color: var(--lex-border-accent)">
               <div class="space-y-3 text-sm">
@@ -219,13 +215,6 @@
                     Size
                   </span>
                   <span id="metaFileSize" class="font-semibold" style="color: var(--lex-text-primary)">--</span>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="font-medium flex items-center gap-1.5" style="color: var(--lex-text-secondary)">
-                    <svg class="w-4 h-4" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
-                    Type
-                  </span>
-                  <span id="metaFileType" class="font-semibold" style="color: var(--lex-text-primary)">--</span>
                 </div>
                 <div class="flex justify-between items-center">
                   <span class="font-medium flex items-center gap-1.5" style="color: var(--lex-text-secondary)">

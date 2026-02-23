@@ -453,9 +453,10 @@
     hideError();
     showInfo('Executing ' + selectedModuleKey + ' from ' + startDate + ' to ' + endDate + '...');
 
-    // Hide previous results
+    // Hide previous results and restore topbar LANA button while loading
     var resultsEl = document.getElementById('moduleResults');
     if (resultsEl) resultsEl.style.display = 'none';
+    setTopbarLanaVisible(true);
 
     try {
       var startTime = Date.now();
@@ -521,6 +522,9 @@
       var placeholder = document.getElementById('reportingPlaceholder');
       if (placeholder) placeholder.style.display = 'none';
       if (resultsEl) resultsEl.style.display = 'flex';
+
+      // Hide topbar LANA button when in-card Ask LANA is visible
+      setTopbarLanaVisible(false);
 
       showInfo('Module executed successfully in ' + executionTimeMs + 'ms. ' + (data.metrics ? data.metrics.length : 0) + ' metrics calculated.');
 
@@ -1386,12 +1390,14 @@
   function renderVisualization(viz, data, uniqueId) {
     switch (viz.type) {
       case 'metric_grid': return renderMetricGrid(viz, uniqueId);
-      case 'trend_chart': return renderTrendChart(viz, data, uniqueId);
+      case 'trend_chart':
+      case 'line_chart': return renderTrendChart(viz, data, uniqueId);
       case 'comparison_chart': return renderComparisonChart(viz, data, uniqueId);
       case 'pie_chart': return renderPieChart(viz, data, uniqueId);
       case 'funnel_chart': return renderFunnelChart(viz, data, uniqueId);
       case 'bubble_chart': return renderBubbleChart(viz, data, uniqueId);
       case 'grouped_bar_chart': return renderGroupedBarChart(viz, data, uniqueId);
+      case 'bar_chart':
       case 'horizontal_bar_chart': return renderHorizontalBarChart(viz, data, uniqueId);
       case 'table': return renderTable(viz, data, uniqueId);
       default:
@@ -1530,6 +1536,17 @@
     return div;
   }
 
+  function renderEmptyStateCard(title, description) {
+    var div = document.createElement('div');
+    div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
+    div.innerHTML = '<h3 class="text-lg font-semibold text-gray-900 mb-2">' + (title || 'Chart') + '</h3>' +
+      (description ? '<p class="text-sm text-gray-500 mb-4">' + description + '</p>' : '') +
+      '<div class="h-48 flex items-center justify-center bg-gray-50 rounded-lg">' +
+      '<div class="text-center"><svg class="mx-auto h-10 w-10 text-gray-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>' +
+      '<p class="text-sm text-gray-400">No data available for this period</p></div></div>';
+    return div;
+  }
+
   function renderPieChart(viz, data, uniqueId) {
     var metric = null;
     if (viz.metrics) {
@@ -1537,7 +1554,7 @@
         if (viz.metrics.indexOf(data.metrics[i].key) !== -1) { metric = data.metrics[i]; break; }
       }
     }
-    if (!metric || !Array.isArray(metric.current)) return null;
+    if (!metric || !Array.isArray(metric.current)) return renderEmptyStateCard(viz.title, viz.description);
 
     var containerId = 'pie-chart-container-' + uniqueId;
     var containerDiv = document.createElement('div');
@@ -1567,7 +1584,7 @@
         if (viz.metrics.indexOf(data.metrics[i].key) !== -1) { metric = data.metrics[i]; break; }
       }
     }
-    if (!metric || !metric.current) return null;
+    if (!metric || !metric.current) return renderEmptyStateCard(viz.title, viz.description);
 
     var containerId = 'funnel-chart-' + uniqueId;
     var containerDiv = document.createElement('div');
@@ -1592,7 +1609,7 @@
         if (data.metrics[i].key === metricKey) { metric = data.metrics[i]; break; }
       }
     }
-    if (!metric) return null;
+    if (!metric) return renderEmptyStateCard(viz.title, viz.description);
 
     var chartData = Array.isArray(metric.current) ? metric.current : (Array.isArray(metric.result) ? metric.result : []);
     var containerId = 'bar-chart-container-' + uniqueId;
@@ -2274,7 +2291,8 @@
     closeDataOverridePanel: closeDataOverridePanel,
     deleteOverride: deleteOverride,
     closeDataSourcesModal: closeDataSourcesModal,
-    closeMissingEntitiesModal: closeMissingEntitiesModal
+    closeMissingEntitiesModal: closeMissingEntitiesModal,
+    askLanaAboutReport: askLanaAboutReport
   };
 
   // Also expose individually for V1 compat onclick handlers
@@ -2299,6 +2317,20 @@
 
   var insightsDrawer = null;
   var insightsChatEl = null;
+  var insightsThreadsEl = null;
+
+  /**
+   * Show or hide the topbar LANA button and its divider.
+   * Hidden when the in-card "Ask LANA" button is visible to avoid duplication.
+   */
+  function setTopbarLanaVisible(visible) {
+    var topbarRight = document.querySelector('.lex-topbar-right');
+    if (!topbarRight) return;
+    var btn = topbarRight.querySelector('.lana-insights-btn');
+    var divider = topbarRight.querySelector('.lana-topbar-divider');
+    if (btn) btn.style.display = visible ? '' : 'none';
+    if (divider) divider.style.display = visible ? '' : 'none';
+  }
 
   function injectLanaButton() {
     var topbarRight = document.querySelector('.lex-topbar-right');
@@ -2337,18 +2369,82 @@
     insightsDrawer.setAttribute('width', 'lg');
     insightsDrawer.setAttribute('open', 'true');
 
-    insightsChatEl = document.createElement('lex-chat');
-    insightsChatEl.setAttribute('context-type', 'insights_chat');
-    insightsChatEl.setAttribute('source', 'sse');
-    insightsChatEl.setAttribute('placeholder', 'Ask about forecasts, trends, and insights...');
-    insightsChatEl.style.height = '100%';
+    // Build wrapper: threads list + chat
+    var wrapper = document.createElement('div');
+    wrapper.style.cssText = 'display:flex;flex-direction:column;height:100%;';
 
-    insightsDrawer.appendChild(insightsChatEl);
+    var threadsEl = document.createElement('lex-chat-threads');
+    threadsEl.setAttribute('page-scope', 'reporting');
+    threadsEl.setAttribute('context-type', 'insights_chat');
+    threadsEl.style.flexShrink = '0';
+
+    var chatEl = document.createElement('lex-chat');
+    chatEl.setAttribute('context-type', 'insights_chat');
+    chatEl.setAttribute('source', 'sse');
+    chatEl.setAttribute('placeholder', 'Ask about forecasts, trends, and insights...');
+    chatEl.style.flex = '1';
+    chatEl.style.minHeight = '0';
+
+    wrapper.appendChild(threadsEl);
+    wrapper.appendChild(chatEl);
+    insightsDrawer.appendChild(wrapper);
     document.body.appendChild(insightsDrawer);
 
-    // The drawer clones child elements during render, so the original
-    // insightsChatEl reference becomes detached. Re-acquire the live element.
+    // Re-acquire live references after drawer clones children
     insightsChatEl = insightsDrawer.querySelector('lex-chat');
+    insightsThreadsEl = insightsDrawer.querySelector('lex-chat-threads');
+
+    // Wire thread selection: switch chat conversation
+    insightsDrawer.addEventListener('lex-thread-select', function (e) {
+      var thread = e.detail && e.detail.thread;
+      if (!thread || !insightsChatEl) return;
+      insightsChatEl.clearConversation();
+      insightsChatEl.loadConversation(thread.thread_id);
+    });
+
+    // Wire new thread creation
+    insightsDrawer.addEventListener('lex-thread-create', function () {
+      if (!insightsChatEl) return;
+      insightsChatEl.clearConversation();
+      if (insightsThreadsEl) insightsThreadsEl.setActiveThread(null);
+    });
+
+    // When lex-chat creates a new conversation, register it as a page-general thread
+    insightsDrawer.addEventListener('lex-chat-conversation-created', function (e) {
+      var conversationId = e.detail && e.detail.conversationId;
+      if (!conversationId || typeof api === 'undefined') return;
+
+      // Check if this conversation is already linked to a thread
+      var threadsComp = insightsThreadsEl;
+      if (threadsComp && threadsComp._threads && threadsComp._threads.length > 0) {
+        // If there are already threads and no active thread was selected,
+        // register this as a page_general thread
+        var hasPageGeneral = false;
+        for (var i = 0; i < threadsComp._threads.length; i++) {
+          if (threadsComp._threads[i].thread_type === 'page_general') {
+            hasPageGeneral = true;
+            break;
+          }
+        }
+        if (hasPageGeneral) return;
+      }
+
+      // Create page general thread
+      api.post('/api/v1/conversation-threads', {
+        title: 'General Insights',
+        thread_type: 'page_general',
+        context_type: 'insights_chat',
+        page_scope: 'reporting'
+      }).then(function (resp) {
+        var created = resp.data || resp;
+        if (insightsThreadsEl) {
+          insightsThreadsEl.addThread(created);
+          insightsThreadsEl.setActiveThread(created.id);
+        }
+      }).catch(function (err) {
+        console.warn('[Reporting] Failed to register page thread:', err);
+      });
+    });
 
     // Customize composer: select insights_chat tool and lock tools
     setTimeout(function () {
@@ -2372,11 +2468,68 @@
         insightsChatEl.disconnect();
       }
       insightsChatEl = null;
+      insightsThreadsEl = null;
       if (insightsDrawer && insightsDrawer.parentNode) {
         insightsDrawer.remove();
       }
       insightsDrawer = null;
     });
+  }
+
+  /**
+   * Create a report-run thread and open the insights panel focused on it.
+   * Called when user clicks "Ask LANA about this report" after execution.
+   */
+  async function askLanaAboutReport() {
+    if (typeof api === 'undefined') return;
+    if (!currentModuleData && !currentModuleConfig) return;
+
+    // Build report snapshot from current module state
+    var snapshot = {
+      moduleName: currentModuleMetadata ? currentModuleMetadata.moduleName : selectedModuleKey,
+      moduleKey: selectedModuleKey,
+      periodType: currentModuleConfig ? currentModuleConfig.period && currentModuleConfig.period.type : null,
+      periodStart: currentModuleConfig ? currentModuleConfig.period && currentModuleConfig.period.start : null,
+      periodEnd: currentModuleConfig ? currentModuleConfig.period && currentModuleConfig.period.end : null,
+      metrics: currentModuleData ? currentModuleData.map(function (m) {
+        return { name: m.name, key: m.key, current: m.current, prior: m.prior, target: m.target, status: m.status };
+      }) : [],
+      executedAt: new Date().toISOString()
+    };
+
+    // Open insights panel if not already open
+    openInsightsPanel();
+
+    // Small delay to let the panel render
+    await new Promise(function (resolve) { setTimeout(resolve, 300); });
+
+    try {
+      var title = (snapshot.moduleName || 'Report') + ' — ' + new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+      var resp = await api.post('/api/v1/conversation-threads', {
+        title: title,
+        thread_type: 'report_run',
+        context_type: 'insights_chat',
+        page_scope: 'reporting',
+        metadata: snapshot
+      });
+
+      var thread = resp.data || resp;
+
+      // Add to thread list and select it
+      if (insightsThreadsEl) {
+        insightsThreadsEl.addThread(thread);
+        insightsThreadsEl.setActiveThread(thread.id);
+      }
+
+      // Switch chat to the new thread's conversation
+      if (insightsChatEl) {
+        insightsChatEl.clearConversation();
+        insightsChatEl.loadConversation(thread.thread_id);
+      }
+    } catch (err) {
+      console.error('[Reporting] Failed to create report-run thread:', err);
+    }
   }
 
   // ==========================================================================
