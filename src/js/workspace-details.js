@@ -39,6 +39,7 @@
   var customFieldDefinitions = [];
   var customFieldValues = [];
   var _tabIndicatorInitialized = false;
+  var _navContext = null;              // navigation context (source, conversationId, etc.)
   // =========================================================================
   // Utility functions (NO regex — string methods only)
   // =========================================================================
@@ -306,14 +307,22 @@
   // =========================================================================
 
   function renderBanner(matter) {
-    // Breadcrumb
+    // Breadcrumb — adjust origin based on navigation source
     var name = matter.matter_name || matter.name || 'Untitled';
     var breadcrumb = document.getElementById('matterBreadcrumb');
     if (breadcrumb) {
-      breadcrumb.items = [
-        { label: 'Workspaces & Matters', href: 'workspaces.html' },
-        { label: name }
-      ];
+      var origin;
+      if (_navContext && _navContext.source === 'chat') {
+        var chatLabel = _navContext.conversationTitle || 'Conversation';
+        var chatHref = 'chat-v2.html';
+        if (_navContext.conversationId) {
+          chatHref += '?session=' + encodeURIComponent(_navContext.conversationId);
+        }
+        origin = { label: chatLabel, href: chatHref };
+      } else {
+        origin = { label: 'Workspaces & Matters', href: 'workspaces.html' };
+      }
+      breadcrumb.items = [origin, { label: name }];
     }
 
     // Banner heading
@@ -7345,6 +7354,7 @@
 
     // Consume context (one-shot read from Lex.Nav.go context param)
     var ctx = Lex.Nav.consume();
+    _navContext = ctx;
 
     // Fallback: read matterId from context if params didn't have it
     if (!matterId && ctx && ctx.matterId) {

@@ -14,6 +14,20 @@
   var moduleCategories = {};
   var selectedModuleKey = null;
 
+  // Visualization state
+  var currentDataSources = [];
+  var currentMissingEntities = [];
+  var currentModuleMetadata = null;
+  var currentModuleConfig = null;
+  var currentModuleData = null;
+  var chartInstances = {};
+  var drilldownRenderer = null;
+  var currentOverrideMetric = null;
+  var currentOverrideData = null;
+  var trendsChart = null;
+  var statusChart = null;
+  var timeSeriesChart = null;
+
   // ==========================================================================
   // Helpers
   // ==========================================================================
@@ -46,6 +60,70 @@
   function hideError() {
     var errEl = document.getElementById('executionError');
     if (errEl) errEl.style.display = 'none';
+  }
+
+  // Format currency
+  function formatCurrency(value) {
+    if (value === null || value === undefined) return 'N/A';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value);
+  }
+
+  // Format number
+  function formatNumber(value, decimals) {
+    if (decimals === undefined) decimals = 0;
+    if (value === null || value === undefined) return 'N/A';
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals
+    }).format(value);
+  }
+
+  // Format percentage
+  function formatPercentage(value, decimals) {
+    if (decimals === undefined) decimals = 1;
+    if (value === null || value === undefined) return 'N/A';
+    return formatNumber(value, decimals) + '%';
+  }
+
+  // Get status color based on target comparison
+  function getStatusColor(current, target, inverseLogic) {
+    if (current === null || current === undefined || target === null || target === undefined) {
+      return 'gray';
+    }
+    var ratio = current / target;
+    if (inverseLogic) {
+      if (ratio <= 1.0) return 'green';
+      if (ratio <= 1.2) return 'yellow';
+      return 'red';
+    } else {
+      if (ratio >= 1.0) return 'green';
+      if (ratio >= 0.8) return 'yellow';
+      return 'red';
+    }
+  }
+
+  // Get status colors for card background
+  function getStatusColors(color) {
+    var colors = {
+      green: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700' },
+      yellow: { bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-700' },
+      red: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700' },
+      gray: { bg: 'bg-white', border: 'border-gray-100', text: 'text-gray-700' }
+    };
+    return colors[color] || colors.gray;
+  }
+
+  // Format date range (using UTC to avoid timezone offset issues)
+  function formatDateRange(start, end) {
+    var startDate = new Date(start);
+    var endDate = new Date(end);
+    var options = { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' };
+    return startDate.toLocaleDateString('en-US', options) + ' - ' + endDate.toLocaleDateString('en-US', options);
   }
 
   // ==========================================================================
@@ -178,6 +256,161 @@
   }
 
   // ==========================================================================
+  // Data Sources
+  // ==========================================================================
+
+  function updateDataSources(dataSources) {
+    currentDataSources = dataSources || [];
+    var count = currentDataSources.length;
+    var countText = document.getElementById('dataSourcesCount');
+    if (countText) {
+      countText.textContent = count + ' Connector' + (count !== 1 ? 's' : '');
+    }
+  }
+
+  function openDataSourcesModal() {
+    var modal = document.getElementById('dataSourcesModal');
+    var list = document.getElementById('dataSourcesList');
+    if (!modal || !list) return;
+
+    list.innerHTML = '';
+
+    if (currentDataSources.length === 0) {
+      list.innerHTML = '<p class="text-sm text-gray-500 text-center py-4">No data sources found</p>';
+    } else {
+      currentDataSources.forEach(function (connector) {
+        var connectorCard = document.createElement('div');
+        connectorCard.className = 'flex items-center gap-3 p-3 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 transition-colors';
+        connectorCard.innerHTML = '<div class="flex-shrink-0">' +
+          '<svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>' +
+          '</svg></div>' +
+          '<div class="flex-1 min-w-0">' +
+          '<p class="text-sm font-medium text-gray-900 truncate">' + (connector.name || connector.connectorType) + '</p>' +
+          '<p class="text-xs text-gray-500">' + (connector.connectorType || '') + '</p>' +
+          '</div>' +
+          '<div class="flex-shrink-0">' +
+          '<span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Active</span>' +
+          '</div>';
+        list.appendChild(connectorCard);
+      });
+    }
+
+    modal.classList.remove('hidden');
+  }
+
+  function closeDataSourcesModal() {
+    var modal = document.getElementById('dataSourcesModal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  // ==========================================================================
+  // Missing Entities
+  // ==========================================================================
+
+  function updateMissingEntities(missingEntities) {
+    currentMissingEntities = missingEntities || [];
+    var count = currentMissingEntities.length;
+    var missingBtn = document.getElementById('missingEntitiesBtn');
+    var missingCountText = document.getElementById('missingEntitiesCount');
+
+    if (missingBtn && missingCountText) {
+      if (count > 0) {
+        missingBtn.classList.remove('hidden');
+        missingCountText.textContent = count + ' Missing';
+      } else {
+        missingBtn.classList.add('hidden');
+      }
+    }
+  }
+
+  function openMissingEntitiesModal() {
+    var modal = document.getElementById('missingEntitiesModal');
+    var list = document.getElementById('missingEntitiesList');
+    if (!modal || !list) return;
+
+    list.innerHTML = '';
+
+    if (currentMissingEntities.length === 0) {
+      list.innerHTML = '<tr><td colspan="3" class="px-4 py-8 text-center text-sm text-gray-500">No missing entities found. All required data is available.</td></tr>';
+    } else {
+      currentMissingEntities.forEach(function (entity) {
+        var row = document.createElement('tr');
+        row.className = 'hover:bg-gray-50';
+        row.innerHTML = '<td class="px-4 py-3"><span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-amber-100 text-amber-800">' + (entity.entity_type || '') + '</span></td>' +
+          '<td class="px-4 py-3 text-sm text-gray-700">' + (entity.description || 'No description available') + '</td>' +
+          '<td class="px-4 py-3"><span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">Required</span></td>';
+        list.appendChild(row);
+      });
+    }
+
+    modal.classList.remove('hidden');
+  }
+
+  function closeMissingEntitiesModal() {
+    var modal = document.getElementById('missingEntitiesModal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  function updateMissingEntitiesForModule(moduleKey) {
+    var module = null;
+    for (var i = 0; i < allModules.length; i++) {
+      if (allModules[i].moduleKey === moduleKey) {
+        module = allModules[i];
+        break;
+      }
+    }
+    if (module && module.missingRequiredEntities) {
+      updateMissingEntities(module.missingRequiredEntities);
+    } else {
+      updateMissingEntities([]);
+    }
+  }
+
+  // ==========================================================================
+  // Module Info Modal
+  // ==========================================================================
+
+  function showModuleInfo() {
+    if (!currentModuleMetadata) {
+      showError('No module data available. Please execute a module first.');
+      return;
+    }
+    var modal = document.getElementById('moduleInfoModal');
+    if (!modal) return;
+
+    document.getElementById('modalModuleName').textContent = currentModuleMetadata.moduleName;
+    document.getElementById('modalModuleKey').textContent = currentModuleMetadata.moduleKey;
+    document.getElementById('modalModuleDescription').textContent = currentModuleMetadata.description;
+    document.getElementById('modalModuleVersion').textContent = currentModuleMetadata.version;
+    document.getElementById('modalModuleMetrics').textContent = currentModuleMetadata.metricCount;
+    document.getElementById('modalModuleCategory').textContent = currentModuleMetadata.category;
+
+    var statusBadge = document.getElementById('modalModuleStatus');
+    var status = currentModuleMetadata.status;
+    statusBadge.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+    statusBadge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium';
+    if (status === 'stable') {
+      statusBadge.classList.add('bg-green-100', 'text-green-800');
+    } else if (status === 'beta') {
+      statusBadge.classList.add('bg-yellow-100', 'text-yellow-800');
+    } else if (status === 'alpha') {
+      statusBadge.classList.add('bg-orange-100', 'text-orange-800');
+    } else if (status === 'deprecated') {
+      statusBadge.classList.add('bg-red-100', 'text-red-800');
+    } else {
+      statusBadge.classList.add('bg-gray-100', 'text-gray-800');
+    }
+
+    modal.classList.remove('hidden');
+  }
+
+  function closeModuleInfo() {
+    var modal = document.getElementById('moduleInfoModal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  // ==========================================================================
   // Module Execution
   // ==========================================================================
 
@@ -201,38 +434,637 @@
       return;
     }
 
+    // Validate date range
+    var startDateObj = new Date(startDate);
+    var endDateObj = new Date(endDate);
+    if (startDateObj > endDateObj) {
+      showError('Start date must be before end date');
+      return;
+    }
+
+    // Convert dates to ISO format
+    var periodStartISO = new Date(startDate + 'T00:00:00Z').toISOString();
+    var periodEndISO = new Date(endDate + 'T23:59:59Z').toISOString();
+
     // Loading state
     if (executeBtn) executeBtn.loading = true;
     hideError();
-    showInfo('Running report...');
+    showInfo('Executing ' + selectedModuleKey + ' from ' + startDate + ' to ' + endDate + '...');
+
+    // Hide previous results
+    var resultsEl = document.getElementById('moduleResults');
+    if (resultsEl) resultsEl.style.display = 'none';
 
     try {
-      var result = await api.post('/api/v1/modules/' + selectedModuleKey + '/execute', {
-        period_start: startDate,
-        period_end: endDate,
-        period_type: periodType
+      var startTime = Date.now();
+
+      var data = await api.post('/api/v1/modules/' + selectedModuleKey + '/execute', {
+        periodType: periodType,
+        periodStart: periodStartISO,
+        periodEnd: periodEndISO,
+        compareBy: periodType,
+        useCache: false
       });
+
+      var endTime = Date.now();
+      var executionTimeMs = endTime - startTime;
+
+      // Store module metadata for Learn More modal
+      currentModuleMetadata = {
+        moduleKey: selectedModuleKey,
+        moduleName: data.moduleName || 'Module Results',
+        description: data.moduleDescription || data.description || 'No description available',
+        version: data.moduleVersion || data.version || '1.0.0',
+        metricCount: data.metrics ? data.metrics.length : 0,
+        category: data.moduleCategory || data.category || 'analytics',
+        status: data.moduleStatus || data.status || 'stable'
+      };
+
+      // Store full module configuration
+      currentModuleConfig = data;
+
+      // Update module header
+      var moduleTitleEl = document.getElementById('moduleTitle');
+      var executionTimeEl = document.getElementById('executionTime');
+      if (moduleTitleEl) moduleTitleEl.textContent = data.moduleName || 'Module Results';
+      if (executionTimeEl) executionTimeEl.textContent = executionTimeMs + 'ms';
+
+      // Update period info
+      var resultPeriodTypeEl = document.getElementById('resultPeriodType');
+      if (resultPeriodTypeEl) {
+        resultPeriodTypeEl.textContent = data.period.type || (periodType.charAt(0).toUpperCase() + periodType.slice(1));
+      }
+
+      var resultCurrentPeriodEl = document.getElementById('resultCurrentPeriod');
+      if (resultCurrentPeriodEl) {
+        resultCurrentPeriodEl.textContent = formatDateRange(data.period.start, data.period.end);
+      }
+
+      var resultPriorPeriodEl = document.getElementById('resultPriorPeriod');
+      if (resultPriorPeriodEl) {
+        if (data.priorPeriod && data.priorPeriod.start && data.priorPeriod.end) {
+          resultPriorPeriodEl.textContent = formatDateRange(data.priorPeriod.start, data.priorPeriod.end);
+        } else {
+          resultPriorPeriodEl.textContent = 'N/A';
+        }
+      }
+
+      // Update data sources
+      updateDataSources(data.dataSources || []);
+
+      // Render visualizations based on backend response (section-driven)
+      renderVisualizations(data);
 
       // Hide placeholder, show results area
       var placeholder = document.getElementById('reportingPlaceholder');
-      var resultsEl = document.getElementById('moduleResults');
       if (placeholder) placeholder.style.display = 'none';
       if (resultsEl) resultsEl.style.display = 'flex';
 
-      // Render results into visualizationsContainer
-      var container = document.getElementById('visualizationsContainer');
-      if (container && result) {
-        // TODO: Wire up visualization rendering from module-execution logic
-        container.innerHTML = '<div class="lex-body-sm lex-text-secondary" style="padding:2rem;text-align:center;">Report executed successfully. Visualization rendering coming soon.</div>';
-      }
+      showInfo('Module executed successfully in ' + executionTimeMs + 'ms. ' + (data.metrics ? data.metrics.length : 0) + ' metrics calculated.');
 
-      showInfo('Report completed successfully.');
     } catch (error) {
       console.error('[Reporting] Execution failed:', error);
       showError(error.message || 'Failed to execute report. Please try again.');
     } finally {
       if (executeBtn) executeBtn.loading = false;
     }
+  }
+
+  // ==========================================================================
+  // Chart Rendering
+  // ==========================================================================
+
+  function renderMetricChart(metric, canvasId) {
+    if (!Array.isArray(metric.current)) {
+      renderEmptyState(canvasId, 'No distribution data available');
+      return;
+    }
+
+    var ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    ctx = ctx.getContext('2d');
+
+    if (window.metricCharts && window.metricCharts[canvasId]) {
+      window.metricCharts[canvasId].destroy();
+    }
+
+    var sortedData = metric.current.slice().sort(function (a, b) { return (b.count || 0) - (a.count || 0); });
+    var labels = sortedData.map(function (item) { return item.label || 'Unknown'; });
+    var counts = sortedData.map(function (item) { return item.count || 0; });
+    var percentages = sortedData.map(function (item) { return parseFloat(item.value) || 0; });
+
+    var backgroundColors = labels.map(function (_, i) {
+      var intensity = 1 - (i / labels.length) * 0.5;
+      return 'rgba(99, 102, 241, ' + intensity + ')';
+    });
+
+    var maxCount = Math.max.apply(null, counts);
+
+    var chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Leads',
+          data: counts,
+          backgroundColor: backgroundColors,
+          borderWidth: 0,
+          barPercentage: 0.8,
+          categoryPercentage: 0.9
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function (context) {
+                var count = context.parsed.x || 0;
+                var percentage = percentages[context.dataIndex] || 0;
+                return count + ' leads (' + percentage + '%)';
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            beginAtZero: true,
+            suggestedMax: Math.ceil(maxCount * 1.1),
+            ticks: { precision: 0 },
+            grid: { display: true, color: '#f3f4f6' }
+          },
+          y: {
+            grid: { display: false },
+            ticks: {
+              callback: function (value, index) {
+                var label = labels[index];
+                return label && label.length > 25 ? label.substring(0, 25) + '...' : label;
+              }
+            }
+          }
+        },
+        onClick: function (event, elements) {
+          if (elements.length > 0) {
+            var index = elements[0].index;
+            var source = labels[index];
+            showLeadSourceDrilldown(metric.key, source);
+          }
+        }
+      }
+    });
+
+    if (!window.metricCharts) window.metricCharts = {};
+    window.metricCharts[canvasId] = chart;
+  }
+
+  function renderEmptyState(canvasId, message) {
+    var canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#d1d5db';
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(message, canvas.width / 2, canvas.height / 2);
+  }
+
+  // ==========================================================================
+  // Drilldown System
+  // ==========================================================================
+
+  async function showLeadSourceDrilldown(metricKey, source) {
+    var modal = document.getElementById('drilldownModal');
+    var title = document.getElementById('drilldownTitle');
+    var content = document.getElementById('drilldownContent');
+    if (!modal || !title || !content) return;
+
+    title.textContent = 'Leads from: ' + source;
+    content.innerHTML = '<div class="text-center py-8"><div class="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto"></div><p class="text-gray-600 mt-4">Loading leads...</p></div>';
+    modal.classList.remove('hidden');
+
+    try {
+      var periodStart = document.getElementById('periodStart').value + 'T00:00:00Z';
+      var periodEnd = document.getElementById('periodEnd').value + 'T23:59:59Z';
+
+      var response = await api.get('/api/v1/integrations/connector-data?entity_type=contact&source=' + encodeURIComponent(source) + '&start_date=' + periodStart + '&end_date=' + periodEnd);
+
+      if (!response || !response.data || response.data.length === 0) {
+        content.innerHTML = '<div class="text-center py-8 text-gray-500">No leads found for this source.</div>';
+        return;
+      }
+
+      var rowsHTML = response.data.map(function (lead) {
+        var name = (lead.data && lead.data.name) || ((lead.data && lead.data.firstName && lead.data.lastName) ? lead.data.firstName + ' ' + lead.data.lastName : 'N/A');
+        var email = (lead.data && lead.data.email) || 'N/A';
+        var phone = (lead.data && lead.data.phone) || 'N/A';
+        var company = (lead.data && lead.data.company) || 'N/A';
+        var created = new Date(lead.source_created_at).toLocaleDateString();
+        return '<tr class="hover:bg-gray-50">' +
+          '<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">' + name + '</td>' +
+          '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">' + email + '</td>' +
+          '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">' + phone + '</td>' +
+          '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">' + company + '</td>' +
+          '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">' + created + '</td></tr>';
+      }).join('');
+
+      content.innerHTML = '<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200">' +
+        '<thead class="bg-gray-50"><tr>' +
+        '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>' +
+        '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>' +
+        '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>' +
+        '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>' +
+        '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>' +
+        '</tr></thead><tbody class="bg-white divide-y divide-gray-200">' + rowsHTML + '</tbody></table></div>' +
+        '<div class="mt-4 text-sm text-gray-600 text-center">Showing ' + response.data.length + ' lead' + (response.data.length !== 1 ? 's' : '') +
+        (response.data.length >= 100 ? ' (limited to 100)' : '') + '</div>';
+
+    } catch (error) {
+      console.error('Failed to load lead source drilldown:', error);
+      content.innerHTML = '<div class="text-center py-8 text-red-600">Failed to load leads: ' + (error.message || 'Unknown error') + '</div>';
+    }
+  }
+
+  async function openGenericDrilldown(metricKey, metricName) {
+    try {
+      var periodStart = document.getElementById('periodStart').value + 'T00:00:00Z';
+      var periodEnd = document.getElementById('periodEnd').value + 'T23:59:59Z';
+      var moduleKey = selectedModuleKey || 'growth-intake-performance';
+
+      if (!drilldownRenderer) {
+        drilldownRenderer = new DrilldownRenderer();
+        window.drilldownRenderer = drilldownRenderer;
+      }
+
+      await drilldownRenderer.open(moduleKey, metricKey, {
+        periodStart: periodStart,
+        periodEnd: periodEnd
+      });
+    } catch (error) {
+      console.error('Failed to open drilldown:', error);
+      alert('Failed to load drilldown: ' + (error.message || 'Unknown error'));
+    }
+  }
+
+  function closeDrilldownModal() {
+    var modal = document.getElementById('drilldownModal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  async function tryGenericDrilldown(content, moduleKey, metricKey, periodStart, periodEnd) {
+    try {
+      if (!window.drilldownRenderer) {
+        window.drilldownRenderer = drilldownRenderer || new DrilldownRenderer();
+        drilldownRenderer = window.drilldownRenderer;
+      }
+      await window.drilldownRenderer.open(moduleKey, metricKey, {
+        periodStart: periodStart,
+        periodEnd: periodEnd,
+        organizationId: api.user.organization_id
+      });
+      return true;
+    } catch (error) {
+      if ((error.response && error.response.status === 404) || error.status === 404) {
+        console.log('[Drilldown] Generic drilldown not available for ' + metricKey + ', falling back to legacy');
+        return false;
+      }
+      console.error('[Drilldown] Error loading generic drilldown:', error);
+      return false;
+    }
+  }
+
+  function attachCellTooltipHandlers() {
+    var existingTooltip = document.getElementById('cell-tooltip-popover');
+    if (existingTooltip) existingTooltip.remove();
+
+    document.querySelectorAll('.cell-tooltip-trigger').forEach(function (trigger) {
+      trigger.addEventListener('click', function (e) {
+        e.stopPropagation();
+        showCellTooltip(trigger);
+      });
+    });
+
+    document.addEventListener('click', function () {
+      var tooltip = document.getElementById('cell-tooltip-popover');
+      if (tooltip) tooltip.remove();
+    });
+  }
+
+  function showCellTooltip(trigger) {
+    var existingTooltip = document.getElementById('cell-tooltip-popover');
+    if (existingTooltip) {
+      existingTooltip.remove();
+      return;
+    }
+
+    var tooltipText = trigger.getAttribute('data-tooltip');
+    if (!tooltipText) return;
+
+    var tooltip = document.createElement('div');
+    tooltip.id = 'cell-tooltip-popover';
+    tooltip.className = 'absolute z-50 bg-gray-900 text-white text-sm rounded-lg shadow-lg p-3 max-w-xs';
+    tooltip.innerHTML = tooltipText;
+    tooltip.style.pointerEvents = 'none';
+
+    var rect = trigger.getBoundingClientRect();
+    tooltip.style.left = (rect.left + window.scrollX) + 'px';
+    tooltip.style.top = (rect.bottom + window.scrollY + 5) + 'px';
+    document.body.appendChild(tooltip);
+
+    setTimeout(function () {
+      var tooltipRect = tooltip.getBoundingClientRect();
+      if (tooltipRect.right > window.innerWidth) {
+        tooltip.style.left = (window.innerWidth - tooltipRect.width - 10) + 'px';
+      }
+      if (tooltipRect.bottom > window.innerHeight) {
+        tooltip.style.top = (rect.top + window.scrollY - tooltipRect.height - 5) + 'px';
+      }
+    }, 0);
+  }
+
+  function renderGenericDrilldown(content, config, rows, pagination, summary) {
+    var columns = config.columns;
+
+    function formatCellValue(value, type) {
+      if (value === null || value === undefined) return '-';
+      if (type === 'currency') {
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
+      }
+      if (type === 'number') return new Intl.NumberFormat('en-US').format(value);
+      if (type === 'percentage') return parseFloat(value).toFixed(1) + '%';
+      if (type === 'date') {
+        if (!value) return '-';
+        var date = new Date(value);
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+      }
+      return value;
+    }
+
+    var summaryHTML = '';
+    if (summary) {
+      var summaryEntries = Object.entries(summary).map(function (entry) {
+        var key = entry[0];
+        var value = entry[1];
+        var label = key.split('_').map(function (w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join(' ');
+        return '<div><p class="text-xs text-gray-500">' + label + '</p><p class="text-lg font-semibold text-gray-900">' + formatCellValue(value, 'currency') + '</p></div>';
+      }).join('');
+      summaryHTML = '<div class="bg-gray-50 rounded-lg p-4 mb-6"><h3 class="text-sm font-semibold text-gray-700 mb-2">Summary</h3><div class="grid grid-cols-2 gap-4">' + summaryEntries + '</div></div>';
+    }
+
+    var headerHTML = columns.map(function (col) {
+      return '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">' + col.header + '</th>';
+    }).join('');
+
+    var bodyHTML = '';
+    if (rows.length > 0) {
+      bodyHTML = rows.map(function (row) {
+        var cellsHTML = columns.map(function (col) {
+          var formattedValue = formatCellValue(row[col.field], col.type);
+          var tooltipIcon = col.tooltip ? '<svg class="inline-block ml-1 h-4 w-4 text-gray-400 cursor-pointer hover:text-gray-600 cell-tooltip-trigger" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-tooltip="' + col.tooltip + '"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>' : '';
+          return '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">' + formattedValue + tooltipIcon + '</td>';
+        }).join('');
+        return '<tr class="hover:bg-gray-50">' + cellsHTML + '</tr>';
+      }).join('');
+    } else {
+      bodyHTML = '<tr><td colspan="' + columns.length + '" class="px-6 py-8 text-center text-gray-500">No data available for this period</td></tr>';
+    }
+
+    var paginationHTML = '';
+    if (pagination && pagination.totalRecords > pagination.pageSize) {
+      paginationHTML = '<div class="mt-4 flex items-center justify-between border-t border-gray-200 pt-4">' +
+        '<p class="text-sm text-gray-600">Showing ' + rows.length + ' of ' + pagination.totalRecords + ' records</p>' +
+        '<p class="text-xs text-gray-500">(Pagination coming soon)</p></div>';
+    }
+
+    content.innerHTML = '<div class="p-6">' +
+      (config.description ? '<p class="text-sm text-gray-600 mb-4">' + config.description + '</p>' : '') +
+      summaryHTML +
+      '<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200">' +
+      '<thead class="bg-gray-50"><tr>' + headerHTML + '</tr></thead>' +
+      '<tbody class="bg-white divide-y divide-gray-200">' + bodyHTML + '</tbody></table></div>' +
+      paginationHTML + '</div>';
+
+    attachCellTooltipHandlers();
+  }
+
+  async function showMetricDrilldown(metricKey, metricName) {
+    var modal = document.getElementById('drilldownModal');
+    var title = document.getElementById('drilldownTitle');
+    var content = document.getElementById('drilldownContent');
+    if (!modal || !title || !content) return;
+
+    try {
+      var periodStart = document.getElementById('periodStart').value + 'T00:00:00Z';
+      var periodEnd = document.getElementById('periodEnd').value + 'T23:59:59Z';
+      var moduleKey = selectedModuleKey || 'growth-intake-performance';
+
+      var hasGenericDrilldown = await tryGenericDrilldown(content, moduleKey, metricKey, periodStart, periodEnd);
+      if (hasGenericDrilldown) return;
+
+      title.textContent = metricName + ' - Details';
+      content.innerHTML = '<div class="text-center py-8"><div class="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto"></div><p class="text-gray-600 mt-4">Loading data...</p></div>';
+      modal.classList.remove('hidden');
+
+      // Default: drill-down not available for legacy metrics
+      content.innerHTML = '<div class="text-center py-8 text-gray-500">Drill-down not available for this metric.</div>';
+
+    } catch (error) {
+      console.error('Failed to load metric drilldown:', error);
+      content.innerHTML = '<div class="text-center py-8 text-red-600">Failed to load data: ' + (error.message || 'Unknown error') + '</div>';
+    }
+  }
+
+  // ==========================================================================
+  // Markdown Helpers
+  // ==========================================================================
+
+  function renderMarkdownInline(text) {
+    if (text === null || text === undefined) return '';
+    if (typeof text !== 'string') text = String(text);
+    if (typeof marked !== 'undefined' && marked && typeof marked.parseInline === 'function') {
+      try { return marked.parseInline(text); } catch (e) { return text; }
+    }
+    return text;
+  }
+
+  function renderMarkdownBlock(text) {
+    if (text === null || text === undefined) return '';
+    if (typeof text !== 'string') text = String(text);
+    if (typeof marked !== 'undefined' && marked && typeof marked.parse === 'function') {
+      try {
+        var html = marked.parse(text).trim();
+        if (html.indexOf('<p>') === 0 && html.lastIndexOf('</p>') === html.length - 4 && html.split('<p>').length === 2) {
+          html = html.slice(3, -4);
+        }
+        return html;
+      } catch (e) {
+        return text.split('\n').join('<br>');
+      }
+    }
+    return text.split('\n').join('<br>');
+  }
+
+  function renderHelpTextModal(helpText, uniqueId) {
+    if (!helpText || !helpText.sections || helpText.sections.length === 0) return '';
+
+    var modalId = 'help-modal-' + uniqueId;
+
+    var sectionsHTML = helpText.sections.map(function (section) {
+      var contentHTML = '';
+      if (section.content) {
+        contentHTML = '<div class="text-sm text-gray-700 leading-relaxed">' + renderMarkdownBlock(section.content) + '</div>';
+      }
+      if (section.bullets && section.bullets.length > 0) {
+        var bulletsHTML = section.bullets.map(function (bullet) {
+          return '<li class="text-sm text-gray-700 leading-relaxed">' + renderMarkdownInline(bullet) + '</li>';
+        }).join('');
+        contentHTML = '<ul class="list-disc pl-5 space-y-2">' + bulletsHTML + '</ul>';
+      }
+      return '<div class="mb-6"><h4 class="text-md font-semibold text-gray-900 mb-3">' + renderMarkdownInline(section.heading) + '</h4>' + contentHTML + '</div>';
+    }).join('');
+
+    return '<button onclick="document.getElementById(\'' + modalId + '\').classList.remove(\'hidden\')" class="ml-2 inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors" title="Click for help understanding this chart">' +
+      '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></button>' +
+      '<div id="' + modalId + '" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">' +
+      '<div class="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">' +
+      '<div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">' +
+      '<h3 class="text-xl font-bold text-gray-900">' + (helpText.title || 'Help') + '</h3>' +
+      '<button onclick="document.getElementById(\'' + modalId + '\').classList.add(\'hidden\')" class="text-gray-400 hover:text-gray-600 transition-colors">' +
+      '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button></div>' +
+      '<div class="px-6 py-6">' + sectionsHTML + '</div>' +
+      '<div class="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4">' +
+      '<button onclick="document.getElementById(\'' + modalId + '\').classList.add(\'hidden\')" class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">Got it!</button></div></div></div>';
+  }
+
+  // ==========================================================================
+  // Metric Card Rendering
+  // ==========================================================================
+
+  function createDistributionMetricCard(metric) {
+    var canvasId = 'chart-' + metric.key;
+    var statusColor = metric.status === 'error' ? 'gray' : (metric.status || 'gray');
+    var totalCount = 0;
+    if (Array.isArray(metric.current)) {
+      totalCount = metric.current.reduce(function (sum, item) { return sum + (item.count || 0); }, 0);
+    }
+    var statusColors = getStatusColors(statusColor);
+
+    return '<div class="' + statusColors.bg + ' rounded-xl shadow-sm border ' + statusColors.border + ' p-6 hover:shadow-md transition-shadow">' +
+      '<div class="flex items-start justify-between mb-4"><div class="flex-1">' +
+      '<h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide">' + metric.name + '</h3>' +
+      '<p class="text-xs text-gray-400 mt-1">' + (metric.description || '') + '</p>' +
+      '<p class="text-xs text-indigo-600 mt-2 font-medium">Click any bar to see actual leads</p></div></div>' +
+      '<div class="mb-4"><p class="text-xs text-gray-500 mb-1">Total Leads</p>' +
+      '<p class="text-2xl font-bold text-gray-900">' + formatNumber(totalCount, 0) + '</p></div>' +
+      '<div class="mb-4"><canvas id="' + canvasId + '" style="max-height: 250px;"></canvas></div></div>';
+  }
+
+  function createMetricCard(metric) {
+    if (Array.isArray(metric.current)) {
+      return createDistributionMetricCard(metric);
+    }
+
+    var isCurrency = metric.type === 'currency' || metric.unit === 'dollars';
+
+    var fmtCurrency = function (value) {
+      if (value === null || value === undefined || isNaN(value)) return 'N/A';
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+    };
+
+    var currentValue, priorValue, targetValue;
+    if (isCurrency) {
+      currentValue = fmtCurrency(metric.current);
+      priorValue = metric.prior !== null ? fmtCurrency(metric.prior) : 'N/A';
+      targetValue = fmtCurrency(metric.target);
+    } else {
+      currentValue = metric.formattedCurrent || formatNumber(metric.current, 0);
+      priorValue = metric.formattedPrior || (metric.prior !== null ? formatNumber(metric.prior, 0) : 'N/A');
+      targetValue = metric.formattedTarget || formatNumber(metric.target, 0);
+    }
+
+    var statusColor = metric.status === 'error' ? 'gray' : (metric.status || 'gray');
+    var change = (metric.change !== null && metric.change !== undefined) ? metric.change : null;
+    var changeDirection = metric.changeDirection || 'flat';
+    var upColor = metric.invertTrend ? 'text-red-600' : 'text-green-600';
+    var downColor = metric.invertTrend ? 'text-green-600' : 'text-red-600';
+
+    var changeArrow;
+    if (changeDirection === 'up') {
+      changeArrow = '<svg class="w-4 h-4 ' + upColor + '" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>';
+    } else if (changeDirection === 'down') {
+      changeArrow = '<svg class="w-4 h-4 ' + downColor + '" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>';
+    } else {
+      changeArrow = '<svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14"></path></svg>';
+    }
+
+    var changeText;
+    if (isCurrency && change !== null) {
+      changeText = fmtCurrency(Math.abs(change));
+    } else {
+      changeText = metric.formattedChange || (change !== null ? formatNumber(Math.abs(change), 1) : 'N/A');
+    }
+
+    var changeColor;
+    if (metric.invertTrend) {
+      changeColor = change > 0 ? 'text-red-600' : change < 0 ? 'text-green-600' : 'text-gray-600';
+    } else {
+      changeColor = change > 0 ? 'text-green-600' : change < 0 ? 'text-red-600' : 'text-gray-600';
+    }
+    var changeLabel = (change !== null && change !== 0) ? (change > 0 ? 'increase' : 'decrease') : 'no change';
+
+    var statusColors = getStatusColors(statusColor);
+
+    // Drilldown button
+    var drilldownBtn = '';
+    if (metric.hasDrilldown === true) {
+      drilldownBtn = '<button onclick="window._reporting.openGenericDrilldown(\'' + metric.key + '\', \'' + metric.name + '\')" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 transition-colors whitespace-nowrap" title="View detailed data breakdown">' +
+        '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>Details</button>';
+    } else if (metric.hasDrilldown !== false) {
+      drilldownBtn = '<button onclick="window._reporting.showMetricDrilldown(\'' + metric.key + '\', \'' + metric.name + '\')" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 transition-colors whitespace-nowrap" title="View details">' +
+        '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>Details</button>';
+    }
+
+    // Comparison section
+    var comparisonHTML = '';
+    if (!currentModuleConfig || !currentModuleConfig.ui || currentModuleConfig.ui.showComparison !== false) {
+      comparisonHTML = '<div class="flex items-center gap-2 mb-4 pb-4 border-b border-gray-100">' +
+        changeArrow +
+        '<span class="text-sm font-medium ' + changeColor + '">' + changeText + ' ' + changeLabel + '</span></div>';
+    }
+
+    // Override button
+    var overrideBtn = '<button onclick="window._reporting.openDataOverridePanel(\'' + metric.key + '\', \'' + metric.name + '\', \'' + (metric.description || '').split("'").join("\\'") + '\', ' + metric.target + ', \'target\')" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1" title="Override target value">' +
+      '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>Override</button>';
+
+    return '<div class="' + statusColors.bg + ' rounded-xl shadow-sm border ' + statusColors.border + ' p-6 hover:shadow-md transition-shadow">' +
+      '<div class="mb-4"><div class="flex items-center justify-between gap-2 mb-2"><div class="flex items-center gap-2">' +
+      '<h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide">' + metric.name + '</h3></div>' +
+      '<div class="flex items-center gap-2">' + drilldownBtn + '</div></div>' +
+      '<p class="text-xs text-gray-400">' + (metric.description || '') + '</p></div>' +
+      '<div class="mb-4"><div class="flex items-center justify-between mb-1"><p class="text-xs text-gray-500">Current Period</p></div>' +
+      '<p class="text-3xl font-bold text-gray-900">' + currentValue + '</p></div>' +
+      comparisonHTML +
+      '<div class="grid grid-cols-2 gap-4 text-sm">' +
+      '<div><p class="text-xs text-gray-500 mb-1">Prior Period</p><p class="font-semibold text-gray-700">' + priorValue + '</p></div>' +
+      '<div><div class="flex items-center justify-between mb-1"><p class="text-xs text-gray-500">Target</p>' + overrideBtn + '</div>' +
+      '<p class="font-semibold text-gray-700">' + targetValue + '</p></div></div></div>';
+  }
+
+  function renderMetrics(metrics) {
+    var grid = document.getElementById('metricsGrid');
+    if (!grid) return;
+    grid.innerHTML = metrics.map(function (metric) { return createMetricCard(metric); }).join('');
+
+    setTimeout(function () {
+      metrics.forEach(function (metric) {
+        if (Array.isArray(metric.current)) {
+          renderMetricChart(metric, 'chart-' + metric.key);
+        }
+      });
+    }, 100);
   }
 
   // ==========================================================================
@@ -354,6 +1186,8 @@
               btn.style.color = 'var(--lex-text-accent)';
               // Track selection
               selectedModuleKey = module.moduleKey;
+              // Update missing entities for this module
+              updateMissingEntitiesForModule(module.moduleKey);
             });
           }
 
@@ -386,6 +1220,7 @@
           firstBtn.style.background = 'var(--lex-bg-accent-soft)';
           firstBtn.style.color = 'var(--lex-text-accent)';
         }
+        updateMissingEntitiesForModule(firstAvailable.moduleKey);
       }
 
     } catch (error) {
@@ -487,6 +1322,972 @@
   }
 
   // ==========================================================================
+  // Section-Based Visualization Rendering
+  // ==========================================================================
+
+  function renderVisualizations(data) {
+    var container = document.getElementById('visualizationsContainer');
+    if (!container) return;
+
+    Object.keys(chartInstances).forEach(function (key) {
+      var instance = chartInstances[key];
+      if (instance && typeof instance.destroy === 'function') {
+        instance.destroy();
+      }
+    });
+    chartInstances = {};
+    container.innerHTML = '';
+
+    var visualizationsBySection = { primary: [], secondary: [], trends: [] };
+
+    (data.visualizations || []).forEach(function (viz) {
+      var section = viz.section || 'trends';
+      if (visualizationsBySection[section]) {
+        visualizationsBySection[section].push(viz);
+      }
+    });
+
+    ['primary', 'secondary', 'trends'].forEach(function (sectionName) {
+      var visualizations = visualizationsBySection[sectionName];
+      if (visualizations && visualizations.length > 0) {
+        renderSection(sectionName, visualizations, data, container);
+      }
+    });
+  }
+
+  function renderSection(sectionName, visualizations, data, container) {
+    var sectionDiv = document.createElement('div');
+    sectionDiv.className = 'mb-8';
+    sectionDiv.id = 'section-' + sectionName;
+
+    if (sectionName === 'trends') {
+      var titleDiv = document.createElement('div');
+      titleDiv.className = 'mb-6 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-6 border border-indigo-100';
+      titleDiv.innerHTML = '<h3 class="text-2xl font-bold text-gray-900 mb-3">Trends &amp; Comparisons</h3>' +
+        '<div class="space-y-3 text-sm text-gray-700">' +
+        '<p class="leading-relaxed"><strong>What you are looking at:</strong> These charts compare your current period performance to the previous period.</p>' +
+        '<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">' +
+        '<div class="bg-white rounded-lg p-4 shadow-sm"><div class="flex items-center gap-2 mb-2"><span class="w-4 h-4 rounded bg-blue-500"></span><strong class="text-blue-700">Blue bars = Current Period</strong></div><p class="text-xs text-gray-600">This is your performance RIGHT NOW.</p></div>' +
+        '<div class="bg-white rounded-lg p-4 shadow-sm"><div class="flex items-center gap-2 mb-2"><span class="w-4 h-4 rounded bg-gray-400"></span><strong class="text-gray-700">Gray bars = Prior Period</strong></div><p class="text-xs text-gray-600">This is your performance BEFORE.</p></div>' +
+        '</div></div>';
+      sectionDiv.appendChild(titleDiv);
+    }
+
+    visualizations.forEach(function (viz, index) {
+      var vizElement = renderVisualization(viz, data, sectionName + '-' + index);
+      if (vizElement) sectionDiv.appendChild(vizElement);
+    });
+
+    container.appendChild(sectionDiv);
+  }
+
+  function renderVisualization(viz, data, uniqueId) {
+    switch (viz.type) {
+      case 'metric_grid': return renderMetricGrid(viz, uniqueId);
+      case 'trend_chart': return renderTrendChart(viz, data, uniqueId);
+      case 'comparison_chart': return renderComparisonChart(viz, data, uniqueId);
+      case 'pie_chart': return renderPieChart(viz, data, uniqueId);
+      case 'funnel_chart': return renderFunnelChart(viz, data, uniqueId);
+      case 'bubble_chart': return renderBubbleChart(viz, data, uniqueId);
+      case 'grouped_bar_chart': return renderGroupedBarChart(viz, data, uniqueId);
+      case 'horizontal_bar_chart': return renderHorizontalBarChart(viz, data, uniqueId);
+      case 'table': return renderTable(viz, data, uniqueId);
+      default:
+        console.warn('[Reporting] Unknown visualization type:', viz.type);
+        return renderPlaceholderChart(viz, uniqueId);
+    }
+  }
+
+  function renderMetricGrid(viz, uniqueId) {
+    var div = document.createElement('div');
+    div.className = 'mb-6';
+    var grid = document.createElement('div');
+    grid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6';
+    grid.id = 'grid-' + uniqueId;
+    grid.innerHTML = viz.metrics.map(function (metric) { return createMetricCard(metric); }).join('');
+    div.appendChild(grid);
+
+    setTimeout(function () {
+      viz.metrics.forEach(function (metric) {
+        if (Array.isArray(metric.current)) {
+          renderMetricChart(metric, 'chart-' + metric.key);
+        }
+      });
+    }, 100);
+
+    return div;
+  }
+
+  function renderTrendChart(viz, data, uniqueId) {
+    if (!data.timeSeries || data.timeSeries.length === 0) return null;
+
+    var div = document.createElement('div');
+    div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
+    var canvasId = 'chart-' + uniqueId;
+    var helpTextHTML = renderHelpTextModal(viz.helpText, uniqueId);
+
+    div.innerHTML = '<div class="flex items-center mb-4"><h3 class="text-lg font-semibold text-gray-900">' + (viz.title || 'Metrics Over Time') + '</h3>' + helpTextHTML + '</div>' +
+      '<div class="h-96"><canvas id="' + canvasId + '"></canvas></div>';
+
+    setTimeout(function () {
+      renderTimeSeriesChartForVisualization(canvasId, data.timeSeries, viz.metrics);
+    }, 100);
+
+    return div;
+  }
+
+  function renderTimeSeriesChartForVisualization(canvasId, timeSeries, metricKeys) {
+    var ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    var renderer = new TimeSeriesRenderer(canvasId, timeSeries, metricKeys, {
+      fill: true, tension: 0.4, responsive: true, maintainAspectRatio: false
+    });
+    var chart = renderer.render();
+    chartInstances[canvasId] = renderer;
+    return chart;
+  }
+
+  function renderComparisonChart(viz, data, uniqueId) {
+    var div = document.createElement('div');
+    div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
+    var canvasId = 'chart-' + uniqueId;
+    var helpTextHTML = renderHelpTextModal(viz.helpText, uniqueId);
+    var description = viz.description || 'Compare how your metrics changed from the previous period to now.';
+
+    div.innerHTML = '<div class="mb-4"><div class="flex items-center justify-between mb-2"><div class="flex items-center">' +
+      '<h3 class="text-lg font-semibold text-gray-900">' + (viz.title || 'Current vs Prior Period') + '</h3>' + helpTextHTML + '</div></div>' +
+      '<p class="text-sm text-gray-600 leading-relaxed">' + description + '</p>' +
+      '<div class="flex items-center gap-6 mt-3 text-xs">' +
+      '<div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-blue-500"></div><span class="text-gray-600">Current Period (Now)</span></div>' +
+      '<div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-gray-400"></div><span class="text-gray-600">Prior Period (Before)</span></div></div></div>' +
+      '<div class="h-64"><canvas id="' + canvasId + '"></canvas></div>';
+
+    setTimeout(function () {
+      var ctx = document.getElementById(canvasId);
+      if (!ctx) return;
+      var metrics = data.metrics.filter(function (m) { return viz.metrics.indexOf(m.key) !== -1; });
+
+      var chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: metrics.map(function (m) { return m.name; }),
+          datasets: [
+            { label: 'Current Period', data: metrics.map(function (m) { return parseFloat(m.current) || 0; }), backgroundColor: '#3b82f6', borderColor: '#2563eb', borderWidth: 1 },
+            { label: 'Prior Period', data: metrics.map(function (m) { return parseFloat(m.prior) || 0; }), backgroundColor: '#9ca3af', borderColor: '#6b7280', borderWidth: 1 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { padding: 15, font: { size: 12 } } },
+            tooltip: {
+              backgroundColor: 'rgba(0, 0, 0, 0.8)', padding: 12,
+              callbacks: {
+                label: function (context) {
+                  var label = context.dataset.label || '';
+                  var value = context.parsed.y;
+                  var metric = metrics[context.dataIndex];
+                  var unit = (metric && metric.unit) || '';
+                  var formattedValue = value.toFixed(1);
+                  if (unit === 'percent' || unit === 'percentage') formattedValue = value.toFixed(1) + '%';
+                  else if (unit === 'days' || unit === 'hours') formattedValue = value.toFixed(1) + ' ' + unit;
+                  else if (unit === 'score') formattedValue = value.toFixed(1) + '/100';
+                  else if (unit === 'leads' || unit === 'consultations') formattedValue = Math.round(value) + ' ' + unit;
+                  return label + ': ' + formattedValue;
+                },
+                footer: function (context) {
+                  if (context.length === 2) {
+                    var currentItem = null; var priorItem = null;
+                    for (var i = 0; i < context.length; i++) {
+                      if (context[i].dataset.label === 'Current Period') currentItem = context[i];
+                      if (context[i].dataset.label === 'Prior Period') priorItem = context[i];
+                    }
+                    var current = currentItem ? currentItem.parsed.y : 0;
+                    var prior = priorItem ? priorItem.parsed.y : 0;
+                    var diff = current - prior;
+                    var diffPercent = prior !== 0 ? ((diff / prior) * 100) : 0;
+                    if (diff > 0) return 'Up ' + Math.abs(diffPercent).toFixed(1) + '% from before';
+                    if (diff < 0) return 'Down ' + Math.abs(diffPercent).toFixed(1) + '% from before';
+                    return 'No change';
+                  }
+                  return '';
+                }
+              }
+            }
+          },
+          scales: {
+            y: { beginAtZero: true, ticks: { font: { size: 11 } }, grid: { color: 'rgba(0, 0, 0, 0.05)' } },
+            x: { ticks: { font: { size: 11 } }, grid: { display: false } }
+          }
+        }
+      });
+      chartInstances[canvasId] = chart;
+    }, 100);
+
+    return div;
+  }
+
+  function renderPieChart(viz, data, uniqueId) {
+    var metric = null;
+    if (viz.metrics) {
+      for (var i = 0; i < data.metrics.length; i++) {
+        if (viz.metrics.indexOf(data.metrics[i].key) !== -1) { metric = data.metrics[i]; break; }
+      }
+    }
+    if (!metric || !Array.isArray(metric.current)) return null;
+
+    var containerId = 'pie-chart-container-' + uniqueId;
+    var containerDiv = document.createElement('div');
+    containerDiv.id = containerId;
+    containerDiv.className = 'mb-6';
+
+    if (metric.current.length === 0) {
+      containerDiv.innerHTML = '<div class="bg-white rounded-lg shadow p-6"><h3 class="text-lg font-semibold mb-2">' + (viz.title || 'Distribution') + '</h3>' +
+        (viz.description ? '<p class="text-sm text-gray-600 mb-4">' + viz.description + '</p>' : '') +
+        '<div class="text-center py-12 text-gray-500"><p class="mt-2 text-sm">No data available for this period</p></div></div>';
+      return containerDiv;
+    }
+
+    var renderer = new PieChartRenderer(containerId, metric.current, {
+      title: viz.title, description: viz.description, legendPosition: 'right',
+      helpText: viz.helpText ? { content: viz.helpText } : null
+    });
+    chartInstances[containerId] = renderer;
+    setTimeout(function () { renderer.render(); }, 0);
+    return containerDiv;
+  }
+
+  function renderFunnelChart(viz, data, uniqueId) {
+    var metric = null;
+    if (viz.metrics) {
+      for (var i = 0; i < data.metrics.length; i++) {
+        if (viz.metrics.indexOf(data.metrics[i].key) !== -1) { metric = data.metrics[i]; break; }
+      }
+    }
+    if (!metric || !metric.current) return null;
+
+    var containerId = 'funnel-chart-' + uniqueId;
+    var containerDiv = document.createElement('div');
+    containerDiv.id = containerId;
+    containerDiv.className = 'mb-6';
+
+    var renderer = new FunnelChartRenderer(containerId, metric.current, {
+      title: viz.title || 'Funnel Chart', description: viz.description, helpText: viz.helpText
+    });
+    chartInstances[containerId] = renderer;
+    setTimeout(function () { renderer.render(); }, 0);
+    return containerDiv;
+  }
+
+  function renderHorizontalBarChart(viz, data, uniqueId) {
+    var metricKey = viz.metrics && viz.metrics[0];
+    if (!metricKey) return null;
+
+    var metric = null;
+    if (data.metrics) {
+      for (var i = 0; i < data.metrics.length; i++) {
+        if (data.metrics[i].key === metricKey) { metric = data.metrics[i]; break; }
+      }
+    }
+    if (!metric) return null;
+
+    var chartData = Array.isArray(metric.current) ? metric.current : (Array.isArray(metric.result) ? metric.result : []);
+    var containerId = 'bar-chart-container-' + uniqueId;
+    var containerDiv = document.createElement('div');
+    containerDiv.id = containerId;
+    containerDiv.className = 'mb-6';
+
+    if (chartData.length === 0) {
+      containerDiv.innerHTML = '<div class="bg-white rounded-lg shadow p-6"><h3 class="text-lg font-semibold mb-2">' + (viz.title || 'Chart') + '</h3>' +
+        (viz.description ? '<p class="text-sm text-gray-600 mb-4">' + viz.description + '</p>' : '') +
+        '<div class="text-center py-12 text-gray-500"><p class="mt-2 text-sm">No data available for this period</p></div></div>';
+      return containerDiv;
+    }
+
+    var renderer = new BarChartRenderer(containerDiv, {
+      labels: chartData.map(function (d) { return d.label || 'Unknown'; }),
+      values: chartData.map(function (d) { return d.value || 0; })
+    }, {
+      title: viz.title, description: viz.description, orientation: 'horizontal',
+      metricName: metric.name, unit: metric.unit,
+      isPercentage: (metric.format && metric.format.suffix === '%') || metric.unit === 'percent',
+      colorRule: viz.colorRule, colors: viz.barColors,
+      helpText: viz.helpText ? { content: viz.helpText } : null,
+      onBarClick: function (index, label) {
+        if (metric.drilldown && metric.drilldown.enabled && window.openDrilldown) {
+          window.openDrilldown(metricKey, { drill_source: label });
+        }
+      }
+    });
+    chartInstances[containerId] = renderer;
+    setTimeout(function () { renderer.render(); }, 0);
+    return containerDiv;
+  }
+
+  function renderBubbleChart(viz, data, uniqueId) {
+    var div = document.createElement('div');
+    div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
+    var canvasId = 'chart-' + uniqueId;
+    var helpTextHTML = renderHelpTextModal(viz.helpText, uniqueId);
+
+    div.innerHTML = '<div class="flex items-center mb-4"><h3 class="text-lg font-semibold text-gray-900">' + (viz.title || 'Bubble Chart') + '</h3>' + helpTextHTML + '</div>' +
+      (viz.description ? '<p class="text-sm text-gray-500 mb-4">' + viz.description + '</p>' : '') +
+      '<div class="h-96"><canvas id="' + canvasId + '"></canvas></div>';
+
+    setTimeout(function () {
+      var ctx = document.getElementById(canvasId);
+      if (!ctx) return;
+      if (!viz.data || viz.data.length === 0) {
+        ctx.parentElement.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500">No data available</div>';
+        return;
+      }
+      var xField = (viz.xAxis && viz.xAxis.field) || 'avg_quality_score';
+      var yField = (viz.yAxis && viz.yAxis.field) || 'booking_rate';
+      var sizeField = (viz.bubbleSize && viz.bubbleSize.field) || 'lead_count';
+      var labelField = (viz.bubbleLabel && viz.bubbleLabel.field) || 'source_name';
+
+      var bubbleData = viz.data.map(function (row) {
+        return {
+          x: parseFloat(row[xField]) || 0,
+          y: parseFloat(row[yField]) || 0,
+          r: Math.sqrt(parseFloat(row[sizeField]) || 1) * 3,
+          label: row[labelField] || 'Unknown'
+        };
+      });
+
+      var chart = new Chart(ctx, {
+        type: 'bubble',
+        data: { datasets: [{ label: viz.title, data: bubbleData, backgroundColor: 'rgba(99, 102, 241, 0.6)', borderColor: 'rgba(99, 102, 241, 1)', borderWidth: 1 }] },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function (context) {
+                  var point = context.raw;
+                  return [point.label,
+                    ((viz.xAxis && viz.xAxis.label) || 'Quality') + ': ' + point.x,
+                    ((viz.yAxis && viz.yAxis.label) || 'Rate') + ': ' + point.y + '%',
+                    ((viz.bubbleSize && viz.bubbleSize.label) || 'Count') + ': ' + Math.round(Math.pow(point.r / 3, 2))];
+                }
+              }
+            }
+          },
+          scales: {
+            x: { title: { display: true, text: (viz.xAxis && viz.xAxis.label) || 'X Axis' }, min: (viz.xAxis && viz.xAxis.min) || 0, max: (viz.xAxis && viz.xAxis.max) || 100 },
+            y: { title: { display: true, text: (viz.yAxis && viz.yAxis.label) || 'Y Axis' }, min: (viz.yAxis && viz.yAxis.min) || 0, max: (viz.yAxis && viz.yAxis.max) || 100 }
+          }
+        }
+      });
+      chartInstances[canvasId] = chart;
+    }, 100);
+
+    return div;
+  }
+
+  function renderGroupedBarChart(viz, data, uniqueId) {
+    var div = document.createElement('div');
+    div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
+    var canvasId = 'chart-' + uniqueId;
+    var helpTextHTML = renderHelpTextModal(viz.helpText, uniqueId);
+
+    div.innerHTML = '<div class="flex items-center mb-4"><h3 class="text-lg font-semibold text-gray-900">' + (viz.title || 'Grouped Bar Chart') + '</h3>' + helpTextHTML + '</div>' +
+      (viz.description ? '<p class="text-sm text-gray-500 mb-4">' + viz.description + '</p>' : '') +
+      '<div class="h-96"><canvas id="' + canvasId + '"></canvas></div>';
+
+    setTimeout(function () {
+      var ctx = document.getElementById(canvasId);
+      if (!ctx) return;
+      if (!viz.data || viz.data.length === 0) {
+        ctx.parentElement.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500">No data available</div>';
+        return;
+      }
+      var xField = (viz.xAxis && viz.xAxis.field) || 'source_name';
+      var labels = viz.data.map(function (row) { return row[xField] || 'Unknown'; });
+      var datasets = (viz.series || []).map(function (serie) {
+        return {
+          label: serie.label,
+          data: viz.data.map(function (row) { return parseFloat(row[serie.field]) || 0; }),
+          backgroundColor: serie.color, borderColor: serie.color, borderWidth: 1
+        };
+      });
+
+      var chart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: labels, datasets: datasets },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom' },
+            tooltip: {
+              callbacks: {
+                afterLabel: function (context) {
+                  if (viz.annotations && viz.annotations.field) {
+                    var row = viz.data[context.dataIndex];
+                    var value = row[viz.annotations.field];
+                    return viz.annotations.label.split('{value}').join(value);
+                  }
+                  return '';
+                }
+              }
+            }
+          },
+          scales: {
+            x: { title: { display: true, text: (viz.xAxis && viz.xAxis.label) || 'Categories' } },
+            y: { title: { display: true, text: (viz.yAxis && viz.yAxis.label) || 'Value' }, min: (viz.yAxis && viz.yAxis.min) || 0, max: (viz.yAxis && viz.yAxis.max) || 100, beginAtZero: true }
+          }
+        }
+      });
+      chartInstances[canvasId] = chart;
+    }, 100);
+
+    return div;
+  }
+
+  function renderTable(viz, data, uniqueId) {
+    var div = document.createElement('div');
+    div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
+
+    var metric = null;
+    if (viz.metrics && data.metrics) {
+      for (var i = 0; i < data.metrics.length; i++) {
+        if (viz.metrics.indexOf(data.metrics[i].key) !== -1) { metric = data.metrics[i]; break; }
+      }
+    }
+
+    if (!metric || !Array.isArray(metric.current)) {
+      div.innerHTML = '<h3 class="text-lg font-semibold text-gray-900 mb-4">' + (viz.title || 'Table') + '</h3>' +
+        '<div class="text-gray-500 text-center py-8">No data available</div>';
+      return div;
+    }
+
+    var tableData = metric.current;
+    var columns = viz.columns || [
+      { field: 'label', header: 'Label', align: 'left' },
+      { field: 'count', header: 'Count', align: 'right' },
+      { field: 'value', header: 'Value', align: 'right', format: 'percent' }
+    ];
+
+    var filteredData = tableData.slice();
+    var currentPage = 1;
+    var rowsPerPage = 10;
+    var sortField = null;
+    var sortDirection = 'asc';
+
+    div.innerHTML = '<h3 class="text-lg font-semibold text-gray-900 mb-4">' + (viz.title || 'Table') + '</h3>' +
+      (viz.description ? '<p class="text-sm text-gray-500 mb-4">' + viz.description + '</p>' : '') +
+      '<div class="mb-4"><input type="text" id="search-' + uniqueId + '" placeholder="Search..." class="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>' +
+      '<div class="overflow-x-auto mb-4"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr id="table-header-' + uniqueId + '"></tr></thead>' +
+      '<tbody id="table-body-' + uniqueId + '" class="bg-white divide-y divide-gray-200"></tbody></table></div>' +
+      '<div class="flex items-center justify-between"><div class="text-sm text-gray-700">Showing <span id="start-' + uniqueId + '">1</span> to <span id="end-' + uniqueId + '">10</span> of <span id="total-' + uniqueId + '">0</span> results</div>' +
+      '<div class="flex gap-2"><button id="prev-' + uniqueId + '" class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed" disabled>Previous</button>' +
+      '<button id="next-' + uniqueId + '" class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">Next</button></div></div>';
+
+    function formatValue(value, column) {
+      if (column.format === 'percent' && typeof value === 'number') return value.toFixed(1) + '%';
+      if (typeof value === 'number') return value.toLocaleString();
+      return value;
+    }
+
+    function renderHeader() {
+      var headerRow = div.querySelector('#table-header-' + uniqueId);
+      if (!headerRow) return;
+      headerRow.innerHTML = columns.map(function (col) {
+        var isSorted = sortField === col.field;
+        var sortIcon = isSorted ? (sortDirection === 'asc' ? ' \u25B2' : ' \u25BC') : ' \u21C5';
+        return '<th class="px-4 py-3 text-' + (col.align || 'left') + ' text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none" data-field="' + col.field + '">' + col.header + sortIcon + '</th>';
+      }).join('');
+
+      headerRow.querySelectorAll('th').forEach(function (th) {
+        th.addEventListener('click', function () {
+          var field = th.dataset.field;
+          if (sortField === field) { sortDirection = sortDirection === 'asc' ? 'desc' : 'asc'; }
+          else { sortField = field; sortDirection = 'asc'; }
+          currentPage = 1;
+          render();
+        });
+      });
+    }
+
+    function renderBody() {
+      var tbody = div.querySelector('#table-body-' + uniqueId);
+      if (!tbody) return;
+      var sortedData = filteredData.slice();
+      if (sortField) {
+        sortedData.sort(function (a, b) {
+          var aVal = a[sortField]; var bVal = b[sortField];
+          if (typeof aVal === 'number' && typeof bVal === 'number') return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+          aVal = String(aVal).toLowerCase(); bVal = String(bVal).toLowerCase();
+          if (sortDirection === 'asc') return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+          return bVal < aVal ? -1 : bVal > aVal ? 1 : 0;
+        });
+      }
+      var startIdx = (currentPage - 1) * rowsPerPage;
+      var endIdx = Math.min(startIdx + rowsPerPage, sortedData.length);
+      var pageData = sortedData.slice(startIdx, endIdx);
+
+      tbody.innerHTML = pageData.map(function (row, idx) {
+        var cellsHTML = columns.map(function (col) {
+          return '<td class="px-4 py-3 text-' + (col.align || 'left') + ' text-sm text-gray-900">' + formatValue(row[col.field], col) + '</td>';
+        }).join('');
+        return '<tr class="' + (idx % 2 === 0 ? 'bg-white' : 'bg-gray-50') + '">' + cellsHTML + '</tr>';
+      }).join('');
+
+      var startEl = div.querySelector('#start-' + uniqueId);
+      var endEl = div.querySelector('#end-' + uniqueId);
+      var totalEl = div.querySelector('#total-' + uniqueId);
+      if (startEl) startEl.textContent = sortedData.length > 0 ? startIdx + 1 : 0;
+      if (endEl) endEl.textContent = endIdx;
+      if (totalEl) totalEl.textContent = sortedData.length;
+
+      var prevBtn = div.querySelector('#prev-' + uniqueId);
+      var nextBtn = div.querySelector('#next-' + uniqueId);
+      if (prevBtn) prevBtn.disabled = currentPage === 1;
+      if (nextBtn) nextBtn.disabled = endIdx >= sortedData.length;
+    }
+
+    function handleSearch(searchTerm) {
+      var term = searchTerm.toLowerCase().trim();
+      if (!term) { filteredData = tableData.slice(); }
+      else {
+        filteredData = tableData.filter(function (row) {
+          return columns.some(function (col) {
+            return String(row[col.field]).toLowerCase().indexOf(term) !== -1;
+          });
+        });
+      }
+      currentPage = 1;
+      render();
+    }
+
+    function render() { renderHeader(); renderBody(); }
+
+    setTimeout(function () {
+      var searchInput = div.querySelector('#search-' + uniqueId);
+      if (searchInput) searchInput.addEventListener('input', function (e) { handleSearch(e.target.value); });
+      var prevBtn = div.querySelector('#prev-' + uniqueId);
+      if (prevBtn) prevBtn.addEventListener('click', function () { if (currentPage > 1) { currentPage--; render(); } });
+      var nextBtn = div.querySelector('#next-' + uniqueId);
+      if (nextBtn) nextBtn.addEventListener('click', function () { var maxPage = Math.ceil(filteredData.length / rowsPerPage); if (currentPage < maxPage) { currentPage++; render(); } });
+      render();
+    }, 0);
+
+    return div;
+  }
+
+  function renderPlaceholderChart(viz, uniqueId) {
+    var div = document.createElement('div');
+    div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
+    div.innerHTML = '<h3 class="text-lg font-semibold text-gray-900 mb-4">' + (viz.title || viz.type) + '</h3>' +
+      '<div class="h-64 flex items-center justify-center bg-gray-50 rounded"><p class="text-gray-500">Chart type "' + viz.type + '" will be implemented soon</p></div>';
+    return div;
+  }
+
+  // ==========================================================================
+  // Legacy Charts (renderCharts / renderTimeSeriesChart)
+  // ==========================================================================
+
+  function renderCharts(metrics) {
+    currentModuleData = metrics;
+    if (trendsChart) trendsChart.destroy();
+    if (statusChart) statusChart.destroy();
+
+    var trendsCtx = document.getElementById('metricTrendsChart');
+    if (trendsCtx) {
+      trendsCtx = trendsCtx.getContext('2d');
+      var metricNames = metrics.map(function (m) { return m.name; });
+      var currentValues = metrics.map(function (m) { return parseFloat(m.current) || 0; });
+      var priorValues = metrics.map(function (m) { return parseFloat(m.prior) || 0; });
+
+      trendsChart = new Chart(trendsCtx, {
+        type: 'bar',
+        data: {
+          labels: metricNames,
+          datasets: [
+            { label: 'Current Period', data: currentValues, backgroundColor: '#818cf8', borderColor: '#6366f1', borderWidth: 1 },
+            { label: 'Prior Period', data: priorValues, backgroundColor: '#e5e7eb', borderColor: '#d1d5db', borderWidth: 1 }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 15 } } },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+    }
+
+    var statusCtx = document.getElementById('statusDistributionChart');
+    if (statusCtx) {
+      statusCtx = statusCtx.getContext('2d');
+      var statusCounts = {
+        green: metrics.filter(function (m) { return m.status === 'green'; }).length,
+        yellow: metrics.filter(function (m) { return m.status === 'yellow'; }).length,
+        red: metrics.filter(function (m) { return m.status === 'red'; }).length,
+        gray: metrics.filter(function (m) { return m.status === 'gray'; }).length
+      };
+      statusChart = new Chart(statusCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['On Target (Green)', 'Warning (Yellow)', 'Critical (Red)', 'No Target (Gray)'],
+          datasets: [{ data: [statusCounts.green, statusCounts.yellow, statusCounts.red, statusCounts.gray], backgroundColor: ['#22c55e', '#eab308', '#ef4444', '#9ca3af'], borderWidth: 0 }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 10 } } } }
+      });
+    }
+  }
+
+  function renderTimeSeriesChart(timeSeries, metrics) {
+    var section = document.getElementById('timeSeriesSection');
+    if (section) section.classList.remove('hidden');
+    if (timeSeriesChart) timeSeriesChart.destroy();
+
+    var canvas = document.getElementById('timeSeriesChart');
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+
+    var labels = timeSeries.map(function (ts) {
+      var date = new Date(ts.date);
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+    });
+
+    var colorPalette = [
+      { bg: 'rgba(99, 102, 241, 0.2)', border: '#6366f1' },
+      { bg: 'rgba(16, 185, 129, 0.2)', border: '#10b981' },
+      { bg: 'rgba(245, 158, 11, 0.2)', border: '#f59e0b' },
+      { bg: 'rgba(239, 68, 68, 0.2)', border: '#ef4444' },
+      { bg: 'rgba(139, 92, 246, 0.2)', border: '#8b5cf6' }
+    ];
+
+    var datasets = metrics.map(function (metric, index) {
+      var color = colorPalette[index % colorPalette.length];
+      var dataPoints = timeSeries.map(function (ts) {
+        var found = null;
+        for (var j = 0; j < ts.metrics.length; j++) {
+          if (ts.metrics[j].key === metric.key) { found = ts.metrics[j]; break; }
+        }
+        return found ? parseFloat(found.value) || 0 : 0;
+      });
+      return { label: metric.name, data: dataPoints, fill: true, backgroundColor: color.bg, borderColor: color.border, borderWidth: 2, tension: 0.4, pointRadius: 4, pointHoverRadius: 6 };
+    });
+
+    timeSeriesChart = new Chart(ctx, {
+      type: 'line',
+      data: { labels: labels, datasets: datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 15 } } },
+        scales: { y: { beginAtZero: true }, x: { ticks: { maxRotation: 45, minRotation: 45 } } }
+      }
+    });
+  }
+
+  // ==========================================================================
+  // Export Functions
+  // ==========================================================================
+
+  function exportToPDF() {
+    if (!currentModuleData) {
+      alert('No data to export. Please execute a module first.');
+      return;
+    }
+
+    var jsPDFLib = window.jspdf;
+    if (!jsPDFLib) { alert('PDF library not loaded.'); return; }
+    var doc = new jsPDFLib.jsPDF();
+
+    doc.setFontSize(20);
+    doc.text('Module Execution Report', 14, 20);
+
+    doc.setFontSize(12);
+    var moduleTitleEl = document.getElementById('moduleTitle');
+    var executionTimeEl = document.getElementById('executionTime');
+    var resultPeriodTypeEl = document.getElementById('resultPeriodType');
+    var resultCurrentPeriodEl = document.getElementById('resultCurrentPeriod');
+
+    doc.text('Module: ' + (moduleTitleEl ? moduleTitleEl.textContent : ''), 14, 35);
+    doc.text('Execution Time: ' + (executionTimeEl ? executionTimeEl.textContent : ''), 14, 42);
+    doc.text('Period Type: ' + (resultPeriodTypeEl ? resultPeriodTypeEl.textContent : ''), 14, 49);
+    doc.text('Current Period: ' + (resultCurrentPeriodEl ? resultCurrentPeriodEl.textContent : ''), 14, 56);
+
+    var tableData = currentModuleData.map(function (m) {
+      return [
+        m.name,
+        m.formattedCurrent || m.current,
+        m.formattedPrior || m.prior || 'N/A',
+        m.formattedTarget || m.target || 'N/A',
+        m.formattedChange || 'N/A',
+        m.status ? m.status.toUpperCase() : 'N/A'
+      ];
+    });
+
+    doc.autoTable({
+      startY: 65,
+      head: [['Metric', 'Current', 'Prior', 'Target', 'Change', 'Status']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [99, 102, 241] },
+      styles: { fontSize: 9 }
+    });
+
+    var fileName = 'module-report-' + new Date().toISOString().split('T')[0] + '.pdf';
+    doc.save(fileName);
+    showInfo('Report exported to ' + fileName);
+  }
+
+  function exportToCSV() {
+    if (!currentModuleData) {
+      alert('No data to export. Please execute a module first.');
+      return;
+    }
+
+    var headers = ['Metric', 'Current', 'Prior', 'Target', 'Change', 'Change %', 'Status'];
+    var rows = currentModuleData.map(function (m) {
+      return [
+        m.name,
+        m.formattedCurrent || m.current,
+        m.formattedPrior || m.prior || 'N/A',
+        m.formattedTarget || m.target || 'N/A',
+        m.formattedChange || 'N/A',
+        m.changePercent ? m.changePercent + '%' : 'N/A',
+        m.status ? m.status.toUpperCase() : 'N/A'
+      ];
+    });
+
+    var csvContent = headers.join(',') + '\n';
+    rows.forEach(function (row) {
+      csvContent += row.map(function (cell) {
+        var cellStr = String(cell);
+        if (cellStr.indexOf(',') !== -1 || cellStr.indexOf('"') !== -1) {
+          return '"' + cellStr.split('"').join('""') + '"';
+        }
+        return cellStr;
+      }).join(',') + '\n';
+    });
+
+    var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    var link = document.createElement('a');
+    var url = URL.createObjectURL(blob);
+    var fileName = 'module-report-' + new Date().toISOString().split('T')[0] + '.csv';
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', fileName);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showInfo('Report exported to ' + fileName);
+  }
+
+  // ==========================================================================
+  // Data Override Panel
+  // ==========================================================================
+
+  function openDataOverridePanel(metricKey, metricName, metricDescription, currentValue, overrideType) {
+    if (!overrideType) overrideType = 'target';
+    var moduleKey = selectedModuleKey;
+    var periodTypeEl = document.getElementById('periodType');
+    var periodStartEl = document.getElementById('periodStart');
+    var periodEndEl = document.getElementById('periodEnd');
+    var periodType = periodTypeEl ? periodTypeEl.value : 'monthly';
+    var periodStart = periodStartEl ? periodStartEl.value : '';
+    var periodEnd = periodEndEl ? periodEndEl.value : '';
+
+    if (!periodStart || !periodEnd) {
+      showError('Please select a date range first');
+      return;
+    }
+
+    currentOverrideMetric = {
+      key: metricKey, name: metricName, description: metricDescription,
+      currentValue: currentValue, overrideType: overrideType
+    };
+
+    var nameEl = document.getElementById('overrideMetricName');
+    var descEl = document.getElementById('overrideMetricDescription');
+    var rangeEl = document.getElementById('overridePeriodRange');
+    var currentEl = document.getElementById('overrideCurrentValue');
+
+    if (nameEl) nameEl.textContent = metricName;
+    if (descEl) descEl.textContent = metricDescription || 'No description available';
+    if (rangeEl) rangeEl.textContent = formatDateRange(new Date(periodStart + 'T00:00:00Z'), new Date(periodEnd + 'T23:59:59Z'));
+
+    var valueLabel = overrideType === 'target' ? 'Current Target' : 'Current Value';
+    if (currentEl) {
+      var labelEl = currentEl.parentElement.querySelector('p.text-xs');
+      if (labelEl) labelEl.textContent = valueLabel;
+      currentEl.textContent = formatNumber(currentValue, 2);
+    }
+
+    var form = document.getElementById('overrideForm');
+    if (form) form.reset();
+    var overrideValueEl = document.getElementById('overrideValue');
+    var overrideNotesEl = document.getElementById('overrideNotes');
+    if (overrideValueEl) overrideValueEl.value = '';
+    if (overrideNotesEl) overrideNotesEl.value = '';
+
+    var overrideTypeEl = document.getElementById('overrideType');
+    if (overrideTypeEl) overrideTypeEl.value = overrideType;
+
+    var hPeriodStart = document.getElementById('overridePeriodStart');
+    var hPeriodEnd = document.getElementById('overridePeriodEnd');
+    var hPeriodType = document.getElementById('overridePeriodType');
+    var hModuleKey = document.getElementById('overrideModuleKey');
+    var hMetricKey = document.getElementById('overrideMetricKey');
+    if (hPeriodStart) hPeriodStart.value = periodStart;
+    if (hPeriodEnd) hPeriodEnd.value = periodEnd;
+    if (hPeriodType) hPeriodType.value = periodType;
+    if (hModuleKey) hModuleKey.value = moduleKey;
+    if (hMetricKey) hMetricKey.value = metricKey;
+
+    loadExistingOverrides(moduleKey, metricKey, periodStart, periodEnd);
+
+    var overlay = document.getElementById('dataOverrideOverlay');
+    var panel = document.getElementById('dataOverridePanel');
+    if (overlay) overlay.classList.remove('hidden');
+    if (panel) panel.classList.remove('translate-x-full');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeDataOverridePanel() {
+    var overlay = document.getElementById('dataOverrideOverlay');
+    var panel = document.getElementById('dataOverridePanel');
+    if (panel) panel.classList.add('translate-x-full');
+    if (overlay) overlay.classList.add('hidden');
+    document.body.style.overflow = '';
+    currentOverrideMetric = null;
+    currentOverrideData = null;
+  }
+
+  async function loadExistingOverrides(moduleKey, metricKey, periodStart, periodEnd) {
+    try {
+      var periodStartISO = new Date(periodStart + 'T00:00:00Z').toISOString();
+      var periodEndISO = new Date(periodEnd + 'T23:59:59Z').toISOString();
+
+      var data = await api.get('/api/v1/modules/' + moduleKey + '/data-overrides', {
+        periodStart: periodStartISO, periodEnd: periodEndISO
+      });
+
+      var metricOverrides = data.filter(function (o) { return o.metric_key === metricKey; });
+      var existingSection = document.getElementById('existingOverridesSection');
+      var existingList = document.getElementById('existingOverridesList');
+
+      if (metricOverrides.length > 0 && existingSection && existingList) {
+        existingSection.classList.remove('hidden');
+        existingList.innerHTML = metricOverrides.map(function (override) {
+          return '<div class="p-3 bg-gray-50 rounded-lg border border-gray-200">' +
+            '<div class="flex items-start justify-between mb-2"><div class="flex-1">' +
+            '<p class="text-sm font-semibold text-gray-900">Override Value: ' + formatNumber(override.override_value, 2) + '</p>' +
+            '<p class="text-xs text-gray-500 mt-1">Period: ' + formatDateRange(override.period_start, override.period_end) + '</p>' +
+            (override.notes ? '<p class="text-xs text-gray-600 mt-1 italic">"' + override.notes + '"</p>' : '') +
+            '</div>' +
+            '<button onclick="window._reporting.deleteOverride(\'' + override.override_id + '\')" class="text-red-600 hover:text-red-800 ml-2" title="Delete override">' +
+            '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button></div>' +
+            '<div class="text-xs text-gray-400">Created: ' + new Date(override.created_at).toLocaleDateString() + '</div></div>';
+        }).join('');
+      } else if (existingSection) {
+        existingSection.classList.add('hidden');
+      }
+    } catch (error) {
+      console.error('Failed to load existing overrides:', error);
+      var section = document.getElementById('existingOverridesSection');
+      if (section) section.classList.add('hidden');
+    }
+  }
+
+  async function saveOverride(e) {
+    if (e) e.preventDefault();
+    if (!currentOverrideMetric) { showError('No metric selected for override'); return; }
+
+    var moduleKey = document.getElementById('overrideModuleKey').value;
+    var periodType = document.getElementById('overridePeriodType').value;
+    var periodStart = document.getElementById('overridePeriodStart').value;
+    var periodEnd = document.getElementById('overridePeriodEnd').value;
+    var overrideValue = parseFloat(document.getElementById('overrideValue').value);
+    var overrideNotes = (document.getElementById('overrideNotes').value || '').trim();
+    var overrideType = document.getElementById('overrideType').value;
+
+    if (!periodStart || !periodEnd) { showError('Period dates are missing. Please close and reopen the panel.'); return; }
+    if (isNaN(overrideValue)) { showError('Please enter a valid numeric value'); return; }
+
+    var periodStartISO = new Date(periodStart + 'T00:00:00Z').toISOString();
+    var periodEndISO = new Date(periodEnd + 'T23:59:59Z').toISOString();
+
+    var saveBtn = document.getElementById('saveOverrideBtn');
+    var saveBtnText = document.getElementById('saveOverrideBtnText');
+    if (saveBtn) saveBtn.disabled = true;
+    if (saveBtnText) saveBtnText.textContent = 'Saving...';
+
+    try {
+      await api.post('/api/v1/modules/' + moduleKey + '/data-overrides', {
+        metricKey: currentOverrideMetric.key,
+        periodStart: periodStartISO, periodEnd: periodEndISO,
+        periodType: periodType, overrideValue: overrideValue,
+        overrideType: overrideType, notes: overrideNotes || null
+      });
+      showInfo('Override saved for ' + currentOverrideMetric.name + '. Re-execute module to see updated values.');
+      closeDataOverridePanel();
+    } catch (error) {
+      console.error('Failed to save override:', error);
+      showError(error.message || 'Failed to save override. Please try again.');
+    } finally {
+      if (saveBtn) saveBtn.disabled = false;
+      if (saveBtnText) saveBtnText.textContent = 'Save Override';
+    }
+  }
+
+  async function deleteOverride(overrideId) {
+    if (!confirm('Are you sure you want to delete this override?')) return;
+    var moduleKey = selectedModuleKey;
+
+    try {
+      await api.delete('/api/v1/modules/' + moduleKey + '/data-overrides/' + overrideId);
+      showInfo('Override deleted successfully. Re-execute module to see updated values.');
+      var periodStart = document.getElementById('periodStart').value;
+      var periodEnd = document.getElementById('periodEnd').value;
+      if (currentOverrideMetric) {
+        await loadExistingOverrides(moduleKey, currentOverrideMetric.key, periodStart, periodEnd);
+      }
+    } catch (error) {
+      console.error('Failed to delete override:', error);
+      showError(error.message || 'Failed to delete override. Please try again.');
+    }
+  }
+
+  // ==========================================================================
+  // Window Namespace Exposure
+  // ==========================================================================
+
+  window._reporting = {
+    showModuleInfo: showModuleInfo,
+    closeModuleInfo: closeModuleInfo,
+    exportToPDF: exportToPDF,
+    exportToCSV: exportToCSV,
+    closeDrilldownModal: closeDrilldownModal,
+    openGenericDrilldown: openGenericDrilldown,
+    showMetricDrilldown: showMetricDrilldown,
+    openDataOverridePanel: openDataOverridePanel,
+    closeDataOverridePanel: closeDataOverridePanel,
+    deleteOverride: deleteOverride,
+    closeDataSourcesModal: closeDataSourcesModal,
+    closeMissingEntitiesModal: closeMissingEntitiesModal
+  };
+
+  // Also expose individually for V1 compat onclick handlers
+  window.showMetricDrilldown = showMetricDrilldown;
+  window.openGenericDrilldown = openGenericDrilldown;
+  window.closeDrilldownModal = closeDrilldownModal;
+  window.closeDataSourcesModal = closeDataSourcesModal;
+  window.closeMissingEntitiesModal = closeMissingEntitiesModal;
+  window.closeModuleInfo = closeModuleInfo;
+  window.showModuleInfo = showModuleInfo;
+  window.openDataOverridePanel = openDataOverridePanel;
+  window.closeDataOverridePanel = closeDataOverridePanel;
+  window.deleteOverride = deleteOverride;
+
+  // ==========================================================================
   // Init
   // ==========================================================================
 
@@ -494,6 +2295,28 @@
     loadModules();
     initModuleSearch();
     initPeriodControls();
+
+    // Data sources button
+    var dataSourcesBtn = document.getElementById('dataSourcesBtn');
+    if (dataSourcesBtn) {
+      dataSourcesBtn.addEventListener('click', openDataSourcesModal);
+    }
+
+    // Missing entities button
+    var missingEntitiesBtn = document.getElementById('missingEntitiesBtn');
+    if (missingEntitiesBtn) {
+      missingEntitiesBtn.addEventListener('click', openMissingEntitiesModal);
+    }
+
+    // Data override panel close handlers
+    var overlayEl = document.getElementById('dataOverrideOverlay');
+    if (overlayEl) overlayEl.addEventListener('click', closeDataOverridePanel);
+    var closePanelBtn = document.getElementById('closeDataOverridePanel');
+    if (closePanelBtn) closePanelBtn.addEventListener('click', closeDataOverridePanel);
+
+    // Override form submit
+    var overrideForm = document.getElementById('overrideForm');
+    if (overrideForm) overrideForm.addEventListener('submit', saveOverride);
   }
 
   if (typeof LexRouter !== 'undefined') {

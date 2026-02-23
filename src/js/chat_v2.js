@@ -147,7 +147,7 @@
     if (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.go === 'function') {
       Lex.Nav.go('workspace-details.html', {
         params: { id: matterId, tab: 'activity' },
-        context: { matterId: matterId, tab: 'activity' }
+        context: { matterId: matterId, tab: 'activity', source: 'chat', conversationId: _conversationId, conversationTitle: _sessionTitle }
       });
     } else {
       window.location.href = 'workspace-details.html?id=' + encodeURIComponent(matterId);

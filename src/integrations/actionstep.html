@@ -28,6 +28,8 @@
   <template id="page-content">
 
     <main class="p-4 lg:p-8">
+      <lex-breadcrumb items='[{"label":"Data Connectors","href":"data-connectors.html"},{"label":"ActionStep Dashboard"}]'></lex-breadcrumb>
+
       <!-- Dashboard Content (Always Visible) -->
       <div id="dashboardContent" class="hidden">
         <!-- Summary Stats -->
@@ -341,6 +343,7 @@
   <script src="../js/lex/components/layout/lex-conversation-item.js"></script>
   <script src="../js/lex/components/layout/lex-notification-panel.js"></script>
   <script src="../js/lex/components/layout/lex-app.js"></script>
+  <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
 
   <!-- Inject page content + hoist modals -->
   <script src="../js/lex/lex-page-init.js"></script>

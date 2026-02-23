@@ -236,9 +236,16 @@
       title: 'Reports',
       activeNav: 'reports',
       scripts: [
+        'js/vendor/chart.js',
+        'js/vendor/jspdf.umd.min.js',
+        'js/vendor/jspdf.plugin.autotable.min.js',
+        'js/vendor/marked.min.js',
+        'js/drilldown-renderer.js',
         'js/admin/reporting.js'
       ],
-      stylesheets: []
+      stylesheets: [
+        'insights/raw-data-viewer.css'
+      ]
     },
 
     'admin/plugins.html': {
