@@ -204,6 +204,8 @@
       periodTypeEl.options = allOptions;
       if (['daily', 'weekly', 'monthly', 'quarterly', 'yearly'].indexOf(currentValue) !== -1) {
         periodTypeEl.value = currentValue;
+      } else {
+        periodTypeEl.value = 'monthly';
       }
     }
   }
@@ -427,7 +429,7 @@
 
     var startDate = periodStartEl ? periodStartEl.value : '';
     var endDate = periodEndEl ? periodEndEl.value : '';
-    var periodType = periodTypeEl ? periodTypeEl.value : 'monthly';
+    var periodType = (periodTypeEl && periodTypeEl.value) ? periodTypeEl.value : 'monthly';
 
     if (!startDate || !endDate) {
       showError('Please select a date range.');
@@ -2091,7 +2093,7 @@
     var periodTypeEl = document.getElementById('periodType');
     var periodStartEl = document.getElementById('periodStart');
     var periodEndEl = document.getElementById('periodEnd');
-    var periodType = periodTypeEl ? periodTypeEl.value : 'monthly';
+    var periodType = (periodTypeEl && periodTypeEl.value) ? periodTypeEl.value : 'monthly';
     var periodStart = periodStartEl ? periodStartEl.value : '';
     var periodEnd = periodEndEl ? periodEndEl.value : '';
 
@@ -2291,6 +2293,96 @@
   // Init
   // ==========================================================================
 
+  // ==========================================================================
+  // LANA Insights Panel
+  // ==========================================================================
+
+  var insightsDrawer = null;
+  var insightsChatEl = null;
+
+  function injectLanaButton() {
+    var topbarRight = document.querySelector('.lex-topbar-right');
+    if (!topbarRight) return;
+
+    // Don't inject twice
+    if (topbarRight.querySelector('.lana-insights-btn')) return;
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'lana-insights-btn';
+    btn.innerHTML = '<span class="lana-btn-icon">'
+      + '<svg class="lana-btn-corner-tl" width="8" height="8" viewBox="0 0 8 8" fill="none">'
+      + '<path d="M0 0L8 0M0 0L0 8" stroke="currentColor" stroke-width="1.5"/>'
+      + '</svg>'
+      + '<svg class="lana-btn-corner-br" width="8" height="8" viewBox="0 0 8 8" fill="none">'
+      + '<path d="M8 8L0 8M8 8L8 0" stroke="currentColor" stroke-width="1.5"/>'
+      + '</svg>'
+      + '</span>'
+      + '<span>LANA</span>';
+    btn.addEventListener('click', openInsightsPanel);
+
+    // Add divider then button (right of settings)
+    var divider = document.createElement('span');
+    divider.className = 'lana-topbar-divider';
+    topbarRight.appendChild(divider);
+    topbarRight.appendChild(btn);
+  }
+
+  function openInsightsPanel() {
+    if (insightsDrawer) return;
+
+    insightsDrawer = document.createElement('lex-drawer');
+    insightsDrawer.setAttribute('heading', 'LANA Insights');
+    insightsDrawer.setAttribute('side', 'right');
+    insightsDrawer.setAttribute('width', 'lg');
+    insightsDrawer.setAttribute('open', 'true');
+
+    insightsChatEl = document.createElement('lex-chat');
+    insightsChatEl.setAttribute('context-type', 'insights_chat');
+    insightsChatEl.setAttribute('source', 'sse');
+    insightsChatEl.setAttribute('placeholder', 'Ask about forecasts, trends, and insights...');
+    insightsChatEl.style.height = '100%';
+
+    insightsDrawer.appendChild(insightsChatEl);
+    document.body.appendChild(insightsDrawer);
+
+    // The drawer clones child elements during render, so the original
+    // insightsChatEl reference becomes detached. Re-acquire the live element.
+    insightsChatEl = insightsDrawer.querySelector('lex-chat');
+
+    // Customize composer: select insights_chat tool and lock tools
+    setTimeout(function () {
+      if (!insightsChatEl) return;
+      var composer = insightsChatEl.querySelector('lex-chat-composer');
+      if (!composer) return;
+
+      // Hide the plus button (no document management in insights mode)
+      var plusBtn = composer.querySelector('[data-plus]');
+      if (plusBtn && plusBtn.parentElement) {
+        plusBtn.parentElement.style.display = 'none';
+      }
+
+      // Pre-select insights_chat tool and lock the tools button
+      composer.setActiveTools(['insights_chat']);
+      composer.setToolsLocked(true);
+    }, 150);
+
+    insightsDrawer.addEventListener('lex-close', function () {
+      if (insightsChatEl && insightsChatEl.disconnect) {
+        insightsChatEl.disconnect();
+      }
+      insightsChatEl = null;
+      if (insightsDrawer && insightsDrawer.parentNode) {
+        insightsDrawer.remove();
+      }
+      insightsDrawer = null;
+    });
+  }
+
+  // ==========================================================================
+  // Init
+  // ==========================================================================
+
   function init() {
     loadModules();
     initModuleSearch();
@@ -2317,6 +2409,9 @@
     // Override form submit
     var overrideForm = document.getElementById('overrideForm');
     if (overrideForm) overrideForm.addEventListener('submit', saveOverride);
+
+    // Inject LANA button after a short delay to ensure topbar has rendered
+    setTimeout(injectLanaButton, 200);
   }
 
   if (typeof LexRouter !== 'undefined') {

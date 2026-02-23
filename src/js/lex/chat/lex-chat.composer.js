@@ -123,6 +123,11 @@
         border-color: var(--lex-chat-text-dim);
       }
       .lex-cmp-tools-chip svg { width: 12px; height: 12px; }
+      .lex-cmp-tools-chip[disabled] {
+        opacity: 0.45;
+        cursor: default;
+        pointer-events: none;
+      }
 
       /* ── Active mode chip ───────────────────────────────────── */
       .lex-cmp-active-chips {
@@ -407,6 +412,7 @@
   const ICON_WRENCH   = `<svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>`;
   const ICON_FILE     = `<svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
   const ICON_ZAP      = `<svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`;
+  const ICON_EYE      = `<svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>`;
   const ICON_FOLDER   = `<svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>`;
   const ICON_SEARCH   = `<svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>`;
   const ICON_FILE_TEXT = `<svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`;
@@ -416,8 +422,9 @@
   // ---------------------------------------------------------------------------
 
   const DEFAULT_TOOLS = [
-    { id: 'document_chat', label: 'Document Chat', icon: ICON_FILE, description: 'Ask questions about specific documents' },
-    { id: 'agentic',       label: 'Agentic Mode',  icon: ICON_ZAP,  description: 'AI performs multi-step research and analysis' }
+    { id: 'document_chat',  label: 'Document Chat',  icon: ICON_FILE, description: 'Ask questions about specific documents' },
+    { id: 'agentic',        label: 'Agentic Mode',   icon: ICON_ZAP,  description: 'AI performs multi-step research and analysis' },
+    { id: 'insights_chat',  label: 'Insights Chat',  icon: ICON_EYE,  description: 'Ask about forecasts, trends, and insights' }
   ];
 
   // ---------------------------------------------------------------------------
@@ -443,6 +450,7 @@
       this._textarea = null;
       this._plusOpen = false;
       this._toolsOpen = false;
+      this._toolsLocked = false;
       this._docPickerOpen = false;
       this._docPickerQuery = '';
       this._docResults = [];
@@ -509,7 +517,7 @@
               </div>
             </div>
             <div class="lex-cmp-anchor">
-              <button type="button" class="lex-cmp-tools-chip" data-tools-btn>${ICON_WRENCH}<span>Tools</span></button>
+              <button type="button" class="lex-cmp-tools-chip" data-tools-btn ${this._toolsLocked ? 'disabled' : ''}>${ICON_WRENCH}<span>Tools</span></button>
               <div class="lex-cmp-popover lex-cmp-popover--tools" data-pop-tools></div>
             </div>
             <span class="lex-cmp-active-chips" data-active-chips></span>
@@ -652,6 +660,7 @@
     }
 
     _toggleTools() {
+      if (this._toolsLocked) return;
       this._toolsOpen = !this._toolsOpen;
       this._plusOpen = false;
       this._syncPopovers();
@@ -684,6 +693,7 @@
     _getTools() { return this.tools || DEFAULT_TOOLS; }
 
     _toggleTool(id) {
+      if (this._toolsLocked) return;
       const active = [...(this.activeTools || [])];
       const idx = active.indexOf(id);
       if (idx >= 0) {
@@ -700,6 +710,7 @@
     }
 
     _removeTool(id) {
+      if (this._toolsLocked) return;
       const active = [...(this.activeTools || [])];
       const idx = active.indexOf(id);
       if (idx < 0) return;
@@ -735,6 +746,7 @@
       if (!container) return;
       const tools = this._getTools();
       const active = this.activeTools || [];
+      const locked = this._toolsLocked;
 
       container.innerHTML = active.map(id => {
         const t = tools.find(x => x.id === id);
@@ -743,7 +755,7 @@
           <div class="lex-cmp-active-chip">
             ${t.icon || ''}
             <span>${esc(t.label)}</span>
-            <button class="lex-cmp-chip-x" data-dismiss-tool="${id}" title="Remove ${esc(t.label)}">${ICON_CLOSE}</button>
+            ${locked ? '' : `<button class="lex-cmp-chip-x" data-dismiss-tool="${id}" title="Remove ${esc(t.label)}">${ICON_CLOSE}</button>`}
           </div>`;
       }).join('');
     }
@@ -934,6 +946,20 @@
     setActiveTools(ids) {
       this._props.activeTools = ids || [];
       this._refreshToolsPopover();
+      this._refreshActiveChips();
+    }
+
+    /**
+     * Lock or unlock tools. When locked, the tools button is disabled and
+     * active tool chips cannot be dismissed.
+     */
+    setToolsLocked(locked) {
+      this._toolsLocked = !!locked;
+      const btn = this.querySelector('[data-tools-btn]');
+      if (btn) {
+        if (this._toolsLocked) btn.setAttribute('disabled', '');
+        else btn.removeAttribute('disabled');
+      }
       this._refreshActiveChips();
     }
 

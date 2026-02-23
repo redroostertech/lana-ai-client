@@ -44,6 +44,7 @@
         matterId:       { type: String, default: null, attribute: 'matter-id' },
         maxHistory:     { type: Number, default: 50, attribute: 'max-history' },
         chatMode:       { type: String, default: 'general', attribute: 'chat-mode' },
+        contextType:    { type: String, default: null, attribute: 'context-type' },
         showComposer:   { type: Boolean, default: true, attribute: 'show-composer' },
         placeholder:    { type: String, default: 'Message Lana AI...' },
         theme:          { type: String, default: null }
@@ -190,6 +191,8 @@
           if (this._documentsEl) this._documentsEl.mode = 'document';
         } else if (toolId === 'agentic') {
           localStorage.setItem('chatMode', 'agentic');
+        } else if (toolId === 'insights_chat') {
+          this._props.chatMode = 'insights';
         }
         this.emit('lex-chat-tool-select', { toolId });
       });
@@ -204,6 +207,8 @@
           }
         } else if (toolId === 'agentic') {
           localStorage.setItem('chatMode', 'general');
+        } else if (toolId === 'insights_chat') {
+          this._props.chatMode = 'general';
         }
         this.emit('lex-chat-tool-dismiss', { toolId });
       });
@@ -292,6 +297,7 @@
       const sendOpts = { ...opts };
       const chatModeStored = localStorage.getItem('chatMode');
       if (chatModeStored === 'agentic') sendOpts.forceAgentic = true;
+      if (this.contextType) sendOpts.contextType = this.contextType;
 
       // Connect if needed
       if (!this._source.connected) {
