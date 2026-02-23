@@ -711,33 +711,30 @@
     // Linked Matters section
     html += '<div id="linkedMattersSection"></div>';
 
-    // Contacts section
-    html += '<div id="contactsSection"></div>';
-
-    // Connected Data section
+    // Unified Connected Data section (contacts + integrations)
     html += '<div id="connectedDataSection"></div>';
 
-    html += '</div>'; // close space-y-4 wrapper
+    html += '</div>';
 
     panel.innerHTML = html;
 
     // Render sub-sections
     renderMatterProfileSection(matter);
     renderLinkedMattersInDock(matter);
-    renderContactsInDock(matter);
-    renderDockConnectedData(matter);
+    renderUnifiedConnectedDataDock(matter);
   }
 
-  async function renderDockConnectedData(matter) {
+  async function renderUnifiedConnectedDataDock(matter) {
     var section = document.getElementById('connectedDataSection');
     if (!section) return;
 
     try {
+      // Fetch contacts and connector data
+      var contacts = (currentMatterData && currentMatterData.contacts) || matter.contacts || [];
       var response = await api.getMatterConnectorData(matter.matter_id);
-      var summary = response.summary || { total_records: 0, connectors: [] };
       var dataGroups = response.data || {};
 
-      // Flatten grouped data into a flat array for the dock summary
+      // Flatten connector records
       var records = [];
       var groupKeys = Object.keys(dataGroups);
       for (var gi = 0; gi < groupKeys.length; gi++) {
@@ -749,51 +746,78 @@
         }
       }
 
-      var connActions = JSON.stringify([{icon:'link',label:'Link'}]).split('"').join('&quot;');
+      var totalCount = contacts.length + records.length;
+      var cardActions = JSON.stringify([
+        {icon:'plus', label:'Add'},
+        {icon:'maximize-2', label:'View All'}
+      ]).split('"').join('&quot;');
 
-      if (records.length === 0) {
-        section.innerHTML = '<lex-card id="connectedDataCard" heading="Connected Data" variant="flat" padding="compact" actions=\'' + connActions + '\'>' +
-          '<p class="text-sm text-gray-500">No connected data</p>' +
-        '</lex-card>';
-        _wireConnectedDataAction(matter);
-        return;
-      }
+      var headingText = 'Connected Data' + (totalCount > 0 ? ' (' + totalCount + ')' : '');
 
-      var contentHtml = '<lex-card id="connectedDataCard" heading="Connected Data (' + records.length + ')" variant="flat" padding="compact" actions=\'' + connActions + '\'>';
-      contentHtml += '<div class="space-y-2">';
-      records.slice(0, 5).forEach(function (record) {
-        var entityLabel = record.entity_type ? record.entity_type.split('_').join(' ') : 'Unknown';
-        contentHtml += '<div class="p-2 rounded-lg border border-gray-200 text-xs">' +
-          '<div class="flex items-center gap-2 mb-1">' +
-            '<span class="px-1.5 py-0.5 rounded font-medium" style="background: var(--lex-bg-accent-soft); color: var(--lex-text-accent)">' + escapeHtml(record.connector_name || '') + '</span>' +
-            '<span class="text-gray-500">' + entityLabel + '</span>' +
-          '</div>' +
-          '<p class="text-gray-700 truncate">' + escapeHtml(record.data?.name || record.data?.title || record.external_id || '') + '</p>' +
-        '</div>';
-      });
-      if (records.length > 5) {
-        contentHtml += '<p class="text-xs text-gray-500 text-center">+ ' + (records.length - 5) + ' more</p>';
-      }
-      contentHtml += '</div>';
-      contentHtml += '</lex-card>';
+      var html = '<lex-card id="connectedDataCard" heading="' + headingText + '" variant="flat" padding="compact" actions=\'' + cardActions + '\'>';
 
-      section.innerHTML = contentHtml;
-      _wireConnectedDataAction(matter);
+      if (totalCount === 0) {
+        html += '<p class="text-sm text-gray-500">No connected data</p>';
+      } else {
+        html += '<div class="space-y-3">';
 
-    } catch (error) {
-      console.error('[renderDockConnectedData] Error:', error);
-      section.innerHTML = '';
-    }
-  }
-
-  function _wireConnectedDataAction(matter) {
-    var cdCard = document.getElementById('connectedDataCard');
-    if (cdCard) {
-      cdCard.addEventListener('card-action', function (e) {
-        if (e.detail && e.detail.action === 'link' && matter && matter.matter_id) {
-          showManualConnectModal(matter.matter_id);
+        // Contacts chips
+        if (contacts.length > 0) {
+          html += '<div>';
+          html += '<p class="text-xs font-medium text-gray-500 mb-1.5">Contacts</p>';
+          html += '<div class="flex items-center flex-wrap gap-2">';
+          var showContacts = Math.min(contacts.length, 3);
+          for (var ci = 0; ci < showContacts; ci++) {
+            html += buildContactChip(contacts[ci], ci, matter.matter_id);
+          }
+          if (contacts.length > 3) {
+            html += '<span class="text-xs text-gray-500">+' + (contacts.length - 3) + ' more</span>';
+          }
+          html += '</div></div>';
         }
-      });
+
+        // Connector records
+        if (records.length > 0) {
+          if (contacts.length > 0) {
+            html += '<div style="border-top:1px solid var(--lex-border-subtle);margin:4px 0;"></div>';
+          }
+          html += '<div>';
+          html += '<p class="text-xs font-medium text-gray-500 mb-1.5">Integrations</p>';
+          records.slice(0, 5).forEach(function (record) {
+            var entityLabel = record.entity_type ? record.entity_type.split('_').join(' ') : 'Unknown';
+            html += '<div class="p-2 rounded-lg border border-gray-200 text-xs">' +
+              '<div class="flex items-center gap-2 mb-1">' +
+                '<span class="px-1.5 py-0.5 rounded font-medium" style="background:var(--lex-bg-accent-soft);color:var(--lex-text-accent)">' + escapeHtml(record.connector_name || '') + '</span>' +
+                '<span class="text-gray-500">' + entityLabel + '</span>' +
+              '</div>' +
+              '<p class="text-gray-700 truncate">' + escapeHtml(record.data?.name || record.data?.title || record.external_id || '') + '</p>' +
+            '</div>';
+          });
+          if (records.length > 5) {
+            html += '<p class="text-xs text-gray-500 text-center">+ ' + (records.length - 5) + ' more records</p>';
+          }
+          html += '</div>';
+        }
+
+        html += '</div>';
+      }
+      html += '</lex-card>';
+
+      section.innerHTML = html;
+
+      // Wire card actions
+      var card = document.getElementById('connectedDataCard');
+      if (card) {
+        card.addEventListener('card-action', function (e) {
+          if (!e.detail) return;
+          if (e.detail.action === 'plus' || e.detail.action === 'maximize-2') {
+            openConnectedDataModal(matter);
+          }
+        });
+      }
+    } catch (error) {
+      console.error('[renderUnifiedConnectedDataDock] Error:', error);
+      section.innerHTML = '';
     }
   }
 
@@ -806,48 +830,6 @@
       '<span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white" style="background: var(--lex-color-blue-600, #2563eb)">' + initial + '</span>' +
       escapeHtml(label) +
     '</button>';
-  }
-
-  async function renderContactsInDock(matter) {
-    var section = document.getElementById('contactsSection');
-    if (!section) return;
-
-    try {
-      var contacts = (currentMatterData && currentMatterData.contacts) || matter.contacts || [];
-      var matterId = matter.matter_id;
-
-      var contactActions = JSON.stringify([{icon:'plus',label:'Add'}]).split('"').join('&quot;');
-      var html = '<lex-card id="contactsCard" heading="Contacts" variant="flat" padding="compact" actions=\'' + contactActions + '\'>';
-
-      if (contacts.length === 0) {
-        html += '<p class="text-sm text-gray-500">No contacts</p>';
-      } else {
-        html += '<div class="flex items-center flex-wrap gap-2">';
-        var showCount = Math.min(contacts.length, 3);
-        for (var ci = 0; ci < showCount; ci++) {
-          html += buildContactChip(contacts[ci], ci, matterId);
-        }
-        if (contacts.length > 3) {
-          html += '<button onclick="openContactsDrawer()" class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium cursor-pointer lex-bg-neutral lex-text-neutral transition-all hover:shadow-sm">+' + (contacts.length - 3) + ' more</button>';
-        }
-        html += '</div>';
-      }
-      html += '</lex-card>';
-
-      section.innerHTML = html;
-
-      // Wire add-contact action directly
-      var cCard = document.getElementById('contactsCard');
-      if (cCard) {
-        cCard.addEventListener('card-action', function (e) {
-          if (e.detail && e.detail.action === 'plus' && matter && matter.matter_id) {
-            openAddContactModal(matter.matter_id);
-          }
-        });
-      }
-    } catch (error) {
-      console.error('[renderContactsInDock] Error:', error);
-    }
   }
 
   // =========================================================================
@@ -876,6 +858,12 @@
     if (!section) return;
 
     var isWorkspace = matter.matter_type === 'workspace';
+
+    // Only show linked matters for workspaces
+    if (!isWorkspace) {
+      section.innerHTML = '';
+      return;
+    }
 
     try {
       var response = await fetch(api.baseUrl + '/api/v1/entity-links/matter/' + matter.matter_id, {
@@ -1339,13 +1327,8 @@
     // Empty state
     if (documents.length === 0 && orphanedFiles.length === 0) {
       container.innerHTML =
-        '<div class="text-center py-12">' +
-          '<svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>' +
-          '</svg>' +
-          '<h4 class="text-lg font-semibold text-gray-900 mb-2">No documents yet</h4>' +
-          '<p class="text-gray-500 mb-6">Upload documents to this matter to enable AI-powered search and analysis</p>' +
-          '<div id="drawerEmptyDropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:lex-border-accent transition-colors cursor-pointer">' +
+        '<div class="py-6">' +
+          '<div id="drawerEmptyDropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:lex-border-accent transition-colors cursor-pointer mb-6">' +
             '<input type="file" id="drawerEmptyFileInput" multiple accept=".pdf,.doc,.docx,.txt,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.pptx,.ppt" class="hidden">' +
             '<div class="text-center">' +
               '<svg class="mx-auto h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
@@ -1356,6 +1339,13 @@
               '</p>' +
               '<p class="mt-1 text-xs text-gray-500">PDF, Word, Excel, Images up to 50MB</p>' +
             '</div>' +
+          '</div>' +
+          '<div class="text-center">' +
+            '<svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+              '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>' +
+            '</svg>' +
+            '<h4 class="text-lg font-semibold text-gray-900 mb-2">No documents yet</h4>' +
+            '<p class="text-gray-500">Upload documents to this matter to enable AI-powered search and analysis</p>' +
           '</div>' +
         '</div>';
       setupDrawerUpload(matter, 'drawerEmptyDropZone', 'drawerEmptyFileInput');
@@ -3595,6 +3585,12 @@
     var content = document.getElementById('linkedMattersSection');
     if (!content) return;
 
+    // Only show linked matters for workspaces
+    if (matter.matter_type !== 'workspace') {
+      content.innerHTML = '';
+      return;
+    }
+
     content.innerHTML =
       '<div class="flex items-center justify-center py-6">' +
         '<div class="animate-spin rounded-full h-6 w-6 border-b-2 lex-border-accent"></div>' +
@@ -5099,6 +5095,277 @@
 
   ['showManualConnectModal', 'closeManualConnectModal', 'loadAvailableConnectors',
    'performManualConnectSearch', 'renderSearchResultCard', 'linkConnectorData'].forEach(_trackGlobal);
+
+  // =========================================================================
+  // Full-screen Connected Data Modal
+  // =========================================================================
+
+  // Connected Data modal state
+  var _cdModalMatter = null;
+  var _cdModalSearchTimeout = null;
+  var _cdModalWired = false;
+
+  function _cdModalBulkAction(action, items) {
+    if (!_cdModalMatter || items.length === 0) return;
+    var matterId = _cdModalMatter.matter_id;
+    var promises = [];
+    var skipped = 0;
+
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      var id = item.id || '';
+
+      if (action === 'link') {
+        // Only link available connector data (skip contacts and already-linked)
+        if (item.status === 'Linked' || item._linkType === 'contact' || id.indexOf('contact_') === 0) {
+          skipped++;
+          continue;
+        }
+        promises.push(api.linkConnectorDataToMatter(matterId, id));
+      } else if (action === 'unlink') {
+        // Only unlink linked connector data (skip contacts and available)
+        if (item.status === 'Available' || item._linkType === 'contact' || id.indexOf('contact_') === 0) {
+          skipped++;
+          continue;
+        }
+        promises.push(api.unlinkConnectorDataFromMatter(matterId, id));
+      }
+    }
+
+    if (promises.length === 0) {
+      var msg = action === 'link'
+        ? 'No available records selected to link.'
+        : 'No linked records selected to unlink.';
+      if (window.Lex && Lex.Toast) {
+        Lex.Toast.warn(msg);
+      }
+      return;
+    }
+
+    Promise.all(promises).then(function () {
+      var verb = action === 'link' ? 'linked' : 'unlinked';
+      var successMsg = promises.length + ' record' + (promises.length > 1 ? 's' : '') + ' ' + verb + ' successfully.';
+      if (skipped > 0) {
+        successMsg += ' (' + skipped + ' skipped)';
+      }
+      if (window.Lex && Lex.Toast) {
+        Lex.Toast.success(successMsg);
+      }
+      // Refresh the table and dock panel
+      _cdModalSearch();
+      if (_cdModalMatter) {
+        renderUnifiedConnectedDataDock(_cdModalMatter);
+      }
+    }).catch(function (err) {
+      console.error('[ConnectedDataModal] Bulk ' + action + ' error:', err);
+      if (window.Lex && Lex.Toast) {
+        Lex.Toast.error('Failed to ' + action + ' some records. Please try again.');
+      }
+      _cdModalSearch();
+    });
+  }
+
+  function openConnectedDataModal(matter) {
+    var modal = document.getElementById('connectedDataFullModal');
+    if (!modal) return;
+    _cdModalMatter = matter;
+    modal.heading = 'Connected Data \u2014 ' + (matter.matter_name || matter.name || '');
+    modal.open = true;
+
+    // Defer DOM queries until modal content + lex-table are upgraded
+    requestAnimationFrame(function () { requestAnimationFrame(function () {
+      var table = document.getElementById('cdModalTable');
+      var searchInput = document.getElementById('cdModalSearch');
+      var entityTypeSelect = document.getElementById('cdModalEntityType');
+      var connectorSelect = document.getElementById('cdModalConnector');
+
+      // Reset filters
+      if (searchInput) searchInput.value = '';
+      if (entityTypeSelect) entityTypeSelect.value = '';
+      if (connectorSelect) connectorSelect.value = '';
+
+      // Set table columns and bulk actions
+      if (table) {
+        table.setAttribute('columns', 'source,type,name,detail,status');
+        table.setAttribute('labels', 'Source,Type,Name,Detail,Status');
+        table.setAttribute('empty-text', 'No data available. Connect an integration to sync data.');
+        table.bulkActions = [
+          { label: 'Link Selected', action: 'link', variant: 'primary', icon: 'link' },
+          { label: 'Unlink Selected', action: 'unlink', variant: 'danger', icon: 'unlink' }
+        ];
+      }
+
+      // Populate connector dropdown from all available connector data
+      api.searchConnectorDataForLinking(_cdModalMatter.matter_id, { limit: 100 }).then(function (response) {
+        var results = response.results || [];
+        var cs = document.getElementById('cdModalConnector');
+        if (cs && results.length > 0) {
+          var seen = {};
+          var connOpts = [{ value: '', label: 'All Connectors' }];
+          for (var si = 0; si < results.length; si++) {
+            var cid = results[si].connector_id;
+            if (cid && !seen[cid]) {
+              seen[cid] = true;
+              connOpts.push({
+                value: cid,
+                label: results[si].connector_name || cid
+              });
+            }
+          }
+          cs.options = connOpts;
+        }
+      }).catch(function () {});
+
+      // Wire events only once (modal DOM persists between opens)
+      if (!_cdModalWired) {
+        _cdModalWired = true;
+
+        if (searchInput) {
+          searchInput.addEventListener('lex-input', function () {
+            clearTimeout(_cdModalSearchTimeout);
+            _cdModalSearchTimeout = setTimeout(_cdModalSearch, 300);
+          });
+        }
+        if (entityTypeSelect) {
+          entityTypeSelect.addEventListener('lex-change', function () { _cdModalSearch(); });
+        }
+        if (connectorSelect) {
+          connectorSelect.addEventListener('lex-change', function () { _cdModalSearch(); });
+        }
+
+        // Bulk link/unlink actions
+        if (table) {
+          table.addEventListener('bulk-action', function (e) {
+            if (!e.detail || !_cdModalMatter) return;
+            var action = e.detail.action;
+            var items = e.detail.items || [];
+            if (items.length === 0) return;
+            _cdModalBulkAction(action, items);
+          });
+        }
+      }
+
+      // Load all available data on open
+      _cdModalSearch();
+    }); });
+  }
+
+  function _cdModalSearch() {
+    var table = document.getElementById('cdModalTable');
+    if (!table) return;
+    if (typeof table.setData !== 'function') {
+      setTimeout(_cdModalSearch, 100);
+      return;
+    }
+    if (!_cdModalMatter) return;
+
+    var searchInput = document.getElementById('cdModalSearch');
+    var entityTypeSelect = document.getElementById('cdModalEntityType');
+    var connectorSelect = document.getElementById('cdModalConnector');
+
+    var search = searchInput ? (searchInput.value || '').trim() : '';
+    var entityType = entityTypeSelect ? (entityTypeSelect.value || '') : '';
+    var connectorId = connectorSelect ? (connectorSelect.value || '') : '';
+    var searchLower = search.toLowerCase();
+
+    // Fetch both linked and available data in parallel
+    var linkedPromise = api.getMatterConnectorData(_cdModalMatter.matter_id).catch(function () { return { data: {} }; });
+    var availablePromise = api.searchConnectorDataForLinking(_cdModalMatter.matter_id, {
+      search: search, entity_type: entityType, connector_id: connectorId, limit: 100
+    }).catch(function () { return { results: [] }; });
+
+    Promise.all([linkedPromise, availablePromise]).then(function (responses) {
+      var linkedResponse = responses[0];
+      var availableResponse = responses[1];
+      var rows = [];
+
+      // 1) Add contacts (already linked to matter)
+      var contacts = (currentMatterData && currentMatterData.contacts) || _cdModalMatter.contacts || [];
+      if (!entityType || entityType === 'contact') {
+        for (var ci = 0; ci < contacts.length; ci++) {
+          var c = contacts[ci];
+          var fullName = ((c.first_name || '') + ' ' + (c.last_name || '')).trim() || c.display_name || 'Unknown';
+          if (searchLower) {
+            var haystack = (fullName + ' ' + (c.email || '') + ' ' + (c.phone || '')).toLowerCase();
+            if (haystack.indexOf(searchLower) === -1) continue;
+          }
+          rows.push({
+            id: 'contact_' + (c.id || ci),
+            source: 'LANA',
+            type: 'Contact',
+            name: fullName,
+            detail: c.email || c.phone || '--',
+            status: 'Linked',
+            _linkType: 'contact'
+          });
+        }
+      }
+
+      // 2) Add linked connector data records
+      var linkedGroups = linkedResponse.data || {};
+      var linkedIds = {};
+      var groupKeys = Object.keys(linkedGroups);
+      for (var gi = 0; gi < groupKeys.length; gi++) {
+        var records = linkedGroups[groupKeys[gi]];
+        if (!Array.isArray(records)) continue;
+        for (var li = 0; li < records.length; li++) {
+          var lr = records[li];
+          var lrEntityLabel = lr.entity_type ? lr.entity_type.split('_').join(' ') : 'Unknown';
+          var lrData = lr.data || {};
+          var lrName = lrData.name || lrData.title || lr.external_id || '';
+          var lrDetail = lrData.description || lrData.email || lrData.status || lr.external_id || '';
+
+          // Apply client-side filters for linked records
+          if (entityType && lr.entity_type !== entityType) continue;
+          if (connectorId && lr.connector_id !== connectorId) continue;
+          if (searchLower) {
+            var lrHaystack = (lrName + ' ' + lrDetail + ' ' + (lr.connector_name || '')).toLowerCase();
+            if (lrHaystack.indexOf(searchLower) === -1) continue;
+          }
+
+          linkedIds[lr.id] = true;
+          rows.push({
+            id: lr.id || '',
+            source: lr.connector_name || lr.connector_id || '',
+            type: lrEntityLabel,
+            name: lrName,
+            detail: lrDetail,
+            status: 'Linked',
+            _linkType: 'connector'
+          });
+        }
+      }
+
+      // 3) Add available (unlinked) connector data records
+      var availableResults = availableResponse.results || [];
+      for (var ri = 0; ri < availableResults.length; ri++) {
+        var r = availableResults[ri];
+        if (linkedIds[r.id]) continue; // skip duplicates
+        var entityLabel = r.entity_type ? r.entity_type.split('_').join(' ') : 'Unknown';
+        var data = r.data || {};
+        var recordName = data.name || data.title || r.external_id || '';
+        var detail = data.description || data.email || data.status || r.external_id || '';
+
+        rows.push({
+          id: r.id || '',
+          source: r.connector_name || r.connector_id || '',
+          type: entityLabel,
+          name: recordName,
+          detail: detail,
+          status: 'Available',
+          _linkType: 'connector'
+        });
+      }
+
+      table.setData(rows);
+    }).catch(function (err) {
+      console.error('[ConnectedDataModal] Search error:', err);
+      table.setData([]);
+    });
+  }
+
+  window.openConnectedDataModal = openConnectedDataModal;
+  ['openConnectedDataModal'].forEach(_trackGlobal);
 
   // =========================================================================
   // Custom Fields Modal (adapted from workspace.js lines 9942-10385)

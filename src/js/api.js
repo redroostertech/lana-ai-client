@@ -1610,6 +1610,16 @@ class ApiClient {
   }
 
   /**
+   * Unlink connector data from a matter
+   * @param {string} matterId - The matter ID
+   * @param {string} connectorDataId - The connector data ID to unlink
+   * @returns {Promise<Object>} Unlink result
+   */
+  async unlinkConnectorDataFromMatter(matterId, connectorDataId) {
+    return this.delete(`/api/v1/matters/${matterId}/link-connector-data/${connectorDataId}`);
+  }
+
+  /**
    * Create a LANA-native task for a matter
    * @param {string} matterId - The matter ID
    * @param {Object} taskData - Task data (title, description, notes, priority, due_date, assigned_to_user_id)

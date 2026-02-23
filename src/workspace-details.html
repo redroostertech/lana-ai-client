@@ -572,6 +572,28 @@
     </div>
   </lex-modal>
 
+  <!-- Full-screen Connected Data Modal -->
+  <lex-modal id="connectedDataFullModal" heading="Connected Data" size="full" hide-actions>
+    <div id="connectedDataFullContent" style="height:100%;display:flex;flex-direction:column;">
+      <!-- Search + Filters -->
+      <div style="padding-bottom:0.75rem;border-bottom:1px solid var(--lex-border-subtle,#E8E5E1);margin-bottom:0.75rem;">
+        <lex-input id="cdModalSearch" placeholder="Search by name, ID, or content..." leading-icon="search"></lex-input>
+        <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
+          <lex-select id="cdModalEntityType" size="sm" placeholder="All Types"
+            options='[{"value":"","label":"All Types"},{"value":"contact","label":"Contacts"},{"value":"matter","label":"Matters"},{"value":"document","label":"Documents"},{"value":"task","label":"Tasks"},{"value":"time_entry","label":"Time Entries"},{"value":"expense","label":"Expenses"},{"value":"invoice","label":"Invoices"},{"value":"email","label":"Emails"}]'>
+          </lex-select>
+          <lex-select id="cdModalConnector" size="sm" placeholder="All Connectors"
+            options='[{"value":"","label":"All Connectors"}]'>
+          </lex-select>
+        </div>
+      </div>
+      <!-- Table area -->
+      <div style="flex:1;overflow:auto;">
+        <lex-table id="cdModalTable" selectable empty-text="No connected data"></lex-table>
+      </div>
+    </div>
+  </lex-modal>
+
   <!-- Edit Custom Fields Modal -->
   <lex-modal id="editCustomFieldsModal" heading="Edit Custom Fields" subtitle="Add or modify custom field values for this matter" size="lg" hide-actions close-on-overlay>
     <div class="p-6">
@@ -970,6 +992,7 @@
   <script src="js/lex/components/form/lex-select.js"></script>
   <script src="js/lex/components/form/lex-checkbox.js"></script>
   <script src="js/lex/components/form/lex-textarea.js"></script>
+  <script src="js/lex/components/data/lex-table.js"></script>
   <script src="js/lex/components/data/lex-pagination.js"></script>
 
   <!-- Inject page content + hoist modals -->
