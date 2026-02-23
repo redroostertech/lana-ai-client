@@ -22,6 +22,7 @@
     style.textContent = `
       lex-chat-activity {
         display: block;
+        padding-bottom: var(--lex-space-md);
       }
       lex-chat-activity[hidden] {
         display: none !important;

@@ -355,7 +355,9 @@
             for (const m of result.messages) {
               this._threadEl.addMessage(m.role, m.content, {
                 messageId: m.id || m.message_id,
-                timestamp: m.timestamp || m.created_at
+                timestamp: m.timestamp || m.created_at,
+                duration: m.duration || null,
+                tokenCount: m.tokenCount || null
               });
             }
             this._threadEl.scrollToBottom(true);
@@ -545,10 +547,11 @@
         case 'done':
           // Finalize the streaming message
           if (this._threadEl) {
-            const duration = this._sendStartTime ? Date.now() - this._sendStartTime : null;
+            const duration = event.processingTimeMs || (this._sendStartTime ? Date.now() - this._sendStartTime : null);
             this._threadEl.finalizeLastMessage({
               messageId: event.messageId,
               duration,
+              tokenCount: event.tokenCount || null,
               citations: this._citations.length > 0 ? this._citations : undefined,
               artifacts: this._artifacts.length > 0 ? this._artifacts : undefined
             });
@@ -636,7 +639,9 @@
               messageId: m.id,
               timestamp: m.timestamp,
               citations: m.citations,
-              artifacts: m.artifacts
+              artifacts: m.artifacts,
+              duration: m.duration || null,
+              tokenCount: m.tokenCount || null
             };
           });
           this._threadEl.prependMessages(formatted);

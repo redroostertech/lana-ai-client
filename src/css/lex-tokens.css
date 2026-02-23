@@ -297,6 +297,15 @@
      SCALE TOKENS — Spacing, radii, shadows, transitions
      ========================================================================== */
 
+  /* ── Spacing ──────────────────────────────────────────────── */
+
+  --lex-space-xs:    2px;
+  --lex-space-sm:    4px;
+  --lex-space-md:    8px;
+  --lex-space-lg:    16px;
+  --lex-space-xl:    24px;
+  --lex-space-2xl:   32px;
+
   /* ── Border Radius ──────────────────────────────────────────── */
 
   --lex-radius-sm:   0.25rem;

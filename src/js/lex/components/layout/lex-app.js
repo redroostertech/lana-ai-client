@@ -623,7 +623,7 @@
             id: 'tools',
             items: [
               { id: 'connectors', label: 'Data Connectors', icon: 'plug', href: 'data-connectors.html' },
-              { id: 'reports', label: 'Reports', icon: 'bar-chart-2', href: 'insights/module-execution.html' }
+              { id: 'reports', label: 'Reports', icon: 'bar-chart-2', href: 'admin/reporting.html' }
             ]
           },
           {

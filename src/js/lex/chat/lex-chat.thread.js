@@ -192,6 +192,8 @@
       if (meta.citations) msg.citations = meta.citations;
       if (meta.artifacts) msg.artifacts = meta.artifacts;
       if (meta.attachments) msg.attachments = meta.attachments;
+      if (meta.duration != null) msg.duration = meta.duration;
+      if (meta.tokenCount != null) msg.tokenCount = meta.tokenCount;
 
       this._container.appendChild(msg);
       this._messages.push(msg);
@@ -318,6 +320,8 @@
         msg.content = m.content;
         if (m.messageId) msg.messageId = m.messageId;
         if (m.timestamp) msg.timestamp = m.timestamp;
+        if (m.duration != null) msg.duration = m.duration;
+        if (m.tokenCount != null) msg.tokenCount = m.tokenCount;
         frag.appendChild(msg);
       }
 

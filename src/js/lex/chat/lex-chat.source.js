@@ -158,7 +158,9 @@
             content: m.content,
             timestamp: m.created_at || m.timestamp,
             citations: m.citations || [],
-            artifacts: m.artifacts || []
+            artifacts: m.artifacts || [],
+            duration: m.duration_ms || null,
+            tokenCount: m.token_count || null
           };
         });
 
@@ -461,7 +463,9 @@
             type: 'done',
             messageId: data.message_id,
             userMessageId: data.user_message_id,
-            threadId: data.thread_id
+            threadId: data.thread_id,
+            tokenCount: data.token_count || data.total_tokens || null,
+            processingTimeMs: data.processing_time_ms || data.generation_time_ms || null
           };
 
         case 'block_hints':

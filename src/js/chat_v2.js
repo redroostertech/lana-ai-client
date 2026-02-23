@@ -29,6 +29,7 @@
   var _stage = 'LOADING';
   var _matter = null;            // full matter object once selected
   var _conversationId = null;
+  var _sessionTitle = null;      // conversation title from session data
 
   // Search debounce timer
   var _searchTimer = null;
@@ -74,6 +75,93 @@
     dom.intents           = document.getElementById('cv2-intents');
     dom.messagesArea      = document.getElementById('cv2-messages-area');
     dom.stageCenterEl     = document.getElementById('cv2-stage-center');
+    dom.app               = document.querySelector('lex-app');
+  }
+
+  // =========================================================================
+  // Page title + workspace details button
+  // =========================================================================
+
+  /**
+   * Update the topbar page title.
+   * Shows "New Conversation" when no conversation is active.
+   */
+  function setPageTitle(title) {
+    if (dom.app && typeof dom.app.setPage === 'function') {
+      dom.app.setPage({ title: title || 'New Conversation' });
+    }
+  }
+
+  /**
+   * Inject or update "View Workspace Details" button next to the topbar heading.
+   * Placed inside lex-topbar .lex-topbar-center, after the h1.
+   */
+  function updateWorkspaceDetailsButton() {
+    var topbar = dom.app ? dom.app.querySelector('lex-topbar') : null;
+    if (!topbar) return;
+
+    var center = topbar.querySelector('.lex-topbar-center');
+    if (!center) return;
+
+    // Ensure center uses flex layout for heading + button side by side
+    center.style.display = 'flex';
+    center.style.alignItems = 'center';
+    center.style.gap = '12px';
+
+    var existing = center.querySelector('[data-action="workspace-details"]');
+
+    if (!_matter || !_matter.id) {
+      // No matter — remove button if present
+      if (existing) existing.remove();
+      return;
+    }
+
+    var label = _matter.name ? 'View ' + _matter.name : 'View Workspace Details';
+
+    if (existing) {
+      // Update label
+      var span = existing.querySelector('span');
+      if (span) span.textContent = label;
+    } else {
+      // Create button
+      var btn = document.createElement('button');
+      btn.setAttribute('data-action', 'workspace-details');
+      btn.title = 'View workspace details';
+      btn.style.cssText = 'flex-shrink:0;display:inline-flex;align-items:center;gap:4px;padding:3px 10px;font-size:12px;font-weight:500;color:var(--lex-text-secondary);background:var(--lex-bg-tertiary);border:none;border-radius:var(--lex-radius-sm);cursor:pointer;white-space:nowrap;transition:background var(--lex-transition-fast);';
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 6H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"></path><path d="M14 4h6m0 0v6m0-6L10 14"></path></svg><span>' + escapeHtml(label) + '</span>';
+      btn.addEventListener('mouseenter', function () { btn.style.background = 'var(--lex-bg-secondary)'; });
+      btn.addEventListener('mouseleave', function () { btn.style.background = 'var(--lex-bg-tertiary)'; });
+      btn.addEventListener('click', function () {
+        openWorkspaceDetails();
+      });
+      center.appendChild(btn);
+    }
+  }
+
+  /**
+   * Open workspace details page for the current matter.
+   */
+  function openWorkspaceDetails() {
+    if (!_matter || !_matter.id) return;
+    var matterId = _matter.matter_id || _matter.id;
+    if (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.go === 'function') {
+      Lex.Nav.go('workspace-details.html', {
+        params: { id: matterId, tab: 'activity' },
+        context: { matterId: matterId, tab: 'activity' }
+      });
+    } else {
+      window.location.href = 'workspace-details.html?id=' + encodeURIComponent(matterId);
+    }
+  }
+
+  /**
+   * Remove the workspace details button (used on cleanup/return to landing).
+   */
+  function removeWorkspaceDetailsButton() {
+    var topbar = dom.app ? dom.app.querySelector('lex-topbar') : null;
+    if (!topbar) return;
+    var btn = topbar.querySelector('[data-action="workspace-details"]');
+    if (btn) btn.remove();
   }
 
   // =========================================================================
@@ -297,6 +385,10 @@
     // Show messages area
     dom.messagesArea.classList.add('cv2-visible');
 
+    // Update page title to matter name (until AI generates a title)
+    setPageTitle(_matter ? _matter.name : 'New Conversation');
+    updateWorkspaceDetailsButton();
+
     // Mount lex-chat (includes its own composer)
     mountLexChat(_conversationId, initialMessage);
 
@@ -403,13 +495,17 @@
       }
     });
 
-    // Title generated — update sidebar conversation
+    // Title generated — update page title + sidebar conversation
     listen('lex-chat-title-generated', function (e) {
       var detail = e.detail || {};
       var title = detail.title;
       var convId = detail.conversationId || _conversationId;
-      if (title && convId && window.ConversationMenu) {
-        window.ConversationMenu.updateConversation(convId, { title: title });
+      if (title) {
+        _sessionTitle = title;
+        setPageTitle(title);
+        if (convId && window.ConversationMenu) {
+          window.ConversationMenu.updateConversation(convId, { title: title });
+        }
       }
     });
 
@@ -676,7 +772,12 @@
     _stage = 'LANDING';
     _matter = null;
     _conversationId = null;
+    _sessionTitle = null;
     _enterActiveInvoked = false;
+
+    // Reset page title and remove workspace button
+    setPageTitle('New Conversation');
+    removeWorkspaceDetailsButton();
 
     // Clear any pending intent-wait poll
     if (_pollInterval) {
@@ -733,6 +834,7 @@
         }
 
         _conversationId = session.thread_id || session.id;
+        _sessionTitle = session.title || (session.metadata && session.metadata.title) || null;
 
         if (window.Lex && window.Lex.state) {
           window.Lex.state.setActiveConversation(_conversationId);
@@ -789,6 +891,11 @@
     // Show messages area
     dom.messagesArea.classList.add('cv2-visible');
 
+    // Update page title: prefer session title, fall back to matter name
+    var title = _sessionTitle || (_matter ? _matter.name : null) || 'New Conversation';
+    setPageTitle(title);
+    updateWorkspaceDetailsButton();
+
     // Mount lex-chat (includes its own composer)
     mountLexChat(_conversationId, null);
 
@@ -813,6 +920,7 @@
     // Reset state for new conversation
     _conversationId = null;
     _matter = null;
+    _sessionTitle = null;
     _enterActiveInvoked = false;
 
     // Load the selected session
@@ -828,6 +936,7 @@
     _stage = 'LOADING';
     _matter = null;
     _conversationId = null;
+    _sessionTitle = null;
     _searchTimer = null;
     _enterActiveInvoked = false;
     _chatEventListeners = [];
@@ -917,6 +1026,8 @@
     }
     // Clean up ACTIVE stage (lex-chat, event listeners)
     cleanupActiveStage();
+    // Remove workspace details button
+    removeWorkspaceDetailsButton();
     // Remove document click handler
     if (_docClickHandler) {
       document.removeEventListener('click', _docClickHandler);
@@ -924,6 +1035,7 @@
     }
     // Reset guards
     _enterActiveInvoked = false;
+    _sessionTitle = null;
     // Clear Lex.state
     if (window.Lex && window.Lex.state) {
       window.Lex.state.setActiveConversation(null);

@@ -219,6 +219,7 @@
         messageId:  { type: String, default: null, attribute: 'message-id' },
         timestamp:  { type: String, default: null },
         duration:   { type: Number, default: null },
+        tokenCount: { type: Number, default: null, attribute: 'token-count' },
         streaming:  { type: Boolean, default: false, reflect: true },
         citations:  { type: Array, default: [] },
         artifacts:  { type: Array, default: [] },
@@ -243,19 +244,29 @@
       }
       const ts = formatTimestamp(this.timestamp);
       if (!ts) return '';
-      const durHtml = this._formatDuration();
-      return `<div class="lex-chat-msg-timestamp">${ChatFormat ? ChatFormat.escapeHtml(ts) : ts}${durHtml}</div>`;
+      const meta = this._formatMeta();
+      return `<div class="lex-chat-msg-timestamp">${ChatFormat ? ChatFormat.escapeHtml(ts) : ts}${meta}</div>`;
     }
 
-    _formatDuration() {
+    _formatMeta() {
+      let parts = [];
+      // Duration
       const ms = this.duration;
-      if (!ms && ms !== 0) return '';
-      if (ms < 1000) return ` · ${ms}ms`;
-      const sec = ms / 1000;
-      if (sec < 60) return ` · ${sec.toFixed(1)}s`;
-      const min = Math.floor(sec / 60);
-      const remSec = Math.round(sec % 60);
-      return ` · ${min}m ${remSec}s`;
+      if (ms || ms === 0) {
+        if (ms < 1000) parts.push(ms + 'ms');
+        else if (ms / 1000 < 60) parts.push((ms / 1000).toFixed(1) + 's');
+        else {
+          const min = Math.floor(ms / 60000);
+          const remSec = Math.round((ms % 60000) / 1000);
+          parts.push(min + 'm ' + remSec + 's');
+        }
+      }
+      // Tokens
+      const tc = this.tokenCount;
+      if (tc) {
+        parts.push(tc.toLocaleString() + ' tokens');
+      }
+      return parts.length > 0 ? ' · ' + parts.join(' · ') : '';
     }
 
     render() {
@@ -376,16 +387,21 @@
       if (metadata.citations) this._props.citations = metadata.citations;
       if (metadata.artifacts) this._props.artifacts = metadata.artifacts;
       if (metadata.duration != null) this._props.duration = metadata.duration;
+      if (metadata.tokenCount != null) this._props.tokenCount = metadata.tokenCount;
 
-      // Update displayed timestamp (with duration if available)
+      // Update displayed timestamp (with duration + token count if available)
       const tsEl = this.querySelector('.lex-chat-msg-timestamp');
       if (tsEl) {
-        tsEl.textContent = formatTimestamp(this.timestamp) + this._formatDuration();
+        tsEl.textContent = formatTimestamp(this.timestamp) + this._formatMeta();
       }
 
       // Remove streaming cursor
       if (this._contentEl) {
         this._contentEl.classList.remove('lex-chat-narrative--streaming');
+
+        // Remove cursor span explicitly (stays in DOM when there are no citations)
+        var cursorEl = this._contentEl.querySelector('.lex-chat-cursor');
+        if (cursorEl) cursorEl.remove();
 
         // Re-format with final citations
         if (this._rawContent && metadata.citations?.length > 0) {

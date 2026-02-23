@@ -233,14 +233,12 @@
     },
 
     'admin/reporting.html': {
-      title: 'Reporting',
-      activeNav: 'admin',
+      title: 'Reports',
+      activeNav: 'reports',
       scripts: [
-        'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js'
+        'js/admin/reporting.js'
       ],
-      stylesheets: [
-        'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
-      ]
+      stylesheets: []
     },
 
     'admin/plugins.html': {

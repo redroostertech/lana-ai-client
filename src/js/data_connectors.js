@@ -333,15 +333,14 @@
 
     var specialPages = {
       'case-actionstep': 'integrations/actionstep.html',
-      'crm-leadly': 'integrations/leadly.html',
-      'crm-gohighlevel': 'integrations/gohighlevel.html'
+      'crm-leadly': 'integrations/leadly.html'
     };
 
     if (specialPages[connectorType]) {
       if (window.LexRouter) {
         LexRouter.navigate(specialPages[connectorType] + '?id=' + connectorId);
       } else {
-        window.location.href = specialPages[connectorType].split('/').pop() + '?id=' + connectorId;
+        window.location.href = specialPages[connectorType] + '?id=' + connectorId;
       }
       return;
     }
@@ -350,7 +349,7 @@
     if (window.LexRouter) {
       LexRouter.navigate('integrations/integration-config.html?id=' + connectorId);
     } else {
-      window.location.href = 'integration-config.html?id=' + connectorId;
+      window.location.href = 'integrations/integration-config.html?id=' + connectorId;
     }
   }
 
@@ -367,7 +366,7 @@
     if (window.LexRouter) {
       LexRouter.navigate('integrations/connector-viewer.html?' + params.toString());
     } else {
-      window.location.href = 'connector-viewer.html?' + params.toString();
+      window.location.href = 'integrations/connector-viewer.html?' + params.toString();
     }
   }
 
@@ -387,7 +386,7 @@
           if (window.LexRouter) {
             LexRouter.navigate('integrations/integration-config.html?id=' + connectorId);
           } else {
-            window.location.href = 'integration-config.html?id=' + connectorId;
+            window.location.href = 'integrations/integration-config.html?id=' + connectorId;
           }
         }, 1000);
         _timeouts.push(tid);
@@ -556,7 +555,7 @@
       modalTitle.textContent = connectorName;
     }
 
-    var systemConnectors = ['case-actionstep', 'crm-leadly', 'crm-gohighlevel'];
+    var systemConnectors = ['case-actionstep', 'crm-leadly'];
     var connectorType = connector.connector_type || connector.connector_id || connectorId;
     var isSystemConnector = systemConnectors.indexOf(connectorType) !== -1;
 
