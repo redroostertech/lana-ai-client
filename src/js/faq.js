@@ -621,3 +621,8 @@ window.FAQSystem = FAQSystem;
 if (window.LexRouter) {
   LexRouter.registerPageInit('faq.html', function () { FAQSystem.init(); });
 }
+
+// Standalone page — init directly (no SPA router)
+if (!window.LexRouter) {
+  FAQSystem.init();
+}
