@@ -313,13 +313,52 @@
         margin-top: 0;
       }
 
-      .lex-sidebar-scrollable {
+      .lex-sidebar-scrollable-wrap {
         flex: 1;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
+        position: relative;
         min-height: 0;
         min-width: 0;
+      }
+
+      /* Top fade — visible only when scrolled down */
+      .lex-sidebar-scrollable-wrap::before,
+      .lex-sidebar-scrollable-wrap::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 2rem;
+        pointer-events: none;
+        z-index: 1;
+        opacity: 0;
+        transition: opacity 0.25s ease;
+      }
+
+      .lex-sidebar-scrollable-wrap::before {
+        top: 0;
+        background: linear-gradient(to bottom, var(--_sb-bg), transparent);
+      }
+
+      .lex-sidebar-scrollable-wrap::after {
+        bottom: 0;
+        background: linear-gradient(to top, var(--_sb-bg), transparent);
+      }
+
+      .lex-sidebar-scrollable-wrap[data-scroll-top="true"]::before {
+        opacity: 1;
+      }
+
+      .lex-sidebar-scrollable-wrap[data-scroll-bottom="true"]::after {
+        opacity: 1;
+      }
+
+      .lex-sidebar-scrollable {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+        overflow-x: hidden;
         scrollbar-width: thin;
         scrollbar-color: var(--_sb-border) transparent;
       }
@@ -341,40 +380,14 @@
         background: var(--_sb-text-muted);
       }
 
-      /* First section (e.g. Tools) stays at natural height */
-      .lex-sidebar-scrollable > .lex-sidebar-section:not(.lex-sidebar-section-has-conversations) {
-        flex-shrink: 0;
-      }
-
-      /* Conversation list section: fills remaining space so the list can scroll */
+      /* Conversation list section */
       .lex-sidebar-section-has-conversations {
-        flex: 1 1 0;
-        min-height: 0;
         display: flex;
         flex-direction: column;
-        overflow: hidden;
       }
 
       .lex-sidebar-section-has-conversations .lex-sidebar-conversation-list {
-        flex: 1 1 0;
-        min-height: 0;
-        overflow-y: auto;
-        overflow-x: hidden;
         padding-bottom: 2rem;
-        scroll-padding-bottom: 1rem;
-      }
-
-      .lex-sidebar-section-has-conversations .lex-sidebar-conversation-list::-webkit-scrollbar {
-        width: 4px;
-      }
-
-      .lex-sidebar-section-has-conversations .lex-sidebar-conversation-list::-webkit-scrollbar-track {
-        background: transparent;
-      }
-
-      .lex-sidebar-section-has-conversations .lex-sidebar-conversation-list::-webkit-scrollbar-thumb {
-        background: var(--_sb-border);
-        border-radius: 2px;
       }
 
       /* ── Nav item ───────────────────────────────────────── */
@@ -799,10 +812,12 @@
 
       // Scrollable sections
       if (scrollSections.length > 0) {
+        html += `<div class="lex-sidebar-scrollable-wrap">`;
         html += `<div class="lex-sidebar-scrollable">`;
         for (const section of scrollSections) {
           html += this._renderSection(section);
         }
+        html += `</div>`;
         html += `</div>`;
       }
 
@@ -1009,20 +1024,34 @@
         }
       });
 
-      // Infinite scroll detection on scrollable area
+      // Scroll detection: infinite scroll + fade indicators
       const scrollable = this.querySelector('.lex-sidebar-scrollable');
+      const scrollWrap = this.querySelector('.lex-sidebar-scrollable-wrap');
       if (scrollable && !scrollable._lexScrollBound) {
         scrollable._lexScrollBound = true;
-        let scrollTimeout;
+
+        const updateFades = () => {
+          if (!scrollWrap) return;
+          const { scrollTop, scrollHeight, clientHeight } = scrollable;
+          scrollWrap.dataset.scrollTop = String(scrollTop > 4);
+          scrollWrap.dataset.scrollBottom = String(scrollTop + clientHeight < scrollHeight - 4);
+        };
+
         scrollable.addEventListener('scroll', () => {
-          clearTimeout(scrollTimeout);
-          scrollTimeout = setTimeout(() => {
+          updateFades();
+
+          // Infinite scroll detection (debounced)
+          clearTimeout(scrollable._lexScrollTimeout);
+          scrollable._lexScrollTimeout = setTimeout(() => {
             const { scrollTop, scrollHeight, clientHeight } = scrollable;
             if (scrollTop + clientHeight >= scrollHeight - 100) {
               this.emit('sidebar-scroll-end');
             }
           }, 150);
         });
+
+        // Initial check after content renders
+        requestAnimationFrame(updateFades);
       }
 
       // User menu toggle
