@@ -125,7 +125,11 @@ const ArticleSystem = (function() {
 
     // Update page title
     document.title = `${article.title} - LanaAI Help`;
-    document.getElementById('pageTitle').textContent = article.title;
+    var pageTitleEl = document.getElementById('pageTitle');
+    if (pageTitleEl) pageTitleEl.textContent = article.title;
+    // Lex shell: update topbar heading
+    var lexApp = document.querySelector('lex-app');
+    if (lexApp && lexApp.setPage) lexApp.setPage({ title: article.title });
 
     // Breadcrumb
     document.getElementById('breadcrumbSection').textContent = section.title;
@@ -405,4 +409,9 @@ window.ArticleSystem = ArticleSystem;
 // SPA: register with router so init runs on every navigation (including re-navigation)
 if (window.LexRouter) {
   LexRouter.registerPageInit('article.html', function () { ArticleSystem.init(); });
+}
+
+// Standalone page — init directly (no SPA router)
+if (!window.LexRouter) {
+  ArticleSystem.init();
 }

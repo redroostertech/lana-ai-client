@@ -3,21 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Article - LanaAI</title>
+  <title>Article - LANA AI</title>
+
+  <!-- ── CSS + Tailwind in head — behavioral scripts at end of body ── -->
+  <link rel="stylesheet" href="css/lex-tokens.css">
+  <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/tailwind-output.css">
   <script src="js/tailwind-loader.js"></script>
-  <script src="js/error-reporter.js"></script>
-  <script src="js/config.js"></script>
-  <script src="js/mock-data.js"></script>
-  <script src="js/api.js"></script>
-  <script src="js/components.js"></script>
-  <script src="js/version.js"></script>
-  <script src="js/menu.js"></script>
-  <script src="js/navigation-helpers.js"></script>
-    <script src="js/new-project-modal.js"></script>
-    <script src="js/conversation-menu.js"></script>
-  <script src="js/conversation-search-modal.js"></script>
-  <script src="js/article.js"></script>
+
   <style>
     /* Article typography styles */
     .article-content h1 {
@@ -82,118 +75,29 @@
     }
   </style>
 
-  <!-- Inline preloader styles - Pure CSS, no dependencies -->
-  <style>
-    #lana-preloader {
-      position: fixed;
-      inset: 0;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 99999;
-      transition: opacity 0.3s ease-out;
-    }
-    #lana-preloader.fade-out {
-      opacity: 0;
-      pointer-events: none;
-    }
-    .preloader-logo {
-      width: 80px;
-      height: 80px;
-      margin-bottom: 24px;
-      animation: pulse-preloader 2s ease-in-out infinite;
-    }
-    .preloader-spinner {
-      width: 48px;
-      height: 48px;
-      border: 4px solid rgba(255, 255, 255, 0.3);
-      border-top-color: white;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-bottom: 16px;
-    }
-    .preloader-text {
-      color: white;
-      font-size: 16px;
-      font-weight: 500;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    @keyframes pulse-preloader {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.85; transform: scale(0.96); }
-    }
-  </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
-  <div id="lana-preloader">
-    <svg class="preloader-logo" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="50" cy="50" r="45" fill="white" opacity="0.15"/>
-      <circle cx="50" cy="50" r="35" fill="white" opacity="0.3"/>
-      <circle cx="50" cy="50" r="25" fill="white"/>
-      <text x="50" y="58" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#667eea" text-anchor="middle">L</text>
-    </svg>
-    <div class="preloader-spinner"></div>
-    <div class="preloader-text">Loading LanaAI...</div>
-  </div>
+<body>
 
-  <div id="app-content">
-  <!-- Sidebar -->
-  <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30 flex flex-col">
-    <div class="flex-shrink-0 flex items-center justify-between h-16 px-6 border-b border-gray-800">
-      <img src="img/logo-light.png" alt="LanaAI" class="h-7">
-      <button id="closeSidebar" class="lg:hidden text-gray-400 hover:text-white">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-        </svg>
-      </button>
-    </div>
+  <!-- Branded loader — shows once lex-loader.js upgrades the element -->
+  <lex-loader theme="light"></lex-loader>
 
-    <nav id="mainNav" class="flex-1 mt-6 px-3 overflow-hidden">
-      <!-- Menu will be dynamically rendered by menu.js -->
-    </nav>
-  </aside>
+  <!-- App shell — sidebar, topbar, empty content area.
+       Page content lives in <template> below and gets injected after
+       the shell renders. This avoids double-rendering of child components. -->
+  <lex-app
+    logo-src="img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="dashboard.html"
+    active-nav-id="help"
+    page-title="Help Article"
+  ></lex-app>
 
-  <!-- Main Content -->
-  <div class="lg:ml-64">
-    <!-- Top Bar -->
-    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
-      <div class="flex items-center justify-between h-16 px-4 lg:px-8">
-        <button id="openSidebar" class="lg:hidden text-gray-500 hover:text-gray-700">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-          </svg>
-        </button>
+  <!-- Page content as inert <template> — elements inside are NOT upgraded
+       by the browser until cloned into the live DOM. Zero double-rendering. -->
+  <template id="page-content">
 
-        <div class="flex-1 px-4 lg:px-0">
-          <h1 class="text-xl font-semibold text-gray-900" id="pageTitle">Help Article</h1>
-        </div>
+    <main>
 
-        <div class="flex items-center gap-4">
-          <!-- User Menu -->
-          <div class="relative" id="userMenu">
-            <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900 p-1" title="Settings">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-              </svg>
-            </button>
-            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1">
-              <a href="settings.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
-              <hr class="my-1">
-              <button id="logoutBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sign out</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </header>
-
-    <!-- Page Content -->
-    <main class="p-4 lg:p-8">
       <!-- Loading State -->
       <div id="articleLoading" class="flex items-center justify-center py-12">
         <div class="animate-spin w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full"></div>
@@ -293,97 +197,66 @@
           </div>
         </div>
       </div>
+
     </main>
-  </div>
 
-  <!-- Overlay for mobile sidebar -->
-  <div id="sidebarOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden lg:hidden"></div>
+  </template>
 
-  <script>
-    // Auth check
-    if (!api.isAuthenticated()) {
-      window.location.href = 'login.html';
-    }
+  <noscript>
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;color:#666;">
+      Please enable JavaScript to use LANA AI.
+    </div>
+  </noscript>
 
-    // Render dynamic menu
-    renderMenu('#mainNav');
+  <!-- ══════════════════════════════════════════════════════════════════
+       Scripts at end of body — HTML renders first, scripts load after
+       ══════════════════════════════════════════════════════════════════ -->
 
-    // Initialize conversation menu
-    if (typeof ConversationMenu !== 'undefined' && ConversationMenu.init()) {
-      ConversationMenu.loadConversations(true);
-    }
+  <!-- Universal shell scripts -->
+  <script src="js/error-reporter.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/mock-data.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/components.js"></script>
+  <script src="js/version.js"></script>
+  <script src="js/menu.js"></script>
+  <script src="js/navigation-helpers.js"></script>
+  <script src="js/new-project-modal.js"></script>
+  <script src="js/conversation-menu.js"></script>
+  <script src="js/conversation-search-modal.js"></script>
+  <script src="js/contact-search-modal.js"></script>
+  <script src="js/notifications.js"></script>
 
-    // Initialize conversation search modal
-    if (typeof ConversationSearchModal !== 'undefined') {
-      ConversationSearchModal.init();
-    }
+  <!-- Lex UI core -->
+  <script src="js/lex/lex.core.js"></script>
+  <script src="js/lex/lex.icons.js"></script>
+  <script src="js/lex/lex.data.js"></script>
+  <script src="js/lex/lex.forms.js"></script>
+  <script src="js/lex/lex.state.js"></script>
+  <script src="js/lex/lex.utils.js"></script>
+  <script src="js/lex/lex.auth.js"></script>
+  <script src="js/lex/lex-nav.js"></script>
 
+  <!-- Lex UI layout (shell components — lex-app builds sidebar/topbar) -->
+  <script src="js/lex/components/foundation/lex-loader.js"></script>
+  <script src="js/lex/components/foundation/lex-toast.js"></script>
+  <script src="js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="js/lex/components/foundation/lex-btn.js"></script>
+  <script src="js/lex/components/foundation/lex-empty.js"></script>
+  <script src="js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="js/lex/components/layout/lex-topbar.js"></script>
+  <script src="js/lex/components/layout/lex-conversation-item.js"></script>
+  <script src="js/lex/components/layout/lex-notification-panel.js"></script>
+  <script src="js/lex/components/layout/lex-app.js"></script>
 
-    // UI Elements
-    const sidebar = document.getElementById('sidebar');
-    const sidebarOverlay = document.getElementById('sidebarOverlay');
-    const openSidebar = document.getElementById('openSidebar');
-    const closeSidebar = document.getElementById('closeSidebar');
-    const userMenu = document.getElementById('userMenu');
-    const userDropdown = document.getElementById('userDropdown');
-    const logoutBtn = document.getElementById('logoutBtn');
+  <!-- Inject page content + hoist modals -->
+  <script src="js/lex/lex-page-init.js"></script>
 
-    // Sidebar toggle
-    openSidebar.addEventListener('click', () => {
-      sidebar.classList.remove('-translate-x-full');
-      sidebarOverlay.classList.remove('hidden');
-    });
+  <!-- Page controller (MUST be last before auth-guard) -->
+  <script src="js/article.js"></script>
 
-    closeSidebar.addEventListener('click', () => {
-      sidebar.classList.add('-translate-x-full');
-      sidebarOverlay.classList.add('hidden');
-    });
-
-    sidebarOverlay.addEventListener('click', () => {
-      sidebar.classList.add('-translate-x-full');
-      sidebarOverlay.classList.add('hidden');
-    });
-
-    // User menu toggle
-    userMenu.addEventListener('click', () => {
-      userDropdown.classList.toggle('hidden');
-    });
-
-    document.addEventListener('click', (e) => {
-      if (!userMenu.contains(e.target)) {
-        userDropdown.classList.add('hidden');
-      }
-    });
-
-    // Logout
-    logoutBtn.addEventListener('click', async () => {
-      await api.logout();
-      window.location.href = 'login.html';
-    });
-
-    // Load user info
-    function loadUserInfo() {
-      const user = api.user;
-      if (user) {
-        const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
-        const initials = (user.firstName?.[0] || '') + (user.lastName?.[0] || '') || user.email[0].toUpperCase();
-
-        const uNameEl = document.getElementById('userName');
-        const uInitEl = document.getElementById('userInitials');
-        if (uNameEl) uNameEl.textContent = name;
-        if (uInitEl) uInitEl.textContent = initials;
-      }
-    }
-
-    loadUserInfo();
-
-    // Initialize article system
-    if (window.ArticleSystem) {
-      ArticleSystem.init();
-    }
-
-  </script>
-
-  </div>
+  <!-- Auth guard + loader dismiss (MUST be last) -->
+  <script src="js/auth-guard.js"></script>
 </body>
 </html>
