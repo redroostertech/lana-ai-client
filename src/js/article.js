@@ -132,7 +132,16 @@ const ArticleSystem = (function() {
     if (lexApp && lexApp.setPage) lexApp.setPage({ title: article.title });
 
     // Breadcrumb
-    document.getElementById('breadcrumbSection').textContent = section.title;
+    var breadcrumbEl = document.getElementById('articleBreadcrumb');
+    if (breadcrumbEl) {
+      breadcrumbEl.items = [
+        { label: 'Help & Support', href: 'help.html' },
+        { label: section.title }
+      ];
+    }
+    // Legacy fallback
+    var breadcrumbSection = document.getElementById('breadcrumbSection');
+    if (breadcrumbSection) breadcrumbSection.textContent = section.title;
 
     // Header
     document.getElementById('articleCategory').textContent = section.title;

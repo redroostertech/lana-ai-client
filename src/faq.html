@@ -53,14 +53,7 @@
 
     <main class="max-w-5xl mx-auto">
 
-      <!-- Breadcrumb -->
-      <nav class="flex items-center gap-2 text-sm text-gray-600 mb-6">
-        <a href="index.html" class="hover:text-indigo-600">Home</a>
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-        </svg>
-        <span class="text-gray-900 font-medium">FAQ</span>
-      </nav>
+      <lex-breadcrumb items='[{"label":"Help &amp; Support","href":"help.html"},{"label":"FAQ"}]'></lex-breadcrumb>
 
       <!-- Header Section -->
       <div class="mb-8">
@@ -268,6 +261,9 @@
   <script src="js/lex/components/layout/lex-conversation-item.js"></script>
   <script src="js/lex/components/layout/lex-notification-panel.js"></script>
   <script src="js/lex/components/layout/lex-app.js"></script>
+
+  <!-- Page-specific Lex components -->
+  <script src="js/lex/components/foundation/lex-breadcrumb.js"></script>
 
   <!-- Inject page content + hoist modals -->
   <script src="js/lex/lex-page-init.js"></script>
