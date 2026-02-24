@@ -620,3 +620,8 @@ window.HelpSystem = HelpSystem;
 if (window.LexRouter) {
   LexRouter.registerPageInit('help.html', function () { HelpSystem.init(); });
 }
+
+// Standalone page — init directly (no SPA router)
+if (!window.LexRouter) {
+  HelpSystem.init();
+}
