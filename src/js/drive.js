@@ -862,18 +862,16 @@
   }
 
   /**
-   * Open a recently accessed file by navigating to folder.html with open_file param.
+   * Open a recently accessed file in the dedicated file viewer page.
    * @param {string} fileId
    * @param {string} clientMatter
    */
   function openRecentFile(fileId, clientMatter) {
-    if (clientMatter) {
-      var params = new URLSearchParams({
-        matter_id: clientMatter,
-        open_file: fileId
-      });
-      Lex.Nav.go('folder.html?' + params.toString());
-    }
+    var referrer = 'drive.html';
+    Lex.Nav.go('file-viewer.html', {
+      params: { id: fileId },
+      context: { referrer: referrer }
+    });
   }
 
   /**

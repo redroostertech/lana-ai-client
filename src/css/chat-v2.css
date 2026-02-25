@@ -159,6 +159,7 @@
   /* Explicit viewport-relative height — ensures lex-chat gets a definite
      height even if the flex chain above uses min-height instead of height. */
   height: calc(100vh - var(--lex-topbar-height, 64px));
+  position: relative;
 }
 
 /* Ensure lex-chat fills the messages area via flex, not height: 100% */
@@ -172,6 +173,52 @@
   opacity: 0.55;
   transition: opacity 400ms ease;
   pointer-events: none;
+}
+
+/* ── Welcome greeting overlay (workspace deep-link → new chat) ──────────── */
+
+.cv2-welcome-greeting {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  z-index: 2;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.cv2-welcome-title {
+  font-size: var(--lex-heading-h1-size, 2rem);
+  font-weight: 600;
+  color: var(--lex-text-primary);
+  max-width: 500px;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.cv2-welcome-greeting.cv2-fading {
+  opacity: 0;
+}
+
+/* Larger suggestion chips for the welcome state */
+.cv2-messages-area .lex-cmp-suggestions {
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px 4px;
+}
+
+.cv2-messages-area .lex-cmp-suggestion {
+  font-size: 13px;
+  padding: 8px 16px;
+  background: var(--lex-bg-tertiary, #ede8e0);
+  border-color: var(--lex-bg-tertiary, #ede8e0);
+  color: var(--lex-text-primary);
+  font-weight: 500;
 }
 
 /* ── Utility: hidden ─────────────────────────────────────────────────────── */

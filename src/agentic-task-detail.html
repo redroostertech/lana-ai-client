@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Task Detail - LANA AI</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="css/lex-tokens.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/tailwind-output.css">
+  <script src="js/tailwind-loader.js"></script>
+
+  <style>
+    .atd-header { padding: 24px 0 16px; }
+    .atd-header-back { font-size: 0.75rem; color: var(--lex-text-tertiary); text-decoration: none; display: inline-flex; align-items: center; gap: 4px; margin-bottom: 8px; }
+    .atd-header-back:hover { color: var(--lex-text-secondary); }
+    .atd-title { font-size: 1.125rem; font-weight: 600; color: var(--lex-text-primary); }
+    .atd-meta { display: flex; align-items: center; gap: 16px; margin-top: 6px; font-size: 0.75rem; color: var(--lex-text-tertiary); }
+    .atd-meta-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+
+    .atd-log { max-height: 500px; overflow-y: auto; padding: 16px; }
+    .atd-log-entry { padding: 8px 0; font-size: 0.8125rem; line-height: 1.5; }
+    .atd-log-entry + .atd-log-entry { border-top: 1px solid var(--lex-border-subtle); }
+    .atd-log-agent { color: var(--lex-text-primary); }
+    .atd-log-user { color: var(--lex-color-primary-600, #2563eb); }
+    .atd-log-progress { color: var(--lex-text-secondary); font-size: 0.75rem; }
+    .atd-log-error { color: var(--lex-color-danger-500, #ef4444); }
+
+    .atd-approval { padding: 16px; margin-top: 16px; border-radius: 8px; border: 1px solid var(--lex-border-default); background: var(--lex-bg-secondary); }
+    .atd-approval-title { font-size: 0.875rem; font-weight: 500; color: var(--lex-text-primary); margin-bottom: 12px; }
+    .atd-approval-toggle { font-size: 0.75rem; color: var(--lex-color-primary-600); cursor: pointer; margin-bottom: 12px; }
+    .atd-approval-diff { font-size: 0.75rem; color: var(--lex-text-secondary); font-family: monospace; background: var(--lex-bg-tertiary); padding: 12px; border-radius: 6px; overflow-x: auto; }
+    .atd-approval-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px; }
+
+    .atd-input-area { display: flex; align-items: flex-end; gap: 8px; padding: 16px; border-top: 1px solid var(--lex-border-subtle); }
+    .atd-input-area textarea { flex: 1; min-height: 44px; max-height: 120px; border: 1px solid var(--lex-border-default); border-radius: 8px; padding: 10px 12px; font-size: 0.8125rem; resize: vertical; font-family: inherit; background: var(--lex-bg-primary); color: var(--lex-text-primary); }
+    .atd-input-area textarea:focus { outline: none; border-color: var(--lex-color-primary-500); }
+
+    .atd-priority-badge { display: inline-block; font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.08em; padding: 2px 6px; border-radius: 3px; color: #fff; font-weight: 600; }
+  </style>
+
+</head>
+<body>
+
+  <lex-loader theme="light"></lex-loader>
+
+  <lex-app
+    logo-src="img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="dashboard.html"
+    active-nav-id="dashboard"
+    page-title="Task Detail"
+  ></lex-app>
+
+  <template id="page-content">
+
+    <main>
+
+      <!-- Header -->
+      <div class="atd-header">
+        <a href="agentic-tasks.html" class="atd-header-back">&larr; Back to Lana Tasks</a>
+        <div class="atd-title" id="atdTitle">Loading...</div>
+        <div class="atd-meta">
+          <span><span class="atd-meta-dot" id="atdStatusDot"></span> <span id="atdStatusLabel">Loading</span></span>
+          <span id="atdPriorityBadge"></span>
+          <span id="atdMatterLink"></span>
+          <span id="atdCreatedAt"></span>
+        </div>
+      </div>
+
+      <!-- Execution log -->
+      <lex-card padding="none">
+        <div style="padding:12px 16px;border-bottom:1px solid var(--lex-border-subtle);font-size:0.75rem;font-weight:500;color:var(--lex-text-tertiary);text-transform:uppercase;letter-spacing:0.08em;">
+          Execution Log
+        </div>
+        <div class="atd-log" id="atdLog">
+          <div style="text-align:center;padding:24px;color:var(--lex-text-tertiary);font-size:0.8125rem;">
+            <lex-spinner size="sm"></lex-spinner> Loading events...
+          </div>
+        </div>
+      </lex-card>
+
+      <!-- Approval panel (hidden by default) -->
+      <div id="atdApprovalPanel" class="atd-approval hidden">
+        <div class="atd-approval-title">Lana wants to make the following changes:</div>
+        <div id="atdApprovalSummary" style="font-size:0.8125rem;color:var(--lex-text-secondary);margin-bottom:12px;"></div>
+        <div class="atd-approval-toggle" id="atdDiffToggle">View detailed changes</div>
+        <div id="atdDiffContainer" class="atd-approval-diff hidden"></div>
+        <div id="atdRejectReason" class="hidden" style="margin-top:12px;">
+          <textarea id="atdRejectReasonInput" placeholder="Reason for rejection (optional)" style="width:100%;min-height:60px;border:1px solid var(--lex-border-default);border-radius:6px;padding:8px;font-size:0.8125rem;resize:vertical;font-family:inherit;"></textarea>
+        </div>
+        <div class="atd-approval-actions">
+          <lex-btn id="atdRejectBtn" variant="outline" size="sm">Reject</lex-btn>
+          <lex-btn id="atdApproveBtn" variant="primary" size="sm">Approve</lex-btn>
+        </div>
+      </div>
+
+      <!-- Input area -->
+      <div id="atdInputArea" class="atd-input-area hidden">
+        <textarea id="atdMessageInput" placeholder="Type a message to Lana..." rows="2"></textarea>
+        <lex-btn id="atdSendBtn" variant="primary" size="sm">Send</lex-btn>
+      </div>
+
+      <!-- Cancel button (shown for running/paused tasks) -->
+      <div id="atdCancelArea" class="hidden" style="padding:16px 0;text-align:right;">
+        <lex-btn id="atdCancelBtn" variant="outline" size="sm">Cancel Task</lex-btn>
+      </div>
+
+    </main>
+
+  </template>
+
+  <noscript>
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;color:#666;">
+      Please enable JavaScript to use LANA AI.
+    </div>
+  </noscript>
+
+  <!-- Universal shell scripts -->
+  <script src="js/error-reporter.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/mock-data.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/components.js"></script>
+  <script src="js/version.js"></script>
+  <script src="js/menu.js"></script>
+  <script src="js/navigation-helpers.js"></script>
+  <script src="js/new-project-modal.js"></script>
+  <script src="js/conversation-menu.js"></script>
+  <script src="js/conversation-search-modal.js"></script>
+  <script src="js/contact-search-modal.js"></script>
+  <script src="js/notifications.js"></script>
+
+  <!-- Lex UI core -->
+  <script src="js/lex/lex.core.js"></script>
+  <script src="js/lex/lex.icons.js"></script>
+  <script src="js/lex/lex.data.js"></script>
+  <script src="js/lex/lex.forms.js"></script>
+  <script src="js/lex/lex.state.js"></script>
+  <script src="js/lex/lex.utils.js"></script>
+  <script src="js/lex/lex.auth.js"></script>
+  <script src="js/lex/lex-nav.js"></script>
+
+  <!-- Lex UI layout -->
+  <script src="js/lex/components/foundation/lex-loader.js"></script>
+  <script src="js/lex/components/foundation/lex-toast.js"></script>
+  <script src="js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="js/lex/components/foundation/lex-btn.js"></script>
+  <script src="js/lex/components/foundation/lex-empty.js"></script>
+  <script src="js/lex/components/form/lex-segmented.js"></script>
+  <script src="js/lex/components/form/lex-select.js"></script>
+  <script src="js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="js/lex/components/layout/lex-topbar.js"></script>
+  <script src="js/lex/components/layout/lex-conversation-item.js"></script>
+  <script src="js/lex/components/layout/lex-notification-panel.js"></script>
+  <script src="js/lex/components/layout/lex-app.js"></script>
+
+  <!-- Page-specific Lex components -->
+  <script src="js/lex/components/foundation/lex-badge.js"></script>
+  <script src="js/lex/components/foundation/lex-card.js"></script>
+
+  <!-- Inject page content -->
+  <script src="js/lex/lex-page-init.js"></script>
+
+  <!-- Page controller (MUST be last before auth-guard) -->
+  <script src="js/pages/agentic-task-detail.js"></script>
+
+  <!-- Auth guard + loader dismiss -->
+  <script src="js/auth-guard.js"></script>
+</body>
+</html>

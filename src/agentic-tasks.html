@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lana Tasks - LANA AI</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="css/lex-tokens.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/tailwind-output.css">
+  <script src="js/tailwind-loader.js"></script>
+
+</head>
+<body>
+
+  <lex-loader theme="light"></lex-loader>
+
+  <lex-app
+    logo-src="img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="dashboard.html"
+    active-nav-id="dashboard"
+    page-title="Lana Tasks"
+  ></lex-app>
+
+  <template id="page-content">
+
+    <main>
+
+      <!-- Page header -->
+      <div style="padding:24px 0 16px;">
+        <div style="font-size:1.125rem;font-weight:600;color:var(--lex-text-primary);">Lana Tasks</div>
+        <div style="font-size:0.8125rem;color:var(--lex-text-tertiary);margin-top:4px;">Interactive tasks assigned to Lana</div>
+      </div>
+
+      <!-- Filter bar -->
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;">
+        <lex-segmented
+          id="atStatusFilter"
+          value="all"
+          options='[{"value":"all","label":"All"},{"value":"running","label":"Running"},{"value":"awaiting_input","label":"Needs Input"},{"value":"awaiting_approval","label":"Pending Approval"},{"value":"completed","label":"Completed"}]'
+        ></lex-segmented>
+
+        <lex-select
+          id="atPriorityFilter"
+          placeholder="All priorities"
+          options='[{"value":"","label":"All priorities"},{"value":"urgent","label":"Urgent"},{"value":"high","label":"High"},{"value":"medium","label":"Medium"},{"value":"low","label":"Low"}]'
+        ></lex-select>
+      </div>
+
+      <!-- Loading skeleton -->
+      <div id="atLoading">
+        <lex-card padding="compact">
+          <div style="padding:16px;" aria-hidden="true">
+            <div style="height:20px;background:var(--lex-bg-tertiary);border-radius:4px;width:60%;margin-bottom:12px;"></div>
+            <div style="height:14px;background:var(--lex-bg-tertiary);border-radius:4px;width:80%;margin-bottom:8px;"></div>
+            <div style="height:14px;background:var(--lex-bg-tertiary);border-radius:4px;width:40%;"></div>
+          </div>
+          <div style="padding:16px;border-top:1px solid var(--lex-border-subtle);" aria-hidden="true">
+            <div style="height:20px;background:var(--lex-bg-tertiary);border-radius:4px;width:55%;margin-bottom:12px;"></div>
+            <div style="height:14px;background:var(--lex-bg-tertiary);border-radius:4px;width:70%;"></div>
+          </div>
+        </lex-card>
+      </div>
+
+      <!-- Content container -->
+      <div id="atItems" class="hidden"></div>
+
+      <!-- Empty state -->
+      <div id="atEmpty" class="hidden">
+        <lex-empty icon="inbox" message="No Lana tasks" description="Tasks assigned to Lana will appear here"></lex-empty>
+      </div>
+
+      <!-- Pagination -->
+      <lex-pagination id="atPagination" class="hidden" page="1" total-pages="1" total="0" limit="20"></lex-pagination>
+
+    </main>
+
+  </template>
+
+  <noscript>
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;color:#666;">
+      Please enable JavaScript to use LANA AI.
+    </div>
+  </noscript>
+
+  <!-- Universal shell scripts -->
+  <script src="js/error-reporter.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/mock-data.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/components.js"></script>
+  <script src="js/version.js"></script>
+  <script src="js/menu.js"></script>
+  <script src="js/navigation-helpers.js"></script>
+  <script src="js/new-project-modal.js"></script>
+  <script src="js/conversation-menu.js"></script>
+  <script src="js/conversation-search-modal.js"></script>
+  <script src="js/contact-search-modal.js"></script>
+  <script src="js/notifications.js"></script>
+
+  <!-- Lex UI core -->
+  <script src="js/lex/lex.core.js"></script>
+  <script src="js/lex/lex.icons.js"></script>
+  <script src="js/lex/lex.data.js"></script>
+  <script src="js/lex/lex.forms.js"></script>
+  <script src="js/lex/lex.state.js"></script>
+  <script src="js/lex/lex.utils.js"></script>
+  <script src="js/lex/lex.auth.js"></script>
+  <script src="js/lex/lex-nav.js"></script>
+
+  <!-- Lex UI layout -->
+  <script src="js/lex/components/foundation/lex-loader.js"></script>
+  <script src="js/lex/components/foundation/lex-toast.js"></script>
+  <script src="js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="js/lex/components/foundation/lex-btn.js"></script>
+  <script src="js/lex/components/foundation/lex-empty.js"></script>
+  <script src="js/lex/components/form/lex-segmented.js"></script>
+  <script src="js/lex/components/form/lex-select.js"></script>
+  <script src="js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="js/lex/components/layout/lex-topbar.js"></script>
+  <script src="js/lex/components/layout/lex-conversation-item.js"></script>
+  <script src="js/lex/components/layout/lex-notification-panel.js"></script>
+  <script src="js/lex/components/layout/lex-app.js"></script>
+
+  <!-- Page-specific Lex components -->
+  <script src="js/lex/components/foundation/lex-badge.js"></script>
+  <script src="js/lex/components/foundation/lex-card.js"></script>
+  <script src="js/lex/components/data/lex-pagination.js"></script>
+
+  <!-- Inject page content -->
+  <script src="js/lex/lex-page-init.js"></script>
+
+  <!-- Page controller (MUST be last before auth-guard) -->
+  <script src="js/pages/agentic-tasks-list.js"></script>
+
+  <!-- Auth guard + loader dismiss -->
+  <script src="js/auth-guard.js"></script>
+</body>
+</html>

@@ -217,6 +217,29 @@
       this.addEventListener('lex-composer-manage-documents', () => {
         this.emit('lex-chat-manage-documents');
       });
+
+      // Composer document selection from # picker — add document to chat context
+      this.addEventListener('lex-composer-document-select', async (e) => {
+        const { documentId, filename } = e.detail || {};
+        if (documentId) {
+          try {
+            await this.addDocument(documentId, filename);
+          } catch (err) {
+            this._showSystemMessage('Failed to add document: ' + err.message);
+            // Remove badge from composer on failure
+            const composer = this.querySelector('lex-chat-composer');
+            if (composer) composer.removeDocument(documentId);
+          }
+        }
+      });
+
+      // Composer document badge dismissed — remove from chat context
+      this.addEventListener('lex-composer-document-remove', async (e) => {
+        const { documentId } = e.detail || {};
+        if (documentId) {
+          await this.removeDocument(documentId);
+        }
+      });
     }
 
     // ---------------------------------------------------------------------------
@@ -295,9 +318,18 @@
 
       // Prepare source options
       const sendOpts = { ...opts };
+      // Map chat mode to backend context_type enum
       const chatModeStored = localStorage.getItem('chatMode');
-      if (chatModeStored === 'agentic') sendOpts.forceAgentic = true;
+      if (chatModeStored === 'agentic' || this.chatMode === 'agentic') {
+        sendOpts.contextType = 'agentic_mode';
+      } else if (this.chatMode === 'document') {
+        sendOpts.contextType = 'document_chat';
+      } else if (this.chatMode === 'insights') {
+        sendOpts.contextType = 'insights_chat';
+      }
+      // Explicit contextType prop takes precedence
       if (this.contextType) sendOpts.contextType = this.contextType;
+      if (this.matterId) sendOpts.matterId = this.matterId;
 
       // Connect if needed
       if (!this._source.connected) {
@@ -456,6 +488,25 @@
           if (this._activityEl) {
             this._activityEl.update(event.content || 'Analyzing...', 'tool');
             this._activityEl.addReasoningEntry({ message: event.content });
+          }
+          break;
+
+        case 'tool_start':
+          if (this._activityEl) {
+            this._activityEl.show('Preparing tool...', 'tool');
+          }
+          break;
+
+        case 'tool_progress':
+          if (this._activityEl) {
+            this._activityEl.update(event.message || 'Processing...', 'tool');
+          }
+          break;
+
+        case 'tool_end':
+          // Don't hide — LLM continues streaming after tools; activity hides on first content chunk
+          if (this._activityEl) {
+            this._activityEl.update('Analyzing results...', 'tool');
           }
           break;
 

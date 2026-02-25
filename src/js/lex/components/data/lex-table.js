@@ -39,6 +39,20 @@
     const style = document.createElement('style');
     style.id = 'lex-table-styles';
     style.textContent = `
+      /* Base element: flex column so scroll area can fill remaining space */
+      lex-table {
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* Scrollable table body — sticky header stays visible while rows scroll */
+      .lex-table-scroll-area thead {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: var(--lex-bg-secondary, #F5F5F0);
+      }
+
       /* Toolbar: column layout when both search and filters are present */
       .lex-table-toolbar {
         display: flex;
@@ -46,6 +60,7 @@
         gap: 8px;
         padding: 0 4px;
         margin-bottom: 8px;
+        flex-shrink: 0;
       }
 
       /* Top row within toolbar: search + count */
@@ -163,6 +178,7 @@
         padding: 8px 16px;
         border-top: 1px solid var(--lex-border-default, #E8E5E1);
         font-size: var(--lex-form-font-size, 0.8125rem);
+        flex-shrink: 0;
       }
       .lex-pagination-controls {
         display: flex;
@@ -298,6 +314,7 @@
         border-radius: var(--lex-radius-md, 6px);
         margin-bottom: 8px;
         font-size: var(--lex-form-font-size, 0.8125rem);
+        flex-shrink: 0;
       }
       .lex-bulk-count {
         font-weight: 600;
@@ -728,7 +745,7 @@
       // aria-label provides an accessible name for the table.
       // Prefer an explicit aria-label attribute on the element; fall back to a generic label.
       const tableLabel = this.getAttribute('aria-label') || this.getAttribute('label') || 'Data table';
-      html += `<div class="overflow-x-auto" style="min-height: 200px"><table class="w-full text-sm" aria-label="${this.escapeHtml(tableLabel)}">`;
+      html += `<div class="lex-table-scroll-area" style="flex:1;min-height:0;overflow:auto"><table class="w-full text-sm" aria-label="${this.escapeHtml(tableLabel)}">`;
       html += `<thead><tr class="border-b lex-border lex-bg-secondary">`;
 
       // Select-all checkbox column

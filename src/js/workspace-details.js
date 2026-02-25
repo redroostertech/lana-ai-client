@@ -40,6 +40,19 @@
   var customFieldValues = [];
   var _tabIndicatorInitialized = false;
   var _navContext = null;              // navigation context (source, conversationId, etc.)
+
+  // Document generation state
+  var docGenState = {
+    documentTypes: [],
+    templateSets: [],
+    contacts: [],
+    isGenerating: false,
+    isAnalyzing: false,
+    generatedContent: '',
+    currentArtifact: null,
+    activeReader: null,
+    customVarCount: 0
+  };
   // =========================================================================
   // Utility functions (NO regex — string methods only)
   // =========================================================================
@@ -558,7 +571,7 @@
   }
 
   function switchMatterTab(tab) {
-    var tabs = ['activity', 'notes', 'tasks', 'comments', 'documents', 'conversations'];
+    var tabs = ['activity', 'notes', 'tasks', 'comments', 'documents', 'conversations', 'skills', 'docGeneration'];
     var activeBtn = null;
 
     tabs.forEach(function (t) {
@@ -611,6 +624,12 @@
       case 'notes':
         renderNotesTab(m.matter);
         break;
+      case 'skills':
+        renderSkillsTab(m.matter);
+        break;
+      case 'docGeneration':
+        renderDocGenerationTab(m.matter);
+        break;
     }
 
     // Update URL param without navigation
@@ -618,7 +637,7 @@
   }
 
   function getCurrentActiveTab() {
-    var tabs = ['activity', 'notes', 'tasks', 'comments', 'documents', 'conversations'];
+    var tabs = ['activity', 'notes', 'tasks', 'comments', 'documents', 'conversations', 'skills', 'docGeneration'];
     for (var i = 0; i < tabs.length; i++) {
       var content = document.getElementById('tabContent' + tabs[i].charAt(0).toUpperCase() + tabs[i].substring(1));
       if (content && !content.classList.contains('hidden')) return tabs[i];
@@ -1388,7 +1407,7 @@
         var actionButtons = '';
         if (doc.status === 'active' || doc.status === 'completed') {
           actionButtons =
-            '<button onclick="openFileViewer(\'' + doc.id + '\')" class="text-xs text-emerald-600 hover:text-emerald-800 font-medium flex items-center gap-1">' +
+            '<button onclick="_navToFileViewer(\'' + doc.id + '\')" class="text-xs text-emerald-600 hover:text-emerald-800 font-medium flex items-center gap-1">' +
               '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>' +
               'View' +
             '</button>' +
@@ -6446,10 +6465,25 @@
     }
   }
 
+  /**
+   * Navigate to the dedicated file viewer page with referrer context.
+   * @param {string} fileId
+   */
+  function _navToFileViewer(fileId) {
+    var params = Lex.Nav.getParams();
+    var matterId = params.get('id') || '';
+    var referrer = 'workspace-details.html?id=' + encodeURIComponent(matterId);
+    Lex.Nav.go('file-viewer.html', {
+      params: { id: fileId },
+      context: { referrer: referrer }
+    });
+  }
+
   window.downloadDocument = downloadDocument;
   window.viewOrphanedDocument = viewOrphanedDocument;
   window.downloadOrphanedDocument = downloadOrphanedDocument;
-  ['downloadDocument', 'viewOrphanedDocument', 'downloadOrphanedDocument'].forEach(_trackGlobal);
+  window._navToFileViewer = _navToFileViewer;
+  ['downloadDocument', 'viewOrphanedDocument', 'downloadOrphanedDocument', '_navToFileViewer'].forEach(_trackGlobal);
 
   // =========================================================================
   // Edit Matter Modal (NEW — specific to workspace_details.html)
@@ -7160,6 +7194,693 @@
    'toggleConnectorDetails', 'toggleEntityGroup'].forEach(_trackGlobal);
 
   // =========================================================================
+  // Document Generation Tab
+  // =========================================================================
+
+  async function renderDocGenerationTab(matter) {
+    var container = document.getElementById('tabContentDocGeneration');
+    if (!container) return;
+
+    // Show shimmer placeholder
+    container.innerHTML =
+      '<div class="space-y-4">' +
+        '<div class="h-4 bg-gray-100 rounded w-1/3 animate-pulse"></div>' +
+        '<div class="h-20 bg-gray-100 rounded animate-pulse"></div>' +
+        '<div class="h-4 bg-gray-100 rounded w-1/4 animate-pulse"></div>' +
+        '<div class="h-32 bg-gray-100 rounded animate-pulse"></div>' +
+      '</div>';
+
+    // Parallel data fetch
+    var matterId = matter.matter_id;
+    var results = await Promise.allSettled([
+      api.get('/api/v1/matters/' + matterId + '/document-types'),
+      api.get('/api/v1/generation-template-sets?matter_id=' + matterId),
+      api.get('/api/v1/matters/' + matterId + '/contacts')
+    ]);
+
+    docGenState.documentTypes = (results[0].status === 'fulfilled' && results[0].value && results[0].value.data)
+      ? results[0].value.data : [];
+    docGenState.templateSets = (results[1].status === 'fulfilled' && results[1].value && results[1].value.data)
+      ? results[1].value.data : [];
+    docGenState.contacts = (results[2].status === 'fulfilled' && results[2].value && results[2].value.data)
+      ? results[2].value.data : [];
+
+    var html = '';
+
+    // Section 1: Learned Document Types
+    var typesHtml = buildDocumentTypesContent(docGenState.documentTypes);
+    var analyzeBtn = '<span onclick="event.stopPropagation(); analyzeDocumentStructure()" class="text-xs font-medium px-2 py-1 rounded cursor-pointer transition-colors" style="color: var(--lex-text-accent); background: var(--lex-bg-accent-muted)">Analyze Documents</span>';
+    var typesBadge = docGenState.documentTypes.length > 0
+      ? '<span class="ml-2 text-xs font-medium px-1.5 py-0.5 rounded-full" style="background: var(--lex-bg-accent-muted); color: var(--lex-text-accent)">' + docGenState.documentTypes.length + '</span>'
+      : '';
+    html += createCollapsibleSection('Learned Document Types', typesHtml, 'docgen-types', {
+      badge: typesBadge,
+      actions: analyzeBtn,
+      defaultExpanded: true
+    });
+
+    // Section 2: Template Sets
+    var setsHtml = buildTemplateSetsContent(docGenState.templateSets);
+    var createSetBtn = '<span onclick="event.stopPropagation(); openTemplateSetModal()" class="text-xs font-medium px-2 py-1 rounded cursor-pointer transition-colors" style="color: var(--lex-text-accent); background: var(--lex-bg-accent-muted)">Create Set</span>';
+    var setsBadge = docGenState.templateSets.length > 0
+      ? '<span class="ml-2 text-xs font-medium px-1.5 py-0.5 rounded-full" style="background: var(--lex-bg-accent-muted); color: var(--lex-text-accent)">' + docGenState.templateSets.length + '</span>'
+      : '';
+    html += createCollapsibleSection('Template Sets', setsHtml, 'docgen-sets', {
+      badge: setsBadge,
+      actions: createSetBtn,
+      defaultExpanded: false
+    });
+
+    // Section 3: Generate Document Form
+    var formHtml = buildGenerateFormContent(matter);
+    html += createCollapsibleSection('Generate Document', formHtml, 'docgen-form', {
+      defaultExpanded: true
+    });
+
+    container.innerHTML = html;
+  }
+
+  function buildDocumentTypesContent(types) {
+    if (!types || types.length === 0) {
+      return '<div class="text-center py-8">' +
+        '<svg class="w-10 h-10 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>' +
+        '</svg>' +
+        '<p class="text-sm text-gray-500">No document types learned yet</p>' +
+        '<p class="text-xs text-gray-400 mt-1">Upload documents and click "Analyze Documents" to discover patterns</p>' +
+      '</div>';
+    }
+
+    var html = '<div class="overflow-x-auto"><table class="w-full text-sm">' +
+      '<thead><tr class="border-b border-gray-200">' +
+        '<th class="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase">Type</th>' +
+        '<th class="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase">Documents</th>' +
+        '<th class="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase">Confidence</th>' +
+        '<th class="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase">Structure</th>' +
+      '</tr></thead><tbody>';
+
+    for (var i = 0; i < types.length; i++) {
+      var t = types[i];
+      var conf = t.confidence_score ? Math.round(t.confidence_score * 100) : 0;
+      var confColor = conf >= 70 ? 'text-green-600' : conf >= 40 ? 'text-amber-600' : 'text-red-500';
+      var hasStructure = t.has_structure || t.structure_version;
+      html += '<tr class="border-b border-gray-100 hover:bg-gray-50">' +
+        '<td class="py-2 px-3 font-medium text-gray-900">' + escapeHtml(t.document_type_label || t.document_type || 'Unknown') + '</td>' +
+        '<td class="py-2 px-3 text-gray-600">' + (t.document_count || 0) + '</td>' +
+        '<td class="py-2 px-3 ' + confColor + ' font-medium">' + conf + '%</td>' +
+        '<td class="py-2 px-3">' +
+          (hasStructure
+            ? '<span class="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full">Learned</span>'
+            : '<span class="text-xs text-gray-400">Not analyzed</span>') +
+        '</td>' +
+      '</tr>';
+    }
+
+    html += '</tbody></table></div>';
+    return html;
+  }
+
+  function buildTemplateSetsContent(sets) {
+    if (!sets || sets.length === 0) {
+      return '<div class="text-center py-8">' +
+        '<svg class="w-10 h-10 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>' +
+        '</svg>' +
+        '<p class="text-sm text-gray-500">No template sets created</p>' +
+        '<p class="text-xs text-gray-400 mt-1">Group similar documents into sets for better generation results</p>' +
+      '</div>';
+    }
+
+    var html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-3">';
+    for (var i = 0; i < sets.length; i++) {
+      var s = sets[i];
+      var docCount = s.document_count || 0;
+      var isAnalyzed = s.is_analyzed || s.analyzed_at;
+      html += '<div class="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors">' +
+        '<div class="flex items-start justify-between mb-2">' +
+          '<div>' +
+            '<h5 class="text-sm font-semibold text-gray-900">' + escapeHtml(s.name) + '</h5>' +
+            '<p class="text-xs text-gray-500 mt-0.5">' + escapeHtml(s.document_type_label || s.document_type || '') + '</p>' +
+          '</div>' +
+          (isAnalyzed ? '<span class="text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full">Analyzed</span>' : '') +
+        '</div>' +
+        '<p class="text-xs text-gray-500 mb-3">' + docCount + ' document' + (docCount !== 1 ? 's' : '') + '</p>' +
+        (s.description ? '<p class="text-xs text-gray-400 mb-3 line-clamp-2">' + escapeHtml(s.description) + '</p>' : '') +
+        '<div class="flex items-center gap-2">' +
+          '<button onclick="editTemplateSet(\'' + s.set_id + '\')" class="text-xs font-medium px-2 py-1 rounded transition-colors" style="color: var(--lex-text-accent); background: var(--lex-bg-accent-muted)">Edit</button>' +
+          '<button onclick="analyzeTemplateSet(\'' + s.set_id + '\')" class="text-xs font-medium px-2 py-1 rounded transition-colors text-gray-600 bg-gray-100 hover:bg-gray-200">Analyze</button>' +
+          '<button onclick="deleteTemplateSet(\'' + s.set_id + '\')" class="text-xs font-medium px-2 py-1 rounded transition-colors text-red-600 bg-red-50 hover:bg-red-100">Delete</button>' +
+        '</div>' +
+      '</div>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function buildGenerateFormContent(matter) {
+    // Merge document types from learned + template sets for the select options
+    var options = '<option value="">-- Select Document Type --</option>';
+
+    if (docGenState.documentTypes.length > 0) {
+      options += '<optgroup label="Learned Types">';
+      for (var i = 0; i < docGenState.documentTypes.length; i++) {
+        var dt = docGenState.documentTypes[i];
+        options += '<option value="' + escapeHtml(dt.document_type) + '">' + escapeHtml(dt.document_type_label || dt.document_type) + '</option>';
+      }
+      options += '</optgroup>';
+    }
+
+    if (docGenState.templateSets.length > 0) {
+      options += '<optgroup label="Template Sets">';
+      for (var j = 0; j < docGenState.templateSets.length; j++) {
+        var ts = docGenState.templateSets[j];
+        options += '<option value="' + escapeHtml(ts.document_type) + '" data-set-id="' + escapeHtml(ts.set_id) + '">' + escapeHtml(ts.name) + '</option>';
+      }
+      options += '</optgroup>';
+    }
+
+    // Contact options
+    var contactOptions = '<option value="">-- No Target Contact --</option>';
+    for (var k = 0; k < docGenState.contacts.length; k++) {
+      var c = docGenState.contacts[k];
+      var cName = c.display_name || ((c.first_name || '') + ' ' + (c.last_name || '')).trim();
+      if (cName) {
+        contactOptions += '<option value="' + escapeHtml(cName) + '">' + escapeHtml(cName) + '</option>';
+      }
+    }
+
+    return '<form id="docGenForm" onsubmit="submitDocGeneration(event)" class="space-y-4">' +
+      '<div>' +
+        '<label class="block text-sm font-medium text-gray-700 mb-1">Document Type</label>' +
+        '<select id="dgDocType" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>' +
+          options +
+        '</select>' +
+      '</div>' +
+      '<div>' +
+        '<label class="block text-sm font-medium text-gray-700 mb-1">Instructions</label>' +
+        '<textarea id="dgInstructions" rows="4" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" required placeholder="Describe what you want to generate. Be specific about tone, structure, and key details to include..."></textarea>' +
+      '</div>' +
+      '<div>' +
+        '<label class="block text-sm font-medium text-gray-700 mb-1">Target Contact</label>' +
+        '<select id="dgContact" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">' +
+          contactOptions +
+        '</select>' +
+        '<p class="text-xs text-gray-400 mt-1">Participant data will be injected into the generated document</p>' +
+      '</div>' +
+      '<div>' +
+        '<label class="block text-sm font-medium text-gray-700 mb-1">Custom Variables</label>' +
+        '<div id="dgCustomVars" class="space-y-2"></div>' +
+        '<button type="button" onclick="addDocGenCustomVar()" class="mt-2 text-xs font-medium px-2 py-1 rounded transition-colors" style="color: var(--lex-text-accent); background: var(--lex-bg-accent-muted)">+ Add Variable</button>' +
+      '</div>' +
+      '<div class="flex items-center gap-2">' +
+        '<input type="checkbox" id="dgStream" checked class="rounded border-gray-300">' +
+        '<label for="dgStream" class="text-sm text-gray-600">Stream output in real-time</label>' +
+      '</div>' +
+      '<div class="pt-3 border-t border-gray-200">' +
+        '<lex-btn type="submit" variant="primary" id="dgSubmitBtn">Generate Document</lex-btn>' +
+      '</div>' +
+    '</form>';
+  }
+
+  function addDocGenCustomVar() {
+    var container = document.getElementById('dgCustomVars');
+    if (!container) return;
+    docGenState.customVarCount++;
+    var idx = docGenState.customVarCount;
+    var row = document.createElement('div');
+    row.className = 'flex items-center gap-2';
+    row.id = 'dgVar-' + idx;
+    row.innerHTML =
+      '<input type="text" placeholder="Variable name" class="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm" data-var-key="' + idx + '">' +
+      '<input type="text" placeholder="Value" class="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm" data-var-val="' + idx + '">' +
+      '<button type="button" onclick="removeDocGenCustomVar(' + idx + ')" class="text-gray-400 hover:text-red-500 p-1">' +
+        '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>' +
+      '</button>';
+    container.appendChild(row);
+  }
+
+  function removeDocGenCustomVar(idx) {
+    var row = document.getElementById('dgVar-' + idx);
+    if (row) row.remove();
+  }
+
+  // =========================================================================
+  // Document Generation - Analysis
+  // =========================================================================
+
+  async function analyzeDocumentStructure() {
+    if (!currentMatterData || docGenState.isAnalyzing) return;
+    var matter = currentMatterData.matter;
+    docGenState.isAnalyzing = true;
+
+    try {
+      Lex.Toast.success('Starting document structure analysis...');
+      await api.post('/api/v1/matters/' + matter.matter_id + '/analyze-document-structure', {});
+      Lex.Toast.success('Analysis started. Types will appear when complete.');
+      // Refresh the tab after a delay to allow analysis to run
+      trackTimeout(setTimeout(function () {
+        if (getCurrentActiveTab() === 'docGeneration') {
+          renderDocGenerationTab(matter);
+        }
+      }, 5000));
+    } catch (err) {
+      Lex.Toast.error('Analysis failed: ' + (err.message || 'Unknown error'));
+    } finally {
+      docGenState.isAnalyzing = false;
+    }
+  }
+
+  // =========================================================================
+  // Document Generation - Template Set CRUD
+  // =========================================================================
+
+  function openTemplateSetModal(existingSet) {
+    var modal = document.getElementById('templateSetModal');
+    var heading = modal;
+    var submitBtn = document.getElementById('tsSubmitBtn');
+    var editId = document.getElementById('tsEditId');
+    var nameEl = document.getElementById('tsName');
+    var descEl = document.getElementById('tsDescription');
+    var docTypeEl = document.getElementById('tsDocType');
+    var docTypeLabelEl = document.getElementById('tsDocTypeLabel');
+
+    if (existingSet) {
+      if (heading) heading.heading = 'Edit Template Set';
+      if (submitBtn) submitBtn.textContent = 'Save Changes';
+      if (editId) editId.value = existingSet.set_id || '';
+      if (nameEl) nameEl.value = existingSet.name || '';
+      if (descEl) descEl.value = existingSet.description || '';
+      if (docTypeEl) docTypeEl.value = existingSet.document_type || '';
+      if (docTypeLabelEl) docTypeLabelEl.value = existingSet.document_type_label || '';
+    } else {
+      if (heading) heading.heading = 'Create Template Set';
+      if (submitBtn) submitBtn.textContent = 'Create Set';
+      if (editId) editId.value = '';
+      if (nameEl) nameEl.value = '';
+      if (descEl) descEl.value = '';
+      if (docTypeEl) docTypeEl.value = '';
+      if (docTypeLabelEl) docTypeLabelEl.value = '';
+    }
+
+    if (modal) modal.open = true;
+  }
+
+  function closeTemplateSetModal() {
+    var modal = document.getElementById('templateSetModal');
+    if (modal) modal.open = false;
+  }
+
+  async function saveTemplateSet(event) {
+    event.preventDefault();
+    if (!currentMatterData) return;
+
+    var editId = (document.getElementById('tsEditId') || {}).value;
+    var payload = {
+      name: (document.getElementById('tsName') || {}).value || '',
+      description: (document.getElementById('tsDescription') || {}).value || '',
+      document_type: (document.getElementById('tsDocType') || {}).value || '',
+      document_type_label: (document.getElementById('tsDocTypeLabel') || {}).value || '',
+      matter_id: currentMatterData.matter.matter_id
+    };
+
+    try {
+      if (editId) {
+        await api.patch('/api/v1/generation-template-sets/' + editId, payload);
+        Lex.Toast.success('Template set updated');
+      } else {
+        await api.post('/api/v1/generation-template-sets', payload);
+        Lex.Toast.success('Template set created');
+      }
+      closeTemplateSetModal();
+      renderDocGenerationTab(currentMatterData.matter);
+    } catch (err) {
+      Lex.Toast.error('Failed to save: ' + (err.message || 'Unknown error'));
+    }
+  }
+
+  async function editTemplateSet(setId) {
+    try {
+      var resp = await api.get('/api/v1/generation-template-sets/' + setId);
+      var set = resp && resp.data ? resp.data : resp;
+      openTemplateSetModal(set);
+    } catch (err) {
+      Lex.Toast.error('Failed to load template set');
+    }
+  }
+
+  async function deleteTemplateSet(setId) {
+    if (!confirm('Delete this template set? This cannot be undone.')) return;
+    try {
+      await api.delete('/api/v1/generation-template-sets/' + setId);
+      Lex.Toast.success('Template set deleted');
+      if (currentMatterData) renderDocGenerationTab(currentMatterData.matter);
+    } catch (err) {
+      Lex.Toast.error('Failed to delete: ' + (err.message || 'Unknown error'));
+    }
+  }
+
+  async function analyzeTemplateSet(setId) {
+    try {
+      Lex.Toast.success('Analyzing template set...');
+      await api.post('/api/v1/generation-template-sets/' + setId + '/analyze', {});
+      Lex.Toast.success('Analysis complete');
+      if (currentMatterData) renderDocGenerationTab(currentMatterData.matter);
+    } catch (err) {
+      Lex.Toast.error('Analysis failed: ' + (err.message || 'Unknown error'));
+    }
+  }
+
+  // =========================================================================
+  // Document Generation - Generate & Stream
+  // =========================================================================
+
+  async function submitDocGeneration(event) {
+    event.preventDefault();
+    if (!currentMatterData || docGenState.isGenerating) return;
+
+    var matter = currentMatterData.matter;
+    var docType = (document.getElementById('dgDocType') || {}).value;
+    var instructions = (document.getElementById('dgInstructions') || {}).value;
+    var contactName = (document.getElementById('dgContact') || {}).value;
+    var useStream = document.getElementById('dgStream') ? document.getElementById('dgStream').checked : true;
+
+    if (!docType || !instructions) {
+      Lex.Toast.error('Please select a document type and provide instructions');
+      return;
+    }
+
+    // Collect custom variables
+    var customVars = {};
+    var varContainer = document.getElementById('dgCustomVars');
+    if (varContainer) {
+      var keyInputs = varContainer.querySelectorAll('[data-var-key]');
+      var valInputs = varContainer.querySelectorAll('[data-var-val]');
+      for (var i = 0; i < keyInputs.length; i++) {
+        var k = keyInputs[i].value.trim();
+        if (k && valInputs[i]) {
+          customVars[k] = valInputs[i].value;
+        }
+      }
+    }
+
+    // Check if a template set was selected
+    var templateSetId = null;
+    var selectEl = document.getElementById('dgDocType');
+    if (selectEl && selectEl.selectedIndex >= 0) {
+      var opt = selectEl.options[selectEl.selectedIndex];
+      if (opt && opt.getAttribute('data-set-id')) {
+        templateSetId = opt.getAttribute('data-set-id');
+      }
+    }
+
+    var payload = {
+      document_type: docType,
+      instructions: instructions,
+      stream: useStream
+    };
+    if (contactName) payload.target_contact_name = contactName;
+    if (templateSetId) payload.template_set_id = templateSetId;
+    if (Object.keys(customVars).length > 0) payload.custom_variables = customVars;
+
+    docGenState.isGenerating = true;
+    docGenState.generatedContent = '';
+    docGenState.currentArtifact = null;
+
+    // Disable submit button
+    var submitBtn = document.getElementById('dgSubmitBtn');
+    if (submitBtn) submitBtn.disabled = true;
+
+    if (useStream) {
+      await streamDocGeneration(matter.matter_id, payload);
+    } else {
+      await nonStreamDocGeneration(matter.matter_id, payload);
+    }
+
+    docGenState.isGenerating = false;
+    if (submitBtn) submitBtn.disabled = false;
+  }
+
+  async function streamDocGeneration(matterId, payload) {
+    // Open the output modal
+    var modal = document.getElementById('docGenOutputModal');
+    var progressArea = document.getElementById('docGenProgressArea');
+    var progressText = document.getElementById('docGenProgressText');
+    var progressBar = document.getElementById('docGenProgressBar');
+    var outputContent = document.getElementById('docGenOutputContent');
+    var artifactInfo = document.getElementById('docGenArtifactInfo');
+
+    if (modal) modal.open = true;
+    if (progressArea) progressArea.classList.remove('hidden');
+    if (progressText) progressText.textContent = 'Generating...';
+    if (progressBar) progressBar.style.width = '0%';
+    if (outputContent) outputContent.innerHTML = '<p class="text-sm text-gray-400">Waiting for content...</p>';
+    if (artifactInfo) artifactInfo.textContent = '';
+
+    try {
+      var token = (window.api && window.api.token) ? window.api.token : '';
+      var baseUrl = (window.api && window.api.baseUrl) ? window.api.baseUrl : '';
+      var response = await fetch(baseUrl + '/api/v1/matters/' + matterId + '/generate-document', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        var errText = '';
+        try { errText = await response.text(); } catch (e) {}
+        throw new Error('Generation failed: ' + response.status + ' ' + errText);
+      }
+
+      var reader = response.body.getReader();
+      docGenState.activeReader = reader;
+      var decoder = new TextDecoder();
+      var buffer = '';
+
+      while (true) {
+        var readResult = await reader.read();
+        if (readResult.done) break;
+
+        buffer += decoder.decode(readResult.value, { stream: true });
+
+        // Parse SSE events from buffer (no regex — string methods only)
+        var events = parseSSEBuffer(buffer);
+        buffer = events.remainder;
+
+        for (var i = 0; i < events.parsed.length; i++) {
+          handleSSEEvent(events.parsed[i], outputContent, progressText, progressBar, progressArea, artifactInfo);
+        }
+      }
+
+      docGenState.activeReader = null;
+    } catch (err) {
+      docGenState.activeReader = null;
+      if (progressArea) progressArea.classList.add('hidden');
+      if (outputContent) {
+        outputContent.innerHTML = '<div class="text-red-600 text-sm p-4 bg-red-50 rounded-lg">' +
+          '<p class="font-medium">Generation Error</p>' +
+          '<p class="mt-1">' + escapeHtml(err.message || 'Unknown error') + '</p>' +
+        '</div>';
+      }
+    }
+  }
+
+  function parseSSEBuffer(buffer) {
+    var parsed = [];
+    var currentEvent = null;
+    var lines = buffer.split('\n');
+    var remainder = '';
+
+    // Check if buffer ends with a complete event (double newline)
+    var endsComplete = buffer.indexOf('\n\n') !== -1;
+    if (!endsComplete) {
+      // Buffer doesn't contain a complete event yet
+      return { parsed: [], remainder: buffer };
+    }
+
+    // Split on double newlines to get event blocks
+    var blocks = [];
+    var blockStart = 0;
+    for (var i = 0; i < buffer.length - 1; i++) {
+      if (buffer.charAt(i) === '\n' && buffer.charAt(i + 1) === '\n') {
+        blocks.push(buffer.substring(blockStart, i));
+        blockStart = i + 2;
+      }
+    }
+    remainder = buffer.substring(blockStart);
+
+    for (var b = 0; b < blocks.length; b++) {
+      var block = blocks[b].trim();
+      if (!block) continue;
+
+      var eventType = 'message';
+      var eventData = '';
+      var blockLines = block.split('\n');
+
+      for (var l = 0; l < blockLines.length; l++) {
+        var line = blockLines[l];
+        if (line.indexOf('event: ') === 0) {
+          eventType = line.substring(7).trim();
+        } else if (line.indexOf('data: ') === 0) {
+          eventData = line.substring(6);
+        }
+      }
+
+      if (eventData) {
+        try {
+          var dataObj = JSON.parse(eventData);
+          parsed.push({ type: eventType, data: dataObj });
+        } catch (e) {
+          // Not valid JSON, treat as raw string
+          parsed.push({ type: eventType, data: eventData });
+        }
+      }
+    }
+
+    return { parsed: parsed, remainder: remainder };
+  }
+
+  function handleSSEEvent(event, outputEl, progressText, progressBar, progressArea, artifactInfo) {
+    switch (event.type) {
+      case 'content':
+        var chunk = typeof event.data === 'string' ? event.data : (event.data.content || event.data.chunk || '');
+        docGenState.generatedContent += chunk;
+        if (outputEl) {
+          renderStreamedContent(outputEl, docGenState.generatedContent);
+        }
+        break;
+
+      case 'progress':
+        var pct = event.data.percent || event.data.progress || 0;
+        var msg = event.data.message || event.data.stage || 'Generating...';
+        if (progressBar) progressBar.style.width = pct + '%';
+        if (progressText) progressText.textContent = msg;
+        break;
+
+      case 'complete':
+        if (progressArea) progressArea.classList.add('hidden');
+        if (event.data && event.data.artifact) {
+          docGenState.currentArtifact = event.data.artifact;
+          if (artifactInfo) {
+            artifactInfo.textContent = 'Saved as: ' + (event.data.artifact.artifact_name || 'Document') + ' (v' + (event.data.artifact.version || 1) + ')';
+          }
+        }
+        // Final render
+        if (outputEl) renderStreamedContent(outputEl, docGenState.generatedContent);
+        break;
+
+      case 'error':
+        if (progressArea) progressArea.classList.add('hidden');
+        var errMsg = typeof event.data === 'string' ? event.data : (event.data.message || 'Generation error');
+        if (outputEl) {
+          outputEl.innerHTML += '<div class="text-red-600 text-sm p-4 bg-red-50 rounded-lg mt-4">' +
+            '<p class="font-medium">Error</p><p class="mt-1">' + escapeHtml(errMsg) + '</p></div>';
+        }
+        break;
+
+      case 'done':
+        // Stream completed
+        break;
+    }
+  }
+
+  function renderStreamedContent(el, fullText) {
+    if (!el) return;
+    // Use marked.parse if available (loaded for matter notes), else escape and use pre
+    if (window.marked && window.marked.parse) {
+      el.innerHTML = window.marked.parse(fullText);
+    } else {
+      el.innerHTML = '<pre class="whitespace-pre-wrap text-sm">' + escapeHtml(fullText) + '</pre>';
+    }
+  }
+
+  async function nonStreamDocGeneration(matterId, payload) {
+    try {
+      var result = await api.post('/api/v1/matters/' + matterId + '/generate-document', payload);
+      var data = result && result.data ? result.data : result;
+      docGenState.generatedContent = data.content || '';
+      docGenState.currentArtifact = data.artifact || null;
+
+      // Open modal with content
+      var modal = document.getElementById('docGenOutputModal');
+      var outputContent = document.getElementById('docGenOutputContent');
+      var artifactInfo = document.getElementById('docGenArtifactInfo');
+      var progressArea = document.getElementById('docGenProgressArea');
+
+      if (modal) modal.open = true;
+      if (progressArea) progressArea.classList.add('hidden');
+      if (outputContent) renderStreamedContent(outputContent, docGenState.generatedContent);
+      if (artifactInfo && data.artifact) {
+        artifactInfo.textContent = 'Saved as: ' + (data.artifact.artifact_name || 'Document') + ' (v' + (data.artifact.version || 1) + ')';
+      }
+    } catch (err) {
+      Lex.Toast.error('Generation failed: ' + (err.message || 'Unknown error'));
+    }
+  }
+
+  // =========================================================================
+  // Document Generation - Output Modal Helpers
+  // =========================================================================
+
+  function copyGeneratedContent() {
+    if (!docGenState.generatedContent) {
+      Lex.Toast.error('No content to copy');
+      return;
+    }
+    try {
+      navigator.clipboard.writeText(docGenState.generatedContent);
+      Lex.Toast.success('Copied to clipboard');
+    } catch (e) {
+      // Fallback
+      var ta = document.createElement('textarea');
+      ta.value = docGenState.generatedContent;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      Lex.Toast.success('Copied to clipboard');
+    }
+  }
+
+  function closeDocGenOutputModal() {
+    var modal = document.getElementById('docGenOutputModal');
+    if (modal) modal.open = false;
+    // Abort any active stream
+    if (docGenState.activeReader) {
+      try { docGenState.activeReader.cancel(); } catch (e) {}
+      docGenState.activeReader = null;
+    }
+  }
+
+  // =========================================================================
+  // Document Generation - Window Globals
+  // =========================================================================
+
+  window.renderDocGenerationTab = renderDocGenerationTab;
+  window.analyzeDocumentStructure = analyzeDocumentStructure;
+  window.openTemplateSetModal = openTemplateSetModal;
+  window.closeTemplateSetModal = closeTemplateSetModal;
+  window.saveTemplateSet = saveTemplateSet;
+  window.editTemplateSet = editTemplateSet;
+  window.deleteTemplateSet = deleteTemplateSet;
+  window.analyzeTemplateSet = analyzeTemplateSet;
+  window.submitDocGeneration = submitDocGeneration;
+  window.addDocGenCustomVar = addDocGenCustomVar;
+  window.removeDocGenCustomVar = removeDocGenCustomVar;
+  window.copyGeneratedContent = copyGeneratedContent;
+  window.closeDocGenOutputModal = closeDocGenOutputModal;
+
+  ['renderDocGenerationTab', 'analyzeDocumentStructure',
+   'openTemplateSetModal', 'closeTemplateSetModal', 'saveTemplateSet',
+   'editTemplateSet', 'deleteTemplateSet', 'analyzeTemplateSet',
+   'submitDocGeneration', 'addDocGenCustomVar', 'removeDocGenCustomVar',
+   'copyGeneratedContent', 'closeDocGenOutputModal'].forEach(_trackGlobal);
+
+  // =========================================================================
   // Window Globals (for onclick handlers in HTML)
   // =========================================================================
 
@@ -7190,6 +7911,7 @@
     var params = Lex.Nav.getParams();
     var matterId = params.get('id');
     var defaultTab = params.get('tab') || 'activity';
+    var openFileId = params.get('open_file') || null;
 
     // Consume context (one-shot read from Lex.Nav.go context param)
     var ctx = Lex.Nav.consume();
@@ -7247,6 +7969,11 @@
 
     // Remove redacted shimmer
     redactPage(false);
+
+    // Auto-open file viewer if open_file param was passed (e.g. from dashboard)
+    if (openFileId) {
+      _timeouts.push(setTimeout(function () { _navToFileViewer(openFileId); }, 100));
+    }
   }
 
   function onLeave() {
@@ -7311,11 +8038,21 @@
       try { window.Lex.state.setActiveMatter(null); } catch (e) {}
     }
 
-    // 11. Clear state
+    // 11. Abort any active document generation stream
+    if (docGenState && docGenState.activeReader) {
+      try { docGenState.activeReader.cancel(); } catch (e) {}
+    }
+
+    // 12. Clear state
     currentMatterData = null;
     currentTaskMatterId = null;
     currentEditingTask = null;
     currentTasksList = [];
+    docGenState = {
+      documentTypes: [], templateSets: [], contacts: [],
+      isGenerating: false, isAnalyzing: false, generatedContent: '',
+      currentArtifact: null, activeReader: null, customVarCount: 0
+    };
     api = null;
   }
 

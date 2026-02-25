@@ -165,6 +165,53 @@
       .lex-cmp-chip-x:hover { background: rgba(255,255,255,0.35); }
       .lex-cmp-chip-x svg { width: 10px; height: 10px; }
 
+      /* ── Document badges area (above textarea) ─────────────── */
+      .lex-cmp-doc-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 8px 12px 0;
+      }
+      .lex-cmp-doc-badges:empty { display: none; }
+      .lex-cmp-doc-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 6px 4px 8px;
+        border-radius: var(--lex-radius-md, 8px);
+        font-size: 12px;
+        font-weight: 500;
+        background: var(--lex-chat-bg-elevated, #f0ede7);
+        color: var(--lex-chat-text, #1a1a1a);
+        white-space: nowrap;
+        max-width: 220px;
+        overflow: hidden;
+        animation: lex-chat-fade-in 0.2s ease both;
+      }
+      .lex-cmp-doc-badge > svg {
+        width: 12px; height: 12px;
+        flex-shrink: 0;
+        opacity: 0.6;
+      }
+      .lex-cmp-doc-badge > span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .lex-cmp-doc-badge-x {
+        width: 16px; height: 16px;
+        display: inline-flex; align-items: center; justify-content: center;
+        border-radius: 50%;
+        background: rgba(0,0,0,0.08);
+        border: none;
+        color: inherit;
+        cursor: pointer;
+        padding: 0;
+        flex-shrink: 0;
+        transition: background var(--lex-transition-fast, 0.15s);
+      }
+      .lex-cmp-doc-badge-x:hover { background: rgba(0,0,0,0.16); }
+      .lex-cmp-doc-badge-x svg { width: 10px; height: 10px; }
+
       /* ── Spacer ─────────────────────────────────────────────── */
       .lex-cmp-spacer { flex: 1; }
 
@@ -455,6 +502,7 @@
       this._docPickerQuery = '';
       this._docResults = [];
       this._hashTriggerPos = -1; // caret position of the # character
+      this._attachedDocs = []; // { id, filename } — documents attached via # picker
       this._boundOutsideClick = null;
     }
 
@@ -496,6 +544,7 @@
               </div>
             </div>
           </div>
+          <div class="lex-cmp-doc-badges" data-doc-badges></div>
           <textarea
             class="lex-cmp-textarea"
             placeholder="${esc(this.placeholder)}"
@@ -634,6 +683,16 @@
           return;
         }
 
+        // Document badge dismiss
+        const dismissDocEl = e.target.closest('[data-dismiss-doc]');
+        if (dismissDocEl) {
+          const docId = dismissDocEl.dataset.dismissDoc;
+          this._attachedDocs = this._attachedDocs.filter(d => d.id !== docId);
+          this._renderDocBadges();
+          this.emit('lex-composer-document-remove', { documentId: docId });
+          return;
+        }
+
         // Document picker selection
         const docEl = e.target.closest('[data-doc-select]');
         if (docEl) {
@@ -699,6 +758,15 @@
       if (idx >= 0) {
         active.splice(idx, 1);
         this._props.activeTools = active;
+        // Deselecting Document Chat clears all attached files
+        if (id === 'document_chat' && this._attachedDocs.length > 0) {
+          const removed = this._attachedDocs.slice();
+          this._attachedDocs = [];
+          this._renderDocBadges();
+          for (const doc of removed) {
+            this.emit('lex-composer-document-remove', { documentId: doc.id });
+          }
+        }
         this.emit('lex-composer-tool-dismiss', { toolId: id });
       } else {
         active.push(id);
@@ -718,6 +786,15 @@
       this._props.activeTools = active;
       this._refreshToolsPopover();
       this._refreshActiveChips();
+      // Dismissing Document Chat clears all attached files
+      if (id === 'document_chat' && this._attachedDocs.length > 0) {
+        const removed = this._attachedDocs.slice();
+        this._attachedDocs = [];
+        this._renderDocBadges();
+        for (const doc of removed) {
+          this.emit('lex-composer-document-remove', { documentId: doc.id });
+        }
+      }
       this.emit('lex-composer-tool-dismiss', { toolId: id });
     }
 
@@ -756,6 +833,27 @@
             ${t.icon || ''}
             <span>${esc(t.label)}</span>
             ${locked ? '' : `<button class="lex-cmp-chip-x" data-dismiss-tool="${id}" title="Remove ${esc(t.label)}">${ICON_CLOSE}</button>`}
+          </div>`;
+      }).join('');
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Document badges (attached via # picker)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    _renderDocBadges() {
+      const container = this.querySelector('[data-doc-badges]');
+      if (!container) return;
+      if (this._attachedDocs.length === 0) {
+        container.innerHTML = '';
+        return;
+      }
+      container.innerHTML = this._attachedDocs.map(doc => {
+        return `
+          <div class="lex-cmp-doc-badge">
+            ${ICON_FILE}
+            <span>${esc(doc.filename)}</span>
+            <button class="lex-cmp-doc-badge-x" data-dismiss-doc="${esc(doc.id)}" title="Remove ${esc(doc.filename)}">${ICON_CLOSE}</button>
           </div>`;
       }).join('');
     }
@@ -824,17 +922,49 @@
     }
 
     _selectDocument(docId, docName) {
+      const hashPos = this._hashTriggerPos; // save before close resets it
       this._closeDocPicker();
-      // Remove the # trigger text from textarea
-      if (this._textarea && this._hashTriggerPos >= 0) {
+      const name = docName || 'document';
+
+      // Enforce max 3 documents
+      const alreadyAttached = this._attachedDocs.some(d => d.id === docId);
+      if (!alreadyAttached && this._attachedDocs.length >= 3) {
+        // Remove #query text, nothing to add
+        if (this._textarea && hashPos >= 0) {
+          const val = this._textarea.value;
+          const pos = this._textarea.selectionStart;
+          this._textarea.value = val.substring(0, hashPos) + val.substring(pos);
+          this._textarea.selectionStart = this._textarea.selectionEnd = hashPos;
+          this._autoResize();
+        }
+        this._textarea?.focus();
+        return;
+      }
+
+      // Replace #query with inline reference #filename
+      if (this._textarea && hashPos >= 0) {
         const val = this._textarea.value;
         const pos = this._textarea.selectionStart;
-        // Find end of the #query (from hash to current caret)
-        const before = val.substring(0, this._hashTriggerPos);
+        const before = val.substring(0, hashPos);
         const after = val.substring(pos);
-        this._textarea.value = before + after;
-        this._textarea.selectionStart = this._textarea.selectionEnd = before.length;
+        const ref = '#' + name + ' ';
+        this._textarea.value = before + ref + after;
+        this._textarea.selectionStart = this._textarea.selectionEnd = before.length + ref.length;
         this._autoResize();
+      }
+
+      // Track attached document and render badge
+      if (!alreadyAttached) {
+        this._attachedDocs.push({ id: docId, filename: name });
+        this._renderDocBadges();
+        // Auto-activate Document Chat tool
+        const active = this.activeTools || [];
+        if (!active.includes('document_chat')) {
+          this._props.activeTools = [...active, 'document_chat'];
+          this._refreshToolsPopover();
+          this._refreshActiveChips();
+          this.emit('lex-composer-tool-select', { toolId: 'document_chat' });
+        }
       }
       this._textarea?.focus();
       this.emit('lex-composer-document-select', { documentId: docId, filename: docName });
@@ -894,6 +1024,8 @@
         this._textarea.value = '';
         this._textarea.style.height = 'auto';
       }
+      this._attachedDocs = [];
+      this._renderDocBadges();
     }
 
     getValue() {
@@ -970,6 +1102,22 @@
     setDocumentResults(results) {
       this._docResults = results || [];
       this._refreshDocPickerResults();
+    }
+
+    /**
+     * Remove a document badge by id.
+     */
+    removeDocument(docId) {
+      this._attachedDocs = this._attachedDocs.filter(d => d.id !== docId);
+      this._renderDocBadges();
+    }
+
+    /**
+     * Get currently attached documents.
+     * @returns {Array<{id: string, filename: string}>}
+     */
+    getAttachedDocuments() {
+      return this._attachedDocs.slice();
     }
   }
 

@@ -11,74 +11,10 @@
   <link rel="stylesheet" href="../css/tailwind-output.css">
   <link rel="stylesheet" href="../insights/raw-data-viewer.css">
   <link rel="stylesheet" href="../css/lex-chat.css">
+  <link rel="stylesheet" href="../css/lana-ask-btn.css">
   <script src="../js/tailwind-loader.js"></script>
 
   <style>
-    .lana-insights-btn {
-      position: relative;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      padding: 8px 16px;
-      font-size: 11.5px;
-      font-weight: 700;
-      letter-spacing: 0.8px;
-      color: #fff;
-      background: linear-gradient(135deg, #1e1b4b 0%, #4338ca 40%, #7c3aed 70%, #c026d3 100%);
-      background-size: 200% 200%;
-      border: none;
-      border-radius: 9999px;
-      cursor: pointer;
-      transition: transform 0.2s ease, box-shadow 0.3s ease, background-position 0.4s ease;
-      box-shadow:
-        0 1px 3px rgba(0, 0, 0, 0.12),
-        0 4px 12px rgba(99, 102, 241, 0.25),
-        inset 0 1px 0 rgba(255, 255, 255, 0.15);
-      line-height: 1;
-      overflow: hidden;
-    }
-    .lana-insights-btn::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      border-radius: 9999px;
-      background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 50%, rgba(255,255,255,0.06) 100%);
-      pointer-events: none;
-    }
-    .lana-insights-btn:hover {
-      transform: translateY(-1px);
-      background-position: 100% 100%;
-      box-shadow:
-        0 2px 6px rgba(0, 0, 0, 0.15),
-        0 8px 24px rgba(124, 58, 237, 0.35),
-        inset 0 1px 0 rgba(255, 255, 255, 0.2);
-    }
-    .lana-insights-btn:active {
-      transform: translateY(0) scale(0.97);
-      box-shadow:
-        0 1px 2px rgba(0, 0, 0, 0.1),
-        0 2px 8px rgba(124, 58, 237, 0.2);
-    }
-    .lana-btn-icon {
-      position: relative;
-      width: 14px;
-      height: 14px;
-      flex-shrink: 0;
-    }
-    .lana-btn-corner-tl {
-      position: absolute;
-      top: 0;
-      left: 0;
-    }
-    .lana-btn-corner-br {
-      position: absolute;
-      bottom: 0;
-      right: 0;
-    }
-    .lana-insights-btn span {
-      position: relative;
-    }
     .lana-topbar-divider {
       width: 1px;
       height: 20px;
@@ -226,37 +162,31 @@
           <div id="moduleResults" style="display:none;flex-direction:column;gap:1.5rem;">
             <!-- Results Header Card -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <div class="flex items-start justify-between mb-2">
+              <!-- Header: Title + Learn More (left), Ask LANA (right) -->
+              <div class="flex items-center justify-between mb-4">
                 <div class="flex items-center gap-3">
                   <h2 id="moduleTitle" class="text-xl font-bold text-gray-900"></h2>
                   <button onclick="window._reporting.showModuleInfo()" class="flex items-center gap-1 px-3 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg">Learn More</button>
                 </div>
-                <!-- PDF/CSV export hidden — not enabled yet
-                <div class="flex gap-3">
-                  <button onclick="window._reporting.exportToPDF()" class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm">PDF</button>
-                  <button onclick="window._reporting.exportToCSV()" class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm">CSV</button>
-                </div>
-                -->
+                <button id="askLanaBtn" onclick="window._reporting.askLanaAboutReport()" class="lana-insights-btn" style="padding:6px 12px;font-size:10.5px;">
+                  <span class="lana-btn-icon">
+                    <svg class="lana-btn-corner-tl" width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M0 0L8 0M0 0L0 8" stroke="currentColor" stroke-width="1.5"/></svg>
+                    <svg class="lana-btn-corner-br" width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M8 8L0 8M8 8L8 0" stroke="currentColor" stroke-width="1.5"/></svg>
+                  </span>
+                  <span>LANA</span>
+                </button>
               </div>
-              <div class="grid grid-cols-4 gap-4 mt-4 text-sm">
+              <!-- All metadata on one row -->
+              <div class="flex items-center justify-between text-sm">
                 <div><p class="text-xs text-gray-500">Compare By</p><p id="resultPeriodType" class="font-medium text-gray-900"></p></div>
                 <div><p class="text-xs text-gray-500">Current Period</p><p id="resultCurrentPeriod" class="font-medium text-gray-900"></p></div>
                 <div><p class="text-xs text-gray-500">Prior Period</p><p id="resultPriorPeriod" class="font-medium text-gray-900"></p></div>
                 <div><p class="text-xs text-gray-500">Execution Time</p><p id="executionTime" class="font-medium text-gray-900"></p></div>
-              </div>
-              <div class="flex items-center gap-3 mt-4">
                 <button id="dataSourcesBtn" class="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">
                   <span id="dataSourcesCount">0 Connectors</span>
                 </button>
                 <button id="missingEntitiesBtn" class="hidden flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100">
                   <span id="missingEntitiesCount">0 Missing</span>
-                </button>
-                <button id="askLanaBtn" onclick="window._reporting.askLanaAboutReport()" class="lana-insights-btn" style="margin-left:auto;padding:6px 12px;font-size:10.5px;">
-                  <span class="lana-btn-icon">
-                    <svg class="lana-btn-corner-tl" width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M0 0L8 0M0 0L0 8" stroke="currentColor" stroke-width="1.5"/></svg>
-                    <svg class="lana-btn-corner-br" width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M8 8L0 8M8 8L8 0" stroke="currentColor" stroke-width="1.5"/></svg>
-                  </span>
-                  <span>Ask LANA</span>
                 </button>
               </div>
             </div>

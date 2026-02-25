@@ -6,7 +6,7 @@
  * Dependencies (loaded via page descriptor before this file):
  *   - lex.utils.js   (escapeHtml, formatFileSize, formatRelativeDate, getFileType)
  *   - lex.icons.js   (getFileIcon, getFileIconSmall, getFileIconSVG)
- *   - file-viewer.js (openFileViewer)
+ *   - lex-nav.js     (Lex.Nav.go — navigates to file-viewer.html)
  */
 (function () {
   'use strict';
@@ -414,7 +414,7 @@
 
     var fileCards = files.map(function (file) {
       return [
-        '<div class="grid-item rounded-lg border p-4 cursor-pointer hover:shadow-md transition-shadow relative group" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)" onclick="openFileViewer(' + JSON.stringify(file.id) + ')">',
+        '<div class="grid-item rounded-lg border p-4 cursor-pointer hover:shadow-md transition-shadow relative group" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)" onclick="_navToFileViewer(' + JSON.stringify(file.id) + ')">',
         '  <button class="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity" style="color: var(--lex-text-tertiary); opacity: 1" onclick="event.stopPropagation(); showFileMenu(' + JSON.stringify(file.id) + ', event)">',
         '    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>',
         '  </button>',
@@ -466,7 +466,7 @@
 
     var fileRows = files.map(function (file) {
       return [
-        '<tr class="cursor-pointer" style="background: transparent" onmouseover="this.style.background=\'var(--lex-bg-secondary)\'" onmouseout="this.style.background=\'transparent\'" onclick="openFileViewer(' + JSON.stringify(file.id) + ')">',
+        '<tr class="cursor-pointer" style="background: transparent" onmouseover="this.style.background=\'var(--lex-bg-secondary)\'" onmouseout="this.style.background=\'transparent\'" onclick="_navToFileViewer(' + JSON.stringify(file.id) + ')">',
         '  <td class="px-6 py-4 whitespace-nowrap">',
         '    <div class="flex items-center">',
         '      ' + getFileIconSmall(file.filename),
@@ -1331,6 +1331,26 @@
   // ── Lifecycle hooks ──────────────────────────────────────────────────
 
   /**
+   * Navigate to the dedicated file viewer page.
+   * Builds a referrer URL from the current folder context so the viewer
+   * can navigate back to this exact folder.
+   * @param {string} fileId
+   */
+  function _navToFileViewer(fileId) {
+    var referrerParts = ['folder.html?matter_id=' + encodeURIComponent(folderState.currentMatterId || '')];
+    if (folderState.currentMatterName) {
+      referrerParts.push('&matter_name=' + encodeURIComponent(folderState.currentMatterName));
+    }
+    if (folderState.currentFolderId) {
+      referrerParts.push('&folder_id=' + encodeURIComponent(folderState.currentFolderId));
+    }
+    Lex.Nav.go('file-viewer.html', {
+      params: { id: fileId },
+      context: { referrer: referrerParts.join('') }
+    });
+  }
+
+  /**
    * Called by LexRouter when navigating to the folder page.
    * Initializes state, parses URL params, redirects if no matter_id,
    * exposes globals, wires events, and loads initial content.
@@ -1372,14 +1392,15 @@
     exposeGlobal('downloadFile', downloadFile);
     exposeGlobal('showFileMenu', showFileMenu);
     exposeGlobal('showFolderMenu', showFolderMenu);
+    exposeGlobal('_navToFileViewer', _navToFileViewer);
 
     setupEventListeners();
     renderBreadcrumbs();
     loadFolderContents();
 
     // Auto-open file viewer if open_file param present
-    if (openFileId && window.openFileViewer) {
-      setTimeout(function () { window.openFileViewer(openFileId); }, 500);
+    if (openFileId) {
+      setTimeout(function () { _navToFileViewer(openFileId); }, 100);
     }
   }
 

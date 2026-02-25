@@ -705,7 +705,7 @@
         : `<span class="text-lg font-bold text-gray-400">${normalizedConnector.name.charAt(0)}</span>`;
 
       return `
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 ${isComingSoon ? 'opacity-60' : 'hover:shadow-md'} transition-shadow ${isComingSoon ? '' : 'cursor-pointer'}" ${isComingSoon ? '' : hasCustomUI ? `onclick="openCustomConnectorUI('${normalizedConnector.ui_entry_point}', '${normalizedConnector.name}')"` : `onclick="openConnector('${normalizedConnector.id}', '${normalizedConnector.category}')"`}>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 ${isComingSoon ? 'opacity-60' : 'hover:shadow-md'} transition-shadow ${isComingSoon ? '' : 'cursor-pointer'}" ${isComingSoon ? '' : hasCustomUI ? `onclick="openCustomConnectorUI('${normalizedConnector.ui_entry_point}', '${normalizedConnector.name}', '${normalizedConnector.id}')"` : `onclick="openConnector('${normalizedConnector.id}', '${normalizedConnector.category}')"`}>
           <div class="flex items-start justify-between mb-4">
             <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
               ${logoHtml}
@@ -795,13 +795,14 @@
     }
 
     // Open custom connector UI - navigate to local wrapper page
-    function openCustomConnectorUI(uiEntryPoint, connectorName) {
+    function openCustomConnectorUI(uiEntryPoint, connectorName, connectorId) {
       console.log('[Connector UI] Opening via wrapper:', uiEntryPoint);
 
       // Navigate to local wrapper page with URL parameters
       const params = new URLSearchParams({
         ui: uiEntryPoint,
-        name: connectorName
+        name: connectorName,
+        connectorId: connectorId || ''
       });
 
       window.location.href = `connector-viewer.html?${params.toString()}`;
@@ -1303,7 +1304,7 @@
 
       if (hasCustomUI) {
         // Navigate to custom connector UI
-        openCustomConnectorUI(connector.ui_entry_point, connector.manifest?.name || connector.name);
+        openCustomConnectorUI(connector.ui_entry_point, connector.manifest?.name || connector.name, connector.id || connector.connector_id);
       } else {
         // Navigate to standard connector management page
         openConnectorManage(connector.id);

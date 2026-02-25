@@ -194,7 +194,7 @@
           client_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
         };
         if (this._conversationId) body.conversation_id = this._conversationId;
-        if (options.forceAgentic) body.force_agentic = true;
+        if (options.matterId) body.matter_id = options.matterId;
         if (options.attachments) body.attachments = options.attachments;
         if (options.contextType) body.context_type = options.contextType;
 
@@ -384,6 +384,15 @@
 
         case 'tool_thinking':
           return { type: 'tool_thinking', content: data.content || data.message || '' };
+
+        case 'tool_start':
+          return { type: 'tool_start', tool: data.tool };
+
+        case 'tool_progress':
+          return { type: 'tool_progress', tool: data.tool, message: data.message || '' };
+
+        case 'tool_end':
+          return { type: 'tool_end', tool: data.tool, success: data.success !== false };
 
         case 'content':
         case 'message':

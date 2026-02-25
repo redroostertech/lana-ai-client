@@ -129,6 +129,92 @@
         flex-shrink: 0;
       }
 
+      /* ── Feedback buttons ─────────────────────────────── */
+
+      .lex-acard-feedback {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        flex-shrink: 0;
+      }
+
+      .lex-acard:hover .lex-acard-feedback {
+        opacity: 1;
+      }
+
+      @media (hover: none) {
+        .lex-acard-feedback {
+          opacity: 1;
+        }
+      }
+
+      .lex-acard-fb-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border: none;
+        background: transparent;
+        border-radius: var(--lex-radius-md, 6px);
+        color: var(--lex-text-tertiary);
+        cursor: pointer;
+        transition: background 0.15s ease, color 0.15s ease;
+        padding: 0;
+      }
+
+      .lex-acard-fb-btn--accept:hover {
+        background: rgba(34, 197, 94, 0.12);
+        color: var(--lex-color-success-600, #16a34a);
+      }
+
+      .lex-acard-fb-btn--assign:hover {
+        background: rgba(59, 130, 246, 0.12);
+        color: var(--lex-color-info-600, #2563eb);
+      }
+
+      .lex-acard-fb-btn--reject:hover {
+        background: rgba(239, 68, 68, 0.12);
+        color: var(--lex-color-danger-600, #dc2626);
+      }
+
+      /* ── Dismiss button ──────────────────────────────── */
+
+      .lex-acard-dismiss {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border: none;
+        background: transparent;
+        border-radius: var(--lex-radius-md, 6px);
+        color: var(--lex-text-tertiary);
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.2s ease, background 0.2s ease;
+        flex-shrink: 0;
+        padding: 0;
+      }
+
+      .lex-acard:hover .lex-acard-dismiss {
+        opacity: 1;
+      }
+
+      .lex-acard-dismiss:hover {
+        background: var(--lex-bg-tertiary);
+        color: var(--lex-text-primary);
+      }
+
+      /* Always visible on touch devices */
+      @media (hover: none) {
+        .lex-acard-dismiss {
+          opacity: 1;
+        }
+      }
+
       /* Spacing between stacked action cards */
       lex-action-card + lex-action-card .lex-acard {
         margin-top: -1px;
@@ -138,6 +224,10 @@
   }
 
   const CHEVRON_SVG = '<svg class="lex-acard-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>';
+  const DISMISS_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+  var FB_ACCEPT_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+  var FB_ASSIGN_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>';
+  var FB_REJECT_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>';
 
   class LexActionCard extends LexElement {
     static get properties() {
@@ -147,6 +237,8 @@
         tag:         { type: String, default: '' },
         priority:    { type: String, default: '' },
         chevron:     { type: Boolean, default: true },
+        dismissible: { type: Boolean, default: false },
+        feedback:    { type: Boolean, default: false },
         action:      { type: String, default: '' }
       };
     }
@@ -158,13 +250,23 @@
         ? `<div class="lex-acard-desc">${this.escapeHtml(this.description)}</div>`
         : '';
 
-      // Meta: tag + priority dot + chevron
+      // Meta: tag + priority dot + dismiss + chevron
       let metaParts = '';
       if (this.tag) {
         metaParts += `<span class="lex-acard-tag">${this.escapeHtml(this.tag)}</span>`;
       }
       if (this.priority) {
         metaParts += `<div class="lex-acard-dot" data-priority="${this.escapeHtml(this.priority)}"></div>`;
+      }
+      if (this.feedback) {
+        metaParts += '<div class="lex-acard-feedback">'
+          + '<button class="lex-acard-fb-btn lex-acard-fb-btn--accept" aria-label="Accept" title="Accept" type="button" data-fb="accept">' + FB_ACCEPT_SVG + '</button>'
+          + '<button class="lex-acard-fb-btn lex-acard-fb-btn--assign" aria-label="Assign to Lana" title="Assign to Lana" type="button" data-fb="assign">' + FB_ASSIGN_SVG + '</button>'
+          + '<button class="lex-acard-fb-btn lex-acard-fb-btn--reject" aria-label="Reject" title="Reject" type="button" data-fb="reject">' + FB_REJECT_SVG + '</button>'
+          + '</div>';
+      }
+      if (this.dismissible && !this.feedback) {
+        metaParts += `<button class="lex-acard-dismiss" aria-label="Dismiss" type="button">${DISMISS_SVG}</button>`;
       }
       if (this.chevron) {
         metaParts += CHEVRON_SVG;
@@ -197,6 +299,33 @@
             action: this.action
           });
         });
+      }
+
+      const dismissBtn = this.querySelector('.lex-acard-dismiss');
+      if (dismissBtn) {
+        this.listen(dismissBtn, 'click', (e) => {
+          e.stopPropagation();
+          this.emit('dismiss-click', {
+            title: this.title,
+            priority: this.priority,
+            action: this.action
+          });
+        });
+      }
+
+      var fbBtns = this.querySelectorAll('.lex-acard-fb-btn');
+      for (var i = 0; i < fbBtns.length; i++) {
+        (function (btn) {
+          var fbType = btn.getAttribute('data-fb');
+          this.listen(btn, 'click', function (e) {
+            e.stopPropagation();
+            this.emit(fbType + '-click', {
+              title: this.title,
+              priority: this.priority,
+              action: this.action
+            });
+          }.bind(this));
+        }.bind(this))(fbBtns[i]);
       }
     }
   }

@@ -1,0 +1,38 @@
+/* Action Queue page styles */
+
+.aq-header {
+  margin-bottom: 1.25rem;
+}
+
+.aq-header-title {
+  font-size: 1.25rem;
+  font-weight: var(--lex-weight-semibold, 600);
+  color: var(--lex-text-primary);
+  letter-spacing: 0.01em;
+}
+
+.aq-header-subtitle {
+  font-size: var(--lex-form-help-size, 0.6875rem);
+  color: var(--lex-text-tertiary);
+  margin-top: 0.125rem;
+}
+
+.aq-filters {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+/* Dismiss animation — card slides out */
+.aq-card-dismissing {
+  opacity: 0;
+  max-height: 0;
+  overflow: hidden;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  margin-top: 0 !important;
+  border-width: 0 !important;
+  transition: opacity 0.2s ease, max-height 0.3s ease 0.05s, padding 0.3s ease 0.05s, margin 0.3s ease 0.05s, border-width 0.3s ease 0.05s;
+}

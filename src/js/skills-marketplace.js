@@ -15,6 +15,12 @@
   let selectedSkill = null;
   let selectedMatters = [];
 
+  // Import skill state
+  var skillImportState = {
+    selectedFile: null,
+    isImporting: false
+  };
+
   // DOM Elements
   let searchInput, categoryFilter, gridViewBtn, listViewBtn;
   let loadingState, skillsContainer, emptyState, filterChips;
@@ -87,15 +93,21 @@
       });
     }
 
-    // Modal close buttons
+    // Import skill button
+    const importSkillBtn = document.getElementById('import-skill-btn');
+    if (importSkillBtn) {
+      importSkillBtn.addEventListener('click', openSkillImportModal);
+    }
+
+    // Modal close buttons — covers all modals including import modal
     const modalCloseButtons = document.querySelectorAll('.modal-close');
-    modalCloseButtons.forEach(btn => {
+    modalCloseButtons.forEach(function(btn) {
       btn.addEventListener('click', closeAllModals);
     });
 
     // Modal overlay clicks
     const modalOverlays = document.querySelectorAll('.modal-overlay');
-    modalOverlays.forEach(overlay => {
+    modalOverlays.forEach(function(overlay) {
       overlay.addEventListener('click', closeAllModals);
     });
 
@@ -125,6 +137,29 @@
     if (matterSearchInput) {
       matterSearchInput.addEventListener('input', debounce(handleMatterSearch, 300));
     }
+
+    // Skill import modal wiring
+    var skillFileClearBtn = document.getElementById('skill-file-clear-btn');
+    if (skillFileClearBtn) {
+      skillFileClearBtn.addEventListener('click', clearSkillImportFile);
+    }
+
+    var skillImportCancelBtn = document.getElementById('skill-import-cancel-btn');
+    if (skillImportCancelBtn) {
+      skillImportCancelBtn.addEventListener('click', closeSkillImportModal);
+    }
+
+    var skillImportConfirmBtn = document.getElementById('skill-import-confirm-btn');
+    if (skillImportConfirmBtn) {
+      skillImportConfirmBtn.addEventListener('click', executeSkillImport);
+    }
+
+    var skillFileInput = document.getElementById('skill-file-input');
+    if (skillFileInput) {
+      skillFileInput.addEventListener('change', handleSkillFileSelect);
+    }
+
+    setupSkillImportDropZone();
   }
 
   /**
@@ -642,6 +677,249 @@
     matterSelectorModal.classList.add('hidden');
     selectedSkill = null;
     selectedMatters = [];
+    closeSkillImportModal();
+  }
+
+  // ── Skill Import ─────────────────────────────────────────────────────────
+
+  /**
+   * Open the skill import modal and reset its state.
+   */
+  function openSkillImportModal() {
+    clearSkillImportFile();
+    var resultEl = document.getElementById('skill-import-result');
+    if (resultEl) {
+      resultEl.classList.add('hidden');
+      resultEl.innerHTML = '';
+    }
+    var modal = document.getElementById('skill-import-modal');
+    if (modal) {
+      modal.classList.remove('hidden');
+    }
+  }
+
+  /**
+   * Close the skill import modal and reset state.
+   */
+  function closeSkillImportModal() {
+    var modal = document.getElementById('skill-import-modal');
+    if (modal) {
+      modal.classList.add('hidden');
+    }
+    clearSkillImportFile();
+    skillImportState.isImporting = false;
+  }
+
+  /**
+   * Set up drag-and-drop for the skill import drop zone.
+   */
+  function setupSkillImportDropZone() {
+    var zone = document.getElementById('skill-drop-zone');
+    if (!zone) return;
+
+    zone.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      zone.style.borderColor = '#6366f1';
+      zone.style.background = '#eef2ff';
+    });
+
+    zone.addEventListener('dragleave', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      zone.style.borderColor = '#d1d5db';
+      zone.style.background = '';
+    });
+
+    zone.addEventListener('drop', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      zone.style.borderColor = '#d1d5db';
+      zone.style.background = '';
+      var files = e.dataTransfer && e.dataTransfer.files;
+      if (files && files.length > 0) {
+        processSkillImportFile(files[0]);
+      }
+    });
+  }
+
+  /**
+   * Handle file input change event.
+   */
+  function handleSkillFileSelect(e) {
+    var files = e.target && e.target.files;
+    if (files && files.length > 0) {
+      processSkillImportFile(files[0]);
+    }
+  }
+
+  /**
+   * Validate and stage a skill ZIP file for import.
+   */
+  function processSkillImportFile(file) {
+    var name = file.name || '';
+    var lower = name.toLowerCase();
+
+    // Check extension using string methods only — no regex
+    var dotZip = '.zip';
+    var endsWithZip = lower.length >= dotZip.length &&
+      lower.substring(lower.length - dotZip.length) === dotZip;
+
+    if (!endsWithZip) {
+      showToast('Please select a .zip file', 'error');
+      return;
+    }
+
+    var maxBytes = 5 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      showToast('File size exceeds the 5MB limit', 'error');
+      return;
+    }
+
+    skillImportState.selectedFile = file;
+
+    var infoEl = document.getElementById('skill-file-info');
+    var nameEl = document.getElementById('skill-file-name');
+    var sizeEl = document.getElementById('skill-file-size');
+
+    if (nameEl) nameEl.textContent = name;
+    if (sizeEl) {
+      var sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+      sizeEl.textContent = sizeMB + ' MB';
+    }
+    if (infoEl) infoEl.classList.remove('hidden');
+
+    var confirmBtn = document.getElementById('skill-import-confirm-btn');
+    if (confirmBtn) confirmBtn.disabled = false;
+
+    var resultEl = document.getElementById('skill-import-result');
+    if (resultEl) {
+      resultEl.classList.add('hidden');
+      resultEl.innerHTML = '';
+    }
+  }
+
+  /**
+   * Clear the selected skill file and reset the import form.
+   */
+  function clearSkillImportFile() {
+    skillImportState.selectedFile = null;
+
+    var infoEl = document.getElementById('skill-file-info');
+    if (infoEl) infoEl.classList.add('hidden');
+
+    var confirmBtn = document.getElementById('skill-import-confirm-btn');
+    if (confirmBtn) confirmBtn.disabled = true;
+
+    var fileInput = document.getElementById('skill-file-input');
+    if (fileInput) fileInput.value = '';
+  }
+
+  /**
+   * Execute the skill import by POSTing the ZIP to the backend.
+   */
+  function executeSkillImport() {
+    if (!skillImportState.selectedFile || skillImportState.isImporting) return;
+
+    skillImportState.isImporting = true;
+
+    var confirmBtn = document.getElementById('skill-import-confirm-btn');
+    var originalBtnText = confirmBtn ? confirmBtn.innerHTML : 'Import Skill';
+
+    if (confirmBtn) {
+      confirmBtn.disabled = true;
+      confirmBtn.innerHTML =
+        '<svg class="w-4 h-4 inline-block mr-1 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>' +
+        '</svg>Importing...';
+    }
+
+    var resultEl = document.getElementById('skill-import-result');
+
+    var formData = new FormData();
+    formData.append('skill_zip', skillImportState.selectedFile);
+
+    var token = (window.api && window.api.token) ? window.api.token : getAuthToken();
+    var baseUrl = (window.api && window.api.baseUrl) ? window.api.baseUrl : (window.LanaConfig && window.LanaConfig.API_BASE_URL ? window.LanaConfig.API_BASE_URL : '');
+
+    fetch(baseUrl + '/api/v1/skills/import', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + token
+      },
+      body: formData
+    }).then(function(response) {
+      return response.json().then(function(data) {
+        return { ok: response.ok, status: response.status, data: data };
+      });
+    }).then(function(result) {
+      if (!result.ok) {
+        var errMsg = (result.data && (result.data.error || result.data.message)) || 'Import failed';
+        if (result.status === 401 || result.status === 403) {
+          errMsg = 'You do not have permission to import skills.';
+        } else if (result.status === 413) {
+          errMsg = 'File too large. Maximum size is 5MB.';
+        } else if (result.status === 400) {
+          errMsg = (result.data && result.data.error) || 'Invalid skill package. Check the ZIP structure.';
+        } else if (result.status === 404) {
+          errMsg = 'Import endpoint not available. Contact your administrator.';
+        }
+        throw new Error(errMsg);
+      }
+
+      var skill = (result.data && result.data.data) ? result.data.data : {};
+      var skillName = skill.skill_name || (skillImportState.selectedFile ? skillImportState.selectedFile.name : 'Skill');
+      var skillVersion = (skill.skill_metadata && skill.skill_metadata.version) ? skill.skill_metadata.version : null;
+
+      if (resultEl) {
+        resultEl.classList.remove('hidden');
+        resultEl.innerHTML =
+          '<div class="rounded-lg p-3 flex gap-2 items-start" style="background:#f0fdf4;border:1px solid #bbf7d0">' +
+            '<svg class="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+              '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>' +
+            '</svg>' +
+            '<p class="text-sm text-green-700"><strong>' + escapeHtml(skillName) + '</strong> imported successfully' +
+              (skillVersion ? ' (v' + escapeHtml(skillVersion) + ')' : '') +
+            '.</p>' +
+          '</div>';
+      }
+
+      showToast('Skill "' + skillName + '" imported successfully', 'success');
+
+      if (confirmBtn) {
+        confirmBtn.innerHTML = 'Imported!';
+      }
+
+      loadSkills();
+
+      setTimeout(function() {
+        closeSkillImportModal();
+      }, 2000);
+
+    }).catch(function(error) {
+      var errMsg = (error && error.message) ? error.message : 'Failed to import skill';
+
+      if (resultEl) {
+        resultEl.classList.remove('hidden');
+        resultEl.innerHTML =
+          '<div class="rounded-lg p-3 flex gap-2 items-start" style="background:#fef2f2;border:1px solid #fecaca">' +
+            '<svg class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+              '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>' +
+            '</svg>' +
+            '<p class="text-sm text-red-700">' + escapeHtml(errMsg) + '</p>' +
+          '</div>';
+      }
+
+      showToast(errMsg, 'error');
+
+      if (confirmBtn) {
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = originalBtnText;
+      }
+
+    }).finally(function() {
+      skillImportState.isImporting = false;
+    });
   }
 
   /**

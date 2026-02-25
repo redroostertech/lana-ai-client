@@ -79,7 +79,7 @@
       ]
     },
 
-    // ── Folder (inside a matter — files, subfolders, viewer) ──
+    // ── Folder (inside a matter — files, subfolders) ──
     'folder.html': {
       title: 'Folder',
       activeNav: 'storage',
@@ -91,18 +91,10 @@
         'js/lex/components/form/lex-select.js',
         'js/lex/components/form/lex-checkbox.js',
         'js/lex/components/form/lex-textarea.js',
-        // Page dependencies
-        'js/vendor/mammoth.min.js',
-        'js/utils/metadata-formatter.js',
-        'js/services/metadata-service.js',
-        'js/vendor/marked.min.js',
-        'js/components/document-metadata-viewer.js',
-        'js/file-viewer.js',
         // Page controller
         'js/folder.js'
       ],
       stylesheets: [
-        'css/components/document-metadata.css',
         'css/drive.css'
       ]
     },

@@ -2414,6 +2414,15 @@
       var conversationId = e.detail && e.detail.conversationId;
       if (!conversationId || typeof api === 'undefined') return;
 
+      // Add to sidebar conversation menu so it appears immediately
+      if (window.ConversationMenu && typeof window.ConversationMenu.addConversation === 'function') {
+        window.ConversationMenu.addConversation({
+          thread_id: conversationId,
+          title: 'Insights Chat',
+          updated_at: new Date().toISOString()
+        });
+      }
+
       // Check if this conversation is already linked to a thread
       var threadsComp = insightsThreadsEl;
       if (threadsComp && threadsComp._threads && threadsComp._threads.length > 0) {
@@ -2429,12 +2438,13 @@
         if (hasPageGeneral) return;
       }
 
-      // Create page general thread
+      // Create page general thread — link it to the actual conversation session
       api.post('/api/v1/conversation-threads', {
         title: 'General Insights',
         thread_type: 'page_general',
         context_type: 'insights_chat',
-        page_scope: 'reporting'
+        page_scope: 'reporting',
+        thread_id: conversationId
       }).then(function (resp) {
         var created = resp.data || resp;
         if (insightsThreadsEl) {

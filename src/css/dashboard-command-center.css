@@ -309,6 +309,12 @@
   100% { opacity: 1; }
 }
 
+@keyframes cc-pulse {
+  0%   { opacity: 1; transform: scale(1); }
+  50%  { opacity: 0.5; transform: scale(1.3); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
 .cc-skeleton--text-sm {
   height: 0.875rem;
 }
@@ -422,6 +428,17 @@
 
 .cc-detail-doc-row:last-child {
   border-bottom: none;
+}
+
+.cc-detail-doc-row--clickable {
+  cursor: pointer;
+  border-radius: var(--lex-radius-md);
+  padding: 0.5rem;
+  transition: background 0.15s;
+}
+
+.cc-detail-doc-row--clickable:hover {
+  background: var(--lex-bg-secondary);
 }
 
 /* Storage percentage bar */

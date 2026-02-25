@@ -225,7 +225,7 @@
     var cardClick = '';
     if (!isComingSoon) {
       if (hasCustomUI) {
-        cardClick = 'onclick="openCustomConnectorUI(\'' + normalizedConnector.ui_entry_point + '\', \'' + normalizedConnector.name + '\')"';
+        cardClick = 'onclick="openCustomConnectorUI(\'' + normalizedConnector.ui_entry_point + '\', \'' + normalizedConnector.name + '\', \'' + normalizedConnector.id + '\')"';
       } else {
         cardClick = 'onclick="openConnector(\'' + normalizedConnector.id + '\', \'' + normalizedConnector.category + '\')"';
       }
@@ -351,7 +351,7 @@
 
     // Connector with custom UI — open in connector-viewer
     if (connector && connector.ui_entry_point) {
-      openCustomConnectorUI(connector.ui_entry_point, connector.name || 'Connector');
+      openCustomConnectorUI(connector.ui_entry_point, connector.name || 'Connector', connector.id || connector.connector_id);
       return;
     }
 
@@ -367,10 +367,11 @@
     openConnectorManage(connectorId);
   }
 
-  function openCustomConnectorUI(uiEntryPoint, connectorName) {
+  function openCustomConnectorUI(uiEntryPoint, connectorName, connectorId) {
     var params = new URLSearchParams({
       ui: uiEntryPoint,
-      name: connectorName
+      name: connectorName,
+      connectorId: connectorId || ''
     });
 
     if (window.LexRouter) {
@@ -598,7 +599,7 @@
     closeConnectorActionsModal();
 
     if (hasCustomUI) {
-      openCustomConnectorUI(connector.ui_entry_point, (connector.manifest && connector.manifest.name) || connector.name);
+      openCustomConnectorUI(connector.ui_entry_point, (connector.manifest && connector.manifest.name) || connector.name, connector.id || connector.connector_id);
     } else {
       openConnectorManage(connector.id);
     }

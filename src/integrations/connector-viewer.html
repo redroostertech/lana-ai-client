@@ -469,6 +469,7 @@
     const urlParams = new URLSearchParams(window.location.search);
     const uiEntryPoint = urlParams.get('ui');
     const connectorName = urlParams.get('name') || 'Connector';
+    const connectorId = urlParams.get('connectorId') || '';
 
     // Update page title, lex-app header, and breadcrumb
     document.title = `${connectorName} - LanaAI`;
@@ -524,6 +525,7 @@
                 <script>
                   // Injected by connector-viewer - available before any other scripts run
                   window.LanaConfig = ${JSON.stringify(window.LanaConfig || {})};
+                  window.LanaConnectorId = "${connectorId}";
                   window.api = { token: "${token}" };
                   localStorage.setItem('lana_token', "${token}");
                   localStorage.setItem('token', "${token}");
@@ -541,6 +543,7 @@
               // Replace relative asset paths with absolute URLs
               html = html.replace(/src=["']assets\//gi, `src="${baseUrl}assets/`);
               html = html.replace(/href=["']assets\//gi, `href="${baseUrl}assets/`);
+              html = html.replace(/src=["']js\//gi, `src="${baseUrl}js/`);
 
               // Inject config script, Tailwind, and tab styles at the beginning of <head>
               const tailwindScript = '<script src="https://cdn.tailwindcss.com"><\/script>';
@@ -606,6 +609,36 @@
 
     // Initialize on page load
     loadConnectorUI();
+
+    // ──────────────────────────────────────────────────────────────────
+    // postMessage bridge: iframe ↔ parent ↔ Electron IPC
+    // ──────────────────────────────────────────────────────────────────
+
+    // Forward iframe requests to open external URLs (for OAuth flow)
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'lana-open-external') {
+        console.log('[Connector Viewer] Opening external URL:', event.data.url);
+        if (window.electronAPI && window.electronAPI.openExternal) {
+          window.electronAPI.openExternal(event.data.url);
+        } else {
+          window.open(event.data.url, '_blank');
+        }
+      }
+    });
+
+    // Forward Electron OAuth callbacks into the iframe
+    if (window.electronAPI && window.electronAPI.onOAuthCallback) {
+      window.electronAPI.onOAuthCallback((callbackData) => {
+        console.log('[Connector Viewer] Forwarding OAuth callback to iframe');
+        const iframe = document.getElementById('connector-frame');
+        if (iframe && iframe.contentWindow) {
+          iframe.contentWindow.postMessage({
+            type: 'lana-oauth-callback',
+            data: callbackData
+          }, '*');
+        }
+      });
+    }
 
     // Handle keyboard shortcuts
     document.addEventListener('keydown', (e) => {

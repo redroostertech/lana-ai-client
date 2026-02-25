@@ -34,6 +34,9 @@
   /** Which detail panel is currently expanded: 'team' | 'docs' | 'storage' | null */
   var activeDetailKey = null;
 
+  /** Cache of action queue items keyed by item ID for detail modal lookup */
+  var _actionItemsMap = {};
+
   // =========================================================================
   // Lifecycle tracking (Finding 7)
   // =========================================================================
@@ -327,13 +330,214 @@
   }
 
   /**
+   * Build and display a detail modal for an action queue item.
+   * Shows title, severity, message, affected matters list, and suggested action.
+   * @param {Object} item — full action queue item from the API
+   */
+  function showActionDetail(item) {
+    if (!item) return;
+
+    var ctx = item.context;
+    if (ctx && typeof ctx === 'string') {
+      try { ctx = JSON.parse(ctx); } catch (e) { ctx = null; }
+    }
+
+    var sa = (ctx && ctx.suggested_action) || null;
+    var details = (ctx && ctx.details) || {};
+    var subCheck = (ctx && ctx.sub_check) || '';
+
+    // Header: severity badge + sub-check label
+    var sevColor = 'var(--lex-text-tertiary)';
+    var sev = String(item.severity || 'low').toLowerCase();
+    if (sev === 'critical' || sev === 'high') sevColor = 'var(--lex-color-danger-500, #ef4444)';
+    else if (sev === 'medium') sevColor = 'var(--lex-color-warning-500, #f59e0b)';
+
+    var subCheckLabel = '';
+    if (subCheck) {
+      subCheckLabel = subCheck.split('_').join(' ');
+      subCheckLabel = subCheckLabel.charAt(0).toUpperCase() + subCheckLabel.slice(1);
+    }
+
+    var bodyParts = [];
+
+    // Severity + type row
+    bodyParts.push(
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">' +
+        '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + sevColor + ';flex-shrink:0;"></span>' +
+        '<span style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--lex-text-tertiary);font-weight:500;">' +
+          escHtml(sev) + (subCheckLabel ? ' \u00b7 ' + escHtml(subCheckLabel) : '') +
+        '</span>' +
+      '</div>'
+    );
+
+    // Message
+    if (details.message) {
+      bodyParts.push(
+        '<p style="font-size:0.8125rem;color:var(--lex-text-secondary);line-height:1.5;margin:0 0 16px;">' +
+          escHtml(details.message) +
+        '</p>'
+      );
+    }
+
+    // Resolve first matter ID from any available source
+    var firstMatterId = null;
+    if (sa) {
+      if (sa.matter_id) firstMatterId = sa.matter_id;
+      if (!firstMatterId && sa.matter_ids && sa.matter_ids.length > 0) firstMatterId = sa.matter_ids[0];
+    }
+
+    // Affected matters list
+    if (sa && sa.items && sa.items.length > 0) {
+      bodyParts.push('<div style="margin-bottom:16px;">');
+      bodyParts.push(
+        '<div style="font-size:0.6875rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--lex-text-tertiary);font-weight:500;margin-bottom:8px;">Affected Matters</div>'
+      );
+
+      for (var k = 0; k < sa.items.length; k++) {
+        var it = sa.items[k];
+        var itemLabel = escHtml(it.matter_name || it.title || it.filename || 'Item ' + (k + 1));
+        var itemMeta = '';
+        var matterId = it.matter_id || '';
+
+        if (!firstMatterId && matterId) firstMatterId = matterId;
+
+        if (it.completeness_pct !== undefined) {
+          itemMeta = it.completeness_pct + '% complete';
+        }
+        if (it.missing_fields && it.missing_fields.length > 0) {
+          itemMeta += (itemMeta ? ' \u00b7 ' : '') + 'Missing: ' + escHtml(it.missing_fields.join(', '));
+        }
+        if (it.due_date) {
+          itemMeta += (itemMeta ? ' \u00b7 ' : '') + 'Due ' + escHtml(formatShortDate(it.due_date));
+        }
+        if (it.days_since_activity !== undefined) {
+          itemMeta += (itemMeta ? ' \u00b7 ' : '') + it.days_since_activity + ' days inactive';
+        }
+
+        var rowStyle = 'padding:8px 0;border-bottom:1px solid var(--lex-border-subtle, rgba(0,0,0,0.06));';
+        if (matterId) {
+          rowStyle += 'cursor:pointer;transition:background 0.15s ease;';
+        }
+
+        bodyParts.push(
+          '<div class="lex-detail-matter-row" style="' + rowStyle + '"' +
+            (matterId ? ' data-matter-id="' + escHtml(matterId) + '"' : '') + '>' +
+            '<div style="display:flex;align-items:center;justify-content:space-between;">' +
+              '<div style="font-size:0.8125rem;color:var(--lex-text-primary);">' + itemLabel + '</div>' +
+              (matterId ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:0.3;flex-shrink:0;"><path d="M9 18l6-6-6-6"/></svg>' : '') +
+            '</div>' +
+            (itemMeta ? '<div style="font-size:0.6875rem;color:var(--lex-text-tertiary);margin-top:2px;">' + escHtml(itemMeta) + '</div>' : '') +
+          '</div>'
+        );
+      }
+
+      bodyParts.push('</div>');
+    }
+
+    // Suggested action
+    if (sa) {
+      var actionLabel = '';
+      if (sa.type === 'lana') {
+        actionLabel = 'Lana can handle this automatically';
+      } else if (sa.action) {
+        actionLabel = sa.action.split('_').join(' ');
+        actionLabel = 'Suggested: ' + actionLabel.charAt(0).toUpperCase() + actionLabel.slice(1);
+      }
+      if (actionLabel) {
+        bodyParts.push(
+          '<div style="font-size:0.75rem;color:var(--lex-text-secondary);padding:10px 12px;background:var(--lex-bg-secondary, rgba(0,0,0,0.02));border-radius:6px;">' +
+            escHtml(actionLabel) +
+          '</div>'
+        );
+      }
+    }
+
+    // Timestamp
+    if (item.created_at) {
+      bodyParts.push(
+        '<div style="font-size:0.6875rem;color:var(--lex-text-tertiary);margin-top:12px;">' +
+          'Created ' + escHtml(timeAgo(item.created_at)) +
+        '</div>'
+      );
+    }
+
+    // "Discuss with Lana" button
+    if (firstMatterId) {
+      var chatMatterId = firstMatterId;
+      bodyParts.push(
+        '<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--lex-border-subtle, rgba(0,0,0,0.06));">' +
+          '<button class="lex-detail-discuss-btn" data-chat-matter-id="' + escHtml(chatMatterId) + '" style="' +
+            'display:flex;align-items:center;justify-content:center;gap:6px;width:100%;' +
+            'padding:10px 16px;border:1px solid var(--lex-border-subtle, rgba(0,0,0,0.12));' +
+            'border-radius:var(--lex-radius-md, 6px);background:var(--lex-bg-primary);' +
+            'color:var(--lex-text-primary);font-size:0.8125rem;font-weight:500;font-family:inherit;' +
+            'cursor:pointer;transition:background 0.15s ease;' +
+          '">' +
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>' +
+            'Discuss with Lana' +
+          '</button>' +
+        '</div>'
+      );
+    }
+
+    var drawer = Lex.Drawer.open({
+      heading: item.title || 'Action Detail',
+      content: bodyParts.join(''),
+      width: 'md',
+      side: 'right',
+      closeOnOverlay: true
+    });
+
+    // Wire matter row clicks → navigate to workspace detail
+    // Use rAF to ensure the drawer's custom element lifecycle has rendered content
+    if (drawer) {
+      requestAnimationFrame(function () {
+        var matterRows = drawer.querySelectorAll('.lex-detail-matter-row[data-matter-id]');
+        for (var m = 0; m < matterRows.length; m++) {
+          matterRows[m].addEventListener('click', function () {
+            var mid = this.getAttribute('data-matter-id');
+            if (mid) Lex.Nav.go('workspace-details.html', { params: { id: mid } });
+          });
+          matterRows[m].addEventListener('mouseenter', function () {
+            this.style.background = 'var(--lex-bg-secondary, rgba(0,0,0,0.02))';
+          });
+          matterRows[m].addEventListener('mouseleave', function () {
+            this.style.background = '';
+          });
+        }
+
+        // Wire "Discuss with Lana" button
+        var discussBtn = drawer.querySelector('.lex-detail-discuss-btn');
+        if (discussBtn) {
+          discussBtn.addEventListener('mouseenter', function () {
+            this.style.background = 'var(--lex-bg-secondary, rgba(0,0,0,0.02))';
+          });
+          discussBtn.addEventListener('mouseleave', function () {
+            this.style.background = 'var(--lex-bg-primary)';
+          });
+          discussBtn.addEventListener('click', function () {
+            var mid = this.getAttribute('data-chat-matter-id');
+            var prompt = (item.title || 'Action item') + ': ' + ((details && details.message) || '');
+            if (sa && sa.action) {
+              var actionText = sa.action.split('_').join(' ');
+              prompt += ' Suggested action: ' + actionText + '.';
+            }
+            try { sessionStorage.setItem('lana_chat_prompt', prompt); } catch (e) { /* ignore */ }
+            Lex.Nav.go('chat-v2.html', { params: { matter: mid } });
+          });
+        }
+      });
+    }
+  }
+
+  /**
    * Render the top-5 action queue items, sorted by severity.
    * Distinguishes between human actions and Lana-suggested actions.
    * - Human actions: click navigates to the matter page
    * - Lana actions: click queues an agentic task, marks acted-on, shows toast
    * @returns {Promise<void>}
    */
-  async function renderZoneC() {
+  async function renderZoneC(silent) {
     var loadingEl = el('ccZoneCLoading');
     var contentEl = el('ccZoneCContent');
     if (!contentEl) return;
@@ -347,13 +551,19 @@
       console.warn('[Dashboard Zone C] Could not load action queue:', err && err.message);
     }
 
-    if (loadingEl) hide(loadingEl);
+    if (!silent && loadingEl) hide(loadingEl);
 
     if (items.length === 0) {
       contentEl.innerHTML =
         '<lex-empty icon="inbox" message="No actions pending" description="Your action queue is empty"></lex-empty>';
       show(contentEl);
       return;
+    }
+
+    // Cache items for detail modal lookup
+    _actionItemsMap = {};
+    for (var j = 0; j < items.length; j++) {
+      _actionItemsMap[String(items[j].id)] = items[j];
     }
 
     var html = '';
@@ -367,6 +577,8 @@
       if (matter) meta.push(matter);
       if (ts)     meta.push(escHtml(timeAgo(ts)));
       var priority = (sev === 'critical' || sev === 'high') ? 'high' : (sev === 'medium' ? 'medium' : 'low');
+      // Map severity → task priority for Lana assignment (urgent, high, medium, low)
+      var taskPriority = (sev === 'critical') ? 'urgent' : (sev === 'high' ? 'high' : (sev === 'medium' ? 'medium' : 'low'));
 
       var lana = isLanaAction(item);
       var actionAttr = '';
@@ -387,8 +599,11 @@
             ' title="' + title + '"' +
             ' description="' + escHtml(metaStr) + '"' +
             ' priority="' + priority + '"' +
+            ' feedback' +
             ' data-action-id="' + escHtml(String(item.id || '')) + '"' +
             ' data-entity-id="' + escHtml(String(item.entity_id || item.id || '')) + '"' +
+            ' data-action-type="' + escHtml(String(item.action_type || '')) + '"' +
+            ' data-priority="' + escHtml(taskPriority) + '"' +
             actionAttr +
           '></lex-action-card>';
       } else {
@@ -410,14 +625,124 @@
             ' title="' + title + '"' +
             ' description="' + escHtml(metaStr2) + '"' +
             ' priority="' + priority + '"' +
+            ' feedback' +
             ' data-action-id="' + escHtml(String(item.id || '')) + '"' +
             ' data-entity-id="' + escHtml(String(item.entity_id || item.id || '')) + '"' +
+            ' data-action-type="' + escHtml(String(item.action_type || '')) + '"' +
+            ' data-priority="' + escHtml(taskPriority) + '"' +
             (humanMatterId ? ' data-matter-id="' + escHtml(String(humanMatterId)) + '"' : '') +
           '></lex-action-card>';
       }
     }
     contentEl.innerHTML = html;
     show(contentEl);
+  }
+
+  // =========================================================================
+  // Zone D — Lana Tasks (live status)
+  // =========================================================================
+
+  /**
+   * Status dot color for a Lana task status.
+   * @param {string} status
+   * @returns {string} CSS color value
+   */
+  function lanaTaskStatusColor(status) {
+    if (status === 'running' || status === 'compiling_context') return '#3b82f6';
+    if (status === 'awaiting_input')    return '#f59e0b';
+    if (status === 'awaiting_approval') return '#f59e0b';
+    if (status === 'completed')         return '#10b981';
+    if (status === 'failed')            return '#ef4444';
+    if (status === 'rejected')          return '#ef4444';
+    if (status === 'cancelled')         return '#6b7280';
+    return '#9ca3af';
+  }
+
+  /**
+   * Human-readable label for a Lana task status.
+   * @param {string} status
+   * @returns {string}
+   */
+  function lanaTaskStatusLabel(status) {
+    if (!status) return 'Pending';
+    if (status === 'compiling_context') return 'Compiling...';
+    if (status === 'running')           return 'Running';
+    if (status === 'awaiting_input')    return 'Needs Input';
+    if (status === 'awaiting_approval') return 'Pending Approval';
+    if (status === 'completed')         return 'Completed';
+    if (status === 'failed')            return 'Failed';
+    if (status === 'rejected')          return 'Rejected';
+    if (status === 'cancelled')         return 'Cancelled';
+    return status;
+  }
+
+  /**
+   * Render Lana Tasks zone — shows up to 5 active/recent Lana tasks.
+   * @returns {Promise<void>}
+   */
+  async function renderZoneD() {
+    var loadingEl = el('ccZoneDLoading');
+    var contentEl = el('ccZoneDContent');
+    if (!contentEl) return;
+
+    var tasks = [];
+
+    try {
+      var result = await api.get('/api/v1/agentic-tasks?limit=5&sort_by=created_at&sort_order=desc');
+      tasks = (result && result.data) || [];
+    } catch (err) {
+      console.warn('[Dashboard Zone D] Could not load Lana tasks:', err && err.message);
+    }
+
+    if (loadingEl) hide(loadingEl);
+
+    if (tasks.length === 0) {
+      contentEl.innerHTML =
+        '<lex-empty icon="zap" message="No Lana tasks yet" description="Assign actions to Lana from the action queue"></lex-empty>';
+      show(contentEl);
+      return;
+    }
+
+    var html = '';
+    for (var i = 0; i < tasks.length; i++) {
+      var task = tasks[i];
+      var status = task.execution_status || 'pending';
+      var dotColor = lanaTaskStatusColor(status);
+      var statusText = escHtml(lanaTaskStatusLabel(status));
+      var title = escHtml(task.name || 'Untitled task');
+      var ts = task.created_at ? escHtml(timeAgo(task.created_at)) : '';
+
+      html +=
+        '<div class="cc-lana-task-row" data-task-id="' + escHtml(task.id) + '" ' +
+          'style="padding:10px 12px;cursor:pointer;transition:background 0.15s ease;' +
+          'border-bottom:1px solid var(--lex-border-subtle, rgba(0,0,0,0.06));" ' +
+          'onmouseenter="this.style.background=\'var(--lex-bg-secondary)\'" onmouseleave="this.style.background=\'transparent\'">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">' +
+            '<div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1;">' +
+              '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + dotColor + ';flex-shrink:0;' +
+                ((status === 'running' || status === 'compiling_context') ? 'animation:cc-pulse 1.5s ease-in-out infinite;' : '') +
+              '"></span>' +
+              '<span style="font-size:0.8125rem;color:var(--lex-text-primary);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + title + '</span>' +
+            '</div>' +
+            '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">' +
+              '<span style="font-size:0.6875rem;color:var(--lex-text-tertiary);">' + statusText + '</span>' +
+              (ts ? '<span style="font-size:0.6875rem;color:var(--lex-text-tertiary);">' + ts + '</span>' : '') +
+            '</div>' +
+          '</div>' +
+        '</div>';
+    }
+
+    contentEl.innerHTML = html;
+    show(contentEl);
+
+    // Wire click → navigate to task detail
+    var rows = contentEl.querySelectorAll('.cc-lana-task-row');
+    for (var j = 0; j < rows.length; j++) {
+      rows[j].addEventListener('click', function () {
+        var taskId = this.getAttribute('data-task-id');
+        if (taskId) Lex.Nav.go('agentic-task-detail.html', { params: { id: taskId } });
+      });
+    }
   }
 
   // =========================================================================
@@ -1111,7 +1436,7 @@
     // Configure heading, action label, action href
     var config = {
       team:    { heading: 'Team Overview',     actionLabel: 'View all members',   actionHref: 'admin/users.html' },
-      docs:    { heading: 'Recent Documents',  actionLabel: 'Go to My Drive',     actionHref: 'drive.html' },
+      docs:    { heading: 'Recent Documents',  actionLabel: '',                   actionHref: '' },
       storage: { heading: 'Storage Breakdown', actionLabel: 'View system health', actionHref: 'admin/health.html' }
     };
     var c = config[key];
@@ -1305,8 +1630,15 @@
         var matter = d.client_matter || d.matter_name || '';
         var ts = (d.last_accessed_at || d.created_at) ? timeAgo(d.last_accessed_at || d.created_at) : '';
 
+        var fileId   = d.id || '';
+        var matterId = d.client_matter || d.matter_id || '';
+
         html +=
-          '<div class="cc-detail-doc-row">' +
+          '<div class="cc-detail-doc-row' + (fileId && matterId ? ' cc-detail-doc-row--clickable' : '') + '"' +
+            (fileId && matterId
+              ? ' data-file-id="' + escHtml(String(fileId)) + '" data-matter-id="' + escHtml(String(matterId)) + '"'
+              : '') +
+          '>' +
             '<svg class="w-4 h-4 flex-shrink-0 lex-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
               '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>' +
             '</svg>' +
@@ -1321,6 +1653,20 @@
       }
       html += '</div>';
       content.innerHTML = html;
+
+      // Wire doc row clicks → open dedicated file viewer
+      var rows = content.querySelectorAll('.cc-detail-doc-row--clickable');
+      for (var k = 0; k < rows.length; k++) {
+        rows[k].addEventListener('click', function () {
+          var fId = this.getAttribute('data-file-id');
+          if (fId) {
+            Lex.Nav.go('file-viewer.html', {
+              params: { id: fId },
+              context: { referrer: 'dashboard.html' }
+            });
+          }
+        });
+      }
     } catch (err) {
       console.warn('[Dashboard] renderDocsDetail failed:', err && err.message);
       content.innerHTML = '<lex-empty icon="alert" message="Could not load documents"></lex-empty>';
@@ -1457,7 +1803,8 @@
       renderZoneE(),              // 1 — pipeline stats → returns {matters}
       renderZoneFRight(),         // 2 — data pulse
       loadUserProductivity(null), // 3 — heatmap
-      loadActivityForUser(null)   // 4 — activity feed
+      loadActivityForUser(null),  // 4 — activity feed
+      renderZoneD()               // 5 — Lana Tasks status
     ]);
 
     // ── 5. Update Zone A matters button once we have the count ─────────────
@@ -1494,49 +1841,202 @@
   // =========================================================================
 
   /**
-   * Handle click on a Lana-suggested action card.
-   * 1. POST /api/v1/action-queue/alert/:entityId/acted-on — mark interaction
-   * 2. POST /api/v1/agentic/tasks — queue the agentic task
-   * 3. Show toast confirmation
-   *
-   * @param {string} entityId       - Alert entity ID for interaction tracking
-   * @param {string} lanaActionStr  - JSON string of the suggested_action config
+   * Handle accept-click on a Zone C feedback button.
+   * @param {Element} card
    */
-  async function handleLanaActionClick(entityId, lanaActionStr) {
-    var action;
-    try {
-      action = JSON.parse(lanaActionStr);
-    } catch (parseErr) {
-      console.warn('[Dashboard] Failed to parse Lana action config:', parseErr && parseErr.message);
-      return;
-    }
+  async function handleAcceptClick(card) {
+    var actionType = card.getAttribute('data-action-type') || 'alert';
+    var entityId   = card.getAttribute('data-entity-id') || card.getAttribute('data-action-id');
+    if (!entityId) return;
 
-    try {
-      // Mark the action queue item as acted-on
-      await api.post('/api/v1/action-queue/alert/' + encodeURIComponent(entityId) + '/acted-on', {});
-    } catch (markErr) {
-      // Non-fatal — continue to queue the task even if marking fails
-      console.warn('[Dashboard] Failed to mark action as acted-on:', markErr && markErr.message);
-    }
+    // Resolve matter context from cached item
+    var itemId = card.getAttribute('data-action-id');
+    var cached = itemId ? _actionItemsMap[itemId] : null;
+    var sa     = cached ? getSuggestedAction(cached) : null;
+    var title  = cached ? (cached.title || '') : '';
 
-    try {
-      // Queue the agentic task
-      await api.post('/api/v1/agentic/tasks', {
-        type: action.action || 'generic',
-        matterId: action.matter_id || (action.matter_ids && action.matter_ids[0]) || null,
-        params: action.params || {}
-      });
-
-      // Show toast confirmation
-      if (typeof Lex !== 'undefined' && Lex.Toast) {
-        Lex.Toast.show({ message: 'Queued — Lana is working on it', variant: 'success' });
+    // Collect all matter IDs for this action
+    var matterIds = [];
+    if (sa) {
+      if (sa.matter_ids && sa.matter_ids.length) {
+        matterIds = sa.matter_ids;
+      } else if (sa.matter_id) {
+        matterIds = [sa.matter_id];
       }
-    } catch (queueErr) {
-      console.warn('[Dashboard] Failed to queue agentic task:', queueErr && queueErr.message);
-      if (typeof Lex !== 'undefined' && Lex.Toast) {
-        Lex.Toast.show({ message: 'Could not queue task — try again', variant: 'error' });
+      if (sa.items && sa.items.length) {
+        for (var k = 0; k < sa.items.length; k++) {
+          var mid = sa.items[k].matter_id || sa.items[k].matterId;
+          if (mid && matterIds.indexOf(mid) === -1) matterIds.push(mid);
+        }
       }
     }
+    if (!matterIds.length && cached && cached.matter_id) {
+      matterIds = [cached.matter_id];
+    }
+
+    card.classList.add('aq-card-dismissing');
+    try {
+      await api.patch(
+        '/api/v1/action-queue/' + encodeURIComponent(actionType) + '/' + encodeURIComponent(entityId) + '/acknowledge',
+        {}
+      );
+
+      // Create a task on each related matter so it's trackable
+      var taskDescription = sa && sa.action ? sa.action : (cached && cached.message ? cached.message : '');
+      for (var t = 0; t < matterIds.length; t++) {
+        try {
+          await api.post('/api/v1/matters/' + encodeURIComponent(matterIds[t]) + '/tasks', {
+            title: title || 'Action queue item',
+            description: taskDescription || '',
+            priority: (cached && cached.severity === 'critical') ? 'high' : (cached && cached.severity ? cached.severity : 'medium'),
+            status: 'pending'
+          });
+        } catch (taskErr) {
+          console.warn('[Dashboard] Could not create task for matter ' + matterIds[t] + ':', taskErr && taskErr.message);
+        }
+      }
+
+      if (typeof Lex !== 'undefined' && Lex.Toast) {
+        var toastMsg = matterIds.length > 0
+          ? 'Accepted — task created on ' + matterIds.length + ' matter' + (matterIds.length > 1 ? 's' : '')
+          : 'Accepted';
+        Lex.Toast.show(toastMsg, 'success');
+      }
+      setTimeout(function () { renderZoneC(true); }, 350);
+    } catch (err) {
+      card.classList.remove('aq-card-dismissing');
+      console.warn('[Dashboard] Accept failed:', err && err.message);
+      if (typeof Lex !== 'undefined' && Lex.Toast) {
+        Lex.Toast.show('Could not accept action', 'error');
+      }
+    }
+  }
+
+  /**
+   * Handle assign-click — show priority picker then assign to Lana from Zone C.
+   * Pre-selects priority based on alert severity, user can override.
+   * @param {Element} card
+   */
+  function handleAssignClick(card) {
+    var actionType = card.getAttribute('data-action-type') || 'alert';
+    var entityId   = card.getAttribute('data-entity-id') || card.getAttribute('data-action-id');
+    if (!entityId) return;
+
+    // Pre-select priority from severity mapping
+    var defaultPriority = card.getAttribute('data-priority') || 'medium';
+
+    var modalContent =
+      '<div style="margin-bottom:12px;">' +
+        '<label style="display:block;font-size:var(--lex-form-font-size,0.8125rem);font-weight:var(--lex-weight-medium,500);color:var(--lex-text-primary);margin-bottom:6px;">Task Priority</label>' +
+        '<select id="dashAssignPriority" style="width:100%;padding:8px 12px;font-family:inherit;font-size:var(--lex-form-font-size,0.8125rem);border:1px solid var(--lex-border-subtle,rgba(0,0,0,0.12));border-radius:var(--lex-input-radius,6px);background:var(--lex-bg-primary);color:var(--lex-text-primary);outline:none;">' +
+          '<option value="urgent"' + (defaultPriority === 'urgent' ? ' selected' : '') + '>Urgent</option>' +
+          '<option value="high"' + (defaultPriority === 'high' ? ' selected' : '') + '>High</option>' +
+          '<option value="medium"' + (defaultPriority === 'medium' ? ' selected' : '') + '>Medium</option>' +
+          '<option value="low"' + (defaultPriority === 'low' ? ' selected' : '') + '>Low</option>' +
+        '</select>' +
+        '<p style="font-size:0.6875rem;color:var(--lex-text-tertiary);margin-top:6px;">Higher priority tasks are executed sooner. Urgent and High start immediately.</p>' +
+      '</div>';
+
+    Lex.Modal.open({
+      heading: 'Assign to Lana',
+      content: modalContent,
+      hideActions: false,
+      confirmText: 'Assign',
+      cancelText: 'Cancel',
+      size: 'sm',
+      onConfirm: function () {
+        var priorityEl = document.getElementById('dashAssignPriority');
+        var priority = priorityEl ? priorityEl.value : defaultPriority;
+
+        card.classList.add('aq-card-dismissing');
+
+        api.post(
+          '/api/v1/action-queue/' + encodeURIComponent(actionType) + '/' + encodeURIComponent(entityId) + '/assign-to-lana',
+          { priority: priority }
+        ).then(function () {
+          if (typeof Lex !== 'undefined' && Lex.Toast) {
+            Lex.Toast.show('Queued (' + priority + ') — Lana is working on it', 'success');
+          }
+          setTimeout(function () { renderZoneC(true); }, 350);
+        }).catch(function (queueErr) {
+          card.classList.remove('aq-card-dismissing');
+          console.warn('[Dashboard] Failed to assign to Lana:', queueErr && queueErr.message);
+          if (typeof Lex !== 'undefined' && Lex.Toast) {
+            var errMsg = queueErr && queueErr.message ? queueErr.message : '';
+            var msg;
+            if (errMsg.indexOf('Already assigned') !== -1) {
+              msg = 'Already assigned to Lana';
+            } else if (errMsg.indexOf('currently handling') !== -1) {
+              msg = errMsg;
+            } else {
+              msg = 'Could not queue task — try again';
+            }
+            Lex.Toast.show(msg, 'error');
+          }
+        });
+      }
+    });
+  }
+
+  /**
+   * Handle reject-click — open reject modal from Zone C.
+   * @param {Element} card
+   */
+  function handleRejectClick(card) {
+    var actionType = card.getAttribute('data-action-type') || 'alert';
+    var entityId   = card.getAttribute('data-entity-id') || card.getAttribute('data-action-id');
+    if (!entityId) return;
+
+    var modalContent =
+      '<div style="margin-bottom:12px;">' +
+        '<label style="display:block;font-size:var(--lex-form-font-size,0.8125rem);font-weight:var(--lex-weight-medium,500);color:var(--lex-text-primary);margin-bottom:6px;">Reason for rejection</label>' +
+        '<textarea id="dashRejectReason" rows="3" maxlength="500" placeholder="Why is this not relevant?" style="width:100%;padding:8px 12px;font-family:inherit;font-size:var(--lex-form-font-size,0.8125rem);border:1px solid var(--lex-border-subtle,rgba(0,0,0,0.12));border-radius:var(--lex-input-radius,6px);background:var(--lex-bg-primary);color:var(--lex-text-primary);resize:vertical;outline:none;"></textarea>' +
+      '</div>' +
+      '<div>' +
+        '<label style="display:block;font-size:var(--lex-form-font-size,0.8125rem);font-weight:var(--lex-weight-medium,500);color:var(--lex-text-primary);margin-bottom:6px;">Suppress for</label>' +
+        '<select id="dashRejectDays" style="padding:8px 12px;font-family:inherit;font-size:var(--lex-form-font-size,0.8125rem);border:1px solid var(--lex-border-subtle,rgba(0,0,0,0.12));border-radius:var(--lex-input-radius,6px);background:var(--lex-bg-primary);color:var(--lex-text-primary);outline:none;">' +
+          '<option value="45">45 days</option>' +
+          '<option value="60">60 days</option>' +
+        '</select>' +
+      '</div>';
+
+    Lex.Modal.open({
+      heading: 'Reject Action',
+      content: modalContent,
+      hideActions: false,
+      confirmText: 'Reject',
+      cancelText: 'Cancel',
+      variant: 'danger',
+      size: 'sm',
+      onConfirm: function () {
+        var reasonEl = document.getElementById('dashRejectReason');
+        var daysEl   = document.getElementById('dashRejectDays');
+        var reason   = reasonEl ? reasonEl.value.trim() : '';
+        var days     = daysEl ? parseInt(daysEl.value, 10) : 45;
+
+        if (!reason) {
+          if (typeof Lex !== 'undefined' && Lex.Toast) {
+            Lex.Toast.show('Please provide a reason', 'error');
+          }
+          return;
+        }
+
+        api.patch(
+          '/api/v1/action-queue/' + encodeURIComponent(actionType) + '/' + encodeURIComponent(entityId) + '/reject',
+          { reason: reason, suppression_days: days }
+        ).then(function () {
+          if (typeof Lex !== 'undefined' && Lex.Toast) {
+            Lex.Toast.show('Rejected — won\'t resurface for ' + days + ' days', 'success');
+          }
+          renderZoneC(true);
+        }).catch(function (err) {
+          console.warn('[Dashboard] Reject failed:', err && err.message);
+          if (typeof Lex !== 'undefined' && Lex.Toast) {
+            Lex.Toast.show('Could not reject action', 'error');
+          }
+        });
+      }
+    });
   }
 
   // =========================================================================
@@ -1608,11 +2108,23 @@
     var zoneCViewAll = el('ccZoneCViewAll');
     if (zoneCViewAll) {
       zoneCViewAll.addEventListener('click', function () {
-        // Navigate to action queue page when it exists
-        // For now route to workspaces as a fallback
-        Lex.Nav.go('workspaces.html');
+        Lex.Nav.go('action-queue.html');
       });
     }
+
+    // Zone D — View all Lana tasks
+    var zoneDViewAll = el('ccZoneDViewAll');
+    if (zoneDViewAll) {
+      zoneDViewAll.addEventListener('click', function () {
+        Lex.Nav.go('agentic-tasks.html');
+      });
+    }
+
+    // Zone D — silent polling every 30s (tasks may change status frequently)
+    _intervals.push(setInterval(function () {
+      if (document.hidden) return;
+      renderZoneD();
+    }, 30000));
 
     // Activity heatmap info modal
     var heatmapInfoBtn = el('activityHeatmapInfoBtn');
@@ -1657,21 +2169,37 @@
         var card = e.target.closest('lex-action-card[data-action-id]');
         if (!card) return;
 
-        var lanaActionStr = card.getAttribute('data-lana-action');
-        var entityId      = card.getAttribute('data-entity-id') || card.getAttribute('data-action-id');
-
-        if (lanaActionStr) {
-          // Lana action: mark acted-on + queue agentic task
-          handleLanaActionClick(entityId, lanaActionStr);
-        } else {
-          // Human action: navigate to matter page
-          var matterId = card.getAttribute('data-matter-id');
-          if (matterId) {
-            Lex.Nav.go('matters.html', { params: { id: matterId } });
-          }
+        var itemId = card.getAttribute('data-action-id');
+        var cached = itemId ? _actionItemsMap[itemId] : null;
+        if (cached) {
+          showActionDetail(cached);
         }
       });
+
+      // Feedback: Accept
+      zoneCContent.addEventListener('accept-click', function (e) {
+        var card = e.target.closest('lex-action-card[data-action-id]');
+        if (card) handleAcceptClick(card);
+      });
+
+      // Feedback: Assign to Lana
+      zoneCContent.addEventListener('assign-click', function (e) {
+        var card = e.target.closest('lex-action-card[data-action-id]');
+        if (card) handleAssignClick(card);
+      });
+
+      // Feedback: Reject
+      zoneCContent.addEventListener('reject-click', function (e) {
+        var card = e.target.closest('lex-action-card[data-action-id]');
+        if (card) handleRejectClick(card);
+      });
     }
+
+    // Zone C — silent polling every 60s (skip when tab is hidden)
+    _intervals.push(setInterval(function () {
+      if (document.hidden) return;
+      renderZoneC(true);
+    }, 60000));
   }
 
   // =========================================================================

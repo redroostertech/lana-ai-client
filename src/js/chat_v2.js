@@ -251,7 +251,7 @@
     });
 
     // Create the conversation in the background while animation runs
-    createConversation(matter.id);
+    createConversation(matter.matter_id || matter.id);
   }
 
   function showInlineComposer() {
@@ -377,9 +377,9 @@
       dom.composerInline.classList.add('cv2-hidden');
     });
 
-    // Dim the greeting
+    // Hide the center stage entirely (matter panel + greeting)
     if (dom.stageCenterEl) {
-      dom.stageCenterEl.classList.add('cv2-greeting-dimmed');
+      dom.stageCenterEl.classList.add('cv2-hidden');
     }
 
     // Show messages area
@@ -401,6 +401,120 @@
   }
 
   // =========================================================================
+  // Welcome flow — deep-link from workspace (matter pre-selected)
+  // Shows greeting + composer with suggestion chips.
+  // =========================================================================
+
+  function enterActiveWithWelcome(matter) {
+    _matter = matter;
+    _enterActiveInvoked = true;
+    _stage = 'ACTIVE';
+
+    if (window.Lex && window.Lex.state) {
+      window.Lex.state.setActiveMatter(matter.id);
+    }
+
+    if (window.Lex && window.Lex.Redact) {
+      window.Lex.Redact.off(dom.cardsWrapper);
+    }
+
+    if (dom.stageCenterEl) {
+      dom.stageCenterEl.classList.add('cv2-hidden');
+    }
+
+    dom.messagesArea.classList.add('cv2-visible');
+
+    setPageTitle(_matter.name || 'New Conversation');
+    updateWorkspaceDetailsButton();
+
+    // Show welcome greeting overlay
+    var welcomeEl = document.createElement('div');
+    welcomeEl.id = 'cv2-welcome-greeting';
+    welcomeEl.className = 'cv2-welcome-greeting';
+    welcomeEl.innerHTML = '<h1 class="cv2-welcome-title">I\'m Lana, your AI assistant. How can I help you today?</h1>';
+    dom.messagesArea.appendChild(welcomeEl);
+
+    // Create conversation, then mount lex-chat
+    api.post('/api/v1/chat/sessions', { matter_id: matter.matter_id || matter.id })
+      .then(function (response) {
+        var session = response && response.session;
+        var convId = session && (session.id || session.thread_id);
+        if (!convId) throw new Error('No session ID');
+
+        _conversationId = convId;
+        if (window.Lex && window.Lex.state) {
+          window.Lex.state.setActiveConversation(convId);
+        }
+
+        mountLexChatWelcome(convId);
+
+        if (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.updateParams === 'function') {
+          window.Lex.Nav.updateParams({ session: convId, matter: _matter.id });
+        }
+      })
+      .catch(function (err) {
+        if (err && err.name === 'AbortError') return;
+        console.error('[chat_v2] Failed to create conversation:', err);
+        showErrorToast('Could not start a new conversation. Please try again.');
+        returnToLanding();
+      });
+  }
+
+  function mountLexChatWelcome(conversationId) {
+    if (!window.customElements || !window.customElements.get('lex-chat')) {
+      showErrorToast('Chat component failed to load. Please refresh and try again.');
+      return;
+    }
+
+    var chatEl = document.createElement('lex-chat');
+    chatEl.setAttribute('conversation-id', conversationId);
+    chatEl.setAttribute('matter-id', _matter.id);
+    chatEl.setAttribute('placeholder', 'Ask anything...');
+
+    if (window.LanaConfig && window.LanaConfig.DEMO_MODE) {
+      chatEl.setAttribute('source', 'demo');
+    }
+
+    dom.messagesArea.appendChild(chatEl);
+    wireChatEvents(chatEl);
+
+    // Add intent suggestions to the composer after lex-chat builds its DOM
+    setTimeout(function () {
+      var composerEl = chatEl.querySelector('lex-chat-composer');
+      if (composerEl) {
+        var suggestions = INTENTS.map(function (intent) {
+          if (intent.id === 'ask') return { label: intent.label, value: '' };
+          return { label: intent.label, value: intent.label + ' this matter' };
+        });
+        composerEl._renderSuggestions(suggestions);
+      }
+    }, 150);
+
+    // Intercept suggestion clicks — populate textarea instead of sending
+    chatEl.addEventListener('lex-composer-suggestion', function (e) {
+      e.stopImmediatePropagation();
+      var composerEl = chatEl.querySelector('lex-chat-composer');
+      if (composerEl && e.detail) {
+        if (e.detail.value) {
+          composerEl.setValue(e.detail.value);
+        }
+        composerEl.focus();
+      }
+    }, true);
+
+    // Hide welcome greeting on first message send
+    chatEl.addEventListener('lex-composer-send', function () {
+      var greetingEl = document.getElementById('cv2-welcome-greeting');
+      if (greetingEl) {
+        greetingEl.classList.add('cv2-fading');
+        setTimeout(function () {
+          if (greetingEl.parentNode) greetingEl.parentNode.removeChild(greetingEl);
+        }, 300);
+      }
+    }, { capture: true, once: true });
+  }
+
+  // =========================================================================
   // lex-chat mounting + event wiring
   // =========================================================================
 
@@ -413,7 +527,7 @@
 
     var chatEl = document.createElement('lex-chat');
     chatEl.setAttribute('conversation-id', conversationId);
-    chatEl.setAttribute('matter-id', _matter.id);
+    chatEl.setAttribute('matter-id', _matter.matter_id || _matter.id);
     chatEl.setAttribute('placeholder', 'Ask about this matter...');
 
     // Demo mode support
@@ -974,6 +1088,10 @@
     if (deepLinkSessionId) {
       loadExistingSession(deepLinkSessionId);
     } else if (deepLinkMatterId) {
+      // Check for pre-seeded prompt from action queue drawer
+      var chatPrompt = null;
+      try { chatPrompt = sessionStorage.getItem('lana_chat_prompt'); sessionStorage.removeItem('lana_chat_prompt'); } catch (e) { /* ignore */ }
+
       api.get('/api/v1/matters/' + deepLinkMatterId)
         .then(function (response) {
           var matter = (response && response.matter) ? response.matter : null;
@@ -981,8 +1099,26 @@
             if (window.Lex && window.Lex.Redact) {
               window.Lex.Redact.off(dom.cardsWrapper);
             }
-            _stage = 'LANDING';
-            onMatterSelected(matter);
+
+            if (chatPrompt) {
+              // Pre-seeded prompt from action queue: use existing intent flow
+              _stage = 'LANDING';
+              onMatterSelected(matter);
+              var promptWaited = 0;
+              var promptPoll = setInterval(function () {
+                promptWaited += 100;
+                if (_conversationId) {
+                  clearInterval(promptPoll);
+                  enterActive(chatPrompt);
+                }
+                if (promptWaited >= 8000) {
+                  clearInterval(promptPoll);
+                }
+              }, 100);
+            } else {
+              // Normal workspace deep-link: welcome greeting + suggestions
+              enterActiveWithWelcome(matter);
+            }
           } else {
             loadRecentMatters();
           }

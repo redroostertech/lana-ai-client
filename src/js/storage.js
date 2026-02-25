@@ -776,7 +776,7 @@ function renderGridView(folders, files) {
   const fileCards = files.map(file => `
     <div
       class="grid-item bg-white rounded-lg border border-gray-200 p-4 cursor-pointer hover:shadow-md transition-shadow relative"
-      onclick="openFileViewer('${file.id}')"
+      onclick="_navToFileViewer('${file.id}')"
     >
       <button
         class="absolute top-2 right-2 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"
@@ -862,7 +862,7 @@ function renderListView(folders, files) {
   }).join('');
 
   const fileRows = files.map(file => `
-    <tr class="hover:bg-gray-50 cursor-pointer" onclick="openFileViewer('${file.id}')">
+    <tr class="hover:bg-gray-50 cursor-pointer" onclick="_navToFileViewer('${file.id}')">
       <td class="px-6 py-4">
         <input type="checkbox" class="rounded text-indigo-600" onclick="event.stopPropagation()">
       </td>
@@ -2096,12 +2096,7 @@ function renderFileCardInRecents(file) {
 }
 
 function openRecentFile(fileId, clientMatter) {
-  // Open file viewer
-  if (window.openFileViewer) {
-    window.openFileViewer(fileId);
-  } else {
-    console.error('[Storage] openFileViewer not available');
-  }
+  _navToFileViewer(fileId);
 }
 
 async function loadPinnedMatters() {
@@ -2272,6 +2267,27 @@ function getFileIconSVG(contentType) {
   return '<svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>';
 }
 
+/**
+ * Navigate to the dedicated file viewer page with referrer context.
+ * @param {string} fileId
+ */
+function _navToFileViewer(fileId) {
+  var referrer = 'storage.html';
+  if (storageState.currentMatterId) {
+    referrer += '?matter_id=' + encodeURIComponent(storageState.currentMatterId);
+    if (storageState.currentMatterName) {
+      referrer += '&matter_name=' + encodeURIComponent(storageState.currentMatterName);
+    }
+    if (storageState.currentFolderId) {
+      referrer += '&folder_id=' + encodeURIComponent(storageState.currentFolderId);
+    }
+  }
+  Lex.Nav.go('file-viewer.html', {
+    params: { id: fileId },
+    context: { referrer: referrer }
+  });
+}
+
 // Export functions for global access
 window.handleFolderClick = handleFolderClick;
 window.navigateToFolder = navigateToMatter;
@@ -2282,3 +2298,4 @@ window.showFileMenu = showFileMenu;
 window.showFolderMenu = showFolderMenu;
 window.togglePin = togglePin;
 window.openRecentFile = openRecentFile;
+window._navToFileViewer = _navToFileViewer;

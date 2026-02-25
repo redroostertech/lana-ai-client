@@ -94,20 +94,27 @@
           </lex-card>
         </div>
 
-        <!-- Zone D — LANA Can Handle (Phase 3 placeholder) -->
+        <!-- Zone D — Lana Tasks (live status) -->
         <div id="ccZoneD">
           <lex-card padding="compact">
             <div class="cc-section-header">
               <div>
-                <div class="cc-section-title">LANA Can Handle</div>
+                <div class="cc-section-title">Lana Tasks</div>
                 <div class="cc-section-subtitle">AI-assisted actions</div>
               </div>
+              <lex-btn id="ccZoneDViewAll" variant="ghost" size="sm">View all</lex-btn>
             </div>
-            <lex-empty
-              icon="inbox"
-              message="AI-assisted actions coming soon"
-              description="LANA will suggest actions it can handle on your behalf">
-            </lex-empty>
+
+            <!-- Loading skeleton -->
+            <div id="ccZoneDLoading">
+              <div style="padding:16px;display:flex;flex-direction:column;gap:12px;">
+                <div style="height:36px;background:var(--lex-bg-secondary);border-radius:6px;"></div>
+                <div style="height:36px;background:var(--lex-bg-secondary);border-radius:6px;"></div>
+              </div>
+            </div>
+
+            <!-- Content (rendered by JS) -->
+            <div id="ccZoneDContent" class="hidden"></div>
           </lex-card>
         </div>
 
