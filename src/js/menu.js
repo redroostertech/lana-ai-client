@@ -107,7 +107,7 @@ const MenuConfig = {
         requiredRoles: [],
         isStaticTop: true,
         items: [
-          { id: 'dashboard', label: 'Dashboard', href: '/index.html', icon: 'home' },
+          { id: 'dashboard', label: 'Dashboard', href: '/dashboard.html', icon: 'home' },
           { id: 'lex-ui', label: 'Lex UI', href: '/lex-test.html', icon: 'lex' },
           {
             id: 'search-conversations',
@@ -200,7 +200,7 @@ const MenuConfig = {
         requiredRoles: [],
         isFooter: true, // Push to bottom of sidebar
         items: [
-          { id: 'back-to-portal', label: 'Back to Portal', href: '/index.html', icon: 'back' },
+          { id: 'back-to-portal', label: 'Back to Portal', href: '/dashboard.html', icon: 'back' },
         ]
       }
     ]
@@ -215,7 +215,7 @@ const MenuConfig = {
         requiredRoles: [],
         isStaticTop: true,
         items: [
-          { id: 'dashboard', label: 'Dashboard', href: '/index.html', icon: 'home' },
+          { id: 'dashboard', label: 'Dashboard', href: '/dashboard.html', icon: 'home' },
           { id: 'lex-ui', label: 'Lex UI', href: '/lex-test.html', icon: 'lex' },
           {
             id: 'search-conversations',
@@ -280,7 +280,7 @@ const MenuConfig = {
         requiredRoles: [],
         isStaticTop: true,
         items: [
-          { id: 'dashboard', label: 'Dashboard', href: '/index.html', icon: 'home' },
+          { id: 'dashboard', label: 'Dashboard', href: '/dashboard.html', icon: 'home' },
           { id: 'lex-ui', label: 'Lex UI', href: '/lex-test.html', icon: 'lex' },
           {
             id: 'search-conversations',
@@ -345,7 +345,7 @@ const MenuConfig = {
         requiredRoles: [],
         isStaticTop: true,
         items: [
-          { id: 'dashboard', label: 'Dashboard', href: '/index.html', icon: 'home' },
+          { id: 'dashboard', label: 'Dashboard', href: '/dashboard.html', icon: 'home' },
           { id: 'lex-ui', label: 'Lex UI', href: '/lex-test.html', icon: 'lex' },
           {
             id: 'search-conversations',
@@ -411,7 +411,7 @@ const MenuConfig = {
         requiredRoles: [],
         isStaticTop: true,
         items: [
-          { id: 'chat-dashboard', label: 'Dashboard', href: '/index.html', icon: 'home' },
+          { id: 'chat-dashboard', label: 'Dashboard', href: '/dashboard.html', icon: 'home' },
           { id: 'lex-ui', label: 'Lex UI', href: '/lex-test.html', icon: 'lex' },
           {
             id: 'chat-search',
@@ -934,7 +934,7 @@ class MenuSystem {
       const adminHref = this._resolveHref('/admin/index.html');
       const settingsHref = this._resolveHref('/settings.html');
       const helpHref = this._resolveHref('/help.html');
-      const portalHref = this._resolveHref('/index.html');
+      const portalHref = this._resolveHref('/dashboard.html');
 
       const user = this.user;
       const fullName = user ? `${user.firstName || user.first_name || ''} ${user.lastName || user.last_name || ''}`.trim() || user.email || 'User' : 'User';
@@ -1095,7 +1095,7 @@ class MenuSystem {
 class SidebarComponent {
   constructor(options = {}) {
     this.brandName = options.brandName || 'LanaAI';
-    this.brandHref = options.brandHref || '/index.html';
+    this.brandHref = options.brandHref || '/dashboard.html';
     this.menuOptions = options.menuOptions || {};
     this.sidebarId = options.sidebarId || 'sidebar';
     this.overlayId = options.overlayId || 'sidebarOverlay';

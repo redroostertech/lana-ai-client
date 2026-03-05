@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Skills - LANA AI</title>
+
+  <!-- CSS + Tailwind in head — behavioral scripts at end of body -->
+  <link rel="stylesheet" href="css/lex-tokens.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/tailwind-output.css">
+  <link rel="stylesheet" href="css/lex-chat.css">
+  <link rel="stylesheet" href="css/lana-ask-btn.css">
+  <link rel="stylesheet" href="css/skills.css">
+  <script src="js/tailwind-loader.js"></script>
+
+  <style>
+    .lana-topbar-divider {
+      width: 1px;
+      height: 20px;
+      background: var(--lex-chat-border, #e5e7eb);
+      margin: 0 4px;
+      flex-shrink: 0;
+    }
+  </style>
+
+</head>
+<body>
+
+  <!-- Branded loader — shows once lex-loader.js upgrades the element -->
+  <lex-loader theme="light"></lex-loader>
+
+  <!-- App shell — sidebar, topbar, empty content area.
+       Page content lives in <template> below and gets injected after
+       the shell renders. -->
+  <lex-app
+    logo-src="img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="dashboard.html"
+    active-nav-id=""
+    page-title="Skills"
+  ></lex-app>
+
+  <!-- Page content as inert <template> — elements inside are NOT upgraded
+       by the browser until cloned into the live DOM. -->
+  <template id="page-content">
+
+    <main>
+      <!-- Welcome Banner -->
+      <lex-banner
+        id="skillsBanner"
+        variant="light"
+        corners
+        heading="Skills"
+        subtitle="Browse, import, and manage skills to automate your workflows."
+      >
+        <lex-btn id="learnMoreBtn" variant="secondary">Learn More</lex-btn>
+      </lex-banner>
+
+      <!-- Content card — header, table/grid body -->
+      <lex-card padding="none" style="margin-top:1rem;">
+        <!-- Card header — title, action buttons, view toggles -->
+        <div class="flex items-center justify-between p-4">
+          <div>
+            <h2 id="skillsSectionHeading" class="text-lg font-semibold" style="color: var(--lex-text-primary)">All Skills</h2>
+          </div>
+          <div class="flex items-center gap-3">
+            <lex-btn id="create-skill-btn" variant="primary" leading-icon="+">
+              Create Skill
+            </lex-btn>
+            <lex-btn id="import-skill-btn" variant="secondary">
+              Import
+            </lex-btn>
+            <div class="flex items-center gap-1" style="border-left: 1px solid var(--lex-border-default); padding-left: 12px;">
+              <lex-btn id="grid-view-btn" variant="ghost" icon="true" title="Grid View">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+                </svg>
+              </lex-btn>
+              <lex-btn id="list-view-btn" variant="primary" icon="true" title="List View">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                </svg>
+              </lex-btn>
+            </div>
+          </div>
+        </div>
+
+        <!-- Grid View: search + category filter + cards (hidden by default) -->
+        <div id="grid-view-container" class="hidden">
+          <div class="px-4 pb-4">
+            <div class="flex flex-col md:flex-row gap-3">
+              <div class="flex-1 relative">
+                <input
+                  type="text"
+                  id="search-input"
+                  placeholder="Search skills..."
+                  class="w-full pl-10 pr-4 py-2 rounded-lg skill-builder-input"
+                />
+                <svg class="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2" style="color: var(--lex-text-tertiary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+              </div>
+              <lex-select
+                id="category-filter"
+                placeholder="All Categories"
+                size="md"
+                style="width:200px;"
+                options='[{"value":"all","label":"All Categories"},{"value":"document-intelligence","label":"Document Intelligence"},{"value":"ai-assistance","label":"AI Assistance"},{"value":"automation","label":"Automation"},{"value":"workflow","label":"Workflow"},{"value":"integration","label":"Integration"}]'
+              ></lex-select>
+            </div>
+            <!-- Filter Chips -->
+            <div id="filter-chips" class="flex flex-wrap gap-2 mt-3"></div>
+          </div>
+
+          <!-- Loading State -->
+          <div id="loading-state" class="flex justify-center py-16">
+            <lex-spinner size="lg" label="Loading skills..."></lex-spinner>
+          </div>
+
+          <!-- Skills Grid (populated by JS) -->
+          <div id="skills-grid-container" class="hidden"></div>
+
+          <!-- Empty State (grid) -->
+          <div id="grid-empty-state" class="hidden">
+            <lex-empty heading="No skills found" description="Try adjusting your search or filters"></lex-empty>
+          </div>
+
+          <!-- Pagination (grid view) -->
+          <div class="px-4 pb-2">
+            <lex-pagination id="grid-pagination"></lex-pagination>
+          </div>
+        </div>
+
+        <!-- List View: lex-table with built-in search, sort, filter, pagination -->
+        <lex-table
+          id="skillsListView"
+          columns="skill_name,description,category,skill_type,installation_count,created_at"
+          labels="Name,Description,Category,Type,Installations,Created"
+          searchable
+          filterable
+          column-filters
+          compact
+          sort-by="created_at"
+          sort-dir="desc"
+          empty-text="No skills found"
+          id-key="skill_id"
+        ></lex-table>
+
+        <!-- Pagination (list view) -->
+        <lex-pagination id="list-pagination"></lex-pagination>
+
+      </lex-card>
+
+    </main>
+
+    <!-- Learn More Modal (hoisted to body by lex-page-init) -->
+    <div id="learn-more-modal" class="modal hidden" data-hoist>
+      <div class="modal-overlay"></div>
+      <div class="modal-content max-w-2xl">
+        <div class="modal-header">
+          <h3 class="text-xl font-semibold" style="color: var(--lex-text-primary);">About Skills</h3>
+          <button class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="flex items-start gap-4 mb-4">
+            <div class="w-12 h-12 flex items-center justify-center rounded-lg flex-shrink-0" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);"><svg class="w-6 h-6" style="color: var(--lex-color-white, #fff);" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M15.39 4.39a1 1 0 0 0 1.68-.474 2.5 2.5 0 1 1 3.014 3.015 1 1 0 0 0-.474 1.68l1.683 1.682a2.414 2.414 0 0 1 0 3.414L19.61 15.39a1 1 0 0 1-1.68-.474 2.5 2.5 0 1 0-3.014 3.015 1 1 0 0 1 .474 1.68l-1.683 1.682a2.414 2.414 0 0 1-3.414 0L8.61 19.61a1 1 0 0 0-1.68.474 2.5 2.5 0 1 1-3.014-3.015 1 1 0 0 0 .474-1.68l-1.683-1.682a2.414 2.414 0 0 1 0-3.414L4.39 8.61a1 1 0 0 1 1.68.474 2.5 2.5 0 1 0 3.014-3.015 1 1 0 0 1-.474-1.68l1.683-1.682a2.414 2.414 0 0 1 3.414 0z"/></svg></div>
+            <div>
+              <h4 class="text-lg font-semibold mb-1" style="color: var(--lex-text-primary);">What are Skills?</h4>
+              <p class="text-sm" style="color: var(--lex-text-secondary);">Skills are automated workflows that respond to events in your matters. They combine triggers, conditions, and actions to automate repetitive legal tasks.</p>
+            </div>
+          </div>
+          <div class="space-y-4">
+            <div>
+              <h5 class="text-sm font-semibold mb-1" style="color: var(--lex-text-secondary);">How Skills Work</h5>
+              <p class="text-sm" style="color: var(--lex-text-secondary);">Each skill listens for a specific trigger event (e.g., a document upload or a status change). When the event occurs, the skill evaluates its conditions and, if met, executes a sequence of actions such as AI analysis, notifications, or document generation.</p>
+            </div>
+            <div>
+              <h5 class="text-sm font-semibold mb-1" style="color: var(--lex-text-secondary);">Getting Started</h5>
+              <ul class="text-sm list-disc list-inside space-y-1" style="color: var(--lex-text-secondary);">
+                <li><strong>Browse</strong> the skills catalog to find pre-built automations</li>
+                <li><strong>Import</strong> skill packages shared by your team</li>
+                <li><strong>Create</strong> custom skills using the LANA designer in the top bar</li>
+                <li><strong>Install</strong> skills to specific matters to activate them</li>
+              </ul>
+            </div>
+            <div>
+              <h5 class="text-sm font-semibold mb-1" style="color: var(--lex-text-secondary);">Categories</h5>
+              <div class="flex flex-wrap gap-2">
+                <span class="category-badge category-document-intelligence">Document Intelligence</span>
+                <span class="category-badge category-ai-assistance">AI Assistance</span>
+                <span class="category-badge category-automation">Automation</span>
+                <span class="category-badge category-workflow">Workflow</span>
+                <span class="category-badge category-integration">Integration</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <lex-btn id="learn-more-close-btn" variant="secondary">Close</lex-btn>
+        </div>
+      </div>
+    </div>
+
+    <!-- Skill Details Modal (hoisted to body by lex-page-init) -->
+    <div id="skill-details-modal" class="modal hidden" data-hoist>
+      <div class="modal-overlay"></div>
+      <div class="modal-content max-w-3xl">
+        <div class="modal-header">
+          <h3 class="text-xl font-semibold" style="color: var(--lex-text-primary);">Skill Details</h3>
+          <button class="modal-close">&times;</button>
+        </div>
+        <div id="skill-details-body" class="modal-body">
+          <!-- Populated by JS -->
+        </div>
+        <div class="modal-footer">
+          <lex-btn id="modal-cancel-btn" variant="secondary">Close</lex-btn>
+          <lex-btn id="modal-install-btn" variant="primary">Install to Matter</lex-btn>
+        </div>
+      </div>
+    </div>
+
+    <!-- Matter Selector Modal -->
+    <div id="matter-selector-modal" class="modal hidden" data-hoist>
+      <div class="modal-overlay"></div>
+      <div class="modal-content max-w-2xl">
+        <div class="modal-header">
+          <h3 class="text-xl font-semibold" style="color: var(--lex-text-primary);">Install Skill to Matter</h3>
+          <button class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p class="text-sm mb-4" style="color: var(--lex-text-secondary);">Select one or more matters to install this skill:</p>
+          <div class="relative mb-4">
+            <input
+              type="text"
+              id="matter-search-input"
+              placeholder="Search matters..."
+              class="w-full pl-10 pr-4 py-2 rounded-lg skill-builder-input"
+            />
+            <svg class="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2" style="color: var(--lex-text-tertiary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+          </div>
+          <div id="matters-list" class="max-h-96 overflow-y-auto rounded-lg divide-y"
+               style="border: 1px solid var(--lex-border-default);">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <lex-btn id="matter-modal-cancel-btn" variant="secondary">Cancel</lex-btn>
+          <lex-btn id="matter-modal-install-btn" variant="primary">Install</lex-btn>
+        </div>
+      </div>
+    </div>
+
+    <!-- Skill Builder Modal (full-screen overlay) -->
+    <div id="createSkillModal" class="fixed inset-0 bg-white hidden flex-col" style="z-index: 10001;" data-hoist>
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between px-6 py-4 shadow-sm"
+           style="border-bottom: 1px solid var(--lex-border-default); background: var(--lex-bg-primary);">
+        <div class="flex items-center gap-3">
+          <div class="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center"
+               style="background: var(--lex-bg-accent-muted);">
+            <svg class="w-6 h-6" style="color: var(--lex-text-accent);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-xl font-semibold" style="color: var(--lex-text-primary);">Skill Builder</h2>
+            <p class="text-sm" style="color: var(--lex-text-secondary);">Create a multi-step automated skill</p>
+          </div>
+        </div>
+        <lex-btn id="closeSkillBuilderBtn" variant="ghost" icon="true" title="Close builder">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </lex-btn>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="flex-1 overflow-hidden flex">
+        <!-- Left Panel - Intent Sequencer -->
+        <div class="flex-1 p-6 overflow-y-auto" style="background: var(--lex-bg-secondary);">
+          <!-- Skill Header -->
+          <div class="mb-6 rounded-lg p-5 shadow-sm"
+               style="background: var(--lex-bg-primary); border: 1px solid var(--lex-border-default);">
+            <div class="flex items-start gap-4">
+              <div class="flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center"
+                   style="background: var(--lex-bg-accent);">
+                <svg class="w-6 h-6" style="color: var(--lex-text-on-accent);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+              </div>
+              <div class="flex-1">
+                <label class="block text-xs font-semibold mb-2 uppercase tracking-wide"
+                       style="color: var(--lex-text-secondary);">Skill Intent</label>
+                <input type="text" id="skill_name" placeholder="e.g., Auto-triage new litigation documents"
+                       class="w-full px-4 py-2.5 rounded-lg transition-colors font-medium skill-builder-input">
+                <textarea id="skill_description" rows="2" placeholder="Describe the business outcome this skill achieves..."
+                       class="w-full mt-3 px-4 py-2.5 rounded-lg transition-colors text-sm resize-none skill-builder-input"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step Sequence Container -->
+          <div id="workflow-steps-container" class="relative space-y-4">
+            <!-- Connector Rail (Visual Flow Line) -->
+            <div class="absolute left-6 top-0 bottom-0 w-0.5" style="background: var(--lex-border-accent);"></div>
+            <!-- Steps will be added here dynamically -->
+          </div>
+
+          <!-- Add Step Button -->
+          <button type="button" id="addStepBtn"
+                  class="w-full mt-6 ml-14 px-6 py-3 bg-white border-2 border-dashed rounded-lg transition-colors flex items-center justify-center gap-2 group"
+                  style="border-color: var(--lex-border-strong); color: var(--lex-text-secondary);">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
+                 style="background: var(--lex-bg-tertiary);">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+              </svg>
+            </div>
+            <span class="font-medium">Add Next Step</span>
+          </button>
+        </div>
+
+        <!-- Right Panel - MX Diagnostics & Step Palette -->
+        <div class="w-96 overflow-y-auto p-6"
+             style="border-left: 1px solid var(--lex-border-default); background: var(--lex-bg-primary);">
+
+          <!-- MX Diagnostics Panel -->
+          <div class="mb-6 rounded-lg p-5"
+               style="background: var(--lex-status-success-bg); border: 1px solid var(--lex-color-success-200, #bbf7d0);">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-bold uppercase tracking-wide" style="color: var(--lex-status-success-text);">MX Health</h3>
+              <div class="flex items-center gap-1.5">
+                <div class="w-2 h-2 rounded-full animate-pulse" style="background: var(--lex-color-success-500);"></div>
+                <span class="text-xs font-mono" style="color: var(--lex-status-success-text);">Ready</span>
+              </div>
+            </div>
+
+            <div class="space-y-3">
+              <!-- Parseability Index -->
+              <div class="rounded-lg p-3" style="background: var(--lex-bg-primary); border: 1px solid var(--lex-border-default);">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-xs font-medium" style="color: var(--lex-text-secondary);">Parseability Index</span>
+                  <span class="text-lg font-bold font-mono" style="color: var(--lex-color-success-700);" id="mx-parseability-score">0%</span>
+                </div>
+                <div class="h-2 rounded-full overflow-hidden" style="background: var(--lex-color-gray-200);">
+                  <div id="mx-parseability-bar" class="h-full transition-all duration-500" style="width: 0%; background: var(--lex-color-success-500);"></div>
+                </div>
+                <p class="text-xs mt-2" style="color: var(--lex-text-tertiary);">How clearly the AI can understand this workflow</p>
+              </div>
+
+              <!-- Intent Clarity -->
+              <div class="rounded-lg p-3" style="background: var(--lex-bg-primary); border: 1px solid var(--lex-border-default);">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-xs font-medium" style="color: var(--lex-text-secondary);">Intent Clarity</span>
+                  <span class="text-sm font-bold font-mono" style="color: var(--lex-text-secondary);" id="mx-intent-score">Unknown</span>
+                </div>
+                <p class="text-xs" style="color: var(--lex-text-tertiary);">Add workflow description to improve</p>
+              </div>
+
+              <!-- Step Health -->
+              <div class="rounded-lg p-3" style="background: var(--lex-bg-primary); border: 1px solid var(--lex-border-default);">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs font-medium" style="color: var(--lex-text-secondary);">Step Health</span>
+                  <span class="text-sm font-bold font-mono" style="color: var(--lex-text-accent);" id="mx-step-count">0 steps</span>
+                </div>
+                <div class="flex gap-1 mt-2">
+                  <div class="flex-1 text-center">
+                    <div class="text-xs font-mono" style="color: var(--lex-color-info-500);" id="mx-trigger-count">0</div>
+                    <div class="text-xs" style="color: var(--lex-text-tertiary);">Triggers</div>
+                  </div>
+                  <div class="flex-1 text-center">
+                    <div class="text-xs font-mono" style="color: var(--lex-color-warning-700);" id="mx-condition-count">0</div>
+                    <div class="text-xs" style="color: var(--lex-text-tertiary);">Logic</div>
+                  </div>
+                  <div class="flex-1 text-center">
+                    <div class="text-xs font-mono" style="color: var(--lex-color-success-700);" id="mx-action-count">0</div>
+                    <div class="text-xs" style="color: var(--lex-text-tertiary);">Actions</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step Types Palette -->
+          <div class="mb-6">
+            <h3 class="text-xs font-bold uppercase tracking-wide mb-4 flex items-center gap-2"
+                style="color: var(--lex-text-secondary);">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"></path>
+              </svg>
+              Step Components
+            </h3>
+
+            <div class="space-y-3">
+              <!-- Trigger Step -->
+              <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 hover:border-blue-300 hover:bg-blue-100 transition-all cursor-pointer">
+                <div class="flex items-center gap-3 mb-2">
+                  <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                    <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                  </div>
+                  <span class="text-sm font-bold text-blue-900">Trigger</span>
+                  <code class="ml-auto text-xs font-mono text-blue-700 bg-blue-100 px-2 py-0.5 rounded">trigger.*</code>
+                </div>
+                <p class="text-xs text-blue-800 leading-relaxed">Initiates workflow on system events</p>
+                <div class="mt-2 flex flex-wrap gap-1">
+                  <span class="text-xs font-mono text-blue-700 bg-blue-100 px-2 py-0.5 rounded">document.created</span>
+                  <span class="text-xs font-mono text-blue-700 bg-blue-100 px-2 py-0.5 rounded">lead.created</span>
+                </div>
+              </div>
+
+              <!-- Condition Step -->
+              <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 hover:border-amber-300 hover:bg-amber-100 transition-all cursor-pointer">
+                <div class="flex items-center gap-3 mb-2">
+                  <div class="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
+                    <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                  </div>
+                  <span class="text-sm font-bold text-amber-900">Condition</span>
+                  <code class="ml-auto text-xs font-mono text-amber-700 bg-amber-100 px-2 py-0.5 rounded">if.*</code>
+                </div>
+                <p class="text-xs text-amber-800 leading-relaxed">Branches flow based on data evaluation</p>
+                <div class="mt-2 flex flex-wrap gap-1">
+                  <span class="text-xs font-mono text-amber-700 bg-amber-100 px-2 py-0.5 rounded">equals</span>
+                  <span class="text-xs font-mono text-amber-700 bg-amber-100 px-2 py-0.5 rounded">contains</span>
+                </div>
+              </div>
+
+              <!-- AI Action Step -->
+              <div class="bg-green-50 border border-green-200 rounded-lg p-4 hover:border-green-300 hover:bg-green-100 transition-all cursor-pointer">
+                <div class="flex items-center gap-3 mb-2">
+                  <div class="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+                    <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                    </svg>
+                  </div>
+                  <span class="text-sm font-bold text-green-900">AI Action</span>
+                  <code class="ml-auto text-xs font-mono text-green-700 bg-green-100 px-2 py-0.5 rounded">ai.*</code>
+                </div>
+                <p class="text-xs text-green-800 leading-relaxed">Processes data with LLM intelligence</p>
+                <div class="mt-2 flex flex-wrap gap-1">
+                  <span class="text-xs font-mono text-green-700 bg-green-100 px-2 py-0.5 rounded">summarize</span>
+                  <span class="text-xs font-mono text-green-700 bg-green-100 px-2 py-0.5 rounded">extract</span>
+                </div>
+              </div>
+
+              <!-- Integration Step -->
+              <div class="bg-purple-50 border border-purple-200 rounded-lg p-4 hover:border-purple-300 hover:bg-purple-100 transition-all cursor-pointer">
+                <div class="flex items-center gap-3 mb-2">
+                  <div class="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                    <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                    </svg>
+                  </div>
+                  <span class="text-sm font-bold text-purple-900">Integration</span>
+                  <code class="ml-auto text-xs font-mono text-purple-700 bg-purple-100 px-2 py-0.5 rounded">ext.*</code>
+                </div>
+                <p class="text-xs text-purple-800 leading-relaxed">Connects to external systems</p>
+                <div class="mt-2 flex flex-wrap gap-1">
+                  <span class="text-xs font-mono text-purple-700 bg-purple-100 px-2 py-0.5 rounded">email</span>
+                  <span class="text-xs font-mono text-purple-700 bg-purple-100 px-2 py-0.5 rounded">crm</span>
+                </div>
+              </div>
+
+              <!-- Transform Step -->
+              <div class="bg-cyan-50 border border-cyan-200 rounded-lg p-4 hover:border-cyan-300 hover:bg-cyan-100 transition-all cursor-pointer">
+                <div class="flex items-center gap-3 mb-2">
+                  <div class="w-8 h-8 rounded-lg bg-cyan-100 flex items-center justify-center">
+                    <svg class="w-4 h-4 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                  </div>
+                  <span class="text-sm font-bold text-cyan-900">Transform</span>
+                  <code class="ml-auto text-xs font-mono text-cyan-700 bg-cyan-100 px-2 py-0.5 rounded">data.*</code>
+                </div>
+                <p class="text-xs text-cyan-800 leading-relaxed">Modifies and extracts data fields</p>
+                <div class="mt-2 flex flex-wrap gap-1">
+                  <span class="text-xs font-mono text-cyan-700 bg-cyan-100 px-2 py-0.5 rounded">map</span>
+                  <span class="text-xs font-mono text-cyan-700 bg-cyan-100 px-2 py-0.5 rounded">filter</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Smart Variables -->
+          <div class="rounded-lg p-5" style="background: var(--lex-bg-secondary); border: 1px solid var(--lex-border-default);">
+            <h4 class="text-xs font-bold uppercase tracking-wide mb-3 flex items-center gap-2"
+                style="color: var(--lex-text-secondary);">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+              </svg>
+              Smart Variables
+            </h4>
+            <div class="space-y-2">
+              <code class="block px-3 py-2 rounded-lg text-xs font-mono"
+                    style="background: var(--lex-bg-primary); color: var(--lex-text-accent); border: 1px solid var(--lex-border-default);">{{trigger.data}}</code>
+              <code class="block px-3 py-2 rounded-lg text-xs font-mono"
+                    style="background: var(--lex-bg-primary); color: var(--lex-text-accent); border: 1px solid var(--lex-border-default);">{{step_1.output}}</code>
+              <code class="block px-3 py-2 rounded-lg text-xs font-mono"
+                    style="background: var(--lex-bg-primary); color: var(--lex-text-accent); border: 1px solid var(--lex-border-default);">{{matter.name}}</code>
+              <code class="block px-3 py-2 rounded-lg text-xs font-mono"
+                    style="background: var(--lex-bg-primary); color: var(--lex-text-accent); border: 1px solid var(--lex-border-default);">{{user.email}}</code>
+            </div>
+            <p class="text-xs mt-3" style="color: var(--lex-text-tertiary);">Reference data from previous steps in your workflow</p>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex items-center justify-between px-6 py-4"
+           style="border-top: 1px solid var(--lex-border-default); background: var(--lex-bg-secondary);">
+        <div class="text-sm" style="color: var(--lex-text-secondary);">
+          <span id="workflow-step-count">0</span> steps configured
+          <span id="skill-version-display" class="hidden ml-3 px-2 py-0.5 text-xs font-mono rounded"
+                style="background: var(--lex-bg-tertiary); color: var(--lex-text-secondary);">v1.0.0</span>
+        </div>
+        <div class="flex gap-3">
+          <lex-btn id="cancelSkillBuilderBtn" variant="secondary" size="md">Cancel</lex-btn>
+          <lex-btn id="saveSkillBtn" variant="primary" size="md">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            Save Skill
+          </lex-btn>
+        </div>
+      </div>
+    </div>
+
+    <!-- Skill Import Modal -->
+    <div id="skill-import-modal" class="modal hidden" data-hoist>
+      <div class="modal-overlay"></div>
+      <div class="modal-content max-w-2xl">
+        <div class="modal-header">
+          <h3 class="text-xl font-semibold" style="color: var(--lex-text-primary);">Import Skill Package</h3>
+          <button class="modal-close" id="skill-import-modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <!-- Info notice -->
+          <div class="rounded-lg p-4 mb-5 flex gap-3"
+               style="background: var(--lex-status-info-bg); border: 1px solid var(--lex-color-info-200, #bfdbfe);">
+            <svg class="w-5 h-5 flex-shrink-0 mt-0.5" style="color: var(--lex-color-info-500);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <p class="text-sm" style="color: var(--lex-status-info-text);">Upload a skill ZIP package containing <code class="font-mono px-1 rounded" style="background: var(--lex-status-info-bg);">manifest.json</code> and <code class="font-mono px-1 rounded" style="background: var(--lex-status-info-bg);">skill.json</code>. Maximum file size is 5MB.</p>
+          </div>
+          <!-- Drag and drop zone -->
+          <div id="skill-drop-zone"
+            class="border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors mb-4"
+            style="border-color: var(--lex-border-strong);"
+            onclick="document.getElementById('skill-file-input').click()">
+            <svg class="w-12 h-12 mx-auto mb-3" style="color: var(--lex-color-gray-300);" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+            </svg>
+            <p class="text-sm font-medium" style="color: var(--lex-text-secondary);">Drop skill package here</p>
+            <p class="text-xs mt-1" style="color: var(--lex-text-tertiary);">or click to browse (.zip files only, max 5MB)</p>
+            <input type="file" id="skill-file-input" accept=".zip,application/zip" class="hidden">
+          </div>
+          <!-- Selected file info -->
+          <div id="skill-file-info" class="hidden mb-4">
+            <div class="flex items-center justify-between p-3 rounded-lg"
+                 style="background: var(--lex-bg-secondary); border: 1px solid var(--lex-border-default);">
+              <div class="flex items-center gap-3">
+                <svg class="w-5 h-5" style="color: var(--lex-text-accent);" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <div>
+                  <p id="skill-file-name" class="text-sm font-medium" style="color: var(--lex-text-primary);"></p>
+                  <p id="skill-file-size" class="text-xs" style="color: var(--lex-text-tertiary);"></p>
+                </div>
+              </div>
+              <button id="skill-file-clear-btn" class="text-xs font-medium"
+                      style="color: var(--lex-color-danger-500);">Remove</button>
+            </div>
+          </div>
+          <!-- Import result -->
+          <div id="skill-import-result" class="hidden mb-4"></div>
+        </div>
+        <div class="modal-footer">
+          <lex-btn id="skill-import-cancel-btn" variant="secondary">Cancel</lex-btn>
+          <lex-btn id="skill-import-confirm-btn" variant="primary" disabled>Import Skill</lex-btn>
+        </div>
+      </div>
+    </div>
+
+  </template>
+
+  <noscript>
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;color:#666;">
+      Please enable JavaScript to use LANA AI.
+    </div>
+  </noscript>
+
+  <!-- Toast container (outside template — always in DOM) -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       Scripts at end of body — HTML renders first, scripts load after
+       ══════════════════════════════════════════════════════════════════ -->
+
+  <!-- Universal shell scripts -->
+  <script src="js/error-reporter.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/mock-data.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/components.js"></script>
+  <script src="js/version.js"></script>
+  <script src="js/menu.js"></script>
+  <script src="js/navigation-helpers.js"></script>
+  <script src="js/new-project-modal.js"></script>
+  <script src="js/conversation-menu.js"></script>
+  <script src="js/conversation-search-modal.js"></script>
+  <script src="js/contact-search-modal.js"></script>
+  <script src="js/notifications.js"></script>
+
+  <!-- Lex UI core -->
+  <script src="js/lex/lex.core.js"></script>
+  <script src="js/lex/lex.icons.js"></script>
+  <script src="js/lex/lex.data.js"></script>
+  <script src="js/lex/lex.forms.js"></script>
+  <script src="js/lex/lex.state.js"></script>
+  <script src="js/lex/lex.utils.js"></script>
+  <script src="js/lex/lex.auth.js"></script>
+  <script src="js/lex/lex-nav.js"></script>
+
+  <!-- Lex UI foundation -->
+  <script src="js/lex/components/foundation/lex-loader.js"></script>
+  <script src="js/lex/components/foundation/lex-toast.js"></script>
+  <script src="js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="js/lex/components/foundation/lex-btn.js"></script>
+  <script src="js/lex/components/foundation/lex-empty.js"></script>
+
+  <!-- Lex UI layout -->
+  <script src="js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="js/lex/components/layout/lex-topbar.js"></script>
+  <script src="js/lex/components/layout/lex-conversation-item.js"></script>
+  <script src="js/lex/components/layout/lex-notification-panel.js"></script>
+  <script src="js/lex/components/layout/lex-app.js"></script>
+
+  <!-- Page-specific Lex components -->
+  <script src="js/lex/components/foundation/lex-banner.js"></script>
+  <script src="js/lex/components/foundation/lex-card.js"></script>
+  <script src="js/lex/components/foundation/lex-drawer.js"></script>
+  <script src="js/lex/components/foundation/lex-modal.js"></script>
+  <script src="js/lex/components/form/lex-select.js"></script>
+  <script src="js/lex/components/data/lex-table.js"></script>
+  <script src="js/lex/components/data/lex-filter-bar.js"></script>
+  <script src="js/lex/components/data/lex-pagination.js"></script>
+
+  <!-- Chat components for Skills Designer drawer -->
+  <script src="js/lex/chat/lex-chat.format.js"></script>
+  <script src="js/lex/chat/lex-chat.source.js"></script>
+  <script src="js/lex/chat/lex-chat.message.js"></script>
+  <script src="js/lex/chat/lex-chat.activity.js"></script>
+  <script src="js/lex/chat/lex-chat.documents.js"></script>
+  <script src="js/lex/chat/lex-chat.composer.js"></script>
+  <script src="js/lex/chat/lex-chat.thread.js"></script>
+  <script src="js/lex/chat/lex-chat.threads.js"></script>
+  <script src="js/lex/chat/lex-chat.js"></script>
+  <script src="js/lex/chat/lex-chat.index.js"></script>
+
+  <!-- Inject page content + hoist modals -->
+  <script src="js/lex/lex-page-init.js"></script>
+
+  <!-- Page controller -->
+  <script src="js/skills.js"></script>
+
+  <!-- Auth guard + loader dismiss (MUST be last) -->
+  <script src="js/auth-guard.js"></script>
+</body>
+</html>

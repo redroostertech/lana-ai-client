@@ -328,8 +328,9 @@
         });
       });
 
-      // Bind copy buttons
+      // Bind copy buttons (skip mermaid copy — handled separately below)
       this.delegate('click', '.lex-chat-copy-btn', (e, target) => {
+        if (target.dataset.mermaidCopy) return;
         const uid = target.dataset.copyId;
         const codeEl = this.querySelector(`code[data-raw]`);
         if (codeEl) {
@@ -346,6 +347,20 @@
           entityType: target.dataset.entityType
         });
       });
+
+      // Bind mermaid copy buttons
+      this.delegate('click', '[data-mermaid-copy]', (e, target) => {
+        const wrapper = target.closest('.lex-mermaid-wrapper');
+        if (!wrapper) return;
+        const mermaidEl = wrapper.querySelector('.mermaid');
+        const source = mermaidEl ? (mermaidEl.dataset.mermaidSource || mermaidEl.textContent) : '';
+        navigator.clipboard.writeText(source).catch(() => {});
+      });
+
+      // Render mermaid diagrams for non-streaming messages
+      if (!this.streaming && ChatFormat && typeof ChatFormat.renderMermaidDiagrams === 'function') {
+        ChatFormat.renderMermaidDiagrams(this);
+      }
     }
 
     /**
@@ -423,6 +438,11 @@
       const logo = this.querySelector('.lex-chat-indicator');
       if (logo) {
         logo.classList.add('lex-chat-indicator--static');
+      }
+
+      // Render mermaid diagrams (must be after content is in DOM)
+      if (ChatFormat && typeof ChatFormat.renderMermaidDiagrams === 'function') {
+        ChatFormat.renderMermaidDiagrams(this);
       }
     }
 

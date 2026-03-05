@@ -55,8 +55,8 @@
   var _hoistedModals = [];
 
   // Capture the real document URL before history.replaceState can change it.
-  // Under file:// protocol, replaceState('/index.html') would change the URL
-  // to file:///index.html, breaking all relative URL resolution.
+  // Under file:// protocol, replaceState('/dashboard.html') would change the URL
+  // to file:///dashboard.html, breaking all relative URL resolution.
   var _appBaseUrl = window.location.href;
 
   // Disable browser automatic scroll restoration on page refresh.
@@ -74,7 +74,7 @@
    * like '/matters.html' or '/admin/dashboard.html'.
    */
   function normalizePath(href) {
-    if (!href) return '/index.html';
+    if (!href) return '/dashboard.html';
 
     // file:// protocol in Electron
     if (href.indexOf('file://') === 0) {
@@ -360,8 +360,8 @@
 
   /**
    * Resolve a route path into a fetchable URL.
-   * Under file:// protocol, root-relative paths like '/index.html' would
-   * resolve to file:///index.html (filesystem root). We resolve against
+   * Under file:// protocol, root-relative paths like '/dashboard.html' would
+   * resolve to file:///dashboard.html (filesystem root). We resolve against
    * _appBaseUrl (captured at module load) since history.replaceState may
    * have already changed window.location.href.
    */
@@ -705,8 +705,8 @@
       // NEVER pass the URL (3rd argument) — keep the browser URL at
       // app.html so CMD+SHIFT+R (hard refresh) reloads the SPA shell
       // instead of the page fragment. The route is stored in state.path.
-      var startPath = initialPath || window.location.pathname || '/index.html';
-      if (startPath === '/' || startPath === '') startPath = '/index.html';
+      var startPath = initialPath || window.location.pathname || '/dashboard.html';
+      if (startPath === '/' || startPath === '') startPath = '/dashboard.html';
       history.replaceState({ path: startPath }, '');
 
       // Wire event listeners

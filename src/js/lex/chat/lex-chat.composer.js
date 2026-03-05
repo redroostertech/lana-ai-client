@@ -469,9 +469,9 @@
   // ---------------------------------------------------------------------------
 
   const DEFAULT_TOOLS = [
-    { id: 'document_chat',  label: 'Document Chat',  icon: ICON_FILE, description: 'Ask questions about specific documents' },
-    { id: 'agentic',        label: 'Agentic Mode',   icon: ICON_ZAP,  description: 'AI performs multi-step research and analysis' },
-    { id: 'insights_chat',  label: 'Insights Chat',  icon: ICON_EYE,  description: 'Ask about forecasts, trends, and insights' }
+    { id: 'document_chat',  label: 'Document Chat',    icon: ICON_FILE, description: 'Ask questions about specific documents' },
+    { id: 'agentic',        label: 'Agentic Mode',     icon: ICON_ZAP,  description: 'AI performs multi-step research and analysis' },
+    { id: 'insights_chat',  label: 'Insights Chat',    icon: ICON_EYE,  description: 'Ask about forecasts, trends, and insights' }
   ];
 
   // ---------------------------------------------------------------------------
@@ -1010,7 +1010,12 @@
     _handleSend() {
       const value = this.getValue();
       if (!value) return;
-      this.emit('lex-composer-send', { content: value });
+      const docs = this.getAttachedDocuments();
+      const detail = { content: value };
+      if (docs.length > 0) {
+        detail.attachments = { files: docs.map(d => ({ file_id: d.id, name: d.filename })) };
+      }
+      this.emit('lex-composer-send', detail);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

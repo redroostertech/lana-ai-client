@@ -1,399 +1,379 @@
 /**
  * New Project Modal
- * Reusable modal component for creating new matter-based conversations
- * Works on any page - injects HTML dynamically
+ * Reusable modal for creating new matter-based conversations.
+ * Uses <lex-modal> and <lex-input> from the Lex UI framework.
+ * Works on any page — creates the modal element on first open.
+ *
+ * No regex. String methods only.
  */
 
 const NewProjectModal = {
+  /** @type {HTMLElement|null} lex-modal element */
   modal: null,
+  /** @type {HTMLElement|null} lex-input search element */
+  searchInput: null,
+  /** @type {HTMLElement|null} matters list container */
+  listContainer: null,
+  /** @type {Array} loaded matters */
   allMatters: [],
+  /** @type {boolean} */
   isOpen: false,
 
-  /**
-   * Initialize the modal
-   */
-  init() {
-    // Inject modal HTML if it doesn't exist
-    if (!document.getElementById('newProjectModal')) {
-      this.injectModalHTML();
-    }
-
-    this.modal = document.getElementById('newProjectModal');
-    this.setupEventListeners();
-    return true;
-  },
+  // ── Lifecycle ───────────────────────────────────────────────────────────
 
   /**
-   * Inject modal HTML into the page
+   * Create the <lex-modal> element and wire events.
+   * Called once on first open().
+   * Returns a Promise that resolves when the modal is ready.
    */
-  injectModalHTML() {
-    const modalHTML = `
-      <!-- New Project Modal -->
-      <div id="newProjectModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 9999;" onclick="if(event.target === this) NewProjectModal.close()">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col" onclick="event.stopPropagation()">
-          <!-- Modal Header -->
-          <div class="flex items-center justify-between p-6 border-b border-gray-200">
-            <div>
-              <h2 class="text-xl font-semibold text-gray-900">Start New Chat
-              <p class="text-sm text-gray-500 mt-1">Select a matter to associate this conversation with</p>
-            </div>
-            <button onclick="NewProjectModal.close()" class="text-gray-400 hover:text-gray-600 transition-colors">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-              </svg>
-            </button>
-          </div>
+  async init() {
+    if (this.modal) return true;
 
-          <!-- Search Bar -->
-          <div class="p-6 border-b border-gray-200">
-            <div class="relative">
-              <input
-                type="text"
-                id="newProjectMatterSearch"
-                placeholder="Search matters by name, client, or number..."
-                class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              >
-              <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-              </svg>
-            </div>
-          </div>
+    // Lazy-load lex-modal and lex-input if not already registered.
+    // This avoids adding script tags to 40+ standalone HTML pages.
+    await this._ensureComponents();
 
-          <!-- Matters List -->
-          <div id="newProjectMattersList" class="flex-1 overflow-y-auto p-6">
-            <div class="flex items-center justify-center py-8 text-gray-400">
-              <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-            </div>
-          </div>
+    // Build modal content: search + list + footer
+    var contentHtml = '';
 
-          <!-- Modal Footer -->
-          <div class="p-4 border-t border-gray-200 bg-gray-50">
-            <div class="flex items-center justify-between gap-4">
-              <div class="flex items-start gap-2 flex-1">
-                <svg class="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                <p class="text-sm text-gray-600">
-                  <span class="font-medium">About Projects:</span> Projects let you organize conversations by matter/case for better context and collaboration.
-                </p>
-              </div>
-              <button onclick="NewProjectModal.createNewMatter()" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors whitespace-nowrap flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                </svg>
-                Create Project
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
+    // Search
+    contentHtml += '<div style="margin-bottom:16px">';
+    contentHtml += '<lex-input id="newProjectMatterSearch" type="search" placeholder="Search matters by name, client, or number..." leading-icon="search" clearable="true"></lex-input>';
+    contentHtml += '</div>';
 
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-  },
+    // Matters list
+    contentHtml += '<div id="newProjectMattersList" style="min-height:200px;max-height:400px;overflow-y:auto">';
+    contentHtml += '<div style="display:flex;align-items:center;justify-content:center;padding:32px 0"><lex-spinner></lex-spinner></div>';
+    contentHtml += '</div>';
 
-  /**
-   * Setup event listeners
-   */
-  setupEventListeners() {
-    // Search input handler
-    const searchInput = document.getElementById('newProjectMatterSearch');
-    if (searchInput) {
-      searchInput.addEventListener('input', (e) => {
-        this.filterMatters(e.target.value);
+    // Footer
+    contentHtml += '<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:16px;padding-top:16px;border-top:1px solid var(--lex-border-subtle,rgba(0,0,0,0.06))">';
+    contentHtml += '<p style="font-size:var(--lex-body-sm-size,0.8125rem);color:var(--lex-text-secondary);line-height:1.5">';
+    contentHtml += 'Select a matter to start a new conversation.';
+    contentHtml += '</p>';
+    contentHtml += '<lex-btn id="newProjectCreateBtn" variant="primary" size="sm">+ Create Matter</lex-btn>';
+    contentHtml += '</div>';
+
+    // Create <lex-modal>
+    var modal = document.createElement('lex-modal');
+    modal.heading = 'Start New Chat';
+    modal.size = 'lg';
+    modal.hideActions = true;
+    modal.innerHTML = contentHtml;
+
+    document.body.appendChild(modal);
+
+    this.modal = modal;
+    this.listContainer = modal.querySelector('#newProjectMattersList');
+    this.searchInput = modal.querySelector('#newProjectMatterSearch');
+
+    // Wire search input
+    if (this.searchInput) {
+      this.searchInput.addEventListener('lex-input', (e) => {
+        this.filterMatters(e.detail ? e.detail.value : '');
       });
     }
 
-    // Close on escape key
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && this.isOpen) {
-        this.close();
-      }
-    });
-  },
-
-  /**
-   * Open the modal
-   */
-  async open() {
-    if (!this.modal) {
-      this.init();
+    // Wire create matter button
+    var createBtn = modal.querySelector('#newProjectCreateBtn');
+    if (createBtn) {
+      createBtn.addEventListener('click', () => {
+        this.createNewMatter();
+      });
     }
 
-    this.modal.classList.remove('hidden');
-    this.modal.classList.add('flex');
+    // Wire close event — reset search on close
+    modal.addEventListener('lex-close', () => {
+      this.isOpen = false;
+      if (this.searchInput) {
+        this.searchInput.value = '';
+      }
+    });
+
+    return true;
+  },
+
+  // ── Open / Close ────────────────────────────────────────────────────────
+
+  async open() {
+    await this.init();
+
+    this.modal.open = true;
     this.isOpen = true;
 
     // Load matters
     await this.loadMatters();
-
-    // Focus search input
-    setTimeout(() => {
-      document.getElementById('newProjectMatterSearch')?.focus();
-    }, 100);
   },
 
-  /**
-   * Close the modal
-   */
   close() {
     if (this.modal) {
-      this.modal.classList.add('hidden');
-      this.modal.classList.remove('flex');
+      this.modal.open = false;
       this.isOpen = false;
-
-      // Clear search
-      const searchInput = document.getElementById('newProjectMatterSearch');
-      if (searchInput) {
-        searchInput.value = '';
+      if (this.searchInput) {
+        this.searchInput.value = '';
       }
     }
   },
 
-  /**
-   * Load matters from API
-   */
+  // ── Data loading ────────────────────────────────────────────────────────
+
   async loadMatters() {
     try {
-      const response = await api.getMatters(1, 100, { status: 'active' });
+      var response = await api.getMatters(1, 100, { status: 'active' });
       this.allMatters = response.matters || [];
-
-      // Show default view with pinned and recent matters
       this.renderDefaultView();
     } catch (error) {
       console.error('[NewProjectModal] Failed to load matters:', error);
-      const listContainer = document.getElementById('newProjectMattersList');
-      if (listContainer) {
-        listContainer.innerHTML = '<p class="text-center text-red-500 py-8">Failed to load matters. Please try again.</p>';
+      if (this.listContainer) {
+        this.listContainer.innerHTML = '<p style="text-align:center;color:var(--lex-color-danger-500);padding:32px 0">Failed to load matters. Please try again.</p>';
       }
     }
   },
 
-  /**
-   * Filter matters based on search query
-   */
+  // ── Filtering ───────────────────────────────────────────────────────────
+
   filterMatters(query) {
     if (!query) {
-      // Show default view when search is cleared
       this.renderDefaultView();
       return;
     }
 
-    const lowerQuery = query.toLowerCase();
-    const filtered = this.allMatters.filter(matter => {
-      const matterName = (matter.name || matter.matter_name || '').toLowerCase();
-      const clientName = (matter.client_name || matter.client?.name || '').toLowerCase();
-      const matterId = (matter.matter_id || '').toLowerCase();
+    var lowerQuery = query.toLowerCase();
+    var filtered = this.allMatters.filter(function (matter) {
+      var matterName = (matter.name || matter.matter_name || '').toLowerCase();
+      var clientName = (matter.client_name || (matter.client && matter.client.name) || '').toLowerCase();
+      var matterId = (matter.matter_id || '').toLowerCase();
 
-      return matterName.includes(lowerQuery) ||
-             clientName.includes(lowerQuery) ||
-             matterId.includes(lowerQuery);
+      return matterName.indexOf(lowerQuery) !== -1 ||
+             clientName.indexOf(lowerQuery) !== -1 ||
+             matterId.indexOf(lowerQuery) !== -1;
     });
 
-    // Show flat search results
     this.renderSearchResults(filtered);
   },
 
-  /**
-   * Render default view with pinned and recent matters
-   */
+  // ── Rendering ───────────────────────────────────────────────────────────
+
   renderDefaultView() {
-    const listContainer = document.getElementById('newProjectMattersList');
-    if (!listContainer) return;
+    if (!this.listContainer) return;
 
     if (this.allMatters.length === 0) {
-      listContainer.innerHTML = '<p class="text-gray-400 text-center py-8">No matters found</p>';
+      this.listContainer.innerHTML = '<p style="color:var(--lex-text-tertiary);text-align:center;padding:32px 0">No matters found</p>';
       return;
     }
 
-    // Separate pinned and unpinned matters
-    const pinnedMatters = this.allMatters.filter(m => m.is_pinned || m.pinned);
-    const unpinnedMatters = this.allMatters.filter(m => !m.is_pinned && !m.pinned);
+    var pinnedMatters = this.allMatters.filter(function (m) { return m.is_pinned || m.pinned; });
+    var unpinnedMatters = this.allMatters.filter(function (m) { return !m.is_pinned && !m.pinned; });
 
-    // Sort unpinned by creation date (most recent first)
-    const recentMatters = unpinnedMatters
-      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+    var recentMatters = unpinnedMatters
+      .sort(function (a, b) { return new Date(b.created_at || 0) - new Date(a.created_at || 0); })
       .slice(0, 10);
 
-    let html = '';
+    var html = '';
 
-    // Section 1: Pinned Matters
     if (pinnedMatters.length > 0) {
-      html += `
-        <div class="mb-6">
-          <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider flex items-center gap-2 mb-3">
-            <svg class="w-4 h-4 text-yellow-600" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
-            </svg>
-            Pinned Matters
-          </h3>
-          ${pinnedMatters.map(matter => this.renderMatterItem(matter, true)).join('')}
-        </div>
-      `;
+      html += '<div style="margin-bottom:20px">';
+      html += '<p style="font-size:var(--lex-body-xs-size,0.75rem);font-weight:600;color:var(--lex-text-tertiary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px">Pinned Matters</p>';
+      html += pinnedMatters.map(function (m) { return NewProjectModal.renderMatterItem(m, true); }).join('');
+      html += '</div>';
     }
 
-    // Section 2: Recent Matters
     if (recentMatters.length > 0) {
-      html += `
-        <div class="mb-6">
-          <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider flex items-center gap-2 mb-3">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-            Recent Matters
-          </h3>
-          ${recentMatters.map(matter => this.renderMatterItem(matter, false)).join('')}
-        </div>
-      `;
+      html += '<div style="margin-bottom:20px">';
+      html += '<p style="font-size:var(--lex-body-xs-size,0.75rem);font-weight:600;color:var(--lex-text-tertiary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px">Recent Matters</p>';
+      html += recentMatters.map(function (m) { return NewProjectModal.renderMatterItem(m, false); }).join('');
+      html += '</div>';
     }
 
-    listContainer.innerHTML = html;
+    this.listContainer.innerHTML = html;
   },
 
-  /**
-   * Render search results (flat list)
-   */
   renderSearchResults(matters) {
-    const listContainer = document.getElementById('newProjectMattersList');
-    if (!listContainer) return;
+    if (!this.listContainer) return;
 
     if (matters.length === 0) {
-      listContainer.innerHTML = '<p class="text-gray-400 text-center py-8">No matters found matching your search</p>';
+      this.listContainer.innerHTML = '<p style="color:var(--lex-text-tertiary);text-align:center;padding:32px 0">No matters found matching your search</p>';
       return;
     }
 
-    const html = `
-      <div class="mb-3">
-        <p class="text-sm text-gray-600">${matters.length} result${matters.length !== 1 ? 's' : ''} found</p>
-      </div>
-      ${matters.map(matter => this.renderMatterItem(matter, false)).join('')}
-    `;
+    var html = '<p style="font-size:var(--lex-body-sm-size,0.8125rem);color:var(--lex-text-secondary);margin-bottom:12px">' + matters.length + ' result' + (matters.length !== 1 ? 's' : '') + ' found</p>';
+    html += matters.map(function (m) { return NewProjectModal.renderMatterItem(m, false); }).join('');
 
-    listContainer.innerHTML = html;
+    this.listContainer.innerHTML = html;
   },
 
-  /**
-   * Render a single matter item
-   */
   renderMatterItem(matter, isPinned) {
-    const clientName = matter.client_name || matter.client?.name || 'Unknown Client';
-    const matterIdString = matter.matter_id;
-    const matterName = matter.name || matter.matter_name || 'Untitled Matter';
-    const status = matter.status || 'Active';
+    var clientName = matter.client_name || (matter.client && matter.client.name) || 'Unknown Client';
+    var matterIdString = matter.matter_id;
+    var matterName = matter.name || matter.matter_name || 'Untitled Matter';
+    var status = matter.status || 'Active';
 
     if (!matterIdString) {
       console.warn('[NewProjectModal] Matter missing matter_id:', matter);
       return '';
     }
 
-    const pinIcon = isPinned ? `
-      <svg class="w-4 h-4 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
-        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
-      </svg>
-    ` : '';
+    var safeName = this.escapeHtml(matterName);
+    var safeNameJs = this.escapeJs(matterName);
+    var safeClient = this.escapeHtml(clientName);
+    var safeId = this.escapeHtml(matterIdString);
 
-    return `
-      <div class="p-4 rounded-lg border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 cursor-pointer transition-all mb-3"
-           onclick="NewProjectModal.selectMatter('${matterIdString}', '${this.escapeHtml(matterName)}')">
-        <div class="flex items-start justify-between gap-3">
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 mb-1">
-              ${pinIcon}
-              <h3 class="font-medium text-gray-900 truncate">${this.escapeHtml(matterName)}</h3>
-              <span class="px-2 py-0.5 text-xs rounded-full ${status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}">${status}</span>
-            </div>
-            <p class="text-sm text-gray-600 truncate">${this.escapeHtml(clientName)}</p>
-            <p class="text-xs text-gray-500 mt-1">${matterIdString}</p>
-          </div>
-          <svg class="w-5 h-5 text-gray-400 group-hover:text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-          </svg>
-        </div>
-      </div>
-    `;
+    var statusColor = status === 'Active'
+      ? 'background:var(--lex-color-success-100,#dcfce7);color:var(--lex-color-success-700,#15803d)'
+      : 'background:var(--lex-color-gray-100);color:var(--lex-color-gray-600)';
+
+    var pinHtml = isPinned
+      ? '<svg style="width:14px;height:14px;color:var(--lex-color-warning-500,#eab308);flex-shrink:0" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>'
+      : '';
+
+    return '<div class="npm-matter-item" style="padding:12px 14px;border-radius:var(--lex-radius-md,8px);border:1px solid var(--lex-border-subtle,rgba(0,0,0,0.08));cursor:pointer;margin-bottom:8px;transition:border-color 0.15s,background 0.15s" '
+      + 'onmouseenter="this.style.borderColor=\'var(--lex-border-accent,#6366f1)\';this.style.background=\'var(--lex-bg-secondary)\'" '
+      + 'onmouseleave="this.style.borderColor=\'var(--lex-border-subtle,rgba(0,0,0,0.08))\';this.style.background=\'transparent\'" '
+      + 'onclick="NewProjectModal.selectMatter(\'' + safeId + '\', \'' + safeNameJs + '\')">'
+      + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">'
+      + pinHtml
+      + '<span style="font-weight:500;color:var(--lex-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + safeName + '</span>'
+      + '<span style="font-size:var(--lex-body-xs-size,0.6875rem);padding:1px 8px;border-radius:9999px;white-space:nowrap;' + statusColor + '">' + status + '</span>'
+      + '</div>'
+      + '<p style="font-size:var(--lex-body-sm-size,0.8125rem);color:var(--lex-text-secondary);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + safeClient + '</p>'
+      + '<p style="font-size:var(--lex-body-xs-size,0.75rem);color:var(--lex-text-tertiary);margin:2px 0 0">' + safeId + '</p>'
+      + '</div>';
   },
 
+  // ── Matter selection ────────────────────────────────────────────────────
+
   /**
-   * Validate matter ID format
-   * Accepts: MATT-XXXXX (native), AS-XXXXX (ActionStep), numeric (legacy)
-   *
-   * TODO: In future, dynamically load prefixes from connector registry
-   * When adding new connectors, update the validPatterns array below
+   * Validate matter ID format.
+   * Accepts: MATT-XXXXX (native), AS-XXXXX (ActionStep), numeric (legacy).
+   * Uses string methods — no regex.
    */
   validateMatterId(matterId) {
     if (!matterId) return false;
+    var s = String(matterId);
+    if (s.length === 0) return false;
 
-    const matterIdString = String(matterId);
+    var lower = s.toLowerCase();
+    if (lower.indexOf('matt-') === 0) return true;
+    if (lower.indexOf('as-') === 0) return true;
+    if (lower.indexOf('matter_') === 0) return true;
 
-    // TODO: Replace this static list with dynamic loading from connector registry
-    // Each connector should define its matter_id prefix format
-    const validPatterns = [
-      /^MATT-/i,      // Native LANA matters
-      /^AS-/i,        // ActionStep imported matters
-      /^matter_/i,    // Legacy matter_ prefix
-      /^\d+$/         // Legacy numeric IDs
-      // ADD NEW CONNECTOR PREFIXES HERE (e.g., /^CLIO-/i, /^MY-/i, etc.)
-    ];
-
-    return validPatterns.some(pattern => pattern.test(matterIdString));
+    // Legacy numeric IDs
+    var allDigits = true;
+    for (var i = 0; i < s.length; i++) {
+      var code = s.charCodeAt(i);
+      if (code < 48 || code > 57) { allDigits = false; break; }
+    }
+    return allDigits;
   },
 
-  /**
-   * Handle matter selection
-   */
   async selectMatter(matterId, matterName) {
     try {
       this.close();
 
-      // Validate matter_id format
       if (!this.validateMatterId(matterId)) {
         console.error('[NewProjectModal] Invalid matter_id format:', matterId);
-        Toast.error('Invalid matter ID. Please try again.');
+        if (window.Lex && window.Lex.Toast) {
+          window.Lex.Toast.show('Invalid matter ID. Please try again.', 'error');
+        }
         return;
       }
 
-      // Convert to string if numeric (legacy matters)
-      const matterIdString = String(matterId);
+      var matterIdString = String(matterId);
+      console.log('[NewProjectModal] Matter selected:', { matterId: matterIdString, matterName: matterName });
 
-      console.log('[NewProjectModal] Matter selected:', { matterId: matterIdString, matterName });
-
-      // Check if we're on chat.html
-      const isOnChatPage = NavigationHelpers.isOnChatPage();
+      var isOnChatPage = NavigationHelpers.isOnChatPage();
 
       if (isOnChatPage && typeof window.createProjectChat === 'function') {
-        // We're on chat.html - use existing createProjectChat function
         await window.createProjectChat(matterIdString, matterName);
       } else {
-        // We're on another page - navigate to chat.html with matter context
-        Toast.success(`Opening chat for ${matterName}...`);
+        if (window.Lex && window.Lex.Toast) {
+          window.Lex.Toast.show('Opening chat for ' + matterName + '...', 'success');
+        }
         NavigationHelpers.navigateToMatterChat(matterIdString);
       }
     } catch (error) {
       console.error('[NewProjectModal] Failed to select matter:', error);
-      Toast.error('Failed to start chat. Please try again.');
+      if (window.Lex && window.Lex.Toast) {
+        window.Lex.Toast.show('Failed to start chat. Please try again.', 'error');
+      }
     }
   },
 
-  /**
-   * Create new matter
-   */
+  // ── Actions ─────────────────────────────────────────────────────────────
+
   createNewMatter() {
-    // Redirect to matters page with action to create new matter
+    this.close();
     window.location.href = NavigationHelpers.resolvePath('matters.html') + '?action=create';
   },
 
+  // ── Component lazy-loading ───────────────────────────────────────────────
+
   /**
-   * Escape HTML to prevent XSS
+   * Ensure lex-modal and lex-input custom elements are defined.
+   * On standalone pages (not app.html), these may not be loaded yet.
+   * Dynamically injects <script> tags and waits for them to register.
    */
+  async _ensureComponents() {
+    var needed = [];
+
+    if (!customElements.get('lex-modal')) {
+      needed.push('js/lex/components/foundation/lex-modal.js');
+    }
+    if (!customElements.get('lex-input')) {
+      needed.push('js/lex/components/form/lex-input.js');
+    }
+
+    if (needed.length === 0) return;
+
+    // Resolve paths relative to current page (handles admin/ subfolders)
+    var prefix = '';
+    if (typeof NavigationHelpers !== 'undefined' && NavigationHelpers.resolvePath) {
+      // resolvePath returns e.g. '../js/...' from admin pages
+      var sample = NavigationHelpers.resolvePath('_');
+      if (sample.indexOf('../') === 0) {
+        prefix = sample.substring(0, sample.lastIndexOf('/') + 1);
+        if (prefix.length > 0 && prefix.charAt(prefix.length - 1) !== '/') {
+          prefix += '/';
+        }
+      }
+    }
+
+    await Promise.all(needed.map(function (src) {
+      return new Promise(function (resolve) {
+        var script = document.createElement('script');
+        script.src = prefix + src;
+        script.onload = resolve;
+        script.onerror = function () {
+          console.warn('[NewProjectModal] Failed to load:', src);
+          resolve(); // don't block the modal
+        };
+        document.head.appendChild(script);
+      });
+    }));
+  },
+
+  // ── Utilities ───────────────────────────────────────────────────────────
+
   escapeHtml(text) {
-    const div = document.createElement('div');
+    if (!text) return '';
+    var div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  },
+
+  escapeJs(text) {
+    if (!text) return '';
+    return String(text)
+      .split('\\').join('\\\\')
+      .split("'").join("\\'")
+      .split('"').join('\\"')
+      .split('\n').join('\\n')
+      .split('\r').join('\\r');
   }
 };
 
-// Global function for opening the modal (called from menu buttons)
-window.openNewProjectModal = function() {
+// Global function for opening the modal (called from sidebar buttons)
+window.openNewProjectModal = function () {
   NewProjectModal.open();
 };
 

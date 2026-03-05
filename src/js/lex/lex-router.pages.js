@@ -148,16 +148,7 @@
     },
 
     // ── Skills ──
-    'skills-marketplace.html': {
-      title: 'Skills Marketplace',
-      activeNav: '',
-      scripts: [
-        'js/skills-marketplace.js'
-      ],
-      stylesheets: [
-        'css/skills-marketplace.css'
-      ]
-    },
+    // skills.html — standalone page (uses <lex-app> shell, not routed)
 
     // ── Admin ──
     // admin/index.html — standalone page (not routed)

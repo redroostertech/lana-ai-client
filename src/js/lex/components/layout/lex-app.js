@@ -71,7 +71,7 @@
       lex-body {
         display: flex;
         flex-direction: column;
-        min-height: 100vh;
+        height: 100vh;
         margin-left: var(--lex-sidebar-current-width, var(--lex-sidebar-width, 256px));
         transition: margin-left var(--lex-transition-slide);
       }
@@ -99,9 +99,9 @@
       lex-content {
         display: block;
         flex: 1;
+        min-height: 0;
         overflow-y: auto;
         background: var(--lex-bg-secondary);
-        min-height: calc(100vh - var(--lex-topbar-height, 64px));
         transition: opacity var(--lex-transition-normal);
       }
       lex-content[data-loading="true"] {
@@ -640,7 +640,7 @@
           {
             id: 'tools',
             items: [
-              { id: 'lana-tasks', label: 'Lana Tasks', icon: 'zap', href: 'agentic-tasks.html' },
+              { id: 'lana-tasks', label: 'Lana Tasks', icon: 'list-checks', href: 'agentic-tasks.html' },
               { id: 'connectors', label: 'Data Connectors', icon: 'plug', href: 'data-connectors.html' },
               { id: 'reports', label: 'Reports', icon: 'bar-chart-2', href: 'admin/reporting.html' }
             ]
@@ -651,7 +651,7 @@
             isScrollable: true,
             isConversationList: true,
             items: [
-              { id: 'new-chat', label: 'New Chat', icon: 'plus', href: 'chat-v2.html' }
+              { id: 'new-chat', label: 'New Chat', icon: 'plus', isButton: true, onClick: 'openNewProjectModal' }
             ]
           }
         ]);

@@ -89,6 +89,96 @@
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Mermaid diagram rendering
+  // ---------------------------------------------------------------------------
+
+  let _mermaidInitialized = false;
+
+  function renderMermaidBlock(trimmedCode) {
+    const uid = 'mermaid-' + Math.random().toString(36).substr(2, 9);
+    const escapedContent = escapeCode(trimmedCode);
+    return `
+      <div class="lex-mermaid-wrapper rounded-md overflow-hidden my-4 border border-white/10 shadow-sm" style="background:#0d0d0d">
+        <div class="flex items-center justify-between px-4 py-2 text-gray-300 text-[11px] font-sans uppercase tracking-tight" style="background:#2f2f2f">
+          <span>diagram</span>
+          <button class="lex-chat-copy-btn flex items-center gap-1.5 hover:text-white transition-colors" data-mermaid-copy="${uid}">
+            <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" xmlns="http://www.w3.org/2000/svg"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+            Copy
+          </button>
+        </div>
+        <div class="p-4 overflow-x-auto flex justify-center" style="background:#fff">
+          <pre class="mermaid" id="${uid}" style="margin:0;background:transparent">${escapedContent}</pre>
+        </div>
+      </div>`;
+  }
+
+  /**
+   * Render any unprocessed mermaid diagrams in the given container.
+   * Must be called AFTER HTML is inserted into the live DOM.
+   * @param {HTMLElement} [container=document] - Scope to search within
+   */
+  function renderMermaidDiagrams(container) {
+    if (typeof mermaid === 'undefined') return;
+
+    var target = container || document;
+    var nodes = target.querySelectorAll('.mermaid:not([data-mermaid-processed])');
+    if (nodes.length === 0) return;
+
+    // Lazy-init mermaid on first use
+    if (!_mermaidInitialized) {
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: 'default',
+        securityLevel: 'strict',
+        fontFamily: 'system-ui, -apple-system, sans-serif'
+      });
+      _mermaidInitialized = true;
+    }
+
+    var nodeArray = Array.from(nodes);
+
+    // Store source text BEFORE mermaid replaces it
+    nodeArray.forEach(function (node) {
+      if (!node.dataset.mermaidSource) {
+        node.dataset.mermaidSource = node.textContent;
+      }
+    });
+
+    try {
+      mermaid.run({ nodes: nodeArray, suppressErrors: true })
+        .then(function () {
+          nodeArray.forEach(function (node) {
+            node.setAttribute('data-mermaid-processed', 'true');
+            // Rendered SVG gets white background — ensure container looks clean
+            node.style.background = 'transparent';
+          });
+        })
+        .catch(function (err) {
+          console.warn('[Lex ChatFormat] Mermaid render failed:', err);
+          // Fallback: show raw source as monospace
+          nodeArray.forEach(function (node) {
+            if (!node.querySelector('svg')) {
+              var source = node.dataset.mermaidSource || node.textContent;
+              node.textContent = source;
+              node.style.fontFamily = 'monospace';
+              node.style.fontSize = '13px';
+              node.style.whiteSpace = 'pre-wrap';
+              node.style.color = '#ef4444';
+              node.style.padding = '1rem';
+              node.setAttribute('data-mermaid-processed', 'error');
+            }
+          });
+        });
+    } catch (err) {
+      console.warn('[Lex ChatFormat] Mermaid init error:', err);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // JSON rendering
+  // ---------------------------------------------------------------------------
+
   function renderJsonBlock(trimmedCode) {
     if (!isCompleteJSON(trimmedCode)) return null;
     try {
@@ -118,19 +208,127 @@
   // Block-level processing (headers, lists, paragraphs)
   // ---------------------------------------------------------------------------
 
+  /**
+   * Check if a line is a markdown table separator (e.g. |---|---|)
+   * Contains only |, -, :, and whitespace.
+   */
+  function isTableSeparator(line) {
+    if (line.indexOf('|') === -1 || line.indexOf('-') === -1) return false;
+    for (var ci = 0; ci < line.length; ci++) {
+      var ch = line.charAt(ci);
+      if (ch !== '|' && ch !== '-' && ch !== ':' && ch !== ' ' && ch !== '\t') return false;
+    }
+    return true;
+  }
+
+  /**
+   * Parse a markdown table row into cell strings.
+   * "|a|b|c|" → ["a","b","c"]
+   */
+  function parseTableRow(line) {
+    var trimmed = line.trim();
+    // Strip leading/trailing pipes
+    if (trimmed.charAt(0) === '|') trimmed = trimmed.substring(1);
+    if (trimmed.charAt(trimmed.length - 1) === '|') trimmed = trimmed.substring(0, trimmed.length - 1);
+    return trimmed.split('|').map(function (c) { return c.trim(); });
+  }
+
+  /**
+   * Render buffered markdown table lines into an HTML table.
+   */
+  function renderTable(tableLines) {
+    if (tableLines.length < 2) return tableLines.join('\n'); // Not enough for header+separator
+
+    var headerLine = tableLines[0];
+    var separatorIdx = -1;
+
+    // Find the separator line (|---|---|)
+    for (var si = 1; si < tableLines.length && si <= 2; si++) {
+      if (isTableSeparator(tableLines[si])) {
+        separatorIdx = si;
+        break;
+      }
+    }
+
+    var html = '<div class="my-3 overflow-x-auto"><table class="min-w-full text-sm border border-gray-200 rounded">';
+
+    if (separatorIdx > 0) {
+      // Has header
+      var headerCells = parseTableRow(headerLine);
+      html += '<thead class="bg-gray-50"><tr>';
+      for (var hi = 0; hi < headerCells.length; hi++) {
+        html += '<th class="px-3 py-2 text-left font-semibold text-gray-700 border-b border-gray-200">' + headerCells[hi] + '</th>';
+      }
+      html += '</tr></thead>';
+
+      // Body rows (after separator)
+      html += '<tbody>';
+      for (var ri = separatorIdx + 1; ri < tableLines.length; ri++) {
+        if (!tableLines[ri].trim()) continue;
+        var cells = parseTableRow(tableLines[ri]);
+        html += '<tr class="border-b border-gray-100 hover:bg-gray-50">';
+        for (var ci = 0; ci < cells.length; ci++) {
+          html += '<td class="px-3 py-1.5 text-gray-800">' + cells[ci] + '</td>';
+        }
+        html += '</tr>';
+      }
+      html += '</tbody>';
+    } else {
+      // No separator — treat all rows as body
+      html += '<tbody>';
+      for (var bi = 0; bi < tableLines.length; bi++) {
+        if (!tableLines[bi].trim()) continue;
+        var bodyCells = parseTableRow(tableLines[bi]);
+        html += '<tr class="border-b border-gray-100 hover:bg-gray-50">';
+        for (var bci = 0; bci < bodyCells.length; bci++) {
+          html += '<td class="px-3 py-1.5 text-gray-800">' + bodyCells[bci] + '</td>';
+        }
+        html += '</tr>';
+      }
+      html += '</tbody>';
+    }
+
+    html += '</table></div>';
+    return html;
+  }
+
   function processBlocks(text) {
     const lines = text.split('\n');
     const out = [];
     let inOL = false;
     let inUL = false;
+    let tableBuffer = [];
 
     function closeLists() {
       if (inOL) { out.push('</ol>'); inOL = false; }
       if (inUL) { out.push('</ul>'); inUL = false; }
     }
 
+    function flushTable() {
+      if (tableBuffer.length > 0) {
+        out.push(renderTable(tableBuffer));
+        tableBuffer = [];
+      }
+    }
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
+
+      // Table row detection: line starts with | and contains at least 2 pipes
+      var pipeCount = 0;
+      for (var pi = 0; pi < line.length; pi++) {
+        if (line.charAt(pi) === '|') pipeCount++;
+      }
+      var isTableLine = line.charAt(0) === '|' && pipeCount >= 2;
+
+      if (isTableLine) {
+        closeLists();
+        tableBuffer.push(line);
+        continue;
+      }
+
+      // Not a table line — flush any buffered table
+      flushTable();
 
       // Skip empty lines inside lists
       if (!line && (inOL || inUL)) continue;
@@ -185,6 +383,7 @@
       }
     }
 
+    flushTable();
     if (inOL) out.push('</ol>');
     if (inUL) out.push('</ul>');
     return out.join('\n');
@@ -216,12 +415,20 @@
         const trimmed = code.trim();
         let html = '';
 
-        const isJSON = lang === 'json' || lang === 'JSON' ||
-          (trimmed.startsWith('{') || trimmed.startsWith('['));
+        // Mermaid diagram blocks
+        if (lang === 'mermaid') {
+          html = renderMermaidBlock(trimmed);
+        }
 
-        if (isJSON && isCompleteJSON(trimmed)) {
-          const jsonHtml = renderJsonBlock(trimmed);
-          if (jsonHtml) html = jsonHtml;
+        // JSON blocks
+        if (!html) {
+          const isJSON = lang === 'json' || lang === 'JSON' ||
+            (trimmed.startsWith('{') || trimmed.startsWith('['));
+
+          if (isJSON && isCompleteJSON(trimmed)) {
+            const jsonHtml = renderJsonBlock(trimmed);
+            if (jsonHtml) html = jsonHtml;
+          }
         }
 
         if (!html) {
@@ -337,7 +544,8 @@
     formatBlock,
     escapeHtml,
     escapeJsString,
-    escapeCode
+    escapeCode,
+    renderMermaidDiagrams
   };
 
 })(typeof window !== 'undefined' ? window : globalThis);

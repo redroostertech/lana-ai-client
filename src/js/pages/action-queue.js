@@ -74,7 +74,12 @@
     if (typeof ctx === 'string') {
       try { ctx = JSON.parse(ctx); } catch (e) { return null; }
     }
-    return ctx.suggested_action || null;
+    if (ctx.suggested_action) return ctx.suggested_action;
+    // Generic plugin context nests data inside findings[]
+    if (ctx.findings && ctx.findings.length > 0 && ctx.findings[0].suggested_action) {
+      return ctx.findings[0].suggested_action;
+    }
+    return null;
   }
 
   /**
@@ -130,9 +135,22 @@
       try { ctx = JSON.parse(ctx); } catch (e) { ctx = null; }
     }
 
-    var sa = (ctx && ctx.suggested_action) || null;
+    // Handle two context structures:
+    // 1. Finding-based: { suggested_action, details, sub_check }
+    // 2. Generic plugin: { findings: [{ suggested_action, message, sub_check }], ... }
+    var finding = null;
+    if (ctx && ctx.findings && ctx.findings.length > 0) {
+      finding = ctx.findings[0];
+    }
+
+    var sa = (ctx && ctx.suggested_action) || (finding && finding.suggested_action) || null;
     var details = (ctx && ctx.details) || {};
     var subCheck = (ctx && ctx.sub_check) || '';
+
+    // Pull message from finding if details.message is empty
+    if (!details.message && finding && finding.message) {
+      details = { message: finding.message };
+    }
 
     var sevColor = 'var(--lex-text-tertiary)';
     var sev = String(item.severity || 'low').toLowerCase();
@@ -157,11 +175,12 @@
       '</div>'
     );
 
-    // Message
-    if (details.message) {
+    // Message — prefer context.details.message, fall back to item.message
+    var displayMessage = details.message || item.message || '';
+    if (displayMessage) {
       bodyParts.push(
         '<p style="font-size:0.8125rem;color:var(--lex-text-secondary);line-height:1.5;margin:0 0 16px;">' +
-          escHtml(details.message) +
+          escHtml(displayMessage) +
         '</p>'
       );
     }
@@ -172,33 +191,97 @@
       if (sa.matter_id) firstMatterId = sa.matter_id;
       if (!firstMatterId && sa.matter_ids && sa.matter_ids.length > 0) firstMatterId = sa.matter_ids[0];
     }
+    if (!firstMatterId && item.matter_id) firstMatterId = item.matter_id;
 
-    // Affected matters list
-    if (sa && sa.items && sa.items.length > 0) {
+    // Items list — render differently based on sub_check type
+    var hasItems = sa && sa.items && sa.items.length > 0;
+
+    if (hasItems && subCheck === 'unreviewed_docs') {
+      // ── Unreviewed documents: group by matter, show filenames ──
+      var matterGroups = {};
+      for (var k = 0; k < sa.items.length; k++) {
+        var it = sa.items[k];
+        var mid = it.matter_id || 'unknown';
+        if (!matterGroups[mid]) {
+          matterGroups[mid] = { name: it.matter_name || 'Unknown Matter', docs: [] };
+        }
+        matterGroups[mid].docs.push(it);
+        if (!firstMatterId && mid !== 'unknown') firstMatterId = mid;
+      }
+
+      bodyParts.push('<div style="margin-bottom:16px;">');
+      bodyParts.push(
+        '<div style="font-size:0.6875rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--lex-text-tertiary);font-weight:500;margin-bottom:8px;">Documents Needing Review</div>'
+      );
+
+      var matterKeys = Object.keys(matterGroups);
+      for (var m = 0; m < matterKeys.length; m++) {
+        var mKey = matterKeys[m];
+        var group = matterGroups[mKey];
+
+        // Matter header row (clickable)
+        bodyParts.push(
+          '<div class="lex-detail-matter-row" style="padding:8px 0;border-bottom:1px solid var(--lex-border-subtle, rgba(0,0,0,0.06));cursor:pointer;transition:background 0.15s ease;" data-matter-id="' + escHtml(mKey) + '">' +
+            '<div style="display:flex;align-items:center;justify-content:space-between;">' +
+              '<div style="font-size:0.8125rem;font-weight:500;color:var(--lex-text-primary);">' + escHtml(group.name) + '</div>' +
+              '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:0.3;flex-shrink:0;"><path d="M9 18l6-6-6-6"/></svg>' +
+            '</div>' +
+          '</div>'
+        );
+
+        // Document rows under this matter
+        for (var d = 0; d < group.docs.length; d++) {
+          var doc = group.docs[d];
+          var docName = escHtml(doc.filename || 'Untitled Document');
+          var docMeta = doc.uploaded_at ? 'Uploaded ' + escHtml(timeAgo(doc.uploaded_at)) : '';
+
+          bodyParts.push(
+            '<div style="padding:6px 0 6px 16px;border-bottom:1px solid var(--lex-border-subtle, rgba(0,0,0,0.04));">' +
+              '<div style="display:flex;align-items:center;gap:6px;">' +
+                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--lex-text-tertiary);flex-shrink:0;"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' +
+                '<span style="font-size:0.8125rem;color:var(--lex-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + docName + '</span>' +
+              '</div>' +
+              (docMeta ? '<div style="font-size:0.6875rem;color:var(--lex-text-tertiary);margin-top:1px;padding-left:20px;">' + docMeta + '</div>' : '') +
+            '</div>'
+          );
+        }
+      }
+
+      // Total count
+      if (sa.total_count && sa.total_count > sa.items.length) {
+        bodyParts.push(
+          '<div style="font-size:0.6875rem;color:var(--lex-text-tertiary);padding:8px 0;text-align:center;">Showing ' + sa.items.length + ' of ' + sa.total_count + ' documents</div>'
+        );
+      }
+
+      bodyParts.push('</div>');
+
+    } else if (hasItems) {
+      // ── Generic items list (matters, tasks, etc.) ──
       bodyParts.push('<div style="margin-bottom:16px;">');
       bodyParts.push(
         '<div style="font-size:0.6875rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--lex-text-tertiary);font-weight:500;margin-bottom:8px;">Affected Matters</div>'
       );
 
-      for (var k = 0; k < sa.items.length; k++) {
-        var it = sa.items[k];
-        var itemLabel = escHtml(it.matter_name || it.title || it.filename || 'Item ' + (k + 1));
+      for (var k2 = 0; k2 < sa.items.length; k2++) {
+        var it2 = sa.items[k2];
+        var itemLabel = escHtml(it2.matter_name || it2.title || it2.filename || 'Item ' + (k2 + 1));
         var itemMeta = '';
-        var matterId = it.matter_id || '';
+        var matterId = it2.matter_id || '';
 
         if (!firstMatterId && matterId) firstMatterId = matterId;
 
-        if (it.completeness_pct !== undefined) {
-          itemMeta = it.completeness_pct + '% complete';
+        if (it2.completeness_pct !== undefined) {
+          itemMeta = it2.completeness_pct + '% complete';
         }
-        if (it.missing_fields && it.missing_fields.length > 0) {
-          itemMeta += (itemMeta ? ' \u00b7 ' : '') + 'Missing: ' + escHtml(it.missing_fields.join(', '));
+        if (it2.missing_fields && it2.missing_fields.length > 0) {
+          itemMeta += (itemMeta ? ' \u00b7 ' : '') + 'Missing: ' + escHtml(it2.missing_fields.join(', '));
         }
-        if (it.due_date) {
-          itemMeta += (itemMeta ? ' \u00b7 ' : '') + 'Due ' + escHtml(formatShortDate(it.due_date));
+        if (it2.due_date) {
+          itemMeta += (itemMeta ? ' \u00b7 ' : '') + 'Due ' + escHtml(formatShortDate(it2.due_date));
         }
-        if (it.days_since_activity !== undefined) {
-          itemMeta += (itemMeta ? ' \u00b7 ' : '') + it.days_since_activity + ' days inactive';
+        if (it2.days_since_activity !== undefined) {
+          itemMeta += (itemMeta ? ' \u00b7 ' : '') + it2.days_since_activity + ' days inactive';
         }
 
         var rowStyle = 'padding:8px 0;border-bottom:1px solid var(--lex-border-subtle, rgba(0,0,0,0.06));';
@@ -214,6 +297,34 @@
               (matterId ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:0.3;flex-shrink:0;"><path d="M9 18l6-6-6-6"/></svg>' : '') +
             '</div>' +
             (itemMeta ? '<div style="font-size:0.6875rem;color:var(--lex-text-tertiary);margin-top:2px;">' + escHtml(itemMeta) + '</div>' : '') +
+          '</div>'
+        );
+      }
+
+      bodyParts.push('</div>');
+    }
+
+    // Fallback: when items are empty but matter_ids exist, show clickable matter links
+    if (!hasItems && sa && sa.matter_ids && sa.matter_ids.length > 0) {
+      var docCount = sa.total_count || sa.matter_ids.length;
+      bodyParts.push('<div style="margin-bottom:16px;">');
+      bodyParts.push(
+        '<div style="font-size:0.6875rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--lex-text-tertiary);font-weight:500;margin-bottom:8px;">Affected Matters (' + docCount + ' document' + (docCount !== 1 ? 's' : '') + ')</div>'
+      );
+
+      for (var mi = 0; mi < sa.matter_ids.length; mi++) {
+        var mId = sa.matter_ids[mi];
+        if (!firstMatterId) firstMatterId = mId;
+
+        bodyParts.push(
+          '<div class="lex-detail-matter-row" style="padding:10px 0;border-bottom:1px solid var(--lex-border-subtle, rgba(0,0,0,0.06));cursor:pointer;transition:background 0.15s ease;" data-matter-id="' + escHtml(mId) + '">' +
+            '<div style="display:flex;align-items:center;justify-content:space-between;">' +
+              '<div style="display:flex;align-items:center;gap:8px;">' +
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--lex-text-tertiary);flex-shrink:0;"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>' +
+                '<span style="font-size:0.8125rem;color:var(--lex-text-primary);">' + escHtml(mId) + '</span>' +
+              '</div>' +
+              '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:0.3;flex-shrink:0;"><path d="M9 18l6-6-6-6"/></svg>' +
+            '</div>' +
           '</div>'
         );
       }
@@ -337,7 +448,7 @@
     // Build URL
     var offset = (_currentPage - 1) * _pageSize;
     var url = '/api/v1/action-queue?limit=' + _pageSize + '&offset=' + offset +
-              '&sort_by=severity&sort_order=desc';
+              '&sort_by=created_at&sort_order=desc';
     if (_actionTypeFilter) {
       url += '&action_type=' + encodeURIComponent(_actionTypeFilter);
     }
@@ -389,8 +500,20 @@
       var title    = escHtml(item.title || item.name || item.description || 'Untitled');
       var matter   = escHtml(item.matter_name || item.matter || '');
       var ts       = item.due_date || item.created_at || null;
+      var itemMsg  = item.message || '';
       var meta     = [];
       if (matter) meta.push(matter);
+      // When no matter name, derive context from suggested_action
+      if (!matter && sa && sa.matter_ids && sa.matter_ids.length > 0) {
+        var docCount = sa.total_count || sa.matter_ids.length;
+        meta.push(docCount + ' document' + (docCount !== 1 ? 's' : ''));
+        if (sa.matter_ids.length === 1) {
+          meta.push(escHtml(sa.matter_ids[0]));
+        } else {
+          meta.push(sa.matter_ids.length + ' matter' + (sa.matter_ids.length !== 1 ? 's' : ''));
+        }
+      }
+      if (!matter && !meta.length && itemMsg) meta.push(escHtml(itemMsg));
       if (ts)     meta.push(escHtml(timeAgo(ts)));
       var priority = (sev === 'critical' || sev === 'high') ? 'high' : (sev === 'medium' ? 'medium' : 'low');
       // Map severity → task priority for Lana assignment (urgent, high, medium, low)

@@ -77,7 +77,8 @@
     style.id = 'lex-card-styles';
     style.textContent = `
       lex-card { display: block; }
-      lex-card > .rounded-xl { height: inherit; }
+      lex-card > .rounded-xl { height: inherit; display: inherit; flex-direction: inherit; min-height: inherit; overflow: inherit; flex: 1; }
+      slot-content { display: contents; }
 
       .lex-card-action-btn {
         display: flex;

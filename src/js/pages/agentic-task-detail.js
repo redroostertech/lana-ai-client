@@ -176,6 +176,13 @@
     } else {
       hide('atdCancelArea');
     }
+
+    // Retry button — show only for failed or cancelled tasks
+    if (status === 'failed' || status === 'cancelled') {
+      show('atdRetryArea');
+    } else {
+      hide('atdRetryArea');
+    }
   }
 
   /**
@@ -458,6 +465,32 @@
       });
   }
 
+  /**
+   * Retry a failed or cancelled task.
+   */
+  function retryTask() {
+    var retryBtn = el('atdRetryBtn');
+    if (retryBtn) retryBtn.setAttribute('disabled', '');
+
+    api.post('/api/v1/agentic-tasks/' + _taskId + '/retry', {})
+      .then(function () {
+        updateUIForStatus('pending');
+        if (retryBtn) retryBtn.removeAttribute('disabled');
+        if (window.Lex && Lex.Toast) {
+          Lex.Toast.show('Task scheduled for retry in ~2 minutes', 'success');
+        }
+        // Restart SSE to watch for new events
+        startSSE();
+      })
+      .catch(function (err) {
+        if (retryBtn) retryBtn.removeAttribute('disabled');
+        console.error('[AgenticTaskDetail] Retry error:', err);
+        if (window.Lex && Lex.Toast) {
+          Lex.Toast.show('Failed to retry: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
+        }
+      });
+  }
+
   // =========================================================================
   // Initialization
   // =========================================================================
@@ -514,6 +547,9 @@
 
     var cancelBtn = el('atdCancelBtn');
     if (cancelBtn) cancelBtn.addEventListener('click', cancelTask);
+
+    var retryBtn = el('atdRetryBtn');
+    if (retryBtn) retryBtn.addEventListener('click', retryTask);
 
     var diffToggle = el('atdDiffToggle');
     if (diffToggle) {

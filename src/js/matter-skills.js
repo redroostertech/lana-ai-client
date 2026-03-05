@@ -109,6 +109,11 @@ async function renderSkillsTab(matter) {
                           class="px-3 py-1.5 text-sm font-medium rounded-lg ${ms.is_enabled ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'} transition-colors">
                     ${ms.is_enabled ? 'Disable' : 'Enable'}
                   </button>
+                  <button onclick="executeMatterSkill('${matter.matter_id}', '${ms.skill_id}')"
+                          class="px-3 py-1.5 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors ${ms.is_enabled ? '' : 'opacity-50 cursor-not-allowed'}"
+                          ${ms.is_enabled ? '' : 'disabled'}>
+                    Execute
+                  </button>
                   <button onclick="editMatterSkill('${ms.matter_skill_id}')"
                           class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
                     Configure
@@ -144,25 +149,21 @@ async function renderSkillsTab(matter) {
 
 // Helper functions for Skills tab (attached to window for onclick handlers)
 window.createNewSkill = function(matterId) {
-  // Store matterId for use in modal
-  window.currentSkillMatterId = matterId;
-  // Open create skill modal
-  const modal = document.getElementById('createSkillModal');
-  modal.classList.remove('hidden');
-  modal.classList.add('flex');
-  // Reset form
-  document.getElementById('createSkillForm').reset();
+  // Navigate to the Skills page (standalone page — full navigation)
+  if (window.Lex && window.Lex.Nav) {
+    Lex.Nav.go('skills.html');
+  } else {
+    window.location.href = 'skills.html';
+  }
 };
 
 window.importSkill = function(matterId) {
-  // Store matterId for use in modal
-  window.currentSkillMatterId = matterId;
-  // Open import skill modal
-  const modal = document.getElementById('importSkillModal');
-  modal.classList.remove('hidden');
-  modal.classList.add('flex');
-  // Reset file input
-  clearSkillFile();
+  // Navigate to the Skills page (standalone page — full navigation)
+  if (window.Lex && window.Lex.Nav) {
+    Lex.Nav.go('skills.html');
+  } else {
+    window.location.href = 'skills.html';
+  }
 };
 
 window.toggleMatterSkill = async function(matterId, skillId, enabled) {
@@ -193,6 +194,29 @@ window.viewSkillExecutions = function(matterSkillId) {
   window.location.href = `matter-skills.html?matterSkillId=${matterSkillId}&tab=executions`;
 };
 
+window.executeMatterSkill = async function(matterId, skillId) {
+  try {
+    showNotification('Queuing skill for execution...', 'info');
+
+    var response = await api.post(
+      '/api/v1/matters/' + matterId + '/skills/' + skillId + '/execute',
+      { input_data: {}, priority: 'normal' }
+    );
+
+    // Handle 202 Accepted (queued for background execution)
+    if (response && response.job_id) {
+      showNotification('Skill queued for execution', 'success');
+    } else if (response && response.success) {
+      showNotification('Skill executed successfully', 'success');
+    } else {
+      showNotification('Skill execution initiated', 'success');
+    }
+  } catch (error) {
+    console.error('[executeMatterSkill] Error:', error);
+    showNotification(error.message || 'Failed to execute skill', 'error');
+  }
+};
+
 // =============================================================================
 // CREATE SKILL MODAL
 // =============================================================================
@@ -201,66 +225,17 @@ function closeCreateSkillModal() {
   const modal = document.getElementById('createSkillModal');
   modal.classList.add('hidden');
   modal.classList.remove('flex');
-  document.getElementById('createSkillForm').reset();
-}
-
-async function submitCreateSkill() {
-  const form = document.getElementById('createSkillForm');
-  if (!form.checkValidity()) {
-    form.reportValidity();
-    return;
-  }
-
-  const formData = new FormData(form);
-  const skillData = {
-    skill_name: formData.get('skill_name'),
-    description: formData.get('description'),
-    category: formData.get('category'),
-    skill_type: 'custom',
-    is_built_in: false,
-    config: {
-      trigger: {
-        event_type: formData.get('trigger_type')
-      },
-      action: {
-        type: 'ai_prompt',
-        prompt_template: formData.get('prompt_template'),
-        output_format: formData.get('output_format')
-      }
-    }
-  };
-
-  try {
-    // Create the skill
-    const response = await api.post('/api/v1/skills', skillData);
-
-    if (response.success) {
-      showNotification('Skill created successfully', 'success');
-
-      // If matterId is provided, enable the skill for that matter
-      const matterId = window.currentSkillMatterId;
-      if (matterId) {
-        try {
-          await api.post(`/api/v1/matters/${matterId}/skills`, {
-            skill_id: response.skill.skill_id,
-            config_overrides: {}
-          });
-          showNotification('Skill enabled for matter', 'success');
-        } catch (error) {
-          console.error('Failed to enable skill for matter:', error);
-        }
-      }
-
-      // Close modal and refresh skills tab
-      closeCreateSkillModal();
-      const currentMatter = currentMatterData?.matter;
-      if (currentMatter) {
-        renderSkillsTab(currentMatter);
-      }
-    }
-  } catch (error) {
-    console.error('Failed to create skill:', error);
-    showNotification(error.message || 'Failed to create skill', 'error');
+  // Clear individual inputs (no form element exists)
+  var nameEl = document.getElementById('skill_name');
+  var descEl = document.getElementById('skill_description');
+  if (nameEl) nameEl.value = '';
+  if (descEl) descEl.value = '';
+  // Reset skill steps
+  skillSteps = [];
+  var stepsContainer = document.getElementById('workflow-steps-container');
+  if (stepsContainer) {
+    var steps = stepsContainer.querySelectorAll('.workflow-step-card');
+    steps.forEach(function(s) { s.remove(); });
   }
 }
 
@@ -1293,9 +1268,12 @@ function removeWorkflowStep(stepId) {
 }
 
 /**
- * Save the skill with all configured steps
+ * Save the skill with all configured steps.
+ *
+ * Builds a skill_config from the skillSteps array, creates the skill via API,
+ * then associates it with the current matter.
  */
-function saveSkill() {
+async function saveSkill() {
   const skillName = document.getElementById('skill_name')?.value?.trim();
   const skillDescription = document.getElementById('skill_description')?.value?.trim();
 
@@ -1309,16 +1287,91 @@ function saveSkill() {
     return;
   }
 
-  // TODO: Implement actual save to backend API
-  console.log('Saving skill:', {
-    name: skillName,
-    description: skillDescription,
-    steps: skillSteps,
-    mxDiagnostics
+  // Build skill_config from skillSteps
+  var triggerStep = skillSteps.find(function(s) { return s.type === 'trigger'; });
+  var actionSteps = skillSteps.filter(function(s) {
+    return s.type === 'ai-action' || s.type === 'integration' || s.type === 'transform';
+  });
+  var conditionSteps = skillSteps.filter(function(s) { return s.type === 'condition'; });
+
+  // Map step types to action config
+  var actions = actionSteps.map(function(step) {
+    var actionType = 'ai_prompt';
+    if (step.type === 'integration') actionType = 'integration';
+    else if (step.type === 'transform') actionType = 'data_transform';
+    return {
+      type: actionType,
+      label: step.label || step.type,
+      config: step.config || {}
+    };
   });
 
-  showNotification('Skill saved successfully', 'success');
-  closeCreateSkillModal();
+  var conditions = conditionSteps.map(function(step) {
+    return {
+      field: step.config?.field || '',
+      operator: step.config?.operator || 'equals',
+      value: step.config?.value || ''
+    };
+  });
+
+  var skillConfig = {
+    trigger: {
+      event_type: triggerStep?.config?.event_type || 'manual'
+    },
+    actions: actions,
+    conditions: conditions
+  };
+
+  var skillData = {
+    skill_name: skillName,
+    description: skillDescription || '',
+    category: 'custom',
+    skill_type: 'custom',
+    is_built_in: false,
+    config: skillConfig
+  };
+
+  try {
+    // Step 1: Create the skill definition
+    var response = await api.post('/api/v1/skills', skillData);
+
+    if (!response || !response.success) {
+      showNotification('Failed to create skill', 'error');
+      return;
+    }
+
+    var skillId = response.skill?.skill_id || response.data?.skill_id;
+    if (!skillId) {
+      showNotification('Skill created but no ID returned', 'error');
+      return;
+    }
+
+    // Step 2: Associate skill with the current matter
+    var matterId = window.currentSkillMatterId;
+    if (matterId) {
+      try {
+        await api.post('/api/v1/matters/' + matterId + '/skills', {
+          skill_id: skillId,
+          config_overrides: {}
+        });
+      } catch (assocError) {
+        console.error('[saveSkill] Failed to associate skill with matter:', assocError);
+        showNotification('Skill created but failed to enable for matter', 'warning');
+      }
+    }
+
+    showNotification('Skill created successfully', 'success');
+
+    // Close modal and refresh skills tab
+    closeCreateSkillModal();
+    var currentMatter = currentMatterData?.matter;
+    if (currentMatter) {
+      renderSkillsTab(currentMatter);
+    }
+  } catch (error) {
+    console.error('[saveSkill] Error:', error);
+    showNotification(error.message || 'Failed to create skill', 'error');
+  }
 }
 
 // Listen for changes to skill name and description to update MX diagnostics

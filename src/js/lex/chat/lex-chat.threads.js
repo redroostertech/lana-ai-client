@@ -60,7 +60,7 @@
         + '.lct-list{max-height:200px;overflow-y:auto;padding:4px 8px 8px;}'
         + '.lct-list.collapsed{display:none;}'
         + '.lct-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;cursor:pointer;'
-        + 'transition:background 0.12s;font-size:12.5px;color:var(--lex-text-primary, #111827);}'
+        + 'transition:background 0.12s;font-size:12.5px;color:var(--lex-text-primary, #111827);position:relative;}'
         + '.lct-item:hover{background:var(--lex-bg-hover, #f3f4f6);}'
         + '.lct-item.active{background:var(--lex-bg-accent-soft, #eef2ff);color:var(--lex-text-accent, #4f46e5);}'
         + '.lct-item-icon{flex-shrink:0;width:14px;height:14px;color:var(--lex-text-tertiary, #9ca3af);}'
@@ -68,6 +68,10 @@
         + '.lct-item-title{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
         + '.lct-item-time{font-size:10px;color:var(--lex-text-tertiary, #9ca3af);white-space:nowrap;}'
         + '.lct-item.pinned{font-weight:600;}'
+        + '.lct-delete-btn{display:none;flex-shrink:0;width:20px;height:20px;padding:2px;border:none;background:none;'
+        + 'color:var(--lex-text-tertiary, #9ca3af);cursor:pointer;border-radius:4px;transition:color 0.12s,background 0.12s;}'
+        + '.lct-item:hover .lct-delete-btn{display:inline-flex;align-items:center;justify-content:center;}'
+        + '.lct-delete-btn:hover{color:#ef4444;background:rgba(239,68,68,0.1);}'
         + '.lct-empty{padding:12px 14px;font-size:11.5px;color:var(--lex-text-tertiary, #9ca3af);text-align:center;}'
         + '.lct-loading{padding:12px 14px;font-size:11.5px;color:var(--lex-text-tertiary, #9ca3af);text-align:center;}'
         + '</style>';
@@ -95,10 +99,12 @@
           var icon = this._getThreadIcon(t.thread_type);
           var title = this.escapeHtml(t.title || this._getDefaultTitle(t.thread_type));
           var time = this._relativeTime(t.last_activity || t.created_at);
+          var trashSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>';
           return '<div class="' + cls + '" data-thread-id="' + t.id + '">'
             + '<span class="lct-item-icon">' + icon + '</span>'
             + '<span class="lct-item-title">' + title + '</span>'
             + '<span class="lct-item-time">' + time + '</span>'
+            + '<button class="lct-delete-btn" data-delete-thread="' + t.id + '" title="Delete thread">' + trashSvg + '</button>'
             + '</div>';
         }.bind(this)).join('');
       }
@@ -122,8 +128,17 @@
         this.emit('lex-thread-create', { threadType: 'ad_hoc' });
       });
 
+      // Delete thread button
+      this.delegate('click', '[data-delete-thread]', function (e, target) {
+        e.stopPropagation();
+        var threadId = target.getAttribute('data-delete-thread');
+        this._deleteThread(threadId);
+      });
+
       // Thread item click
       this.delegate('click', '[data-thread-id]', function (e, target) {
+        // Ignore clicks on the delete button
+        if (e.target.closest('[data-delete-thread]')) return;
         var threadId = target.getAttribute('data-thread-id');
         var thread = null;
         for (var i = 0; i < this._threads.length; i++) {
@@ -164,6 +179,7 @@
       } finally {
         this._loading = false;
         this._scheduleUpdate();
+        this.emit('lex-threads-loaded', { threads: this._threads });
       }
     }
 
@@ -193,9 +209,40 @@
       this._scheduleUpdate();
     }
 
+    /**
+     * Remove a thread from the internal list by ID and re-render.
+     * If the deleted thread was active, emit lex-thread-delete so the parent can reset.
+     */
+    removeThread(threadId) {
+      var wasActive = this.activeThread === threadId;
+      this._threads = this._threads.filter(function (t) { return t.id !== threadId; });
+
+      if (wasActive) {
+        this.activeThread = null;
+        this.emit('lex-thread-delete', { threadId: threadId });
+      }
+
+      this._scheduleUpdate();
+    }
+
     // -----------------------------------------------------------------------
     // Private helpers
     // -----------------------------------------------------------------------
+
+    /**
+     * Delete a thread via the API, then remove it from the list.
+     * @private
+     */
+    async _deleteThread(threadId) {
+      if (typeof api === 'undefined') return;
+
+      try {
+        await api.delete('/api/v1/conversation-threads/' + threadId);
+        this.removeThread(threadId);
+      } catch (err) {
+        console.error('[lex-chat-threads] Failed to delete thread:', err);
+      }
+    }
 
     _getThreadIcon(threadType) {
       if (threadType === 'page_general') {

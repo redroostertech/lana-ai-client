@@ -607,7 +607,9 @@
     var m = currentMatterData;
     switch (tab) {
       case 'activity':
+        // Always re-fetch activity data to capture changes from other tabs (notes, tasks, etc.)
         renderActivityTab(m.matter, m.activities, m.activityPagination);
+        refreshActivityData(m.matter.matter_id);
         break;
       case 'documents':
         renderDocumentsTab(m.matter, m.documents, m.docPagination, m.orphanedFiles);
@@ -1277,6 +1279,21 @@
     }
 
     return escapeHtml(activity.description || activity.content || 'Activity');
+  }
+
+  // Refresh activity data from API (background, non-blocking)
+  async function refreshActivityData(matterId) {
+    try {
+      var result = await api.getMatterActivity(matterId, 20, 0);
+      if (result && result.activities && currentMatterData) {
+        currentMatterData.activities = result.activities;
+        currentMatterData.activityPagination = result.pagination || {};
+        renderActivityTab(currentMatterData.matter, result.activities, result.pagination);
+      }
+    } catch (error) {
+      // Silently fail — cached data is already rendered as fallback
+      console.warn('[refreshActivityData] Failed to refresh:', error.message);
+    }
   }
 
   // Load a specific activity page (for pagination)
@@ -7210,20 +7227,18 @@
         '<div class="h-32 bg-gray-100 rounded animate-pulse"></div>' +
       '</div>';
 
-    // Parallel data fetch
+    // Parallel data fetch (contacts already loaded in currentMatterData)
     var matterId = matter.matter_id;
     var results = await Promise.allSettled([
       api.get('/api/v1/matters/' + matterId + '/document-types'),
-      api.get('/api/v1/generation-template-sets?matter_id=' + matterId),
-      api.get('/api/v1/matters/' + matterId + '/contacts')
+      api.get('/api/v1/generation-template-sets?matter_id=' + matterId)
     ]);
 
     docGenState.documentTypes = (results[0].status === 'fulfilled' && results[0].value && results[0].value.data)
       ? results[0].value.data : [];
     docGenState.templateSets = (results[1].status === 'fulfilled' && results[1].value && results[1].value.data)
       ? results[1].value.data : [];
-    docGenState.contacts = (results[2].status === 'fulfilled' && results[2].value && results[2].value.data)
-      ? results[2].value.data : [];
+    docGenState.contacts = (currentMatterData && currentMatterData.contacts) || [];
 
     var html = '';
 

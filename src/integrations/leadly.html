@@ -32,6 +32,25 @@
 
       <!-- Dashboard Content (Always Visible) -->
       <div id="dashboardContent" class="hidden">
+
+        <!-- Pipeline Category Filter -->
+        <div id="pipelineCategoryFilter" class="mb-6 flex items-center gap-4 bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+          <label class="text-sm font-medium text-gray-700 flex-shrink-0">View:</label>
+          <select id="pipelineCategorySelect" onchange="onPipelineCategoryChange(this.value)"
+                  class="block w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+            <option value="new_lead" selected>New Leads Only</option>
+            <option value="all">All Pipelines</option>
+            <option value="maintenance">Maintenance Only</option>
+            <option value="event_attendee">Event Attendees Only</option>
+            <option value="funding">Funding Only</option>
+          </select>
+          <select id="pipelineSelect" onchange="onPipelineChange(this.value)"
+                  class="block w-64 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+            <option value="">All pipelines in category</option>
+          </select>
+          <span id="pipelineFilterInfo" class="text-xs text-gray-400 ml-auto"></span>
+        </div>
+
         <!-- Summary Stats -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <!-- Opportunities & Pipeline Card -->
@@ -440,7 +459,8 @@
 
         // Update last sync time
         if (result.last_sync) {
-          document.getElementById('lastSyncTime').textContent = `Last sync: ${timeAgo(result.last_sync.completed_at || result.last_sync.started_at)}`;
+          var lastSyncEl = document.getElementById('lastSyncTime');
+          if (lastSyncEl) lastSyncEl.textContent = `Last sync: ${timeAgo(result.last_sync.completed_at || result.last_sync.started_at)}`;
         }
 
         document.getElementById('loadingState').classList.add('hidden');
@@ -471,6 +491,66 @@
         loadTabContent(currentTab);
       }
     }
+
+    // ---- Pipeline Category Filter ----
+    let currentPipelineCategory = 'new_lead';
+    let currentPipelineId = '';
+
+    /**
+     * Populate the per-pipeline dropdown from the pipelines API.
+     */
+    async function loadPipelineOptions(category) {
+      const select = document.getElementById('pipelineSelect');
+      select.innerHTML = '<option value="">All pipelines in category</option>';
+
+      try {
+        const params = new URLSearchParams({ limit: '50' });
+        if (category && category !== 'all') {
+          params.set('pipeline_category', category);
+        }
+        const result = await api.get(`/api/v1/pipelines?${params.toString()}`);
+        const pipelines = result?.data || [];
+
+        for (const p of pipelines) {
+          const opt = document.createElement('option');
+          opt.value = p.pipeline_id || p.external_id || p.id;
+          opt.textContent = p.name || p.pipeline_id;
+          select.appendChild(opt);
+        }
+
+        const infoEl = document.getElementById('pipelineFilterInfo');
+        if (pipelines.length === 0 && category !== 'all') {
+          infoEl.textContent = 'No pipelines in this category. Categorize via Settings.';
+        } else {
+          infoEl.textContent = `${pipelines.length} pipeline${pipelines.length !== 1 ? 's' : ''}`;
+        }
+      } catch (err) {
+        console.error('Failed to load pipeline options:', err);
+      }
+    }
+
+    /**
+     * Called when the category dropdown changes.
+     */
+    function onPipelineCategoryChange(category) {
+      currentPipelineCategory = category;
+      currentPipelineId = '';
+      document.getElementById('pipelineSelect').value = '';
+      loadPipelineOptions(category);
+    }
+
+    /**
+     * Called when the specific pipeline dropdown changes.
+     */
+    function onPipelineChange(pipelineId) {
+      currentPipelineId = pipelineId;
+    }
+
+    // Load pipeline options on dashboard init
+    document.addEventListener('DOMContentLoaded', () => {
+      loadPipelineOptions('new_lead');
+    });
+    // ---- End Pipeline Category Filter ----
 
     // Switch tab
     function switchTab(tab) {

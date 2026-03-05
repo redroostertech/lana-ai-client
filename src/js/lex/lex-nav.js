@@ -65,7 +65,7 @@
     'error.html':                             { message: 'string', code: 'string', ref: 'string' },
     'login.html':                             { return: 'string' },
     'matter-skills.html':                     { matterSkillId: 'string', tab: 'string' },
-    'skills-marketplace.html':                { category: 'string' },
+    'skills.html':                            { category: 'string' },
     'action-queue.html':                      { action_type: 'string', severity: 'string' },
     'file-viewer.html':                       { id: 'string' }
   };

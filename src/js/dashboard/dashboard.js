@@ -256,7 +256,12 @@
     if (typeof ctx === 'string') {
       try { ctx = JSON.parse(ctx); } catch (e) { return null; }
     }
-    return ctx.suggested_action || null;
+    if (ctx.suggested_action) return ctx.suggested_action;
+    // Generic plugin context nests data inside findings[]
+    if (ctx.findings && ctx.findings.length > 0 && ctx.findings[0].suggested_action) {
+      return ctx.findings[0].suggested_action;
+    }
+    return null;
   }
 
   /**
@@ -280,33 +285,54 @@
    * @returns {string|null} enriched description or null
    */
   function buildEnrichedDescription(sa, matter, ts) {
-    if (!sa || !sa.items || sa.items.length === 0) return null;
-    var items = sa.items;
+    if (!sa) return null;
+
     var parts = [];
-    var maxPreview = 2;
+    var hasItems = sa.items && sa.items.length > 0;
 
-    for (var k = 0; k < items.length && k < maxPreview; k++) {
-      var it = items[k];
-      if (it.title) {
-        // task_health: task title + due date
-        var taskDesc = escHtml(it.title);
-        if (it.due_date) taskDesc += ' (due ' + escHtml(formatShortDate(it.due_date)) + ')';
-        parts.push(taskDesc);
-      } else if (it.filename) {
-        // unreviewed_docs: filename
-        parts.push(escHtml(it.filename));
-      } else if (it.missing_fields) {
-        // matter_completeness: matter name + completeness
-        parts.push(escHtml(it.matter_name || '') + ' (' + (it.completeness_pct || 0) + '% complete)');
-      } else if (it.matter_name) {
-        // staleness/engagement: matter name
-        parts.push(escHtml(it.matter_name));
+    if (hasItems) {
+      var items = sa.items;
+      var maxPreview = 2;
+
+      // Prepend matter context for document-type items
+      if (matter && sa.action === 'review_documents') {
+        parts.push(matter);
       }
-    }
 
-    var totalCount = sa.total_count || items.length;
-    if (totalCount > maxPreview) {
-      parts.push('+ ' + (totalCount - maxPreview) + ' more');
+      for (var k = 0; k < items.length && k < maxPreview; k++) {
+        var it = items[k];
+        if (it.title) {
+          // task_health: task title + due date
+          var taskDesc = escHtml(it.title);
+          if (it.due_date) taskDesc += ' (due ' + escHtml(formatShortDate(it.due_date)) + ')';
+          parts.push(taskDesc);
+        } else if (it.filename) {
+          // unreviewed_docs: filename
+          parts.push(escHtml(it.filename));
+        } else if (it.missing_fields) {
+          // matter_completeness: matter name + completeness
+          parts.push(escHtml(it.matter_name || '') + ' (' + (it.completeness_pct || 0) + '% complete)');
+        } else if (it.matter_name) {
+          // staleness/engagement: matter name
+          parts.push(escHtml(it.matter_name));
+        }
+      }
+
+      var totalCount = sa.total_count || items.length;
+      if (totalCount > maxPreview) {
+        parts.push('+ ' + (totalCount - maxPreview) + ' more');
+      }
+    } else if (sa.matter_ids && sa.matter_ids.length > 0) {
+      // No items but have matter_ids — show count + matter IDs
+      var docCount = sa.total_count || sa.matter_ids.length;
+      parts.push(docCount + ' document' + (docCount !== 1 ? 's' : ''));
+      if (sa.matter_ids.length === 1) {
+        parts.push(escHtml(sa.matter_ids[0]));
+      } else {
+        parts.push(sa.matter_ids.length + ' matter' + (sa.matter_ids.length !== 1 ? 's' : ''));
+      }
+    } else {
+      return null;
     }
 
     if (ts) parts.push(escHtml(timeAgo(ts)));
@@ -342,9 +368,22 @@
       try { ctx = JSON.parse(ctx); } catch (e) { ctx = null; }
     }
 
-    var sa = (ctx && ctx.suggested_action) || null;
+    // Handle two context structures:
+    // 1. Finding-based: { suggested_action, details, sub_check }
+    // 2. Generic plugin: { findings: [{ suggested_action, message, sub_check }], ... }
+    var finding = null;
+    if (ctx && ctx.findings && ctx.findings.length > 0) {
+      finding = ctx.findings[0];
+    }
+
+    var sa = (ctx && ctx.suggested_action) || (finding && finding.suggested_action) || null;
     var details = (ctx && ctx.details) || {};
     var subCheck = (ctx && ctx.sub_check) || '';
+
+    // Pull message from finding if details.message is empty
+    if (!details.message && finding && finding.message) {
+      details = { message: finding.message };
+    }
 
     // Header: severity badge + sub-check label
     var sevColor = 'var(--lex-text-tertiary)';
@@ -370,11 +409,12 @@
       '</div>'
     );
 
-    // Message
-    if (details.message) {
+    // Message — prefer context.details.message, fall back to item.message
+    var displayMessage = details.message || item.message || '';
+    if (displayMessage) {
       bodyParts.push(
         '<p style="font-size:0.8125rem;color:var(--lex-text-secondary);line-height:1.5;margin:0 0 16px;">' +
-          escHtml(details.message) +
+          escHtml(displayMessage) +
         '</p>'
       );
     }
@@ -385,24 +425,40 @@
       if (sa.matter_id) firstMatterId = sa.matter_id;
       if (!firstMatterId && sa.matter_ids && sa.matter_ids.length > 0) firstMatterId = sa.matter_ids[0];
     }
+    if (!firstMatterId && item.matter_id) firstMatterId = item.matter_id;
 
-    // Affected matters list
+    // Items list (documents, tasks, matters, etc.)
     if (sa && sa.items && sa.items.length > 0) {
+      // Pick a contextual section heading based on the action type
+      var sectionHeading = 'Affected Matters';
+      if (sa.action === 'review_documents') sectionHeading = 'Documents to Review';
+      else if (sa.action === 'complete_tasks') sectionHeading = 'Tasks';
+
       bodyParts.push('<div style="margin-bottom:16px;">');
       bodyParts.push(
-        '<div style="font-size:0.6875rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--lex-text-tertiary);font-weight:500;margin-bottom:8px;">Affected Matters</div>'
+        '<div style="font-size:0.6875rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--lex-text-tertiary);font-weight:500;margin-bottom:8px;">' + escHtml(sectionHeading) + '</div>'
       );
 
       for (var k = 0; k < sa.items.length; k++) {
         var it = sa.items[k];
-        var itemLabel = escHtml(it.matter_name || it.title || it.filename || 'Item ' + (k + 1));
+        var itemLabel;
         var itemMeta = '';
         var matterId = it.matter_id || '';
 
         if (!firstMatterId && matterId) firstMatterId = matterId;
 
+        // For document items, show filename as label with matter as context
+        if (it.filename) {
+          itemLabel = escHtml(it.filename);
+          if (it.matter_name) {
+            itemMeta = it.matter_name; // escaped by outer escHtml at render
+          }
+        } else {
+          itemLabel = escHtml(it.matter_name || it.title || 'Item ' + (k + 1));
+        }
+
         if (it.completeness_pct !== undefined) {
-          itemMeta = it.completeness_pct + '% complete';
+          itemMeta += (itemMeta ? ' \u00b7 ' : '') + it.completeness_pct + '% complete';
         }
         if (it.missing_fields && it.missing_fields.length > 0) {
           itemMeta += (itemMeta ? ' \u00b7 ' : '') + 'Missing: ' + escHtml(it.missing_fields.join(', '));
@@ -427,6 +483,34 @@
               (matterId ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:0.3;flex-shrink:0;"><path d="M9 18l6-6-6-6"/></svg>' : '') +
             '</div>' +
             (itemMeta ? '<div style="font-size:0.6875rem;color:var(--lex-text-tertiary);margin-top:2px;">' + escHtml(itemMeta) + '</div>' : '') +
+          '</div>'
+        );
+      }
+
+      bodyParts.push('</div>');
+    }
+
+    // Fallback: when items are empty but matter_ids exist, show clickable matter links
+    if (!(sa && sa.items && sa.items.length > 0) && sa && sa.matter_ids && sa.matter_ids.length > 0) {
+      var docCount = sa.total_count || sa.matter_ids.length;
+      bodyParts.push('<div style="margin-bottom:16px;">');
+      bodyParts.push(
+        '<div style="font-size:0.6875rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--lex-text-tertiary);font-weight:500;margin-bottom:8px;">Affected Matters (' + docCount + ' document' + (docCount !== 1 ? 's' : '') + ')</div>'
+      );
+
+      for (var mi = 0; mi < sa.matter_ids.length; mi++) {
+        var mId = sa.matter_ids[mi];
+        if (!firstMatterId) firstMatterId = mId;
+
+        bodyParts.push(
+          '<div class="lex-detail-matter-row" style="padding:10px 0;border-bottom:1px solid var(--lex-border-subtle, rgba(0,0,0,0.06));cursor:pointer;transition:background 0.15s ease;" data-matter-id="' + escHtml(mId) + '">' +
+            '<div style="display:flex;align-items:center;justify-content:space-between;">' +
+              '<div style="display:flex;align-items:center;gap:8px;">' +
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--lex-text-tertiary);flex-shrink:0;"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>' +
+                '<span style="font-size:0.8125rem;color:var(--lex-text-primary);">' + escHtml(mId) + '</span>' +
+              '</div>' +
+              '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:0.3;flex-shrink:0;"><path d="M9 18l6-6-6-6"/></svg>' +
+            '</div>' +
           '</div>'
         );
       }
@@ -571,11 +655,7 @@
       var item     = items[i];
       var sev      = item.severity || item.priority || 'low';
       var title    = escHtml(item.title || item.name || item.description || 'Untitled');
-      var matter   = escHtml(item.matter_name || item.matter || '');
       var ts       = item.due_date || item.created_at || null;
-      var meta     = [];
-      if (matter) meta.push(matter);
-      if (ts)     meta.push(escHtml(timeAgo(ts)));
       var priority = (sev === 'critical' || sev === 'high') ? 'high' : (sev === 'medium' ? 'medium' : 'low');
       // Map severity → task priority for Lana assignment (urgent, high, medium, low)
       var taskPriority = (sev === 'critical') ? 'urgent' : (sev === 'high' ? 'high' : (sev === 'medium' ? 'medium' : 'low'));
@@ -583,6 +663,22 @@
       var lana = isLanaAction(item);
       var actionAttr = '';
       var sa = getSuggestedAction(item);
+
+      // Resolve matter name: prefer item-level, fall back to context items
+      var matter = escHtml(item.matter_name || item.matter || '');
+      if (!matter && sa && sa.items && sa.items.length > 0) {
+        var _names = [];
+        for (var mn = 0; mn < sa.items.length; mn++) {
+          if (sa.items[mn].matter_name && _names.indexOf(sa.items[mn].matter_name) === -1) {
+            _names.push(sa.items[mn].matter_name);
+          }
+        }
+        if (_names.length === 1) {
+          matter = escHtml(_names[0]);
+        } else if (_names.length > 1) {
+          matter = escHtml(_names.length + ' matters');
+        }
+      }
 
       if (lana) {
         // Encode the action config as a data attribute for the click handler
@@ -613,6 +709,8 @@
         if (enrichedDesc) {
           metaStr2 = enrichedDesc;
         } else {
+          var meta = [];
+          if (matter) meta.push(matter);
           if (ts) meta.push(escHtml(timeAgo(ts)));
           metaStr2 = meta.join(' \u00b7 ');
         }

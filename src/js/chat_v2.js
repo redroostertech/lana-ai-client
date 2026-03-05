@@ -392,12 +392,10 @@
     // Mount lex-chat (includes its own composer)
     mountLexChat(_conversationId, initialMessage);
 
-    // Update URL params so state is bookmarkable
-    if (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.updateParams === 'function') {
-      var urlParams = { session: _conversationId };
-      if (_matter && _matter.id) urlParams.matter = _matter.id;
-      window.Lex.Nav.updateParams(urlParams);
-    }
+    // Update URL params so state is bookmarkable and survives refresh
+    var urlUpdate = { session: _conversationId };
+    if (_matter && _matter.id) urlUpdate.matter = _matter.id;
+    syncUrlParams(urlUpdate);
   }
 
   // =========================================================================
@@ -448,9 +446,7 @@
 
         mountLexChatWelcome(convId);
 
-        if (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.updateParams === 'function') {
-          window.Lex.Nav.updateParams({ session: convId, matter: _matter.id });
-        }
+        syncUrlParams({ session: convId, matter: _matter.id });
       })
       .catch(function (err) {
         if (err && err.name === 'AbortError') return;
@@ -920,6 +916,36 @@
   }
 
   // =========================================================================
+  // URL state — update both history.state.path AND browser URL bar.
+  // chat-v2.html is standalone (not SPA-routed), so init() reads
+  // location.search. We must keep the browser URL in sync so that
+  // page refreshes restore the correct conversation.
+  // =========================================================================
+
+  function syncUrlParams(params) {
+    // Update Lex.Nav state (history.state.path) for SPA compatibility
+    if (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.updateParams === 'function') {
+      window.Lex.Nav.updateParams(params);
+    }
+
+    // Also update the actual browser URL so F5 / refresh reads correct params
+    var urlParams = new URLSearchParams(window.location.search);
+    var keys = Object.keys(params);
+    for (var i = 0; i < keys.length; i++) {
+      var key = keys[i];
+      var val = params[key];
+      if (val === null || val === undefined) {
+        urlParams.delete(key);
+      } else {
+        urlParams.set(key, String(val));
+      }
+    }
+    var qs = urlParams.toString();
+    var newUrl = window.location.pathname + (qs ? '?' + qs : '');
+    history.replaceState(history.state || {}, '', newUrl);
+  }
+
+  // =========================================================================
   // XSS prevention — string-only, no regex
   // =========================================================================
 
@@ -1013,12 +1039,10 @@
     // Mount lex-chat (includes its own composer)
     mountLexChat(_conversationId, null);
 
-    // Update URL params
-    if (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.updateParams === 'function') {
-      var urlParams = { session: _conversationId };
-      if (_matter && _matter.id) urlParams.matter = _matter.id;
-      window.Lex.Nav.updateParams(urlParams);
-    }
+    // Update URL params so state is bookmarkable and survives refresh
+    var urlUpdate = { session: _conversationId };
+    if (_matter && _matter.id) urlUpdate.matter = _matter.id;
+    syncUrlParams(urlUpdate);
   }
 
   // =========================================================================
@@ -1075,15 +1099,44 @@
     // Register selectConversation for sidebar integration
     window.selectConversation = selectConversation;
 
+    // Register createProjectChat for NewProjectModal integration.
+    // When the user opens the "+ New Chat" modal from chat-v2.html and
+    // selects a matter, this handles the switch in-page (no reload).
+    window.createProjectChat = function (matterId) {
+      // Clean up any active conversation before switching matters
+      returnToLanding();
+
+      // Fetch the full matter and enter welcome flow
+      api.get('/api/v1/matters/' + matterId)
+        .then(function (response) {
+          var matter = (response && response.matter) ? response.matter : null;
+          if (matter && matter.id) {
+            enterActiveWithWelcome(matter);
+          } else {
+            showErrorToast('Could not load matter. Please try again.');
+            loadRecentMatters();
+          }
+        })
+        .catch(function () {
+          showErrorToast('Could not load matter. Please try again.');
+          loadRecentMatters();
+        });
+    };
+
     // Activate skeleton shimmer for the cards area
     if (window.Lex && window.Lex.Redact) {
       window.Lex.Redact.on(dom.cardsWrapper);
     }
 
-    // Check for deep-link params
-    var params = window.Lex && window.Lex.Nav ? window.Lex.Nav.getParams() : null;
-    var deepLinkSessionId = params && params.get ? params.get('session') : null;
-    var deepLinkMatterId = params && params.get ? params.get('matter') : null;
+    // Clear stale history.state.path from previous visits.
+    // chat-v2.html is a standalone page (not SPA-routed), so
+    // updateParams() writes session/matter into history.state.path.
+    // On a fresh navigation (e.g. sidebar "+ New Chat"), the browser
+    // may preserve the old state, causing init() to read a stale
+    // session ID and 404. Use location.search as the canonical source.
+    var params = new URLSearchParams(window.location.search);
+    var deepLinkSessionId = params.get('session') || null;
+    var deepLinkMatterId = params.get('matter') || null;
 
     if (deepLinkSessionId) {
       loadExistingSession(deepLinkSessionId);
@@ -1180,6 +1233,10 @@
     // Remove global selectConversation
     if (window.selectConversation === selectConversation) {
       delete window.selectConversation;
+    }
+    // Remove global createProjectChat
+    if (typeof window.createProjectChat === 'function') {
+      delete window.createProjectChat;
     }
     // Close file drawer if open
     if (window.ChatFileDrawer && typeof window.ChatFileDrawer.close === 'function') {

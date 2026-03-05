@@ -582,7 +582,20 @@
     drawer.addEventListener('lex-thread-select', function (e) {
       var thread = e.detail && e.detail.thread;
       if (!thread || !state.askLanaChatEl) return;
-      state.askLanaChatEl.loadConversation(thread.conversation_id);
+      state.askLanaChatEl.loadConversation(thread.thread_id);
+    });
+
+    // Auto-select page_general thread when threads finish loading
+    drawer.addEventListener('lex-threads-loaded', function (e) {
+      var threads = e.detail && e.detail.threads;
+      if (!threads || !threads.length || !state.askLanaChatEl) return;
+      for (var i = 0; i < threads.length; i++) {
+        if (threads[i].thread_type === 'page_general' && threads[i].thread_id) {
+          state.askLanaChatEl.loadConversation(threads[i].thread_id);
+          if (state.askLanaThreadsEl) state.askLanaThreadsEl.setActiveThread(threads[i].id);
+          break;
+        }
+      }
     });
 
     // Wire new conversation
@@ -600,7 +613,7 @@
       var threadsComp = state.askLanaThreadsEl;
       if (threadsComp && threadsComp._threads) {
         for (var i = 0; i < threadsComp._threads.length; i++) {
-          if (threadsComp._threads[i].conversation_id === conversationId) return;
+          if (threadsComp._threads[i].thread_id === conversationId) return;
         }
       }
 

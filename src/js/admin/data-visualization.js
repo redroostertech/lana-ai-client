@@ -816,6 +816,20 @@
       _chatEl.loadConversation(thread.thread_id);
     });
 
+    // Auto-select page_general thread when threads finish loading
+    container.addEventListener('lex-threads-loaded', function (e) {
+      var threads = e.detail && e.detail.threads;
+      if (!threads || !threads.length || !_chatEl) return;
+      // Find page_general thread and auto-select it
+      for (var i = 0; i < threads.length; i++) {
+        if (threads[i].thread_type === 'page_general' && threads[i].thread_id) {
+          _chatEl.loadConversation(threads[i].thread_id);
+          if (_threadsEl) _threadsEl.setActiveThread(threads[i].id);
+          break;
+        }
+      }
+    });
+
     // Wire new thread creation
     container.addEventListener('lex-thread-create', function () {
       if (!_chatEl) return;
@@ -839,14 +853,19 @@
 
       var threadsComp = _threadsEl;
       if (threadsComp && threadsComp._threads && threadsComp._threads.length > 0) {
-        var hasPageGeneral = false;
         for (var i = 0; i < threadsComp._threads.length; i++) {
           if (threadsComp._threads[i].thread_type === 'page_general') {
-            hasPageGeneral = true;
-            break;
+            // Update existing page_general thread's thread_id to stay in sync
+            var existingThread = threadsComp._threads[i];
+            existingThread.thread_id = conversationId;
+            api.put('/api/v1/conversation-threads/' + existingThread.id, {
+              thread_id: conversationId
+            }).catch(function (err) {
+              console.warn('[DataViz] Failed to update page thread thread_id:', err);
+            });
+            return;
           }
         }
-        if (hasPageGeneral) return;
       }
 
       api.post('/api/v1/conversation-threads', {

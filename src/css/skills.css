@@ -1,0 +1,695 @@
+/* Skills Page Styles
+   Colour values come from Lex design tokens wherever possible.
+   Raw Tailwind colour utilities are replaced here with token-based rules
+   so the UI stays in sync with any future brand changes.
+   ------------------------------------------------------------------ */
+
+/* ── Skill Builder — native input baseline ─────────────────────── */
+/* skill_name and skill_description remain native inputs/textareas.
+   We give them token-based styling so they match the Lex form aesthetic. */
+
+.skill-builder-input {
+  background: var(--lex-bg-primary);
+  border: 1px solid var(--lex-border-default);
+  color: var(--lex-text-primary);
+  transition: var(--lex-transition-fast);
+}
+
+.skill-builder-input::placeholder {
+  color: var(--lex-text-tertiary);
+}
+
+.skill-builder-input:hover {
+  border-color: var(--lex-border-strong);
+}
+
+.skill-builder-input:focus {
+  outline: none;
+  border-color: var(--lex-input-border-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lex-input-border-focus) 20%, transparent);
+}
+
+/* ── Legacy button classes — kept for JS compatibility ─────────── */
+/* These were previously using raw Tailwind utilities.
+   Replaced with Lex token equivalents. */
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  background: var(--lex-bg-accent);
+  color: var(--lex-text-on-accent);
+  border: none;
+  border-radius: var(--lex-btn-radius-md);
+  font-weight: var(--lex-weight-medium);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  cursor: pointer;
+  transition: background var(--lex-transition-fast);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--lex-bg-accent-hover);
+}
+
+.btn-primary:disabled {
+  opacity: var(--lex-input-disabled-opacity);
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  background: var(--lex-color-gray-200);
+  color: var(--lex-text-primary);
+  border: none;
+  border-radius: var(--lex-btn-radius-md);
+  font-weight: var(--lex-weight-medium);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  cursor: pointer;
+  transition: background var(--lex-transition-fast);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--lex-color-gray-300);
+}
+
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  background: var(--lex-color-danger-500);
+  color: var(--lex-color-white);
+  border: none;
+  border-radius: var(--lex-btn-radius-md);
+  font-weight: var(--lex-weight-medium);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  cursor: pointer;
+  transition: background var(--lex-transition-fast);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--lex-color-danger-700);
+}
+
+/* ── Skills Grid ────────────────────────────────────────────────── */
+
+.skills-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.5rem;
+}
+
+.skill-card {
+  background: var(--lex-card-bg);
+  border: 1px solid var(--lex-card-border);
+  border-radius: var(--lex-radius-xl);
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  position: relative;
+}
+
+.skill-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 0%;
+  background: var(--lex-bg-accent);
+  border-radius: 0 2px 2px 0;
+  transition: height 0.3s ease;
+}
+
+.skill-card:hover {
+  box-shadow: var(--lex-shadow-lg);
+  border-color: var(--lex-border-accent);
+  transform: translateX(4px);
+}
+
+.skill-card:hover::before {
+  height: 40%;
+}
+
+.skill-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+/* Skill icon — intentional gradient for visual identity */
+.skill-icon {
+  width: 3rem;
+  height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--lex-radius-lg);
+  font-size: 1.5rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.skill-name {
+  font-size: var(--lex-h6-size, 1rem);
+  font-weight: var(--lex-weight-semibold);
+  color: var(--lex-text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.skill-version {
+  font-size: var(--lex-body-xs-size, 0.75rem);
+  color: var(--lex-text-tertiary);
+}
+
+.skill-description {
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  color: var(--lex-text-secondary);
+  margin-bottom: 1rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.skill-meta {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: var(--lex-body-xs-size, 0.75rem);
+  color: var(--lex-text-tertiary);
+  margin-bottom: 1rem;
+}
+
+.skill-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.skill-tag {
+  padding: 0.25rem 0.5rem;
+  background: var(--lex-bg-tertiary);
+  color: var(--lex-text-secondary);
+  border-radius: var(--lex-radius-sm);
+  font-size: var(--lex-body-xs-size, 0.75rem);
+}
+
+.skill-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 1rem;
+  border-top: 1px solid var(--lex-border-subtle);
+}
+
+.skill-status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--lex-radius-full);
+  font-size: var(--lex-body-xs-size, 0.75rem);
+  font-weight: var(--lex-weight-medium);
+}
+
+.skill-status-installed {
+  background: var(--lex-status-success-bg);
+  color: var(--lex-status-success-text);
+}
+
+.skill-status-not-installed {
+  background: var(--lex-bg-tertiary);
+  color: var(--lex-text-secondary);
+}
+
+.install-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  background: var(--lex-bg-accent);
+  color: var(--lex-text-on-accent);
+  border: none;
+  border-radius: var(--lex-btn-radius-md);
+  cursor: pointer;
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  font-weight: var(--lex-weight-medium);
+  transition: background var(--lex-transition-fast);
+}
+
+.install-btn:hover {
+  background: var(--lex-bg-accent-hover);
+}
+
+.install-btn:disabled {
+  background: var(--lex-color-gray-300);
+  cursor: not-allowed;
+}
+
+/* ── Skills List ────────────────────────────────────────────────── */
+
+.skills-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.skill-list-item {
+  background: var(--lex-card-bg);
+  border: 1px solid var(--lex-card-border);
+  border-radius: var(--lex-radius-xl);
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  position: relative;
+}
+
+.skill-list-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 0%;
+  background: var(--lex-bg-accent);
+  border-radius: 0 2px 2px 0;
+  transition: height 0.3s ease;
+}
+
+.skill-list-item:hover {
+  box-shadow: var(--lex-shadow-md);
+  border-color: var(--lex-border-accent);
+  transform: translateX(4px);
+}
+
+.skill-list-item:hover::before {
+  height: 40%;
+}
+
+.skill-list-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+
+/* Skill list icon — intentional gradient for visual identity */
+.skill-list-icon {
+  width: 4rem;
+  height: 4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--lex-radius-lg);
+  font-size: 1.875rem;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.skill-list-body {
+  flex: 1;
+}
+
+.skill-list-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.skill-list-name {
+  font-size: var(--lex-h5-size, 1.125rem);
+  font-weight: var(--lex-weight-semibold);
+  color: var(--lex-text-primary);
+}
+
+.skill-list-version {
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  color: var(--lex-text-tertiary);
+}
+
+.skill-list-description {
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  color: var(--lex-text-secondary);
+  margin-bottom: 0.75rem;
+}
+
+.skill-list-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  color: var(--lex-text-tertiary);
+}
+
+/* ── Category Badges ────────────────────────────────────────────── */
+/* These use semantic category colours intentionally — they are
+   content-level colour coding, not brand-level UI chrome. */
+
+.category-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--lex-radius-full);
+  font-size: var(--lex-body-xs-size, 0.75rem);
+  font-weight: var(--lex-weight-medium);
+}
+
+.category-document-intelligence {
+  background: var(--lex-status-info-bg);
+  color: var(--lex-status-info-text);
+}
+
+.category-ai-assistance {
+  background: #f3e8ff;
+  color: #6b21a8;
+}
+
+.category-automation {
+  background: var(--lex-status-success-bg);
+  color: var(--lex-status-success-text);
+}
+
+.category-workflow {
+  background: var(--lex-status-warning-bg);
+  color: var(--lex-status-warning-text);
+}
+
+.category-integration {
+  background: #fce7f3;
+  color: #9d174d;
+}
+
+/* ── Filter Chips ───────────────────────────────────────────────── */
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  background: var(--lex-bg-accent-muted);
+  color: var(--lex-text-accent);
+  border-radius: var(--lex-radius-full);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+}
+
+.filter-chip-remove {
+  cursor: pointer;
+  transition: color var(--lex-transition-fast);
+}
+
+.filter-chip-remove:hover {
+  color: var(--lex-text-accent-hover);
+}
+
+/* ── Modal Overlay (raw HTML modals) ────────────────────────────── */
+/* These raw modal classes remain because skills.js uses
+   classList.add/remove('hidden') to control visibility.
+   They are styled with Lex tokens for consistency. */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: var(--lex-z-modal);
+  overflow-y: auto;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--lex-modal-overlay, rgba(13, 8, 7, 0.5));
+  transition: opacity var(--lex-transition-normal);
+}
+
+.modal-content {
+  position: relative;
+  background: var(--lex-bg-elevated);
+  border-radius: var(--lex-modal-radius, var(--lex-radius-xl));
+  box-shadow: var(--lex-modal-shadow, var(--lex-shadow-xl));
+  border: 1px solid var(--lex-border-default);
+  margin: 2rem auto;
+  max-width: 42rem;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--lex-border-subtle);
+}
+
+.modal-header h3 {
+  font-size: var(--lex-h6-size, 1rem);
+  font-weight: var(--lex-weight-semibold);
+  color: var(--lex-text-primary);
+}
+
+.modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  font-size: 1.5rem;
+  font-weight: var(--lex-weight-bold);
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--lex-text-tertiary);
+  border-radius: var(--lex-radius-md);
+  transition: background var(--lex-transition-fast), color var(--lex-transition-fast);
+  line-height: 1;
+}
+
+.modal-close:hover {
+  background: var(--lex-bg-tertiary);
+  color: var(--lex-text-primary);
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--lex-border-subtle);
+  background: var(--lex-bg-secondary);
+  border-radius: 0 0 var(--lex-modal-radius, var(--lex-radius-xl)) var(--lex-modal-radius, var(--lex-radius-xl));
+}
+
+/* ── Skill Details Modal ────────────────────────────────────────── */
+
+.skill-detail-section {
+  margin-bottom: 1.5rem;
+}
+
+.skill-detail-section-title {
+  font-size: var(--lex-body-xs-size, 0.75rem);
+  font-weight: var(--lex-weight-semibold);
+  color: var(--lex-text-secondary);
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.skill-detail-info {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.skill-detail-info-item {
+  font-size: var(--lex-body-sm-size, 0.875rem);
+}
+
+.skill-detail-info-label {
+  color: var(--lex-text-secondary);
+  font-weight: var(--lex-weight-medium);
+}
+
+.skill-detail-info-value {
+  color: var(--lex-text-primary);
+}
+
+.skill-detail-list {
+  list-style: disc;
+  list-style-position: inside;
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  color: var(--lex-text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.skill-detail-code {
+  background: var(--lex-bg-secondary);
+  border-radius: var(--lex-radius-md);
+  padding: 0.75rem;
+  font-size: var(--lex-body-xs-size, 0.75rem);
+  font-family: var(--lex-font-mono);
+  color: var(--lex-text-primary);
+  overflow-x: auto;
+}
+
+/* ── Matter Selector ────────────────────────────────────────────── */
+
+.matter-item {
+  padding: 1rem;
+  cursor: pointer;
+  transition: background var(--lex-transition-fast);
+}
+
+.matter-item:hover {
+  background: var(--lex-bg-secondary);
+}
+
+.matter-item.selected {
+  background: var(--lex-bg-accent-soft);
+}
+
+.matter-item-checkbox {
+  width: 1rem;
+  height: 1rem;
+  border-radius: var(--lex-radius-sm);
+  border: 1px solid var(--lex-border-strong);
+  accent-color: var(--lex-bg-accent);
+}
+
+.matter-item-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.matter-item-name {
+  font-weight: var(--lex-weight-medium);
+  color: var(--lex-text-primary);
+}
+
+.matter-item-meta {
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  color: var(--lex-text-secondary);
+}
+
+/* ── Toast Notifications ────────────────────────────────────────── */
+/* The raw toast container (#toast-container) is kept in the DOM as a
+   fallback. Lex.Toast renders its own managed container.
+   These styles support the legacy showToast() function if still in use. */
+
+.toast {
+  background: var(--lex-bg-elevated);
+  border-radius: var(--lex-radius-lg);
+  box-shadow: var(--lex-shadow-lg);
+  border: 1px solid var(--lex-border-default);
+  padding: 1rem;
+  max-width: 20rem;
+  transition: transform var(--lex-transition-slow), opacity var(--lex-transition-slow);
+  animation: skills-toast-in 0.3s ease-out;
+}
+
+.toast.success {
+  border-left: 3px solid var(--lex-color-success-500);
+}
+
+.toast.error {
+  border-left: 3px solid var(--lex-color-danger-500);
+}
+
+.toast.warning {
+  border-left: 3px solid var(--lex-color-warning-500);
+}
+
+.toast-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.toast-icon {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.toast-icon.success {
+  color: var(--lex-color-success-500);
+}
+
+.toast-icon.error {
+  color: var(--lex-color-danger-500);
+}
+
+.toast-icon.warning {
+  color: var(--lex-color-warning-500);
+}
+
+.toast-message {
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  color: var(--lex-text-primary);
+  flex: 1;
+}
+
+.toast-close {
+  color: var(--lex-text-tertiary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color var(--lex-transition-fast);
+}
+
+.toast-close:hover {
+  color: var(--lex-text-primary);
+}
+
+@keyframes skills-toast-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* ── View Toggle Active State ───────────────────────────────────── */
+
+#grid-view-btn[variant="primary"],
+#list-view-btn[variant="primary"] {
+  /* lex-btn handles active variant via its internal styles */
+}
+
+/* ── Responsive ─────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .skills-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .skill-list-content {
+    flex-direction: column;
+  }
+
+  .skill-list-icon {
+    width: 3rem;
+    height: 3rem;
+    font-size: 1.5rem;
+  }
+}
+
+/* ── Utility: line clamp ─────────────────────────────────────────── */
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

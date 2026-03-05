@@ -304,18 +304,46 @@ const Insights = {
   },
 
   /**
-   * Get funnel data
+   * Get funnel data, optionally filtered by pipeline or category.
+   *
+   * @param {Object} filters - { pipeline_id, pipeline_category }
+   *   pipeline_category defaults to 'new_lead' on the backend.
+   *   Pass pipeline_category='all' for unfiltered view.
    */
   async getFunnelData(filters = {}) {
-    // DEMO MODE - Uncomment to show mock data
-    // if (api.isDemoMode()) {
-    //   await MockData.delay(450);
-    //   return InsightsMockData.funnelData;
-    // }
-    // return api.get('/api/v1/insights/funnel', filters);
+    if (api.isDemoMode()) {
+      return InsightsEmptyState.funnelData;
+    }
 
-    // Empty state - no data available yet
-    return InsightsEmptyState.funnelData;
+    try {
+      const params = new URLSearchParams();
+      if (filters.pipeline_id) params.set('pipeline_id', filters.pipeline_id);
+      if (filters.pipeline_category) params.set('pipeline_category', filters.pipeline_category);
+
+      const queryStr = params.toString();
+      const url = queryStr ? `/api/v1/insights/funnel?${queryStr}` : '/api/v1/insights/funnel';
+      return await api.get(url);
+    } catch (err) {
+      console.error('[Insights] Failed to fetch funnel data:', err);
+      return InsightsEmptyState.funnelData;
+    }
+  },
+
+  /**
+   * Get available pipelines for funnel filter dropdowns.
+   *
+   * @param {Object} filters - { pipeline_category }
+   * @returns {Promise<Object>} { data: [...], metadata: {...} }
+   */
+  async getPipelines(filters = {}) {
+    try {
+      const params = new URLSearchParams({ limit: '50' });
+      if (filters.pipeline_category) params.set('pipeline_category', filters.pipeline_category);
+      return await api.get(`/api/v1/pipelines?${params.toString()}`);
+    } catch (err) {
+      console.error('[Insights] Failed to fetch pipelines:', err);
+      return { data: [] };
+    }
   },
 
   /**

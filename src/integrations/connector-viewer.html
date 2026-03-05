@@ -531,6 +531,19 @@
                   localStorage.setItem('token', "${token}");
                   console.log('[Connector UI] Config injected - API URL:', window.LanaConfig.API_BASE_URL);
                   console.log('[Connector UI] Token injected:', "${token}" ? "${token}".substring(0, 20) + "..." : "NO TOKEN");
+
+                  // Patch fetch to resolve relative URLs against the API base URL
+                  // (blob:// origins cannot resolve relative paths like /api/...)
+                  (function() {
+                    var _originalFetch = window.fetch;
+                    var _apiBase = (window.LanaConfig && window.LanaConfig.API_BASE_URL) || '';
+                    window.fetch = function(input, init) {
+                      if (typeof input === 'string' && input.startsWith('/') && _apiBase) {
+                        input = _apiBase + input;
+                      }
+                      return _originalFetch.call(this, input, init);
+                    };
+                  })();
                 <\/script>
               `;
 

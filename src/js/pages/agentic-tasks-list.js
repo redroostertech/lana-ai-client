@@ -188,8 +188,8 @@
     // Status filter
     var statusFilterEl = el('atStatusFilter');
     if (statusFilterEl) {
-      statusFilterEl.addEventListener('change', function () {
-        var val = statusFilterEl.value || statusFilterEl.getAttribute('value') || '';
+      statusFilterEl.addEventListener('lex-change', function (e) {
+        var val = (e.detail && e.detail.value) || statusFilterEl.value || '';
         _statusFilter = (val === 'all') ? '' : val;
         _currentPage = 1;
         loadTasks();
@@ -199,8 +199,8 @@
     // Priority filter
     var priorityFilterEl = el('atPriorityFilter');
     if (priorityFilterEl) {
-      priorityFilterEl.addEventListener('change', function () {
-        _priorityFilter = priorityFilterEl.value || '';
+      priorityFilterEl.addEventListener('lex-change', function (e) {
+        _priorityFilter = (e.detail && e.detail.value !== undefined) ? e.detail.value : '';
         _currentPage = 1;
         loadTasks();
       });

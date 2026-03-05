@@ -148,7 +148,9 @@
         if (!res.ok) return { messages: [], pagination: null, hasMore: false };
 
         const data = await res.json();
-        const rawMessages = data.messages || [];
+        const rawMessages = (data.messages || []).filter(function (m) {
+          return m.role !== 'tool' && m.role !== 'system';
+        });
 
         // Reverse from desc order to chronological
         const messages = rawMessages.reverse().map(function (m) {

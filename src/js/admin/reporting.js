@@ -2402,6 +2402,19 @@
       insightsChatEl.loadConversation(thread.thread_id);
     });
 
+    // Auto-select page_general thread when threads finish loading
+    insightsDrawer.addEventListener('lex-threads-loaded', function (e) {
+      var threads = e.detail && e.detail.threads;
+      if (!threads || !threads.length || !insightsChatEl) return;
+      for (var i = 0; i < threads.length; i++) {
+        if (threads[i].thread_type === 'page_general' && threads[i].thread_id) {
+          insightsChatEl.loadConversation(threads[i].thread_id);
+          if (insightsThreadsEl) insightsThreadsEl.setActiveThread(threads[i].id);
+          break;
+        }
+      }
+    });
+
     // Wire new thread creation
     insightsDrawer.addEventListener('lex-thread-create', function () {
       if (!insightsChatEl) return;
@@ -2423,19 +2436,21 @@
         });
       }
 
-      // Check if this conversation is already linked to a thread
       var threadsComp = insightsThreadsEl;
       if (threadsComp && threadsComp._threads && threadsComp._threads.length > 0) {
-        // If there are already threads and no active thread was selected,
-        // register this as a page_general thread
-        var hasPageGeneral = false;
         for (var i = 0; i < threadsComp._threads.length; i++) {
           if (threadsComp._threads[i].thread_type === 'page_general') {
-            hasPageGeneral = true;
-            break;
+            // Update existing page_general thread's thread_id to stay in sync
+            var existingThread = threadsComp._threads[i];
+            existingThread.thread_id = conversationId;
+            api.put('/api/v1/conversation-threads/' + existingThread.id, {
+              thread_id: conversationId
+            }).catch(function (err) {
+              console.warn('[Reporting] Failed to update page thread thread_id:', err);
+            });
+            return;
           }
         }
-        if (hasPageGeneral) return;
       }
 
       // Create page general thread — link it to the actual conversation session

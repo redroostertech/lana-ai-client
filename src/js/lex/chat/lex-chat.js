@@ -131,7 +131,9 @@
 
       // Composer send
       this.addEventListener('lex-composer-send', (e) => {
-        this.send(e.detail.content);
+        const opts = {};
+        if (e.detail.attachments) opts.attachments = e.detail.attachments;
+        this.send(e.detail.content, opts);
       });
 
       // Composer stop
@@ -324,6 +326,12 @@
         sendOpts.contextType = 'agentic_mode';
       } else if (this.chatMode === 'document') {
         sendOpts.contextType = 'document_chat';
+        // Auto-include pinned documents as attachments in document chat mode
+        if (this._documents && this._documents.length > 0 && !sendOpts.attachments) {
+          sendOpts.attachments = {
+            files: this._documents.map(d => ({ file_id: d.id, name: d.filename || d.name }))
+          };
+        }
       } else if (this.chatMode === 'insights') {
         sendOpts.contextType = 'insights_chat';
       }
