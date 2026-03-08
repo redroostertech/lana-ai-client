@@ -139,6 +139,9 @@
               <button onclick="switchTab('workflows')" id="tab-workflows" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
                 Workflows
               </button>
+              <button onclick="switchTab('analytics')" id="tab-analytics" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                Analytics
+              </button>
             </nav>
           </div>
 
@@ -434,7 +437,16 @@
       document.getElementById('dashboardContent').classList.add('hidden');
 
       try {
-        const result = await api.get('/api/v1/leadly/dashboard');
+        // Build query params with pipeline filters
+        const params = new URLSearchParams();
+        if (currentPipelineCategory && currentPipelineCategory !== 'all') {
+          params.set('pipeline_category', currentPipelineCategory);
+        }
+        if (currentPipelineId) {
+          params.set('pipeline_id', currentPipelineId);
+        }
+        const qs = params.toString();
+        const result = await api.get('/api/v1/leadly/dashboard' + (qs ? '?' + qs : ''));
         dashboardData = result;
 
         // Always show dashboard content with tabs, regardless of configuration status
@@ -537,6 +549,7 @@
       currentPipelineId = '';
       document.getElementById('pipelineSelect').value = '';
       loadPipelineOptions(category);
+      loadDashboard();
     }
 
     /**
@@ -544,6 +557,7 @@
      */
     function onPipelineChange(pipelineId) {
       currentPipelineId = pipelineId;
+      loadDashboard();
     }
 
     // Load pipeline options on dashboard init
@@ -592,6 +606,9 @@
           case 'workflows':
             await loadWorkflows();
             break;
+          case 'analytics':
+            await loadAnalyticsTab();
+            break;
           default:
             await loadOverview();
         }
@@ -625,6 +642,130 @@
         }
       }
     }
+
+    // ---- Analytics Tab ----
+    // Analytics reports (Data Quality, Marketing Attribution, Funnel) are rendered
+    // by the generic reporting system at admin/reporting.html via module definitions.
+    // This tab provides quick-glance summaries and links to the full reports.
+
+    async function loadAnalyticsTab() {
+      const content = document.getElementById('tabContent');
+
+      content.innerHTML = `
+        <div class="space-y-6">
+          <!-- Report Module Links -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Data Quality -->
+            <a href="../admin/reporting.html?module=data-quality-analysis" class="block bg-white rounded-lg border border-gray-200 p-6 hover:border-amber-300 hover:shadow-md transition-all group">
+              <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                  <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900 group-hover:text-amber-700">Data Quality</h3>
+              </div>
+              <p class="text-sm text-gray-500 mb-4">Duplicates, name mismatches, false unknowns, and guest contacts</p>
+              <span class="text-sm font-medium text-amber-600 group-hover:text-amber-700 inline-flex items-center gap-1">
+                Open Report
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+              </span>
+            </a>
+
+            <!-- Marketing Attribution -->
+            <a href="../admin/reporting.html?module=marketing-attribution-analysis" class="block bg-white rounded-lg border border-gray-200 p-6 hover:border-teal-300 hover:shadow-md transition-all group">
+              <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center">
+                  <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900 group-hover:text-teal-700">Marketing Attribution</h3>
+              </div>
+              <p class="text-sm text-gray-500 mb-4">Contact sources, first/last touch channels, campaign performance, and revenue attribution</p>
+              <span class="text-sm font-medium text-teal-600 group-hover:text-teal-700 inline-flex items-center gap-1">
+                Open Report
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+              </span>
+            </a>
+
+            <!-- Funnel Analysis -->
+            <a href="../admin/reporting.html?module=funnel-analysis-attribution" class="block bg-white rounded-lg border border-gray-200 p-6 hover:border-blue-300 hover:shadow-md transition-all group">
+              <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900 group-hover:text-blue-700">Funnel Analysis</h3>
+              </div>
+              <p class="text-sm text-gray-500 mb-4">Pipeline stage progression, conversion rates, and stage value analysis</p>
+              <span class="text-sm font-medium text-blue-600 group-hover:text-blue-700 inline-flex items-center gap-1">
+                Open Report
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+              </span>
+            </a>
+          </div>
+
+          <!-- Recent Changes (Leadly-specific, not a report module) -->
+          <div class="bg-white rounded-lg border border-gray-200">
+            <div class="px-6 py-4 border-b border-gray-200 flex items-center gap-3">
+              <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900">Recent Changes</h3>
+                <p class="text-sm text-gray-500">Records changed since last sync</p>
+              </div>
+            </div>
+            <div id="recentChangesBody" class="p-6">
+              <div class="flex justify-center py-4"><div class="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600"></div></div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      loadRecentChanges();
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // -- Recent Changes (Leadly-specific sync tracking) --
+    async function loadRecentChanges() {
+      const body = document.getElementById('recentChangesBody');
+      try {
+        const result = await api.get('/api/v1/leadly/dashboard/changes');
+        const changes = result.changes || [];
+
+        if (changes.length === 0) {
+          body.innerHTML = '<p class="text-sm text-gray-500 text-center py-2">No changes detected since last sync</p>';
+          return;
+        }
+
+        body.innerHTML = `
+          <div class="flex items-center justify-between mb-4">
+            <span class="text-sm text-gray-600">${formatNumber(result.total)} records changed since ${result.since ? new Date(result.since).toLocaleString() : 'last sync'}</span>
+          </div>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            ${changes.map(c => {
+              const label = c.entity_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+              return `
+                <div class="bg-gray-50 rounded-lg p-3 text-center">
+                  <p class="text-xs text-gray-500">${escapeHtml(label)}</p>
+                  <p class="text-lg font-bold text-gray-900">${formatNumber(c.total)}</p>
+                  <div class="flex justify-center gap-2 mt-1 text-xs">
+                    <span class="text-green-600">+${c.inserted} new</span>
+                    <span class="text-blue-600">${c.updated} upd</span>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      } catch (err) {
+        body.innerHTML = '<p class="text-sm text-gray-500 text-center py-2">Unable to load change data</p>';
+      }
+    }
+    // ---- End Analytics Tab ----
 
     // Global uploader instance
     // Load Run Tab (Manual Sync)

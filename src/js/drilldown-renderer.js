@@ -341,7 +341,7 @@ class DrilldownRenderer {
     this.init();
 
     // Extract options (support both object and legacy separate params)
-    const { periodStart, periodEnd, organizationId } = options;
+    const { periodStart, periodEnd, organizationId, ...extraFilters } = options;
 
     if (!periodStart || !periodEnd) {
       console.error('[DrilldownRenderer] Missing periodStart or periodEnd in options');
@@ -375,6 +375,7 @@ class DrilldownRenderer {
         periodStart,
         periodEnd,
         organizationId,
+        extraFilters,
         ...config.drilldown
       };
 
@@ -517,6 +518,11 @@ class DrilldownRenderer {
           search: this.searchQuery
         };
 
+        // Add extra filters passed from funnel stage click etc.
+        if (this.currentConfig.extraFilters) {
+          Object.assign(requestBody, this.currentConfig.extraFilters);
+        }
+
         // Add view filter if set (from clicking summary cards)
         if (this.currentViewFilter) {
           requestBody.viewFilter = this.currentViewFilter;
@@ -551,6 +557,11 @@ class DrilldownRenderer {
           filters: this.filters,
           search: this.searchQuery
         };
+
+        // Add extra filters passed from funnel stage click etc.
+        if (this.currentConfig.extraFilters) {
+          Object.assign(requestBody, this.currentConfig.extraFilters);
+        }
 
         // Add view filter if set (from clicking summary cards)
         if (this.currentViewFilter) {

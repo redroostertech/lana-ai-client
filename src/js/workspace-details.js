@@ -571,7 +571,7 @@
   }
 
   function switchMatterTab(tab) {
-    var tabs = ['activity', 'notes', 'tasks', 'comments', 'documents', 'conversations', 'skills', 'docGeneration'];
+    var tabs = ['activity', 'notes', 'tasks', 'comments', 'documents', 'conversations', 'skills', 'docGeneration', 'analytics'];
     var activeBtn = null;
 
     tabs.forEach(function (t) {
@@ -632,6 +632,9 @@
       case 'docGeneration':
         renderDocGenerationTab(m.matter);
         break;
+      case 'analytics':
+        renderMatterAnalyticsTab(m.matter);
+        break;
     }
 
     // Update URL param without navigation
@@ -639,7 +642,7 @@
   }
 
   function getCurrentActiveTab() {
-    var tabs = ['activity', 'notes', 'tasks', 'comments', 'documents', 'conversations', 'skills', 'docGeneration'];
+    var tabs = ['activity', 'notes', 'tasks', 'comments', 'documents', 'conversations', 'skills', 'docGeneration', 'analytics'];
     for (var i = 0; i < tabs.length; i++) {
       var content = document.getElementById('tabContent' + tabs[i].charAt(0).toUpperCase() + tabs[i].substring(1));
       if (content && !content.classList.contains('hidden')) return tabs[i];
@@ -1049,6 +1052,9 @@
     if (!currentMatterData || !currentMatterData.matter_id) return;
     var matterId = currentMatterData.matter_id;
     var activeTab = getCurrentActiveTab();
+
+    // Reset analytics cache so refreshed data is fetched on next visit
+    _analyticsLoaded = false;
 
     redactPage(true);
     await loadMatterDetails(matterId, { bustCache: true });
@@ -7894,6 +7900,104 @@
    'editTemplateSet', 'deleteTemplateSet', 'analyzeTemplateSet',
    'submitDocGeneration', 'addDocGenCustomVar', 'removeDocGenCustomVar',
    'copyGeneratedContent', 'closeDocGenOutputModal'].forEach(_trackGlobal);
+
+  // =========================================================================
+  // Analytics Tab
+  // =========================================================================
+
+  var _analyticsLoaded = false;
+
+  function _buildMatterAnalyticsPlaceholders() {
+    var html = '';
+    for (var i = 0; i < 7; i++) {
+      html += '<div style="background:white;border:1px solid #e5e7eb;border-radius:0.5rem;padding:1rem;">';
+      html += '<div style="height:0.75rem;width:60%;background:#e5e7eb;border-radius:0.25rem;margin-bottom:0.5rem;"></div>';
+      html += '<div style="height:1.5rem;width:40%;background:#e5e7eb;border-radius:0.25rem;"></div>';
+      html += '</div>';
+    }
+    return html;
+  }
+
+  function _renderMatterAnalyticsCards(data) {
+    var cardsEl = document.getElementById('matterAnalyticsCards');
+    if (!cardsEl) return;
+
+    var cards = [
+      { label: 'Documents', value: String(data.documents_count || 0) },
+      { label: 'Notes', value: String(data.notes_count || 0) },
+      { label: 'Tasks', value: String(data.tasks_completed || 0) + ' / ' + String(data.tasks_total || 0), sublabel: 'completed' },
+      { label: 'Overdue Tasks', value: String(data.tasks_overdue || 0), highlight: (data.tasks_overdue || 0) > 0 },
+      { label: 'Hours Billed', value: parseFloat(data.time_total_hours || 0).toFixed(1) },
+      { label: 'Contacts', value: String(data.contacts_count_org_level || 0), sublabel: 'org-wide' }
+    ];
+
+    var html = '';
+
+    cards.forEach(function (card) {
+      var borderStyle = card.highlight ? 'border-color:#ef4444;' : '';
+      var valueColor = card.highlight ? 'color:#ef4444;' : 'color:#111827;';
+      html += '<div style="background:white;border:1px solid #e5e7eb;border-radius:0.5rem;padding:1rem;' + borderStyle + '">';
+      html += '<p style="font-size:0.75rem;color:#6b7280;margin:0 0 0.25rem 0;">' + escapeHtml(card.label) + '</p>';
+      html += '<p style="font-size:1.5rem;font-weight:600;margin:0;' + valueColor + '">' + escapeHtml(card.value) + '</p>';
+      if (card.sublabel) {
+        html += '<p style="font-size:0.675rem;color:#9ca3af;margin:0.125rem 0 0 0;">' + escapeHtml(card.sublabel) + '</p>';
+      }
+      html += '</div>';
+    });
+
+    // Last activity card
+    if (data.last_activity_at) {
+      var lastDate = new Date(data.last_activity_at);
+      var now = new Date();
+      var daysSince = Math.floor((now - lastDate) / (1000 * 60 * 60 * 24));
+      var timeAgo = daysSince === 0 ? 'Today' : daysSince === 1 ? 'Yesterday' : String(daysSince) + ' days ago';
+      html += '<div style="background:white;border:1px solid #e5e7eb;border-radius:0.5rem;padding:1rem;">';
+      html += '<p style="font-size:0.75rem;color:#6b7280;margin:0 0 0.25rem 0;">Last Activity</p>';
+      html += '<p style="font-size:1.5rem;font-weight:600;margin:0;color:#111827;">' + escapeHtml(timeAgo) + '</p>';
+      html += '</div>';
+    }
+
+    cardsEl.innerHTML = html;
+  }
+
+  function renderMatterAnalyticsTab(matter) {
+    var cardsEl = document.getElementById('matterAnalyticsCards');
+    var emptyEl = document.getElementById('matterAnalyticsEmpty');
+    var errorEl = document.getElementById('matterAnalyticsError');
+    if (!cardsEl) return;
+
+    // Only fetch once per page load; subsequent tab switches show cached content
+    if (_analyticsLoaded) return;
+    _analyticsLoaded = true;
+
+    if (emptyEl) emptyEl.style.display = 'none';
+    if (errorEl) errorEl.style.display = 'none';
+    cardsEl.style.display = 'grid';
+
+    // Show skeleton placeholders while loading
+    cardsEl.innerHTML = _buildMatterAnalyticsPlaceholders();
+
+    var matterId = matter && matter.matter_id;
+    if (!matterId) {
+      cardsEl.style.display = 'none';
+      if (emptyEl) emptyEl.style.display = '';
+      _analyticsLoaded = false;
+      return;
+    }
+
+    api.get('/api/v1/matters/' + encodeURIComponent(matterId) + '/analytics')
+      .then(function (response) {
+        var data = (response && response.data) ? response.data : response;
+        _renderMatterAnalyticsCards(data);
+      })
+      .catch(function (err) {
+        console.error('[workspace-details] Failed to load matter analytics:', err);
+        cardsEl.style.display = 'none';
+        if (errorEl) errorEl.style.display = '';
+        // Reset flag so user can retry by leaving and re-entering the tab
+        _analyticsLoaded = false;
+      });
+  }
 
   // =========================================================================
   // Window Globals (for onclick handlers in HTML)

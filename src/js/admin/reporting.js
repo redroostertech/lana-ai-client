@@ -62,6 +62,13 @@
     if (errEl) errEl.style.display = 'none';
   }
 
+  // Escape HTML to prevent XSS when inserting values into innerHTML
+  function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
   // Format currency
   function formatCurrency(value) {
     if (value === null || value === undefined) return 'N/A';
@@ -417,6 +424,12 @@
   // ==========================================================================
 
   async function executeModule() {
+    // If an imported report is selected, execute via V2 endpoint
+    if (selectedImportedReportId) {
+      await executeImportedReport();
+      return;
+    }
+
     if (!selectedModuleKey) {
       showError('Please select a report module from the sidebar.');
       return;
@@ -718,6 +731,48 @@
   function closeDrilldownModal() {
     var modal = document.getElementById('drilldownModal');
     if (modal) modal.classList.add('hidden');
+  }
+
+  async function showFunnelStageDrilldown(stageInfo) {
+    try {
+      var pipelineId = stageInfo.pipeline_id;
+      var position = stageInfo.position !== undefined ? stageInfo.position : 0;
+      var periodStart = document.getElementById('periodStart') ? document.getElementById('periodStart').value + 'T00:00:00Z' : '';
+      var periodEnd = document.getElementById('periodEnd') ? document.getElementById('periodEnd').value + 'T23:59:59Z' : '';
+      var moduleKey = selectedModuleKey || 'funnel-analysis-attribution';
+
+      if (!drilldownRenderer) {
+        drilldownRenderer = new DrilldownRenderer();
+        window.drilldownRenderer = drilldownRenderer;
+      }
+
+      await drilldownRenderer.open(moduleKey, 'funnel_stage_progression', {
+        periodStart: periodStart,
+        periodEnd: periodEnd,
+        drill_source: stageInfo.label || '',
+        pipeline_id: pipelineId || '',
+        position: position
+      });
+    } catch (error) {
+      console.error('Failed to open funnel drilldown:', error);
+      // Fallback to simple modal if DrilldownRenderer fails
+      var modal = document.getElementById('drilldownModal');
+      var title = document.getElementById('drilldownTitle');
+      var content = document.getElementById('drilldownContent');
+      if (modal && title && content) {
+        title.textContent = (stageInfo.pipelineName || '') + ' — ' + (stageInfo.label || 'Stage');
+        content.innerHTML = '<div class="text-center py-8 text-red-600">Failed to load drilldown: ' + (error.message || 'Unknown error') + '</div>';
+        modal.classList.remove('hidden');
+      }
+    }
+  }
+
+
+  function escapeHtml(text) {
+    if (!text || text === 'N/A') return text || '';
+    var div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 
   async function tryGenericDrilldown(content, moduleKey, metricKey, periodStart, periodEnd) {
@@ -1182,8 +1237,10 @@
             btn.appendChild(note);
           } else {
             btn.addEventListener('click', function () {
-              // Clear all selections
-              moduleMenu.querySelectorAll('button[data-module-key]').forEach(function (b) {
+              // Deselect any imported report
+              selectedImportedReportId = null;
+              // Clear all selections (modules + imported reports)
+              moduleMenu.querySelectorAll('button[data-module-key], button[data-report-id]').forEach(function (b) {
                 b.style.background = 'none';
                 b.style.color = 'var(--lex-text-primary)';
               });
@@ -1264,7 +1321,7 @@
   function filterModules(searchQuery, moduleMenu, emptyEl) {
     if (!moduleMenu) return;
 
-    var moduleItems = moduleMenu.querySelectorAll('button[data-module-key]');
+    var moduleItems = moduleMenu.querySelectorAll('button[data-module-key], button[data-report-id]');
     var categorySections = moduleMenu.querySelectorAll('[data-category-section]');
 
     if (!searchQuery) {
@@ -1395,10 +1452,12 @@
       case 'comparison_chart': return renderComparisonChart(viz, data, uniqueId);
       case 'pie_chart': return renderPieChart(viz, data, uniqueId);
       case 'funnel_chart': return renderFunnelChart(viz, data, uniqueId);
+      case 'funnel_insight_panels': return renderFunnelInsightPanels(viz, data, uniqueId);
       case 'bubble_chart': return renderBubbleChart(viz, data, uniqueId);
       case 'grouped_bar_chart': return renderGroupedBarChart(viz, data, uniqueId);
       case 'bar_chart':
       case 'horizontal_bar_chart': return renderHorizontalBarChart(viz, data, uniqueId);
+      case 'attribution_summary': return renderAttributionSummary(viz, data, uniqueId);
       case 'table': return renderTable(viz, data, uniqueId);
       default:
         console.warn('[Reporting] Unknown visualization type:', viz.type);
@@ -1592,11 +1651,334 @@
     containerDiv.className = 'mb-6';
 
     var renderer = new FunnelChartRenderer(containerId, metric.current, {
-      title: viz.title || 'Funnel Chart', description: viz.description, helpText: viz.helpText
+      title: viz.title || 'Funnel Chart', description: viz.description, helpText: viz.helpText,
+      onStageClick: function (stageInfo) {
+        showFunnelStageDrilldown(stageInfo);
+      },
+      onTabSwitch: function (tabInfo) {
+        var insightContainer = document.getElementById('funnel-insights-container');
+        if (insightContainer && window._funnelInsightData) {
+          renderInsightPanelsForPipeline(tabInfo.pipelineId, tabInfo.pipelineName, insightContainer);
+        }
+      }
     });
     chartInstances[containerId] = renderer;
     setTimeout(function () { renderer.render(); }, 0);
     return containerDiv;
+  }
+
+  /**
+   * Render funnel insight panels — contextual drop-off diagnostics per pipeline
+   */
+  function renderFunnelInsightPanels(viz, data, uniqueId) {
+    // Extract referenced metrics and group by pipeline_id
+    var insightData = {};
+    var metricKeys = viz.metrics || [];
+
+    for (var m = 0; m < metricKeys.length; m++) {
+      var metricKey = metricKeys[m];
+      var metric = null;
+      for (var i = 0; i < data.metrics.length; i++) {
+        if (data.metrics[i].key === metricKey) { metric = data.metrics[i]; break; }
+      }
+      if (!metric || !Array.isArray(metric.current)) continue;
+
+      var grouped = {};
+      for (var r = 0; r < metric.current.length; r++) {
+        var row = metric.current[r];
+        var pid = row.pipeline_id || '_all';
+        if (!grouped[pid]) grouped[pid] = [];
+        grouped[pid].push(row);
+      }
+      insightData[metricKey] = { grouped: grouped, raw: metric.current };
+    }
+
+    // Store globally for onTabSwitch access
+    window._funnelInsightData = insightData;
+
+    var containerDiv = document.createElement('div');
+    containerDiv.id = 'funnel-insights-container';
+    containerDiv.className = 'mb-6';
+
+    // Initial render will be triggered by FunnelChartRenderer's onTabSwitch on first render
+    // If no tab switch fires (e.g. data issue), show a placeholder
+    setTimeout(function () {
+      if (containerDiv.children.length === 0) {
+        // Find first pipeline_id from any metric
+        var firstPipelineId = '';
+        var firstPipelineName = '';
+        for (var key in insightData) {
+          for (var pid in insightData[key].grouped) {
+            if (pid !== '_all') {
+              firstPipelineId = pid;
+              var rows = insightData[key].grouped[pid];
+              if (rows.length > 0 && rows[0].pipeline_name) firstPipelineName = rows[0].pipeline_name;
+              break;
+            }
+          }
+          if (firstPipelineId) break;
+        }
+        if (firstPipelineId) {
+          renderInsightPanelsForPipeline(firstPipelineId, firstPipelineName, containerDiv);
+        }
+      }
+    }, 200);
+
+    return containerDiv;
+  }
+
+  /**
+   * Render insight panels for a specific pipeline
+   */
+  function renderInsightPanelsForPipeline(pipelineId, pipelineName, container) {
+    var insightData = window._funnelInsightData;
+    if (!insightData) return;
+
+    container.innerHTML = '';
+
+    // Outer card
+    var card = document.createElement('div');
+    card.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6';
+
+    // Header
+    var header = document.createElement('div');
+    header.className = 'mb-5';
+    header.innerHTML = '<h3 class="text-lg font-semibold text-gray-900">Pipeline Drop-Off Insights</h3>' +
+      '<p class="text-sm text-gray-500 mt-1">Why contacts may be falling off in <span class="font-medium text-gray-700">' +
+      escapeHtml(pipelineName || 'this pipeline') + '</span></p>';
+    card.appendChild(header);
+
+    var panelsContainer = document.createElement('div');
+    panelsContainer.className = 'space-y-4';
+
+    // 1. Stagnation Analysis
+    var stagnationRows = getInsightRows(insightData, 'funnel_stagnation_analysis', pipelineId);
+    panelsContainer.appendChild(buildStagnationPanel(stagnationRows));
+
+    // 2. Assignment Gaps
+    var assignmentRows = getInsightRows(insightData, 'funnel_assignment_gaps', pipelineId);
+    panelsContainer.appendChild(buildAssignmentPanel(assignmentRows));
+
+    // 3. Tag Engagement / Win Rate
+    var tagRows = getInsightRows(insightData, 'funnel_tag_engagement', pipelineId);
+    panelsContainer.appendChild(buildTagEngagementPanel(tagRows));
+
+    card.appendChild(panelsContainer);
+
+    // 5. Cross-pipeline tag insights (not filtered by pipeline)
+    var crossTagRows = insightData['funnel_tag_win_correlation'] ? insightData['funnel_tag_win_correlation'].raw : [];
+    if (crossTagRows.length > 0) {
+      var divider = document.createElement('div');
+      divider.className = 'border-t border-gray-100 mt-5 pt-5';
+      // Check if all cross-pipeline rates are 0
+      var allCrossZero = true;
+      for (var ct = 0; ct < crossTagRows.length; ct++) {
+        if (parseFloat(crossTagRows[ct].win_rate) > 0) { allCrossZero = false; break; }
+      }
+      divider.innerHTML = '<h4 class="text-sm font-semibold text-gray-700 mb-1">Cross-Pipeline Tag Insights</h4>' +
+        '<p class="text-xs text-gray-500 mb-3">Tag conversion rates across all pipelines combined</p>' +
+        (allCrossZero ? '<p class="text-xs text-amber-600 mb-3">All conversion rates are 0% \u2014 the won leads\' contacts don\'t have any of these tags assigned in your CRM.</p>' : '');
+      divider.appendChild(buildTagTable(crossTagRows, 'win_rate', 10));
+      card.appendChild(divider);
+    }
+
+    container.appendChild(card);
+  }
+
+  function getInsightRows(insightData, metricKey, pipelineId) {
+    if (!insightData[metricKey]) return [];
+    return insightData[metricKey].grouped[pipelineId] || [];
+  }
+
+  function buildStagnationPanel(rows) {
+    var panel = document.createElement('div');
+    panel.className = 'rounded-lg border border-gray-100 p-4';
+
+    var ruleDesc = '<p class="text-xs text-gray-400 mt-1">Flags open leads that haven\'t moved to a new stage in 30+ days (30\u201360, 60\u201390, or 90+ day buckets).</p>';
+
+    if (rows.length === 0) {
+      panel.innerHTML = '<div class="flex items-start gap-3">' +
+        '<div class="flex-shrink-0 w-8 h-8 rounded-full bg-green-50 flex items-center justify-center"><svg class="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg></div>' +
+        '<div><h4 class="text-sm font-semibold text-gray-900">Stagnation Analysis</h4>' +
+        '<p class="text-sm text-gray-500 mt-0.5">No stagnating opportunities detected</p>' + ruleDesc + '</div></div>';
+      return panel;
+    }
+
+    // Find worst bucket
+    var total = 0;
+    var buckets = {};
+    for (var i = 0; i < rows.length; i++) {
+      buckets[rows[i].label] = { count: parseInt(rows[i].value) || 0, value: parseFloat(rows[i].total_value) || 0 };
+      total += parseInt(rows[i].value) || 0;
+    }
+
+    var severe = buckets['90+ days'];
+    var bannerClass = severe && severe.count > 0 ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200';
+    var iconColor = severe && severe.count > 0 ? 'text-red-600 bg-red-100' : 'text-amber-600 bg-amber-100';
+
+    panel.className = 'rounded-lg border p-4 ' + bannerClass;
+    panel.innerHTML = '<div class="flex items-start gap-3">' +
+      '<div class="flex-shrink-0 w-8 h-8 rounded-full ' + iconColor + ' flex items-center justify-center"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>' +
+      '<div class="flex-1">' +
+        '<h4 class="text-sm font-semibold text-gray-900">Stagnation Analysis</h4>' +
+        '<p class="text-sm text-gray-600 mt-0.5">' + total + ' opportunities have been sitting without stage movement</p>' +
+        '<div class="flex gap-4 mt-3">' +
+          buildStatChip('90+ days', buckets['90+ days'], 'red') +
+          buildStatChip('60-90 days', buckets['60-90 days'], 'amber') +
+          buildStatChip('30-60 days', buckets['30-60 days'], 'yellow') +
+        '</div>' + ruleDesc +
+      '</div></div>';
+
+    return panel;
+  }
+
+  function buildStatChip(label, bucket, color) {
+    var count = bucket ? bucket.count : 0;
+    if (count === 0) return '';
+    var colorMap = { red: 'bg-red-100 text-red-700', amber: 'bg-amber-100 text-amber-700', yellow: 'bg-yellow-100 text-yellow-700' };
+    var cls = colorMap[color] || 'bg-gray-100 text-gray-700';
+    return '<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ' + cls + '">' +
+      label + ': ' + count.toLocaleString() + '</span>';
+  }
+
+  function buildAssignmentPanel(rows) {
+    var panel = document.createElement('div');
+    panel.className = 'rounded-lg border border-gray-100 p-4';
+
+    if (rows.length === 0) {
+      panel.innerHTML = '<div class="flex items-start gap-3">' +
+        '<div class="flex-shrink-0 w-8 h-8 rounded-full bg-green-50 flex items-center justify-center"><svg class="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg></div>' +
+        '<div><h4 class="text-sm font-semibold text-gray-900">Assignment Gaps</h4>' +
+        '<p class="text-sm text-gray-500 mt-0.5">All opportunities have team members assigned</p></div></div>';
+      return panel;
+    }
+
+    var row = rows[0];
+    var pct = parseFloat(row.percentage) || 0;
+    var unassigned = parseInt(row.value) || 0;
+    var total = parseInt(row.total_count) || 0;
+
+    var bannerClass, iconColor;
+    if (pct >= 75) {
+      bannerClass = 'bg-red-50 border-red-200';
+      iconColor = 'text-red-600 bg-red-100';
+    } else if (pct >= 50) {
+      bannerClass = 'bg-amber-50 border-amber-200';
+      iconColor = 'text-amber-600 bg-amber-100';
+    } else {
+      bannerClass = 'bg-blue-50 border-blue-200';
+      iconColor = 'text-blue-600 bg-blue-100';
+    }
+
+    panel.className = 'rounded-lg border p-4 ' + bannerClass;
+    panel.innerHTML = '<div class="flex items-start gap-3">' +
+      '<div class="flex-shrink-0 w-8 h-8 rounded-full ' + iconColor + ' flex items-center justify-center"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg></div>' +
+      '<div class="flex-1">' +
+        '<h4 class="text-sm font-semibold text-gray-900">Assignment Gaps</h4>' +
+        '<p class="text-sm text-gray-600 mt-0.5">' + pct + '% of open opportunities (' + unassigned.toLocaleString() + ' of ' + total.toLocaleString() + ') have no team member assigned</p>' +
+        (pct >= 50 ? '<p class="text-xs text-gray-500 mt-2">Unassigned leads are more likely to fall through the cracks. Consider assigning owners to improve follow-up rates.</p>' : '') +
+      '</div></div>';
+
+    return panel;
+  }
+
+  function buildTagEngagementPanel(rows) {
+    var panel = document.createElement('div');
+    panel.className = 'rounded-lg border border-gray-100 p-4';
+
+    var headerHtml = '<div class="flex items-start gap-3">' +
+      '<div class="flex-shrink-0 w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center"><svg class="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg></div>' +
+      '<div class="flex-1"><h4 class="text-sm font-semibold text-gray-900">Engagement Tag Win Rates</h4>';
+
+    if (rows.length === 0) {
+      panel.innerHTML = headerHtml + '<p class="text-sm text-gray-500 mt-0.5">No engagement tag data available for this pipeline</p>' +
+        '<p class="text-xs text-gray-400 mt-1">Shows CRM contact tags and how often tagged leads convert. Requires contacts to have tags assigned in your CRM.</p></div></div>';
+      return panel;
+    }
+
+    // Check if all conversion rates are 0
+    var allZero = true;
+    for (var t = 0; t < rows.length; t++) {
+      if (parseFloat(rows[t].win_rate) > 0) { allZero = false; break; }
+    }
+
+    panel.innerHTML = headerHtml +
+      '<p class="text-sm text-gray-500 mt-0.5">Tags that correlate with winning deals</p>' +
+      (allZero ? '<p class="text-xs text-amber-600 mt-1">All conversion rates are 0% \u2014 the won leads\' contacts don\'t have any of these tags assigned in your CRM.</p>' : '') +
+      '</div></div>';
+
+    panel.appendChild(buildTagTable(rows, 'win_rate', 8));
+    return panel;
+  }
+
+  function buildTagTable(rows, rateField, limit) {
+    var table = document.createElement('div');
+    table.className = 'mt-3 overflow-hidden rounded-lg border border-gray-200';
+
+    var html = '<table class="w-full text-sm"><thead><tr class="bg-gray-50 border-b border-gray-200">' +
+      '<th class="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase">Tag</th>' +
+      '<th class="text-right px-3 py-2 text-xs font-medium text-gray-500 uppercase">Count</th>' +
+      '<th class="text-right px-3 py-2 text-xs font-medium text-gray-500 uppercase">Conversion</th>' +
+      '<th class="px-3 py-2 w-24"></th></tr></thead><tbody>';
+
+    var shown = Math.min(rows.length, limit);
+    for (var i = 0; i < shown; i++) {
+      var row = rows[i];
+      var winRate = parseFloat(row[rateField]) || 0;
+      var barColor = winRate >= 40 ? 'bg-green-500' : (winRate >= 20 ? 'bg-amber-500' : 'bg-red-400');
+      var textColor = winRate >= 40 ? 'text-green-700' : (winRate >= 20 ? 'text-amber-700' : 'text-red-600');
+      var bgRow = i % 2 === 0 ? '' : 'bg-gray-50';
+
+      html += '<tr class="border-b border-gray-100 ' + bgRow + '">' +
+        '<td class="px-3 py-2 text-gray-900">' + escapeHtml(row.label || '') + '</td>' +
+        '<td class="px-3 py-2 text-right text-gray-600">' + (parseInt(row.value) || 0).toLocaleString() + '</td>' +
+        '<td class="px-3 py-2 text-right font-medium ' + textColor + '">' + winRate + '%</td>' +
+        '<td class="px-3 py-2"><div class="w-full bg-gray-200 rounded-full h-2"><div class="' + barColor + ' h-2 rounded-full" style="width: ' + Math.min(winRate, 100) + '%"></div></div></td></tr>';
+    }
+
+    html += '</tbody></table>';
+    table.innerHTML = html;
+    return table;
+  }
+
+  function buildSourcePanel(rows) {
+    var panel = document.createElement('div');
+    panel.className = 'rounded-lg border border-gray-100 p-4';
+
+    var headerHtml = '<div class="flex items-start gap-3">' +
+      '<div class="flex-shrink-0 w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center"><svg class="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg></div>' +
+      '<div class="flex-1"><h4 class="text-sm font-semibold text-gray-900">Lead Source Performance</h4>';
+
+    if (rows.length === 0) {
+      panel.innerHTML = headerHtml + '<p class="text-sm text-gray-500 mt-0.5">No source data available for this pipeline</p></div></div>';
+      return panel;
+    }
+
+    panel.innerHTML = headerHtml +
+      '<p class="text-sm text-gray-500 mt-0.5">Which lead sources convert best in this pipeline</p></div></div>';
+
+    var barsDiv = document.createElement('div');
+    barsDiv.className = 'mt-3 space-y-2';
+
+    var shown = Math.min(rows.length, 8);
+    for (var i = 0; i < shown; i++) {
+      var row = rows[i];
+      var winRate = parseFloat(row.win_rate) || 0;
+      var wonCount = parseInt(row.won_count) || 0;
+      var decidedCount = parseInt(row.decided_count) || 0;
+      var barColor = winRate >= 40 ? 'bg-green-500' : (winRate >= 20 ? 'bg-amber-500' : 'bg-red-400');
+
+      var barRow = document.createElement('div');
+      barRow.className = 'flex items-center gap-3';
+      barRow.innerHTML =
+        '<div class="w-48 text-sm text-gray-700 truncate" title="' + escapeHtml(row.label || '') + '">' + escapeHtml(row.label || '') + '</div>' +
+        '<div class="flex-1 bg-gray-200 rounded-full h-2.5"><div class="' + barColor + ' h-2.5 rounded-full" style="width: ' + Math.min(winRate, 100) + '%"></div></div>' +
+        '<div class="w-24 text-right text-xs text-gray-500">' + winRate + '% (' + wonCount + '/' + decidedCount + ')</div>';
+      barsDiv.appendChild(barRow);
+    }
+
+    panel.appendChild(barsDiv);
+    return panel;
   }
 
   function renderHorizontalBarChart(viz, data, uniqueId) {
@@ -1642,6 +2024,226 @@
     chartInstances[containerId] = renderer;
     setTimeout(function () { renderer.render(); }, 0);
     return containerDiv;
+  }
+
+  function renderAttributionSummary(viz, data, uniqueId) {
+    var metricKeys = viz.metrics || [];
+    var metricsMap = {};
+    for (var i = 0; i < metricKeys.length; i++) {
+      var key = metricKeys[i];
+      for (var j = 0; j < data.metrics.length; j++) {
+        if (data.metrics[j].key === key) {
+          metricsMap[key] = Array.isArray(data.metrics[j].current) ? data.metrics[j].current : [];
+          break;
+        }
+      }
+      if (!metricsMap[key]) metricsMap[key] = [];
+    }
+
+    var container = document.createElement('div');
+    container.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6';
+
+    var headerHTML = '<div class="mb-6">' +
+      '<h3 class="text-lg font-semibold text-gray-900">' + (viz.title || 'Attribution Insights') + '</h3>' +
+      (viz.description ? '<p class="text-sm text-gray-500 mt-1">' + viz.description + '</p>' : '') +
+      '</div>';
+
+    // Section 1: Lead Journey Paths
+    var multiTouchData = metricsMap['attribution_multi_touch_analysis'] || [];
+    var journeyData = metricsMap['attribution_lead_journeys'] || [];
+
+    // Build insight sentence from multi-touch data
+    var totalAttrLeads = 0;
+    var multiLeads = 0;
+    var multiConv = 0;
+    var singleConv = 0;
+    for (var mt = 0; mt < multiTouchData.length; mt++) {
+      var mtRow = multiTouchData[mt];
+      var mtCount = parseInt(mtRow.value) || 0;
+      totalAttrLeads += mtCount;
+      if (mtRow.label === 'Single Touch') {
+        singleConv = parseFloat(mtRow.win_rate) || 0;
+      } else {
+        multiLeads += mtCount;
+        multiConv = parseFloat(mtRow.win_rate) || 0;
+      }
+    }
+    var multiPct = totalAttrLeads > 0 ? Math.round(100 * multiLeads / totalAttrLeads) : 0;
+
+    var multiTouchHTML = '<div class="mb-8">' +
+      '<h4 class="text-base font-semibold text-gray-700 mb-1">Lead Journey Paths</h4>' +
+      '<p class="text-xs text-gray-400 mb-3">Across all pipelines \u2014 shows first \u2192 last marketing channel for each lead</p>';
+
+    // Insight banner
+    if (totalAttrLeads > 0) {
+      multiTouchHTML += '<div class="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 mb-4">' +
+        '<p class="text-sm text-blue-800">' +
+        '<span class="font-semibold">' + multiPct + '%</span> of leads had 2+ marketing touchpoints. ' +
+        'Multi-touch: <span class="font-semibold">' + multiConv + '%</span> conversion · ' +
+        'Single-touch: <span class="font-semibold">' + singleConv + '%</span> conversion' +
+        '</p></div>';
+    }
+
+    // Journey paths table
+    if (journeyData.length === 0) {
+      multiTouchHTML += '<p class="text-sm text-gray-400">No journey path data available.</p>';
+    } else {
+      multiTouchHTML += '<div class="overflow-hidden rounded-lg border border-gray-200">' +
+        '<table class="w-full text-sm"><thead><tr class="bg-gray-50 border-b border-gray-200">' +
+        '<th class="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase">Journey (First \u2192 Last)</th>' +
+        '<th class="text-center px-3 py-2 text-xs font-medium text-gray-500 uppercase">Type</th>' +
+        '<th class="text-right px-3 py-2 text-xs font-medium text-gray-500 uppercase">Leads</th>' +
+        '<th class="text-right px-3 py-2 text-xs font-medium text-gray-500 uppercase">Won</th>' +
+        '<th class="text-right px-3 py-2 text-xs font-medium text-gray-500 uppercase">Conversion</th>' +
+        '</tr></thead><tbody>';
+      for (var jd = 0; jd < journeyData.length; jd++) {
+        var jRow = journeyData[jd];
+        var jConv = parseFloat(jRow.win_rate) || 0;
+        var jConvColor = jConv >= 40 ? 'text-green-700' : (jConv >= 20 ? 'text-yellow-700' : 'text-red-600');
+        var jConvBg = jConv >= 40 ? 'bg-green-50 text-green-700' : (jConv >= 20 ? 'bg-yellow-50 text-yellow-700' : '');
+        var jType = jRow.journey_type === 'single' ? 'Single' : 'Multi';
+        var jTypeBadge = jRow.journey_type === 'single'
+          ? '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">Single</span>'
+          : '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Multi</span>';
+        var bgRow = jd % 2 === 0 ? '' : 'bg-gray-50';
+        multiTouchHTML += '<tr class="border-b border-gray-100 ' + bgRow + '">' +
+          '<td class="px-3 py-2 text-gray-900">' + escapeHtml(jRow.label || '') + '</td>' +
+          '<td class="px-3 py-2 text-center">' + jTypeBadge + '</td>' +
+          '<td class="px-3 py-2 text-right text-gray-600">' + (parseInt(jRow.value) || 0).toLocaleString() + '</td>' +
+          '<td class="px-3 py-2 text-right text-gray-600">' + (parseInt(jRow.won_count) || 0) + '</td>' +
+          '<td class="px-3 py-2 text-right font-medium ' + jConvColor + '">' +
+          (jConvBg ? '<span class="px-2 py-0.5 rounded ' + jConvBg + '">' + jConv + '%</span>' : jConv + '%') +
+          '</td></tr>';
+      }
+      multiTouchHTML += '</tbody></table></div>';
+    }
+    multiTouchHTML += '</div>';
+
+    // Section 2: First Touch vs Last Touch
+    var touchData = metricsMap['attribution_first_vs_last_touch'] || [];
+    var firstTouches = [];
+    var lastTouches = [];
+    for (var td = 0; td < touchData.length; td++) {
+      if (touchData[td].touch_type === 'first_touch') firstTouches.push(touchData[td]);
+      else if (touchData[td].touch_type === 'last_touch') lastTouches.push(touchData[td]);
+    }
+
+    var touchHTML = '<div class="mb-8">' +
+      '<h4 class="text-base font-semibold text-gray-700 mb-1">Discovery vs Conversion Channels</h4>' +
+      '<p class="text-xs text-gray-400 mb-3">Across all pipelines — only leads with UTM attribution data</p>';
+    if (firstTouches.length === 0 && lastTouches.length === 0) {
+      touchHTML += '<p class="text-sm text-gray-400">No first/last touch data available.</p>';
+    } else {
+      touchHTML += '<div class="grid grid-cols-1 md:grid-cols-2 gap-6">';
+
+      // First touch column
+      touchHTML += '<div><h5 class="text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">First Touch (Discovery)</h5>';
+      touchHTML += '<div class="space-y-2">';
+      var ftMax = firstTouches.length > 0 ? parseFloat(firstTouches[0].value) || 1 : 1;
+      for (var ft = 0; ft < firstTouches.length; ft++) {
+        var ftRow = firstTouches[ft];
+        var ftPct = Math.round((parseFloat(ftRow.value) / ftMax) * 100);
+        touchHTML += '<div class="flex items-center gap-3">' +
+          '<div class="w-28 text-sm text-gray-700 truncate" title="' + (ftRow.channel || '') + '">' + (ftRow.channel || 'Unknown') + '</div>' +
+          '<div class="flex-1 bg-gray-100 rounded-full h-5 relative">' +
+          '<div class="bg-blue-500 h-5 rounded-full" style="width:' + ftPct + '%"></div>' +
+          '</div>' +
+          '<div class="w-12 text-sm text-gray-600 text-right">' + (ftRow.value || 0) + '</div>' +
+          '<div class="w-14 text-xs text-gray-400 text-right">' + (ftRow.win_rate || 0) + '%</div>' +
+          '</div>';
+      }
+      touchHTML += '</div></div>';
+
+      // Last touch column
+      touchHTML += '<div><h5 class="text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">Last Touch (Conversion)</h5>';
+      touchHTML += '<div class="space-y-2">';
+      var ltMax = lastTouches.length > 0 ? parseFloat(lastTouches[0].value) || 1 : 1;
+      for (var lt = 0; lt < lastTouches.length; lt++) {
+        var ltRow = lastTouches[lt];
+        var ltPct = Math.round((parseFloat(ltRow.value) / ltMax) * 100);
+        touchHTML += '<div class="flex items-center gap-3">' +
+          '<div class="w-28 text-sm text-gray-700 truncate" title="' + (ltRow.channel || '') + '">' + (ltRow.channel || 'Unknown') + '</div>' +
+          '<div class="flex-1 bg-gray-100 rounded-full h-5 relative">' +
+          '<div class="bg-purple-500 h-5 rounded-full" style="width:' + ltPct + '%"></div>' +
+          '</div>' +
+          '<div class="w-12 text-sm text-gray-600 text-right">' + (ltRow.value || 0) + '</div>' +
+          '<div class="w-14 text-xs text-gray-400 text-right">' + (ltRow.win_rate || 0) + '%</div>' +
+          '</div>';
+      }
+      touchHTML += '</div></div>';
+      touchHTML += '</div>';
+    }
+    touchHTML += '</div>';
+
+    // Section 3: Campaign Performance
+    var campaignData = metricsMap['attribution_campaign_performance'] || [];
+    var campaignHTML = '<div class="mb-8">' +
+      '<h4 class="text-base font-semibold text-gray-700 mb-1">Campaign Performance</h4>' +
+      '<p class="text-xs text-gray-400 mb-3">Across all pipelines — only leads with UTM campaign tags</p>';
+    if (campaignData.length === 0) {
+      campaignHTML += '<p class="text-sm text-gray-400">No UTM campaign data available. Campaigns require utmCampaign tags in your marketing URLs.</p>';
+    } else {
+      campaignHTML += '<table class="w-full text-sm">' +
+        '<thead><tr class="text-left text-gray-500 border-b border-gray-200">' +
+        '<th class="pb-2 font-medium">Campaign</th>' +
+        '<th class="pb-2 font-medium">Channel</th>' +
+        '<th class="pb-2 font-medium text-right">Leads</th>' +
+        '<th class="pb-2 font-medium text-right">Won</th>' +
+        '<th class="pb-2 font-medium text-right">Conversion</th>' +
+        '</tr></thead><tbody>';
+      for (var cp = 0; cp < campaignData.length; cp++) {
+        var cpRow = campaignData[cp];
+        var cpWinRate = parseFloat(cpRow.win_rate) || 0;
+        var cpColor = cpWinRate >= 40 ? 'bg-green-100 text-green-800' : (cpWinRate >= 20 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800');
+        var cpBg = cp % 2 === 1 ? ' bg-gray-50' : '';
+        campaignHTML += '<tr class="border-b border-gray-100' + cpBg + '">' +
+          '<td class="py-2 text-gray-700">' + (cpRow.label || 'Unknown') + '</td>' +
+          '<td class="py-2 text-gray-500">' + (cpRow.channel || '-') + '</td>' +
+          '<td class="py-2 text-right text-gray-700">' + (cpRow.value || 0) + '</td>' +
+          '<td class="py-2 text-right text-gray-700">' + (cpRow.won_count || 0) + '</td>' +
+          '<td class="py-2 text-right"><span class="inline-block px-2 py-0.5 rounded text-xs font-medium ' + cpColor + '">' + cpWinRate + '%</span></td>' +
+          '</tr>';
+      }
+      campaignHTML += '</tbody></table>';
+    }
+    campaignHTML += '</div>';
+
+    // Section 4: Top Landing Pages
+    var landingData = metricsMap['attribution_landing_pages'] || [];
+    var landingHTML = '<div class="mb-2">' +
+      '<h4 class="text-base font-semibold text-gray-700 mb-1">Top Landing Pages</h4>' +
+      '<p class="text-xs text-gray-400 mb-3">Across all pipelines — last-touch landing page before conversion</p>';
+    if (landingData.length === 0) {
+      landingHTML += '<p class="text-sm text-gray-400">No landing page data available.</p>';
+    } else {
+      landingHTML += '<table class="w-full text-sm">' +
+        '<thead><tr class="text-left text-gray-500 border-b border-gray-200">' +
+        '<th class="pb-2 font-medium">Landing Page</th>' +
+        '<th class="pb-2 font-medium text-right">Leads</th>' +
+        '<th class="pb-2 font-medium text-right">Won</th>' +
+        '<th class="pb-2 font-medium text-right">Conversion</th>' +
+        '</tr></thead><tbody>';
+      for (var lp = 0; lp < landingData.length; lp++) {
+        var lpRow = landingData[lp];
+        var lpWinRate = parseFloat(lpRow.win_rate) || 0;
+        var lpColor = lpWinRate >= 40 ? 'bg-green-100 text-green-800' : (lpWinRate >= 20 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800');
+        var lpBg = lp % 2 === 1 ? ' bg-gray-50' : '';
+        var displayUrl = lpRow.label || 'Unknown';
+        var fullUrl = lpRow.full_url || displayUrl;
+        if (displayUrl.length > 60) displayUrl = displayUrl.substring(0, 60) + '...';
+        landingHTML += '<tr class="border-b border-gray-100' + lpBg + '">' +
+          '<td class="py-2 text-gray-700 max-w-xs truncate" title="' + fullUrl + '">' + displayUrl + '</td>' +
+          '<td class="py-2 text-right text-gray-700">' + (lpRow.value || 0) + '</td>' +
+          '<td class="py-2 text-right text-gray-700">' + (lpRow.won_count || 0) + '</td>' +
+          '<td class="py-2 text-right"><span class="inline-block px-2 py-0.5 rounded text-xs font-medium ' + lpColor + '">' + lpWinRate + '%</span></td>' +
+          '</tr>';
+      }
+      landingHTML += '</tbody></table>';
+    }
+    landingHTML += '</div>';
+
+    container.innerHTML = headerHTML + multiTouchHTML + touchHTML + campaignHTML + landingHTML;
+    return container;
   }
 
   function renderBubbleChart(viz, data, uniqueId) {
@@ -2276,6 +2878,490 @@
   }
 
   // ==========================================================================
+  // Report Import & Management (V2)
+  // ==========================================================================
+
+  var importedReports = [];
+  var selectedImportedReportId = null;
+  var pendingImportFile = null;
+
+  async function loadImportedReports() {
+    var moduleMenu = document.getElementById('moduleMenu');
+    if (!moduleMenu) return;
+
+    // Remove any existing imported reports section
+    var existing = moduleMenu.querySelector('[data-category-section="imported"]');
+    if (existing) existing.remove();
+
+    try {
+      var response = await api.get('/api/v1/reporting/reports', {
+        limit: 100,
+        offset: 0,
+        sort: 'name',
+        order: 'asc',
+        is_active: true
+      });
+
+      importedReports = (response.data || response.reports || []);
+
+      if (!importedReports.length) return;
+
+      // Group imported reports by category
+      var reportsByCategory = {};
+      importedReports.forEach(function (report) {
+        var cat = report.category || 'other';
+        if (!reportsByCategory[cat]) reportsByCategory[cat] = [];
+        reportsByCategory[cat].push(report);
+      });
+
+      // Build a single "Imported" category section
+      var categorySection = document.createElement('div');
+      categorySection.style.marginBottom = '0.25rem';
+      categorySection.dataset.categorySection = 'imported';
+      categorySection.style.borderTop = '1px solid var(--lex-border-default)';
+      categorySection.style.paddingTop = '0.75rem';
+      categorySection.style.marginTop = '0.75rem';
+
+      // Category header (collapsible)
+      var categoryHeader = document.createElement('button');
+      categoryHeader.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:0.375rem 0.5rem;border-radius:var(--lex-radius-md);cursor:pointer;background:none;border:none;width:100%;';
+
+      var categoryName = document.createElement('span');
+      categoryName.className = 'lex-overline lex-text-secondary';
+      categoryName.textContent = 'Imported';
+      categoryHeader.appendChild(categoryName);
+
+      var chevron = document.createElement('svg');
+      chevron.setAttribute('width', '14');
+      chevron.setAttribute('height', '14');
+      chevron.setAttribute('fill', 'none');
+      chevron.setAttribute('stroke', 'currentColor');
+      chevron.setAttribute('stroke-width', '2');
+      chevron.setAttribute('viewBox', '0 0 24 24');
+      chevron.style.transition = 'transform 0.2s ease';
+      chevron.style.color = 'var(--lex-text-tertiary)';
+      chevron.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>';
+      categoryHeader.appendChild(chevron);
+      categorySection.appendChild(categoryHeader);
+
+      // Report items container
+      var reportContainer = document.createElement('div');
+      reportContainer.style.cssText = 'display:flex;flex-direction:column;gap:0.125rem;margin-top:0.25rem;';
+      reportContainer.dataset.categoryModules = 'imported';
+
+      // Sort categories, then render each report
+      var catKeys = Object.keys(reportsByCategory).sort();
+      catKeys.forEach(function (cat) {
+        reportsByCategory[cat].forEach(function (report) {
+          var btn = document.createElement('button');
+          btn.style.cssText = [
+            'display:flex;align-items:center;justify-content:space-between;width:100%;text-align:left;padding:0.375rem 0.5rem;',
+            'border-radius:var(--lex-radius-md);border:none;background:none;cursor:pointer;',
+            'transition:var(--lex-transition-fast);color:var(--lex-text-primary);'
+          ].join('');
+          btn.dataset.reportId = report.report_id;
+          btn.dataset.category = 'imported';
+          btn.dataset.moduleName = report.name.toLowerCase();
+          btn.dataset.moduleDescription = (report.description || '').toLowerCase();
+
+          var textWrap = document.createElement('div');
+          textWrap.style.cssText = 'flex:1;min-width:0;';
+
+          var nameEl = document.createElement('div');
+          nameEl.className = 'lex-label-sm';
+          nameEl.textContent = report.name;
+          textWrap.appendChild(nameEl);
+
+          btn.appendChild(textWrap);
+
+          // Delete button (only for non-templates)
+          if (!report.is_template) {
+            var deleteBtn = document.createElement('button');
+            deleteBtn.style.cssText = 'flex-shrink:0;background:none;border:none;cursor:pointer;padding:0.25rem;color:var(--lex-text-tertiary);display:none;';
+            deleteBtn.title = 'Delete report';
+            deleteBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>';
+            deleteBtn.addEventListener('click', function (e) {
+              e.stopPropagation();
+              deleteImportedReport(report.report_id, report.name);
+            });
+            btn.appendChild(deleteBtn);
+
+            // Show delete on hover
+            btn.addEventListener('mouseenter', function () { deleteBtn.style.display = ''; });
+            btn.addEventListener('mouseleave', function () { deleteBtn.style.display = 'none'; });
+          }
+
+          btn.addEventListener('click', function () {
+            selectImportedReport(report.report_id);
+          });
+
+          reportContainer.appendChild(btn);
+        });
+      });
+
+      categorySection.appendChild(reportContainer);
+
+      // Collapse / expand
+      categoryHeader.addEventListener('click', function () {
+        var collapsed = reportContainer.style.display === 'none';
+        if (collapsed) {
+          reportContainer.style.display = 'flex';
+          chevron.style.transform = 'rotate(0deg)';
+        } else {
+          reportContainer.style.display = 'none';
+          chevron.style.transform = 'rotate(-90deg)';
+        }
+      });
+
+      moduleMenu.appendChild(categorySection);
+
+    } catch (error) {
+      console.error('[Reporting] Failed to load imported reports:', error);
+    }
+  }
+
+  function selectImportedReport(reportId) {
+    selectedImportedReportId = reportId;
+    selectedModuleKey = null;
+
+    // Clear all selections in the sidebar (both modules and imported reports)
+    var moduleMenu = document.getElementById('moduleMenu');
+    if (moduleMenu) {
+      moduleMenu.querySelectorAll('button[data-module-key], button[data-report-id]').forEach(function (b) {
+        b.style.background = 'none';
+        b.style.color = 'var(--lex-text-primary)';
+      });
+
+      // Highlight the selected imported report
+      var selected = moduleMenu.querySelector('button[data-report-id="' + reportId + '"]');
+      if (selected) {
+        selected.style.background = 'var(--lex-bg-accent-soft)';
+        selected.style.color = 'var(--lex-text-accent)';
+      }
+    }
+
+    var report = importedReports.find(function (r) { return r.report_id === reportId; });
+    if (report) {
+      showInfo('Selected: ' + report.name + '. Click "Run Report" to execute.');
+    }
+  }
+
+  async function deleteImportedReport(reportId, reportName) {
+    if (!confirm('Delete imported report "' + reportName + '"? This cannot be undone.')) return;
+
+    try {
+      await api.delete('/api/v1/reporting/reports/' + reportId);
+      showInfo('Report "' + reportName + '" deleted.');
+      if (selectedImportedReportId === reportId) {
+        selectedImportedReportId = null;
+      }
+      await loadImportedReports();
+    } catch (error) {
+      console.error('[Reporting] Failed to delete report:', error);
+      showError(error.message || 'Failed to delete report.');
+    }
+  }
+
+  async function executeImportedReport() {
+    if (!selectedImportedReportId) return;
+
+    var executeBtn = document.getElementById('executeBtn');
+    if (executeBtn) executeBtn.loading = true;
+    hideError();
+
+    var report = importedReports.find(function (r) { return r.report_id === selectedImportedReportId; });
+    var reportName = report ? report.name : 'Imported Report';
+    showInfo('Executing ' + reportName + '...');
+
+    // Hide previous results
+    var resultsEl = document.getElementById('moduleResults');
+    if (resultsEl) resultsEl.style.display = 'none';
+    setTopbarLanaVisible(true);
+
+    try {
+      var startTime = Date.now();
+
+      var result = await api.post('/api/v1/reporting/reports/' + selectedImportedReportId + '/execute', {
+        filters: {},
+        bypass_cache: false
+      });
+
+      var executionTimeMs = Date.now() - startTime;
+
+      // Store metadata for display
+      currentModuleMetadata = {
+        moduleKey: selectedImportedReportId,
+        moduleName: result.report ? result.report.name : reportName,
+        description: report ? (report.description || '') : '',
+        version: '1.0.0',
+        metricCount: result.row_count || 0,
+        category: (result.report ? result.report.category : (report ? report.category : '')) || 'imported',
+        status: 'stable'
+      };
+      currentModuleConfig = result;
+
+      // Update header
+      var moduleTitleEl = document.getElementById('moduleTitle');
+      var executionTimeEl = document.getElementById('executionTime');
+      if (moduleTitleEl) moduleTitleEl.textContent = result.report ? result.report.name : reportName;
+      if (executionTimeEl) executionTimeEl.textContent = (result.execution_time_ms || executionTimeMs) + 'ms';
+
+      // Update period info
+      var resultPeriodTypeEl = document.getElementById('resultPeriodType');
+      if (resultPeriodTypeEl) resultPeriodTypeEl.textContent = 'Query';
+
+      var resultCurrentPeriodEl = document.getElementById('resultCurrentPeriod');
+      if (resultCurrentPeriodEl) resultCurrentPeriodEl.textContent = result.cached ? 'Cached' : 'Live';
+
+      var resultPriorPeriodEl = document.getElementById('resultPriorPeriod');
+      if (resultPriorPeriodEl) resultPriorPeriodEl.textContent = 'N/A';
+
+      // Update data sources
+      updateDataSources([]);
+
+      // Show results container
+      if (resultsEl) resultsEl.style.display = 'flex';
+
+      // Render the results as a simple table in the visualizations container
+      var vizContainer = document.getElementById('visualizationsContainer');
+      if (vizContainer) {
+        var rows = result.data || [];
+        var rowCount = result.row_count || rows.length;
+
+        if (!rows.length) {
+          vizContainer.innerHTML = '<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center">' +
+            '<p class="text-gray-500">No data returned. Check your report configuration and data sources.</p></div>';
+        } else {
+          // Build a data table from the results
+          var columns = Object.keys(rows[0]);
+          var tableHtml = '<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">' +
+            '<div class="p-4 border-b border-gray-100 flex items-center justify-between">' +
+            '<h3 class="text-sm font-semibold text-gray-900">Results (' + rowCount + ' rows)</h3>' +
+            '</div>' +
+            '<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200">' +
+            '<thead class="bg-gray-50"><tr>';
+
+          columns.forEach(function (col) {
+            tableHtml += '<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">' + escapeHtml(col) + '</th>';
+          });
+          tableHtml += '</tr></thead><tbody class="bg-white divide-y divide-gray-200">';
+
+          var maxDisplay = Math.min(rows.length, 100);
+          for (var i = 0; i < maxDisplay; i++) {
+            tableHtml += '<tr>';
+            columns.forEach(function (col) {
+              var val = rows[i][col];
+              if (val === null || val === undefined) val = '';
+              tableHtml += '<td class="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">' + escapeHtml(String(val)) + '</td>';
+            });
+            tableHtml += '</tr>';
+          }
+
+          if (rows.length > 100) {
+            tableHtml += '<tr><td colspan="' + columns.length + '" class="px-4 py-3 text-sm text-gray-500 text-center">Showing first 100 of ' + rowCount + ' rows</td></tr>';
+          }
+
+          tableHtml += '</tbody></table></div></div>';
+          vizContainer.innerHTML = tableHtml;
+        }
+      }
+
+      // Hide topbar LANA since in-card button is visible
+      setTopbarLanaVisible(false);
+
+      showInfo('Report executed successfully. ' + (result.row_count || 0) + ' rows returned in ' + (result.execution_time_ms || executionTimeMs) + 'ms' + (result.cached ? ' (cached)' : '') + '.');
+
+    } catch (error) {
+      console.error('[Reporting] V2 execution failed:', error);
+      showError(error.message || 'Failed to execute report.');
+    } finally {
+      if (executeBtn) executeBtn.loading = false;
+    }
+  }
+
+  // Import modal
+  function openImportModal() {
+    pendingImportFile = null;
+    var modal = document.getElementById('importReportModal');
+    if (modal) modal.classList.remove('hidden');
+
+    // Reset state
+    var fileInput = document.getElementById('importFileInput');
+    if (fileInput) fileInput.value = '';
+    var fileInfo = document.getElementById('importFileInfo');
+    if (fileInfo) fileInfo.classList.add('hidden');
+    var submitBtn = document.getElementById('importSubmitBtn');
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Import'; }
+    var errEl = document.getElementById('importError');
+    if (errEl) errEl.classList.add('hidden');
+    var successEl = document.getElementById('importSuccess');
+    if (successEl) successEl.classList.add('hidden');
+  }
+
+  function closeImportModal() {
+    var modal = document.getElementById('importReportModal');
+    if (modal) modal.classList.add('hidden');
+    pendingImportFile = null;
+  }
+
+  function handleImportFileSelect(file) {
+    if (!file) return;
+
+    var validTypes = ['application/json', 'text/json', 'application/zip', 'application/x-zip-compressed'];
+    var validExtensions = ['.json', '.zip'];
+    var fileName = file.name.toLowerCase();
+    var hasValidExt = validExtensions.some(function (ext) { return fileName.endsWith(ext); });
+
+    if (validTypes.indexOf(file.type) === -1 && !hasValidExt) {
+      var errEl = document.getElementById('importError');
+      var errText = document.getElementById('importErrorText');
+      if (errText) errText.textContent = 'Invalid file type. Please upload a JSON or ZIP file.';
+      if (errEl) errEl.classList.remove('hidden');
+      return;
+    }
+
+    if (file.size > 50 * 1024 * 1024) {
+      var errEl2 = document.getElementById('importError');
+      var errText2 = document.getElementById('importErrorText');
+      if (errText2) errText2.textContent = 'File too large. Maximum size is 50 MB.';
+      if (errEl2) errEl2.classList.remove('hidden');
+      return;
+    }
+
+    pendingImportFile = file;
+
+    // Show file info
+    var fileInfo = document.getElementById('importFileInfo');
+    if (fileInfo) fileInfo.classList.remove('hidden');
+    var fileNameEl = document.getElementById('importFileName');
+    if (fileNameEl) fileNameEl.textContent = file.name;
+    var fileSizeEl = document.getElementById('importFileSize');
+    if (fileSizeEl) {
+      var sizeKB = (file.size / 1024).toFixed(1);
+      fileSizeEl.textContent = sizeKB > 1024 ? (file.size / 1024 / 1024).toFixed(1) + ' MB' : sizeKB + ' KB';
+    }
+
+    // Enable submit
+    var submitBtn = document.getElementById('importSubmitBtn');
+    if (submitBtn) submitBtn.disabled = false;
+
+    // Hide errors
+    var errEl3 = document.getElementById('importError');
+    if (errEl3) errEl3.classList.add('hidden');
+    var successEl = document.getElementById('importSuccess');
+    if (successEl) successEl.classList.add('hidden');
+  }
+
+  function clearImportFile() {
+    pendingImportFile = null;
+    var fileInput = document.getElementById('importFileInput');
+    if (fileInput) fileInput.value = '';
+    var fileInfo = document.getElementById('importFileInfo');
+    if (fileInfo) fileInfo.classList.add('hidden');
+    var submitBtn = document.getElementById('importSubmitBtn');
+    if (submitBtn) submitBtn.disabled = true;
+  }
+
+  async function submitImport() {
+    if (!pendingImportFile) return;
+
+    var submitBtn = document.getElementById('importSubmitBtn');
+    var errEl = document.getElementById('importError');
+    var errText = document.getElementById('importErrorText');
+    var successEl = document.getElementById('importSuccess');
+    var successText = document.getElementById('importSuccessText');
+
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Importing...'; }
+    if (errEl) errEl.classList.add('hidden');
+    if (successEl) successEl.classList.add('hidden');
+
+    try {
+      var formData = new FormData();
+      formData.append('report_file', pendingImportFile);
+
+      var result = await api.post('/api/v1/reporting/import', formData);
+
+      var reportName = (result.data && result.data.name) || pendingImportFile.name;
+      var isUpdate = result.metadata && result.metadata.is_update;
+
+      if (successText) successText.textContent = (isUpdate ? 'Updated' : 'Imported') + ' report: ' + reportName;
+      if (successEl) successEl.classList.remove('hidden');
+
+      // Refresh the imported reports list
+      await loadImportedReports();
+
+      // Auto-select the imported report
+      if (result.data && result.data.report_id) {
+        selectImportedReport(result.data.report_id);
+      }
+
+      // Reset file input after success
+      pendingImportFile = null;
+      var fileInput = document.getElementById('importFileInput');
+      if (fileInput) fileInput.value = '';
+      var fileInfo = document.getElementById('importFileInfo');
+      if (fileInfo) fileInfo.classList.add('hidden');
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Import'; }
+
+    } catch (error) {
+      console.error('[Reporting] Import failed:', error);
+      if (errText) errText.textContent = error.message || 'Import failed. Please check the file format and try again.';
+      if (errEl) errEl.classList.remove('hidden');
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Import'; }
+    }
+  }
+
+  function initImportControls() {
+    var importBtn = document.getElementById('importReportBtn');
+    if (importBtn) {
+      importBtn.addEventListener('click', openImportModal);
+    }
+
+    var dropZone = document.getElementById('importDropZone');
+    var fileInput = document.getElementById('importFileInput');
+
+    if (dropZone && fileInput) {
+      dropZone.addEventListener('click', function () { fileInput.click(); });
+
+      fileInput.addEventListener('change', function () {
+        if (fileInput.files && fileInput.files[0]) {
+          handleImportFileSelect(fileInput.files[0]);
+        }
+      });
+
+      dropZone.addEventListener('dragover', function (e) {
+        e.preventDefault();
+        dropZone.style.borderColor = 'var(--lex-border-accent, #6366f1)';
+        dropZone.style.background = 'var(--lex-bg-accent-soft, #eef2ff)';
+      });
+
+      dropZone.addEventListener('dragleave', function () {
+        dropZone.style.borderColor = '';
+        dropZone.style.background = '';
+      });
+
+      dropZone.addEventListener('drop', function (e) {
+        e.preventDefault();
+        dropZone.style.borderColor = '';
+        dropZone.style.background = '';
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+          handleImportFileSelect(e.dataTransfer.files[0]);
+        }
+      });
+    }
+
+    var clearBtn = document.getElementById('importFileClear');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', clearImportFile);
+    }
+
+    var submitBtn = document.getElementById('importSubmitBtn');
+    if (submitBtn) {
+      submitBtn.addEventListener('click', submitImport);
+    }
+  }
+
+  // ==========================================================================
   // Window Namespace Exposure
   // ==========================================================================
 
@@ -2292,7 +3378,10 @@
     deleteOverride: deleteOverride,
     closeDataSourcesModal: closeDataSourcesModal,
     closeMissingEntitiesModal: closeMissingEntitiesModal,
-    askLanaAboutReport: askLanaAboutReport
+    askLanaAboutReport: askLanaAboutReport,
+    closeImportModal: closeImportModal,
+    openImportModal: openImportModal,
+    deleteImportedReport: deleteImportedReport
   };
 
   // Also expose individually for V1 compat onclick handlers
@@ -2558,13 +3647,195 @@
   }
 
   // ==========================================================================
+  // Workspace Analytics
+  // ==========================================================================
+
+  // Track whether the matter picker API call has been made so we do not make
+  // duplicate API calls if the user switches tabs multiple times.
+  var matterPickerLoaded = false;
+  // Track whether the change listener has been attached (separate from the API
+  // call so that a failed API call does not result in double-attached listeners
+  // when matterPickerLoaded is reset and the function is called again).
+  var matterPickerListenerAttached = false;
+
+  function initAnalyticsTabs() {
+    var tabs = document.querySelectorAll('.analytics-tab');
+    tabs.forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        var targetTab = this.getAttribute('data-tab');
+        switchAnalyticsTab(targetTab);
+      });
+    });
+  }
+
+  function switchAnalyticsTab(tab) {
+    // Update tab button styles
+    document.querySelectorAll('.analytics-tab').forEach(function (t) {
+      if (t.getAttribute('data-tab') === tab) {
+        t.style.borderBottomColor = '#2563eb';
+        t.style.color = '#2563eb';
+      } else {
+        t.style.borderBottomColor = 'transparent';
+        t.style.color = '#6b7280';
+      }
+    });
+
+    var firmPanel = document.getElementById('firmAnalyticsPanel');
+    var workspacePanel = document.getElementById('workspaceAnalyticsPanel');
+
+    if (tab === 'workspace') {
+      if (firmPanel) firmPanel.style.display = 'none';
+      if (workspacePanel) workspacePanel.style.display = 'block';
+      loadMatterPicker();
+    } else {
+      if (firmPanel) firmPanel.style.display = '';
+      if (workspacePanel) workspacePanel.style.display = 'none';
+    }
+  }
+
+  function loadMatterPicker() {
+    if (matterPickerLoaded) return;
+
+    var picker = document.getElementById('workspaceMatterPicker');
+    if (!picker) return;
+
+    // Attach the change listener exactly once, regardless of API call success/failure.
+    if (!matterPickerListenerAttached) {
+      matterPickerListenerAttached = true;
+      picker.addEventListener('change', function () {
+        var matterId = this.value;
+        if (matterId) {
+          loadWorkspaceAnalytics(matterId);
+        } else {
+          showWorkspaceEmpty();
+        }
+      });
+    }
+
+    matterPickerLoaded = true;
+
+    api.get('/api/v1/matters?limit=100&sort=updated_at&order=desc')
+      .then(function (response) {
+        var matters = (response && response.data) || (response && response.matters) || [];
+        matters.forEach(function (m) {
+          var opt = document.createElement('option');
+          opt.value = m.id || m.matter_id || '';
+          opt.textContent = m.name || m.matter_number || String(opt.value);
+          picker.appendChild(opt);
+        });
+        // Indicate truncation when the limit was reached
+        if (matters.length >= 100) {
+          var hint = document.getElementById('matterPickerTruncationHint');
+          if (!hint) {
+            hint = document.createElement('p');
+            hint.id = 'matterPickerTruncationHint';
+            hint.style.cssText = 'font-size:0.7rem;color:#9ca3af;margin:0.25rem 0 0 0;';
+            hint.textContent = 'Showing the 100 most recently updated matters.';
+            picker.parentNode.appendChild(hint);
+          }
+        }
+      })
+      .catch(function (err) {
+        console.error('[Reporting] Failed to load matters for workspace picker:', err);
+        // Reset API-loaded flag so the user can retry on next tab switch.
+        // The change listener is NOT reset — it was attached once and stays.
+        matterPickerLoaded = false;
+      });
+  }
+
+  function loadWorkspaceAnalytics(matterId) {
+    var cardsEl = document.getElementById('workspaceAnalyticsCards');
+    var emptyEl = document.getElementById('workspaceAnalyticsEmpty');
+    if (!cardsEl) return;
+
+    if (emptyEl) emptyEl.style.display = 'none';
+    cardsEl.style.display = 'grid';
+
+    // Show skeleton placeholders while loading
+    cardsEl.innerHTML = buildAnalyticsCardPlaceholders();
+
+    api.get('/api/v1/matters/' + encodeURIComponent(matterId) + '/analytics')
+      .then(function (response) {
+        var data = (response && response.data) ? response.data : response;
+        renderWorkspaceAnalyticsCards(data);
+      })
+      .catch(function (err) {
+        console.error('[Reporting] Failed to load workspace analytics:', err);
+        cardsEl.innerHTML = '<p style="color:#ef4444;font-size:0.875rem;grid-column:1/-1;">Failed to load analytics. Please try again.</p>';
+      });
+  }
+
+  function renderWorkspaceAnalyticsCards(data) {
+    var cardsEl = document.getElementById('workspaceAnalyticsCards');
+    if (!cardsEl) return;
+
+    var cards = [
+      { label: 'Documents', value: String(data.documents_count || 0) },
+      { label: 'Notes', value: String(data.notes_count || 0) },
+      { label: 'Tasks', value: String(data.tasks_completed || 0) + ' / ' + String(data.tasks_total || 0), sublabel: 'completed' },
+      { label: 'Overdue Tasks', value: String(data.tasks_overdue || 0), highlight: (data.tasks_overdue || 0) > 0 },
+      { label: 'Hours Billed', value: parseFloat(data.time_total_hours || 0).toFixed(1) },
+      { label: 'Contacts', value: String(data.contacts_count_org_level || 0), sublabel: 'org-wide' }
+    ];
+
+    var html = '';
+
+    cards.forEach(function (card) {
+      var borderStyle = card.highlight ? 'border-color:#ef4444;' : '';
+      var valueColor = card.highlight ? 'color:#ef4444;' : 'color:#111827;';
+      html += '<div style="background:white;border:1px solid #e5e7eb;border-radius:0.5rem;padding:1rem;' + borderStyle + '">';
+      html += '<p style="font-size:0.75rem;color:#6b7280;margin:0 0 0.25rem 0;">' + escapeHtml(card.label) + '</p>';
+      html += '<p style="font-size:1.5rem;font-weight:600;margin:0;' + valueColor + '">' + escapeHtml(card.value) + '</p>';
+      if (card.sublabel) {
+        html += '<p style="font-size:0.675rem;color:#9ca3af;margin:0.125rem 0 0 0;">' + escapeHtml(card.sublabel) + '</p>';
+      }
+      html += '</div>';
+    });
+
+    // Last activity card
+    if (data.last_activity_at) {
+      var lastDate = new Date(data.last_activity_at);
+      var now = new Date();
+      var daysSince = Math.floor((now - lastDate) / (1000 * 60 * 60 * 24));
+      var timeAgo = daysSince === 0 ? 'Today' : daysSince === 1 ? 'Yesterday' : String(daysSince) + ' days ago';
+      html += '<div style="background:white;border:1px solid #e5e7eb;border-radius:0.5rem;padding:1rem;">';
+      html += '<p style="font-size:0.75rem;color:#6b7280;margin:0 0 0.25rem 0;">Last Activity</p>';
+      html += '<p style="font-size:1.5rem;font-weight:600;margin:0;color:#111827;">' + escapeHtml(timeAgo) + '</p>';
+      html += '</div>';
+    }
+
+    cardsEl.innerHTML = html;
+  }
+
+  function buildAnalyticsCardPlaceholders() {
+    var html = '';
+    for (var i = 0; i < 7; i++) {
+      html += '<div style="background:white;border:1px solid #e5e7eb;border-radius:0.5rem;padding:1rem;">';
+      html += '<div style="height:0.75rem;width:60%;background:#e5e7eb;border-radius:0.25rem;margin-bottom:0.5rem;"></div>';
+      html += '<div style="height:1.5rem;width:40%;background:#e5e7eb;border-radius:0.25rem;"></div>';
+      html += '</div>';
+    }
+    return html;
+  }
+
+  function showWorkspaceEmpty() {
+    var cardsEl = document.getElementById('workspaceAnalyticsCards');
+    var emptyEl = document.getElementById('workspaceAnalyticsEmpty');
+    if (cardsEl) cardsEl.style.display = 'none';
+    if (emptyEl) emptyEl.style.display = '';
+  }
+
+  // ==========================================================================
   // Init
   // ==========================================================================
 
   function init() {
     loadModules();
+    loadImportedReports();
     initModuleSearch();
     initPeriodControls();
+    initImportControls();
+    initAnalyticsTabs();
 
     // Data sources button
     var dataSourcesBtn = document.getElementById('dataSourcesBtn');

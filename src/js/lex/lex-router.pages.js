@@ -216,7 +216,7 @@
     },
 
     'admin/reporting.html': {
-      title: 'Reports',
+      title: 'Analytics',
       activeNav: 'reports',
       scripts: [
         'js/vendor/chart.js',
@@ -286,7 +286,7 @@
 
     // ── Insights ──
     'insights/module-execution.html': {
-      title: 'Reports',
+      title: 'Analytics',
       activeNav: 'reports',
       scripts: [
         'js/vendor/chart.js',

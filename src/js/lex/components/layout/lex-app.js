@@ -642,7 +642,7 @@
             items: [
               { id: 'lana-tasks', label: 'Lana Tasks', icon: 'list-checks', href: 'agentic-tasks.html' },
               { id: 'connectors', label: 'Data Connectors', icon: 'plug', href: 'data-connectors.html' },
-              { id: 'reports', label: 'Reports', icon: 'bar-chart-2', href: 'admin/reporting.html' }
+              { id: 'reports', label: 'Analytics', icon: 'bar-chart-2', href: 'admin/reporting.html' }
             ]
           },
           {

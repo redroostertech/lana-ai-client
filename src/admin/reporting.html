@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Reports - LANA AI</title>
+  <title>Analytics - LANA AI</title>
 
   <!-- CSS in head -->
   <link rel="stylesheet" href="../css/lex-tokens.css">
@@ -34,7 +34,7 @@
     logo-alt="LANA AI"
     logo-href="../dashboard.html"
     active-nav-id="reports"
-    page-title="Reports"
+    page-title="Analytics"
   ></lex-app>
 
   <template id="page-content">
@@ -46,11 +46,35 @@
         id="reportingBanner"
         variant="light"
         corners
-        heading="Reports"
-        subtitle="Select a report module from the sidebar to get started"
-      ></lex-banner>
+        heading="Analytics"
+        subtitle="Firm-wide analytics and per-matter workspace insights"
+      >
+        <lex-btn id="importReportBtn" variant="secondary" size="sm">
+          <span style="display:flex;align-items:center;gap:0.375rem;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+            </svg>
+            Import Report
+          </span>
+        </lex-btn>
+      </lex-banner>
 
       <lex-spacer size="md"></lex-spacer>
+
+      <!-- Analytics Tab Bar -->
+      <div id="analyticsTabBar" style="display:flex;gap:0;border-bottom:1px solid #e5e7eb;margin-bottom:1.5rem;">
+        <button id="tabFirmAnalytics" class="analytics-tab" data-tab="firm"
+          style="padding:0.5rem 1rem;font-size:0.875rem;font-weight:500;border-bottom:2px solid #2563eb;color:#2563eb;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;">
+          Firm Analytics
+        </button>
+        <button id="tabWorkspaceAnalytics" class="analytics-tab" data-tab="workspace"
+          style="padding:0.5rem 1rem;font-size:0.875rem;font-weight:500;border-bottom:2px solid transparent;color:#6b7280;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;">
+          Workspace Analytics
+        </button>
+      </div>
+
+      <!-- Firm Analytics Panel (existing content) -->
+      <div id="firmAnalyticsPanel">
 
       <!-- Two-column layout: Module Sidebar + Main Content -->
       <div id="reportingLayout" style="display:grid;grid-template-columns:260px 1fr;gap:1.5rem;align-items:start;">
@@ -108,7 +132,7 @@
         </div>
 
         <!-- ── Main Content Column ────────────────────────────────── -->
-        <div id="reportingMainColumn" style="display:flex;flex-direction:column;gap:1.5rem;">
+        <div id="reportingMainColumn" style="display:flex;flex-direction:column;gap:1.5rem;min-width:0;overflow-x:hidden;">
 
           <!-- Controls Card -->
           <lex-card id="controlsCard">
@@ -198,6 +222,33 @@
         </div><!-- /reportingMainColumn -->
 
       </div><!-- /reportingLayout -->
+
+      </div><!-- /firmAnalyticsPanel -->
+
+      <!-- Workspace Analytics Panel -->
+      <div id="workspaceAnalyticsPanel" style="display:none;">
+        <div style="max-width:800px;margin:0 auto;">
+
+          <!-- Matter Picker -->
+          <div style="margin-bottom:1.5rem;">
+            <label style="display:block;font-size:0.875rem;font-weight:500;color:#374151;margin-bottom:0.375rem;">Select Matter</label>
+            <select id="workspaceMatterPicker" style="width:100%;max-width:400px;padding:0.5rem;border:1px solid #d1d5db;border-radius:0.375rem;font-size:0.875rem;">
+              <option value="">Choose a matter...</option>
+            </select>
+          </div>
+
+          <!-- Analytics Cards Grid -->
+          <div id="workspaceAnalyticsCards" style="display:none;grid-template-columns:repeat(auto-fill, minmax(180px, 1fr));gap:1rem;">
+            <!-- Cards populated by JS -->
+          </div>
+
+          <!-- Empty State -->
+          <div id="workspaceAnalyticsEmpty" style="text-align:center;padding:3rem 1rem;color:#6b7280;">
+            <p style="font-size:0.875rem;">Select a matter to view workspace analytics</p>
+          </div>
+
+        </div>
+      </div><!-- /workspaceAnalyticsPanel -->
 
       <!-- Drilldown Modal -->
       <div id="drilldownModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full z-50">
@@ -322,6 +373,53 @@
             </div>
             <div class="flex justify-end p-5 border-t border-gray-200">
               <button onclick="window._reporting.closeMissingEntitiesModal()" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Close</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Import Report Modal -->
+      <div id="importReportModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-6 w-full max-w-lg">
+          <div class="bg-white rounded-lg shadow-xl">
+            <div class="flex items-start justify-between p-5 border-b border-gray-200">
+              <h3 class="text-xl font-semibold text-gray-900">Import Report</h3>
+              <button onclick="window._reporting.closeImportModal()" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </button>
+            </div>
+            <div class="p-5">
+              <p class="text-sm text-gray-600 mb-4">Upload a report definition file (JSON or ZIP). ZIP files should contain a <code class="bg-gray-100 px-1 py-0.5 rounded text-xs">report.json</code> at the root and optionally a <code class="bg-gray-100 px-1 py-0.5 rounded text-xs">ui/</code> folder.</p>
+              <div id="importDropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-indigo-400 transition-colors cursor-pointer">
+                <svg class="mx-auto h-10 w-10 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                </svg>
+                <p class="text-sm font-medium text-gray-700">Drop file here or click to browse</p>
+                <p class="text-xs text-gray-500 mt-1">JSON or ZIP, max 50 MB</p>
+                <input type="file" id="importFileInput" accept=".json,.zip,application/json,application/zip" class="hidden">
+              </div>
+              <div id="importFileInfo" class="hidden mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    <span id="importFileName" class="text-sm font-medium text-gray-900"></span>
+                  </div>
+                  <button id="importFileClear" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                  </button>
+                </div>
+                <p id="importFileSize" class="text-xs text-gray-500 mt-1"></p>
+              </div>
+              <div id="importError" class="hidden mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p id="importErrorText" class="text-sm text-red-700"></p>
+              </div>
+              <div id="importSuccess" class="hidden mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p id="importSuccessText" class="text-sm text-green-700"></p>
+              </div>
+            </div>
+            <div class="flex justify-end gap-3 p-5 border-t border-gray-200">
+              <button onclick="window._reporting.closeImportModal()" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
+              <button id="importSubmitBtn" disabled class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">Import</button>
             </div>
           </div>
         </div>
