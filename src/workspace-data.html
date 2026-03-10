@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workspace Data - LANA AI</title>
+
+  <link rel="stylesheet" href="css/lex-tokens.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/tailwind-output.css">
+  <link rel="stylesheet" href="css/lex-chat.css">
+  <link rel="stylesheet" href="css/lana-ask-btn.css">
+  <script src="js/tailwind-loader.js"></script>
+</head>
+<body>
+
+  <lex-loader theme="light"></lex-loader>
+
+  <lex-app
+    logo-src="img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="dashboard.html"
+    active-nav-id="workspaces"
+    page-title="Workspace Data"
+  ></lex-app>
+
+  <template id="page-content">
+
+    <main style="display:flex;flex-direction:column;height:calc(100vh - var(--lex-topbar-height, 64px));overflow:hidden;margin:0;box-sizing:border-box;">
+
+      <div id="wsDataLayout" style="display:flex;flex:1;min-height:0;overflow:hidden;">
+
+        <!-- Left: main content column -->
+        <div id="wsDataMainColumn" style="flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;">
+
+          <!-- Page header -->
+          <lex-banner
+            id="wsDataBanner"
+            variant="light"
+            heading="Connected Data"
+            subtitle="Browse and query data connected to this workspace"
+          >
+            <button id="askLanaBtn" class="lana-insights-btn" style="padding:6px 12px;font-size:10.5px;">
+              <span class="lana-btn-icon">
+                <svg class="lana-btn-corner-tl" width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M0 0L8 0M0 0L0 8" stroke="currentColor" stroke-width="1.5"/></svg>
+                <svg class="lana-btn-corner-br" width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M8 8L0 8M8 8L8 0" stroke="currentColor" stroke-width="1.5"/></svg>
+              </span>
+              <span>LANA</span>
+            </button>
+          </lex-banner>
+
+          <lex-breadcrumb id="wsDataBreadcrumb" items='[{"label":"Workspaces","href":"workspaces.html"},{"label":"Connected Data"}]'></lex-breadcrumb>
+
+          <!-- Summary stats bar -->
+          <div id="wsDataSummary" style="padding:0 1rem;flex-shrink:0;">
+            <div style="display:flex;gap:0.75rem;margin-bottom:0.75rem;" id="wsDataStatCards"></div>
+          </div>
+
+          <!-- Table area -->
+          <div style="flex:1;min-height:0;display:flex;flex-direction:column;padding:0 1rem 1rem;">
+            <lex-card padding="none" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;">
+              <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;flex-shrink:0;flex-wrap:wrap;">
+                <lex-select
+                  id="wsDataEntityFilter"
+                  placeholder="All Entity Types"
+                  size="sm"
+                  style="width:200px;"
+                ></lex-select>
+                <lex-select
+                  id="wsDataConnectorFilter"
+                  placeholder="All Connectors"
+                  size="sm"
+                  style="width:200px;"
+                ></lex-select>
+                <div style="flex:1;"></div>
+                <input
+                  type="text"
+                  id="wsDataSearch"
+                  placeholder="Search records..."
+                  style="width:240px;padding:6px 12px;border:1px solid var(--lex-border-default, #e5e7eb);border-radius:6px;font-size:13px;outline:none;"
+                >
+              </div>
+              <lex-table
+                id="wsDataTable"
+                columns="external_id,entity_type,connector_id,raw_data"
+                labels="ID,Entity Type,Connector,Data"
+                searchable
+                filterable
+                empty-text="No connected data found"
+                sort-by="synced_at"
+                sort-dir="desc"
+                style="flex:1;min-height:0;overflow:hidden;"
+              ></lex-table>
+              <lex-pagination id="wsDataPagination" style="padding:0 1rem;flex-shrink:0;"></lex-pagination>
+            </lex-card>
+          </div>
+
+        </div>
+
+        <!-- Right column: Chat panel (hidden by default) -->
+        <div id="wsDataChatColumn" style="display:none;width:380px;flex-shrink:0;flex-direction:column;margin-left:16px;background:var(--lex-surface-primary, #fff);border-left:1px solid var(--lex-border-default, #e5e7eb);overflow:hidden;">
+          <div style="padding:0.75rem 1rem;border-bottom:1px solid var(--lex-border-default, #e5e7eb);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+            <div>
+              <p class="lex-label lex-text-primary" style="margin:0;">Ask LANA about this data</p>
+              <p class="lex-body-xs lex-text-secondary" style="margin:0.25rem 0 0;">Use natural language to query and analyze</p>
+            </div>
+            <button id="closeChatBtn" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--lex-text-tertiary);border-radius:4px;" title="Close chat">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
+          </div>
+          <div id="chatContainer" style="flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden;">
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+
+  </template>
+
+  <noscript>
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;color:#666;">
+      Please enable JavaScript to use LANA AI.
+    </div>
+  </noscript>
+
+  <!-- Universal shell scripts -->
+  <script src="js/error-reporter.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/mock-data.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/components.js"></script>
+  <script src="js/version.js"></script>
+  <script src="js/menu.js"></script>
+  <script src="js/navigation-helpers.js"></script>
+  <script src="js/new-project-modal.js"></script>
+  <script src="js/conversation-menu.js"></script>
+  <script src="js/conversation-search-modal.js"></script>
+  <script src="js/contact-search-modal.js"></script>
+  <script src="js/notifications.js"></script>
+
+  <!-- Lex UI core -->
+  <script src="js/lex/lex.core.js"></script>
+  <script src="js/lex/lex.icons.js"></script>
+  <script src="js/lex/lex.data.js"></script>
+  <script src="js/lex/lex.forms.js"></script>
+  <script src="js/lex/lex.state.js"></script>
+  <script src="js/lex/lex.utils.js"></script>
+  <script src="js/lex/lex.auth.js"></script>
+  <script src="js/lex/lex-nav.js"></script>
+
+  <!-- Lex UI foundation + layout -->
+  <script src="js/lex/components/foundation/lex-loader.js"></script>
+  <script src="js/lex/components/foundation/lex-toast.js"></script>
+  <script src="js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="js/lex/components/foundation/lex-btn.js"></script>
+  <script src="js/lex/components/foundation/lex-empty.js"></script>
+  <script src="js/lex/components/form/lex-segmented.js"></script>
+  <script src="js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="js/lex/components/layout/lex-topbar.js"></script>
+  <script src="js/lex/components/layout/lex-conversation-item.js"></script>
+  <script src="js/lex/components/layout/lex-notification-panel.js"></script>
+  <script src="js/lex/components/layout/lex-app.js"></script>
+
+  <!-- Page-specific Lex components -->
+  <script src="js/lex/components/foundation/lex-breadcrumb.js"></script>
+  <script src="js/lex/components/foundation/lex-banner.js"></script>
+  <script src="js/lex/components/foundation/lex-card.js"></script>
+  <script src="js/lex/components/form/lex-select.js"></script>
+  <script src="js/lex/components/data/lex-table.js"></script>
+  <script src="js/lex/components/data/lex-pagination.js"></script>
+
+  <!-- Mermaid -->
+  <script src="js/vendor/mermaid.min.js"></script>
+
+  <!-- Chat components -->
+  <script src="js/lex/chat/lex-chat.format.js"></script>
+  <script src="js/lex/chat/lex-chat.source.js"></script>
+  <script src="js/lex/chat/lex-chat.message.js"></script>
+  <script src="js/lex/chat/lex-chat.activity.js"></script>
+  <script src="js/lex/chat/lex-chat.documents.js"></script>
+  <script src="js/lex/chat/lex-chat.composer.js"></script>
+  <script src="js/lex/chat/lex-chat.thread.js"></script>
+  <script src="js/lex/chat/lex-chat.threads.js"></script>
+  <script src="js/lex/chat/lex-chat.js"></script>
+  <script src="js/lex/chat/lex-chat.index.js"></script>
+
+  <!-- Inject page content -->
+  <script src="js/lex/lex-page-init.js"></script>
+
+  <!-- Page controller -->
+  <script src="js/workspace-data.js"></script>
+
+  <!-- Auth guard (MUST be last) -->
+  <script src="js/auth-guard.js"></script>
+</body>
+</html>

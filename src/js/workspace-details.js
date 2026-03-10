@@ -827,7 +827,7 @@
             '</div>';
           });
           if (records.length > 5) {
-            html += '<p class="text-xs text-gray-500 text-center">+ ' + (records.length - 5) + ' more records</p>';
+            html += '<a href="workspace-data.html?id=' + encodeURIComponent(matter.matter_id) + '" class="block text-xs text-blue-600 hover:text-blue-800 text-center cursor-pointer">+ ' + (records.length - 5) + ' more records</a>';
           }
           html += '</div>';
         }
@@ -843,7 +843,10 @@
       if (card) {
         card.addEventListener('card-action', function (e) {
           if (!e.detail) return;
-          if (e.detail.action === 'plus' || e.detail.action === 'maximize-2') {
+          if (e.detail.action === 'maximize-2') {
+            // Navigate to full workspace data visualization page
+            window.location.href = 'workspace-data.html?id=' + encodeURIComponent(matter.matter_id);
+          } else if (e.detail.action === 'plus') {
             openConnectedDataModal(matter);
           }
         });
