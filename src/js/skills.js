@@ -643,6 +643,18 @@
                   else if (rawActionType.indexOf('update') !== -1) populateConfig.operation = 'update';
                   else populateConfig.operation = 'query';
                 }
+                // For AI action steps, derive task from backend action_type and normalize prompt field
+                if (actionType === 'ai-action') {
+                  if (!populateConfig.task) {
+                    if (rawActionType.indexOf('extract') !== -1) populateConfig.task = 'extract';
+                    else if (rawActionType.indexOf('classify') !== -1 || rawActionType.indexOf('chat') !== -1) populateConfig.task = 'classify';
+                    else if (rawActionType.indexOf('generate') !== -1) populateConfig.task = 'generate';
+                    else populateConfig.task = 'summarize';
+                  }
+                  if (!populateConfig.prompt_template && populateConfig.prompt) {
+                    populateConfig.prompt_template = populateConfig.prompt;
+                  }
+                }
                 // For notification steps, derive notification_type from backend action_type
                 if (actionType === 'notification' && !populateConfig.notification_type) {
                   if (rawActionType.indexOf('createTask') !== -1) populateConfig.notification_type = 'create_task';
@@ -1220,6 +1232,10 @@
    */
   function mapStepToActionType(stepType, stepCfg) {
     if (stepType === 'ai-action') {
+      var aiTask = stepCfg.task || 'summarize';
+      if (aiTask === 'extract') return 'ai.extractEntities';
+      if (aiTask === 'classify') return 'ai.chat';
+      if (aiTask === 'generate') return 'ai.generateText';
       return 'ai.generate';
     }
     if (stepType === 'database') {
@@ -1255,7 +1271,8 @@
     if (stepType === 'ai-action') {
       return {
         task: stepCfg.task || 'summarize',
-        prompt_template: stepCfg.prompt_template || ''
+        prompt_template: stepCfg.prompt_template || '',
+        prompt: stepCfg.prompt_template || ''
       };
     }
     if (stepType === 'database') {
@@ -1312,8 +1329,10 @@
     } else if (stepType === 'ai-action') {
       var aiSelects = container.querySelectorAll('select');
       var textareas = container.querySelectorAll('textarea');
-      if (aiSelects.length >= 1 && configData.task) aiSelects[0].value = configData.task;
-      if (textareas.length >= 1 && configData.prompt_template !== undefined) textareas[0].value = configData.prompt_template;
+      var taskVal = configData.task || '';
+      var promptVal = configData.prompt_template || configData.prompt || '';
+      if (aiSelects.length >= 1 && taskVal) aiSelects[0].value = taskVal;
+      if (textareas.length >= 1 && promptVal) textareas[0].value = promptVal;
     } else if (stepType === 'database') {
       var dbOpSelect = container.querySelector('.db-operation-select');
       var dbTableSelect = container.querySelector('.db-table-select');
@@ -1328,8 +1347,10 @@
       var notifTitleInput = container.querySelector('.notification-title-input');
       var notifMsgInput = container.querySelector('.notification-message-input');
       if (notifTypeSelect && configData.notification_type) notifTypeSelect.value = configData.notification_type;
-      if (notifTitleInput && configData.title) notifTitleInput.value = configData.title;
-      if (notifMsgInput && configData.message) notifMsgInput.value = configData.message;
+      var titleVal = configData.title || configData.subject || '';
+      var msgVal = configData.message || configData.body || configData.description || '';
+      if (notifTitleInput && titleVal) notifTitleInput.value = titleVal;
+      if (notifMsgInput && msgVal) notifMsgInput.value = msgVal;
     } else if (stepType === 'integration') {
       var intSelects = container.querySelectorAll('select');
       if (intSelects.length >= 1 && configData.action_type) intSelects[0].value = configData.action_type;
