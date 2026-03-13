@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Analytics - LANA AI</title>
+  <title>Firm Reporting - LANA AI</title>
 
   <!-- CSS in head -->
   <link rel="stylesheet" href="../css/lex-tokens.css">
@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="../css/tailwind-output.css">
   <link rel="stylesheet" href="../insights/raw-data-viewer.css">
   <link rel="stylesheet" href="../css/lex-chat.css">
-  <link rel="stylesheet" href="../css/lana-ask-btn.css">
+  <!-- lana-ask-btn.css replaced by self-contained lex-ask-lana-btn component -->
   <script src="../js/tailwind-loader.js"></script>
 
   <style>
@@ -34,7 +34,7 @@
     logo-alt="LANA AI"
     logo-href="../dashboard.html"
     active-nav-id="reports"
-    page-title="Analytics"
+    page-title="Firm Reporting"
   ></lex-app>
 
   <template id="page-content">
@@ -46,8 +46,8 @@
         id="reportingBanner"
         variant="light"
         corners
-        heading="Analytics"
-        subtitle="Firm-wide analytics and per-matter workspace insights"
+        heading="Firm Reporting"
+        subtitle="Firm-wide analytics, trends, and performance metrics"
       >
         <lex-btn id="importReportBtn" variant="secondary" size="sm">
           <span style="display:flex;align-items:center;gap:0.375rem;">
@@ -61,20 +61,10 @@
 
       <lex-spacer size="md"></lex-spacer>
 
-      <!-- Analytics Tab Bar -->
-      <div id="analyticsTabBar" style="display:flex;gap:0;border-bottom:1px solid #e5e7eb;margin-bottom:1.5rem;">
-        <button id="tabFirmAnalytics" class="analytics-tab" data-tab="firm"
-          style="padding:0.5rem 1rem;font-size:0.875rem;font-weight:500;border-bottom:2px solid #2563eb;color:#2563eb;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;">
-          Firm Analytics
-        </button>
-        <button id="tabWorkspaceAnalytics" class="analytics-tab" data-tab="workspace"
-          style="padding:0.5rem 1rem;font-size:0.875rem;font-weight:500;border-bottom:2px solid transparent;color:#6b7280;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;">
-          Workspace Analytics
-        </button>
-      </div>
-
-      <!-- Firm Analytics Panel (existing content) -->
-      <div id="firmAnalyticsPanel">
+      <!-- Breadcrumb back to analytics hub -->
+      <lex-breadcrumb
+        crumbs='[{"label":"Analytics","href":"admin/analytics.html"},{"label":"Firm Reporting"}]'
+      ></lex-breadcrumb>
 
       <!-- Two-column layout: Module Sidebar + Main Content -->
       <div id="reportingLayout" style="display:grid;grid-template-columns:260px 1fr;gap:1.5rem;align-items:start;">
@@ -82,29 +72,7 @@
         <!-- ── Module Sidebar ──────────────────────────────────────── -->
         <div id="moduleSidebarColumn">
 
-          <!-- External Reporting Links -->
           <lex-card id="externalLinksCard" padding="compact">
-            <div style="padding:0.25rem 0 0.75rem;border-bottom:1px solid var(--lex-border-subtle);margin-bottom:0.75rem;">
-              <p class="lex-overline lex-text-secondary" style="margin-bottom:0.5rem;">External Reporting</p>
-              <div style="display:flex;flex-direction:column;gap:0.375rem;">
-                <a href="http://nuvuaimodel.nuvuadvisory.com" target="_blank" rel="noopener noreferrer"
-                   class="lex-hover-bg-accent"
-                   style="display:flex;align-items:center;gap:0.5rem;padding:0.375rem 0.5rem;border-radius:var(--lex-radius-md);text-decoration:none;transition:var(--lex-transition-fast);">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--lex-text-accent);flex-shrink:0;" aria-hidden="true">
-                    <path d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
-                  </svg>
-                  <span class="lex-label lex-text-primary">NuVu Advisory</span>
-                </a>
-                <a href="https://amabcm.lovable.app/" target="_blank" rel="noopener noreferrer"
-                   class="lex-hover-bg-accent"
-                   style="display:flex;align-items:center;gap:0.5rem;padding:0.375rem 0.5rem;border-radius:var(--lex-radius-md);text-decoration:none;transition:var(--lex-transition-fast);">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--lex-text-accent);flex-shrink:0;" aria-hidden="true">
-                    <path d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
-                  </svg>
-                  <span class="lex-label lex-text-primary">AMABCM</span>
-                </a>
-              </div>
-            </div>
 
             <!-- Module Search + List -->
             <p class="lex-overline lex-text-secondary" style="margin-bottom:0.5rem;">Report Modules</p>
@@ -194,13 +162,7 @@
                   <h2 id="moduleTitle" class="text-xl font-bold text-gray-900"></h2>
                   <button onclick="window._reporting.showModuleInfo()" class="flex items-center gap-1 px-3 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg">Learn More</button>
                 </div>
-                <button id="askLanaBtn" onclick="window._reporting.askLanaAboutReport()" class="lana-insights-btn" style="padding:6px 12px;font-size:10.5px;">
-                  <span class="lana-btn-icon">
-                    <svg class="lana-btn-corner-tl" width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M0 0L8 0M0 0L0 8" stroke="currentColor" stroke-width="1.5"/></svg>
-                    <svg class="lana-btn-corner-br" width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M8 8L0 8M8 8L8 0" stroke="currentColor" stroke-width="1.5"/></svg>
-                  </span>
-                  <span>LANA</span>
-                </button>
+                <lex-ask-lana-btn size="sm" id="reportingLanaBtn"></lex-ask-lana-btn>
               </div>
               <!-- All metadata on one row -->
               <div class="flex items-center justify-between text-sm">
@@ -222,33 +184,6 @@
         </div><!-- /reportingMainColumn -->
 
       </div><!-- /reportingLayout -->
-
-      </div><!-- /firmAnalyticsPanel -->
-
-      <!-- Workspace Analytics Panel -->
-      <div id="workspaceAnalyticsPanel" style="display:none;">
-        <div style="max-width:800px;margin:0 auto;">
-
-          <!-- Matter Picker -->
-          <div style="margin-bottom:1.5rem;">
-            <label style="display:block;font-size:0.875rem;font-weight:500;color:#374151;margin-bottom:0.375rem;">Select Matter</label>
-            <select id="workspaceMatterPicker" style="width:100%;max-width:400px;padding:0.5rem;border:1px solid #d1d5db;border-radius:0.375rem;font-size:0.875rem;">
-              <option value="">Choose a matter...</option>
-            </select>
-          </div>
-
-          <!-- Analytics Cards Grid -->
-          <div id="workspaceAnalyticsCards" style="display:none;grid-template-columns:repeat(auto-fill, minmax(180px, 1fr));gap:1rem;">
-            <!-- Cards populated by JS -->
-          </div>
-
-          <!-- Empty State -->
-          <div id="workspaceAnalyticsEmpty" style="text-align:center;padding:3rem 1rem;color:#6b7280;">
-            <p style="font-size:0.875rem;">Select a matter to view workspace analytics</p>
-          </div>
-
-        </div>
-      </div><!-- /workspaceAnalyticsPanel -->
 
       <!-- Drilldown Modal -->
       <div id="drilldownModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full z-50">
@@ -453,6 +388,20 @@
         </div>
       </div>
 
+    <!-- Unified LANA Insights panel (drawer mode, destroy on close) -->
+    <lex-lana-panel
+      id="reportingLana"
+      mode="drawer"
+      drawer-heading="LANA Insights"
+      drawer-width="lg"
+      page-scope="reporting"
+      context-type="insights_chat"
+      placeholder="Ask about forecasts, trends, and insights..."
+      tools-locked="true"
+      default-tool="insights_chat"
+      thread-title="General Insights"
+      destroy-on-close="true"
+    ></lex-lana-panel>
     </main>
 
   </template>
@@ -508,6 +457,7 @@
   <script src="../js/lex/components/layout/lex-app.js"></script>
 
   <!-- Page-specific Lex components — loaded before lex-page-init.js -->
+  <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
   <script src="../js/lex/components/foundation/lex-banner.js"></script>
   <script src="../js/lex/components/foundation/lex-card.js"></script>
   <script src="../js/lex/components/foundation/lex-drawer.js"></script>
@@ -528,6 +478,8 @@
   <script src="../js/lex/chat/lex-chat.threads.js"></script>
   <script src="../js/lex/chat/lex-chat.js"></script>
   <script src="../js/lex/chat/lex-chat.index.js"></script>
+  <script src="../js/lex/components/chat/lex-ask-lana-btn.js"></script>
+  <script src="../js/lex/components/chat/lex-lana-panel.js"></script>
 
   <!-- Inject page content + hoist modals -->
   <script src="../js/lex/lex-page-init.js"></script>

@@ -125,7 +125,7 @@ const MenuConfig = {
         requiredRoles: [],
         items: [
           { id: 'connectors', label: 'Data Connectors', href: '/data-connectors.html', icon: 'connectors' },
-          { id: 'insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
+          { id: 'insights', label: 'Analytics', href: '/admin/analytics.html', icon: 'analytics' },
         ]
       },
       {
@@ -232,7 +232,7 @@ const MenuConfig = {
         requiredRoles: [],
         items: [
           { id: 'connectors', label: 'Data Connectors', href: '/data-connectors.html', icon: 'connectors' },
-          { id: 'insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
+          { id: 'insights', label: 'Analytics', href: '/admin/analytics.html', icon: 'analytics' },
         ]
       },
       {
@@ -297,7 +297,7 @@ const MenuConfig = {
         requiredRoles: [],
         items: [
           { id: 'connectors', label: 'Data Connectors', href: '/data-connectors.html', icon: 'connectors' },
-          { id: 'insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
+          { id: 'insights', label: 'Analytics', href: '/admin/analytics.html', icon: 'analytics' },
         ]
       },
       {
@@ -362,7 +362,7 @@ const MenuConfig = {
         requiredRoles: [],
         items: [
           { id: 'connectors', label: 'Data Connectors', href: '/data-connectors.html', icon: 'connectors' },
-          { id: 'insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
+          { id: 'insights', label: 'Analytics', href: '/admin/analytics.html', icon: 'analytics' },
         ]
       },
       {
@@ -431,7 +431,7 @@ const MenuConfig = {
         requiredRoles: [],
         items: [
           { id: 'chat-connectors', label: 'Data Connectors', href: '/data-connectors.html', icon: 'connectors' },
-          { id: 'chat-insights', label: 'Reports', href: '/insights/module-execution.html', icon: 'insights' },
+          { id: 'chat-insights', label: 'Analytics', href: '/admin/analytics.html', icon: 'analytics' },
         ]
       },
       {

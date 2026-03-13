@@ -511,7 +511,9 @@
           const iframe = document.getElementById('connector-frame');
 
           // Fetch the HTML, inject config BEFORE loading, then load modified HTML
-          fetch(uiEntryPoint)
+          // Add cache-busting parameter to bypass browser/MinIO caching
+          var cacheBustUrl = uiEntryPoint + (uiEntryPoint.indexOf('?') === -1 ? '?' : '&') + '_cb=' + Date.now();
+          fetch(cacheBustUrl)
             .then(response => response.text())
             .then(html => {
               console.log('[Connector Viewer] Fetched connector HTML, injecting config...');

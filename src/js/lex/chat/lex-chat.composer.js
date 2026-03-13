@@ -1110,6 +1110,21 @@
     }
 
     /**
+     * Programmatically attach a document badge (no textarea text mutation).
+     * Use this to pre-populate the composer with a file context.
+     * @param {string} docId
+     * @param {string} filename
+     */
+    attachDocument(docId, filename) {
+      if (!docId) return;
+      const alreadyAttached = this._attachedDocs.some(d => d.id === docId);
+      if (alreadyAttached) return;
+      if (this._attachedDocs.length >= 3) return;
+      this._attachedDocs.push({ id: docId, filename: filename || 'Document' });
+      this._renderDocBadges();
+    }
+
+    /**
      * Remove a document badge by id.
      */
     removeDocument(docId) {

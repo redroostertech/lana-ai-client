@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/components/document-metadata.css">
   <link rel="stylesheet" href="css/lex-chat.css">
-  <link rel="stylesheet" href="css/lana-ask-btn.css">
+  <!-- lana-ask-btn.css replaced by self-contained lex-ask-lana-btn component -->
   <link rel="stylesheet" href="css/tailwind-output.css">
   <script src="js/tailwind-loader.js"></script>
 </head>
@@ -61,13 +61,7 @@
         <!-- Divider -->
         <div style="width:1px;height:20px;background:var(--lex-border-default);margin:0 4px;flex-shrink:0;"></div>
         <!-- LANA button -->
-        <button id="askLanaBtn" class="lana-insights-btn" style="padding:6px 12px;font-size:10.5px;">
-          <span class="lana-btn-icon">
-            <svg class="lana-btn-corner-tl" width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M0 0L8 0M0 0L0 8" stroke="currentColor" stroke-width="1.5"/></svg>
-            <svg class="lana-btn-corner-br" width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M8 8L0 8M8 8L8 0" stroke="currentColor" stroke-width="1.5"/></svg>
-          </span>
-          <span>LANA</span>
-        </button>
+        <lex-ask-lana-btn id="askLanaBtn" panel="fileViewerLana" size="sm"></lex-ask-lana-btn>
       </div>
     </div>
 
@@ -216,6 +210,20 @@
       </div>
 
     </div>
+
+    <!-- Unified LANA chat panel (drawer mode) -->
+    <lex-lana-panel
+      id="fileViewerLana"
+      mode="drawer"
+      drawer-heading="LANA — Document Chat"
+      drawer-width="lg"
+      page-scope="workspace"
+      context-type="document_chat"
+      placeholder="Ask a question about this document..."
+      tools-locked="true"
+      default-tool="document_chat"
+      thread-title="Document Chat"
+    ></lex-lana-panel>
   </main>
   </template>
 
@@ -295,6 +303,8 @@
   <script src="js/lex/chat/lex-chat.threads.js"></script>
   <script src="js/lex/chat/lex-chat.js"></script>
   <script src="js/lex/chat/lex-chat.index.js"></script>
+  <script src="js/lex/components/chat/lex-ask-lana-btn.js"></script>
+  <script src="js/lex/components/chat/lex-lana-panel.js"></script>
 
   <!-- Inject page content + hoist modals -->
   <script src="js/lex/lex-page-init.js"></script>

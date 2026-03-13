@@ -470,6 +470,10 @@
             this._props.conversationId = event.threadId;
             this.emit('lex-chat-conversation-created', { conversationId: event.threadId });
           }
+          // Capture backend-resolved matter ID early (before handler runs)
+          if (event.matterId && !this.matterId) {
+            this._props.matterId = event.matterId;
+          }
           this.emit('lex-chat-response-start', { conversationId: this.conversationId });
           break;
 
@@ -626,6 +630,12 @@
           if (event.threadId && !this.conversationId) {
             this._props.conversationId = event.threadId;
             this.emit('lex-chat-conversation-created', { conversationId: event.threadId });
+          }
+
+          // Capture backend-resolved matter ID (e.g. resolved from attachment file)
+          // This ensures subsequent messages include the correct matter_id
+          if (event.matterId && !this.matterId) {
+            this._props.matterId = event.matterId;
           }
 
           this.emit('lex-chat-response-end', {

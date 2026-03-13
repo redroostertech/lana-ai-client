@@ -15,6 +15,10 @@
   var selectedSkill = null;
   var selectedMatters = [];
 
+  // Matter context (for breadcrumb navigation)
+  var _matterId = '';
+  var _matterName = '';
+
   // Pagination state (grid view)
   var gridPage = 1;
   var gridLimit = 20;
@@ -26,10 +30,7 @@
     isImporting: false
   };
 
-  // Skills Designer drawer state
-  var _skillsDrawer = null;
-  var _skillsChatEl = null;
-  var _skillsThreadsEl = null;
+  // Skills Designer — managed by lex-lana-panel
 
   // Debounce timer for MX diagnostics (FE-1: avoid firing on every keystroke)
   var _mxDebounceTimer = null;
@@ -56,6 +57,41 @@
   var loadingState, skillsGridContainer, gridEmptyState, filterChips;
   var gridViewContainer, skillsListView, gridPagination, listPagination;
   var skillDetailsModal, matterSelectorModal;
+
+  /**
+   * Get URL query parameter
+   * @param {string} name - Parameter name
+   * @returns {string} Parameter value or empty string
+   */
+  function _getQueryParam(name) {
+    var params = new URLSearchParams(window.location.search);
+    return params.get(name) || '';
+  }
+
+  /**
+   * Fetch matter details and update breadcrumb
+   */
+  function _fetchMatterForBreadcrumb() {
+    if (!_matterId) return;
+
+    api.get('/api/v1/matters/' + encodeURIComponent(_matterId))
+      .then(function(result) {
+        var matter = (result && result.data) || result || {};
+        _matterName = matter.matter_name || matter.name || _matterId;
+
+        var breadcrumb = document.getElementById('skillsBreadcrumb');
+        if (breadcrumb) {
+          breadcrumb.setAttribute('items', JSON.stringify([
+            { label: 'Workspaces', href: 'workspaces.html' },
+            { label: _matterName, href: 'workspace-details.html?id=' + encodeURIComponent(_matterId) },
+            { label: 'Skills' }
+          ]));
+        }
+      })
+      .catch(function(err) {
+        console.warn('[skills] Failed to fetch matter for breadcrumb:', err);
+      });
+  }
 
   /**
    * Initialize the skills page
@@ -91,11 +127,17 @@
     skillDetailsModal = document.getElementById('skill-details-modal');
     matterSelectorModal = document.getElementById('matter-selector-modal');
 
+    // Check for matter context from URL (for breadcrumb navigation)
+    _matterId = _getQueryParam('id');
+    if (_matterId) {
+      _fetchMatterForBreadcrumb();
+    }
+
     // Attach event listeners
     attachEventListeners();
 
-    // Inject LANA button into topbar after a short delay to ensure topbar has rendered
-    setTimeout(injectLanaButton, 200);
+    // Wire lex-ask-lana-btn → Skills Designer panel
+    _initLanaPanel();
 
     // Set initial view (list is default)
     setViewMode('list');
@@ -262,36 +304,11 @@
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // Topbar LANA Button (injected programmatically like reporting.js)
+  // Ask LANA panel integration (lex-lana-panel)
   // ═══════════════════════════════════════════════════════════════
 
-  function injectLanaButton() {
-    var topbarRight = document.querySelector('.lex-topbar-right');
-    if (!topbarRight) return;
-
-    // Don't inject twice
-    if (topbarRight.querySelector('.lana-insights-btn')) return;
-
-    var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'lana-insights-btn';
-    btn.style.cssText = 'padding:6px 12px;font-size:10.5px;';
-    btn.innerHTML = '<span class="lana-btn-icon">'
-      + '<svg class="lana-btn-corner-tl" width="8" height="8" viewBox="0 0 8 8" fill="none">'
-      + '<path d="M0 0L8 0M0 0L0 8" stroke="currentColor" stroke-width="1.5"/>'
-      + '</svg>'
-      + '<svg class="lana-btn-corner-br" width="8" height="8" viewBox="0 0 8 8" fill="none">'
-      + '<path d="M8 8L0 8M8 8L8 0" stroke="currentColor" stroke-width="1.5"/>'
-      + '</svg>'
-      + '</span>'
-      + '<span>LANA</span>';
-    btn.addEventListener('click', openSkillsDesigner);
-
-    // Add divider then button
-    var divider = document.createElement('span');
-    divider.className = 'lana-topbar-divider';
-    topbarRight.appendChild(divider);
-    topbarRight.appendChild(btn);
+  function _initLanaPanel() {
+    // Panel is in the HTML template — nothing to inject
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -441,7 +458,12 @@
     'pipeline.stage_changed': 'Triggered when an item moves to a different pipeline stage',
     'ai.analysis_completed': 'Triggered when AI analysis of content completes',
     'ai.summary_generated': 'Triggered when AI generates a summary',
-    'ai.extraction_completed': 'Triggered when AI data extraction completes'
+    'ai.extraction_completed': 'Triggered when AI data extraction completes',
+    'schedule.minutes': 'Runs on a recurring interval (every 30 minutes). Configure schedule in skill settings.',
+    'schedule.hourly': 'Runs every N hours. Configure interval in skill settings.',
+    'schedule.daily': 'Runs once per day at a configured time. Ideal for daily checks, reports, and maintenance tasks.',
+    'schedule.weekly': 'Runs once per week on a configured day and time. Ideal for weekly digests and summaries.',
+    'schedule.monthly': 'Runs once per month on a configured day. Ideal for monthly reports and billing cycles.'
   };
 
   /**
@@ -484,7 +506,8 @@
       'Folder Events': ['folder.created','folder.renamed','folder.deleted'],
       'Generated Document Events': ['generated_document.created','generated_document.failed'],
       'Pipeline Events': ['pipeline.created','pipeline.updated','pipeline.stage_changed'],
-      'AI Events': ['ai.analysis_completed','ai.summary_generated','ai.extraction_completed']
+      'AI Events': ['ai.analysis_completed','ai.summary_generated','ai.extraction_completed'],
+      'Schedule Events': ['schedule.minutes','schedule.hourly','schedule.daily','schedule.weekly','schedule.monthly']
     };
 
     var html = '';
@@ -592,6 +615,7 @@
             if (selectEl && config.trigger.event_type) {
               selectEl.value = config.trigger.event_type;
               updateEventDescription(lastStep.id);
+              updateStepStatus(lastStep.id, true);
             }
           }
         }
@@ -601,16 +625,43 @@
             var actionStep = skillSteps[skillSteps.length - 1];
             if (actionStep) {
               var actionType = config.actions[a].action_type || 'ai-action';
+              var rawActionType = config.actions[a].action_type || '';
               if (actionType.indexOf('ai') === 0) actionType = 'ai-action';
-              else if (actionType.indexOf('notification') === 0 || actionType.indexOf('connector') === 0) actionType = 'integration';
-              else if (actionType.indexOf('text') === 0) actionType = 'transform';
+              else if (actionType.indexOf('database') === 0) actionType = 'database';
+              else if (actionType.indexOf('notification') === 0) actionType = 'notification';
+              else if (actionType.indexOf('connector') === 0 || actionType.indexOf('integration') === 0) actionType = 'integration';
+              else if (actionType.indexOf('text') === 0 || actionType.indexOf('artifact') === 0) actionType = 'transform';
               updateStepType(actionStep.id, actionType);
               var typeSelector = document.querySelector('[data-step-id="' + actionStep.id + '"] .step-type-selector');
               if (typeSelector) typeSelector.value = actionType;
               // Populate action config from saved data
               if (config.actions[a].config) {
-                populateStepConfigFromData(actionStep.id, actionType, config.actions[a].config);
-                actionStep.config = config.actions[a].config;
+                var populateConfig = config.actions[a].config;
+                // For database steps, derive operation from backend action_type
+                if (actionType === 'database' && !populateConfig.operation) {
+                  if (rawActionType.indexOf('insert') !== -1) populateConfig.operation = 'insert';
+                  else if (rawActionType.indexOf('update') !== -1) populateConfig.operation = 'update';
+                  else populateConfig.operation = 'query';
+                }
+                // For notification steps, derive notification_type from backend action_type
+                if (actionType === 'notification' && !populateConfig.notification_type) {
+                  if (rawActionType.indexOf('createTask') !== -1) populateConfig.notification_type = 'create_task';
+                  else if (rawActionType.indexOf('logActivity') !== -1) populateConfig.notification_type = 'log_activity';
+                  else populateConfig.notification_type = 'send_notification';
+                }
+                populateStepConfigFromData(actionStep.id, actionType, populateConfig);
+                actionStep.config = populateConfig;
+              }
+              // Load step description if present
+              var stepDesc = config.actions[a].description || '';
+              if (stepDesc) {
+                actionStep.description = stepDesc;
+                var descContainer = document.getElementById('desc-' + actionStep.id);
+                if (descContainer) {
+                  descContainer.classList.remove('hidden');
+                  var descText = descContainer.querySelector('.step-description-text');
+                  if (descText) descText.textContent = stepDesc;
+                }
               }
             }
           }
@@ -633,6 +684,16 @@
             if (steps[s].config) {
               populateStepConfigFromData(step.id, steps[s].type, steps[s].config);
               step.config = steps[s].config;
+            }
+            // Load step description if present
+            if (steps[s].description) {
+              step.description = steps[s].description;
+              var descCont = document.getElementById('desc-' + step.id);
+              if (descCont) {
+                descCont.classList.remove('hidden');
+                var descTxt = descCont.querySelector('.step-description-text');
+                if (descTxt) descTxt.textContent = steps[s].description;
+              }
             }
           }
         }
@@ -699,6 +760,8 @@
       + '<option value="trigger">Trigger</option>'
       + '<option value="condition">Condition</option>'
       + '<option value="ai-action">AI Action</option>'
+      + '<option value="database">Database</option>'
+      + '<option value="notification">Notification</option>'
       + '<option value="integration">Integration</option>'
       + '<option value="transform">Transform</option>'
       + '</select>'
@@ -711,11 +774,18 @@
       + '<label class="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Inferred Intent</label>'
       + '<input type="text" class="step-intent-input w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm" placeholder="e.g., Detect when new litigation document is uploaded" data-step-id="' + stepId + '">'
       + '</div>'
+      + '<div class="step-description-container mb-4 hidden" id="desc-' + stepId + '">'
+      + '<p class="text-xs text-gray-600 italic bg-gray-50 rounded-md px-3 py-2 border border-gray-100 step-description-text"></p>'
+      + '</div>'
       + '<div class="step-config-container" id="config-' + stepId + '"></div>'
       + '<div class="mt-4 flex items-center gap-2 text-xs">'
-      + '<div class="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-50 border border-amber-200">'
+      + '<div id="status-needs-' + stepId + '" class="step-status-needs flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-50 border border-amber-200">'
       + '<div class="w-1.5 h-1.5 rounded-full bg-amber-500"></div>'
       + '<span class="text-amber-700 font-medium">Needs Configuration</span>'
+      + '</div>'
+      + '<div id="status-ready-' + stepId + '" class="step-status-ready flex items-center gap-1.5 px-2 py-1 rounded-md bg-green-50 border border-green-200 hidden">'
+      + '<div class="w-1.5 h-1.5 rounded-full bg-green-500"></div>'
+      + '<span class="text-green-700 font-medium">Configured</span>'
       + '</div>'
       + '<code class="ml-auto text-gray-500 font-mono">{{step_' + (stepIndex + 1) + '.output}}</code>'
       + '</div></div></div>';
@@ -779,7 +849,7 @@
     else if (type === 'condition') mxDiagnostics.conditionCount++;
     else mxDiagnostics.actionCount++;
 
-    // Update icon color
+    // Update icon color and SVG
     var stepEl = document.querySelector('[data-step-id="' + stepId + '"]');
     if (stepEl) {
       var iconWrapper = stepEl.querySelector('.step-icon-wrapper');
@@ -788,10 +858,26 @@
           'trigger': 'bg-blue-600',
           'condition': 'bg-amber-600',
           'ai-action': 'bg-green-600',
+          'database': 'bg-indigo-600',
+          'notification': 'bg-rose-600',
           'integration': 'bg-purple-600',
           'transform': 'bg-cyan-600'
         };
         iconWrapper.className = 'w-10 h-10 rounded-lg flex items-center justify-center step-icon-wrapper ' + (colorMap[type] || 'bg-blue-600');
+
+        var iconSvgMap = {
+          'trigger': '<svg class="w-5 h-5 text-white step-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>',
+          'condition': '<svg class="w-5 h-5 text-white step-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+          'ai-action': '<svg class="w-5 h-5 text-white step-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg>',
+          'database': '<svg class="w-5 h-5 text-white step-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>',
+          'notification': '<svg class="w-5 h-5 text-white step-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>',
+          'integration': '<svg class="w-5 h-5 text-white step-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>',
+          'transform': '<svg class="w-5 h-5 text-white step-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>'
+        };
+        var iconEl = iconWrapper.querySelector('.step-icon');
+        if (iconEl) {
+          iconWrapper.innerHTML = iconSvgMap[type] || iconSvgMap['trigger'];
+        }
       }
     }
 
@@ -844,14 +930,68 @@
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Prompt Template</label>'
         + '<textarea rows="3" placeholder="Summarize the key points from {{trigger.data.document}}..." class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 text-sm resize-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"></textarea>'
         + '</div></div>';
+    } else if (type === 'database') {
+      configHtml = '<div class="space-y-3"><div>'
+        + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Operation</label>'
+        + '<select class="db-operation-select w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
+        + '<option value="insert">Insert Record</option>'
+        + '<option value="query">Query Records</option>'
+        + '<option value="update">Update Record</option>'
+        + '</select></div><div>'
+        + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Table</label>'
+        + '<select class="db-table-select w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
+        + '<optgroup label="Document Tables">'
+        + '<option value="documents">Documents</option>'
+        + '<option value="document_chunks">Document Chunks</option>'
+        + '<option value="document_metadata">Document Metadata</option>'
+        + '</optgroup>'
+        + '<optgroup label="Matter Tables">'
+        + '<option value="client_matters">Client Matters</option>'
+        + '<option value="matter_contacts">Matter Contacts</option>'
+        + '<option value="matter_documents">Matter Documents</option>'
+        + '<option value="matter_notes">Matter Notes</option>'
+        + '</optgroup>'
+        + '<optgroup label="Workflow Tables">'
+        + '<option value="workflows">Workflows</option>'
+        + '<option value="workflow_executions">Workflow Executions</option>'
+        + '<option value="workflow_steps">Workflow Steps</option>'
+        + '</optgroup>'
+        + '<optgroup label="Integration Tables">'
+        + '<option value="connector_data">Connector Data</option>'
+        + '<option value="integration_sources">Integration Sources</option>'
+        + '</optgroup>'
+        + '<optgroup label="Skill Tables">'
+        + '<option value="custom_skills">Custom Skills</option>'
+        + '<option value="skill_executions">Skill Executions</option>'
+        + '<option value="skill_artifacts">Skill Artifacts</option>'
+        + '</optgroup>'
+        + '</select></div><div>'
+        + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Data (JSON)</label>'
+        + '<textarea rows="4" class="db-data-input w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 text-sm font-mono resize-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500" placeholder=\'{"title": "Example", "content": "{{trigger.data.value}}"}\'></textarea>'
+        + '<p class="mt-1 text-xs text-gray-500">Use <code>{{trigger.*}}</code> template variables for dynamic values. Fields like organization_id, matter_id, and created_by are auto-injected.</p>'
+        + '</div></div>';
+    } else if (type === 'notification') {
+      configHtml = '<div class="space-y-3"><div>'
+        + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Notification Type</label>'
+        + '<select class="notification-type-select w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
+        + '<option value="create_task">Create Task</option>'
+        + '<option value="send_notification">Send In-App Notification</option>'
+        + '<option value="log_activity">Log Activity</option>'
+        + '</select></div><div>'
+        + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Title / Subject</label>'
+        + '<input type="text" class="notification-title-input w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500" placeholder="e.g., Review overdue invoices">'
+        + '</div><div>'
+        + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Message</label>'
+        + '<textarea rows="3" class="notification-message-input w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 text-sm resize-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500" placeholder="Use {{actions.*.result}} for dynamic content"></textarea>'
+        + '<p class="mt-1 text-xs text-gray-500">Recipients are auto-resolved from the matter\'s assigned users.</p>'
+        + '</div></div>';
     } else if (type === 'integration') {
       configHtml = '<div class="space-y-3"><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Action Type</label>'
         + '<select class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
-        + '<option value="send_email">Send Email</option>'
-        + '<option value="create_task">Create Task</option>'
         + '<option value="update_crm">Update CRM</option>'
-        + '<option value="post_slack">Post to Slack</option>'
+        + '<option value="webhook">Webhook</option>'
+        + '<option value="connector_execute">Connector Action</option>'
         + '</select></div></div>';
     } else if (type === 'transform') {
       configHtml = '<div class="space-y-3"><div>'
@@ -888,6 +1028,7 @@
           break;
         }
       }
+      updateStepStatus(stepId, true);
       debouncedUpdateMXDiagnostics();
     };
 
@@ -1040,6 +1181,26 @@
       var textareas = container.querySelectorAll('textarea');
       if (aiSelects.length >= 1) config.task = aiSelects[0].value;
       if (textareas.length >= 1) config.prompt_template = textareas[0].value;
+    } else if (stepType === 'database') {
+      var dbOpSelect = container.querySelector('.db-operation-select');
+      var dbTableSelect = container.querySelector('.db-table-select');
+      var dbDataInput = container.querySelector('.db-data-input');
+      if (dbOpSelect) config.operation = dbOpSelect.value;
+      if (dbTableSelect) config.table = dbTableSelect.value;
+      if (dbDataInput && dbDataInput.value.trim()) {
+        try {
+          config.data = JSON.parse(dbDataInput.value.trim());
+        } catch (e) {
+          config.data_raw = dbDataInput.value.trim();
+        }
+      }
+    } else if (stepType === 'notification') {
+      var notifTypeSelect = container.querySelector('.notification-type-select');
+      var notifTitleInput = container.querySelector('.notification-title-input');
+      var notifMsgInput = container.querySelector('.notification-message-input');
+      if (notifTypeSelect) config.notification_type = notifTypeSelect.value;
+      if (notifTitleInput) config.title = notifTitleInput.value;
+      if (notifMsgInput) config.message = notifMsgInput.value;
     } else if (stepType === 'integration') {
       var intSelects = container.querySelectorAll('select');
       if (intSelects.length >= 1) config.action_type = intSelects[0].value;
@@ -1061,11 +1222,22 @@
     if (stepType === 'ai-action') {
       return 'ai.generate';
     }
+    if (stepType === 'database') {
+      var op = stepCfg.operation || 'insert';
+      if (op === 'query') return 'database.query';
+      if (op === 'update') return 'database.update';
+      return 'database.insert';
+    }
+    if (stepType === 'notification') {
+      var nt = stepCfg.notification_type || '';
+      if (nt === 'create_task') return 'notification.createTask';
+      if (nt === 'log_activity') return 'notification.logActivity';
+      return 'notification.send';
+    }
     if (stepType === 'integration') {
       var at = stepCfg.action_type || '';
-      if (at === 'send_email') return 'notification.sendEmail';
-      if (at === 'post_slack') return 'notification.send';
-      return 'database.query';
+      if (at === 'webhook') return 'connector.webhook';
+      return 'connector.execute';
     }
     if (stepType === 'transform') {
       return 'text.template';
@@ -1086,9 +1258,24 @@
         prompt_template: stepCfg.prompt_template || ''
       };
     }
+    if (stepType === 'database') {
+      var dbConfig = {
+        table: stepCfg.table || 'matter_notes'
+      };
+      if (stepCfg.data) dbConfig.data = stepCfg.data;
+      else if (stepCfg.data_raw) dbConfig.data_raw = stepCfg.data_raw;
+      return dbConfig;
+    }
+    if (stepType === 'notification') {
+      return {
+        notification_type: stepCfg.notification_type || 'create_task',
+        title: stepCfg.title || '',
+        message: stepCfg.message || ''
+      };
+    }
     if (stepType === 'integration') {
       return {
-        action_type: stepCfg.action_type || 'send_email'
+        action_type: stepCfg.action_type || 'connector_execute'
       };
     }
     if (stepType === 'transform') {
@@ -1127,12 +1314,50 @@
       var textareas = container.querySelectorAll('textarea');
       if (aiSelects.length >= 1 && configData.task) aiSelects[0].value = configData.task;
       if (textareas.length >= 1 && configData.prompt_template !== undefined) textareas[0].value = configData.prompt_template;
+    } else if (stepType === 'database') {
+      var dbOpSelect = container.querySelector('.db-operation-select');
+      var dbTableSelect = container.querySelector('.db-table-select');
+      var dbDataInput = container.querySelector('.db-data-input');
+      if (dbOpSelect && configData.operation) dbOpSelect.value = configData.operation;
+      if (dbTableSelect && configData.table) dbTableSelect.value = configData.table;
+      if (dbDataInput && configData.data) {
+        dbDataInput.value = JSON.stringify(configData.data, null, 2);
+      }
+    } else if (stepType === 'notification') {
+      var notifTypeSelect = container.querySelector('.notification-type-select');
+      var notifTitleInput = container.querySelector('.notification-title-input');
+      var notifMsgInput = container.querySelector('.notification-message-input');
+      if (notifTypeSelect && configData.notification_type) notifTypeSelect.value = configData.notification_type;
+      if (notifTitleInput && configData.title) notifTitleInput.value = configData.title;
+      if (notifMsgInput && configData.message) notifMsgInput.value = configData.message;
     } else if (stepType === 'integration') {
       var intSelects = container.querySelectorAll('select');
       if (intSelects.length >= 1 && configData.action_type) intSelects[0].value = configData.action_type;
     } else if (stepType === 'transform') {
       var txSelects = container.querySelectorAll('select');
       if (txSelects.length >= 1 && configData.operation) txSelects[0].value = configData.operation;
+    }
+
+    // Mark step as configured
+    updateStepStatus(stepId, true);
+  }
+
+  /**
+   * Update the configuration status badge for a step.
+   * @param {string} stepId - The step DOM id
+   * @param {boolean} isConfigured - Whether the step has valid configuration
+   */
+  function updateStepStatus(stepId, isConfigured) {
+    var needsEl = document.getElementById('status-needs-' + stepId);
+    var readyEl = document.getElementById('status-ready-' + stepId);
+    if (!needsEl || !readyEl) return;
+
+    if (isConfigured) {
+      needsEl.classList.add('hidden');
+      readyEl.classList.remove('hidden');
+    } else {
+      needsEl.classList.remove('hidden');
+      readyEl.classList.add('hidden');
     }
   }
 
@@ -1189,12 +1414,14 @@
         // ai-action, integration, transform → mapped to actions
         actionIndex++;
         var actionId = 'action_' + actionIndex;
-        actionsArray.push({
+        var actionEntry = {
           action_id: actionId,
           action_type: mapStepToActionType(step.type, stepCfg),
           config: buildActionConfig(step.type, stepCfg),
           dependsOn: actionIndex > 1 ? ['action_' + (actionIndex - 1)] : null
-        });
+        };
+        if (step.description) actionEntry.description = step.description;
+        actionsArray.push(actionEntry);
       }
     }
 
@@ -1268,177 +1495,7 @@
     });
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // Skills Designer Drawer (Ask LANA)
-  // ═══════════════════════════════════════════════════════════════
-
-  /**
-   * Open the Skills Designer drawer with lex-chat for skills_chat context.
-   * Follows the same pattern as data-visualization.js and reporting.js.
-   */
-  function openSkillsDesigner() {
-    // If drawer already exists, just re-open it
-    if (_skillsDrawer) {
-      _skillsDrawer.setAttribute('open', 'true');
-      return;
-    }
-
-    _skillsDrawer = document.createElement('lex-drawer');
-    _skillsDrawer.setAttribute('heading', 'Skills Designer');
-    _skillsDrawer.setAttribute('side', 'right');
-    _skillsDrawer.setAttribute('width', 'lg');
-    _skillsDrawer.setAttribute('open', 'true');
-
-    // Build wrapper: threads list + chat
-    var wrapper = document.createElement('div');
-    wrapper.style.cssText = 'display:flex;flex-direction:column;height:100%;';
-
-    var threadsEl = document.createElement('lex-chat-threads');
-    threadsEl.setAttribute('page-scope', 'skills');
-    threadsEl.setAttribute('context-type', 'skills_chat');
-    threadsEl.style.flexShrink = '0';
-
-    var chatEl = document.createElement('lex-chat');
-    chatEl.setAttribute('context-type', 'skills_chat');
-    chatEl.setAttribute('source', 'sse');
-    chatEl.setAttribute('placeholder', 'Describe the skill you want to create...');
-    chatEl.style.flex = '1';
-    chatEl.style.minHeight = '0';
-
-    wrapper.appendChild(threadsEl);
-    wrapper.appendChild(chatEl);
-    _skillsDrawer.appendChild(wrapper);
-    document.body.appendChild(_skillsDrawer);
-
-    // Re-acquire live references after drawer clones children
-    _skillsChatEl = _skillsDrawer.querySelector('lex-chat');
-    _skillsThreadsEl = _skillsDrawer.querySelector('lex-chat-threads');
-
-    // Wire thread selection: switch chat conversation
-    _skillsDrawer.addEventListener('lex-thread-select', function (e) {
-      var thread = e.detail && e.detail.thread;
-      if (!thread || !_skillsChatEl) return;
-      _skillsChatEl.clearConversation();
-      _skillsChatEl.loadConversation(thread.thread_id);
-    });
-
-    // Auto-select page_general thread when threads finish loading
-    _skillsDrawer.addEventListener('lex-threads-loaded', function (e) {
-      var threads = e.detail && e.detail.threads;
-      if (!threads || !threads.length || !_skillsChatEl) return;
-      for (var i = 0; i < threads.length; i++) {
-        if (threads[i].thread_type === 'page_general' && threads[i].thread_id) {
-          _skillsChatEl.loadConversation(threads[i].thread_id);
-          if (_skillsThreadsEl) _skillsThreadsEl.setActiveThread(threads[i].id);
-          break;
-        }
-      }
-    });
-
-    // Wire new thread creation
-    _skillsDrawer.addEventListener('lex-thread-create', function () {
-      if (!_skillsChatEl) return;
-      _skillsChatEl.clearConversation();
-      if (_skillsThreadsEl) _skillsThreadsEl.setActiveThread(null);
-    });
-
-    // When lex-chat creates a new conversation, register it as a page-general thread
-    _skillsDrawer.addEventListener('lex-chat-conversation-created', function (e) {
-      var conversationId = e.detail && e.detail.conversationId;
-      if (!conversationId || typeof api === 'undefined') return;
-
-      // Add to sidebar conversation menu so it appears immediately
-      if (window.ConversationMenu && typeof window.ConversationMenu.addConversation === 'function') {
-        window.ConversationMenu.addConversation({
-          thread_id: conversationId,
-          title: 'Skills Designer',
-          updated_at: new Date().toISOString()
-        });
-      }
-
-      var threadsComp = _skillsThreadsEl;
-      if (threadsComp && threadsComp._threads && threadsComp._threads.length > 0) {
-        for (var i = 0; i < threadsComp._threads.length; i++) {
-          if (threadsComp._threads[i].thread_type === 'page_general') {
-            // Update existing page_general thread's thread_id to stay in sync
-            var existingThread = threadsComp._threads[i];
-            existingThread.thread_id = conversationId;
-            api.put('/api/v1/conversation-threads/' + existingThread.id, {
-              thread_id: conversationId
-            }).catch(function (err) {
-              console.warn('[Skills] Failed to update page thread thread_id:', err);
-            });
-            return;
-          }
-        }
-      }
-
-      // Create page general thread
-      api.post('/api/v1/conversation-threads', {
-        title: 'Skills Designer',
-        thread_type: 'page_general',
-        context_type: 'skills_chat',
-        page_scope: 'skills',
-        thread_id: conversationId
-      }).then(function (resp) {
-        var created = resp.data || resp;
-        if (_skillsThreadsEl) {
-          _skillsThreadsEl.addThread(created);
-          _skillsThreadsEl.setActiveThread(created.id);
-        }
-      }).catch(function (err) {
-        console.warn('[Skills] Failed to register page thread:', err);
-      });
-    });
-
-    // Lock composer to skills_chat tool only
-    setTimeout(function () {
-      if (!_skillsChatEl) return;
-      var composer = _skillsChatEl.querySelector('lex-chat-composer');
-      if (!composer) return;
-
-      // Hide the plus button
-      var plusBtn = composer.querySelector('[data-plus]');
-      if (plusBtn && plusBtn.parentElement) {
-        plusBtn.parentElement.style.display = 'none';
-      }
-
-      // Define the skills_chat tool so the composer knows about it
-      // (it's not in DEFAULT_TOOLS since we reverted the composer changes)
-      var ICON_WAND = '<svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">'
-        + '<path d="M15 4V2m0 2v2m0-2h2m-2 0h-2"/>'
-        + '<path d="M8.5 8.5l-1.5-1.5"/>'
-        + '<path d="M20 4l-9.5 9.5"/>'
-        + '<path d="M3.5 20.5l10-10"/>'
-        + '<path d="M9 11l-6 6 4 4 6-6"/>'
-        + '</svg>';
-
-      composer.tools = [
-        { id: 'skills_chat', label: 'Skills Designer', icon: ICON_WAND, description: 'Design and create skills with AI assistance' }
-      ];
-
-      // Pre-select skills_chat tool and lock
-      if (typeof composer.setActiveTools === 'function') {
-        composer.setActiveTools(['skills_chat']);
-      }
-      if (typeof composer.setToolsLocked === 'function') {
-        composer.setToolsLocked(true);
-      }
-    }, 150);
-
-    // Close handler — clean up references
-    _skillsDrawer.addEventListener('lex-close', function () {
-      if (_skillsChatEl && _skillsChatEl.disconnect) {
-        _skillsChatEl.disconnect();
-      }
-      _skillsChatEl = null;
-      _skillsThreadsEl = null;
-      if (_skillsDrawer && _skillsDrawer.parentNode) {
-        _skillsDrawer.remove();
-      }
-      _skillsDrawer = null;
-    });
-  }
+  // openSkillsDesigner — removed, handled by lex-lana-panel in HTML
 
   // ═══════════════════════════════════════════════════════════════
   // Skills Loading & Rendering

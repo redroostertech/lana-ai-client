@@ -149,20 +149,22 @@ async function renderSkillsTab(matter) {
 
 // Helper functions for Skills tab (attached to window for onclick handlers)
 window.createNewSkill = function(matterId) {
-  // Navigate to the Skills page (standalone page — full navigation)
+  // Navigate to the Skills page with matter context for breadcrumb
+  var href = matterId ? 'skills.html?id=' + encodeURIComponent(matterId) : 'skills.html';
   if (window.Lex && window.Lex.Nav) {
-    Lex.Nav.go('skills.html');
+    Lex.Nav.go(href);
   } else {
-    window.location.href = 'skills.html';
+    window.location.href = href;
   }
 };
 
 window.importSkill = function(matterId) {
-  // Navigate to the Skills page (standalone page — full navigation)
+  // Navigate to the Skills page with matter context for breadcrumb
+  var href = matterId ? 'skills.html?id=' + encodeURIComponent(matterId) : 'skills.html';
   if (window.Lex && window.Lex.Nav) {
-    Lex.Nav.go('skills.html');
+    Lex.Nav.go(href);
   } else {
-    window.location.href = 'skills.html';
+    window.location.href = href;
   }
 };
 

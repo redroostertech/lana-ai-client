@@ -623,28 +623,41 @@
       '<div class="text-sm" style="background:var(--lex-status-warning-bg, #fefce8);border:1px solid var(--lex-status-warning, #ca8a04);border-radius:var(--lex-radius-md, 6px);padding:0.75rem;">' +
         '<p class="font-medium" style="color:var(--lex-status-warning-text, #713f12);">What will happen:</p>' +
         '<ul class="list-disc ml-4 mt-1" style="color:var(--lex-status-warning-text, #713f12);">' +
-          '<li>All synced data will be preserved</li>' +
           '<li>The connector will stop syncing</li>' +
           '<li>OAuth tokens will be revoked</li>' +
           '<li>You can reinstall later</li>' +
         '</ul>' +
       '</div>' +
+      '<label class="flex items-center gap-2 mt-3 cursor-pointer">' +
+        '<input type="checkbox" id="purgeDataCheckbox" class="rounded border-gray-300">' +
+        '<span class="text-sm text-gray-700">Also purge all synced data</span>' +
+      '</label>' +
     '</div>';
 
     Lex.Modal.confirm('Uninstall Connector', message, function () {
-      confirmUninstallConnector();
+      var purgeData = document.getElementById('purgeDataCheckbox') && document.getElementById('purgeDataCheckbox').checked;
+      confirmUninstallConnector(purgeData);
     }, { variant: 'default', confirmText: 'Uninstall', cancelText: 'Cancel', size: 'sm' });
   }
 
-  function confirmUninstallConnector() {
+  function confirmUninstallConnector(purgeData) {
     if (!selectedConnectorForActions) return;
 
     var connector = selectedConnectorForActions;
     var connectorName = (connector.manifest && connector.manifest.name) || connector.name || connector.connector_name || 'this connector';
+    var connectorType = connector.connector_id || connector.source_type || connector.id;
 
-    // The Lex.Modal.confirm() dialog auto-closes on confirm — no explicit close needed.
-    api.delete('/api/v1/integrations/connectors/' + connector.id).then(function () {
-      Lex.Toast.success(connectorName + ' has been uninstalled successfully');
+    // If purge requested, delete data first, then uninstall
+    var purgePromise = purgeData
+      ? api.delete('/api/connectors/' + connectorType + '/data/purge')
+      : Promise.resolve();
+
+    purgePromise.then(function () {
+      return api.delete('/api/v1/integrations/connectors/' + connector.id);
+    }).then(function () {
+      var msg = connectorName + ' has been uninstalled';
+      if (purgeData) msg += ' and all synced data purged';
+      Lex.Toast.success(msg);
       selectedConnectorForActions = null;
       loadConnectors();
     }).catch(function (error) {
@@ -1126,6 +1139,64 @@
     });
   }
 
+  // ── Update connector (reimport ZIP without deleting data) ──────────
+
+  function updateConnector() {
+    if (!selectedConnectorForActions) {
+      Lex.Toast.error('No connector selected');
+      return;
+    }
+    // Close the actions modal and trigger the hidden file input
+    closeConnectorActionsModal(false);
+    var fileInput = document.getElementById('updateConnectorFileInput');
+    if (fileInput) {
+      fileInput.value = '';
+      fileInput.click();
+    }
+  }
+
+  function handleUpdateConnectorFile(event) {
+    var file = event.target.files[0];
+    if (!file) {
+      selectedConnectorForActions = null;
+      return;
+    }
+
+    var connectorName = selectedConnectorForActions
+      ? ((selectedConnectorForActions.manifest && selectedConnectorForActions.manifest.name) || selectedConnectorForActions.name || 'Connector')
+      : 'Connector';
+
+    Lex.Toast.info('Updating ' + connectorName + '...');
+
+    var formData = new FormData();
+    formData.append('connector_zip', file);
+
+    api.post('/api/v1/generic-connectors/import', formData).then(function (result) {
+      if (result && result.success) {
+        Lex.Toast.success(connectorName + ' updated successfully!');
+        selectedConnectorForActions = null;
+        var tid = setTimeout(function () {
+          loadConnectors();
+        }, 1500);
+        _timeouts.push(tid);
+      } else {
+        throw new Error((result && (result.error || result.message)) || 'Failed to update connector');
+      }
+    }).catch(function (error) {
+      console.error('Update connector error:', error);
+      var errorMessage = error.message || 'Unknown error';
+      if (errorMessage.indexOf('400') !== -1) {
+        errorMessage = 'Invalid connector package. Please check the ZIP file structure.';
+      } else if (errorMessage.indexOf('401') !== -1 || errorMessage.indexOf('403') !== -1) {
+        errorMessage = 'You do not have permission to update connectors. Admin access required.';
+      } else if (errorMessage.indexOf('413') !== -1) {
+        errorMessage = 'File too large. Maximum size is 20MB.';
+      }
+      Lex.Toast.error('Update failed: ' + errorMessage);
+      selectedConnectorForActions = null;
+    });
+  }
+
   // ── Drag and drop ───────────────────────────────────────────────────
 
   function preventDefaults(e) {
@@ -1231,6 +1302,8 @@
     exposeGlobal('showConnectorActionsModal', showConnectorActionsModal);
     exposeGlobal('closeConnectorActionsModal', closeConnectorActionsModal);
     exposeGlobal('navigateToConnectorDashboard', navigateToConnectorDashboard);
+    exposeGlobal('updateConnector', updateConnector);
+    exposeGlobal('handleUpdateConnectorFile', handleUpdateConnectorFile);
     exposeGlobal('uninstallConnector', uninstallConnector);
     exposeGlobal('confirmUninstallConnector', confirmUninstallConnector);
     exposeGlobal('deleteConnector', deleteConnector);

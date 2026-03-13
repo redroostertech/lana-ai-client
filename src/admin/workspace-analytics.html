@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Administration - LANA AI</title>
+  <title>Workspace Analytics - LANA AI</title>
 
   <!-- ── CSS + Tailwind in head — behavioral scripts at end of body ── -->
   <link rel="stylesheet" href="../css/lex-tokens.css">
@@ -14,84 +14,62 @@
 </head>
 <body>
 
-  <!-- Branded loader — shows once lex-loader.js upgrades the element -->
+  <!-- Branded loader -->
   <lex-loader theme="light"></lex-loader>
 
-  <!-- App shell — sidebar, topbar, empty content area.
-       Page content lives in <template> below and gets injected after
-       the shell renders. This avoids double-rendering of child components. -->
+  <!-- App shell -->
   <lex-app
     logo-src="../img/logo-light.png"
     logo-alt="LANA AI"
     logo-href="../dashboard.html"
-    active-nav-id="admin"
-    page-title="Administration"
+    active-nav-id="reports"
+    page-title="Workspace Analytics"
   ></lex-app>
 
-  <!-- Page content as inert <template> — elements inside are NOT upgraded
-       by the browser until cloned into the live DOM. Zero double-rendering. -->
+  <!-- Page content as inert <template> -->
   <template id="page-content">
 
     <main>
 
+      <!-- Breadcrumb back to hub -->
+      <lex-breadcrumb
+        crumbs='[{"label":"Analytics","href":"admin/analytics.html"},{"label":"Workspace Analytics"}]'
+      ></lex-breadcrumb>
+
       <!-- Page header -->
       <lex-banner
         variant="light"
-        heading="Administration"
-        subtitle="Manage users, roles, organizations, and system settings"
+        heading="Workspace Analytics"
+        subtitle="Per-matter analytics — documents, tasks, notes, contacts, and activity"
       ></lex-banner>
 
-      <!-- Admin navigation cards grid -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" style="margin-top:1.5rem;">
+      <!-- Matter Picker -->
+      <div style="max-width:800px;margin:1.5rem auto 0;">
 
-        <lex-action-card
-          title="Users"
-          description="Manage user accounts, permissions, and access"
-          tag="Identity"
-          data-href="admin/users.html"
-        ></lex-action-card>
+        <div style="margin-bottom:1.5rem;">
+          <label for="workspaceMatterPicker" style="display:block;font-size:0.875rem;font-weight:500;color:#374151;margin-bottom:0.375rem;">Select Matter</label>
+          <select id="workspaceMatterPicker" style="width:100%;max-width:400px;padding:0.5rem;border:1px solid #d1d5db;border-radius:0.375rem;font-size:0.875rem;">
+            <option value="">Choose a matter...</option>
+          </select>
+        </div>
 
-        <lex-action-card
-          title="Roles &amp; Permissions"
-          description="Configure roles and permission levels"
-          tag="Identity"
-          data-href="admin/roles.html"
-        ></lex-action-card>
+        <!-- Analytics Cards Grid -->
+        <div id="workspaceAnalyticsCards" style="display:none;grid-template-columns:repeat(auto-fill, minmax(180px, 1fr));gap:1rem;">
+          <!-- Cards populated by JS -->
+        </div>
 
-        <lex-action-card
-          title="Organizations"
-          description="Manage organizational structure and settings"
-          tag="Structure"
-          data-href="admin/organizations.html"
-        ></lex-action-card>
+        <!-- Empty State -->
+        <div id="workspaceAnalyticsEmpty" style="text-align:center;padding:3rem 1rem;color:#6b7280;">
+          <p style="font-size:0.875rem;">Select a matter to view workspace analytics</p>
+        </div>
 
-        <lex-action-card
-          title="Sessions"
-          description="Monitor active user sessions and connections"
-          tag="Security"
-          data-href="admin/sessions.html"
-        ></lex-action-card>
-
-        <lex-action-card
-          title="Audit Logs"
-          description="View system activity and security logs"
-          tag="Security"
-          data-href="admin/audit.html"
-        ></lex-action-card>
-
-        <lex-action-card
-          title="System Health"
-          description="Monitor system status and performance"
-          tag="Operations"
-          data-href="admin/health.html"
-        ></lex-action-card>
-
-        <lex-action-card
-          title="Analytics"
-          description="Firm reporting, workspace insights, data visualization, and predictions"
-          tag="Analytics"
-          data-href="admin/analytics.html"
-        ></lex-action-card>
+        <!-- Error State -->
+        <div id="workspaceAnalyticsError" style="display:none;text-align:center;padding:2rem 1rem;">
+          <p style="color:#ef4444;font-size:0.875rem;">Failed to load analytics. Please try again.</p>
+          <button id="retryBtn" style="margin-top:0.75rem;padding:0.375rem 1rem;font-size:0.875rem;color:#2563eb;background:none;border:1px solid #2563eb;border-radius:0.375rem;cursor:pointer;">
+            Retry
+          </button>
+        </div>
 
       </div>
 
@@ -151,13 +129,12 @@
   <!-- Page-specific Lex components (BEFORE inject) -->
   <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
   <script src="../js/lex/components/foundation/lex-banner.js"></script>
-  <script src="../js/lex/components/foundation/lex-action-card.js"></script>
 
   <!-- Inject page content + hoist modals -->
   <script src="../js/lex/lex-page-init.js"></script>
 
   <!-- Page controller -->
-  <script src="../js/admin/admin-index.js"></script>
+  <script src="../js/admin/workspace-analytics.js"></script>
 
   <!-- Auth guard + loader dismiss (MUST be last) -->
   <script src="../js/auth-guard.js"></script>

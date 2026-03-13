@@ -358,7 +358,8 @@
             type: 'connected',
             threadId: data.thread_id || null,
             sessionId: data.session_id || null,
-            model: data.model || null
+            model: data.model || null,
+            matterId: data.matter_id || null
           };
 
         case 'thinking':
@@ -477,7 +478,8 @@
             userMessageId: data.user_message_id,
             threadId: data.thread_id,
             tokenCount: data.token_count || data.total_tokens || null,
-            processingTimeMs: data.processing_time_ms || data.generation_time_ms || null
+            processingTimeMs: data.processing_time_ms || data.generation_time_ms || null,
+            matterId: data.matter_id || null
           };
 
         case 'block_hints':
@@ -496,6 +498,9 @@
         case 'documents_loaded':
           // Pass through as generic events for extension
           return { type: eventType, ...data };
+
+        case 'error':
+          return { type: 'error', error: data.error || data.message || 'Unknown error', status: data.status || null };
 
         default:
           return null;

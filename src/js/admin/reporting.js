@@ -3401,204 +3401,32 @@
   // ==========================================================================
 
   // ==========================================================================
-  // LANA Insights Panel
+  // LANA Insights Panel (via lex-lana-panel)
   // ==========================================================================
 
-  var insightsDrawer = null;
-  var insightsChatEl = null;
-  var insightsThreadsEl = null;
+  // setTopbarLanaVisible — no-op, topbar button replaced by lex-ask-lana-btn
+  function setTopbarLanaVisible() {}
 
-  /**
-   * Show or hide the topbar LANA button and its divider.
-   * Hidden when the in-card "Ask LANA" button is visible to avoid duplication.
-   */
-  function setTopbarLanaVisible(visible) {
-    var topbarRight = document.querySelector('.lex-topbar-right');
-    if (!topbarRight) return;
-    var btn = topbarRight.querySelector('.lana-insights-btn');
-    var divider = topbarRight.querySelector('.lana-topbar-divider');
-    if (btn) btn.style.display = visible ? '' : 'none';
-    if (divider) divider.style.display = visible ? '' : 'none';
-  }
+  // injectLanaButton — no longer needed, button is in HTML
+  function injectLanaButton() {}
 
-  function injectLanaButton() {
-    var topbarRight = document.querySelector('.lex-topbar-right');
-    if (!topbarRight) return;
-
-    // Don't inject twice
-    if (topbarRight.querySelector('.lana-insights-btn')) return;
-
-    var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'lana-insights-btn';
-    btn.innerHTML = '<span class="lana-btn-icon">'
-      + '<svg class="lana-btn-corner-tl" width="8" height="8" viewBox="0 0 8 8" fill="none">'
-      + '<path d="M0 0L8 0M0 0L0 8" stroke="currentColor" stroke-width="1.5"/>'
-      + '</svg>'
-      + '<svg class="lana-btn-corner-br" width="8" height="8" viewBox="0 0 8 8" fill="none">'
-      + '<path d="M8 8L0 8M8 8L8 0" stroke="currentColor" stroke-width="1.5"/>'
-      + '</svg>'
-      + '</span>'
-      + '<span>LANA</span>';
-    btn.addEventListener('click', openInsightsPanel);
-
-    // Add divider then button (right of settings)
-    var divider = document.createElement('span');
-    divider.className = 'lana-topbar-divider';
-    topbarRight.appendChild(divider);
-    topbarRight.appendChild(btn);
-  }
-
+  // openInsightsPanel — delegates to panel.show()
   function openInsightsPanel() {
-    if (insightsDrawer) return;
-
-    insightsDrawer = document.createElement('lex-drawer');
-    insightsDrawer.setAttribute('heading', 'LANA Insights');
-    insightsDrawer.setAttribute('side', 'right');
-    insightsDrawer.setAttribute('width', 'lg');
-    insightsDrawer.setAttribute('open', 'true');
-
-    // Build wrapper: threads list + chat
-    var wrapper = document.createElement('div');
-    wrapper.style.cssText = 'display:flex;flex-direction:column;height:100%;';
-
-    var threadsEl = document.createElement('lex-chat-threads');
-    threadsEl.setAttribute('page-scope', 'reporting');
-    threadsEl.setAttribute('context-type', 'insights_chat');
-    threadsEl.style.flexShrink = '0';
-
-    var chatEl = document.createElement('lex-chat');
-    chatEl.setAttribute('context-type', 'insights_chat');
-    chatEl.setAttribute('source', 'sse');
-    chatEl.setAttribute('placeholder', 'Ask about forecasts, trends, and insights...');
-    chatEl.style.flex = '1';
-    chatEl.style.minHeight = '0';
-
-    wrapper.appendChild(threadsEl);
-    wrapper.appendChild(chatEl);
-    insightsDrawer.appendChild(wrapper);
-    document.body.appendChild(insightsDrawer);
-
-    // Re-acquire live references after drawer clones children
-    insightsChatEl = insightsDrawer.querySelector('lex-chat');
-    insightsThreadsEl = insightsDrawer.querySelector('lex-chat-threads');
-
-    // Wire thread selection: switch chat conversation
-    insightsDrawer.addEventListener('lex-thread-select', function (e) {
-      var thread = e.detail && e.detail.thread;
-      if (!thread || !insightsChatEl) return;
-      insightsChatEl.clearConversation();
-      insightsChatEl.loadConversation(thread.thread_id);
-    });
-
-    // Auto-select page_general thread when threads finish loading
-    insightsDrawer.addEventListener('lex-threads-loaded', function (e) {
-      var threads = e.detail && e.detail.threads;
-      if (!threads || !threads.length || !insightsChatEl) return;
-      for (var i = 0; i < threads.length; i++) {
-        if (threads[i].thread_type === 'page_general' && threads[i].thread_id) {
-          insightsChatEl.loadConversation(threads[i].thread_id);
-          if (insightsThreadsEl) insightsThreadsEl.setActiveThread(threads[i].id);
-          break;
-        }
-      }
-    });
-
-    // Wire new thread creation
-    insightsDrawer.addEventListener('lex-thread-create', function () {
-      if (!insightsChatEl) return;
-      insightsChatEl.clearConversation();
-      if (insightsThreadsEl) insightsThreadsEl.setActiveThread(null);
-    });
-
-    // When lex-chat creates a new conversation, register it as a page-general thread
-    insightsDrawer.addEventListener('lex-chat-conversation-created', function (e) {
-      var conversationId = e.detail && e.detail.conversationId;
-      if (!conversationId || typeof api === 'undefined') return;
-
-      // Add to sidebar conversation menu so it appears immediately
-      if (window.ConversationMenu && typeof window.ConversationMenu.addConversation === 'function') {
-        window.ConversationMenu.addConversation({
-          thread_id: conversationId,
-          title: 'Insights Chat',
-          updated_at: new Date().toISOString()
-        });
-      }
-
-      var threadsComp = insightsThreadsEl;
-      if (threadsComp && threadsComp._threads && threadsComp._threads.length > 0) {
-        for (var i = 0; i < threadsComp._threads.length; i++) {
-          if (threadsComp._threads[i].thread_type === 'page_general') {
-            // Update existing page_general thread's thread_id to stay in sync
-            var existingThread = threadsComp._threads[i];
-            existingThread.thread_id = conversationId;
-            api.put('/api/v1/conversation-threads/' + existingThread.id, {
-              thread_id: conversationId
-            }).catch(function (err) {
-              console.warn('[Reporting] Failed to update page thread thread_id:', err);
-            });
-            return;
-          }
-        }
-      }
-
-      // Create page general thread — link it to the actual conversation session
-      api.post('/api/v1/conversation-threads', {
-        title: 'General Insights',
-        thread_type: 'page_general',
-        context_type: 'insights_chat',
-        page_scope: 'reporting',
-        thread_id: conversationId
-      }).then(function (resp) {
-        var created = resp.data || resp;
-        if (insightsThreadsEl) {
-          insightsThreadsEl.addThread(created);
-          insightsThreadsEl.setActiveThread(created.id);
-        }
-      }).catch(function (err) {
-        console.warn('[Reporting] Failed to register page thread:', err);
-      });
-    });
-
-    // Customize composer: select insights_chat tool and lock tools
-    setTimeout(function () {
-      if (!insightsChatEl) return;
-      var composer = insightsChatEl.querySelector('lex-chat-composer');
-      if (!composer) return;
-
-      // Hide the plus button (no document management in insights mode)
-      var plusBtn = composer.querySelector('[data-plus]');
-      if (plusBtn && plusBtn.parentElement) {
-        plusBtn.parentElement.style.display = 'none';
-      }
-
-      // Pre-select insights_chat tool and lock the tools button
-      composer.setActiveTools(['insights_chat']);
-      composer.setToolsLocked(true);
-    }, 150);
-
-    insightsDrawer.addEventListener('lex-close', function () {
-      if (insightsChatEl && insightsChatEl.disconnect) {
-        insightsChatEl.disconnect();
-      }
-      insightsChatEl = null;
-      insightsThreadsEl = null;
-      if (insightsDrawer && insightsDrawer.parentNode) {
-        insightsDrawer.remove();
-      }
-      insightsDrawer = null;
-    });
+    var panel = document.getElementById('reportingLana');
+    if (panel) panel.show();
   }
 
   /**
    * Create a report-run thread and open the insights panel focused on it.
-   * Called when user clicks "Ask LANA about this report" after execution.
+   * Called when user clicks the in-card "Ask LANA" button after execution.
    */
   async function askLanaAboutReport() {
     if (typeof api === 'undefined') return;
     if (!currentModuleData && !currentModuleConfig) return;
 
-    // Build report snapshot from current module state
+    var panel = document.getElementById('reportingLana');
+    if (!panel) return;
+
     var snapshot = {
       moduleName: currentModuleMetadata ? currentModuleMetadata.moduleName : selectedModuleKey,
       moduleKey: selectedModuleKey,
@@ -3611,218 +3439,23 @@
       executedAt: new Date().toISOString()
     };
 
-    // Open insights panel if not already open
-    openInsightsPanel();
-
-    // Small delay to let the panel render
+    panel.show();
     await new Promise(function (resolve) { setTimeout(resolve, 300); });
 
     try {
-      var title = (snapshot.moduleName || 'Report') + ' — ' + new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      var title = (snapshot.moduleName || 'Report') + ' — '
+        + new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-      var resp = await api.post('/api/v1/conversation-threads', {
+      await panel.createThread({
         title: title,
         thread_type: 'report_run',
         context_type: 'insights_chat',
         page_scope: 'reporting',
         metadata: snapshot
       });
-
-      var thread = resp.data || resp;
-
-      // Add to thread list and select it
-      if (insightsThreadsEl) {
-        insightsThreadsEl.addThread(thread);
-        insightsThreadsEl.setActiveThread(thread.id);
-      }
-
-      // Switch chat to the new thread's conversation
-      if (insightsChatEl) {
-        insightsChatEl.clearConversation();
-        insightsChatEl.loadConversation(thread.thread_id);
-      }
     } catch (err) {
       console.error('[Reporting] Failed to create report-run thread:', err);
     }
-  }
-
-  // ==========================================================================
-  // Workspace Analytics
-  // ==========================================================================
-
-  // Track whether the matter picker API call has been made so we do not make
-  // duplicate API calls if the user switches tabs multiple times.
-  var matterPickerLoaded = false;
-  // Track whether the change listener has been attached (separate from the API
-  // call so that a failed API call does not result in double-attached listeners
-  // when matterPickerLoaded is reset and the function is called again).
-  var matterPickerListenerAttached = false;
-
-  function initAnalyticsTabs() {
-    var tabs = document.querySelectorAll('.analytics-tab');
-    tabs.forEach(function (tab) {
-      tab.addEventListener('click', function () {
-        var targetTab = this.getAttribute('data-tab');
-        switchAnalyticsTab(targetTab);
-      });
-    });
-  }
-
-  function switchAnalyticsTab(tab) {
-    // Update tab button styles
-    document.querySelectorAll('.analytics-tab').forEach(function (t) {
-      if (t.getAttribute('data-tab') === tab) {
-        t.style.borderBottomColor = '#2563eb';
-        t.style.color = '#2563eb';
-      } else {
-        t.style.borderBottomColor = 'transparent';
-        t.style.color = '#6b7280';
-      }
-    });
-
-    var firmPanel = document.getElementById('firmAnalyticsPanel');
-    var workspacePanel = document.getElementById('workspaceAnalyticsPanel');
-
-    if (tab === 'workspace') {
-      if (firmPanel) firmPanel.style.display = 'none';
-      if (workspacePanel) workspacePanel.style.display = 'block';
-      loadMatterPicker();
-    } else {
-      if (firmPanel) firmPanel.style.display = '';
-      if (workspacePanel) workspacePanel.style.display = 'none';
-    }
-  }
-
-  function loadMatterPicker() {
-    if (matterPickerLoaded) return;
-
-    var picker = document.getElementById('workspaceMatterPicker');
-    if (!picker) return;
-
-    // Attach the change listener exactly once, regardless of API call success/failure.
-    if (!matterPickerListenerAttached) {
-      matterPickerListenerAttached = true;
-      picker.addEventListener('change', function () {
-        var matterId = this.value;
-        if (matterId) {
-          loadWorkspaceAnalytics(matterId);
-        } else {
-          showWorkspaceEmpty();
-        }
-      });
-    }
-
-    matterPickerLoaded = true;
-
-    api.get('/api/v1/matters?limit=100&sort=updated_at&order=desc')
-      .then(function (response) {
-        var matters = (response && response.data) || (response && response.matters) || [];
-        matters.forEach(function (m) {
-          var opt = document.createElement('option');
-          opt.value = m.id || m.matter_id || '';
-          opt.textContent = m.name || m.matter_number || String(opt.value);
-          picker.appendChild(opt);
-        });
-        // Indicate truncation when the limit was reached
-        if (matters.length >= 100) {
-          var hint = document.getElementById('matterPickerTruncationHint');
-          if (!hint) {
-            hint = document.createElement('p');
-            hint.id = 'matterPickerTruncationHint';
-            hint.style.cssText = 'font-size:0.7rem;color:#9ca3af;margin:0.25rem 0 0 0;';
-            hint.textContent = 'Showing the 100 most recently updated matters.';
-            picker.parentNode.appendChild(hint);
-          }
-        }
-      })
-      .catch(function (err) {
-        console.error('[Reporting] Failed to load matters for workspace picker:', err);
-        // Reset API-loaded flag so the user can retry on next tab switch.
-        // The change listener is NOT reset — it was attached once and stays.
-        matterPickerLoaded = false;
-      });
-  }
-
-  function loadWorkspaceAnalytics(matterId) {
-    var cardsEl = document.getElementById('workspaceAnalyticsCards');
-    var emptyEl = document.getElementById('workspaceAnalyticsEmpty');
-    if (!cardsEl) return;
-
-    if (emptyEl) emptyEl.style.display = 'none';
-    cardsEl.style.display = 'grid';
-
-    // Show skeleton placeholders while loading
-    cardsEl.innerHTML = buildAnalyticsCardPlaceholders();
-
-    api.get('/api/v1/matters/' + encodeURIComponent(matterId) + '/analytics')
-      .then(function (response) {
-        var data = (response && response.data) ? response.data : response;
-        renderWorkspaceAnalyticsCards(data);
-      })
-      .catch(function (err) {
-        console.error('[Reporting] Failed to load workspace analytics:', err);
-        cardsEl.innerHTML = '<p style="color:#ef4444;font-size:0.875rem;grid-column:1/-1;">Failed to load analytics. Please try again.</p>';
-      });
-  }
-
-  function renderWorkspaceAnalyticsCards(data) {
-    var cardsEl = document.getElementById('workspaceAnalyticsCards');
-    if (!cardsEl) return;
-
-    var cards = [
-      { label: 'Documents', value: String(data.documents_count || 0) },
-      { label: 'Notes', value: String(data.notes_count || 0) },
-      { label: 'Tasks', value: String(data.tasks_completed || 0) + ' / ' + String(data.tasks_total || 0), sublabel: 'completed' },
-      { label: 'Overdue Tasks', value: String(data.tasks_overdue || 0), highlight: (data.tasks_overdue || 0) > 0 },
-      { label: 'Hours Billed', value: parseFloat(data.time_total_hours || 0).toFixed(1) },
-      { label: 'Contacts', value: String(data.contacts_count_org_level || 0), sublabel: 'org-wide' }
-    ];
-
-    var html = '';
-
-    cards.forEach(function (card) {
-      var borderStyle = card.highlight ? 'border-color:#ef4444;' : '';
-      var valueColor = card.highlight ? 'color:#ef4444;' : 'color:#111827;';
-      html += '<div style="background:white;border:1px solid #e5e7eb;border-radius:0.5rem;padding:1rem;' + borderStyle + '">';
-      html += '<p style="font-size:0.75rem;color:#6b7280;margin:0 0 0.25rem 0;">' + escapeHtml(card.label) + '</p>';
-      html += '<p style="font-size:1.5rem;font-weight:600;margin:0;' + valueColor + '">' + escapeHtml(card.value) + '</p>';
-      if (card.sublabel) {
-        html += '<p style="font-size:0.675rem;color:#9ca3af;margin:0.125rem 0 0 0;">' + escapeHtml(card.sublabel) + '</p>';
-      }
-      html += '</div>';
-    });
-
-    // Last activity card
-    if (data.last_activity_at) {
-      var lastDate = new Date(data.last_activity_at);
-      var now = new Date();
-      var daysSince = Math.floor((now - lastDate) / (1000 * 60 * 60 * 24));
-      var timeAgo = daysSince === 0 ? 'Today' : daysSince === 1 ? 'Yesterday' : String(daysSince) + ' days ago';
-      html += '<div style="background:white;border:1px solid #e5e7eb;border-radius:0.5rem;padding:1rem;">';
-      html += '<p style="font-size:0.75rem;color:#6b7280;margin:0 0 0.25rem 0;">Last Activity</p>';
-      html += '<p style="font-size:1.5rem;font-weight:600;margin:0;color:#111827;">' + escapeHtml(timeAgo) + '</p>';
-      html += '</div>';
-    }
-
-    cardsEl.innerHTML = html;
-  }
-
-  function buildAnalyticsCardPlaceholders() {
-    var html = '';
-    for (var i = 0; i < 7; i++) {
-      html += '<div style="background:white;border:1px solid #e5e7eb;border-radius:0.5rem;padding:1rem;">';
-      html += '<div style="height:0.75rem;width:60%;background:#e5e7eb;border-radius:0.25rem;margin-bottom:0.5rem;"></div>';
-      html += '<div style="height:1.5rem;width:40%;background:#e5e7eb;border-radius:0.25rem;"></div>';
-      html += '</div>';
-    }
-    return html;
-  }
-
-  function showWorkspaceEmpty() {
-    var cardsEl = document.getElementById('workspaceAnalyticsCards');
-    var emptyEl = document.getElementById('workspaceAnalyticsEmpty');
-    if (cardsEl) cardsEl.style.display = 'none';
-    if (emptyEl) emptyEl.style.display = '';
   }
 
   // ==========================================================================
@@ -3835,8 +3468,6 @@
     initModuleSearch();
     initPeriodControls();
     initImportControls();
-    initAnalyticsTabs();
-
     // Data sources button
     var dataSourcesBtn = document.getElementById('dataSourcesBtn');
     if (dataSourcesBtn) {
@@ -3859,8 +3490,13 @@
     var overrideForm = document.getElementById('overrideForm');
     if (overrideForm) overrideForm.addEventListener('submit', saveOverride);
 
-    // Inject LANA button after a short delay to ensure topbar has rendered
-    setTimeout(injectLanaButton, 200);
+    // Wire the in-card "Ask LANA" button to askLanaAboutReport
+    var reportingLanaBtn = document.getElementById('reportingLanaBtn');
+    if (reportingLanaBtn) {
+      reportingLanaBtn.addEventListener('lex-ask-lana-click', function () {
+        askLanaAboutReport();
+      });
+    }
   }
 
   if (typeof LexRouter !== 'undefined') {

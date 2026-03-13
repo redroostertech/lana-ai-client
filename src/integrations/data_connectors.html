@@ -204,6 +204,25 @@
           </svg>
         </button>
 
+        <!-- Update Connector -->
+        <button id="actionUpdateConnector" onclick="updateConnector()" class="w-full group flex items-center gap-4 px-5 py-4 rounded-xl transition-all duration-200 border-2 hover:opacity-90" style="background:var(--lex-card-bg);border-color:var(--lex-border-default);color:var(--lex-text-primary)">
+          <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style="background:var(--lex-status-info-bg)">
+            <svg class="w-5 h-5" style="color:var(--lex-icon-info)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+            </svg>
+          </div>
+          <div class="text-left flex-1">
+            <div class="font-semibold text-base">Update Connector</div>
+            <div class="text-xs" style="color:var(--lex-text-secondary)">Upload a new ZIP to update configuration and UI</div>
+          </div>
+          <svg class="w-5 h-5" style="color:var(--lex-text-tertiary)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+          </svg>
+        </button>
+
+        <!-- Hidden file input for update -->
+        <input type="file" id="updateConnectorFileInput" accept=".zip,application/zip" class="hidden" onchange="handleUpdateConnectorFile(event)">
+
         <!-- Uninstall -->
         <button id="actionUninstall" onclick="uninstallConnector()" class="w-full group flex items-center gap-4 px-5 py-4 rounded-xl transition-all duration-200 border-2 hover:opacity-90" style="background:var(--lex-card-bg);border-color:var(--lex-border-default);color:var(--lex-text-primary)">
           <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style="background:var(--lex-status-warning-bg)">

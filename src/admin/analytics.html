@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Administration - LANA AI</title>
+  <title>Analytics - LANA AI</title>
 
   <!-- ── CSS + Tailwind in head — behavioral scripts at end of body ── -->
   <link rel="stylesheet" href="../css/lex-tokens.css">
@@ -17,19 +17,16 @@
   <!-- Branded loader — shows once lex-loader.js upgrades the element -->
   <lex-loader theme="light"></lex-loader>
 
-  <!-- App shell — sidebar, topbar, empty content area.
-       Page content lives in <template> below and gets injected after
-       the shell renders. This avoids double-rendering of child components. -->
+  <!-- App shell -->
   <lex-app
     logo-src="../img/logo-light.png"
     logo-alt="LANA AI"
     logo-href="../dashboard.html"
-    active-nav-id="admin"
-    page-title="Administration"
+    active-nav-id="reports"
+    page-title="Analytics"
   ></lex-app>
 
-  <!-- Page content as inert <template> — elements inside are NOT upgraded
-       by the browser until cloned into the live DOM. Zero double-rendering. -->
+  <!-- Page content as inert <template> -->
   <template id="page-content">
 
     <main>
@@ -37,60 +34,25 @@
       <!-- Page header -->
       <lex-banner
         variant="light"
-        heading="Administration"
-        subtitle="Manage users, roles, organizations, and system settings"
+        heading="Analytics"
+        subtitle="Reporting, workspace insights, data exploration, and predictions"
       ></lex-banner>
 
-      <!-- Admin navigation cards grid -->
+      <!-- Analytics navigation cards grid -->
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" style="margin-top:1.5rem;">
 
         <lex-action-card
-          title="Users"
-          description="Manage user accounts, permissions, and access"
-          tag="Identity"
-          data-href="admin/users.html"
+          title="Firm Reporting"
+          description="Run firm-wide reports, view trends, and analyze performance metrics"
+          tag="Reports"
+          data-href="admin/reporting.html"
         ></lex-action-card>
 
         <lex-action-card
-          title="Roles &amp; Permissions"
-          description="Configure roles and permission levels"
-          tag="Identity"
-          data-href="admin/roles.html"
-        ></lex-action-card>
-
-        <lex-action-card
-          title="Organizations"
-          description="Manage organizational structure and settings"
-          tag="Structure"
-          data-href="admin/organizations.html"
-        ></lex-action-card>
-
-        <lex-action-card
-          title="Sessions"
-          description="Monitor active user sessions and connections"
-          tag="Security"
-          data-href="admin/sessions.html"
-        ></lex-action-card>
-
-        <lex-action-card
-          title="Audit Logs"
-          description="View system activity and security logs"
-          tag="Security"
-          data-href="admin/audit.html"
-        ></lex-action-card>
-
-        <lex-action-card
-          title="System Health"
-          description="Monitor system status and performance"
-          tag="Operations"
-          data-href="admin/health.html"
-        ></lex-action-card>
-
-        <lex-action-card
-          title="Analytics"
-          description="Firm reporting, workspace insights, data visualization, and predictions"
-          tag="Analytics"
-          data-href="admin/analytics.html"
+          title="Data Visualization"
+          description="Browse database tables and query data with natural language"
+          tag="Explorer"
+          data-href="admin/data-visualization.html"
         ></lex-action-card>
 
       </div>
@@ -157,7 +119,7 @@
   <script src="../js/lex/lex-page-init.js"></script>
 
   <!-- Page controller -->
-  <script src="../js/admin/admin-index.js"></script>
+  <script src="../js/admin/analytics-index.js"></script>
 
   <!-- Auth guard + loader dismiss (MUST be last) -->
   <script src="../js/auth-guard.js"></script>

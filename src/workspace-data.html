@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/tailwind-output.css">
   <link rel="stylesheet" href="css/lex-chat.css">
-  <link rel="stylesheet" href="css/lana-ask-btn.css">
+  <!-- lana-ask-btn.css replaced by self-contained lex-ask-lana-btn component -->
   <script src="js/tailwind-loader.js"></script>
 </head>
 <body>
@@ -40,13 +40,7 @@
             heading="Connected Data"
             subtitle="Browse and query data connected to this workspace"
           >
-            <button id="askLanaBtn" class="lana-insights-btn" style="padding:6px 12px;font-size:10.5px;">
-              <span class="lana-btn-icon">
-                <svg class="lana-btn-corner-tl" width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M0 0L8 0M0 0L0 8" stroke="currentColor" stroke-width="1.5"/></svg>
-                <svg class="lana-btn-corner-br" width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M8 8L0 8M8 8L8 0" stroke="currentColor" stroke-width="1.5"/></svg>
-              </span>
-              <span>LANA</span>
-            </button>
+            <lex-ask-lana-btn panel="wsDataLana" size="sm"></lex-ask-lana-btn>
           </lex-banner>
 
           <lex-breadcrumb id="wsDataBreadcrumb" items='[{"label":"Workspaces","href":"workspaces.html"},{"label":"Connected Data"}]'></lex-breadcrumb>
@@ -82,8 +76,8 @@
               </div>
               <lex-table
                 id="wsDataTable"
-                columns="external_id,entity_type,connector_id,raw_data"
-                labels="ID,Entity Type,Connector,Data"
+                columns="external_id,entity_type,connector_id,raw_data,ai_action"
+                labels="ID,Entity Type,Connector,Data,&#8203;"
                 searchable
                 filterable
                 empty-text="No connected data found"
@@ -97,20 +91,21 @@
 
         </div>
 
-        <!-- Right column: Chat panel (hidden by default) -->
-        <div id="wsDataChatColumn" style="display:none;width:380px;flex-shrink:0;flex-direction:column;margin-left:16px;background:var(--lex-surface-primary, #fff);border-left:1px solid var(--lex-border-default, #e5e7eb);overflow:hidden;">
-          <div style="padding:0.75rem 1rem;border-bottom:1px solid var(--lex-border-default, #e5e7eb);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
-            <div>
-              <p class="lex-label lex-text-primary" style="margin:0;">Ask LANA about this data</p>
-              <p class="lex-body-xs lex-text-secondary" style="margin:0.25rem 0 0;">Use natural language to query and analyze</p>
-            </div>
-            <button id="closeChatBtn" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--lex-text-tertiary);border-radius:4px;" title="Close chat">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-            </button>
-          </div>
-          <div id="chatContainer" style="flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden;">
-          </div>
-        </div>
+        <!-- Right column: Unified LANA chat panel -->
+        <lex-lana-panel
+          id="wsDataLana"
+          mode="column"
+          page-scope="workspace_data"
+          context-type="full_chat"
+          placeholder="Ask about this workspace data..."
+          composer-tools='[{"id":"insights_chat","label":"Insights","icon":"eye","description":"Ask about this workspace data"},{"id":"skills_chat","label":"Create Task","icon":"wand","description":"Create a skill or task for LANA"}]'
+          tools-locked="false"
+          thread-title="Workspace Data"
+          column-heading="LANA Assistant"
+          column-subtitle="Query data insights or create tasks"
+          width="380"
+          style="margin-left:16px;"
+        ></lex-lana-panel>
 
       </div>
 
@@ -185,6 +180,8 @@
   <script src="js/lex/chat/lex-chat.threads.js"></script>
   <script src="js/lex/chat/lex-chat.js"></script>
   <script src="js/lex/chat/lex-chat.index.js"></script>
+  <script src="js/lex/components/chat/lex-ask-lana-btn.js"></script>
+  <script src="js/lex/components/chat/lex-lana-panel.js"></script>
 
   <!-- Inject page content -->
   <script src="js/lex/lex-page-init.js"></script>

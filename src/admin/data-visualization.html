@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="../css/components.css">
   <link rel="stylesheet" href="../css/tailwind-output.css">
   <link rel="stylesheet" href="../css/lex-chat.css">
-  <link rel="stylesheet" href="../css/lana-ask-btn.css">
+  <!-- lana-ask-btn.css replaced by self-contained lex-ask-lana-btn component -->
   <script src="../js/tailwind-loader.js"></script>
 
 </head>
@@ -45,13 +45,7 @@
             heading="Data Visualization"
             subtitle="Browse database tables and query data with natural language"
           >
-            <button id="askLanaBtn" class="lana-insights-btn" style="padding:6px 12px;font-size:10.5px;">
-              <span class="lana-btn-icon">
-                <svg class="lana-btn-corner-tl" width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M0 0L8 0M0 0L0 8" stroke="currentColor" stroke-width="1.5"/></svg>
-                <svg class="lana-btn-corner-br" width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M8 8L0 8M8 8L8 0" stroke="currentColor" stroke-width="1.5"/></svg>
-              </span>
-              <span>LANA</span>
-            </button>
+            <lex-ask-lana-btn panel="dataVizLana" size="sm"></lex-ask-lana-btn>
           </lex-banner>
 
           <lex-breadcrumb items='[{"label":"Administration","href":"admin/index.html"},{"label":"Data Visualization"}]'></lex-breadcrumb>
@@ -91,21 +85,21 @@
 
         </div>
 
-        <!-- Right column: Chat panel (hidden by default, toggled by LANA button) -->
-        <div id="dataVizChatColumn" style="display:none;width:380px;flex-shrink:0;flex-direction:column;margin-left:16px;background:var(--lex-surface-primary, #fff);border-left:1px solid var(--lex-border-default, #e5e7eb);overflow:hidden;">
-          <div style="padding:0.75rem 1rem;border-bottom:1px solid var(--lex-border-default, #e5e7eb);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
-            <div>
-              <p class="lex-label lex-text-primary" style="margin:0;">Ask LANA about this data</p>
-              <p class="lex-body-xs lex-text-secondary" style="margin:0.25rem 0 0;">Use natural language to query and analyze</p>
-            </div>
-            <button id="closeChatBtn" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--lex-text-tertiary);border-radius:4px;" title="Close chat">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-            </button>
-          </div>
-          <div id="chatContainer" style="flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden;">
-            <!-- lex-chat-threads and lex-chat injected by controller -->
-          </div>
-        </div>
+        <!-- Right column: Unified LANA chat panel -->
+        <lex-lana-panel
+          id="dataVizLana"
+          mode="column"
+          page-scope="data_visualization"
+          context-type="insights_chat"
+          placeholder="Ask about the data..."
+          tools-locked="true"
+          default-tool="insights_chat"
+          thread-title="Data Visualization"
+          column-heading="Ask LANA about this data"
+          column-subtitle="Use natural language to query and analyze"
+          width="380"
+          style="margin-left:16px;"
+        ></lex-lana-panel>
 
       </div>
 
@@ -184,6 +178,8 @@
   <script src="../js/lex/chat/lex-chat.threads.js"></script>
   <script src="../js/lex/chat/lex-chat.js"></script>
   <script src="../js/lex/chat/lex-chat.index.js"></script>
+  <script src="../js/lex/components/chat/lex-ask-lana-btn.js"></script>
+  <script src="../js/lex/components/chat/lex-lana-panel.js"></script>
 
   <!-- Inject page content + hoist modals -->
   <script src="../js/lex/lex-page-init.js"></script>

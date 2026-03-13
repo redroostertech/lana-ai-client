@@ -32,9 +32,8 @@
     metadataMode: 'view',
     metadataChanged: false,
     originalMetadata: {},
-    askLanaDrawer: null,
-    askLanaChatEl: null,
-    askLanaThreadsEl: null
+    // askLanaDrawer/askLanaChatEl/askLanaThreadsEl removed — managed by lex-lana-panel
+    _lanaSessionBootstrapped: false
   };
 
   // =========================================================================
@@ -169,10 +168,10 @@
     errorDiv.classList.remove('hidden');
     hideLoading();
 
-    // Hide Ask LANA and Download buttons when file fails
+    // Disable Ask LANA and hide Download buttons when file fails
     var askBtn = document.getElementById('askLanaBtn');
     var dlBtn = document.getElementById('viewerDownloadBtn');
-    if (askBtn) askBtn.style.display = 'none';
+    if (askBtn) askBtn.disabled = true;
     if (dlBtn) dlBtn.style.display = 'none';
   }
 
@@ -198,6 +197,16 @@
         .catch(function () { /* non-critical */ });
 
       state.currentFile = response;
+
+      // Configure LANA panel with file context
+      var lanaPanel = document.getElementById('fileViewerLana');
+      if (lanaPanel) {
+        lanaPanel.threadTitle = response.filename;
+        if (response.client_matter || response.matter_id) {
+          lanaPanel.setAttribute('matter-id', response.client_matter || response.matter_id);
+        }
+      }
+
       state.originalMetadata = {
         document_type: (response.metadata && response.metadata.document_type) || '',
         tags: (response.metadata && response.metadata.tags) || '',
@@ -533,200 +542,72 @@
   }
 
   // =========================================================================
-  // Ask LANA — Document Chat Drawer
+  // Ask LANA — Document Chat (via lex-lana-panel)
   // =========================================================================
 
-  function openAskLana() {
-    if (state.askLanaDrawer) {
-      state.askLanaDrawer.setAttribute('open', 'true');
-      return;
-    }
+  function _initLanaPanel() {
+    var panel = document.getElementById('fileViewerLana');
+    if (!panel) return;
 
-    var file = state.currentFile;
-    if (!file) return;
-
-    // Create drawer
-    var drawer = document.createElement('lex-drawer');
-    drawer.setAttribute('heading', 'LANA — Document Chat');
-    drawer.setAttribute('side', 'right');
-    drawer.setAttribute('width', 'lg');
-    drawer.setAttribute('open', 'true');
-    state.askLanaDrawer = drawer;
-
-    // Build wrapper: threads list + chat
-    var wrapper = document.createElement('div');
-    wrapper.style.cssText = 'display:flex;flex-direction:column;height:100%;';
-
-    var threadsEl = document.createElement('lex-chat-threads');
-    threadsEl.setAttribute('page-scope', 'workspace');
-    threadsEl.setAttribute('context-type', 'document_chat');
-    threadsEl.style.flexShrink = '0';
-
-    var chatEl = document.createElement('lex-chat');
-    chatEl.setAttribute('context-type', 'document_chat');
-    chatEl.setAttribute('source', 'sse');
-    chatEl.setAttribute('placeholder', 'Ask a question about this document...');
-    chatEl.style.flex = '1';
-    chatEl.style.minHeight = '0';
-
-    wrapper.appendChild(threadsEl);
-    wrapper.appendChild(chatEl);
-    drawer.appendChild(wrapper);
-    document.body.appendChild(drawer);
-
-    // Re-acquire live references after drawer clones children
-    state.askLanaChatEl = drawer.querySelector('lex-chat');
-    state.askLanaThreadsEl = drawer.querySelector('lex-chat-threads');
-
-    // Wire thread selection
-    drawer.addEventListener('lex-thread-select', function (e) {
-      var thread = e.detail && e.detail.thread;
-      if (!thread || !state.askLanaChatEl) return;
-      state.askLanaChatEl.loadConversation(thread.thread_id);
-    });
-
-    // Auto-select page_general thread when threads finish loading
-    drawer.addEventListener('lex-threads-loaded', function (e) {
-      var threads = e.detail && e.detail.threads;
-      if (!threads || !threads.length || !state.askLanaChatEl) return;
-      for (var i = 0; i < threads.length; i++) {
-        if (threads[i].thread_type === 'page_general' && threads[i].thread_id) {
-          state.askLanaChatEl.loadConversation(threads[i].thread_id);
-          if (state.askLanaThreadsEl) state.askLanaThreadsEl.setActiveThread(threads[i].id);
-          break;
-        }
+    // Show the current file as a badge in the composer when panel opens
+    panel.addEventListener('lex-lana-opened', function () {
+      var file = state.currentFile;
+      if (file && file.id) {
+        panel.attachFile(file.id, file.filename);
       }
     });
 
-    // Wire new conversation
-    drawer.addEventListener('lex-chat-new', function () {
-      if (!state.askLanaChatEl) return;
-      state.askLanaChatEl.clearConversation();
-      if (state.askLanaThreadsEl) state.askLanaThreadsEl.setActiveThread(null);
-    });
+    // Inject file attachment on every send + session bootstrap on first send
+    panel.addEventListener('lex-lana-before-send', function (e) {
+      var file = state.currentFile;
+      if (!file) return;
 
-    // Register thread when conversation is created
-    drawer.addEventListener('lex-chat-conversation-created', function (e) {
-      var conversationId = e.detail && e.detail.conversationId;
-      if (!conversationId || typeof api === 'undefined') return;
-
-      var threadsComp = state.askLanaThreadsEl;
-      if (threadsComp && threadsComp._threads) {
-        for (var i = 0; i < threadsComp._threads.length; i++) {
-          if (threadsComp._threads[i].thread_id === conversationId) return;
-        }
+      var matterId = file.client_matter || file.matter_id || null;
+      var opts = e.detail.opts;
+      opts.attachments = opts.attachments || {};
+      opts.attachments.files = [{
+        file_id: file.id,
+        name: file.filename,
+        type: file.content_type || file.mime_type || ''
+      }];
+      // Ensure matter context reaches the SSE request
+      if (matterId) {
+        opts.matterId = matterId;
       }
 
-      api.post('/api/v1/conversation-threads', {
-        thread_type: 'page_general',
-        page_scope: 'workspace',
-        context_type: 'document_chat',
-        thread_id: conversationId,
-        title: file.filename,
-        metadata: {
-          document_id: file.id,
-          document_name: file.filename,
-          matter_id: file.client_matter || file.matter_id || null
-        }
-      }).then(function (resp) {
-        var created = resp.data || resp;
-        if (threadsComp && typeof threadsComp.addThread === 'function') {
-          threadsComp.addThread(created);
-        } else if (threadsComp && typeof threadsComp.refresh === 'function') {
-          threadsComp.refresh();
-        }
-      }).catch(function (err) {
-        console.error('[FileViewerPage] Failed to register thread:', err);
-      });
-    });
+      // First message: bootstrap session + register document before send
+      if (!state._lanaSessionBootstrapped) {
+        e.preventDefault(); // take over send manually
+        state._lanaSessionBootstrapped = true;
+        var content = e.detail.content;
 
-    // Wrap send() to:
-    //   1. On first message: create chat_session with proper context, then addDocument
-    //   2. On every message: inject attachments.files with the current document
-    var _fileAttachment = {
-      file_id: file.id,
-      name: file.filename,
-      type: file.content_type || file.mime_type || ''
-    };
-    var _sessionBootstrapped = false;
+        api.post('/api/v1/chat/sessions', {
+          title: file.filename,
+          matter_id: matterId || undefined
+        }).then(function (resp) {
+          var session = resp.session || resp.data || resp;
+          var threadId = session.thread_id || session.id;
 
-    setTimeout(function () {
-      if (!state.askLanaChatEl) return;
-
-      var originalSend = state.askLanaChatEl.send.bind(state.askLanaChatEl);
-      state.askLanaChatEl.send = function (content, opts) {
-        opts = opts || {};
-        opts.attachments = opts.attachments || {};
-        opts.attachments.files = [_fileAttachment];
-
-        // First message: bootstrap session + document before sending
-        if (!_sessionBootstrapped) {
-          _sessionBootstrapped = true;
-          var matterId = file.client_matter || file.matter_id || null;
-
-          return api.post('/api/v1/chat/sessions', {
-            title: file.filename,
-            matter_id: matterId || undefined
-          }).then(function (resp) {
-            var session = resp.session || resp.data || resp;
-            var threadId = session.thread_id || session.id;
-
-            // Add to sidebar conversation menu so it appears immediately
-            if (window.ConversationMenu && typeof window.ConversationMenu.addConversation === 'function') {
-              window.ConversationMenu.addConversation({
-                thread_id: threadId,
-                title: file.filename || 'Document Chat',
-                matter_id: matterId,
-                updated_at: new Date().toISOString()
-              });
-            }
-
-            // Bind chat to the pre-created session
-            state.askLanaChatEl._props.conversationId = threadId;
-            if (state.askLanaChatEl._source) {
-              state.askLanaChatEl._source._conversationId = threadId;
-            }
-
-            // Register document in chat state (server-side activeDocumentIds)
-            var docPromise = Promise.resolve();
-            if (typeof state.askLanaChatEl.addDocument === 'function') {
-              docPromise = state.askLanaChatEl.addDocument(
-                file.id, file.filename, matterId
-              ).catch(function (err) {
-                console.warn('[FileViewerPage] addDocument failed (non-fatal):', err);
-              });
-            }
-
-            return docPromise.then(function () {
-              return originalSend(content, opts);
-            });
-          }).catch(function (err) {
-            console.error('[FileViewerPage] Failed to create session, sending without:', err);
-            _sessionBootstrapped = false; // retry next time
-            return originalSend(content, opts);
+          // bindConversationId handles sidebar + thread registration
+          panel.bindConversationId(threadId, {
+            title: file.filename || 'Document Chat',
+            matterId: matterId
           });
-        }
 
-        return originalSend(content, opts);
-      };
+          var docPromise = panel.addDocument(file.id, file.filename, matterId)
+            .catch(function (err) {
+              console.warn('[FileViewerPage] addDocument failed (non-fatal):', err);
+            });
 
-      var composer = state.askLanaChatEl.querySelector('lex-chat-composer');
-      if (!composer) return;
-
-      // Hide plus button (no doc management in this context)
-      var plusBtn = composer.querySelector('[data-plus]');
-      if (plusBtn && plusBtn.parentElement) {
-        plusBtn.parentElement.style.display = 'none';
+          return docPromise.then(function () {
+            panel.sendMessage(content, opts);
+          });
+        }).catch(function (err) {
+          console.error('[FileViewerPage] Session bootstrap failed:', err);
+          state._lanaSessionBootstrapped = false;
+          panel.sendMessage(content, opts);
+        });
       }
-
-      // Pre-select document_chat tool and lock the tools button
-      composer.setActiveTools(['document_chat']);
-      composer.setToolsLocked(true);
-    }, 150);
-
-    // Clean up on close
-    drawer.addEventListener('lex-drawer-close', function () {
-      // Keep drawer in DOM for reuse — just mark as closed
     });
   }
 
@@ -763,7 +644,7 @@
       }
     });
     document.getElementById('toggleSidebarBtn').addEventListener('click', toggleMetadataSidebar);
-    document.getElementById('askLanaBtn').addEventListener('click', openAskLana);
+    _initLanaPanel();
 
     // Metadata controls
     var modeToggle = document.getElementById('metaModeToggle');
@@ -778,8 +659,9 @@
     // Keyboard: Escape to go back
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
-        // If Ask LANA drawer is open, let it handle Escape
-        if (state.askLanaDrawer && state.askLanaDrawer.getAttribute('open') === 'true') return;
+        // If Ask LANA panel drawer is open, let it handle Escape
+        var lanaPanel = document.getElementById('fileViewerLana');
+        if (lanaPanel && lanaPanel.open) return;
         navigateBack();
       }
     });

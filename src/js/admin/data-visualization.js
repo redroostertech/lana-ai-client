@@ -400,8 +400,7 @@
   var _currentPage = 1;
   var _pageSize    = 50;
   var _availableViews = [];     // populated from /api/v1/mcp-data/views
-  var _chatEl      = null;
-  var _threadsEl   = null;
+  // _chatEl / _threadsEl removed — managed by lex-lana-panel
 
   // ═══════════════════════════════════════════════════════════════
   // Helpers
@@ -449,8 +448,7 @@
         _setupTabs();
         _wirePagination();
         _wireRefresh();
-        _wireAskLana();
-        _setupChat();
+        _initLanaPanel();
         _loadData();
       })
       .catch(function (err) {
@@ -649,34 +647,32 @@
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // Ask LANA button
+  // Ask LANA panel integration (lex-lana-panel)
   // ═══════════════════════════════════════════════════════════════
 
-  function _wireAskLana() {
-    var btn = el('askLanaBtn');
-    var closeBtn = el('closeChatBtn');
-    var chatCol = el('dataVizChatColumn');
-    if (!chatCol) return;
+  function _initLanaPanel() {
+    var panel = document.getElementById('dataVizLana');
+    if (!panel) return;
 
-    function _openChat() {
-      chatCol.style.display = 'flex';
-      // Focus composer after panel is visible
-      setTimeout(function () {
-        if (!_chatEl) return;
-        var composer = _chatEl.querySelector('lex-chat-composer');
-        if (composer) {
-          var input = composer.querySelector('textarea, input, [contenteditable]');
-          if (input) input.focus();
-        }
-      }, 150);
-    }
+    // Inject active view as attachment on every send
+    panel.addEventListener('lex-lana-before-send', function (e) {
+      var opts = e.detail.opts;
+      var viewName = _getEffectiveView();
+      var config = VIEW_CONFIG[viewName];
+      if (!viewName || !config) return;
 
-    function _closeChat() {
-      chatCol.style.display = 'none';
-    }
+      var label = viewName.substring(4); // strip 'mcp_'
+      label = label.split('_').map(function (w) {
+        return w.charAt(0).toUpperCase() + w.substring(1);
+      }).join(' ');
 
-    if (btn) btn.addEventListener('click', _openChat);
-    if (closeBtn) closeBtn.addEventListener('click', _closeChat);
+      opts.attachments = opts.attachments || {};
+      opts.attachments.views = [{
+        view_name: viewName,
+        label: label,
+        columns: config.columns ? config.columns.split(',') : []
+      }];
+    });
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -771,166 +767,7 @@
     return out;
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // Chat integration (insights_chat)
-  // ═══════════════════════════════════════════════════════════════
-
-  function _setupChat() {
-    var container = el('chatContainer');
-    if (!container) return;
-
-    // Create threads list
-    _threadsEl = document.createElement('lex-chat-threads');
-    _threadsEl.setAttribute('page-scope', 'data_visualization');
-    _threadsEl.setAttribute('context-type', 'insights_chat');
-    _threadsEl.style.flexShrink = '0';
-
-    // Create chat
-    _chatEl = document.createElement('lex-chat');
-    _chatEl.setAttribute('context-type', 'insights_chat');
-    _chatEl.setAttribute('source', 'sse');
-    _chatEl.setAttribute('placeholder', 'Ask about the data...');
-    _chatEl.style.flex = '1';
-    _chatEl.style.minHeight = '0';
-
-    container.appendChild(_threadsEl);
-    container.appendChild(_chatEl);
-
-    // Re-acquire live references after potential cloning
-    var liveChat = container.querySelector('lex-chat');
-    var liveThreads = container.querySelector('lex-chat-threads');
-    if (liveChat) _chatEl = liveChat;
-    if (liveThreads) _threadsEl = liveThreads;
-
-    // Ensure layout styles survive cloning
-    _threadsEl.style.flexShrink = '0';
-    _chatEl.style.flex = '1';
-    _chatEl.style.minHeight = '0';
-    _chatEl.style.overflow = 'hidden';
-
-    // Wire thread selection
-    container.addEventListener('lex-thread-select', function (e) {
-      var thread = e.detail && e.detail.thread;
-      if (!thread || !_chatEl) return;
-      _chatEl.clearConversation();
-      _chatEl.loadConversation(thread.thread_id);
-    });
-
-    // Auto-select page_general thread when threads finish loading
-    container.addEventListener('lex-threads-loaded', function (e) {
-      var threads = e.detail && e.detail.threads;
-      if (!threads || !threads.length || !_chatEl) return;
-      // Find page_general thread and auto-select it
-      for (var i = 0; i < threads.length; i++) {
-        if (threads[i].thread_type === 'page_general' && threads[i].thread_id) {
-          _chatEl.loadConversation(threads[i].thread_id);
-          if (_threadsEl) _threadsEl.setActiveThread(threads[i].id);
-          break;
-        }
-      }
-    });
-
-    // Wire new thread creation
-    container.addEventListener('lex-thread-create', function () {
-      if (!_chatEl) return;
-      _chatEl.clearConversation();
-      if (_threadsEl) _threadsEl.setActiveThread(null);
-    });
-
-    // Register page_general thread on first conversation
-    container.addEventListener('lex-chat-conversation-created', function (e) {
-      var conversationId = e.detail && e.detail.conversationId;
-      if (!conversationId || typeof api === 'undefined') return;
-
-      // Add to sidebar conversation menu so it appears immediately
-      if (window.ConversationMenu && typeof window.ConversationMenu.addConversation === 'function') {
-        window.ConversationMenu.addConversation({
-          thread_id: conversationId,
-          title: 'Data Visualization Chat',
-          updated_at: new Date().toISOString()
-        });
-      }
-
-      var threadsComp = _threadsEl;
-      if (threadsComp && threadsComp._threads && threadsComp._threads.length > 0) {
-        for (var i = 0; i < threadsComp._threads.length; i++) {
-          if (threadsComp._threads[i].thread_type === 'page_general') {
-            // Update existing page_general thread's thread_id to stay in sync
-            var existingThread = threadsComp._threads[i];
-            existingThread.thread_id = conversationId;
-            api.put('/api/v1/conversation-threads/' + existingThread.id, {
-              thread_id: conversationId
-            }).catch(function (err) {
-              console.warn('[DataViz] Failed to update page thread thread_id:', err);
-            });
-            return;
-          }
-        }
-      }
-
-      api.post('/api/v1/conversation-threads', {
-        title: 'Data Visualization',
-        thread_type: 'page_general',
-        context_type: 'insights_chat',
-        page_scope: 'data_visualization',
-        thread_id: conversationId
-      }).then(function (resp) {
-        var created = resp.data || resp;
-        if (_threadsEl) {
-          _threadsEl.addThread(created);
-          _threadsEl.setActiveThread(created.id);
-        }
-      }).catch(function (err) {
-        console.warn('[DataViz] Failed to register page thread:', err);
-      });
-    });
-
-    // Wrap chat send to inject active view as attachment
-    var origSend = _chatEl.send;
-    if (typeof origSend === 'function') {
-      _chatEl.send = function (content, opts) {
-        opts = opts || {};
-        var viewName = _getEffectiveView();
-        var config = VIEW_CONFIG[viewName];
-        if (viewName && config) {
-          // Build a human-readable label from the view name (mcp_users → Users)
-          var label = viewName.substring(4); // strip "mcp_"
-          label = label.split('_').map(function (w) {
-            return w.charAt(0).toUpperCase() + w.substring(1);
-          }).join(' ');
-
-          opts.attachments = opts.attachments || {};
-          opts.attachments.views = [{
-            view_name: viewName,
-            label: label,
-            columns: config.columns ? config.columns.split(',') : []
-          }];
-        }
-        return origSend.call(this, content, opts);
-      };
-    }
-
-    // Lock composer tools to insights_chat
-    setTimeout(function () {
-      if (!_chatEl) return;
-      var composer = _chatEl.querySelector('lex-chat-composer');
-      if (!composer) return;
-
-      // Hide plus button
-      var plusBtn = composer.querySelector('[data-plus]');
-      if (plusBtn && plusBtn.parentElement) {
-        plusBtn.parentElement.style.display = 'none';
-      }
-
-      // Lock to insights_chat tools
-      if (typeof composer.setActiveTools === 'function') {
-        composer.setActiveTools(['insights_chat']);
-      }
-      if (typeof composer.setToolsLocked === 'function') {
-        composer.setToolsLocked(true);
-      }
-    }, 150);
-  }
+  // _setupChat() removed — managed by lex-lana-panel component
 
   // ═══════════════════════════════════════════════════════════════
   // Start

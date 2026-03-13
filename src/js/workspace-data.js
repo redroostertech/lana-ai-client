@@ -34,8 +34,8 @@
   var _connectorFilter = '';
   var _sortBy      = 'synced_at';
   var _sortDir     = 'desc';
-  var _chatEl      = null;
-  var _threadsEl   = null;
+  var _matterUuid  = '';  // actual UUID from DB (for backend APIs)
+  // _chatEl / _threadsEl removed — managed by lex-lana-panel
 
   // Bulk selection state
   var _selectedRowIds   = {};   // { [rowId]: true }
@@ -94,6 +94,7 @@
       .then(function (result) {
         var matter = (result && result.data) || result || {};
         _matterName = matter.matter_name || matter.name || _matterId;
+        _matterUuid = matter.id || _matterId; // UUID for backend APIs
 
         // Update breadcrumb
         var breadcrumb = el('wsDataBreadcrumb');
@@ -115,8 +116,7 @@
         _wireSearch();
         _wireFilters();
         _wirePagination();
-        _wireAskLana();
-        _setupChat();
+        _initLanaPanel();
         _loadData();
       })
       .catch(function (err) {
@@ -261,6 +261,157 @@
         lastCell.appendChild(badgeWrap);
       }
     });
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // AI action column — inject "send to chat" button per row
+  // ═══════════════════════════════════════════════════════════════
+
+  var AI_ICON_SVG = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">'
+    + '<path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1.27a7 7 0 0 1-13.46 0H5a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>'
+    + '<circle cx="9" cy="15" r="1"/><circle cx="15" cy="15" r="1"/></svg>';
+
+  function _addAiActionButtons(table) {
+    if (!table) return;
+    requestAnimationFrame(function () {
+      var rows = table.querySelectorAll('tbody tr');
+      for (var i = 0; i < rows.length; i++) {
+        var cells = rows[i].querySelectorAll('td');
+        if (!cells.length) continue;
+        // The _ai_action column is the last column
+        var actionCell = cells[cells.length - 1];
+        if (!actionCell) continue;
+
+        var rowId = rows[i].getAttribute('data-row-id');
+        actionCell.innerHTML = '';
+        actionCell.style.cssText = 'text-align:center;padding:4px;width:40px;';
+
+        var btn = document.createElement('button');
+        btn.className = 'lex-ai-row-btn';
+        btn.setAttribute('data-ai-row', rowId);
+        btn.title = 'Send to LANA chat';
+        btn.style.cssText =
+          'display:inline-flex;align-items:center;justify-content:center;' +
+          'width:28px;height:28px;border-radius:6px;border:1px solid var(--lex-border-default, #e5e7eb);' +
+          'background:var(--lex-surface-primary, #fff);color:var(--lex-text-secondary, #6b7280);' +
+          'cursor:pointer;transition:all 0.15s ease;padding:0;';
+        btn.innerHTML = AI_ICON_SVG;
+
+        // Hover state
+        btn.addEventListener('mouseenter', function () {
+          this.style.background = '#7c3aed';
+          this.style.color = '#fff';
+          this.style.borderColor = '#7c3aed';
+        });
+        btn.addEventListener('mouseleave', function () {
+          this.style.background = 'var(--lex-surface-primary, #fff)';
+          this.style.color = 'var(--lex-text-secondary, #6b7280)';
+          this.style.borderColor = 'var(--lex-border-default, #e5e7eb)';
+        });
+
+        actionCell.appendChild(btn);
+      }
+    });
+  }
+
+  /**
+   * Attach a connector_data row to the chat as context, then open the panel.
+   * Shows a badge capsule in the composer and injects data on next send.
+   */
+  function _sendRowToChat(rowId) {
+    var fullRow = _rowDataMap[rowId];
+    if (!fullRow) return;
+
+    // Open panel if hidden
+    var panel = document.getElementById('wsDataLana');
+    if (panel) panel.show();
+
+    var rowData = _getRowData(fullRow.data);
+    var entityType = fullRow.entity_type || 'record';
+
+    // Build a short label for the badge
+    var badgeLabel = entityType;
+    var rowKeys = Object.keys(rowData);
+    if (rowKeys.length > 0) {
+      var firstVal = String(rowData[rowKeys[0]] || '').trim();
+      if (firstVal.length > 0) {
+        badgeLabel = firstVal.length > 24 ? firstVal.substring(0, 21) + '...' : firstVal;
+      }
+    }
+
+    // Store the pending attachment so the next send() includes it
+    _pendingDataAttachment = {
+      connector_data_id: fullRow.id,
+      external_id: fullRow.external_id,
+      entity_type: fullRow.entity_type,
+      connector_id: fullRow.connector_id || fullRow.connector_name,
+      data: rowData
+    };
+
+    // Render badge capsule in the composer's doc-badges area
+    _renderDataBadge(badgeLabel, rowId);
+  }
+
+  /** Pending data attachment cleared after send */
+  var _pendingDataAttachment = null;
+
+  var DATA_ICON_SVG = '<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">'
+    + '<ellipse cx="12" cy="5" rx="9" ry="3"/>'
+    + '<path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>'
+    + '<path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>';
+
+  var CLOSE_ICON_SVG = '<svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24">'
+    + '<path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
+
+  /**
+   * Render a badge capsule in the composer showing the attached data record.
+   * Reuses the lex-cmp-doc-badge styling from the composer component.
+   */
+  function _renderDataBadge(label, rowId) {
+    var panel = document.getElementById('wsDataLana');
+    var chatEl = panel && panel.getChatElement ? panel.getChatElement() : null;
+    if (!chatEl) return;
+    var composer = chatEl.querySelector('lex-chat-composer');
+    if (!composer) return;
+
+    var container = composer.querySelector('[data-doc-badges]');
+    if (!container) return;
+
+    // Remove any existing data badge (only one at a time)
+    var existing = container.querySelector('[data-connector-badge]');
+    if (existing) existing.remove();
+
+    var escLabel = Lex.Utils.escapeHtml(label);
+
+    var badge = document.createElement('div');
+    badge.className = 'lex-cmp-doc-badge';
+    badge.setAttribute('data-connector-badge', rowId);
+    badge.innerHTML = DATA_ICON_SVG +
+      '<span>' + escLabel + '</span>' +
+      '<button class="lex-cmp-doc-badge-x" data-dismiss-connector-badge title="Remove record">' + CLOSE_ICON_SVG + '</button>';
+
+    // Wire dismiss
+    badge.querySelector('[data-dismiss-connector-badge]').addEventListener('click', function (e) {
+      e.stopPropagation();
+      _pendingDataAttachment = null;
+      badge.remove();
+    });
+
+    container.appendChild(badge);
+  }
+
+  /**
+   * Clear the data badge after a message is sent.
+   * Called from the send wrapper.
+   */
+  function _clearDataBadge() {
+    var panel = document.getElementById('wsDataLana');
+    var chatEl = panel && panel.getChatElement ? panel.getChatElement() : null;
+    if (!chatEl) return;
+    var composer = chatEl.querySelector('lex-chat-composer');
+    if (!composer) return;
+    var badge = composer.querySelector('[data-connector-badge]');
+    if (badge) badge.remove();
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -861,33 +1012,54 @@
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // Ask LANA button
+  // Ask LANA panel integration (lex-lana-panel)
   // ═══════════════════════════════════════════════════════════════
 
-  function _wireAskLana() {
-    var btn = el('askLanaBtn');
-    var closeBtn = el('closeChatBtn');
-    var chatCol = el('wsDataChatColumn');
-    if (!chatCol) return;
+  function _initLanaPanel() {
+    var panel = document.getElementById('wsDataLana');
+    if (!panel) return;
 
-    function _openChat() {
-      chatCol.style.display = 'flex';
-      setTimeout(function () {
-        if (!_chatEl) return;
-        var composer = _chatEl.querySelector('lex-chat-composer');
-        if (composer) {
-          var input = composer.querySelector('textarea, input, [contenteditable]');
-          if (input) input.focus();
-        }
-      }, 150);
+    // Set matter scope once we have it
+    if (_matterUuid) {
+      panel.setAttribute('matter-id', _matterUuid);
+      panel.threadTitle = 'Workspace Data - ' + _matterName;
     }
 
-    function _closeChat() {
-      chatCol.style.display = 'none';
-    }
+    // Inject workspace context + pending row attachment on every send
+    panel.addEventListener('lex-lana-before-send', function (e) {
+      var opts = e.detail.opts;
+      opts.attachments = opts.attachments || {};
+      opts.attachments.workspace = {
+        matter_id: _matterUuid,
+        matter_name: _matterName,
+        context: 'workspace_connected_data'
+      };
+      if (_pendingDataAttachment) {
+        opts.attachments.connector_data = _pendingDataAttachment;
+        _pendingDataAttachment = null;
+        _clearDataBadge();
+      }
+    });
 
-    if (btn) btn.addEventListener('click', _openChat);
-    if (closeBtn) closeBtn.addEventListener('click', _closeChat);
+    // Listen for tool switches to update context-type
+    panel.addEventListener('lex-lana-tool-select', function (e) {
+      var toolId = e.detail && e.detail.toolId;
+      if (toolId === 'skills_chat' || toolId === 'insights_chat') {
+        panel.setContextType(toolId);
+      }
+    });
+    panel.addEventListener('lex-lana-tool-dismiss', function () {
+      panel.setContextType('full_chat');
+    });
+
+    // AI action button in table rows — send row data to chat
+    document.addEventListener('click', function (e) {
+      var aiBtn = e.target.closest('[data-ai-row]');
+      if (aiBtn) {
+        e.stopPropagation();
+        _sendRowToChat(aiBtn.getAttribute('data-ai-row'));
+      }
+    });
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -944,6 +1116,7 @@
         _wireRowClick();
         _linkifyConnectorCells(table);
         _addAnnotationBadges(table);
+        _addAiActionButtons(table);
         _wireCheckboxColumn(table);
       })
       .catch(function (err) {
@@ -1163,6 +1336,7 @@
       entity_type:      _formatEntityType(row.entity_type),
       connector_id:     row.connector_name || row.connector_id || 'LANA',
       raw_data:         _formatDataSummary(row.data),
+      ai_action:        '',
       // Annotation metadata passed through for badge rendering
       annotation_count: row.annotation_count || 0,
       has_corrections:  row.has_corrections  || false
@@ -1426,150 +1600,7 @@
     });
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // Chat integration (insights_chat)
-  // ═══════════════════════════════════════════════════════════════
-
-  function _setupChat() {
-    var container = el('chatContainer');
-    if (!container) return;
-
-    // Create threads list
-    _threadsEl = document.createElement('lex-chat-threads');
-    _threadsEl.setAttribute('page-scope', 'workspace_data_' + _matterId);
-    _threadsEl.setAttribute('context-type', 'insights_chat');
-    _threadsEl.style.flexShrink = '0';
-
-    // Create chat
-    _chatEl = document.createElement('lex-chat');
-    _chatEl.setAttribute('context-type', 'insights_chat');
-    _chatEl.setAttribute('source', 'sse');
-    _chatEl.setAttribute('placeholder', 'Ask about this workspace data...');
-    _chatEl.style.flex = '1';
-    _chatEl.style.minHeight = '0';
-
-    container.appendChild(_threadsEl);
-    container.appendChild(_chatEl);
-
-    // Re-acquire live references after potential cloning
-    var liveChat = container.querySelector('lex-chat');
-    var liveThreads = container.querySelector('lex-chat-threads');
-    if (liveChat) _chatEl = liveChat;
-    if (liveThreads) _threadsEl = liveThreads;
-
-    _threadsEl.style.flexShrink = '0';
-    _chatEl.style.flex = '1';
-    _chatEl.style.minHeight = '0';
-    _chatEl.style.overflow = 'hidden';
-
-    // Wire thread selection
-    container.addEventListener('lex-thread-select', function (e) {
-      var thread = e.detail && e.detail.thread;
-      if (!thread || !_chatEl) return;
-      _chatEl.clearConversation();
-      _chatEl.loadConversation(thread.thread_id);
-    });
-
-    // Auto-select page_general thread when threads finish loading
-    container.addEventListener('lex-threads-loaded', function (e) {
-      var threads = e.detail && e.detail.threads;
-      if (!threads || !threads.length || !_chatEl) return;
-      for (var i = 0; i < threads.length; i++) {
-        if (threads[i].thread_type === 'page_general' && threads[i].thread_id) {
-          _chatEl.loadConversation(threads[i].thread_id);
-          if (_threadsEl) _threadsEl.setActiveThread(threads[i].id);
-          break;
-        }
-      }
-    });
-
-    // Wire new thread creation
-    container.addEventListener('lex-thread-create', function () {
-      if (!_chatEl) return;
-      _chatEl.clearConversation();
-      if (_threadsEl) _threadsEl.setActiveThread(null);
-    });
-
-    // Register page_general thread on first conversation
-    container.addEventListener('lex-chat-conversation-created', function (e) {
-      var conversationId = e.detail && e.detail.conversationId;
-      if (!conversationId || typeof api === 'undefined') return;
-
-      if (window.ConversationMenu && typeof window.ConversationMenu.addConversation === 'function') {
-        window.ConversationMenu.addConversation({
-          thread_id: conversationId,
-          title: 'Workspace Data - ' + _matterName,
-          updated_at: new Date().toISOString()
-        });
-      }
-
-      var threadsComp = _threadsEl;
-      if (threadsComp && threadsComp._threads && threadsComp._threads.length > 0) {
-        for (var i = 0; i < threadsComp._threads.length; i++) {
-          if (threadsComp._threads[i].thread_type === 'page_general') {
-            var existingThread = threadsComp._threads[i];
-            existingThread.thread_id = conversationId;
-            api.put('/api/v1/conversation-threads/' + existingThread.id, {
-              thread_id: conversationId
-            }).catch(function (err) {
-              console.warn('[WorkspaceData] Failed to update page thread thread_id:', err);
-            });
-            return;
-          }
-        }
-      }
-
-      api.post('/api/v1/conversation-threads', {
-        title: 'Workspace Data - ' + _matterName,
-        thread_type: 'page_general',
-        context_type: 'insights_chat',
-        page_scope: 'workspace_data_' + _matterId,
-        thread_id: conversationId
-      }).then(function (resp) {
-        var created = resp.data || resp;
-        if (_threadsEl) {
-          _threadsEl.addThread(created);
-          _threadsEl.setActiveThread(created.id);
-        }
-      }).catch(function (err) {
-        console.warn('[WorkspaceData] Failed to register page thread:', err);
-      });
-    });
-
-    // Wrap chat send to inject workspace context as attachment
-    var origSend = _chatEl.send;
-    if (typeof origSend === 'function') {
-      _chatEl.send = function (content, opts) {
-        opts = opts || {};
-        opts.attachments = opts.attachments || {};
-        opts.attachments.workspace = {
-          matter_id: _matterId,
-          matter_name: _matterName,
-          context: 'workspace_connected_data'
-        };
-        return origSend.call(this, content, opts);
-      };
-    }
-
-    // Lock composer tools to insights_chat
-    setTimeout(function () {
-      if (!_chatEl) return;
-      var composer = _chatEl.querySelector('lex-chat-composer');
-      if (!composer) return;
-
-      var plusBtn = composer.querySelector('[data-plus]');
-      if (plusBtn && plusBtn.parentElement) {
-        plusBtn.parentElement.style.display = 'none';
-      }
-
-      if (typeof composer.setActiveTools === 'function') {
-        composer.setActiveTools(['insights_chat']);
-      }
-      if (typeof composer.setToolsLocked === 'function') {
-        composer.setToolsLocked(true);
-      }
-    }, 150);
-  }
+  // _setupChat() removed — managed by lex-lana-panel component
 
   // ═══════════════════════════════════════════════════════════════
   // Start
