@@ -1466,6 +1466,31 @@
             '</button>';
         }
 
+        // DOCX template action buttons
+        var isDocxFile = (doc.content_type || '').indexOf('wordprocessingml') !== -1 ||
+                         (doc.filename || '').toLowerCase().endsWith('.docx') ||
+                         (doc.original_filename || '').toLowerCase().endsWith('.docx');
+
+        if (isDocxFile && !doc.read_only && (doc.status === 'active' || doc.status === 'completed')) {
+          if (doc.is_template) {
+            actionButtons +=
+              '<button onclick="openDocxTemplateModal(\'' + doc.id + '\', \'' + matter.matter_id + '\', \'' + escapeHtml(docName).split("'").join("\\'") + '\')" class="text-xs text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1">' +
+                '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>' +
+                'Generate' +
+              '</button>' +
+              '<button onclick="toggleDocxTemplate(\'' + doc.id + '\', \'' + matter.matter_id + '\', false)" class="text-xs text-gray-500 hover:text-gray-700 font-medium flex items-center gap-1" title="Remove template flag">' +
+                '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>' +
+                'Unmark' +
+              '</button>';
+          } else {
+            actionButtons +=
+              '<button onclick="toggleDocxTemplate(\'' + doc.id + '\', \'' + matter.matter_id + '\', true)" class="text-xs text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1" title="Mark as document template">' +
+                '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>' +
+                'Use as Template' +
+              '</button>';
+          }
+        }
+
         if (!doc.read_only) {
           actionButtons +=
             '<button onclick="replaceDrawerDocument(\'' + doc.id + '\', \'' + matter.matter_id + '\')" class="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1" title="Replace file and re-index" style="display: none;">' +
@@ -1502,6 +1527,7 @@
                     '</p>' +
                   '</div>' +
                   '<div class="flex items-center gap-2 flex-shrink-0">' +
+                    (doc.is_template ? '<span class="inline-flex items-center px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded">Template</span>' : '') +
                     docStatusBadge(doc.status) +
                   '</div>' +
                 '</div>' +
@@ -1843,6 +1869,47 @@
   }
 
   // =========================================================================
+  // DOCX Template — uses shared DocxTemplateModal module
+  // =========================================================================
+
+  var _wsDocxModal = null;
+
+  function _initWsDocxTemplateModal() {
+    if (typeof DocxTemplateModal === 'undefined') return;
+    _wsDocxModal = new DocxTemplateModal({
+      prefix: 'docxTemplate',
+      getContacts: function () {
+        return (currentMatterData && currentMatterData.contacts) || [];
+      },
+      getMatterData: function () {
+        return currentMatterData || null;
+      },
+      onGenerated: function () {
+        if (_wsDocxModal && _wsDocxModal.state.matterId) {
+          refreshDrawerDocuments(_wsDocxModal.state.matterId);
+        }
+      },
+      onError: function (msg) { Lex.Toast.error(msg); },
+      onSuccess: function (msg) { Lex.Toast.success(msg, { duration: 8000 }); }
+    });
+  }
+
+  async function toggleDocxTemplate(docId, matterId, isTemplate) {
+    try {
+      await DocxTemplateModal.toggleTemplate(docId, matterId, isTemplate, {
+        onSuccess: function (msg) { Lex.Toast.success(msg); },
+        onError: function (msg) { Lex.Toast.error(msg); }
+      });
+      await refreshDrawerDocuments(matterId);
+    } catch (_) { /* handled by callbacks */ }
+  }
+
+  function openDocxTemplateModal(docId, matterId, docName) {
+    if (!_wsDocxModal) _initWsDocxTemplateModal();
+    if (_wsDocxModal) _wsDocxModal.open(docId, matterId, docName);
+  }
+
+  // =========================================================================
   // Window globals for onclick handlers in HTML
   // =========================================================================
 
@@ -1853,10 +1920,12 @@
   window.refreshDrawerDocuments = refreshDrawerDocuments;
   window.assignOrphanedFile = assignOrphanedFile;
   window.deleteOrphanedFile = deleteOrphanedFile;
+  window.toggleDocxTemplate = toggleDocxTemplate;
+  window.openDocxTemplateModal = openDocxTemplateModal;
 
   ['loadActivityPage', 'deleteDrawerDocument', 'retryDocumentIngestion',
    'replaceDrawerDocument', 'refreshDrawerDocuments', 'assignOrphanedFile',
-   'deleteOrphanedFile'].forEach(_trackGlobal);
+   'deleteOrphanedFile', 'toggleDocxTemplate', 'openDocxTemplateModal'].forEach(_trackGlobal);
 
   // =========================================================================
   // Conversations Tab

@@ -229,6 +229,7 @@
       // Load content + metadata
       await loadFileContent(response);
       loadMetadata(response);
+      _updateTemplateButtons();
 
       // Dismiss loader
       if (typeof Lex !== 'undefined' && Lex.Loader && typeof Lex.Loader.hide === 'function') {
@@ -612,6 +613,96 @@
   }
 
   // =========================================================================
+  // DOCX Template — uses shared DocxTemplateModal module
+  // =========================================================================
+
+  var _docxModal = null;
+
+  function _initDocxTemplateModal() {
+    if (typeof DocxTemplateModal === 'undefined') return;
+    _docxModal = new DocxTemplateModal({
+      prefix: 'fvDocx',
+      getContacts: function () {
+        var file = state.currentFile;
+        var matterId = file && (file.client_matter || file.matter_id);
+        if (!matterId) return [];
+        return api.get('/api/v1/matter-participants?matter_id=' + matterId).then(function (res) {
+          if (res && res.data) return res.data;
+          if (Array.isArray(res)) return res;
+          return [];
+        });
+      },
+      onGenerated: function () { /* no-op for file viewer */ },
+      onError: function (msg) { notify(msg, 'error'); },
+      onSuccess: function (msg) { notify(msg, 'success'); }
+    });
+  }
+
+  function _updateTemplateButtons() {
+    var file = state.currentFile;
+    if (!file) return;
+
+    var ct = (file.content_type || '').toLowerCase();
+    var fn = (file.filename || '').toLowerCase();
+    var isDocx = ct.indexOf('wordprocessingml') !== -1 ||
+                 ct.indexOf('openxmlformats-officedocument') !== -1 ||
+                 fn.endsWith('.docx');
+
+    var templateBtn = document.getElementById('viewerTemplateBtn');
+    var generateBtn = document.getElementById('viewerGenerateBtn');
+    if (!isDocx) return;
+
+    if (file.is_template) {
+      if (templateBtn) {
+        templateBtn.classList.remove('hidden');
+        document.getElementById('viewerTemplateBtnLabel').textContent = 'Unmark Template';
+      }
+      if (generateBtn) generateBtn.classList.remove('hidden');
+    } else {
+      if (templateBtn) {
+        templateBtn.classList.remove('hidden');
+        document.getElementById('viewerTemplateBtnLabel').textContent = 'Use as Template';
+      }
+      if (generateBtn) generateBtn.classList.add('hidden');
+    }
+  }
+
+  async function _toggleTemplate() {
+    var file = state.currentFile;
+    if (!file) return;
+
+    var matterId = file.client_matter || file.matter_id;
+    if (!matterId) {
+      notify('This file is not associated with a matter', 'error');
+      return;
+    }
+
+    try {
+      await DocxTemplateModal.toggleTemplate(file.id, matterId, !file.is_template, {
+        onSuccess: function (msg) {
+          state.currentFile.is_template = !file.is_template;
+          _updateTemplateButtons();
+          notify(msg, 'success');
+        },
+        onError: function (msg) { notify(msg, 'error'); }
+      });
+    } catch (_) { /* handled by callbacks */ }
+  }
+
+  function _openGenerateModal() {
+    var file = state.currentFile;
+    if (!file || !_docxModal) return;
+
+    var matterId = file.client_matter || file.matter_id;
+    if (!matterId) {
+      notify('This file is not associated with a matter', 'error');
+      return;
+    }
+
+    _docxModal.open(file.id, matterId, file.filename);
+  }
+
+  // =========================================================================
   // Initialization
   // =========================================================================
 
@@ -644,6 +735,14 @@
       }
     });
     document.getElementById('toggleSidebarBtn').addEventListener('click', toggleMetadataSidebar);
+
+    // Template buttons
+    _initDocxTemplateModal();
+    var templateBtn = document.getElementById('viewerTemplateBtn');
+    if (templateBtn) templateBtn.addEventListener('click', _toggleTemplate);
+    var generateBtn = document.getElementById('viewerGenerateBtn');
+    if (generateBtn) generateBtn.addEventListener('click', _openGenerateModal);
+
     _initLanaPanel();
 
     // Metadata controls

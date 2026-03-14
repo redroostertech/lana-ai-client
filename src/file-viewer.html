@@ -52,6 +52,15 @@
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
           Download
         </lex-btn>
+        <!-- Template actions (DOCX only, toggled via JS) -->
+        <lex-btn id="viewerTemplateBtn" variant="ghost" class="hidden">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+          <span id="viewerTemplateBtnLabel">Use as Template</span>
+        </lex-btn>
+        <lex-btn id="viewerGenerateBtn" variant="primary" class="hidden">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+          Generate
+        </lex-btn>
         <!-- Toggle Metadata Sidebar -->
         <lex-btn id="toggleSidebarBtn" variant="ghost" icon="true" title="Toggle metadata sidebar">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -211,6 +220,68 @@
 
     </div>
 
+    <!-- DOCX Template Generation Modal -->
+    <lex-modal id="fvDocxModal" heading="Generate Document from Template" size="full" hide-actions close-on-overlay>
+      <div class="flex flex-col h-full">
+        <!-- Two-column body -->
+        <div class="flex-1 flex overflow-hidden">
+
+          <!-- Left column: template info, contact, preview -->
+          <div class="w-96 flex-shrink-0 border-r border-gray-200 overflow-y-auto p-6 space-y-5">
+            <div class="flex items-center gap-3 pb-4 border-b border-gray-200">
+              <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+              </div>
+              <div>
+                <h4 id="fvDocxTitle" class="text-sm font-medium text-gray-900">Template</h4>
+                <p id="fvDocxPlaceholders" class="text-xs text-gray-500">Loading...</p>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Select Contact</label>
+              <select id="fvDocxContactSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                <option value="">-- Choose a contact --</option>
+              </select>
+            </div>
+
+            <div id="fvDocxPreview" class="hidden">
+              <label class="block text-sm font-medium text-gray-700 mb-2">Field Preview</label>
+              <div id="fvDocxPreviewList" class="bg-gray-50 rounded-lg p-3 space-y-1.5 overflow-y-auto text-sm"></div>
+            </div>
+
+            <div id="fvDocxCustomVars" class="hidden">
+              <label class="block text-sm font-medium text-gray-700 mb-2">Custom Variables</label>
+              <div id="fvDocxCustomVarsList" class="space-y-2"></div>
+            </div>
+
+            <div class="flex items-center gap-4">
+              <label class="flex items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" id="fvDocxSaveToMatter" checked class="rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                Save to matter documents
+              </label>
+            </div>
+          </div>
+
+          <!-- Right column: blank fields (scrollable) -->
+          <div class="flex-1 overflow-y-auto p-6">
+            <div id="fvDocxBlanks" class="hidden">
+              <label class="block text-sm font-medium text-gray-700 mb-2">Blank Fields</label>
+              <p class="text-xs text-gray-500 mb-3">Assign what each blank field represents by selecting a variable or typing a custom value.</p>
+              <div id="fvDocxBlanksList" class="space-y-3"></div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Pinned footer -->
+        <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 flex-shrink-0">
+          <lex-btn type="button" id="fvDocxCancelBtn" variant="secondary">Cancel</lex-btn>
+          <lex-btn type="button" id="fvDocxGenerateBtn" variant="primary" disabled>Generate Document</lex-btn>
+        </div>
+      </div>
+    </lex-modal>
+
     <!-- Unified LANA chat panel (drawer mode) -->
     <lex-lana-panel
       id="fileViewerLana"
@@ -284,6 +355,7 @@
   <script src="js/lex/components/layout/lex-app.js"></script>
 
   <!-- Page-specific Lex components -->
+  <script src="js/lex/components/foundation/lex-modal.js"></script>
   <script src="js/lex/components/foundation/lex-drawer.js"></script>
   <script src="js/lex/components/form/lex-input.js"></script>
   <script src="js/lex/components/form/lex-select.js"></script>
@@ -317,6 +389,9 @@
   <script src="js/services/metadata-service.js"></script>
   <script src="js/vendor/marked.min.js"></script>
   <script src="js/components/document-metadata-viewer.js"></script>
+
+  <!-- Shared services -->
+  <script src="js/services/docx-template-modal.js"></script>
 
   <!-- Page controller (MUST be last before auth-guard) -->
   <script src="js/file-viewer-page.js"></script>
