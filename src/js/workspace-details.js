@@ -1466,12 +1466,16 @@
             '</button>';
         }
 
-        // DOCX template action buttons
+        // Template action buttons (DOCX + PDF)
         var isDocxFile = (doc.content_type || '').indexOf('wordprocessingml') !== -1 ||
                          (doc.filename || '').toLowerCase().endsWith('.docx') ||
                          (doc.original_filename || '').toLowerCase().endsWith('.docx');
+        var isPdfFile = (doc.content_type || '') === 'application/pdf' ||
+                        (doc.filename || '').toLowerCase().endsWith('.pdf') ||
+                        (doc.original_filename || '').toLowerCase().endsWith('.pdf');
+        var isTemplateable = isDocxFile || isPdfFile;
 
-        if (isDocxFile && !doc.read_only && (doc.status === 'active' || doc.status === 'completed')) {
+        if (isTemplateable && !doc.read_only && (doc.status === 'active' || doc.status === 'completed')) {
           if (doc.is_template) {
             actionButtons +=
               '<button onclick="openDocxTemplateModal(\'' + doc.id + '\', \'' + matter.matter_id + '\', \'' + escapeHtml(docName).split("'").join("\\'") + '\')" class="text-xs text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1">' +

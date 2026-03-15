@@ -647,10 +647,12 @@
     var isDocx = ct.indexOf('wordprocessingml') !== -1 ||
                  ct.indexOf('openxmlformats-officedocument') !== -1 ||
                  fn.endsWith('.docx');
+    var isPdf = ct === 'application/pdf' || fn.endsWith('.pdf');
+    var isTemplateable = isDocx || isPdf;
 
     var templateBtn = document.getElementById('viewerTemplateBtn');
     var generateBtn = document.getElementById('viewerGenerateBtn');
-    if (!isDocx) return;
+    if (!isTemplateable) return;
 
     if (file.is_template) {
       if (templateBtn) {
