@@ -239,10 +239,18 @@
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Select Contact</label>
-              <select id="fvDocxContactSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-                <option value="">-- Choose a contact --</option>
-              </select>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Select Contacts</label>
+              <div id="fvDocxContactList" class="border border-gray-300 rounded-lg overflow-hidden">
+                <div class="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-200">
+                  <input type="checkbox" id="fvDocxContactSelectAll" class="rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                  <label for="fvDocxContactSelectAll" class="text-xs font-medium text-gray-600 cursor-pointer select-none">Select All</label>
+                  <span id="fvDocxContactCount" class="ml-auto text-xs text-gray-400"></span>
+                </div>
+                <div class="px-2 py-1.5 border-b border-gray-200">
+                  <input type="text" id="fvDocxContactSearch" class="w-full px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-purple-500 focus:border-purple-500" placeholder="Search contacts...">
+                </div>
+                <div id="fvDocxContactItems" class="max-h-40 overflow-y-auto divide-y divide-gray-100"></div>
+              </div>
             </div>
 
             <div id="fvDocxPreview" class="hidden">
@@ -266,8 +274,17 @@
           <!-- Right column: blank fields (scrollable) -->
           <div class="flex-1 overflow-y-auto p-6">
             <div id="fvDocxBlanks" class="hidden">
-              <label class="block text-sm font-medium text-gray-700 mb-2">Blank Fields</label>
-              <p class="text-xs text-gray-500 mb-3">Assign what each blank field represents by selecting a variable or typing a custom value.</p>
+              <div class="flex items-center justify-between mb-3">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700">Blank Fields</label>
+                  <p class="text-xs text-gray-500 mt-0.5">Assign what each blank field represents by selecting a variable or typing a custom value.</p>
+                </div>
+                <div id="fvDocxBlankFilters" class="flex items-center gap-1 flex-shrink-0">
+                  <button type="button" class="dtm-filter-btn px-2.5 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-700" data-filter="all" data-prefix="fvDocx">All <span class="dtm-filter-count"></span></button>
+                  <button type="button" class="dtm-filter-btn px-2.5 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200" data-filter="mapped" data-prefix="fvDocx">Mapped <span class="dtm-filter-count"></span></button>
+                  <button type="button" class="dtm-filter-btn px-2.5 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200" data-filter="unmapped" data-prefix="fvDocx">Unmapped <span class="dtm-filter-count"></span></button>
+                </div>
+              </div>
               <div id="fvDocxBlanksList" class="space-y-3"></div>
             </div>
           </div>

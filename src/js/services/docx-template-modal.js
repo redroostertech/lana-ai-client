@@ -167,8 +167,9 @@
       blanks: [],
       categories: [],
       contacts: [],
-      selectedContact: null,
-      variableNamespace: null
+      selectedContacts: [],
+      variableNamespace: null,
+      blankFilter: 'all'   // 'all' | 'mapped' | 'unmapped'
     };
   }
 
@@ -196,19 +197,35 @@
     // Reset UI
     var titleEl = self._el('Title');
     var placeholdersEl = self._el('Placeholders');
-    var contactSelect = self._el('ContactSelect');
     var previewDiv = self._el('Preview');
     var blanksDiv = self._el('Blanks');
     var customVarsDiv = self._el('CustomVars');
     var genBtn = self._el('GenerateBtn');
+    var contactItems = self._el('ContactItems');
+    var selectAllCb = self._el('ContactSelectAll');
 
     if (titleEl) titleEl.textContent = docName || 'Template';
     if (placeholdersEl) placeholdersEl.textContent = 'Loading...';
-    if (contactSelect) contactSelect.innerHTML = '<option value="">-- Choose a contact --</option>';
+    if (contactItems) contactItems.innerHTML = '';
+    if (selectAllCb) { selectAllCb.checked = false; selectAllCb.indeterminate = false; }
+    self.state.selectedContacts = [];
+    self.state._autoMapped = false;
     if (previewDiv) previewDiv.classList.add('hidden');
     if (blanksDiv) blanksDiv.classList.add('hidden');
     if (customVarsDiv) customVarsDiv.classList.add('hidden');
-    if (genBtn) genBtn.disabled = true;
+    if (genBtn) { genBtn.disabled = true; genBtn.textContent = 'Generate Document'; }
+    self.state.blankFilter = 'all';
+
+    // Reset filter buttons to "All" active
+    var filtersDiv = self._el('BlankFilters');
+    if (filtersDiv) {
+      var filterBtns = filtersDiv.querySelectorAll('.dtm-filter-btn');
+      for (var fb = 0; fb < filterBtns.length; fb++) {
+        var isAll = filterBtns[fb].getAttribute('data-filter') === 'all';
+        filterBtns[fb].className = 'dtm-filter-btn px-2.5 py-1 text-xs font-medium rounded-full ' +
+          (isAll ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200');
+      }
+    }
 
     var modal = self._el('Modal');
     if (modal) modal.open = true;
@@ -282,22 +299,66 @@
     }
     st.contacts = contacts || [];
 
-    // Populate contact dropdown
-    var contactSelect = self._el('ContactSelect');
-    if (contactSelect) {
+    // Populate contact checkbox list
+    var contactItems = self._el('ContactItems');
+    var contactCountEl = self._el('ContactCount');
+    var selectAllCb = self._el('ContactSelectAll');
+
+    if (contactItems) {
+      var itemsHtml = '';
       for (var i = 0; i < st.contacts.length; i++) {
         var c = st.contacts[i];
         var name = c.display_name || ((c.first_name || '') + ' ' + (c.last_name || '')).trim() || c.email || 'Contact';
-        var opt = document.createElement('option');
-        opt.value = c.id;
-        opt.textContent = name + (c.email ? ' (' + c.email + ')' : '') +
-          (c.participant_type && c.participant_type !== 'other' ? ' - ' + c.participant_type : '');
-        contactSelect.appendChild(opt);
+        var detail = c.email || '';
+        if (c.participant_type && c.participant_type !== 'other') {
+          detail = detail ? detail + ' - ' + c.participant_type : c.participant_type;
+        }
+        var searchable = (name + ' ' + detail).toLowerCase();
+        itemsHtml += '<label class="dtm-contact-row flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer" data-search="' + _escapeHtml(searchable) + '">' +
+          '<input type="checkbox" class="dtm-contact-cb rounded border-gray-300 text-purple-600 focus:ring-purple-500" value="' + _escapeHtml(c.id) + '">' +
+          '<div class="min-w-0">' +
+            '<div class="text-sm text-gray-800 truncate">' + _escapeHtml(name) + '</div>' +
+            (detail ? '<div class="text-xs text-gray-400 truncate">' + _escapeHtml(detail) + '</div>' : '') +
+          '</div>' +
+        '</label>';
+      }
+      contactItems.innerHTML = itemsHtml;
+      if (contactCountEl) contactCountEl.textContent = st.contacts.length + ' contact' + (st.contacts.length !== 1 ? 's' : '');
+
+      // Checkbox change handler (avoid stacking listeners on re-open)
+      if (!contactItems._dtmBound) {
+        contactItems.addEventListener('change', function () {
+          self._onContactSelectionChange();
+        });
+        contactItems._dtmBound = true;
       }
 
-      contactSelect.onchange = function () {
-        self._onContactChange(contactSelect.value);
-      };
+      // Select All handler — only toggles visible (non-hidden) contacts
+      if (selectAllCb) {
+        selectAllCb.checked = false;
+        selectAllCb.onchange = function () {
+          var rows = contactItems.querySelectorAll('.dtm-contact-row:not(.hidden)');
+          for (var j = 0; j < rows.length; j++) {
+            var cb = rows[j].querySelector('.dtm-contact-cb');
+            if (cb) cb.checked = selectAllCb.checked;
+          }
+          self._onContactSelectionChange();
+        };
+      }
+
+      // Search handler
+      var searchInput = self._el('ContactSearch');
+      if (searchInput) {
+        searchInput.value = '';
+        searchInput.oninput = function () {
+          var query = searchInput.value.toLowerCase().trim();
+          var rows = contactItems.querySelectorAll('.dtm-contact-row');
+          for (var s = 0; s < rows.length; s++) {
+            var haystack = rows[s].getAttribute('data-search') || '';
+            rows[s].classList.toggle('hidden', query.length > 0 && haystack.indexOf(query) === -1);
+          }
+        };
+      }
     }
 
     // Render custom vars for unmapped curly brace placeholders
@@ -308,38 +369,82 @@
   };
 
   // =========================================================================
-  // Internal: contact change
+  // Internal: contact selection change (multi-select)
   // =========================================================================
 
-  DocxTemplateModal.prototype._onContactChange = function (contactId) {
+  DocxTemplateModal.prototype._onContactSelectionChange = function () {
     var self = this;
     var st = self.state;
     var genBtn = self._el('GenerateBtn');
     var previewDiv = self._el('Preview');
     var previewList = self._el('PreviewList');
+    var contactItems = self._el('ContactItems');
+    var contactCountEl = self._el('ContactCount');
+    var selectAllCb = self._el('ContactSelectAll');
 
-    if (!contactId) {
-      if (genBtn) genBtn.disabled = true;
-      if (previewDiv) previewDiv.classList.add('hidden');
-      st.selectedContact = null;
-      return;
+    // Gather selected contact IDs
+    var selectedIds = {};
+    if (contactItems) {
+      var cbs = contactItems.querySelectorAll('.dtm-contact-cb:checked');
+      for (var ci = 0; ci < cbs.length; ci++) selectedIds[cbs[ci].value] = true;
     }
 
-    var contact = null;
+    // Build selected contacts array
+    st.selectedContacts = [];
     for (var i = 0; i < st.contacts.length; i++) {
-      if (st.contacts[i].id === contactId) {
-        contact = st.contacts[i];
-        break;
+      if (selectedIds[st.contacts[i].id]) {
+        st.selectedContacts.push(st.contacts[i]);
       }
     }
 
-    st.selectedContact = contact;
-    if (genBtn) genBtn.disabled = false;
+    var count = st.selectedContacts.length;
 
-    // Build preview
+    // Update select-all checkbox state
+    if (selectAllCb) {
+      selectAllCb.checked = count > 0 && count === st.contacts.length;
+      selectAllCb.indeterminate = count > 0 && count < st.contacts.length;
+    }
+
+    // Update count display
+    if (contactCountEl) {
+      contactCountEl.textContent = count > 0
+        ? count + ' of ' + st.contacts.length + ' selected'
+        : st.contacts.length + ' contact' + (st.contacts.length !== 1 ? 's' : '');
+    }
+
+    // Update generate button
+    if (genBtn) {
+      genBtn.disabled = count === 0;
+      if (count > 1) {
+        genBtn.textContent = 'Generate ' + count + ' Documents';
+      } else {
+        genBtn.textContent = 'Generate Document';
+      }
+    }
+
+    if (count === 0) {
+      if (previewDiv) previewDiv.classList.add('hidden');
+      return;
+    }
+
+    // Auto-map blank fields (only on first selection)
+    if (count === 1 || (count > 0 && st._autoMapped !== true)) {
+      self._autoMapBlanks();
+      st._autoMapped = true;
+    }
+
+    // Build preview using first selected contact
+    var contact = st.selectedContacts[0];
     if (previewList && contact) {
       var matterData = self.getMatterData();
       var html = '';
+
+      // Multi-contact header
+      if (count > 1) {
+        html += '<div class="text-xs text-purple-600 font-medium mb-2">Previewing: ' +
+          _escapeHtml(contact.display_name || ((contact.first_name || '') + ' ' + (contact.last_name || '')).trim() || contact.email || 'Contact') +
+          ' (1 of ' + count + ')</div>';
+      }
 
       // Curly brace placeholders
       if (st.placeholders.length > 0) {
@@ -480,7 +585,7 @@
           snippet = beforeSnip + ' _____ ' + afterSnip;
         }
 
-        html += '<div class="bg-white border border-gray-100 rounded p-2 space-y-1.5">' +
+        html += '<div class="dtm-blank-card bg-white border border-gray-100 rounded p-2 space-y-1.5" data-blank-card-id="' + blank.id + '">' +
           '<span class="text-xs font-medium text-gray-700">' + label + '</span>';
 
         if (snippet) {
@@ -547,7 +652,349 @@
         customInput.classList.add('hidden');
         customInput.value = '';
       }
+      // Update filter counts after mapping change
+      self._updateBlankFilterCounts();
+      self._applyBlankFilter();
     });
+
+    // Event delegation for filter buttons
+    var filtersDiv = self._el('BlankFilters');
+    if (filtersDiv) {
+      filtersDiv.addEventListener('click', function (e) {
+        var btn = e.target.closest('.dtm-filter-btn');
+        if (!btn) return;
+        var filter = btn.getAttribute('data-filter');
+        self.state.blankFilter = filter;
+
+        // Update active button styles
+        var allBtns = filtersDiv.querySelectorAll('.dtm-filter-btn');
+        for (var fb = 0; fb < allBtns.length; fb++) {
+          var isActive = allBtns[fb].getAttribute('data-filter') === filter;
+          allBtns[fb].className = 'dtm-filter-btn px-2.5 py-1 text-xs font-medium rounded-full ' +
+            (isActive ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200');
+        }
+
+        self._applyBlankFilter();
+      });
+    }
+
+    // Initialize filter counts
+    self._updateBlankFilterCounts();
+  };
+
+  // =========================================================================
+  // Internal: blank field filtering
+  // =========================================================================
+
+  /**
+   * Count mapped vs unmapped blanks and update filter button badges.
+   */
+  DocxTemplateModal.prototype._updateBlankFilterCounts = function () {
+    var self = this;
+    var st = self.state;
+    var prefix = self.prefix;
+    var mapped = 0;
+    var unmapped = 0;
+
+    for (var i = 0; i < st.blanks.length; i++) {
+      var selectEl = document.getElementById(prefix + 'BlankMap_' + st.blanks[i].id);
+      if (selectEl && selectEl.value && selectEl.value !== '') {
+        mapped++;
+      } else {
+        unmapped++;
+      }
+    }
+
+    var total = st.blanks.length;
+    var filtersDiv = self._el('BlankFilters');
+    if (!filtersDiv) return;
+
+    var btns = filtersDiv.querySelectorAll('.dtm-filter-btn');
+    for (var b = 0; b < btns.length; b++) {
+      var filter = btns[b].getAttribute('data-filter');
+      var countEl = btns[b].querySelector('.dtm-filter-count');
+      if (!countEl) continue;
+      if (filter === 'all') countEl.textContent = total;
+      else if (filter === 'mapped') countEl.textContent = mapped;
+      else if (filter === 'unmapped') countEl.textContent = unmapped;
+    }
+  };
+
+  /**
+   * Show/hide blank cards and category groups based on the active filter.
+   */
+  DocxTemplateModal.prototype._applyBlankFilter = function () {
+    var self = this;
+    var st = self.state;
+    var prefix = self.prefix;
+    var filter = st.blankFilter || 'all';
+    var blanksList = self._el('BlanksList');
+    if (!blanksList) return;
+
+    var cards = blanksList.querySelectorAll('.dtm-blank-card');
+    for (var i = 0; i < cards.length; i++) {
+      var cardId = cards[i].getAttribute('data-blank-card-id');
+      var selectEl = document.getElementById(prefix + 'BlankMap_' + cardId);
+      var isMapped = selectEl && selectEl.value && selectEl.value !== '';
+
+      if (filter === 'all') {
+        cards[i].classList.remove('hidden');
+      } else if (filter === 'mapped') {
+        cards[i].classList.toggle('hidden', !isMapped);
+      } else if (filter === 'unmapped') {
+        cards[i].classList.toggle('hidden', isMapped);
+      }
+    }
+
+    // Hide category groups that have zero visible cards
+    var categories = st.categories || [];
+    for (var ci = 0; ci < categories.length; ci++) {
+      var cat = categories[ci];
+      var groupWrapper = blanksList.querySelector('[data-group="' + cat.id + '"]');
+      if (!groupWrapper) continue;
+      var parentContainer = groupWrapper.closest('.border.border-gray-200');
+      if (!parentContainer) continue;
+
+      var groupDiv = document.getElementById(prefix + 'BlankGroup_' + cat.id);
+      if (!groupDiv) continue;
+
+      var visibleCards = groupDiv.querySelectorAll('.dtm-blank-card:not(.hidden)');
+      var hasVisible = visibleCards.length > 0;
+      parentContainer.classList.toggle('hidden', !hasVisible);
+
+      // Auto-expand groups with visible cards when filtering; collapse empty
+      if (filter !== 'all') {
+        groupDiv.classList.toggle('hidden', !hasVisible);
+        var chevron = groupWrapper.querySelector('.dtm-chevron');
+        if (chevron) chevron.classList.toggle('rotate-180', hasVisible);
+      }
+
+      // Update category count badge to show visible/total
+      var badge = groupWrapper.querySelector('.bg-gray-200');
+      if (badge) {
+        if (filter === 'all') {
+          badge.textContent = cat.count;
+        } else {
+          badge.textContent = visibleCards.length + '/' + cat.count;
+        }
+      }
+    }
+  };
+
+  // =========================================================================
+  // Internal: ML-based auto-mapping (scoring, not keyword rules)
+  // =========================================================================
+
+  /**
+   * Stop words to exclude from tokenization — common words that add noise.
+   */
+  var STOP_WORDS = {
+    'the': 1, 'a': 1, 'an': 1, 'and': 1, 'or': 1, 'of': 1, 'to': 1, 'in': 1,
+    'is': 1, 'it': 1, 'for': 1, 'on': 1, 'at': 1, 'by': 1, 'as': 1, 'be': 1,
+    'if': 1, 'no': 1, 'not': 1, 'are': 1, 'was': 1, 'with': 1, 'that': 1,
+    'this': 1, 'from': 1, 'will': 1, 'has': 1, 'have': 1, 'had': 1, 'been': 1,
+    'shall': 1, 'may': 1, 'any': 1, 'all': 1, 'each': 1, 'every': 1,
+    'such': 1, 'other': 1, 'which': 1, 'their': 1, 'its': 1, 'his': 1, 'her': 1,
+    'option': 1, 'per': 1, 'also': 1, 'must': 1, 'than': 1, 'into': 1
+  };
+
+  /**
+   * Category-to-domain affinity map. Scores how well a blank's category
+   * aligns with a variable's domain (prefix). Higher = stronger match.
+   */
+  var CATEGORY_DOMAIN = {
+    'name':      { 'contact': 0.4, 'matter': 0.2 },
+    'address':   { 'contact': 0.5 },
+    'contact':   { 'contact': 0.4 },
+    'date':      { 'date': 0.6 },
+    'signature': { 'contact': 0.3, 'date': 0.2 },
+    'amount':    { 'matter': 0.1 },
+    'number':    {},
+    'checkbox':  {},
+    'payment_method': {},
+    'description': { 'matter': 0.1 }
+  };
+
+  /**
+   * Synonym expansions — maps words that appear in blanks to words that
+   * appear in variable labels, bridging vocabulary gaps.
+   */
+  var SYNONYMS = {
+    'tel': 'phone', 'telephone': 'phone', 'cell': 'mobile', 'cellular': 'mobile',
+    'e-mail': 'email', 'mail': 'email', 'mailing': 'address',
+    'zip': 'zip', 'postal': 'zip', 'postcode': 'zip',
+    'apt': 'street', 'suite': 'street', 'unit': 'street',
+    'firm': 'company', 'business': 'company', 'entity': 'company', 'corporation': 'company',
+    'surname': 'last', 'lastname': 'last', 'firstname': 'first',
+    'signed': 'date', 'executed': 'date', 'dated': 'date',
+    'printed': 'name', 'lessor': 'name', 'lessee': 'name', 'tenant': 'name', 'landlord': 'name',
+    'landlady': 'name', 'occupant': 'name', 'resident': 'name',
+    'agent': 'name', 'manager': 'name', 'owner': 'name',
+    'fax': 'fax', 'facsimile': 'fax'
+  };
+
+  /**
+   * Tokenize text into a normalized word set, applying stop word removal
+   * and synonym expansion.
+   *
+   * @param {string} text - Raw text to tokenize
+   * @returns {Object} Map of word → count (acts as a bag of words)
+   */
+  function _tokenize(text) {
+    if (!text) return {};
+    var words = text.toLowerCase().replace(/[^a-z0-9]/g, ' ').split(/\s+/);
+    var bag = {};
+    for (var i = 0; i < words.length; i++) {
+      var w = words[i];
+      if (!w || w.length < 2 || STOP_WORDS[w]) continue;
+      bag[w] = (bag[w] || 0) + 1;
+      // Also add synonym if present
+      var syn = SYNONYMS[w];
+      if (syn) bag[syn] = (bag[syn] || 0) + 0.5;
+    }
+    return bag;
+  }
+
+  /**
+   * Compute a similarity score between two word bags.
+   * Uses weighted Jaccard: intersection / union, weighted by frequency.
+   *
+   * @param {Object} bagA - Word bag A
+   * @param {Object} bagB - Word bag B
+   * @returns {number} Score between 0.0 and 1.0
+   */
+  function _wordOverlap(bagA, bagB) {
+    var keysA = Object.keys(bagA);
+    var keysB = Object.keys(bagB);
+    if (keysA.length === 0 || keysB.length === 0) return 0;
+
+    var intersection = 0;
+    var union = 0;
+
+    // Combine all keys
+    var allKeys = {};
+    var i;
+    for (i = 0; i < keysA.length; i++) allKeys[keysA[i]] = true;
+    for (i = 0; i < keysB.length; i++) allKeys[keysB[i]] = true;
+
+    var keys = Object.keys(allKeys);
+    for (i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      var a = bagA[k] || 0;
+      var b = bagB[k] || 0;
+      intersection += Math.min(a, b);
+      union += Math.max(a, b);
+    }
+
+    return union > 0 ? intersection / union : 0;
+  }
+
+  /**
+   * Score a single blank against a single variable. Returns a value 0.0–1.0.
+   *
+   * Scoring components:
+   *   - Word overlap between blank text and variable label/key (0–1, weight 0.5)
+   *   - Category-domain affinity bonus (0–0.6, based on CATEGORY_DOMAIN)
+   *   - Exact sub-field match bonus (e.g., blank says "city", var is "address_city")
+   *
+   * @param {Object} blankBag - Tokenized blank text
+   * @param {string} blankCategory - Blank's detected category
+   * @param {Object} varBag - Tokenized variable label + key
+   * @param {string} varKey - Variable key (e.g., 'contact.address_city')
+   * @returns {number} Score 0.0–1.0
+   */
+  function _scoreMatch(blankBag, blankCategory, varBag, varKey) {
+    // 1. Word overlap (primary signal)
+    var overlap = _wordOverlap(blankBag, varBag);
+
+    // 2. Category-domain affinity
+    var domain = varKey.indexOf('.') !== -1 ? varKey.substring(0, varKey.indexOf('.')) : '';
+    var affinities = CATEGORY_DOMAIN[blankCategory] || {};
+    var domainBonus = affinities[domain] || 0;
+
+    // 3. Sub-field exact match bonus — if the variable's field name appears in the blank text
+    var fieldPart = varKey.indexOf('.') !== -1 ? varKey.substring(varKey.indexOf('.') + 1) : varKey;
+    var fieldWords = fieldPart.replace(/_/g, ' ').toLowerCase().split(/\s+/);
+    var exactBonus = 0;
+    for (var fw = 0; fw < fieldWords.length; fw++) {
+      if (fieldWords[fw].length >= 3 && blankBag[fieldWords[fw]]) {
+        exactBonus += 0.15;
+      }
+    }
+    if (exactBonus > 0.3) exactBonus = 0.3;
+
+    // Combined score, capped at 1.0
+    var score = (overlap * 0.5) + domainBonus + exactBonus;
+    return score > 1.0 ? 1.0 : score;
+  }
+
+  /**
+   * Minimum confidence threshold. Below this score, we don't auto-map.
+   * Prevents false positives like "Number of Parking Spaces" → Full Name.
+   */
+  var MIN_CONFIDENCE = 0.25;
+
+  /**
+   * Build variable token cache (called once per modal open, not per blank).
+   */
+  function _buildVarTokens(ns) {
+    var cache = {};
+    var keys = Object.keys(ns);
+    for (var i = 0; i < keys.length; i++) {
+      var key = keys[i];
+      var entry = ns[key];
+      // Tokenize label + key parts (e.g., "Full Name" + "contact full name")
+      var text = (entry.label || '') + ' ' + key.replace(/[._]/g, ' ');
+      cache[key] = _tokenize(text);
+    }
+    return cache;
+  }
+
+  DocxTemplateModal.prototype._autoMapBlanks = function () {
+    var self = this;
+    var st = self.state;
+    var ns = st.variableNamespace || {};
+    var prefix = self.prefix;
+    var nsKeys = Object.keys(ns);
+    if (nsKeys.length === 0) return;
+
+    // Build variable token cache once
+    var varTokens = _buildVarTokens(ns);
+
+    for (var i = 0; i < st.blanks.length; i++) {
+      var blank = st.blanks[i];
+      var selectEl = document.getElementById(prefix + 'BlankMap_' + blank.id);
+      if (!selectEl) continue;
+
+      // Skip if user already made a selection
+      if (selectEl.value && selectEl.value !== '') continue;
+
+      // Tokenize blank's label + context
+      var blankText = (blank.label || '') + ' ' + (blank.context_before || '') + ' ' + (blank.context_after || '');
+      var blankBag = _tokenize(blankText);
+
+      // Score against every variable, pick the best
+      var bestKey = null;
+      var bestScore = 0;
+
+      for (var v = 0; v < nsKeys.length; v++) {
+        var varKey = nsKeys[v];
+        var score = _scoreMatch(blankBag, blank.category, varTokens[varKey], varKey);
+        if (score > bestScore) {
+          bestScore = score;
+          bestKey = varKey;
+        }
+      }
+
+      // Only map if confidence exceeds threshold
+      if (bestKey && bestScore >= MIN_CONFIDENCE) {
+        selectEl.value = bestKey;
+      }
+    }
+
+    // Refresh filter counts + apply current filter
+    self._updateBlankFilterCounts();
+    self._applyBlankFilter();
   };
 
   // =========================================================================
@@ -558,15 +1005,17 @@
     var self = this;
     var st = self.state;
 
-    if (!st.docId || !st.matterId || !st.selectedContact) {
-      self.onError('Please select a contact first');
+    if (!st.docId || !st.matterId || st.selectedContacts.length === 0) {
+      self.onError('Please select at least one contact');
       return;
     }
 
     var genBtn = self._el('GenerateBtn');
+    var total = st.selectedContacts.length;
+
     if (genBtn) {
       genBtn.disabled = true;
-      genBtn.textContent = 'Generating...';
+      genBtn.textContent = total > 1 ? 'Generating 1 of ' + total + '...' : 'Generating...';
     }
 
     // Collect custom variables for curly brace placeholders
@@ -603,57 +1052,83 @@
     var saveCheckbox = self._el('SaveToMatter');
     if (saveCheckbox) saveToMatter = saveCheckbox.checked;
 
-    try {
-      var response = await fetch(api.baseUrl + '/api/v1/matters/' + st.matterId + '/documents/' + st.docId + '/generate-from-template', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + api.token
-        },
-        body: JSON.stringify({
-          contact_id: st.selectedContact.id,
-          output_format: 'docx',
-          custom_variables: customVars,
-          blank_mappings: blankMappings,
-          save_to_matter: saveToMatter
-        })
-      });
+    var succeeded = 0;
+    var failed = 0;
+    var lastData = null;
 
-      var result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || result.message || 'Generation failed');
+    for (var ci = 0; ci < st.selectedContacts.length; ci++) {
+      var contact = st.selectedContacts[ci];
+
+      if (genBtn && total > 1) {
+        genBtn.textContent = 'Generating ' + (ci + 1) + ' of ' + total + '...';
       }
 
-      var data = result.data || result;
+      try {
+        var response = await fetch(api.baseUrl + '/api/v1/matters/' + st.matterId + '/documents/' + st.docId + '/generate-from-template', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + api.token
+          },
+          body: JSON.stringify({
+            contact_id: contact.id,
+            output_format: 'docx',
+            custom_variables: customVars,
+            blank_mappings: blankMappings,
+            save_to_matter: saveToMatter
+          })
+        });
 
-      // Trigger download
-      if (data.file_base64) {
-        var blob = _base64ToBlob(data.file_base64, data.content_type || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = data.filename || 'generated-document.docx';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        var result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.error || result.message || 'Generation failed');
+        }
+
+        var data = result.data || result;
+        lastData = data;
+
+        // Trigger download
+        if (data.file_base64) {
+          var blob = _base64ToBlob(data.file_base64, data.content_type || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = data.filename || 'generated-document.docx';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }
+
+        succeeded++;
+      } catch (error) {
+        failed++;
+        var contactName = contact.display_name || ((contact.first_name || '') + ' ' + (contact.last_name || '')).trim() || contact.email || 'Contact';
+        self.onError('Failed for ' + contactName + ': ' + error.message);
       }
+    }
 
-      var msg = 'Document generated: ' + (data.filename || 'document.docx');
-      if (data.placeholders_missing && data.placeholders_missing.length > 0) {
-        msg += ' (' + data.placeholders_missing.length + ' field(s) missing)';
+    // Summary
+    if (total === 1 && succeeded === 1 && lastData) {
+      var msg = 'Document generated: ' + (lastData.filename || 'document.docx');
+      if (lastData.placeholders_missing && lastData.placeholders_missing.length > 0) {
+        msg += ' (' + lastData.placeholders_missing.length + ' field(s) missing)';
       }
       self.onSuccess(msg);
-      self.close();
-      self.onGenerated(data);
+    } else if (succeeded > 0) {
+      var summaryMsg = succeeded + ' of ' + total + ' document' + (total !== 1 ? 's' : '') + ' generated';
+      if (failed > 0) summaryMsg += ' (' + failed + ' failed)';
+      self.onSuccess(summaryMsg);
+    }
 
-    } catch (error) {
-      self.onError('Generation failed: ' + error.message);
-    } finally {
-      if (genBtn) {
-        genBtn.disabled = false;
-        genBtn.textContent = 'Generate Document';
-      }
+    if (succeeded > 0) {
+      self.close();
+      self.onGenerated(lastData);
+    }
+
+    if (genBtn) {
+      genBtn.disabled = false;
+      genBtn.textContent = 'Generate Document';
     }
   };
 
