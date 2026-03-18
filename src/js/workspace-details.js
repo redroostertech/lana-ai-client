@@ -1886,8 +1886,8 @@
         // Fetch fresh contacts from the API each time the modal opens
         var matterId = currentMatterData && currentMatterData.matter && currentMatterData.matter.matter_id;
         if (!matterId) return (currentMatterData && currentMatterData.contacts) || [];
-        return api.get('/api/v1/matters/' + matterId).then(function (res) {
-          var matterData = res.data || res;
+        return api.get('/api/v1/matters/' + matterId + '?full_details=true').then(function (res) {
+          var matterData = (res.data || res).matter || res.data || res;
           var freshContacts = matterData.contacts || [];
           if (currentMatterData) currentMatterData.contacts = freshContacts;
           return freshContacts;
