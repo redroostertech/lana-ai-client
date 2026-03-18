@@ -1883,7 +1883,17 @@
     _wsDocxModal = new DocxTemplateModal({
       prefix: 'docxTemplate',
       getContacts: function () {
-        return (currentMatterData && currentMatterData.contacts) || [];
+        // Fetch fresh contacts from the API each time the modal opens
+        var matterId = currentMatterData && currentMatterData.matter && currentMatterData.matter.matter_id;
+        if (!matterId) return (currentMatterData && currentMatterData.contacts) || [];
+        return api.get('/api/v1/matters/' + matterId).then(function (res) {
+          var matterData = res.data || res;
+          var freshContacts = matterData.contacts || [];
+          if (currentMatterData) currentMatterData.contacts = freshContacts;
+          return freshContacts;
+        }).catch(function () {
+          return (currentMatterData && currentMatterData.contacts) || [];
+        });
       },
       getMatterData: function () {
         return currentMatterData || null;
