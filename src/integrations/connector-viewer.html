@@ -506,6 +506,18 @@
 
         console.log('[Connector Viewer] Loading UI:', uiEntryPoint);
 
+        // Guard: if uiEntryPoint is a relative path (e.g. "ui/index.html"), attempt to
+        // construct a full MinIO URL using the default MinIO endpoint.
+        if (uiEntryPoint && !uiEntryPoint.startsWith('file://') && !uiEntryPoint.startsWith('http://') && !uiEntryPoint.startsWith('https://')) {
+          console.warn('[Connector Viewer] ui_entry_point is a relative path, not a full URL:', uiEntryPoint);
+          showError(
+            'Invalid connector URL format. The connector UI entry point is a relative path ("' + uiEntryPoint + '") ' +
+            'instead of a full URL. This usually means the connector needs to be re-imported. ' +
+            'Please re-upload the connector ZIP or contact support.'
+          );
+          return;
+        }
+
         // Support both file:// URLs and HTTP URLs (MinIO S3-compatible serving)
         if (uiEntryPoint.startsWith('file://') || uiEntryPoint.startsWith('http://') || uiEntryPoint.startsWith('https://')) {
           const iframe = document.getElementById('connector-frame');

@@ -7319,18 +7319,22 @@
         '<div class="h-32 bg-gray-100 rounded animate-pulse"></div>' +
       '</div>';
 
-    // Parallel data fetch (contacts already loaded in currentMatterData)
+    // Parallel data fetch (refresh contacts from API to include newly added + connector contacts)
     var matterId = matter.matter_id;
     var results = await Promise.allSettled([
       api.get('/api/v1/matters/' + matterId + '/document-types'),
-      api.get('/api/v1/generation-template-sets?matter_id=' + matterId)
+      api.get('/api/v1/generation-template-sets?matter_id=' + matterId),
+      api.get('/api/v1/matters/' + matterId)
     ]);
 
     docGenState.documentTypes = (results[0].status === 'fulfilled' && results[0].value && results[0].value.data)
       ? results[0].value.data : [];
     docGenState.templateSets = (results[1].status === 'fulfilled' && results[1].value && results[1].value.data)
       ? results[1].value.data : [];
-    docGenState.contacts = (currentMatterData && currentMatterData.contacts) || [];
+    // Use fresh contacts from re-fetched matter data, falling back to cached data
+    var freshMatterData = (results[2].status === 'fulfilled' && results[2].value) ? results[2].value : null;
+    docGenState.contacts = (freshMatterData && freshMatterData.contacts) ||
+      (currentMatterData && currentMatterData.contacts) || [];
 
     var html = '';
 
