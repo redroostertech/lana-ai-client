@@ -250,6 +250,343 @@
   };
 
   /**
+   * Load the PDF into the preview pane using pdf.js with numbered overlay badges
+   * positioned at each detected blank field's coordinates.
+   */
+  DocxTemplateModal.prototype._loadPdfPreview = function () {
+    var self = this;
+    var viewer = document.getElementById(self.prefix + 'PdfViewer');
+    if (!viewer || !self.state.docId) return;
+
+    var isPdf = (self.state.docName || '').toLowerCase().indexOf('.pdf') !== -1;
+    if (!isPdf) {
+      viewer.innerHTML = '<div class="flex items-center justify-center h-full text-sm text-gray-400">Preview not available for this file type</div>';
+      return;
+    }
+
+    if (typeof pdfjsLib === 'undefined') {
+      // Fallback: iframe if pdf.js not loaded
+      viewer.innerHTML = '<div class="flex items-center justify-center h-full text-sm text-gray-400">Loading preview...</div>';
+      fetch(api.baseUrl + '/api/v1/storage/files/' + encodeURIComponent(self.state.docId) + '/download', {
+        headers: { 'Authorization': 'Bearer ' + api.token }
+      }).then(function(r) { return r.blob(); }).then(function(blob) {
+        viewer.innerHTML = '<iframe src="' + URL.createObjectURL(blob) + '#toolbar=0" style="width:100%;height:100%;border:none;"></iframe>';
+      }).catch(function() {
+        viewer.innerHTML = '<div class="flex items-center justify-center h-full text-sm text-red-400">Failed to load preview</div>';
+      });
+      return;
+    }
+
+    // Configure pdf.js worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/vendor/pdf.worker.min.js';
+
+    viewer.innerHTML = '<div class="flex items-center justify-center h-full text-sm text-gray-400">Rendering PDF...</div>';
+
+    // Sort blanks by position for numbering
+    var sorted = (self.state.blanks || []).slice().sort(function (a, b) { return a.position - b.position; });
+    var blankLabels = {};
+    for (var bi = 0; bi < sorted.length; bi++) {
+      blankLabels[sorted[bi].id] = { num: bi + 1, label: sorted[bi].label || 'Blank', blank: sorted[bi] };
+    }
+
+    // Fetch PDF and render with pdf.js
+    fetch(api.baseUrl + '/api/v1/storage/files/' + encodeURIComponent(self.state.docId) + '/download', {
+      headers: { 'Authorization': 'Bearer ' + api.token }
+    })
+    .then(function (resp) { return resp.arrayBuffer(); })
+    .then(function (arrayBuf) {
+      return pdfjsLib.getDocument({ data: arrayBuf }).promise;
+    })
+    .then(function (pdfDoc) {
+      viewer.innerHTML = '';
+      var scale = 1.3;
+      var allTextItems = []; // Collect text items across all pages with their coords
+
+      var renderPage = function (pageNum) {
+        return pdfDoc.getPage(pageNum).then(function (page) {
+          var viewport = page.getViewport({ scale: scale });
+
+          // Container for this page
+          var pageDiv = document.createElement('div');
+          pageDiv.className = 'dtm-pdf-page';
+          pageDiv.style.cssText = 'position:relative;margin:0 auto 16px auto;background:white;box-shadow:0 2px 8px rgba(0,0,0,0.12);width:' + viewport.width + 'px;height:' + viewport.height + 'px;';
+
+          // Canvas
+          var canvas = document.createElement('canvas');
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          pageDiv.appendChild(canvas);
+
+          var ctx = canvas.getContext('2d');
+          var renderTask = page.render({ canvasContext: ctx, viewport: viewport });
+
+          return renderTask.promise.then(function () {
+            return page.getTextContent();
+          }).then(function (textContent) {
+            // Collect text items with their page coordinates for blank matching
+            var items = textContent.items;
+            for (var t = 0; t < items.length; t++) {
+              var item = items[t];
+              if (!item.str) continue;
+              var tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+              allTextItems.push({
+                str: item.str,
+                x: tx[4],
+                y: tx[5],
+                width: item.width * scale,
+                height: item.height * scale,
+                pageDiv: pageDiv,
+                pageNum: pageNum
+              });
+            }
+            viewer.appendChild(pageDiv);
+          });
+        });
+      };
+
+      // Render all pages sequentially
+      var chain = Promise.resolve();
+      for (var p = 1; p <= pdfDoc.numPages; p++) {
+        (function (pn) {
+          chain = chain.then(function () { return renderPage(pn); });
+        })(p);
+      }
+
+      return chain.then(function () {
+        self._overlayBlankBadges(allTextItems, sorted, scale);
+      });
+    })
+    .catch(function (err) {
+      console.error('[DocxTemplateModal] PDF render failed:', err);
+      viewer.innerHTML = '<div class="flex items-center justify-center h-full text-sm text-red-400">Failed to render PDF: ' + _escapeHtml(err.message) + '</div>';
+    });
+  };
+
+  /**
+   * Overlay numbered badges on the PDF at each blank field position.
+   *
+   * Finds the pdf.js text item containing each blank's label text,
+   * then places the badge at the right edge of that text item (x + width).
+   * Handles compound items (multiple labels in one item like "City: ___, State: ___, ZIP___"),
+   * split items ("Address" + ":"), and underscore-only items as fallback.
+   */
+  DocxTemplateModal.prototype._overlayBlankBadges = function (textItems, sortedBlanks, scale) {
+    var self = this;
+    var falsePos = { 'follows': 1, 'with a copy to': 1, 'hereof': 1, 'thereof': 1,
+      'herein': 1, 'nation': 1, 'company': 1, 'section': 1, 'article': 1 };
+
+    var pageDivs = {};
+    for (var ti = 0; ti < textItems.length; ti++) {
+      if (textItems[ti].pageDiv) pageDivs[textItems[ti].pageNum] = textItems[ti].pageDiv;
+    }
+
+    var labelCands = [];
+    var underscoreCands = [];
+
+    for (var i = 0; i < textItems.length; i++) {
+      var it = textItems[i];
+      var s = it.str.trim();
+      if (s.length < 2 && s !== ':') continue;
+      var charW = (it.width || 0) / Math.max(s.length, 1);
+      var sk = it.pageNum * 1e6 + Math.round(it.y) * 1000 + Math.round(it.x);
+
+      if (s.indexOf('___') !== -1) {
+        underscoreCands.push({ x: it.x, y: it.y, w: it.width, pageNum: it.pageNum, pageDiv: pageDivs[it.pageNum], sk: sk });
+      }
+
+      var segments = s.split(/,/);
+      if (segments.length > 1) {
+        var offset = 0;
+        for (var si = 0; si < segments.length; si++) {
+          var seg = segments[si];
+          var t = seg.trim();
+          var ci2 = t.indexOf(':');
+          if (ci2 > 0) {
+            var lbl = t.substring(0, ci2).trim().toLowerCase();
+            if (lbl.length > 0 && lbl.length < 20 && !falsePos[lbl]) {
+              var segStart = s.indexOf(seg, offset > 0 ? offset - 1 : 0);
+              labelCands.push({ label: lbl, x: it.x + charW * segStart, y: it.y, w: charW * (ci2 + 1),
+                pageNum: it.pageNum, pageDiv: pageDivs[it.pageNum], sk: sk + segStart });
+            }
+          } else {
+            var um = t.match(/^([A-Za-z ]+?)_/);
+            if (um) {
+              var ulbl = um[1].trim().toLowerCase();
+              if (ulbl.length > 0 && ulbl.length < 20 && !falsePos[ulbl]) {
+                var segStart2 = s.indexOf(seg, offset > 0 ? offset - 1 : 0);
+                labelCands.push({ label: ulbl, x: it.x + charW * segStart2, y: it.y, w: charW * um[1].length,
+                  pageNum: it.pageNum, pageDiv: pageDivs[it.pageNum], sk: sk + segStart2 });
+              }
+            }
+          }
+          offset += seg.length + 1;
+        }
+        continue;
+      }
+
+      var ci3 = s.indexOf(':');
+      if (ci3 > 0) {
+        var lbl2 = s.substring(0, ci3).trim().toLowerCase();
+        if (lbl2.length > 0 && lbl2.length < 20 && !falsePos[lbl2]) {
+          labelCands.push({ label: lbl2, x: it.x, y: it.y, w: charW * (ci3 + 1),
+            pageNum: it.pageNum, pageDiv: pageDivs[it.pageNum], sk: sk });
+        }
+      }
+
+      if (s.charAt(0) === ':' && s.length < 3 && i > 0) {
+        // Check if next item on the same line is body text (not a field blank)
+        // If so, this ":" is part of a sentence, not a field label
+        var isFieldColon = true;
+        if (i + 1 < textItems.length) {
+          var nextIt = textItems[i + 1];
+          if (nextIt.pageNum === it.pageNum && Math.abs(nextIt.y - it.y) < 3) {
+            var nextStr = nextIt.str.trim();
+            // If next item on same line has alphabetic text (not underscores/empty), it's body text
+            if (nextStr.length > 0 && nextStr.replace(/_/g, '').trim().length > 0 && nextStr.indexOf('___') === -1) {
+              isFieldColon = false;
+            }
+          }
+        }
+        if (isFieldColon) {
+          for (var back = 1; back <= Math.min(3, i); back++) {
+            var prev = textItems[i - back];
+            var ps = prev.str.trim().toLowerCase();
+            if (ps.length > 0 && ps.length < 20 && !falsePos[ps] &&
+                prev.pageNum === it.pageNum && Math.abs(prev.y - it.y) < 3 &&
+                ps.indexOf(':') === -1) {
+              labelCands.push({ label: ps, x: prev.x, y: prev.y, w: (prev.width || 0) + (it.width || 0),
+                pageNum: prev.pageNum, pageDiv: pageDivs[prev.pageNum],
+                sk: prev.pageNum * 1e6 + Math.round(prev.y) * 1000 + Math.round(prev.x) });
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    labelCands.sort(function (a, b) { return a.sk - b.sk; });
+    underscoreCands.sort(function (a, b) { return a.sk - b.sk; });
+    var uPtr = 0;
+
+    for (var bi = 0; bi < sortedBlanks.length; bi++) {
+      var blank = sortedBlanks[bi];
+      var num = bi + 1;
+      var blankLabel = (blank.label || '').trim().toLowerCase();
+      if (!blankLabel) continue;
+      var placed = false;
+
+      for (var li = 0; li < labelCands.length; li++) {
+        if (labelCands[li].label === blankLabel) {
+          var m = labelCands[li];
+          labelCands.splice(li, 1);
+          self._placeBadge({ pageDiv: m.pageDiv, x: m.x + m.w, y: m.y, width: 0 }, num, blank);
+          placed = true;
+          break;
+        }
+      }
+
+      if (!placed && blank.length > 0 && uPtr < underscoreCands.length) {
+        var um2 = underscoreCands[uPtr];
+        uPtr++;
+        self._placeBadge({ pageDiv: um2.pageDiv, x: um2.x + um2.w, y: um2.y, width: 0 }, num, blank);
+      }
+    }
+  };
+
+  /**
+   * Place a numbered badge on a PDF page.
+   */
+  DocxTemplateModal.prototype._placeBadge = function (textItem, num, blank) {
+    var self = this;
+    if (!textItem || !textItem.pageDiv) return;
+
+    var badge = document.createElement('div');
+    badge.className = 'dtm-overlay-badge';
+    badge.setAttribute('data-blank-id', blank.id);
+    badge.style.cssText = 'position:absolute;' +
+      'left:' + Math.round(textItem.x + 4) + 'px;' +
+      'top:' + Math.round(textItem.y - 4) + 'px;' +
+      'min-width:18px;height:18px;padding:0 3px;border-radius:9px;' +
+      'background:#7c3aed;color:white;font-size:9px;font-weight:700;' +
+      'display:flex;align-items:center;justify-content:center;' +
+      'cursor:pointer;z-index:5;box-shadow:0 1px 3px rgba(0,0,0,0.3);' +
+      'transition:background 0.2s;font-family:system-ui,sans-serif;';
+    badge.textContent = num;
+    badge.title = (blank.label || 'Blank ' + num);
+
+    (function (blankId, prefix) {
+      badge.addEventListener('click', function () {
+        var select = document.getElementById(prefix + 'BlankMap_' + blankId);
+        if (select) {
+          select.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          select.focus();
+          select.style.boxShadow = '0 0 0 3px rgba(124,58,237,0.3)';
+          setTimeout(function () { select.style.boxShadow = ''; }, 2000);
+        }
+      });
+    })(blank.id, self.prefix);
+
+    textItem.pageDiv.appendChild(badge);
+  };
+
+  /**
+   * Preview the template file in an overlay modal.
+   */
+  DocxTemplateModal.prototype.viewTemplate = function () {
+    var self = this;
+    var docId = self.state.docId;
+    var docName = self.state.docName || 'Template';
+    if (!docId) return;
+
+    // Remove existing preview overlay if any
+    var existing = document.getElementById('dtm-template-preview-overlay');
+    if (existing) existing.remove();
+
+    // Build overlay
+    var overlay = document.createElement('div');
+    overlay.id = 'dtm-template-preview-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML =
+      '<div style="background:white;border-radius:12px;width:90%;max-width:900px;height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e5e7eb;">' +
+          '<span style="font-size:14px;font-weight:600;color:#111827;">' + _escapeHtml(docName) + '</span>' +
+          '<button id="dtm-preview-close" style="padding:4px;border-radius:6px;border:none;background:none;cursor:pointer;color:#6b7280;" title="Close">' +
+            '<svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>' +
+          '</button>' +
+        '</div>' +
+        '<div id="dtm-preview-body" style="flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#f9fafb;">' +
+          '<div style="color:#9ca3af;font-size:14px;">Loading preview...</div>' +
+        '</div>' +
+      '</div>';
+
+    document.body.appendChild(overlay);
+
+    // Close handlers
+    var closeBtn = document.getElementById('dtm-preview-close');
+    if (closeBtn) closeBtn.onclick = function () { overlay.remove(); };
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) overlay.remove();
+    });
+
+    // Fetch the file and display in iframe
+    var previewBody = document.getElementById('dtm-preview-body');
+    fetch(api.baseUrl + '/api/v1/storage/files/' + encodeURIComponent(docId) + '/download', {
+      headers: { 'Authorization': 'Bearer ' + api.token }
+    })
+    .then(function (resp) {
+      if (!resp.ok) throw new Error('Failed to load file');
+      return resp.blob();
+    })
+    .then(function (blob) {
+      var blobUrl = URL.createObjectURL(blob);
+      previewBody.innerHTML = '<iframe src="' + blobUrl + '" style="width:100%;height:100%;border:none;"></iframe>';
+    })
+    .catch(function (err) {
+      previewBody.innerHTML = '<div style="color:#ef4444;font-size:14px;">Failed to load preview: ' + _escapeHtml(err.message) + '</div>';
+    });
+  };
+
+  /**
    * Generate document from the template.
    */
   DocxTemplateModal.prototype.generate = function () {
@@ -545,97 +882,53 @@
     var nsKeys = Object.keys(ns).sort();
     var prefix = self.prefix;
 
-    var blanksById = {};
-    for (var b = 0; b < st.blanks.length; b++) {
-      blanksById[st.blanks[b].id] = st.blanks[b];
-    }
+    // Sort blanks by position (document order)
+    var sorted = st.blanks.slice().sort(function (a, b) { return a.position - b.position; });
 
-    var html = '';
-    var categories = st.categories || [];
-
-    for (var ci = 0; ci < categories.length; ci++) {
-      var cat = categories[ci];
-      var icon = CATEGORY_ICONS[cat.icon] || CATEGORY_ICONS['more-horizontal'];
-      var groupId = prefix + 'BlankGroup_' + cat.id;
-
-      html += '<div class="border border-gray-200 rounded-lg overflow-hidden">' +
-        '<button type="button" class="dtm-group-toggle w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 hover:bg-gray-100 transition-colors" data-group="' + cat.id + '" data-prefix="' + prefix + '">' +
-          '<div class="flex items-center gap-2">' +
-            '<span class="text-gray-500">' + icon + '</span>' +
-            '<span class="text-sm font-medium text-gray-800">' + _escapeHtml(cat.label) + '</span>' +
-            '<span class="inline-flex items-center px-1.5 py-0.5 bg-gray-200 text-gray-600 text-xs font-medium rounded">' + cat.count + '</span>' +
-          '</div>' +
-          '<svg class="dtm-chevron w-4 h-4 text-gray-400 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>' +
-        '</button>';
-
-      html += '<div id="' + groupId + '" class="hidden"><div class="p-2 space-y-2">';
-
-      var blankIdsList = cat.blank_ids || [];
-      for (var bi = 0; bi < blankIdsList.length; bi++) {
-        var blank = blanksById[blankIdsList[bi]];
-        if (!blank) continue;
-
-        var label = _escapeHtml(blank.label || 'Blank ' + (blank.index + 1));
-        var ctxBefore = blank.context_before || '';
-        var ctxAfter = blank.context_after || '';
-        var snippet = '';
-        if (ctxBefore || ctxAfter) {
-          var beforeSnip = ctxBefore.length > 30 ? '...' + ctxBefore.substring(ctxBefore.length - 30) : ctxBefore;
-          var afterSnip = ctxAfter.length > 30 ? ctxAfter.substring(0, 30) + '...' : ctxAfter;
-          snippet = beforeSnip + ' _____ ' + afterSnip;
-        }
-
-        html += '<div class="dtm-blank-card bg-white border border-gray-100 rounded p-2 space-y-1.5" data-blank-card-id="' + blank.id + '">' +
-          '<span class="text-xs font-medium text-gray-700">' + label + '</span>';
-
-        if (snippet) {
-          html += '<p class="text-[10px] text-gray-400 font-mono truncate" title="' + _escapeHtml(snippet) + '">' + _escapeHtml(snippet) + '</p>';
-        }
-
-        html += '<div class="flex items-center gap-1.5">' +
-          '<select id="' + prefix + 'BlankMap_' + blank.id + '" class="dtm-blank-select flex-1 px-2 py-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-purple-500" data-blank-id="' + blank.id + '" data-prefix="' + prefix + '">' +
-            '<option value="">-- Not mapped --</option>' +
-            '<option value="__custom__">Custom value...</option>';
-
-        var lastPfx = '';
-        for (var k = 0; k < nsKeys.length; k++) {
-          var key = nsKeys[k];
-          var entry = ns[key];
-          var pfx = key.indexOf('.') !== -1 ? key.substring(0, key.indexOf('.')) : '';
-          if (pfx !== lastPfx && pfx) {
-            if (lastPfx) html += '</optgroup>';
-            html += '<optgroup label="' + pfx.charAt(0).toUpperCase() + pfx.substring(1) + '">';
-            lastPfx = pfx;
-          }
-          html += '<option value="' + _escapeHtml(key) + '">' + _escapeHtml(entry.label || key) + '</option>';
-        }
-        if (lastPfx) html += '</optgroup>';
-
-        html += '</select>' +
-          '<input type="text" id="' + prefix + 'BlankCustom_' + blank.id + '" class="hidden flex-1 px-2 py-1 border border-gray-300 rounded text-xs" placeholder="Type value...">' +
-          '</div></div>';
+    // Build the select options HTML once (reused for every blank)
+    var optionsHtml = '<option value="">Select...</option>' +
+      '<option value="__custom__">Custom value...</option>';
+    var lastPfx = '';
+    for (var k = 0; k < nsKeys.length; k++) {
+      var key = nsKeys[k];
+      var entry = ns[key];
+      var pfx = key.indexOf('.') !== -1 ? key.substring(0, key.indexOf('.')) : '';
+      if (pfx !== lastPfx && pfx) {
+        if (lastPfx) optionsHtml += '</optgroup>';
+        optionsHtml += '<optgroup label="' + pfx.charAt(0).toUpperCase() + pfx.substring(1) + '">';
+        lastPfx = pfx;
       }
+      optionsHtml += '<option value="' + _escapeHtml(key) + '">' + _escapeHtml(entry.label || key) + '</option>';
+    }
+    if (lastPfx) optionsHtml += '</optgroup>';
 
-      html += '</div></div></div>';
+    // Render compact field list (shown in right panel next to PDF preview)
+    var html = '';
+    for (var i = 0; i < sorted.length; i++) {
+      var blank = sorted[i];
+      var label = _escapeHtml(blank.label || 'Blank ' + (blank.index + 1));
+      var catMeta = (typeof CATEGORY_ICONS !== 'undefined') ? null : null; // icons defined at top
+
+      html += '<div class="dtm-blank-card border-b border-gray-100 px-3 py-2" data-blank-card-id="' + blank.id + '">' +
+        '<div class="flex items-center gap-2 mb-1">' +
+          '<span class="flex-shrink-0 w-5 h-5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-bold flex items-center justify-center">' + (i + 1) + '</span>' +
+          '<span class="text-xs font-semibold text-gray-800 truncate flex-1">' + label + '</span>' +
+          '<span class="text-[9px] text-gray-400 uppercase tracking-wide flex-shrink-0">' + _escapeHtml(blank.category || '') + '</span>' +
+        '</div>' +
+        '<div class="flex items-center gap-1 pl-7">' +
+          '<select id="' + prefix + 'BlankMap_' + blank.id + '" class="dtm-blank-select flex-1 px-1.5 py-1 border border-gray-200 rounded text-[11px] bg-white focus:ring-1 focus:ring-purple-500 focus:border-purple-500" data-blank-id="' + blank.id + '" data-prefix="' + prefix + '">' +
+            optionsHtml +
+          '</select>' +
+          '<input type="text" id="' + prefix + 'BlankCustom_' + blank.id + '" class="hidden flex-1 px-1.5 py-1 border border-gray-200 rounded text-[11px] bg-white focus:ring-1 focus:ring-purple-500" placeholder="Type value...">' +
+        '</div>' +
+      '</div>';
     }
 
     blanksList.innerHTML = html;
     blanksDiv.classList.remove('hidden');
 
-    // Event delegation for group toggles
-    blanksList.addEventListener('click', function (e) {
-      var btn = e.target.closest('.dtm-group-toggle');
-      if (!btn) return;
-      var catId = btn.getAttribute('data-group');
-      var pfx = btn.getAttribute('data-prefix');
-      var group = document.getElementById(pfx + 'BlankGroup_' + catId);
-      var chevron = btn.querySelector('.dtm-chevron');
-      if (group) {
-        var isHidden = group.classList.contains('hidden');
-        group.classList.toggle('hidden');
-        if (chevron) chevron.classList.toggle('rotate-180', isHidden);
-      }
-    });
+    // Load PDF preview into the viewer pane
+    self._loadPdfPreview();
 
     // Event delegation for blank select changes
     blanksList.addEventListener('change', function (e) {
@@ -652,7 +945,18 @@
         customInput.classList.add('hidden');
         customInput.value = '';
       }
-      // Update filter counts after mapping change
+      // Visual feedback on the field row
+      var card = select.closest('.dtm-blank-card');
+      if (card) {
+        var numBadge = card.querySelector('.bg-purple-100');
+        if (select.value && select.value !== '') {
+          card.style.background = '#f0fdf4';
+          if (numBadge) { numBadge.className = numBadge.className.replace('bg-purple-100', 'bg-green-100').replace('text-purple-700', 'text-green-700'); }
+        } else {
+          card.style.background = '';
+          if (numBadge) { numBadge.className = numBadge.className.replace('bg-green-100', 'bg-purple-100').replace('text-green-700', 'text-purple-700'); }
+        }
+      }
       self._updateBlankFilterCounts();
       self._applyBlankFilter();
     });

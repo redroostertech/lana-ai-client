@@ -704,6 +704,11 @@
     _docxModal.open(file.id, matterId, file.filename);
   }
 
+  function viewFvDocxTemplate() {
+    if (_docxModal) _docxModal.viewTemplate();
+  }
+  window.viewFvDocxTemplate = viewFvDocxTemplate;
+
   // =========================================================================
   // Initialization
   // =========================================================================

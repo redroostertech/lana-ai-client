@@ -1923,6 +1923,11 @@
     if (_wsDocxModal) _wsDocxModal.open(docId, matterId, docName);
   }
 
+  function viewDocxTemplate() {
+    if (_wsDocxModal) _wsDocxModal.viewTemplate();
+  }
+  window.viewDocxTemplate = viewDocxTemplate;
+
   // =========================================================================
   // Window globals for onclick handlers in HTML
   // =========================================================================
