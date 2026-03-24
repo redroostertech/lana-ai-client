@@ -643,6 +643,8 @@
     st.blanks = varsData.blanks || [];
     st.categories = varsData.categories || [];
     st.variableNamespace = varsData.variable_namespace || {};
+    st.suggestedMappings = varsData.suggested_mappings || {};
+    st.dataSources = varsData.data_sources || {};
 
     // Update count display
     var placeholdersEl = self._el('Placeholders');
@@ -1355,12 +1357,13 @@
     var prefix = self.prefix;
     if (Object.keys(ns).length === 0) return;
 
+    var aiMappings = st.suggestedMappings || {};
+    var hasAI = Object.keys(aiMappings).length > 0;
+
     // Sort blanks by position to process in document order
     var sorted = st.blanks.slice().sort(function (a, b) { return a.position - b.position; });
 
-    // Track label occurrences to distinguish between party blocks
-    // First set of fields → contact (external party)
-    // Second set of same fields → organization (your company)
+    // Track label occurrences for fallback (non-AI) mapping
     var labelCount = {};
 
     for (var i = 0; i < sorted.length; i++) {
@@ -1374,21 +1377,38 @@
       // Skip signature fields
       if (label === 'signed' || label === 'signature') continue;
 
-      // Count occurrences of this label
-      labelCount[label] = (labelCount[label] || 0) + 1;
-      var occurrence = labelCount[label];
+      var varKey = null;
 
-      // First occurrence → contact, second → organization
-      var varKey;
-      if (occurrence <= 1) {
-        varKey = LABEL_TO_CONTACT[label];
-      } else {
-        varKey = LABEL_TO_ORG[label] || LABEL_TO_CONTACT[label];
+      // Priority 1: AI-suggested mapping
+      if (hasAI && aiMappings[blank.id]) {
+        varKey = aiMappings[blank.id];
+        // Validate the suggested key exists in namespace (skip sheet.* for now)
+        if (varKey.indexOf('sheet.') === 0) {
+          // Sheet column — use as custom value
+          // TODO: resolve sheet column to actual value when generating
+          varKey = null; // Skip for now, will implement with sheet data resolution
+        }
+      }
+
+      // Priority 2: Static label-to-variable mapping (fallback)
+      if (!varKey) {
+        labelCount[label] = (labelCount[label] || 0) + 1;
+        var occurrence = labelCount[label];
+
+        if (occurrence <= 1) {
+          varKey = LABEL_TO_CONTACT[label];
+        } else {
+          varKey = LABEL_TO_ORG[label] || LABEL_TO_CONTACT[label];
+        }
       }
 
       if (varKey && ns[varKey]) {
         selectEl.value = varKey;
       }
+    }
+
+    if (hasAI) {
+      console.log('[DocxTemplateModal] AI mappings applied:', Object.keys(aiMappings).length, 'suggestions');
     }
 
     self._updateBlankFilterCounts();
