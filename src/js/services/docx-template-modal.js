@@ -65,34 +65,54 @@
    * Resolve a placeholder value for client-side preview.
    * Works for contact.*, matter.*, and date.* namespaces.
    */
+  function _titleCase(str) {
+    if (!str) return '';
+    return str.replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+  }
+
   function _resolvePreview(placeholder, contact, matterData) {
     if (!contact) return '';
 
+    // Derive names intelligently — handle cases where only full name or only first/last are provided
+    var _firstName = contact.first_name || '';
+    var _lastName = contact.last_name || '';
+    var _displayName = contact.display_name || '';
+    var _fullName = '';
+
+    if (_firstName || _lastName) {
+      _fullName = ((_firstName || '') + ' ' + (_lastName || '')).trim();
+    } else if (_displayName) {
+      _fullName = _displayName;
+      var nameParts = _displayName.trim().split(/\s+/);
+      _firstName = nameParts[0] || '';
+      _lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+    }
+
     // Contact namespace
-    if (placeholder === 'contact.first_name') return contact.first_name || '';
-    if (placeholder === 'contact.last_name') return contact.last_name || '';
-    if (placeholder === 'contact.full_name') return ((contact.first_name || '') + ' ' + (contact.last_name || '')).trim();
-    if (placeholder === 'contact.display_name') return contact.display_name || '';
+    if (placeholder === 'contact.first_name') return _titleCase(_firstName);
+    if (placeholder === 'contact.last_name') return _titleCase(_lastName);
+    if (placeholder === 'contact.full_name') return _titleCase(_fullName);
+    if (placeholder === 'contact.display_name') return _titleCase(_displayName || _fullName);
     if (placeholder === 'contact.email') return contact.email || '';
     if (placeholder === 'contact.phone_mobile') return contact.phone_mobile || '';
     if (placeholder === 'contact.phone_work') return contact.phone_work || '';
     if (placeholder === 'contact.phone_home') return contact.phone_home || '';
     if (placeholder === 'contact.phone_fax') return contact.phone_fax || '';
-    if (placeholder === 'contact.company_name') return contact.company_name || '';
-    if (placeholder === 'contact.title') return contact.title || '';
-    if (placeholder === 'contact.role') return contact.role || '';
-    if (placeholder === 'contact.participant_type') return contact.participant_type || '';
+    if (placeholder === 'contact.company_name') return _titleCase(contact.company_name || '');
+    if (placeholder === 'contact.title') return _titleCase(contact.title || '');
+    if (placeholder === 'contact.role') return _titleCase(contact.role || '');
+    if (placeholder === 'contact.participant_type') return _titleCase(contact.participant_type || '');
 
     // Address fields
     if (placeholder.indexOf('contact.address') === 0 && contact.address) {
       var addr = typeof contact.address === 'string' ? JSON.parse(contact.address) : contact.address;
-      if (placeholder === 'contact.address_street') return [addr.street, addr.street2].filter(Boolean).join(', ');
-      if (placeholder === 'contact.address_city') return addr.city || '';
-      if (placeholder === 'contact.address_state') return addr.state || '';
+      if (placeholder === 'contact.address_street') return _titleCase([addr.street, addr.street2].filter(Boolean).join(', '));
+      if (placeholder === 'contact.address_city') return _titleCase(addr.city || '');
+      if (placeholder === 'contact.address_state') return (addr.state || '').toUpperCase();
       if (placeholder === 'contact.address_zip') return addr.zip || '';
-      if (placeholder === 'contact.address_country') return addr.country || '';
+      if (placeholder === 'contact.address_country') return _titleCase(addr.country || '');
       if (placeholder === 'contact.address_full') {
-        return [addr.street, addr.street2, [addr.city, addr.state, addr.zip].filter(Boolean).join(', '), addr.country].filter(Boolean).join(', ');
+        return _titleCase([addr.street, addr.street2, [addr.city, addr.state, addr.zip].filter(Boolean).join(', '), addr.country].filter(Boolean).join(', '));
       }
     }
 
@@ -120,6 +140,14 @@
       if (placeholder === 'matter.status') return matterData.status || '';
       if (placeholder === 'matter.client_name') return matterData.client_name || '';
       if (placeholder === 'matter.description') return matterData.description || '';
+    }
+
+    // Organization namespace — pulls from matter's organization data or org settings
+    if (placeholder.indexOf('org.') === 0 && matterData) {
+      var org = matterData.organization || {};
+      var orgSettings = org.settings || {};
+      var orgField = placeholder.substring(4);
+      return _titleCase(org[orgField] || orgSettings[orgField] || '');
     }
 
     return '';
@@ -805,18 +833,32 @@
           var blank = st.blanks[bi];
           var selectEl = document.getElementById(self.prefix + 'BlankMap_' + blank.id);
           var blankVal = '';
-          if (selectEl && selectEl.value && selectEl.value !== '__custom__') {
+          var blankMapped = false;
+          var blankVarName = '';
+          if (selectEl && selectEl.value && selectEl.value !== '' && selectEl.value !== '__custom__') {
+            blankMapped = true;
+            blankVarName = selectEl.value;
             blankVal = _resolvePreview(selectEl.value, contact, matterData);
           } else if (selectEl && selectEl.value === '__custom__') {
+            blankMapped = true;
             var customEl = document.getElementById(self.prefix + 'BlankCustom_' + blank.id);
             blankVal = customEl ? customEl.value : '';
           }
           var blankLabel = blank.label || 'Blank ' + (bi + 1);
+          var valHtml;
+          if (blankVal) {
+            valHtml = '<span class="text-gray-900">' + _escapeHtml(blankVal) + '</span>';
+          } else if (blankMapped) {
+            // Mapped but contact has no data for this field
+            var _ns = st.variableNamespace || {};
+            var varLabel = (_ns[blankVarName] && _ns[blankVarName].label) || blankVarName;
+            valHtml = '<span class="text-amber-500 italic">' + _escapeHtml(varLabel) + ' (empty)</span>';
+          } else {
+            valHtml = '<span class="text-gray-400 italic">Not mapped</span>';
+          }
           html += '<div class="flex items-center gap-2 text-xs">' +
             '<span class="text-gray-500 w-40 truncate">' + _escapeHtml(blankLabel) + '</span>' +
-            '<span class="text-gray-400">&rarr;</span>' +
-            (blankVal ? '<span class="text-gray-900">' + _escapeHtml(blankVal) + '</span>'
-                      : '<span class="text-gray-400 italic">Not mapped</span>') +
+            '<span class="text-gray-400">&rarr;</span>' + valHtml +
             '</div>';
         }
       }
@@ -1254,49 +1296,101 @@
     return cache;
   }
 
+  // Label-to-variable mapping for contact fields (the external party)
+  var LABEL_TO_CONTACT = {
+    'name':          'contact.full_name',
+    'full name':     'contact.full_name',
+    'first name':    'contact.first_name',
+    'last name':     'contact.last_name',
+    'print name':    'contact.full_name',
+    'printed name':  'contact.full_name',
+    'company':       'contact.company_name',
+    'company name':  'contact.company_name',
+    'email':         'contact.email',
+    'e-mail':        'contact.email',
+    'phone':         'contact.phone_mobile',
+    'telephone':     'contact.phone_mobile',
+    'cell':          'contact.phone_mobile',
+    'mobile':        'contact.phone_mobile',
+    'fax':           'contact.phone_fax',
+    'title':         'contact.title',
+    'position':      'contact.title',
+    'address':       'contact.address_street',
+    'street':        'contact.address_street',
+    'city':          'contact.address_city',
+    'state':         'contact.address_state',
+    'zip':           'contact.address_zip',
+    'zip code':      'contact.address_zip',
+    'postal code':   'contact.address_zip',
+    'country':       'contact.address_country',
+    'date':          'date.today'
+  };
+
+  // Label-to-variable mapping for organization fields (your company)
+  var LABEL_TO_ORG = {
+    'name':          'org.signer_name',
+    'full name':     'org.signer_name',
+    'print name':    'org.signer_name',
+    'printed name':  'org.signer_name',
+    'company':       'org.name',
+    'company name':  'org.name',
+    'email':         'org.email',
+    'phone':         'org.phone',
+    'telephone':     'org.phone',
+    'fax':           'org.fax',
+    'title':         'org.signer_title',
+    'position':      'org.signer_title',
+    'address':       'org.address',
+    'city':          'org.city',
+    'state':         'org.state',
+    'zip':           'org.zip',
+    'zip code':      'org.zip',
+    'date':          'date.today'
+  };
+
   DocxTemplateModal.prototype._autoMapBlanks = function () {
     var self = this;
     var st = self.state;
     var ns = st.variableNamespace || {};
     var prefix = self.prefix;
-    var nsKeys = Object.keys(ns);
-    if (nsKeys.length === 0) return;
+    if (Object.keys(ns).length === 0) return;
 
-    // Build variable token cache once
-    var varTokens = _buildVarTokens(ns);
+    // Sort blanks by position to process in document order
+    var sorted = st.blanks.slice().sort(function (a, b) { return a.position - b.position; });
 
-    for (var i = 0; i < st.blanks.length; i++) {
-      var blank = st.blanks[i];
+    // Track label occurrences to distinguish between party blocks
+    // First set of fields → contact (external party)
+    // Second set of same fields → organization (your company)
+    var labelCount = {};
+
+    for (var i = 0; i < sorted.length; i++) {
+      var blank = sorted[i];
       var selectEl = document.getElementById(prefix + 'BlankMap_' + blank.id);
       if (!selectEl) continue;
-
-      // Skip if user already made a selection
       if (selectEl.value && selectEl.value !== '') continue;
 
-      // Tokenize blank's label + context
-      var blankText = (blank.label || '') + ' ' + (blank.context_before || '') + ' ' + (blank.context_after || '');
-      var blankBag = _tokenize(blankText);
+      var label = (blank.label || '').toLowerCase().trim();
 
-      // Score against every variable, pick the best
-      var bestKey = null;
-      var bestScore = 0;
+      // Skip signature fields
+      if (label === 'signed' || label === 'signature') continue;
 
-      for (var v = 0; v < nsKeys.length; v++) {
-        var varKey = nsKeys[v];
-        var score = _scoreMatch(blankBag, blank.category, varTokens[varKey], varKey);
-        if (score > bestScore) {
-          bestScore = score;
-          bestKey = varKey;
-        }
+      // Count occurrences of this label
+      labelCount[label] = (labelCount[label] || 0) + 1;
+      var occurrence = labelCount[label];
+
+      // First occurrence → contact, second → organization
+      var varKey;
+      if (occurrence <= 1) {
+        varKey = LABEL_TO_CONTACT[label];
+      } else {
+        varKey = LABEL_TO_ORG[label] || LABEL_TO_CONTACT[label];
       }
 
-      // Only map if confidence exceeds threshold
-      if (bestKey && bestScore >= MIN_CONFIDENCE) {
-        selectEl.value = bestKey;
+      if (varKey && ns[varKey]) {
+        selectEl.value = varKey;
       }
     }
 
-    // Refresh filter counts + apply current filter
     self._updateBlankFilterCounts();
     self._applyBlankFilter();
   };
@@ -1360,6 +1454,78 @@
     var failed = 0;
     var lastData = null;
 
+    // Use batch API for 5+ contacts (queued background processing)
+    // Use direct sequential calls for 1-4 contacts (immediate download)
+    var BATCH_THRESHOLD = 5;
+
+    if (total >= BATCH_THRESHOLD) {
+      // Batch mode: queue all contacts for background processing
+      if (genBtn) genBtn.textContent = 'Queuing ' + total + ' documents...';
+
+      try {
+        var batchResponse = await fetch(api.baseUrl + '/api/v1/matters/' + st.matterId + '/documents/' + st.docId + '/generate-from-template/batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + api.token },
+          body: JSON.stringify({
+            contact_ids: st.selectedContacts.map(function (c) { return c.id; }),
+            output_format: 'docx',
+            custom_variables: customVars,
+            blank_mappings: blankMappings,
+            save_to_matter: saveToMatter
+          })
+        });
+
+        var batchResult = await batchResponse.json();
+        if (!batchResponse.ok) {
+          throw new Error(batchResult.error || batchResult.message || 'Batch queue failed');
+        }
+
+        var batchData = batchResult.data || batchResult;
+        var batchId = batchData.batch_id;
+
+        // Poll for completion
+        if (genBtn) genBtn.textContent = 'Processing 0 of ' + total + '...';
+
+        var pollInterval = setInterval(async function () {
+          try {
+            var statusResp = await fetch(api.baseUrl + '/api/v1/matters/' + st.matterId + '/documents/' + st.docId + '/generate-from-template/batch/' + batchId, {
+              headers: { 'Authorization': 'Bearer ' + api.token }
+            });
+            var statusData = (await statusResp.json()).data;
+            var done = statusData.completed + statusData.failed;
+
+            if (genBtn) genBtn.textContent = 'Processing ' + done + ' of ' + total + '...';
+
+            if (statusData.status === 'completed' || statusData.status === 'completed_with_errors' || statusData.status === 'failed') {
+              clearInterval(pollInterval);
+              succeeded = statusData.completed;
+              failed = statusData.failed;
+
+              if (genBtn) {
+                genBtn.disabled = false;
+                genBtn.textContent = 'Generate Document';
+              }
+
+              if (failed > 0) {
+                self.onError(failed + ' of ' + total + ' documents failed to generate');
+              }
+              if (succeeded > 0) {
+                self.onSuccess(succeeded + ' document' + (succeeded !== 1 ? 's' : '') + ' generated and saved to matter');
+                self.onGenerated();
+              }
+            }
+          } catch (_) {}
+        }, 2000);
+
+        return; // Don't fall through to the summary code below
+      } catch (error) {
+        self.onError('Batch generation failed: ' + error.message);
+        if (genBtn) { genBtn.disabled = false; genBtn.textContent = 'Generate Document'; }
+        return;
+      }
+    }
+
+    // Sequential mode for small batches (1-4 contacts)
     for (var ci = 0; ci < st.selectedContacts.length; ci++) {
       var contact = st.selectedContacts[ci];
 
@@ -1370,10 +1536,7 @@
       try {
         var response = await fetch(api.baseUrl + '/api/v1/matters/' + st.matterId + '/documents/' + st.docId + '/generate-from-template', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + api.token
-          },
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + api.token },
           body: JSON.stringify({
             contact_id: contact.id,
             output_format: 'docx',
