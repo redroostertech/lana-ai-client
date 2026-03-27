@@ -1409,6 +1409,11 @@
     // Build document list HTML
     var docListHtml = '';
     if (documents.length > 0) {
+      // Count templates
+      var templateCount = 0;
+      for (var tc = 0; tc < documents.length; tc++) { if (documents[tc].is_template) templateCount++; }
+      var nonTemplateCount = documents.length - templateCount;
+
       var docItems = '';
       for (var di = 0; di < documents.length; di++) {
         var doc = documents[di];
@@ -1513,9 +1518,11 @@
             '</span>';
         }
 
+        var docType = doc.is_template ? 'template' : 'document';
         docItems +=
-          '<div class="bg-white border border-gray-200 hover:lex-border-accent rounded-lg p-3 transition-all group" data-doc-id="' + doc.id + '">' +
+          '<div class="bg-white border border-gray-200 hover:lex-border-accent rounded-lg p-3 transition-all group" data-doc-id="' + doc.id + '" data-doc-type="' + docType + '">' +
             '<div class="flex items-start gap-3">' +
+              '<input type="checkbox" class="doc-select-cb mt-2 rounded border-gray-300 text-purple-600 focus:ring-purple-500 flex-shrink-0" data-doc-id="' + doc.id + '" onclick="event.stopPropagation(); updateDocSelection()">' +
               '<div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">' +
                 getFileIcon(doc.content_type) +
               '</div>' +
@@ -1544,10 +1551,24 @@
       }
 
       docListHtml =
-        '<div class="flex items-center justify-between">' +
-          '<p class="text-sm text-gray-500">' + documents.length + ' document' + (documents.length !== 1 ? 's' : '') + '</p>' +
+        // Filter tabs + batch actions bar
+        '<div class="flex items-center justify-between mb-3">' +
+          '<div class="flex items-center gap-1">' +
+            '<button onclick="filterDocs(\'all\')" class="doc-filter-btn px-2.5 py-1 text-xs font-medium rounded-full bg-gray-900 text-white" data-filter="all">All ' + documents.length + '</button>' +
+            (templateCount > 0 ? '<button onclick="filterDocs(\'template\')" class="doc-filter-btn px-2.5 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200" data-filter="template">Templates ' + templateCount + '</button>' : '') +
+            (nonTemplateCount > 0 ? '<button onclick="filterDocs(\'document\')" class="doc-filter-btn px-2.5 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200" data-filter="document">Documents ' + nonTemplateCount + '</button>' : '') +
+          '</div>' +
+          '<div class="flex items-center gap-2">' +
+            '<label class="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">' +
+              '<input type="checkbox" id="docSelectAll" onchange="toggleDocSelectAll(this.checked)" class="rounded border-gray-300 text-purple-600 focus:ring-purple-500">' +
+              'Select All' +
+            '</label>' +
+            '<button id="docBatchDeleteBtn" onclick="batchDeleteDocs()" class="hidden px-2 py-1 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded transition-colors">' +
+              'Delete Selected' +
+            '</button>' +
+          '</div>' +
         '</div>' +
-        '<div class="space-y-2">' + docItems + '</div>';
+        '<div id="docListContainer" class="space-y-2">' + docItems + '</div>';
     }
 
     // Build orphaned files HTML
@@ -1931,6 +1952,78 @@
   // =========================================================================
   // Window globals for onclick handlers in HTML
   // =========================================================================
+
+  // Document filter, select, batch delete
+  function filterDocs(type) {
+    var cards = document.querySelectorAll('[data-doc-id][data-doc-type]');
+    var btns = document.querySelectorAll('.doc-filter-btn');
+    btns.forEach(function (b) {
+      var isActive = b.getAttribute('data-filter') === type;
+      b.className = 'doc-filter-btn px-2.5 py-1 text-xs font-medium rounded-full ' +
+        (isActive ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200');
+    });
+    cards.forEach(function (c) {
+      if (type === 'all' || c.getAttribute('data-doc-type') === type) {
+        c.style.display = '';
+      } else {
+        c.style.display = 'none';
+      }
+    });
+    // Uncheck all when filtering
+    document.querySelectorAll('.doc-select-cb').forEach(function (cb) { cb.checked = false; });
+    var selectAll = document.getElementById('docSelectAll');
+    if (selectAll) selectAll.checked = false;
+    updateDocSelection();
+  }
+
+  function toggleDocSelectAll(checked) {
+    document.querySelectorAll('.doc-select-cb').forEach(function (cb) {
+      if (cb.closest('[data-doc-id]').style.display !== 'none') {
+        cb.checked = checked;
+      }
+    });
+    updateDocSelection();
+  }
+
+  function updateDocSelection() {
+    var selected = document.querySelectorAll('.doc-select-cb:checked');
+    var batchBtn = document.getElementById('docBatchDeleteBtn');
+    if (batchBtn) {
+      if (selected.length > 0) {
+        batchBtn.classList.remove('hidden');
+        batchBtn.textContent = 'Delete ' + selected.length + ' Selected';
+      } else {
+        batchBtn.classList.add('hidden');
+      }
+    }
+  }
+
+  async function batchDeleteDocs() {
+    var selected = document.querySelectorAll('.doc-select-cb:checked');
+    if (selected.length === 0) return;
+    if (!confirm('Delete ' + selected.length + ' document' + (selected.length !== 1 ? 's' : '') + '? This cannot be undone.')) return;
+
+    var matterId = currentMatterData && currentMatterData.matter && currentMatterData.matter.matter_id;
+    var deleted = 0;
+    var failed = 0;
+    for (var i = 0; i < selected.length; i++) {
+      var docId = selected[i].getAttribute('data-doc-id');
+      try {
+        await api.delete('/api/v1/storage/files/' + docId + '?matter_id=' + encodeURIComponent(matterId));
+        deleted++;
+      } catch (_) {
+        failed++;
+      }
+    }
+    if (deleted > 0) Lex.Toast.success(deleted + ' document' + (deleted !== 1 ? 's' : '') + ' deleted');
+    if (failed > 0) Lex.Toast.error(failed + ' failed to delete');
+    await refreshDrawerDocuments(matterId);
+  }
+
+  window.filterDocs = filterDocs;
+  window.toggleDocSelectAll = toggleDocSelectAll;
+  window.updateDocSelection = updateDocSelection;
+  window.batchDeleteDocs = batchDeleteDocs;
 
   window.loadActivityPage = loadActivityPage;
   window.deleteDrawerDocument = deleteDrawerDocument;
