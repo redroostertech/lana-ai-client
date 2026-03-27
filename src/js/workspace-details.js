@@ -4491,6 +4491,10 @@
     var taskIdEl = document.getElementById('taskId');
     if (taskIdEl) taskIdEl.value = '';
 
+    // Hide delete button when creating
+    var deleteBtn = document.getElementById('taskDeleteBtn');
+    if (deleteBtn) deleteBtn.style.display = 'none';
+
     // Clear lex field values
     var clearFields = ['taskTitle', 'taskDescription', 'taskNotes', 'taskDueDate'];
     for (var fi = 0; fi < clearFields.length; fi++) {
@@ -4528,6 +4532,10 @@
 
       modal.heading = 'Edit Task';
       modal.open = true;
+
+      // Show delete button when editing
+      var deleteBtn = document.getElementById('taskDeleteBtn');
+      if (deleteBtn) deleteBtn.style.display = '';
 
       var taskIdEl = document.getElementById('taskId');
       if (taskIdEl) taskIdEl.value = task.id;
@@ -4577,11 +4585,29 @@
     }
   }
 
+  // Inline delete confirmation
+  function confirmDeleteTask() {
+    var btn = document.getElementById('taskDeleteBtn');
+    var confirm = document.getElementById('taskDeleteConfirm');
+    if (btn) btn.classList.add('hidden');
+    if (confirm) confirm.classList.remove('hidden');
+  }
+
+  function cancelDeleteTask() {
+    var btn = document.getElementById('taskDeleteBtn');
+    var confirm = document.getElementById('taskDeleteConfirm');
+    if (btn) btn.classList.remove('hidden');
+    if (confirm) confirm.classList.add('hidden');
+  }
+  window.confirmDeleteTask = confirmDeleteTask;
+  window.cancelDeleteTask = cancelDeleteTask;
+
   // Delete Task
   async function deleteTask(taskId) {
-    if (!confirm('Are you sure you want to delete this task?')) return;
+    if (!taskId) return;
 
     try {
+      closeTaskModal();
       await api.deleteTask(taskId);
       Lex.Toast.success('Task deleted successfully');
       await refreshCurrentMatter();
