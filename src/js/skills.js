@@ -630,7 +630,8 @@
               else if (actionType.indexOf('database') === 0) actionType = 'database';
               else if (actionType.indexOf('notification') === 0) actionType = 'notification';
               else if (actionType.indexOf('connector') === 0 || actionType.indexOf('integration') === 0) actionType = 'integration';
-              else if (actionType.indexOf('text') === 0 || actionType.indexOf('artifact') === 0) actionType = 'transform';
+              else if (actionType.indexOf('text') === 0 || actionType.indexOf('artifact') === 0 || actionType.indexOf('document') === 0) actionType = 'transform';
+              else actionType = 'ai-action';
               updateStepType(actionStep.id, actionType);
               var typeSelector = document.querySelector('[data-step-id="' + actionStep.id + '"] .step-type-selector');
               if (typeSelector) typeSelector.value = actionType;
@@ -643,12 +644,21 @@
                   else if (rawActionType.indexOf('update') !== -1) populateConfig.operation = 'update';
                   else populateConfig.operation = 'query';
                 }
+                // For transform steps, derive operation from backend action_type
+                if (actionType === 'transform' && !populateConfig.operation) {
+                  if (rawActionType.indexOf('diff') !== -1) populateConfig.operation = 'map';
+                  else if (rawActionType.indexOf('merge') !== -1 || rawActionType.indexOf('Merge') !== -1) populateConfig.operation = 'merge';
+                  else if (rawActionType.indexOf('filter') !== -1) populateConfig.operation = 'filter';
+                  else if (rawActionType.indexOf('split') !== -1) populateConfig.operation = 'split';
+                  else populateConfig.operation = 'map';
+                }
                 // For AI action steps, derive task from backend action_type and normalize prompt field
                 if (actionType === 'ai-action') {
                   if (!populateConfig.task) {
                     if (rawActionType.indexOf('extract') !== -1) populateConfig.task = 'extract';
                     else if (rawActionType.indexOf('classify') !== -1 || rawActionType.indexOf('chat') !== -1) populateConfig.task = 'classify';
-                    else if (rawActionType.indexOf('generate') !== -1) populateConfig.task = 'generate';
+                    else if (rawActionType.indexOf('generate') !== -1 || rawActionType.indexOf('Generate') !== -1) populateConfig.task = 'generate';
+                    else if (rawActionType.indexOf('analyze') !== -1 || rawActionType.indexOf('Analyze') !== -1) populateConfig.task = 'summarize';
                     else populateConfig.task = 'summarize';
                   }
                   if (!populateConfig.prompt_template && populateConfig.prompt) {
@@ -668,6 +678,12 @@
               var stepDesc = config.actions[a].description || '';
               if (stepDesc) {
                 actionStep.description = stepDesc;
+                // Also populate inferred intent from description if no explicit intent
+                if (!actionStep.inferred_intent) {
+                  actionStep.inferred_intent = stepDesc;
+                  var intentEl = document.querySelector('[data-step-id="' + actionStep.id + '"] input[placeholder]');
+                  if (intentEl) intentEl.value = stepDesc;
+                }
                 var descContainer = document.getElementById('desc-' + actionStep.id);
                 if (descContainer) {
                   descContainer.classList.remove('hidden');
@@ -1000,20 +1016,28 @@
     } else if (type === 'integration') {
       configHtml = '<div class="space-y-3"><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Action Type</label>'
-        + '<select class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
+        + '<select class="integration-action-select w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
         + '<option value="update_crm">Update CRM</option>'
         + '<option value="webhook">Webhook</option>'
         + '<option value="connector_execute">Connector Action</option>'
-        + '</select></div></div>';
+        + '</select></div><div>'
+        + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Configuration</label>'
+        + '<textarea rows="3" class="integration-data-input w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 text-sm font-mono resize-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500" placeholder=\'{"endpoint": "/api/v1/...", "data": {}}\'></textarea>'
+        + '<p class="mt-1 text-xs text-gray-500">JSON config for connector parameters. Supports <code>{{variable}}</code> syntax.</p>'
+        + '</div></div>';
     } else if (type === 'transform') {
       configHtml = '<div class="space-y-3"><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Operation</label>'
-        + '<select class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
+        + '<select class="transform-operation-select w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
         + '<option value="map">Map Fields</option>'
         + '<option value="filter">Filter Data</option>'
         + '<option value="merge">Merge Objects</option>'
         + '<option value="split">Split String</option>'
-        + '</select></div></div>';
+        + '</select></div><div>'
+        + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Configuration</label>'
+        + '<textarea rows="3" class="transform-data-input w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 text-sm font-mono resize-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500" placeholder=\'{"field": "{{trigger.data.value}}"}\'></textarea>'
+        + '<p class="mt-1 text-xs text-gray-500">JSON config for this operation. Supports <code>{{variable}}</code> syntax.</p>'
+        + '</div></div>';
     }
 
     configContainer.innerHTML = configHtml;
@@ -1214,11 +1238,35 @@
       if (notifTitleInput) config.title = notifTitleInput.value;
       if (notifMsgInput) config.message = notifMsgInput.value;
     } else if (stepType === 'integration') {
-      var intSelects = container.querySelectorAll('select');
-      if (intSelects.length >= 1) config.action_type = intSelects[0].value;
+      var intActionSelect = container.querySelector('.integration-action-select');
+      var intDataInput = container.querySelector('.integration-data-input');
+      if (intActionSelect) config.action_type = intActionSelect.value;
+      if (intDataInput && intDataInput.value.trim()) {
+        try {
+          var intParsed = JSON.parse(intDataInput.value.trim());
+          var intParsedKeys = Object.keys(intParsed);
+          for (var ipk = 0; ipk < intParsedKeys.length; ipk++) {
+            config[intParsedKeys[ipk]] = intParsed[intParsedKeys[ipk]];
+          }
+        } catch (e) {
+          config.data_raw = intDataInput.value.trim();
+        }
+      }
     } else if (stepType === 'transform') {
-      var txSelects = container.querySelectorAll('select');
-      if (txSelects.length >= 1) config.operation = txSelects[0].value;
+      var txOpSelect = container.querySelector('.transform-operation-select');
+      var txDataInput = container.querySelector('.transform-data-input');
+      if (txOpSelect) config.operation = txOpSelect.value;
+      if (txDataInput && txDataInput.value.trim()) {
+        try {
+          var txParsed = JSON.parse(txDataInput.value.trim());
+          var txParsedKeys = Object.keys(txParsed);
+          for (var tpk = 0; tpk < txParsedKeys.length; tpk++) {
+            config[txParsedKeys[tpk]] = txParsed[txParsedKeys[tpk]];
+          }
+        } catch (e) {
+          config.data_raw = txDataInput.value.trim();
+        }
+      }
     }
 
     return config;
@@ -1291,14 +1339,25 @@
       };
     }
     if (stepType === 'integration') {
-      return {
-        action_type: stepCfg.action_type || 'connector_execute'
-      };
+      var intConfig = { action_type: stepCfg.action_type || 'connector_execute' };
+      var intExtraKeys = Object.keys(stepCfg);
+      for (var ixi = 0; ixi < intExtraKeys.length; ixi++) {
+        if (intExtraKeys[ixi] !== 'action_type') {
+          intConfig[intExtraKeys[ixi]] = stepCfg[intExtraKeys[ixi]];
+        }
+      }
+      return intConfig;
     }
     if (stepType === 'transform') {
-      return {
-        operation: stepCfg.operation || 'map'
-      };
+      var txConfig = { operation: stepCfg.operation || 'map' };
+      // Merge any additional config fields from the textarea
+      var txExtraKeys = Object.keys(stepCfg);
+      for (var txi = 0; txi < txExtraKeys.length; txi++) {
+        if (txExtraKeys[txi] !== 'operation') {
+          txConfig[txExtraKeys[txi]] = stepCfg[txExtraKeys[txi]];
+        }
+      }
+      return txConfig;
     }
     return {};
   }
@@ -1339,24 +1398,69 @@
       var dbDataInput = container.querySelector('.db-data-input');
       if (dbOpSelect && configData.operation) dbOpSelect.value = configData.operation;
       if (dbTableSelect && configData.table) dbTableSelect.value = configData.table;
-      if (dbDataInput && configData.data) {
-        dbDataInput.value = JSON.stringify(configData.data, null, 2);
+      // Populate data textarea from data, where, or full config
+      var dbDataVal = configData.data || configData.where || null;
+      if (!dbDataVal) {
+        // Show remaining config fields as JSON (exclude operation/table already in form)
+        var remainingCfg = {};
+        var dbKeys = Object.keys(configData);
+        for (var dk = 0; dk < dbKeys.length; dk++) {
+          if (dbKeys[dk] !== 'operation' && dbKeys[dk] !== 'table') {
+            remainingCfg[dbKeys[dk]] = configData[dbKeys[dk]];
+          }
+        }
+        if (Object.keys(remainingCfg).length > 0) dbDataVal = remainingCfg;
+      }
+      if (dbDataInput && dbDataVal) {
+        dbDataInput.value = JSON.stringify(dbDataVal, null, 2);
       }
     } else if (stepType === 'notification') {
       var notifTypeSelect = container.querySelector('.notification-type-select');
       var notifTitleInput = container.querySelector('.notification-title-input');
       var notifMsgInput = container.querySelector('.notification-message-input');
       if (notifTypeSelect && configData.notification_type) notifTypeSelect.value = configData.notification_type;
-      var titleVal = configData.title || configData.subject || '';
-      var msgVal = configData.message || configData.body || configData.description || '';
+      var titleVal = configData.title || configData.subject || configData.event_type || '';
+      var msgVal = configData.message || configData.body || '';
+      // For log_activity type, build message from resource fields if no message
+      if (!msgVal && configData.resource_type) {
+        msgVal = configData.resource_type + (configData.resource_id ? ': ' + configData.resource_id : '')
+          + (configData.resource_name ? ' (' + configData.resource_name + ')' : '');
+      }
       if (notifTitleInput && titleVal) notifTitleInput.value = titleVal;
       if (notifMsgInput && msgVal) notifMsgInput.value = msgVal;
     } else if (stepType === 'integration') {
-      var intSelects = container.querySelectorAll('select');
-      if (intSelects.length >= 1 && configData.action_type) intSelects[0].value = configData.action_type;
+      var intActionSelect = container.querySelector('.integration-action-select');
+      var intDataInput = container.querySelector('.integration-data-input');
+      if (intActionSelect && configData.action_type) intActionSelect.value = configData.action_type;
+      if (intDataInput) {
+        var intRemaining = {};
+        var intKeys = Object.keys(configData);
+        for (var ik = 0; ik < intKeys.length; ik++) {
+          if (intKeys[ik] !== 'action_type') {
+            intRemaining[intKeys[ik]] = configData[intKeys[ik]];
+          }
+        }
+        if (Object.keys(intRemaining).length > 0) {
+          intDataInput.value = JSON.stringify(intRemaining, null, 2);
+        }
+      }
     } else if (stepType === 'transform') {
-      var txSelects = container.querySelectorAll('select');
-      if (txSelects.length >= 1 && configData.operation) txSelects[0].value = configData.operation;
+      var txOpSelect = container.querySelector('.transform-operation-select');
+      var txDataInput = container.querySelector('.transform-data-input');
+      if (txOpSelect && configData.operation) txOpSelect.value = configData.operation;
+      // Populate data textarea with remaining config fields
+      if (txDataInput) {
+        var txRemaining = {};
+        var txKeys = Object.keys(configData);
+        for (var tk = 0; tk < txKeys.length; tk++) {
+          if (txKeys[tk] !== 'operation') {
+            txRemaining[txKeys[tk]] = configData[txKeys[tk]];
+          }
+        }
+        if (Object.keys(txRemaining).length > 0) {
+          txDataInput.value = JSON.stringify(txRemaining, null, 2);
+        }
+      }
     }
 
     // Mark step as configured
@@ -1542,21 +1646,61 @@
     }).then(function(data) {
       allSkills = data.skills || data.data || [];
 
-      // Flatten metadata fields for lex-table compatibility
+      // Flatten and normalize fields for lex-table compatibility
       allSkills = allSkills.map(function(skill) {
         var meta = skill.metadata || {};
+        var config = skill.skill_config || {};
         return Object.assign({}, skill, {
-          category: meta.category || 'automation',
-          version: meta.version || '1.0.0',
+          description: skill.skill_description || skill.description || config.description || meta.description || '',
+          category: skill.category || config.category || meta.category || 'automation',
+          skill_type: skill.skill_type || config.skill_type || meta.skill_type || '',
+          version: skill.skill_version || skill.version || config.version || meta.version || '1.0.0',
+          installation_count: skill.installation_count || skill.total_executions || 0,
           tags: meta.tags || []
         });
       });
 
       filteredSkills = allSkills.slice();
 
+      // Format rows for lex-table display
+      var formattedSkills = allSkills.map(function(skill) {
+        var out = Object.assign({}, skill);
+
+        // Truncate long descriptions
+        if (out.description && out.description.length > 100) {
+          out.description = out.description.substring(0, 97) + '...';
+        }
+
+        // Format category: replace hyphens/underscores with spaces, title-case
+        if (out.category) {
+          out.category = out.category.split(/[-_]/).map(function(w) {
+            return w.charAt(0).toUpperCase() + w.substring(1);
+          }).join(' ');
+        }
+
+        // Format skill_type similarly
+        if (out.skill_type) {
+          out.skill_type = out.skill_type.split(/[-_]/).map(function(w) {
+            return w.charAt(0).toUpperCase() + w.substring(1);
+          }).join(' ');
+        }
+
+        // Format created_at to readable date
+        if (out.created_at) {
+          try {
+            var d = new Date(out.created_at);
+            if (!isNaN(d.getTime())) {
+              out.created_at = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            }
+          } catch (e) { /* keep raw value */ }
+        }
+
+        return out;
+      });
+
       // Populate lex-table for list view
       if (skillsListView && typeof skillsListView.setData === 'function') {
-        skillsListView.setData(allSkills);
+        skillsListView.setData(formattedSkills);
       }
 
       // Update grid if in grid view

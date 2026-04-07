@@ -194,6 +194,282 @@ class AgenticUI {
     // Do not show error card; fallback response + inline notice in chat handle communication
   }
 
+  /**
+   * Handle agentic_approval_required SSE event.
+   * Rendered inline in the chat stream using Lex design tokens.
+   *
+   * @param {Object} data - Approval-required payload from backend
+   *   {
+   *     status: 'awaiting_approval',
+   *     currentStep: { id, description, stepType, ... },
+   *     approvalMessage: 'Review the proposed changes before continuing.',
+   *     snapshotId: 'uuid',
+   *     stepsCompleted: 2,
+   *     totalSteps: 5,
+   *     summary: '...'
+   *   }
+   * @param {string} conversationId - Active conversation ID from chat context
+   */
+  handleAgenticApprovalRequired(data, conversationId) {
+    console.log('[AgenticUI] Approval Required event:', data);
+
+    this.stopElapsedTimeCounter();
+    setTimeout(() => { this.hideProgressIndicator(); }, 500);
+
+    const chatMessages = document.getElementById('chatMessages');
+    if (!chatMessages) {
+      console.warn('[AgenticUI] chatMessages container not found');
+      return;
+    }
+
+    const snapshotId = data.snapshotId || '';
+    const stepsCompleted = data.stepsCompleted || 0;
+    const totalSteps = data.totalSteps || 0;
+    const approvalMessage = data.approvalMessage || 'Review the proposed action before continuing.';
+    const currentStep = data.currentStep || {};
+    const stepDescription = currentStep.description || currentStep.stepDescription || '';
+    const stepTypeRaw = currentStep.stepType || currentStep.step_type || '';
+    const stepType = stepTypeRaw ? stepTypeRaw.replace(/_/g, ' ') : '';
+
+    // Store context for approve/reject callbacks
+    this.pendingApproval = {
+      snapshotId: snapshotId,
+      conversationId: conversationId || (window.chatApp && window.chatApp.currentConversationId) || ''
+    };
+
+    // Cap totalSteps to at least stepsCompleted + 1 for display sanity
+    const displayTotal = Math.max(totalSteps, stepsCompleted + 1);
+    const progressLabel = totalSteps > 0
+      ? `Step ${stepsCompleted + 1} of ${displayTotal} — awaiting approval`
+      : 'Awaiting approval';
+
+    const stepDetailHtml = stepDescription
+      ? `<div style="margin-top:12px;padding:12px;background:var(--lex-bg-secondary,#f9fafb);border:1px solid var(--lex-border-subtle,#e5e7eb);border-radius:6px;">
+          ${stepType ? `<div style="font-size:0.6875rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--lex-text-tertiary,#6b7280);margin-bottom:4px;">${this.escapeHtml(stepType)}</div>` : ''}
+          <div style="font-size:0.875rem;color:var(--lex-text-primary,#111827);line-height:1.5;">${this.escapeHtml(stepDescription)}</div>
+        </div>`
+      : '';
+
+    const approvalId = 'agentic-approval-' + (snapshotId || Date.now());
+    const approvalHtml = `
+      <div id="${approvalId}" class="agentic-approval-card" data-snapshot-id="${this.escapeHtml(snapshotId)}" style="
+        margin:16px 0;
+        padding:16px;
+        background:var(--lex-card-bg,#ffffff);
+        border:1px solid var(--lex-color-warning-300,#fcd34d);
+        border-left:4px solid var(--lex-color-warning-500,#f59e0b);
+        border-radius:var(--lex-card-radius,8px);
+        box-shadow:var(--lex-shadow-sm,0 1px 2px rgba(0,0,0,0.05));
+      ">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--lex-color-warning-600,#d97706)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <div style="font-size:0.6875rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--lex-color-warning-700,#b45309);">
+            ${this.escapeHtml(progressLabel)}
+          </div>
+        </div>
+        <div style="font-size:0.9375rem;font-weight:600;color:var(--lex-text-primary,#111827);line-height:1.4;">
+          ${this.escapeHtml(approvalMessage)}
+        </div>
+        ${stepDetailHtml}
+        <div style="display:flex;align-items:center;gap:8px;margin-top:16px;flex-wrap:wrap;">
+          <button
+            type="button"
+            data-approval-action="approve"
+            onclick="window.AgenticUI.approveAgenticTask('${this.escapeHtml(approvalId)}')"
+            style="
+              display:inline-flex;align-items:center;gap:6px;
+              padding:8px 14px;
+              font-size:0.8125rem;font-weight:600;
+              color:#ffffff;
+              background:var(--lex-color-primary-600,#4f46e5);
+              border:1px solid var(--lex-color-primary-600,#4f46e5);
+              border-radius:var(--lex-btn-radius,6px);
+              cursor:pointer;
+              transition:background-color 0.15s ease;
+            "
+            onmouseover="this.style.background='var(--lex-color-primary-700,#4338ca)'"
+            onmouseout="this.style.background='var(--lex-color-primary-600,#4f46e5)'"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Approve &amp; Continue
+          </button>
+          <button
+            type="button"
+            data-approval-action="reject"
+            onclick="window.AgenticUI.rejectAgenticTask('${this.escapeHtml(approvalId)}')"
+            style="
+              display:inline-flex;align-items:center;gap:6px;
+              padding:8px 14px;
+              font-size:0.8125rem;font-weight:600;
+              color:var(--lex-text-primary,#111827);
+              background:var(--lex-card-bg,#ffffff);
+              border:1px solid var(--lex-border-default,#d1d5db);
+              border-radius:var(--lex-btn-radius,6px);
+              cursor:pointer;
+              transition:background-color 0.15s ease;
+            "
+            onmouseover="this.style.background='var(--lex-bg-secondary,#f9fafb)'"
+            onmouseout="this.style.background='var(--lex-card-bg,#ffffff)'"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Reject
+          </button>
+          <span data-approval-status style="font-size:0.75rem;color:var(--lex-text-tertiary,#6b7280);margin-left:4px;"></span>
+        </div>
+      </div>
+    `;
+
+    chatMessages.insertAdjacentHTML('beforeend', approvalHtml);
+    this.scrollToBottom();
+  }
+
+  /**
+   * Approve the paused agentic task and resume execution.
+   * @param {string} approvalId - DOM id of the approval card
+   */
+  approveAgenticTask(approvalId) {
+    this._submitApprovalDecision(approvalId, 'approve');
+  }
+
+  /**
+   * Reject the paused agentic task and cancel remaining execution.
+   * @param {string} approvalId - DOM id of the approval card
+   */
+  rejectAgenticTask(approvalId) {
+    this._submitApprovalDecision(approvalId, 'reject');
+  }
+
+  /**
+   * Shared submission path for approve/reject decisions.
+   * Calls the task-level resume endpoint which continues sequential execution.
+   *
+   * @private
+   */
+  _submitApprovalDecision(approvalId, decision) {
+    const card = document.getElementById(approvalId);
+    if (!card) {
+      console.warn('[AgenticUI] Approval card not found:', approvalId);
+      return;
+    }
+
+    const pending = this.pendingApproval || {};
+    const conversationId = pending.conversationId;
+
+    if (!conversationId) {
+      this._setApprovalStatus(card, 'Missing conversation context. Please reload.', 'error');
+      return;
+    }
+
+    // Disable both buttons to prevent double-submit
+    const buttons = card.querySelectorAll('button[data-approval-action]');
+    buttons.forEach(btn => {
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      btn.style.cursor = 'not-allowed';
+    });
+    this._setApprovalStatus(card, decision === 'approve' ? 'Resuming task...' : 'Cancelling task...', 'pending');
+
+    const endpoint = decision === 'approve'
+      ? `/api/v1/streaming/agentic/tasks/${encodeURIComponent(conversationId)}/approve`
+      : `/api/v1/streaming/agentic/tasks/${encodeURIComponent(conversationId)}/reject`;
+
+    const apiClient = window.api;
+    if (!apiClient || typeof apiClient.post !== 'function') {
+      this._setApprovalStatus(card, 'API client unavailable.', 'error');
+      this._reenableApprovalButtons(card);
+      return;
+    }
+
+    apiClient.post(endpoint, { comments: '' })
+      .then(resp => {
+        const result = (resp && resp.data) || {};
+        const finalStatus = result.status || (decision === 'approve' ? 'approved' : 'cancelled');
+        this._finalizeApprovalCard(card, decision, finalStatus);
+        this.pendingApproval = null;
+
+        if (window.Lex && window.Lex.Toast) {
+          const toastFn = decision === 'approve' ? window.Lex.Toast.success : window.Lex.Toast.info;
+          if (typeof toastFn === 'function') {
+            toastFn(decision === 'approve' ? 'Task approved and resumed' : 'Task cancelled');
+          }
+        }
+      })
+      .catch(err => {
+        console.error('[AgenticUI] Approval decision failed:', err);
+        const message = (err && err.message) ? err.message : 'Request failed';
+        this._setApprovalStatus(card, `Failed: ${message}`, 'error');
+        this._reenableApprovalButtons(card);
+
+        if (window.Lex && window.Lex.Toast && typeof window.Lex.Toast.error === 'function') {
+          window.Lex.Toast.error(`Failed to ${decision} task`);
+        }
+      });
+  }
+
+  /**
+   * Replace the card body with a resolved/terminal state.
+   * @private
+   */
+  _finalizeApprovalCard(card, decision, finalStatus) {
+    if (!card) return;
+
+    const isApprove = decision === 'approve';
+    const iconColor = isApprove ? 'var(--lex-color-success-600,#059669)' : 'var(--lex-text-tertiary,#6b7280)';
+    const borderColor = isApprove ? 'var(--lex-color-success-300,#6ee7b7)' : 'var(--lex-border-default,#d1d5db)';
+    const accentColor = isApprove ? 'var(--lex-color-success-500,#10b981)' : 'var(--lex-text-tertiary,#9ca3af)';
+    const label = isApprove ? 'Approved — task resumed' : 'Rejected — task cancelled';
+    const hint = isApprove
+      ? 'The remaining steps are running in the background. Reload the conversation to see full results.'
+      : 'No changes will be applied. You can send a new message to start over.';
+    const iconPath = isApprove
+      ? '<polyline points="20 6 9 17 4 12"/>'
+      : '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>';
+
+    card.style.borderColor = borderColor;
+    card.style.borderLeftColor = accentColor;
+    card.innerHTML = `
+      <div style="display:flex;align-items:flex-start;gap:10px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px;">
+          ${iconPath}
+        </svg>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:0.875rem;font-weight:600;color:var(--lex-text-primary,#111827);">${this.escapeHtml(label)}</div>
+          <div style="font-size:0.75rem;color:var(--lex-text-secondary,#4b5563);margin-top:4px;line-height:1.4;">${this.escapeHtml(hint)}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  /** @private */
+  _setApprovalStatus(card, text, tone) {
+    if (!card) return;
+    const statusEl = card.querySelector('[data-approval-status]');
+    if (!statusEl) return;
+    statusEl.textContent = text;
+    if (tone === 'error') {
+      statusEl.style.color = 'var(--lex-color-danger-600,#dc2626)';
+    } else if (tone === 'pending') {
+      statusEl.style.color = 'var(--lex-text-tertiary,#6b7280)';
+    } else {
+      statusEl.style.color = 'var(--lex-text-tertiary,#6b7280)';
+    }
+  }
+
+  /** @private */
+  _reenableApprovalButtons(card) {
+    if (!card) return;
+    const buttons = card.querySelectorAll('button[data-approval-action]');
+    buttons.forEach(btn => {
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
+    });
+  }
+
   // ========================================================================
   // PROGRESS INDICATOR UI
   // ========================================================================

@@ -67,7 +67,21 @@
    */
   function _titleCase(str) {
     if (!str) return '';
-    return str.replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+    var result = '';
+    var capitalizeNext = true;
+    for (var i = 0; i < str.length; i++) {
+      var ch = str[i];
+      if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '-' || ch === '_') {
+        result += ch;
+        capitalizeNext = true;
+      } else if (capitalizeNext) {
+        result += ch.toUpperCase();
+        capitalizeNext = false;
+      } else {
+        result += ch;
+      }
+    }
+    return result;
   }
 
   function _resolvePreview(placeholder, contact, matterData) {
@@ -83,7 +97,7 @@
       _fullName = ((_firstName || '') + ' ' + (_lastName || '')).trim();
     } else if (_displayName) {
       _fullName = _displayName;
-      var nameParts = _displayName.trim().split(/\s+/);
+      var nameParts = _displayName.trim().split(' ').filter(function (p) { return p.length > 0; });
       _firstName = nameParts[0] || '';
       _lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
     }
@@ -187,6 +201,10 @@
     this.onError = opts.onError || function (msg) { console.error('[DocxTemplateModal]', msg); };
     this.onSuccess = opts.onSuccess || function () {};
 
+    this._pollIntervalId = null;
+    this._pageHeights = {}; // pageIndex → height at scale=1.0 (for coordinate conversion)
+    this._pdfScale = 1.3;   // must match scale used in _loadPdfPreview
+
     this.state = {
       docId: null,
       matterId: null,
@@ -273,6 +291,11 @@
    * Close the modal.
    */
   DocxTemplateModal.prototype.close = function () {
+    // Clear any active batch polling interval
+    if (this._pollIntervalId) {
+      clearInterval(this._pollIntervalId);
+      this._pollIntervalId = null;
+    }
     var modal = this._el('Modal');
     if (modal) modal.open = false;
   };
@@ -334,9 +357,13 @@
         return pdfDoc.getPage(pageNum).then(function (page) {
           var viewport = page.getViewport({ scale: scale });
 
+          // Store actual page height at scale=1.0 for coordinate conversion
+          self._pageHeights[pageNum - 1] = viewport.height / scale;
+
           // Container for this page
           var pageDiv = document.createElement('div');
           pageDiv.className = 'dtm-pdf-page';
+          pageDiv.setAttribute('data-page-index', pageNum - 1);
           pageDiv.style.cssText = 'position:relative;margin:0 auto 16px auto;background:white;box-shadow:0 2px 8px rgba(0,0,0,0.12);width:' + viewport.width + 'px;height:' + viewport.height + 'px;';
 
           // Canvas
@@ -422,7 +449,7 @@
         underscoreCands.push({ x: it.x, y: it.y, w: it.width, pageNum: it.pageNum, pageDiv: pageDivs[it.pageNum], sk: sk });
       }
 
-      var segments = s.split(/,/);
+      var segments = s.split(',');
       if (segments.length > 1) {
         var offset = 0;
         for (var si = 0; si < segments.length; si++) {
@@ -437,13 +464,25 @@
                 pageNum: it.pageNum, pageDiv: pageDivs[it.pageNum], sk: sk + segStart });
             }
           } else {
-            var um = t.match(/^([A-Za-z ]+?)_/);
-            if (um) {
-              var ulbl = um[1].trim().toLowerCase();
-              if (ulbl.length > 0 && ulbl.length < 20 && !falsePos[ulbl]) {
-                var segStart2 = s.indexOf(seg, offset > 0 ? offset - 1 : 0);
-                labelCands.push({ label: ulbl, x: it.x + charW * segStart2, y: it.y, w: charW * um[1].length,
-                  pageNum: it.pageNum, pageDiv: pageDivs[it.pageNum], sk: sk + segStart2 });
+            // Extract leading alpha text before the first underscore (no regex)
+            var uIdx = t.indexOf('_');
+            if (uIdx > 0) {
+              var umText = t.substring(0, uIdx);
+              // Verify it's only letters and spaces
+              var umValid = true;
+              for (var uc = 0; uc < umText.length; uc++) {
+                var ucc = umText.charCodeAt(uc);
+                if (!((ucc >= 65 && ucc <= 90) || (ucc >= 97 && ucc <= 122) || ucc === 32)) {
+                  umValid = false; break;
+                }
+              }
+              if (umValid) {
+                var ulbl = umText.trim().toLowerCase();
+                if (ulbl.length > 0 && ulbl.length < 20 && !falsePos[ulbl]) {
+                  var segStart2 = s.indexOf(seg, offset > 0 ? offset - 1 : 0);
+                  labelCands.push({ label: ulbl, x: it.x + charW * segStart2, y: it.y, w: charW * umText.length,
+                    pageNum: it.pageNum, pageDiv: pageDivs[it.pageNum], sk: sk + segStart2 });
+                }
               }
             }
           }
@@ -470,7 +509,7 @@
           if (nextIt.pageNum === it.pageNum && Math.abs(nextIt.y - it.y) < 3) {
             var nextStr = nextIt.str.trim();
             // If next item on same line has alphabetic text (not underscores/empty), it's body text
-            if (nextStr.length > 0 && nextStr.replace(/_/g, '').trim().length > 0 && nextStr.indexOf('___') === -1) {
+            if (nextStr.length > 0 && nextStr.split('_').join('').trim().length > 0 && nextStr.indexOf('___') === -1) {
               isFieldColon = false;
             }
           }
@@ -522,28 +561,61 @@
   };
 
   /**
-   * Place a numbered badge on a PDF page.
+   * Convert badge display position (CSS px at scale=1.3, top-left origin)
+   * to PDF coordinates (scale=1.0, bottom-left origin).
+   *
+   * @param {number} displayX - badge left in px within the page div
+   * @param {number} displayY - badge top in px within the page div
+   * @param {number} pageIndex - 0-based page number
+   * @returns {{ x: number, y: number, pageIndex: number }}
+   */
+  DocxTemplateModal.prototype._displayToPdfCoords = function (displayX, displayY, pageIndex) {
+    var scale = this._pdfScale;
+    var pdfX = displayX / scale;
+    var pageHeightPdf = this._pageHeights[pageIndex] || 792; // fallback to Letter
+    var pdfY = pageHeightPdf - (displayY / scale);
+    return { x: pdfX, y: pdfY, pageIndex: pageIndex };
+  };
+
+  /**
+   * Place a draggable numbered badge on a PDF page.
+   * Stores initial PDF coordinates on the badge. User can drag to reposition.
    */
   DocxTemplateModal.prototype._placeBadge = function (textItem, num, blank) {
     var self = this;
     if (!textItem || !textItem.pageDiv) return;
 
+    var initLeft = Math.round(textItem.x + 4);
+    var initTop = Math.round(textItem.y - 4);
+    var pageIndex = parseInt(textItem.pageDiv.getAttribute('data-page-index') || '0', 10);
+
     var badge = document.createElement('div');
     badge.className = 'dtm-overlay-badge';
     badge.setAttribute('data-blank-id', blank.id);
+    badge.setAttribute('data-page-index', pageIndex);
     badge.style.cssText = 'position:absolute;' +
-      'left:' + Math.round(textItem.x + 4) + 'px;' +
-      'top:' + Math.round(textItem.y - 4) + 'px;' +
+      'left:' + initLeft + 'px;' +
+      'top:' + initTop + 'px;' +
       'min-width:18px;height:18px;padding:0 3px;border-radius:9px;' +
       'background:#7c3aed;color:white;font-size:9px;font-weight:700;' +
       'display:flex;align-items:center;justify-content:center;' +
-      'cursor:pointer;z-index:5;box-shadow:0 1px 3px rgba(0,0,0,0.3);' +
-      'transition:background 0.2s;font-family:system-ui,sans-serif;';
+      'cursor:grab;z-index:5;box-shadow:0 1px 3px rgba(0,0,0,0.3);' +
+      'transition:background 0.2s,box-shadow 0.2s;font-family:system-ui,sans-serif;' +
+      'user-select:none;';
     badge.textContent = num;
-    badge.title = (blank.label || 'Blank ' + num);
+    badge.title = (blank.label || 'Blank ' + num) + ' — drag to reposition';
 
+    // Store initial PDF-space coordinates
+    var initCoords = self._displayToPdfCoords(initLeft, initTop, pageIndex);
+    badge.dataset.pdfX = String(initCoords.x);
+    badge.dataset.pdfY = String(initCoords.y);
+    badge.dataset.adjusted = 'false';
+
+    // Click handler — scroll to field mapping select (only fires if not dragging)
+    var wasDragged = false;
     (function (blankId, prefix) {
       badge.addEventListener('click', function () {
+        if (wasDragged) { wasDragged = false; return; }
         var select = document.getElementById(prefix + 'BlankMap_' + blankId);
         if (select) {
           select.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -553,6 +625,68 @@
         }
       });
     })(blank.id, self.prefix);
+
+    // Drag handlers — constrained within the page div
+    var dragState = null;
+
+    badge.addEventListener('mousedown', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      dragState = {
+        startMouseX: e.clientX,
+        startMouseY: e.clientY,
+        startLeft: parseInt(badge.style.left, 10) || 0,
+        startTop: parseInt(badge.style.top, 10) || 0
+      };
+      badge.style.cursor = 'grabbing';
+      badge.style.zIndex = '10';
+      badge.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4)';
+    });
+
+    document.addEventListener('mousemove', function (e) {
+      if (!dragState) return;
+      var dx = e.clientX - dragState.startMouseX;
+      var dy = e.clientY - dragState.startMouseY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) wasDragged = true;
+
+      var newLeft = dragState.startLeft + dx;
+      var newTop = dragState.startTop + dy;
+
+      // Constrain within page div bounds
+      var pdw = textItem.pageDiv.clientWidth;
+      var pdh = textItem.pageDiv.clientHeight;
+      if (newLeft < 0) newLeft = 0;
+      if (newTop < 0) newTop = 0;
+      if (newLeft > pdw - 18) newLeft = pdw - 18;
+      if (newTop > pdh - 18) newTop = pdh - 18;
+
+      badge.style.left = newLeft + 'px';
+      badge.style.top = newTop + 'px';
+    });
+
+    document.addEventListener('mouseup', function () {
+      if (!dragState) return;
+      dragState = null;
+      badge.style.cursor = 'grab';
+      badge.style.zIndex = '5';
+
+      // Update stored PDF coordinates from new position
+      var finalLeft = parseInt(badge.style.left, 10) || 0;
+      var finalTop = parseInt(badge.style.top, 10) || 0;
+      var coords = self._displayToPdfCoords(finalLeft, finalTop, pageIndex);
+      badge.dataset.pdfX = String(coords.x);
+      badge.dataset.pdfY = String(coords.y);
+
+      if (wasDragged) {
+        badge.dataset.adjusted = 'true';
+        // Visual indicator: orange border for repositioned badges
+        badge.style.background = '#ea580c';
+        badge.style.boxShadow = '0 0 0 2px #fed7aa, 0 2px 6px rgba(0,0,0,0.3)';
+        badge.title = (blank.label || 'Blank ' + num) + ' — repositioned by user';
+      } else {
+        badge.style.boxShadow = '0 1px 3px rgba(0,0,0,0.3)';
+      }
+    });
 
     textItem.pageDiv.appendChild(badge);
   };
@@ -1190,7 +1324,19 @@
    */
   function _tokenize(text) {
     if (!text) return {};
-    var words = text.toLowerCase().replace(/[^a-z0-9]/g, ' ').split(/\s+/);
+    // Normalize: lowercase, replace non-alphanumeric with spaces, split on spaces
+    var lower = text.toLowerCase();
+    var normalized = '';
+    for (var ci = 0; ci < lower.length; ci++) {
+      var ch = lower.charCodeAt(ci);
+      // Keep a-z (97-122) and 0-9 (48-57), replace everything else with space
+      if ((ch >= 97 && ch <= 122) || (ch >= 48 && ch <= 57)) {
+        normalized += lower[ci];
+      } else {
+        normalized += ' ';
+      }
+    }
+    var words = normalized.split(' ').filter(function (w) { return w.length > 0; });
     var bag = {};
     for (var i = 0; i < words.length; i++) {
       var w = words[i];
@@ -1262,7 +1408,7 @@
 
     // 3. Sub-field exact match bonus — if the variable's field name appears in the blank text
     var fieldPart = varKey.indexOf('.') !== -1 ? varKey.substring(varKey.indexOf('.') + 1) : varKey;
-    var fieldWords = fieldPart.replace(/_/g, ' ').toLowerCase().split(/\s+/);
+    var fieldWords = fieldPart.split('_').join(' ').toLowerCase().split(' ').filter(function (w) { return w.length > 0; });
     var exactBonus = 0;
     for (var fw = 0; fw < fieldWords.length; fw++) {
       if (fieldWords[fw].length >= 3 && blankBag[fieldWords[fw]]) {
@@ -1292,7 +1438,7 @@
       var key = keys[i];
       var entry = ns[key];
       // Tokenize label + key parts (e.g., "Full Name" + "contact full name")
-      var text = (entry.label || '') + ' ' + key.replace(/[._]/g, ' ');
+      var text = (entry.label || '') + ' ' + key.split('.').join(' ').split('_').join(' ');
       cache[key] = _tokenize(text);
     }
     return cache;
@@ -1450,19 +1596,38 @@
       }
     }
 
-    // Collect blank mappings
+    // Collect blank mappings — for flat PDFs, include confirmed PDF coordinates
+    var isFlatPdf = st.docName && (st.docName.toLowerCase().indexOf('.pdf') !== -1);
     var blankMappings = {};
     for (var b = 0; b < st.blanks.length; b++) {
       var blankId = st.blanks[b].id;
       var selectEl = document.getElementById(self.prefix + 'BlankMap_' + blankId);
       if (!selectEl) continue;
+
+      var varValue = '';
       if (selectEl.value === '__custom__') {
         var customEl = document.getElementById(self.prefix + 'BlankCustom_' + blankId);
-        if (customEl && customEl.value) {
-          blankMappings[blankId] = 'custom:' + customEl.value;
-        }
+        if (customEl && customEl.value) varValue = 'custom:' + customEl.value;
       } else if (selectEl.value) {
-        blankMappings[blankId] = selectEl.value;
+        varValue = selectEl.value;
+      }
+      if (!varValue) continue;
+
+      // For flat PDFs, enrich with badge coordinates so backend places text precisely
+      if (isFlatPdf) {
+        var badge = document.querySelector('.dtm-overlay-badge[data-blank-id="' + blankId + '"]');
+        if (badge && badge.dataset.pdfX && badge.dataset.pdfY) {
+          blankMappings[blankId] = {
+            variable: varValue,
+            x: parseFloat(badge.dataset.pdfX),
+            y: parseFloat(badge.dataset.pdfY),
+            pageIndex: parseInt(badge.dataset.pageIndex || '0', 10)
+          };
+        } else {
+          blankMappings[blankId] = varValue; // fallback: string format
+        }
+      } else {
+        blankMappings[blankId] = varValue; // DOCX / fillable PDF: string format
       }
     }
 
@@ -1506,7 +1671,7 @@
         // Poll for completion
         if (genBtn) genBtn.textContent = 'Processing 0 of ' + total + '...';
 
-        var pollInterval = setInterval(async function () {
+        self._pollIntervalId = setInterval(async function () {
           try {
             var statusResp = await fetch(api.baseUrl + '/api/v1/matters/' + st.matterId + '/documents/' + st.docId + '/generate-from-template/batch/' + batchId, {
               headers: { 'Authorization': 'Bearer ' + api.token }
@@ -1517,7 +1682,8 @@
             if (genBtn) genBtn.textContent = 'Processing ' + done + ' of ' + total + '...';
 
             if (statusData.status === 'completed' || statusData.status === 'completed_with_errors' || statusData.status === 'failed') {
-              clearInterval(pollInterval);
+              clearInterval(self._pollIntervalId);
+              self._pollIntervalId = null;
               succeeded = statusData.completed;
               failed = statusData.failed;
 

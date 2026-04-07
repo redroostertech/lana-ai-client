@@ -182,6 +182,13 @@
         color: var(--lex-chat-text-muted);
         border: 1px solid var(--lex-chat-border-soft);
       }
+
+      /* Grounding refusal — subtle amber left border */
+      .lex-chat-grounding-refusal {
+        border-left: 3px solid #f59e0b;
+        padding-left: 12px;
+        opacity: 0.9;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -223,7 +230,8 @@
         streaming:  { type: Boolean, default: false, reflect: true },
         citations:  { type: Array, default: [] },
         artifacts:  { type: Array, default: [] },
-        attachments: { type: Array, default: [] }
+        attachments: { type: Array, default: [] },
+        grounding:   { type: Object, default: null }
       };
     }
 
@@ -432,6 +440,23 @@
         if (metadata.artifacts?.length > 0) {
           this._renderArtifactsSection(metadata.artifacts);
         }
+
+        // Capture grounding data and render badge + refusal styling
+        if (metadata.grounding) {
+          this._props.grounding = metadata.grounding;
+          this._renderGroundingIndicator(metadata.grounding);
+
+          var contentBody = this.querySelector('[data-content-body]');
+          if (contentBody) {
+            var g = metadata.grounding;
+            var isRefusal = (g.validatorFailures && g.validatorFailures.length > 0) ||
+                            g.fallbackUsed ||
+                            (g.groundingStatus === 'none' && g.evidenceMode !== 'grounded_tool' && g.evidenceMode !== 'ungrounded_fallback');
+            if (isRefusal) {
+              contentBody.classList.add('lex-chat-grounding-refusal');
+            }
+          }
+        }
       }
 
       // Switch logo to static after streaming completes
@@ -444,6 +469,51 @@
       if (ChatFormat && typeof ChatFormat.renderMermaidDiagrams === 'function') {
         ChatFormat.renderMermaidDiagrams(this);
       }
+    }
+
+    /**
+     * Render a subtle grounding badge inline with the message timestamp.
+     * @param {Object} grounding - Grounding context from the backend debug_context event
+     */
+    _renderGroundingIndicator(grounding) {
+      var wrapper = this.querySelector('.lex-chat-msg-timestamp');
+      if (!wrapper) return;
+
+      // Guard against double-render
+      if (wrapper.querySelector('lex-badge')) return;
+
+      var status = grounding.groundingStatus;
+      var evidenceMode = grounding.evidenceMode;
+
+      var label, color;
+      if (status === 'strong') {
+        label = 'Grounded';
+        color = 'green';
+      } else if (status === 'partial' || status === 'weak') {
+        label = 'Partially grounded';
+        color = 'yellow';
+      } else if (status === 'none') {
+        if (evidenceMode === 'grounded_tool') {
+          label = 'Tool-verified';
+          color = 'blue';
+        } else if (evidenceMode === 'ungrounded_fallback') {
+          // General chat / greetings — no badge needed
+          return;
+        } else {
+          label = 'Ungrounded';
+          color = 'gray';
+        }
+      } else {
+        // Unknown status — don't show
+        return;
+      }
+
+      var badge = document.createElement('lex-badge');
+      badge.label = label;
+      badge.color = color;
+      badge.size = 'sm';
+      badge.style.marginLeft = '8px';
+      wrapper.appendChild(badge);
     }
 
     _renderCitationsSection(citations) {

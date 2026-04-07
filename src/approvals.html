@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Approvals - LANA AI</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="css/lex-tokens.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/approvals.css">
+  <link rel="stylesheet" href="css/tailwind-output.css">
+  <script src="js/tailwind-loader.js"></script>
+
+</head>
+<body>
+
+  <lex-loader theme="light"></lex-loader>
+
+  <lex-app
+    logo-src="img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="dashboard.html"
+    active-nav-id="approvals"
+    page-title="Approvals"
+  ></lex-app>
+
+  <template id="page-content">
+
+    <main>
+
+      <!-- Page header -->
+      <div class="apr-header">
+        <div class="apr-header-title">Approval Inbox</div>
+        <div class="apr-header-subtitle">Review and act on pending approval requests</div>
+      </div>
+
+      <!-- Stats bar (clickable to filter by status) -->
+      <div class="apr-stats" id="aprStats">
+        <div class="apr-stat active" data-status="" id="aprStatAll">
+          <div class="apr-stat-value" id="aprCountAll">—</div>
+          <div class="apr-stat-label">All</div>
+        </div>
+        <div class="apr-stat" data-status="pending" id="aprStatPending">
+          <div class="apr-stat-value" id="aprCountPending">—</div>
+          <div class="apr-stat-label">Pending</div>
+        </div>
+        <div class="apr-stat" data-status="approved" id="aprStatApproved">
+          <div class="apr-stat-value" id="aprCountApproved">—</div>
+          <div class="apr-stat-label">Approved</div>
+        </div>
+        <div class="apr-stat" data-status="rejected" id="aprStatRejected">
+          <div class="apr-stat-value" id="aprCountRejected">—</div>
+          <div class="apr-stat-label">Rejected</div>
+        </div>
+        <div class="apr-stat" data-status="expired" id="aprStatExpired">
+          <div class="apr-stat-value" id="aprCountExpired">—</div>
+          <div class="apr-stat-label">Expired</div>
+        </div>
+      </div>
+
+      <!-- Filter bar -->
+      <div class="apr-filters">
+        <lex-segmented
+          id="aprStatusFilter"
+          value="pending"
+          options='[{"value":"pending","label":"Pending"},{"value":"approved","label":"Approved"},{"value":"rejected","label":"Rejected"},{"value":"expired","label":"Expired"},{"value":"","label":"All"}]'
+        ></lex-segmented>
+
+        <lex-select
+          id="aprPriorityFilter"
+          placeholder="All priorities"
+          size="sm"
+          options='[{"value":"","label":"All priorities"},{"value":"urgent","label":"Urgent"},{"value":"high","label":"High"},{"value":"normal","label":"Normal"},{"value":"low","label":"Low"}]'
+          style="width:160px;"
+        ></lex-select>
+
+        <lex-select
+          id="aprSourceFilter"
+          placeholder="All sources"
+          size="sm"
+          options='[{"value":"","label":"All sources"},{"value":"workflow","label":"Workflow"},{"value":"chat","label":"Chat"},{"value":"skill","label":"Skill"},{"value":"manual","label":"Manual"}]'
+          style="width:160px;"
+        ></lex-select>
+
+        <div style="flex:1;"></div>
+
+        <input
+          type="text"
+          id="aprSearch"
+          placeholder="Search approvals..."
+          style="width:220px;padding:6px 12px;border:1px solid var(--lex-border-default);border-radius:6px;font-size:13px;outline:none;background:var(--lex-bg-primary);color:var(--lex-text-primary);"
+        >
+      </div>
+
+      <!-- Loading skeleton -->
+      <div id="aprLoading">
+        <lex-card padding="compact">
+          <lex-action-card title="Loading..." description="..." priority="high" aria-hidden="true"></lex-action-card>
+          <lex-action-card title="Loading..." description="..." priority="medium" aria-hidden="true"></lex-action-card>
+          <lex-action-card title="Loading..." description="..." priority="medium" aria-hidden="true"></lex-action-card>
+          <lex-action-card title="Loading..." description="..." priority="low" aria-hidden="true"></lex-action-card>
+        </lex-card>
+      </div>
+
+      <!-- Approval list -->
+      <lex-card id="aprCard" padding="none" class="hidden">
+        <div id="aprList"></div>
+      </lex-card>
+
+      <!-- Pagination -->
+      <lex-pagination id="aprPagination" class="hidden" page="1" total-pages="1" total="0" limit="20"></lex-pagination>
+
+      <!-- Empty state -->
+      <div id="aprEmpty" class="hidden">
+        <lex-empty icon="inbox" message="No approvals found" description="Nothing matches the current filters"></lex-empty>
+      </div>
+
+    </main>
+
+  </template>
+
+  <noscript>
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;color:#666;">
+      Please enable JavaScript to use LANA AI.
+    </div>
+  </noscript>
+
+  <!-- Universal shell scripts -->
+  <script src="js/error-reporter.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/mock-data.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/components.js"></script>
+  <script src="js/version.js"></script>
+  <script src="js/menu.js"></script>
+  <script src="js/navigation-helpers.js"></script>
+  <script src="js/new-project-modal.js"></script>
+  <script src="js/conversation-menu.js"></script>
+  <script src="js/conversation-search-modal.js"></script>
+  <script src="js/contact-search-modal.js"></script>
+  <script src="js/notifications.js"></script>
+
+  <!-- Lex UI core -->
+  <script src="js/lex/lex.core.js"></script>
+  <script src="js/lex/lex.icons.js"></script>
+  <script src="js/lex/lex.data.js"></script>
+  <script src="js/lex/lex.forms.js"></script>
+  <script src="js/lex/lex.state.js"></script>
+  <script src="js/lex/lex.utils.js"></script>
+  <script src="js/lex/lex.auth.js"></script>
+  <script src="js/lex/lex-nav.js"></script>
+
+  <!-- Lex UI layout -->
+  <script src="js/lex/components/foundation/lex-loader.js"></script>
+  <script src="js/lex/components/foundation/lex-toast.js"></script>
+  <script src="js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="js/lex/components/foundation/lex-btn.js"></script>
+  <script src="js/lex/components/foundation/lex-empty.js"></script>
+  <script src="js/lex/components/form/lex-segmented.js"></script>
+  <script src="js/lex/components/form/lex-select.js"></script>
+  <script src="js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="js/lex/components/layout/lex-topbar.js"></script>
+  <script src="js/lex/components/layout/lex-conversation-item.js"></script>
+  <script src="js/lex/components/layout/lex-notification-panel.js"></script>
+  <script src="js/lex/components/layout/lex-app.js"></script>
+
+  <!-- Page-specific Lex components -->
+  <script src="js/lex/components/foundation/lex-action-card.js"></script>
+  <script src="js/lex/components/foundation/lex-badge.js"></script>
+  <script src="js/lex/components/foundation/lex-card.js"></script>
+  <script src="js/lex/components/data/lex-pagination.js"></script>
+
+  <!-- Inject page content -->
+  <script src="js/lex/lex-page-init.js"></script>
+
+  <!-- Page controller (MUST be last before auth-guard) -->
+  <script src="js/approvals.js"></script>
+
+  <!-- Auth guard + loader dismiss -->
+  <script src="js/auth-guard.js"></script>
+</body>
+</html>

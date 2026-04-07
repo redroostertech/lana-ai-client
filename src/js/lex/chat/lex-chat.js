@@ -295,6 +295,7 @@
       this._citations = [];
       this._artifacts = [];
       this._streamingContent = '';
+      this._groundingContext = null;
       this._sendStartTime = Date.now();
 
       // Add user message to thread
@@ -622,7 +623,8 @@
               duration,
               tokenCount: event.tokenCount || null,
               citations: this._citations.length > 0 ? this._citations : undefined,
-              artifacts: this._artifacts.length > 0 ? this._artifacts : undefined
+              artifacts: this._artifacts.length > 0 ? this._artifacts : undefined,
+              grounding: this._groundingContext || undefined
             });
           }
 
@@ -651,6 +653,11 @@
             });
           }
           this._showSystemMessage('Generation stopped');
+          break;
+
+        case 'grounding_context':
+          // Keep the latest (post-tool) grounding context; backend emits multiple per response
+          this._groundingContext = event;
           break;
 
         case 'block_hints':

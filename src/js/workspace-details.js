@@ -1077,8 +1077,10 @@
   // =========================================================================
 
   function deleteMatter(matterId) {
-    if (typeof Modal !== 'undefined' && Modal.confirm) {
-      Modal.confirm('Delete Matter', 'Are you sure you want to delete this matter? This action cannot be undone.', async function () {
+    Lex.Modal.confirm(
+      'Delete Matter',
+      'Are you sure you want to delete this matter? This action cannot be undone.',
+      async function () {
         try {
           await api.deleteMatter(matterId);
           Lex.Toast.success('Matter deleted');
@@ -1086,15 +1088,8 @@
         } catch (error) {
           Lex.Toast.error(error.message || 'Failed to delete matter');
         }
-      });
-    } else if (confirm('Are you sure you want to delete this matter? This action cannot be undone.')) {
-      api.deleteMatter(matterId).then(function () {
-        Lex.Toast.success('Matter deleted');
-        Lex.Nav.go('workspaces.html');
-      }).catch(function (error) {
-        Lex.Toast.error(error.message || 'Failed to delete matter');
-      });
-    }
+      }
+    );
   }
 
   // =========================================================================
@@ -1759,9 +1754,11 @@
   }
 
   // Delete a document from the current matter
-  async function deleteDrawerDocument(fileId, matterId) {
-    if (typeof Modal !== 'undefined' && Modal.confirm) {
-      Modal.confirm('Delete Document', 'Are you sure you want to delete this document? This action cannot be undone.', async function () {
+  function deleteDrawerDocument(fileId, matterId) {
+    Lex.Modal.confirm(
+      'Delete Document',
+      'Are you sure you want to delete this document? This action cannot be undone.',
+      async function () {
         try {
           await api.deleteDocument(fileId);
           Lex.Toast.success('Document deleted successfully');
@@ -1769,16 +1766,8 @@
         } catch (error) {
           Lex.Toast.error(error.message || 'Failed to delete document');
         }
-      });
-    } else if (confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
-      try {
-        await api.deleteDocument(fileId);
-        Lex.Toast.success('Document deleted successfully');
-        await refreshDrawerDocuments(matterId);
-      } catch (error) {
-        Lex.Toast.error(error.message || 'Failed to delete document');
       }
-    }
+    );
   }
 
   // Retry document ingestion for a failed document
@@ -1998,26 +1987,32 @@
     }
   }
 
-  async function batchDeleteDocs() {
+  function batchDeleteDocs() {
     var selected = document.querySelectorAll('.doc-select-cb:checked');
     if (selected.length === 0) return;
-    if (!confirm('Delete ' + selected.length + ' document' + (selected.length !== 1 ? 's' : '') + '? This cannot be undone.')) return;
 
-    var matterId = currentMatterData && currentMatterData.matter && currentMatterData.matter.matter_id;
-    var deleted = 0;
-    var failed = 0;
-    for (var i = 0; i < selected.length; i++) {
-      var docId = selected[i].getAttribute('data-doc-id');
-      try {
-        await api.delete('/api/v1/storage/files/' + docId + '?matter_id=' + encodeURIComponent(matterId));
-        deleted++;
-      } catch (_) {
-        failed++;
+    var count = selected.length;
+    Lex.Modal.confirm(
+      'Delete ' + count + ' Document' + (count !== 1 ? 's' : ''),
+      'Are you sure you want to delete ' + count + ' document' + (count !== 1 ? 's' : '') + '? This action cannot be undone.',
+      async function () {
+        var matterId = currentMatterData && currentMatterData.matter && currentMatterData.matter.matter_id;
+        var deleted = 0;
+        var failed = 0;
+        for (var i = 0; i < selected.length; i++) {
+          var docId = selected[i].getAttribute('data-doc-id');
+          try {
+            await api.delete('/api/v1/storage/files/' + docId + '?matter_id=' + encodeURIComponent(matterId));
+            deleted++;
+          } catch (_) {
+            failed++;
+          }
+        }
+        if (deleted > 0) Lex.Toast.success(deleted + ' document' + (deleted !== 1 ? 's' : '') + ' deleted');
+        if (failed > 0) Lex.Toast.error(failed + ' failed to delete');
+        await refreshDrawerDocuments(matterId);
       }
-    }
-    if (deleted > 0) Lex.Toast.success(deleted + ' document' + (deleted !== 1 ? 's' : '') + ' deleted');
-    if (failed > 0) Lex.Toast.error(failed + ' failed to delete');
-    await refreshDrawerDocuments(matterId);
+    );
   }
 
   window.filterDocs = filterDocs;
@@ -3766,19 +3761,11 @@
   }
 
   function confirmDeleteContact(contactId, contactName) {
-    if (typeof Modal !== 'undefined' && Modal.confirm) {
-      Modal.confirm(
-        'Delete Contact',
-        'Are you sure you want to delete the contact "' + contactName + '"? This action cannot be undone.',
-        function () { deleteContact(contactId); },
-        'Delete',
-        'danger'
-      );
-    } else {
-      if (confirm('Are you sure you want to delete the contact "' + contactName + '"? This action cannot be undone.')) {
-        deleteContact(contactId);
-      }
-    }
+    Lex.Modal.confirm(
+      'Delete Contact',
+      'Are you sure you want to delete the contact "' + contactName + '"? This action cannot be undone.',
+      function () { deleteContact(contactId); }
+    );
   }
 
   async function deleteContact(contactId) {
@@ -7286,8 +7273,11 @@
    * @param {string} matchId - Pending match ID
    * @param {string} matterId - Matter ID
    */
-  async function showApprovePendingMatchModal(matchId, matterId) {
-    if (!confirm('Approve this match? This will create a permanent link between this matter and the connector data.')) return;
+  function showApprovePendingMatchModal(matchId, matterId) {
+    Lex.Modal.confirm(
+      'Approve Match',
+      'Approve this match? This will create a permanent link between this matter and the connector data.',
+      async function () {
     try {
       Lex.Toast.info('Approving match...');
       await api.approvePendingMatch(matterId, matchId);
@@ -7309,6 +7299,8 @@
       console.error('[showApprovePendingMatchModal] Error:', error);
       Lex.Toast.error(error.message || 'Failed to approve match');
     }
+      }
+    );
   }
 
   /**
@@ -7561,10 +7553,11 @@
         '</div>' +
         '<p class="text-xs text-gray-500 mb-3">' + docCount + ' document' + (docCount !== 1 ? 's' : '') + '</p>' +
         (s.description ? '<p class="text-xs text-gray-400 mb-3 line-clamp-2">' + escapeHtml(s.description) + '</p>' : '') +
-        '<div class="flex items-center gap-2">' +
-          '<button onclick="editTemplateSet(\'' + s.set_id + '\')" class="text-xs font-medium px-2 py-1 rounded transition-colors" style="color: var(--lex-text-accent); background: var(--lex-bg-accent-muted)">Edit</button>' +
-          '<button onclick="analyzeTemplateSet(\'' + s.set_id + '\')" class="text-xs font-medium px-2 py-1 rounded transition-colors text-gray-600 bg-gray-100 hover:bg-gray-200">Analyze</button>' +
-          '<button onclick="deleteTemplateSet(\'' + s.set_id + '\')" class="text-xs font-medium px-2 py-1 rounded transition-colors text-red-600 bg-red-50 hover:bg-red-100">Delete</button>' +
+        '<div class="flex items-center gap-2 flex-wrap">' +
+          '<button onclick="manageSetDocuments(\'' + s.id + '\', \'' + escapeHtml(s.name) + '\')" class="text-xs font-medium px-2 py-1 rounded transition-colors text-blue-700 bg-blue-50 hover:bg-blue-100">Documents</button>' +
+          '<button onclick="editTemplateSet(\'' + s.id + '\')" class="text-xs font-medium px-2 py-1 rounded transition-colors" style="color: var(--lex-text-accent); background: var(--lex-bg-accent-muted)">Edit</button>' +
+          '<button onclick="analyzeTemplateSet(\'' + s.id + '\')" class="text-xs font-medium px-2 py-1 rounded transition-colors text-gray-600 bg-gray-100 hover:bg-gray-200">Analyze</button>' +
+          '<button onclick="deleteTemplateSet(\'' + s.id + '\')" class="text-xs font-medium px-2 py-1 rounded transition-colors text-red-600 bg-red-50 hover:bg-red-100">Delete</button>' +
         '</div>' +
       '</div>';
     }
@@ -7589,7 +7582,7 @@
       options += '<optgroup label="Template Sets">';
       for (var j = 0; j < docGenState.templateSets.length; j++) {
         var ts = docGenState.templateSets[j];
-        options += '<option value="' + escapeHtml(ts.document_type) + '" data-set-id="' + escapeHtml(ts.set_id) + '">' + escapeHtml(ts.name) + '</option>';
+        options += '<option value="' + escapeHtml(ts.document_type) + '" data-set-id="' + escapeHtml(ts.id) + '">' + escapeHtml(ts.name) + '</option>';
       }
       options += '</optgroup>';
     }
@@ -7702,7 +7695,7 @@
     if (existingSet) {
       if (heading) heading.heading = 'Edit Template Set';
       if (submitBtn) submitBtn.textContent = 'Save Changes';
-      if (editId) editId.value = existingSet.set_id || '';
+      if (editId) editId.value = existingSet.id || '';
       if (nameEl) nameEl.value = existingSet.name || '';
       if (descEl) descEl.value = existingSet.description || '';
       if (docTypeEl) docTypeEl.value = existingSet.document_type || '';
@@ -7763,15 +7756,20 @@
     }
   }
 
-  async function deleteTemplateSet(setId) {
-    if (!confirm('Delete this template set? This cannot be undone.')) return;
-    try {
-      await api.delete('/api/v1/generation-template-sets/' + setId);
-      Lex.Toast.success('Template set deleted');
-      if (currentMatterData) renderDocGenerationTab(currentMatterData.matter);
-    } catch (err) {
-      Lex.Toast.error('Failed to delete: ' + (err.message || 'Unknown error'));
-    }
+  function deleteTemplateSet(setId) {
+    Lex.Modal.confirm(
+      'Delete Template Set',
+      'Are you sure you want to delete this template set? This action cannot be undone.',
+      async function () {
+        try {
+          await api.delete('/api/v1/generation-template-sets/' + setId);
+          Lex.Toast.success('Template set deleted');
+          if (currentMatterData) renderDocGenerationTab(currentMatterData.matter);
+        } catch (err) {
+          Lex.Toast.error('Failed to delete: ' + (err.message || 'Unknown error'));
+        }
+      }
+    );
   }
 
   async function analyzeTemplateSet(setId) {
@@ -7782,6 +7780,159 @@
       if (currentMatterData) renderDocGenerationTab(currentMatterData.matter);
     } catch (err) {
       Lex.Toast.error('Analysis failed: ' + (err.message || 'Unknown error'));
+    }
+  }
+
+  // =========================================================================
+  // Document Generation - Template Set Document Management
+  // =========================================================================
+
+  /**
+   * Open an inline panel showing documents in a template set, with the ability
+   * to add from the matter's documents or remove existing ones.
+   */
+  async function manageSetDocuments(setId, setName) {
+    try {
+      // Fetch the set with its documents
+      var resp = await api.get('/api/v1/generation-template-sets/' + setId);
+      var set = resp && resp.data ? resp.data : resp;
+      var docs = set.documents || [];
+
+      // Build overlay
+      var overlay = document.getElementById('tsDocOverlay');
+      if (overlay) overlay.remove();
+
+      overlay = document.createElement('div');
+      overlay.id = 'tsDocOverlay';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;';
+
+      var panel = document.createElement('div');
+      panel.style.cssText = 'background:white;border-radius:12px;width:90%;max-width:640px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);';
+
+      // Header
+      var header = document.createElement('div');
+      header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #e5e7eb;';
+      header.innerHTML = '<div><h3 style="font-size:16px;font-weight:600;color:#111827;">Documents in ' + escapeHtml(setName) + '</h3>' +
+        '<p style="font-size:12px;color:#6b7280;margin-top:2px;">' + docs.length + ' document' + (docs.length !== 1 ? 's' : '') + '</p></div>' +
+        '<button id="tsDocCloseBtn" style="padding:4px;border-radius:6px;border:none;background:none;cursor:pointer;color:#6b7280;" title="Close">' +
+          '<svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>' +
+        '</button>';
+      panel.appendChild(header);
+
+      // Document list
+      var listContainer = document.createElement('div');
+      listContainer.style.cssText = 'flex:1;overflow-y:auto;padding:12px 20px;';
+
+      if (docs.length === 0) {
+        listContainer.innerHTML = '<div style="text-align:center;padding:24px;color:#9ca3af;font-size:14px;">No documents in this set yet</div>';
+      } else {
+        var listHtml = '';
+        for (var i = 0; i < docs.length; i++) {
+          var d = docs[i];
+          var fname = d.filename || 'Unknown';
+          listHtml += '<div class="flex items-center justify-between py-2 border-b border-gray-100" data-doc-id="' + escapeHtml(d.document_id) + '">' +
+            '<div class="min-w-0 flex-1">' +
+              '<p class="text-sm text-gray-800 truncate">' + escapeHtml(fname) + '</p>' +
+              '<p class="text-xs text-gray-400">' + escapeHtml(d.content_type || '') + '</p>' +
+            '</div>' +
+            '<button onclick="removeDocFromSet(\'' + setId + '\', \'' + d.document_id + '\', this)" class="ml-2 text-xs font-medium px-2 py-1 rounded text-red-600 bg-red-50 hover:bg-red-100 transition-colors flex-shrink-0">Remove</button>' +
+          '</div>';
+        }
+        listContainer.innerHTML = listHtml;
+      }
+      panel.appendChild(listContainer);
+
+      // Add document section
+      var addSection = document.createElement('div');
+      addSection.style.cssText = 'border-top:1px solid #e5e7eb;padding:12px 20px;';
+      addSection.innerHTML = '<p style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px;">Add Document from Matter</p>' +
+        '<div style="display:flex;gap:8px;">' +
+          '<select id="tsDocSelect" style="flex:1;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">' +
+            '<option value="">Loading documents...</option>' +
+          '</select>' +
+          '<button id="tsDocAddBtn" onclick="addDocToSet(\'' + setId + '\')" style="padding:6px 14px;border-radius:6px;border:none;background:#7c3aed;color:white;font-size:13px;font-weight:500;cursor:pointer;">Add</button>' +
+        '</div>';
+      panel.appendChild(addSection);
+
+      overlay.appendChild(panel);
+      document.body.appendChild(overlay);
+
+      // Close handlers
+      document.getElementById('tsDocCloseBtn').onclick = function () { overlay.remove(); };
+      overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.remove(); });
+
+      // Populate the document select with matter documents not already in the set
+      var existingIds = {};
+      for (var ei = 0; ei < docs.length; ei++) existingIds[docs[ei].document_id] = true;
+
+      var matterId = currentMatterData && currentMatterData.matter ? currentMatterData.matter.matter_id : null;
+      if (matterId) {
+        var docsResp = await api.get('/api/v1/matters/' + matterId + '/documents?limit=200');
+        var matterDocs = (docsResp && docsResp.data) ? docsResp.data : (Array.isArray(docsResp) ? docsResp : []);
+        var select = document.getElementById('tsDocSelect');
+        if (select) {
+          var optHtml = '<option value="">-- Select a document --</option>';
+          for (var di = 0; di < matterDocs.length; di++) {
+            var md = matterDocs[di];
+            if (existingIds[md.id]) continue; // Already in set
+            optHtml += '<option value="' + escapeHtml(md.id) + '">' + escapeHtml(md.filename || 'Document') + '</option>';
+          }
+          select.innerHTML = optHtml;
+        }
+      }
+    } catch (err) {
+      Lex.Toast.error('Failed to load set documents: ' + (err.message || 'Unknown error'));
+    }
+  }
+
+  /**
+   * Add a document to a template set from the management overlay.
+   */
+  async function addDocToSet(setId) {
+    var select = document.getElementById('tsDocSelect');
+    if (!select || !select.value) {
+      Lex.Toast.error('Please select a document');
+      return;
+    }
+    var docId = select.value;
+    var matterId = currentMatterData && currentMatterData.matter ? currentMatterData.matter.matter_id : null;
+
+    try {
+      await api.post('/api/v1/generation-template-sets/' + setId + '/documents', {
+        document_id: docId,
+        source_matter_id: matterId
+      });
+      Lex.Toast.success('Document added to set');
+      // Refresh the overlay
+      var overlay = document.getElementById('tsDocOverlay');
+      if (overlay) overlay.remove();
+      // Re-fetch set name from state
+      var setName = '';
+      for (var i = 0; i < docGenState.templateSets.length; i++) {
+        if (docGenState.templateSets[i].id === setId) { setName = docGenState.templateSets[i].name; break; }
+      }
+      manageSetDocuments(setId, setName);
+      // Refresh the tab to update document counts
+      if (currentMatterData) renderDocGenerationTab(currentMatterData.matter);
+    } catch (err) {
+      Lex.Toast.error('Failed to add document: ' + (err.message || 'Unknown error'));
+    }
+  }
+
+  /**
+   * Remove a document from a template set.
+   */
+  async function removeDocFromSet(setId, docId, btnEl) {
+    try {
+      await api.delete('/api/v1/generation-template-sets/' + setId + '/documents/' + docId);
+      // Remove the row from DOM
+      var row = btnEl.closest('[data-doc-id]');
+      if (row) row.remove();
+      Lex.Toast.success('Document removed');
+      // Refresh the tab to update document counts
+      if (currentMatterData) renderDocGenerationTab(currentMatterData.matter);
+    } catch (err) {
+      Lex.Toast.error('Failed to remove document: ' + (err.message || 'Unknown error'));
     }
   }
 
@@ -8103,6 +8254,9 @@
   window.editTemplateSet = editTemplateSet;
   window.deleteTemplateSet = deleteTemplateSet;
   window.analyzeTemplateSet = analyzeTemplateSet;
+  window.manageSetDocuments = manageSetDocuments;
+  window.addDocToSet = addDocToSet;
+  window.removeDocFromSet = removeDocFromSet;
   window.submitDocGeneration = submitDocGeneration;
   window.addDocGenCustomVar = addDocGenCustomVar;
   window.removeDocGenCustomVar = removeDocGenCustomVar;
@@ -8112,6 +8266,7 @@
   ['renderDocGenerationTab', 'analyzeDocumentStructure',
    'openTemplateSetModal', 'closeTemplateSetModal', 'saveTemplateSet',
    'editTemplateSet', 'deleteTemplateSet', 'analyzeTemplateSet',
+   'manageSetDocuments', 'addDocToSet', 'removeDocFromSet',
    'submitDocGeneration', 'addDocGenCustomVar', 'removeDocGenCustomVar',
    'copyGeneratedContent', 'closeDocGenOutputModal'].forEach(_trackGlobal);
 

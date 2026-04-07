@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Approval Detail - LANA AI</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="css/lex-tokens.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/approvals.css">
+  <link rel="stylesheet" href="css/tailwind-output.css">
+  <script src="js/tailwind-loader.js"></script>
+
+</head>
+<body>
+
+  <lex-loader theme="light"></lex-loader>
+
+  <lex-app
+    logo-src="img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="dashboard.html"
+    active-nav-id="approvals"
+    page-title="Approval Detail"
+  ></lex-app>
+
+  <template id="page-content">
+
+    <main>
+
+      <!-- Header -->
+      <div class="apd-header">
+        <a href="approvals.html" class="apd-back">&larr; Back to Approvals</a>
+        <div class="apd-title" id="apdTitle">Loading...</div>
+        <div class="apd-desc" id="apdDesc" style="display:none;"></div>
+        <div class="apd-meta-row">
+          <span id="apdStatusBadge"></span>
+          <span id="apdPriorityBadge"></span>
+          <span id="apdSourceBadge"></span>
+          <span id="apdTimer" style="font-size:0.75rem;"></span>
+        </div>
+      </div>
+
+      <!-- Loading state -->
+      <div id="apdLoading" style="text-align:center;padding:48px 0;">
+        <lex-spinner size="md"></lex-spinner>
+      </div>
+
+      <!-- Detail content (hidden until loaded) -->
+      <div id="apdContent" class="hidden">
+
+        <!-- Info grid -->
+        <lex-card padding="none" style="margin-bottom:1rem;">
+          <div class="apd-section-heading">Details</div>
+          <div class="apd-info-grid" id="apdInfoGrid"></div>
+        </lex-card>
+
+        <!-- Payload preview -->
+        <lex-card padding="none" style="margin-bottom:1rem;" id="apdPayloadCard">
+          <div class="apd-section-heading">Payload</div>
+          <div id="apdPayloadContent"></div>
+        </lex-card>
+
+        <!-- Status timeline -->
+        <lex-card padding="none" style="margin-bottom:1rem;">
+          <div class="apd-section-heading">History</div>
+          <div class="apd-timeline" id="apdTimeline">
+            <div style="text-align:center;padding:16px;color:var(--lex-text-tertiary);font-size:0.8125rem;">
+              <lex-spinner size="sm"></lex-spinner> Loading history...
+            </div>
+          </div>
+        </lex-card>
+
+        <!-- Action area (only visible for pending approvals assigned to current user) -->
+        <lex-card padding="none" id="apdActionCard" class="hidden">
+          <div class="apd-section-heading">Decision</div>
+          <div class="apd-actions">
+            <div class="apd-action-form">
+              <div>
+                <label class="apd-comment-label" for="apdComment">Comment (optional)</label>
+                <textarea
+                  id="apdComment"
+                  class="apd-comment-input"
+                  placeholder="Add a comment explaining your decision..."
+                  rows="3"
+                ></textarea>
+              </div>
+              <div class="apd-action-buttons">
+                <lex-btn id="apdApproveBtn" variant="success" size="md">Approve</lex-btn>
+                <lex-btn id="apdRejectBtn" variant="danger" size="md">Reject</lex-btn>
+                <lex-btn id="apdReassignBtn" variant="secondary" size="md">Reassign</lex-btn>
+                <lex-btn id="apdCancelBtn" variant="ghost" size="md">Cancel Request</lex-btn>
+              </div>
+            </div>
+          </div>
+        </lex-card>
+
+      </div>
+
+      <!-- Error state -->
+      <div id="apdError" class="hidden">
+        <lex-empty icon="document" message="Unable to load approval" description="This approval may not exist or you may not have access to it."></lex-empty>
+      </div>
+
+    </main>
+
+    <!-- Reassign modal -->
+    <lex-modal id="apdReassignModal" heading="Reassign Approval" size="sm">
+      <div style="padding:1rem;display:flex;flex-direction:column;gap:0.75rem;">
+        <lex-select
+          id="apdReassignUser"
+          label="Assign to"
+          placeholder="Select a user..."
+          searchable
+        ></lex-select>
+        <div>
+          <label class="apd-comment-label" for="apdReassignComment">Reason (optional)</label>
+          <textarea
+            id="apdReassignComment"
+            class="apd-comment-input"
+            placeholder="Why are you reassigning this approval?"
+            rows="2"
+          ></textarea>
+        </div>
+        <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+          <lex-btn id="apdReassignCancelBtn" variant="ghost" size="sm">Cancel</lex-btn>
+          <lex-btn id="apdReassignConfirmBtn" variant="primary" size="sm">Reassign</lex-btn>
+        </div>
+      </div>
+    </lex-modal>
+
+  </template>
+
+  <noscript>
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;color:#666;">
+      Please enable JavaScript to use LANA AI.
+    </div>
+  </noscript>
+
+  <!-- Universal shell scripts -->
+  <script src="js/error-reporter.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/mock-data.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/components.js"></script>
+  <script src="js/version.js"></script>
+  <script src="js/menu.js"></script>
+  <script src="js/navigation-helpers.js"></script>
+  <script src="js/new-project-modal.js"></script>
+  <script src="js/conversation-menu.js"></script>
+  <script src="js/conversation-search-modal.js"></script>
+  <script src="js/contact-search-modal.js"></script>
+  <script src="js/notifications.js"></script>
+
+  <!-- Lex UI core -->
+  <script src="js/lex/lex.core.js"></script>
+  <script src="js/lex/lex.icons.js"></script>
+  <script src="js/lex/lex.data.js"></script>
+  <script src="js/lex/lex.forms.js"></script>
+  <script src="js/lex/lex.state.js"></script>
+  <script src="js/lex/lex.utils.js"></script>
+  <script src="js/lex/lex.auth.js"></script>
+  <script src="js/lex/lex-nav.js"></script>
+
+  <!-- Lex UI layout -->
+  <script src="js/lex/components/foundation/lex-loader.js"></script>
+  <script src="js/lex/components/foundation/lex-toast.js"></script>
+  <script src="js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="js/lex/components/foundation/lex-btn.js"></script>
+  <script src="js/lex/components/foundation/lex-empty.js"></script>
+  <script src="js/lex/components/form/lex-segmented.js"></script>
+  <script src="js/lex/components/form/lex-select.js"></script>
+  <script src="js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="js/lex/components/layout/lex-topbar.js"></script>
+  <script src="js/lex/components/layout/lex-conversation-item.js"></script>
+  <script src="js/lex/components/layout/lex-notification-panel.js"></script>
+  <script src="js/lex/components/layout/lex-app.js"></script>
+
+  <!-- Page-specific Lex components -->
+  <script src="js/lex/components/foundation/lex-badge.js"></script>
+  <script src="js/lex/components/foundation/lex-card.js"></script>
+  <script src="js/lex/components/foundation/lex-modal.js"></script>
+
+  <!-- Inject page content -->
+  <script src="js/lex/lex-page-init.js"></script>
+
+  <!-- Page controller (MUST be last before auth-guard) -->
+  <script src="js/approvals.js"></script>
+
+  <!-- Auth guard + loader dismiss -->
+  <script src="js/auth-guard.js"></script>
+</body>
+</html>

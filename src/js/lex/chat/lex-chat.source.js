@@ -489,6 +489,21 @@
             blocks: data.blocks || data.suggested_blocks || []
           };
 
+        case 'debug_context':
+          if (!data.grounding) return null; // skip if no grounding data
+          return {
+            type: 'grounding_context',
+            groundingStatus: data.grounding.grounding_status || 'none',
+            evidenceMode: data.grounding.evidence_mode || 'unknown',
+            retrievalCoverage: data.grounding.retrieval_coverage || null,
+            fallbackUsed: data.grounding.fallback_used || false,
+            validatorFailures: data.grounding.validator_failures || [],
+            toolEvidenceCount: data.grounding.tool_evidence_count || 0,
+            policy: data.grounding_policy || null,
+            handler: data.handler || null,
+            strategy: data.strategy || null
+          };
+
         case 'sources':
         case 'retrieval_metrics':
         case 'tool_result':

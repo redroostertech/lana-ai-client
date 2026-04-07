@@ -1,0 +1,510 @@
+/* Approvals page styles — HITL Approval Inbox & Detail */
+
+/* ─── Shared page header ─────────────────────────────────────── */
+
+.apr-header {
+  margin-bottom: 1.25rem;
+}
+
+.apr-header-title {
+  font-size: 1.25rem;
+  font-weight: var(--lex-weight-semibold, 600);
+  color: var(--lex-text-primary);
+  letter-spacing: 0.01em;
+}
+
+.apr-header-subtitle {
+  font-size: var(--lex-form-help-size, 0.6875rem);
+  color: var(--lex-text-tertiary);
+  margin-top: 0.125rem;
+}
+
+/* ─── Filter bar ─────────────────────────────────────────────── */
+
+.apr-filters {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+/* ─── Stats bar ──────────────────────────────────────────────── */
+
+.apr-stats {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.apr-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0.75rem 1.125rem;
+  background: var(--lex-bg-primary);
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-radius-lg, 8px);
+  min-width: 100px;
+  box-shadow: var(--lex-shadow-sm);
+  cursor: pointer;
+  transition: border-color var(--lex-transition-fast), box-shadow var(--lex-transition-fast);
+}
+
+.apr-stat:hover {
+  border-color: var(--lex-border-strong);
+  box-shadow: var(--lex-shadow-md);
+}
+
+.apr-stat.active {
+  border-color: var(--lex-border-accent);
+  background: var(--lex-bg-accent-soft);
+}
+
+.apr-stat-value {
+  font-size: 1.375rem;
+  font-weight: var(--lex-weight-bold, 700);
+  color: var(--lex-text-primary);
+  line-height: 1;
+}
+
+.apr-stat-label {
+  font-size: var(--lex-form-help-size, 0.6875rem);
+  color: var(--lex-text-tertiary);
+  margin-top: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ─── Approval list item ─────────────────────────────────────── */
+
+.apr-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--lex-border-subtle);
+  cursor: pointer;
+  transition: background var(--lex-transition-fast);
+  position: relative;
+}
+
+.apr-item:last-child {
+  border-bottom: none;
+}
+
+.apr-item:hover {
+  background: var(--lex-bg-secondary);
+}
+
+.apr-item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.apr-item-title {
+  font-size: var(--lex-label-base, 0.875rem);
+  font-weight: var(--lex-weight-medium, 500);
+  color: var(--lex-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 0.25rem;
+}
+
+.apr-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: var(--lex-form-help-size, 0.6875rem);
+  color: var(--lex-text-tertiary);
+}
+
+.apr-item-meta-dot {
+  color: var(--lex-border-strong);
+}
+
+.apr-item-timer {
+  font-size: var(--lex-form-help-size, 0.6875rem);
+  font-weight: var(--lex-weight-medium, 500);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.apr-item-timer.urgent {
+  color: var(--lex-status-danger, #B42318);
+}
+
+.apr-item-timer.warning {
+  color: var(--lex-status-warning, #B54708);
+}
+
+.apr-item-timer.ok {
+  color: var(--lex-text-tertiary);
+}
+
+.apr-item-timer.expired {
+  color: var(--lex-text-disabled);
+}
+
+.apr-item-chevron {
+  flex-shrink: 0;
+  color: var(--lex-text-tertiary);
+  align-self: center;
+}
+
+/* Priority left bar */
+.apr-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: transparent;
+  transition: background var(--lex-transition-fast);
+}
+
+.apr-item[data-priority="urgent"]::before  { background: var(--lex-status-danger, #F04438); }
+.apr-item[data-priority="high"]::before    { background: var(--lex-status-warning, #F79009); }
+.apr-item[data-priority="normal"]::before  { background: var(--lex-border-accent); }
+.apr-item[data-priority="low"]::before     { background: var(--lex-border-default); }
+
+/* ─── Priority badge ─────────────────────────────────────────── */
+
+.apr-priority {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: var(--lex-weight-semibold, 600);
+  padding: 2px 6px;
+  border-radius: var(--lex-radius-full, 9999px);
+  white-space: nowrap;
+}
+
+.apr-priority-urgent {
+  background: var(--lex-status-danger-bg, #FEF3F2);
+  color: var(--lex-status-danger-text, #B42318);
+}
+
+.apr-priority-high {
+  background: var(--lex-status-warning-bg, #FFFAEB);
+  color: var(--lex-status-warning-text, #B54708);
+}
+
+.apr-priority-normal {
+  background: var(--lex-status-info-bg, #EFF4FF);
+  color: var(--lex-status-info-text, #175CD3);
+}
+
+.apr-priority-low {
+  background: var(--lex-bg-tertiary, #F5F3F0);
+  color: var(--lex-text-secondary);
+}
+
+/* ─── Status badge ───────────────────────────────────────────── */
+
+.apr-status {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: var(--lex-weight-semibold, 600);
+  padding: 2px 6px;
+  border-radius: var(--lex-radius-full, 9999px);
+  white-space: nowrap;
+}
+
+.apr-status-pending {
+  background: var(--lex-status-warning-bg, #FFFAEB);
+  color: var(--lex-status-warning-text, #B54708);
+}
+
+.apr-status-approved {
+  background: var(--lex-status-success-bg, #ECFDF3);
+  color: var(--lex-status-success-text, #067647);
+}
+
+.apr-status-rejected {
+  background: var(--lex-status-danger-bg, #FEF3F2);
+  color: var(--lex-status-danger-text, #B42318);
+}
+
+.apr-status-expired,
+.apr-status-cancelled {
+  background: var(--lex-bg-tertiary, #F5F3F0);
+  color: var(--lex-text-tertiary);
+}
+
+/* ─── Source type badge ──────────────────────────────────────── */
+
+.apr-source {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: var(--lex-weight-medium, 500);
+  padding: 2px 6px;
+  border-radius: var(--lex-radius-sm, 4px);
+  border: 1px solid var(--lex-border-default);
+  color: var(--lex-text-secondary);
+  background: var(--lex-bg-primary);
+  white-space: nowrap;
+}
+
+/* ─── Detail page ────────────────────────────────────────────── */
+
+.apd-header {
+  padding: 24px 0 16px;
+}
+
+.apd-back {
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.apd-back:hover {
+  color: var(--lex-text-secondary);
+}
+
+.apd-title {
+  font-size: 1.125rem;
+  font-weight: var(--lex-weight-semibold, 600);
+  color: var(--lex-text-primary);
+  margin-bottom: 8px;
+}
+
+.apd-desc {
+  font-size: var(--lex-body-sm, 0.875rem);
+  color: var(--lex-text-secondary);
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+.apd-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+  margin-top: 4px;
+}
+
+/* ─── Info grid ──────────────────────────────────────────────── */
+
+.apd-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.apd-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.apd-info-label {
+  font-size: var(--lex-form-help-size, 0.6875rem);
+  color: var(--lex-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: var(--lex-weight-medium, 500);
+}
+
+.apd-info-value {
+  font-size: var(--lex-label-base, 0.875rem);
+  color: var(--lex-text-primary);
+  font-weight: var(--lex-weight-medium, 500);
+}
+
+/* ─── Payload viewer ─────────────────────────────────────────── */
+
+.apd-payload {
+  padding: 1rem;
+  font-size: 0.8125rem;
+  font-family: var(--lex-font-mono, 'JetBrains Mono', 'Fira Code', monospace);
+  color: var(--lex-text-primary);
+  background: var(--lex-bg-secondary);
+  border-radius: var(--lex-radius-md, 6px);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.apd-payload-kv {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+}
+
+.apd-kv-row {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.8125rem;
+  align-items: flex-start;
+}
+
+.apd-kv-key {
+  min-width: 140px;
+  color: var(--lex-text-tertiary);
+  font-weight: var(--lex-weight-medium, 500);
+  flex-shrink: 0;
+}
+
+.apd-kv-val {
+  color: var(--lex-text-primary);
+  word-break: break-all;
+}
+
+/* ─── Timeline ───────────────────────────────────────────────── */
+
+.apd-timeline {
+  padding: 1rem;
+}
+
+.apd-timeline-item {
+  display: flex;
+  gap: 0.75rem;
+  padding-bottom: 1rem;
+  position: relative;
+}
+
+.apd-timeline-item:last-child {
+  padding-bottom: 0;
+}
+
+.apd-timeline-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--lex-border-strong);
+  flex-shrink: 0;
+  margin-top: 4px;
+  position: relative;
+  z-index: 1;
+}
+
+.apd-timeline-dot.approved  { background: var(--lex-status-success, #17B26A); }
+.apd-timeline-dot.rejected  { background: var(--lex-status-danger, #F04438); }
+.apd-timeline-dot.pending   { background: var(--lex-status-warning, #F79009); }
+.apd-timeline-dot.expired   { background: var(--lex-text-disabled); }
+.apd-timeline-dot.cancelled { background: var(--lex-text-disabled); }
+.apd-timeline-dot.created   { background: var(--lex-border-accent); }
+
+.apd-timeline-line {
+  position: absolute;
+  left: 4px;
+  top: 16px;
+  bottom: 0;
+  width: 2px;
+  background: var(--lex-border-subtle);
+}
+
+.apd-timeline-item:last-child .apd-timeline-line {
+  display: none;
+}
+
+.apd-timeline-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.apd-timeline-action {
+  font-size: 0.8125rem;
+  font-weight: var(--lex-weight-medium, 500);
+  color: var(--lex-text-primary);
+  text-transform: capitalize;
+}
+
+.apd-timeline-actor {
+  font-size: var(--lex-form-help-size, 0.6875rem);
+  color: var(--lex-text-tertiary);
+  margin-top: 1px;
+}
+
+.apd-timeline-comment {
+  font-size: 0.8125rem;
+  color: var(--lex-text-secondary);
+  margin-top: 4px;
+  font-style: italic;
+  background: var(--lex-bg-secondary);
+  border-left: 2px solid var(--lex-border-default);
+  padding: 4px 8px;
+  border-radius: 0 var(--lex-radius-sm, 4px) var(--lex-radius-sm, 4px) 0;
+}
+
+/* ─── Action area ────────────────────────────────────────────── */
+
+.apd-actions {
+  padding: 1rem;
+}
+
+.apd-action-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.apd-comment-label {
+  font-size: var(--lex-label-sm, 0.75rem);
+  font-weight: var(--lex-weight-medium, 500);
+  color: var(--lex-text-secondary);
+}
+
+.apd-comment-input {
+  width: 100%;
+  min-height: 72px;
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-radius-md, 6px);
+  padding: 8px 12px;
+  font-size: 0.8125rem;
+  resize: vertical;
+  font-family: inherit;
+  background: var(--lex-bg-primary);
+  color: var(--lex-text-primary);
+  transition: border-color var(--lex-transition-fast);
+  box-sizing: border-box;
+}
+
+.apd-comment-input:focus {
+  outline: none;
+  border-color: var(--lex-input-border-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lex-input-border-focus) 20%, transparent);
+}
+
+.apd-action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* ─── Section card heading ───────────────────────────────────── */
+
+.apd-section-heading {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--lex-border-subtle);
+  font-size: 0.6875rem;
+  font-weight: var(--lex-weight-semibold, 600);
+  color: var(--lex-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}

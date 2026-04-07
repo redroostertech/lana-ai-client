@@ -903,8 +903,7 @@
     if (results[1].status === 'fulfilled' && results[1].value) {
       storageStats = results[1].value;
       var totalFiles   = parseInt(storageStats.total_files   || 0, 10);
-      var deletedFiles = parseInt(storageStats.deleted_files || 0, 10);
-      docsCount = (totalFiles + deletedFiles).toLocaleString();
+      docsCount = totalFiles.toLocaleString();
     }
 
     // System storage from /admin/health/storage (used_bytes + usage_percent)

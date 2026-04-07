@@ -804,7 +804,24 @@ class LanaChat {
               const data = JSON.parse(line.slice(5).trim());
 
               // Handle different event types
-              if (currentEvent === 'context_usage') {
+              if (currentEvent === 'connected') {
+                if (data.session_id) {
+                  this.currentSessionId = data.session_id;
+                }
+
+                // New streaming conversations only get their thread ID over SSE.
+                if (data.thread_id && !this.currentConversationId) {
+                  this.currentConversationId = data.thread_id;
+                  console.log('[SSE Connected] New conversation created:', {
+                    thread_id: data.thread_id,
+                    session_id: data.session_id
+                  });
+
+                  if (window.FileDrawer) {
+                    window.FileDrawer.loadDocuments(data.thread_id);
+                  }
+                }
+              } else if (currentEvent === 'context_usage') {
                 console.log('[SSE] Received context_usage event:', data);
                 this.updateContextMeter(data);
               } else if (currentEvent === 'thinking') {
@@ -859,6 +876,12 @@ class LanaChat {
                   // Fallback: show progress in typing indicator
                   this.updateTypingIndicator(data.message || `${data.phase}: ${data.status}`);
                 }
+              } else if (currentEvent === 'agentic_approval_required') {
+                console.log('[SSE] Agentic Approval Required:', data);
+                this.hideTypingIndicator();
+                if (window.AgenticUI) {
+                  window.AgenticUI.handleAgenticApprovalRequired(data, this.currentConversationId);
+                }
               } else if (currentEvent === 'agentic_complete') {
                 console.log('[SSE] Agentic Complete:', data);
                 if (window.AgenticUI) {
@@ -873,6 +896,16 @@ class LanaChat {
                 console.log('[SSE] Agentic Follow-up:', data);
                 if (window.AgenticUI) {
                   window.AgenticUI.handleAgenticFollowup(data);
+                }
+              } else if (currentEvent === 'done') {
+                // Fallback for any client that misses the initial connected event.
+                if (data.thread_id && !this.currentConversationId) {
+                  this.currentConversationId = data.thread_id;
+                  console.log('[SSE Done] Captured conversation ID from done event:', data.thread_id);
+
+                  if (window.FileDrawer) {
+                    window.FileDrawer.loadDocuments(data.thread_id);
+                  }
                 }
               } else if (data.content) {
                 // Regular message content
