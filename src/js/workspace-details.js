@@ -41,6 +41,12 @@
   var _tabIndicatorInitialized = false;
   var _navContext = null;              // navigation context (source, conversationId, etc.)
 
+  // Document tab pagination/search state
+  var _docPage = 1;
+  var _docPageSize = 12;
+  var _docSearch = '';
+  var _docSearchTimeout = null;
+
   // Document generation state
   var docGenState = {
     documentTypes: [],
@@ -249,7 +255,7 @@
         api.getMatterPermissions(matterId).catch(function () { return { permissions: [] }; }),
         api.getMatterActivity(matterId, 20, 0).catch(function () { return { activities: [], pagination: {} }; }),
         api.getMatterConversations(matterId, 25, 0).catch(function () { return { sessions: [], pagination: {} }; }),
-        api.getMatterFiles(matterId).catch(function () { return { files: [], pagination: { total_count: 0 } }; }),
+        api.getMatterFiles(matterId, { page: 1, pageSize: 500 }).catch(function () { return { files: [], pagination: { total_count: 0 } }; }),
         api.getOrphanedFiles(matterId).catch(function () { return { orphaned_files: [], total_count: 0 }; }),
         api.getMatterTasks(matterId).catch(function () { return { tasks: [], total_count: 0 }; }),
         api.getComments(matterId, { limit: 0 }).catch(function () { return { data: [], pagination: { total: 0 } }; })
@@ -1404,14 +1410,33 @@
     // Build document list HTML
     var docListHtml = '';
     if (documents.length > 0) {
-      // Count templates
+      // Client-side search filter
+      var allDocs = documents;
+      var filteredDocs = allDocs;
+      if (_docSearch) {
+        var searchLower = _docSearch.toLowerCase();
+        filteredDocs = allDocs.filter(function (d) {
+          var name = (d.original_filename || d.filename || '').toLowerCase();
+          return name.indexOf(searchLower) !== -1;
+        });
+      }
+
+      // Count templates (from filtered set)
       var templateCount = 0;
-      for (var tc = 0; tc < documents.length; tc++) { if (documents[tc].is_template) templateCount++; }
-      var nonTemplateCount = documents.length - templateCount;
+      for (var tc = 0; tc < filteredDocs.length; tc++) { if (filteredDocs[tc].is_template) templateCount++; }
+      var nonTemplateCount = filteredDocs.length - templateCount;
+
+      // Client-side pagination
+      var totalCount = filteredDocs.length;
+      var currentPage = _docPage;
+      var totalPages = Math.ceil(totalCount / _docPageSize) || 1;
+      if (currentPage > totalPages) { currentPage = 1; _docPage = 1; }
+      var startIdx = (currentPage - 1) * _docPageSize;
+      var pageDocs = filteredDocs.slice(startIdx, startIdx + _docPageSize);
 
       var docItems = '';
-      for (var di = 0; di < documents.length; di++) {
-        var doc = documents[di];
+      for (var di = 0; di < pageDocs.length; di++) {
+        var doc = pageDocs[di];
         var docName = doc.original_filename || doc.filename || '';
         var sourceBadge = '';
         if (doc.source === 'workspace') {
@@ -1546,10 +1571,17 @@
       }
 
       docListHtml =
+        // Search bar
+        '<div class="mb-3">' +
+          '<div class="relative">' +
+            '<svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>' +
+            '<input type="text" id="docSearchInput" placeholder="Search documents..." value="' + escapeHtml(_docSearch) + '" class="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent">' +
+          '</div>' +
+        '</div>' +
         // Filter tabs + batch actions bar
         '<div class="flex items-center justify-between mb-3">' +
           '<div class="flex items-center gap-1">' +
-            '<button onclick="filterDocs(\'all\')" class="doc-filter-btn px-2.5 py-1 text-xs font-medium rounded-full bg-gray-900 text-white" data-filter="all">All ' + documents.length + '</button>' +
+            '<button onclick="filterDocs(\'all\')" class="doc-filter-btn px-2.5 py-1 text-xs font-medium rounded-full bg-gray-900 text-white" data-filter="all">All ' + totalCount + '</button>' +
             (templateCount > 0 ? '<button onclick="filterDocs(\'template\')" class="doc-filter-btn px-2.5 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200" data-filter="template">Templates ' + templateCount + '</button>' : '') +
             (nonTemplateCount > 0 ? '<button onclick="filterDocs(\'document\')" class="doc-filter-btn px-2.5 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200" data-filter="document">Documents ' + nonTemplateCount + '</button>' : '') +
           '</div>' +
@@ -1563,7 +1595,13 @@
             '</button>' +
           '</div>' +
         '</div>' +
-        '<div id="docListContainer" class="space-y-2">' + docItems + '</div>';
+        '<div id="docListContainer" class="space-y-2">' +
+          (filteredDocs.length === 0
+            ? '<div class="text-center py-8"><p class="text-sm text-gray-500">No documents matching "' + escapeHtml(_docSearch) + '"</p></div>'
+            : docItems) +
+        '</div>' +
+        // Pagination
+        (totalPages > 1 ? '<lex-pagination id="docPagination" class="mt-4 border-t pt-4" page="' + currentPage + '" total-pages="' + totalPages + '" total="' + totalCount + '" limit="' + _docPageSize + '"></lex-pagination>' : '');
     }
 
     // Build orphaned files HTML
@@ -1644,6 +1682,36 @@
       '</div>';
 
     setupDrawerUpload(matter, 'drawerDocDropZone', 'drawerDocFileInput');
+
+    // Wire up document search
+    var searchInput = document.getElementById('docSearchInput');
+    if (searchInput) {
+      // Restore focus if user was actively searching
+      if (_docSearch) {
+        searchInput.focus();
+        searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+      }
+      searchInput.addEventListener('input', function () {
+        clearTimeout(_docSearchTimeout);
+        _docSearchTimeout = setTimeout(function () {
+          _docSearch = searchInput.value.trim();
+          _docPage = 1;
+          loadDocumentsPage(matter.matter_id);
+        }, 300);
+      });
+    }
+
+    // Wire up document pagination
+    var docPag = document.getElementById('docPagination');
+    if (docPag) {
+      docPag.addEventListener('page-change', function (e) {
+        var newPage = e.detail && e.detail.page;
+        if (newPage) {
+          _docPage = newPage;
+          loadDocumentsPage(matter.matter_id);
+        }
+      });
+    }
   }
 
   // Setup drag-and-drop / click-to-upload handlers for a drop zone
@@ -1730,14 +1798,21 @@
     }
   }
 
-  // Refresh the documents tab after an upload/delete operation
+  // Re-render documents with current search/page state (no API call)
+  function loadDocumentsPage(matterId) {
+    if (currentMatterData && currentMatterData.matter) {
+      renderDocumentsTab(currentMatterData.matter, currentMatterData.documents, currentMatterData.docPagination, currentMatterData.orphanedFiles);
+    }
+  }
+
+  // Refresh the documents tab after an upload/delete operation (fetches from API)
   async function refreshDrawerDocuments(matterId) {
     try {
-      var docsResult = await api.getMatterDocuments(matterId);
-      var documents = docsResult.documents || [];
+      var docsResult = await api.getMatterFiles(matterId, { page: 1, pageSize: 500 });
+      var documents = docsResult.files || [];
       var pagination = docsResult.pagination || {};
-      var orphanedResult = await api.getOrphanedFiles(matterId).catch(function () { return { files: [] }; });
-      var orphanedFiles = orphanedResult.files || [];
+      var orphanedResult = await api.getOrphanedFiles(matterId).catch(function () { return { orphaned_files: [] }; });
+      var orphanedFiles = orphanedResult.orphaned_files || orphanedResult.files || [];
 
       if (currentMatterData) {
         currentMatterData.documents = documents;
@@ -8536,6 +8611,10 @@
     currentTaskMatterId = null;
     currentEditingTask = null;
     currentTasksList = [];
+    _docPage = 1;
+    _docSearch = '';
+    clearTimeout(_docSearchTimeout);
+    _docSearchTimeout = null;
     docGenState = {
       documentTypes: [], templateSets: [], contacts: [],
       isGenerating: false, isAnalyzing: false, generatedContent: '',
