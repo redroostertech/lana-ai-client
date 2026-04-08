@@ -1249,6 +1249,7 @@
               btn.style.color = 'var(--lex-text-accent)';
               // Track selection
               selectedModuleKey = module.moduleKey;
+              showCustomizeButton();
               // Update missing entities for this module
               updateMissingEntitiesForModule(module.moduleKey);
             });
@@ -1278,6 +1279,7 @@
       var firstAvailable = allModules.find(function (m) { return m.available; });
       if (firstAvailable && moduleMenu) {
         selectedModuleKey = firstAvailable.moduleKey;
+        showCustomizeButton();
         var firstBtn = moduleMenu.querySelector('button[data-module-key="' + firstAvailable.moduleKey + '"]');
         if (firstBtn) {
           firstBtn.style.background = 'var(--lex-bg-accent-soft)';
@@ -3365,6 +3367,341 @@
   // Window Namespace Exposure
   // ==========================================================================
 
+  // ==========================================================================
+  // Module Customization Panel
+  // ==========================================================================
+
+  var customizationCatalog = null; // Cached analytics catalog
+
+  function openCustomizePanel() {
+    var panel = document.getElementById('customizePanel');
+    var overlay = document.getElementById('customizeOverlay');
+    if (panel) panel.style.transform = 'translateX(0)';
+    if (overlay) overlay.classList.remove('hidden');
+    loadExistingCustomizations();
+    loadAnalyticsCatalog();
+  }
+
+  function closeCustomizePanel() {
+    var panel = document.getElementById('customizePanel');
+    var overlay = document.getElementById('customizeOverlay');
+    if (panel) panel.style.transform = 'translateX(100%)';
+    if (overlay) overlay.classList.add('hidden');
+  }
+
+  async function loadAnalyticsCatalog() {
+    if (customizationCatalog) return;
+    try {
+      var result = await api.get('/api/v1/analytics/catalog');
+      if (result && result.data) {
+        customizationCatalog = result.data;
+      }
+    } catch (err) {
+      console.warn('[Reporting] Failed to load analytics catalog:', err);
+    }
+  }
+
+  async function loadExistingCustomizations() {
+    var moduleKey = selectedModuleKey || '';
+    if (!moduleKey) return;
+
+    var container = document.getElementById('existingCustomizations');
+    if (!container) return;
+
+    try {
+      var result = await api.get('/api/v1/module-customizations?module_key=' + encodeURIComponent(moduleKey));
+      var items = (result && result.data) ? result.data : [];
+
+      if (items.length === 0) {
+        container.innerHTML = '<p class="text-xs text-gray-500">No customizations saved for this module</p>';
+        return;
+      }
+
+      var html = '';
+      for (var i = 0; i < items.length; i++) {
+        var item = items[i];
+        var defaultBadge = item.is_default
+          ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-700 ml-2">Default</span>'
+          : '';
+        html += '<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">'
+          + '<div>'
+          + '<p class="text-sm font-medium text-gray-900">' + escapeHtml(item.customization_name) + defaultBadge + '</p>'
+          + (item.description ? '<p class="text-xs text-gray-500 mt-0.5">' + escapeHtml(item.description) + '</p>' : '')
+          + '</div>'
+          + '<div class="flex items-center gap-2">'
+          + (item.is_default ? '' : '<button onclick="window._reporting.setCustomizationDefault(\'' + item.id + '\')" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Set Default</button>')
+          + '<button onclick="window._reporting.deleteCustomization(\'' + item.id + '\')" class="text-xs text-red-600 hover:text-red-800 font-medium">Delete</button>'
+          + '</div>'
+          + '</div>';
+      }
+      container.innerHTML = html;
+
+      // Show active customization info
+      var activeInfo = document.getElementById('activeCustomizationInfo');
+      var defaultItem = items.find(function (it) { return it.is_default; });
+      if (defaultItem && activeInfo) {
+        activeInfo.classList.remove('hidden');
+        var nameEl = document.getElementById('activeCustomizationName');
+        var descEl = document.getElementById('activeCustomizationDesc');
+        if (nameEl) nameEl.textContent = defaultItem.customization_name;
+        if (descEl) descEl.textContent = defaultItem.description || 'Active default customization';
+      } else if (activeInfo) {
+        activeInfo.classList.add('hidden');
+      }
+    } catch (err) {
+      container.innerHTML = '<p class="text-xs text-red-500">Failed to load customizations</p>';
+      console.error('[Reporting] Failed to load customizations:', err);
+    }
+  }
+
+  function addMetricRow() {
+    var container = document.getElementById('custMetricsContainer');
+    if (!container) return;
+    var row = document.createElement('div');
+    row.className = 'flex items-center gap-2';
+    row.innerHTML = '<input type="text" placeholder="e.g. count.id" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm cust-metric-input" maxlength="100">'
+      + '<button type="button" class="text-red-500 hover:text-red-700 text-xs" onclick="this.parentElement.remove()">Remove</button>';
+    container.appendChild(row);
+  }
+
+  function addDimensionRow() {
+    var container = document.getElementById('custDimensionsContainer');
+    if (!container) return;
+
+    var options = '';
+    if (customizationCatalog && customizationCatalog.tables) {
+      var allCols = {};
+      customizationCatalog.tables.forEach(function (t) {
+        t.columns.forEach(function (c) {
+          if (c.capabilities.indexOf('group') !== -1) {
+            allCols[c.key] = c.label + ' (' + t.label + ')';
+          }
+        });
+      });
+      var keys = Object.keys(allCols);
+      for (var k = 0; k < keys.length; k++) {
+        options += '<option value="' + keys[k] + '">' + escapeHtml(allCols[keys[k]]) + '</option>';
+      }
+    }
+
+    var row = document.createElement('div');
+    row.className = 'flex items-center gap-2';
+    row.innerHTML = '<select class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm cust-dimension-input">'
+      + '<option value="">Select column...</option>'
+      + options
+      + '</select>'
+      + '<button type="button" class="text-red-500 hover:text-red-700 text-xs" onclick="this.parentElement.remove()">Remove</button>';
+    container.appendChild(row);
+  }
+
+  function addFilterRow() {
+    var container = document.getElementById('custFiltersContainer');
+    if (!container) return;
+    var row = document.createElement('div');
+    row.className = 'flex items-center gap-2';
+    row.innerHTML = '<input type="text" placeholder="Column" class="w-28 border border-gray-300 rounded px-2 py-1 text-sm cust-filter-col" maxlength="100">'
+      + '<select class="w-24 border border-gray-300 rounded px-2 py-1 text-sm cust-filter-op">'
+      + '<option value="equals">equals</option><option value="not_equals">not equals</option>'
+      + '<option value="contains">contains</option><option value="in">in</option>'
+      + '<option value="gt">greater than</option><option value="lt">less than</option>'
+      + '</select>'
+      + '<input type="text" placeholder="Value" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm cust-filter-val" maxlength="255">'
+      + '<button type="button" class="text-red-500 hover:text-red-700 text-xs" onclick="this.parentElement.remove()">Remove</button>';
+    container.appendChild(row);
+  }
+
+  function collectCustomizationData() {
+    var data = {
+      module_key: selectedModuleKey || '',
+      customization_name: (document.getElementById('custName') || {}).value || '',
+      description: (document.getElementById('custDescription') || {}).value || undefined
+    };
+
+    // Metric overrides
+    var metricMode = (document.getElementById('custMetricMode') || {}).value;
+    if (metricMode) {
+      var metricInputs = document.querySelectorAll('.cust-metric-input');
+      var metrics = [];
+      metricInputs.forEach(function (input) {
+        var val = input.value.trim();
+        if (val) metrics.push({ key: val });
+      });
+      data.metric_overrides = {
+        mode: metricMode,
+        metrics: metricMode !== 'remove' ? metrics : [],
+        remove_keys: metricMode === 'remove' ? metrics.map(function (m) { return m.key; }) : []
+      };
+    }
+
+    // Dimension overrides
+    var dimMode = (document.getElementById('custDimensionMode') || {}).value;
+    if (dimMode) {
+      var dimInputs = document.querySelectorAll('.cust-dimension-input');
+      var dimensions = [];
+      dimInputs.forEach(function (input) {
+        var val = input.value.trim ? input.value.trim() : input.value;
+        if (val) dimensions.push({ key: val });
+      });
+      data.dimension_overrides = {
+        mode: dimMode,
+        dimensions: dimMode !== 'remove' ? dimensions : [],
+        remove_keys: dimMode === 'remove' ? dimensions.map(function (d) { return d.key; }) : []
+      };
+    }
+
+    // Filter overrides
+    var filterMode = (document.getElementById('custFilterMode') || {}).value;
+    if (filterMode) {
+      var filterRows = document.querySelectorAll('#custFiltersContainer > div');
+      var filters = [];
+      filterRows.forEach(function (row) {
+        var col = row.querySelector('.cust-filter-col');
+        var op = row.querySelector('.cust-filter-op');
+        var val = row.querySelector('.cust-filter-val');
+        if (col && col.value && op && val) {
+          var f = { column: col.value.trim(), operator: op.value };
+          if (op.value === 'in') {
+            f.values = val.value.split(',').map(function (v) { return v.trim(); });
+          } else {
+            f.value = val.value.trim();
+          }
+          filters.push(f);
+        }
+      });
+      data.filter_overrides = { mode: filterMode, filters: filters };
+    }
+
+    return data;
+  }
+
+  async function saveCustomization(setAsDefault) {
+    var data = collectCustomizationData();
+    if (!data.module_key || !data.customization_name) {
+      showError('Module and customization name are required');
+      return;
+    }
+
+    try {
+      var result = await api.post('/api/v1/module-customizations', data);
+      if (result && result.data && setAsDefault) {
+        await api.post('/api/v1/module-customizations/' + result.data.id + '/set-default');
+      }
+      showInfo('Customization saved' + (setAsDefault ? ' and set as default' : ''));
+      loadExistingCustomizations();
+      updateCustomizationBadge();
+      // Clear form
+      if (document.getElementById('custName')) document.getElementById('custName').value = '';
+      if (document.getElementById('custDescription')) document.getElementById('custDescription').value = '';
+    } catch (err) {
+      showError('Failed to save customization: ' + (err.message || err));
+    }
+  }
+
+  async function setCustomizationDefault(id) {
+    try {
+      await api.post('/api/v1/module-customizations/' + id + '/set-default');
+      showInfo('Customization set as default');
+      loadExistingCustomizations();
+      updateCustomizationBadge();
+    } catch (err) {
+      showError('Failed to set default: ' + (err.message || err));
+    }
+  }
+
+  async function deleteCustomization(id) {
+    try {
+      await api.delete('/api/v1/module-customizations/' + id);
+      showInfo('Customization deleted');
+      loadExistingCustomizations();
+      updateCustomizationBadge();
+    } catch (err) {
+      showError('Failed to delete customization: ' + (err.message || err));
+    }
+  }
+
+  async function removeCustomizationDefault() {
+    // There is no "unset default" API — we'd need to delete + recreate.
+    // For now, just delete the default and let the user know.
+    try {
+      var result = await api.get('/api/v1/module-customizations/modules/' + encodeURIComponent(selectedModuleKey) + '/effective');
+      if (result && result.data && result.data.customization) {
+        await api.delete('/api/v1/module-customizations/' + result.data.customization.id);
+        showInfo('Default customization removed');
+        loadExistingCustomizations();
+        updateCustomizationBadge();
+      }
+    } catch (err) {
+      showError('Failed to remove default: ' + (err.message || err));
+    }
+  }
+
+  async function updateCustomizationBadge() {
+    var badge = document.getElementById('customizationBadge');
+    if (!badge || !selectedModuleKey) {
+      if (badge) badge.style.display = 'none';
+      return;
+    }
+    try {
+      var result = await api.get('/api/v1/module-customizations/modules/' + encodeURIComponent(selectedModuleKey) + '/effective');
+      if (result && result.data && result.data.has_customization) {
+        badge.textContent = 'Customized';
+        badge.style.display = 'inline';
+      } else {
+        badge.style.display = 'none';
+      }
+    } catch (err) {
+      badge.style.display = 'none';
+    }
+  }
+
+  function initCustomizePanel() {
+    var customizeBtn = document.getElementById('customizeBtn');
+    if (customizeBtn) customizeBtn.addEventListener('click', openCustomizePanel);
+
+    var closeBtn = document.getElementById('closeCustomizePanel');
+    if (closeBtn) closeBtn.addEventListener('click', closeCustomizePanel);
+
+    var overlayEl = document.getElementById('customizeOverlay');
+    if (overlayEl) overlayEl.addEventListener('click', closeCustomizePanel);
+
+    var saveBtn = document.getElementById('saveCustomizationBtn');
+    if (saveBtn) saveBtn.addEventListener('click', function () { saveCustomization(false); });
+
+    var saveDefaultBtn = document.getElementById('saveAndSetDefaultBtn');
+    if (saveDefaultBtn) saveDefaultBtn.addEventListener('click', function () { saveCustomization(true); });
+
+    var addMetricBtn = document.getElementById('addMetricBtn');
+    if (addMetricBtn) addMetricBtn.addEventListener('click', addMetricRow);
+
+    var addDimBtn = document.getElementById('addDimensionBtn');
+    if (addDimBtn) addDimBtn.addEventListener('click', addDimensionRow);
+
+    var addFilterBtn = document.getElementById('addFilterBtn');
+    if (addFilterBtn) addFilterBtn.addEventListener('click', addFilterRow);
+
+    var removeDefaultBtn = document.getElementById('removeDefaultBtn');
+    if (removeDefaultBtn) removeDefaultBtn.addEventListener('click', removeCustomizationDefault);
+
+    // Toggle sub-sections based on mode selectors
+    ['custMetricMode', 'custDimensionMode', 'custFilterMode'].forEach(function (id) {
+      var sel = document.getElementById(id);
+      if (sel) {
+        sel.addEventListener('change', function () {
+          var listId = id.replace('Mode', 'sList');
+          var listEl = document.getElementById(listId);
+          if (listEl) listEl.classList.toggle('hidden', !sel.value);
+        });
+      }
+    });
+  }
+
+  // Show the customize button when a module is selected
+  function showCustomizeButton() {
+    var btn = document.getElementById('customizeBtn');
+    if (btn) btn.style.display = selectedModuleKey ? '' : 'none';
+    updateCustomizationBadge();
+  }
+
   window._reporting = {
     showModuleInfo: showModuleInfo,
     closeModuleInfo: closeModuleInfo,
@@ -3381,7 +3718,11 @@
     askLanaAboutReport: askLanaAboutReport,
     closeImportModal: closeImportModal,
     openImportModal: openImportModal,
-    deleteImportedReport: deleteImportedReport
+    deleteImportedReport: deleteImportedReport,
+    openCustomizePanel: openCustomizePanel,
+    closeCustomizePanel: closeCustomizePanel,
+    setCustomizationDefault: setCustomizationDefault,
+    deleteCustomization: deleteCustomization
   };
 
   // Also expose individually for V1 compat onclick handlers
@@ -3468,6 +3809,7 @@
     initModuleSearch();
     initPeriodControls();
     initImportControls();
+    initCustomizePanel();
     // Data sources button
     var dataSourcesBtn = document.getElementById('dataSourcesBtn');
     if (dataSourcesBtn) {

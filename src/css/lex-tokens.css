@@ -114,6 +114,21 @@
   --lex-color-white: #FFFFFF;
   --lex-color-black: #0D0807;
 
+  /* ── Chart Palette ─────────────────────────────────────────── */
+  /* Used by lex-chart and visualization renderers.              */
+  /* Override these to rebrand all charts at once.               */
+
+  --lex-chart-color-1:  var(--lex-color-brand-600);    /* Primary — warm earth */
+  --lex-chart-color-2:  var(--lex-color-success-500);  /* Green */
+  --lex-chart-color-3:  var(--lex-color-info-500);     /* Blue */
+  --lex-chart-color-4:  var(--lex-color-warning-500);  /* Amber */
+  --lex-chart-color-5:  var(--lex-color-danger-500);   /* Red */
+  --lex-chart-color-6:  var(--lex-color-brand-400);    /* Muted earth */
+  --lex-chart-color-7:  #7C3AED;                       /* Violet */
+  --lex-chart-color-8:  #06B6D4;                       /* Cyan */
+  --lex-chart-color-9:  #D946EF;                       /* Fuchsia */
+  --lex-chart-color-10: #84CC16;                       /* Lime */
+
 
   /* ==========================================================================
      SEMANTIC TOKENS — Meaningful aliases mapping to primitives

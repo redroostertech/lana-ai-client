@@ -1,0 +1,70 @@
+{
+  "name": "Reporting Module Customization",
+  "description": "E2E tests for the module customization layer: analytics catalog API, module customization CRUD, and integration with report execution. API-driven tests that verify the backend endpoints the frontend UI calls.",
+  "phases": [
+    {
+      "id": 1,
+      "name": "Authentication & Setup",
+      "steps": [
+        "Login with valid credentials and receive JWT token",
+        "Verify analytics catalog endpoint is accessible"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Analytics Catalog API",
+      "steps": [
+        "GET /api/v1/analytics/catalog returns tables array",
+        "Catalog includes expected tables (client_matters, invoices, tasks)",
+        "Each table has columns with labels, types, and capabilities",
+        "Catalog includes all 6 metric functions",
+        "Catalog includes granularities and filter operators"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Ad-Hoc Query Execution",
+      "steps": [
+        "Execute simple count query on client_matters",
+        "Execute query with dimension grouping (status)",
+        "Execute query with time dimension (monthly granularity)",
+        "Execute query with filter (status equals active)",
+        "Verify org isolation — query always returns org-scoped data",
+        "Invalid table name returns validation error",
+        "Invalid metric format returns validation error"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "Module Customization CRUD",
+      "steps": [
+        "GET /api/v1/module-customizations returns empty list initially",
+        "POST creates a new customization with metric overrides",
+        "GET /:id returns the created customization",
+        "PUT /:id updates the customization description",
+        "POST /:id/set-default marks it as default",
+        "GET /modules/:key/effective returns the default customization",
+        "POST /:id/clone creates a copy with new name",
+        "DELETE /:id soft-deletes the customization",
+        "Verify max 10 customizations per module per org limit"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "Customization Validation",
+      "steps": [
+        "Reject invalid metric key format (missing dot)",
+        "Reject column not in SAFE_COLUMNS allowlist",
+        "Reject customization without required name field",
+        "Accept valid replace mode with proper metrics"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "Report Import Cleanup",
+      "steps": [
+        "Verify re-import deactivates existing customizations for that report"
+      ]
+    }
+  ]
+}
