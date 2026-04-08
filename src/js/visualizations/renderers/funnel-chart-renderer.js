@@ -12,6 +12,8 @@
  * @module FunnelChartRenderer
  */
 
+import { escapeHtml } from '../chart-utils.js';
+
 export class FunnelChartRenderer {
   /**
    * @param {string} containerId - DOM element ID where the funnel will be rendered
@@ -253,7 +255,7 @@ export class FunnelChartRenderer {
 
     // Tab label with mini stats
     btn.innerHTML =
-      '<span>' + this._escapeHtml(group.name || 'Pipeline ' + (index + 1)) + '</span>' +
+      '<span>' + escapeHtml(group.name || 'Pipeline ' + (index + 1)) + '</span>' +
       '<span class="ml-2 text-xs text-gray-400">' + group.conversion + '%</span>';
 
     btn.onclick = function () {
@@ -561,7 +563,7 @@ export class FunnelChartRenderer {
           '<div class="flex items-center gap-3 flex-1 min-w-0">' +
             '<div class="flex-1 min-w-0">' +
               '<div class="flex items-center gap-2">' +
-                '<span class="font-semibold text-sm text-gray-900">' + self._escapeHtml(cleanLabel) + '</span>' +
+                '<span class="font-semibold text-sm text-gray-900">' + escapeHtml(cleanLabel) + '</span>' +
                 '<span class="text-xs text-gray-400">' + atCount.toLocaleString() + ' leads</span>' +
               '</div>' +
               '<div class="mt-1.5 w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">' +
@@ -624,7 +626,7 @@ export class FunnelChartRenderer {
             '<div class="w-4 h-4 rounded-full ' + bgColor + '"></div>' +
           '</div>' +
           '<div class="flex-1 min-w-0">' +
-            '<div class="font-semibold text-gray-900 mb-1">' + this._escapeHtml(stage.label) + '</div>' +
+            '<div class="font-semibold text-gray-900 mb-1">' + escapeHtml(stage.label) + '</div>' +
             '<div class="text-sm text-gray-600">' + value.toLocaleString() + ' leads</div>' +
           '</div>' +
         '</div>' +
@@ -739,7 +741,7 @@ export class FunnelChartRenderer {
     this.container.innerHTML =
       '<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">' +
         '<div class="flex items-center mb-4">' +
-          '<h3 class="text-lg font-semibold text-gray-900">' + this._escapeHtml(this.config.title) + '</h3>' +
+          '<h3 class="text-lg font-semibold text-gray-900">' + escapeHtml(this.config.title) + '</h3>' +
         '</div>' +
         '<p class="text-gray-500 text-center py-8">No funnel data available</p>' +
       '</div>';
@@ -765,12 +767,6 @@ export class FunnelChartRenderer {
       console.log('[FunnelChartRenderer] Help text:', this.config.helpText);
       alert(this.config.helpText);
     }
-  }
-
-  _escapeHtml(text) {
-    var div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
   }
 
   getState() {

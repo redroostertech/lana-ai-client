@@ -23,24 +23,10 @@
  * renderer.destroy();
  */
 
+import { escapeHtml, destroyChart } from '../chart-utils.js';
+import { ChartTheme } from '../chart-theme.js';
+
 export class PieChartRenderer {
-  /**
-   * Default color palette for pie chart segments
-   * @private
-   * @static
-   */
-  static DEFAULT_COLORS = [
-    '#6366f1', // Indigo
-    '#10b981', // Green
-    '#f59e0b', // Amber
-    '#ef4444', // Red
-    '#8b5cf6', // Violet
-    '#ec4899', // Pink
-    '#14b8a6', // Teal
-    '#f97316', // Orange
-    '#06b6d4', // Cyan
-    '#84cc16'  // Lime
-  ];
 
   /**
    * Creates an instance of PieChartRenderer
@@ -79,11 +65,11 @@ export class PieChartRenderer {
       title: config.title || null,
       description: config.description || null,
       legendPosition: config.legendPosition || 'right',
-      colors: config.colors || PieChartRenderer.DEFAULT_COLORS,
+      colors: config.colors || ChartTheme.getColors(),
       height: config.height || 256,
       responsive: config.responsive !== undefined ? config.responsive : true,
       maintainAspectRatio: config.maintainAspectRatio !== undefined ? config.maintainAspectRatio : false,
-      legendFontSize: config.legendFontSize || 10,
+      legendFontSize: config.legendFontSize || ChartTheme.font.sizeSmall,
       legendPadding: config.legendPadding || 10,
       helpText: config.helpText || null,
       ...config
@@ -144,25 +130,6 @@ export class PieChartRenderer {
   }
 
   /**
-   * Escape HTML to prevent XSS attacks
-   *
-   * @private
-   * @param {string} unsafe - Unsafe string that may contain HTML
-   * @returns {string} HTML-escaped safe string
-   * @description Prevents XSS attacks by escaping special HTML characters.
-   * Used when rendering user-provided content like help text.
-   */
-  _escapeHtml(unsafe) {
-    if (typeof unsafe !== 'string') return '';
-    return unsafe
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
-  }
-
-  /**
    * Renders help text button (optional)
    *
    * @private
@@ -172,7 +139,7 @@ export class PieChartRenderer {
    */
   _renderHelpTextButton() {
     // Simple help button - can be enhanced with modal functionality
-    // NOTE: If adding a modal, use _escapeHtml() to sanitize helpText content
+    // NOTE: If adding a modal, use escapeHtml() from chart-utils to sanitize helpText content
     return `
       <button
         class="ml-2 text-gray-400 hover:text-gray-600 transition-colors"
@@ -262,9 +229,7 @@ export class PieChartRenderer {
       }
 
       // Destroy existing chart instance if present
-      if (this.chartInstance) {
-        this.chartInstance.destroy();
-      }
+      this.chartInstance = destroyChart(this.chartInstance);
 
       // Create Chart.js instance
       this.chartInstance = new Chart(canvas, this._getChartConfig());
@@ -326,10 +291,7 @@ export class PieChartRenderer {
    */
   destroy() {
     // Destroy Chart.js instance
-    if (this.chartInstance) {
-      this.chartInstance.destroy();
-      this.chartInstance = null;
-    }
+    this.chartInstance = destroyChart(this.chartInstance);
 
     // Remove container from DOM
     if (this.containerElement && this.containerElement.parentNode) {

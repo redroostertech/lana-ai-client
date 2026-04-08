@@ -29,6 +29,9 @@
  * @since 2025-02-01
  */
 
+import { sampleData, destroyChart } from '../chart-utils.js';
+import { ChartTheme } from '../chart-theme.js';
+
 /**
  * BubbleChartRenderer Class
  *
@@ -109,6 +112,7 @@ export class BubbleChartRenderer {
    * @returns {Object} Merged configuration object
    */
   _mergeConfig(userConfig) {
+    const primaryColor = ChartTheme.getColors(1)[0];
     const defaultConfig = {
       title: 'Bubble Chart',
       description: null,
@@ -129,8 +133,8 @@ export class BubbleChartRenderer {
         scaleFactor: 3
       },
       colors: {
-        backgroundColor: 'rgba(99, 102, 241, 0.6)',
-        borderColor: 'rgba(99, 102, 241, 1)',
+        backgroundColor: ChartTheme.hexToRgba(primaryColor, 0.6),
+        borderColor: primaryColor,
         borderWidth: 1
       },
       tooltip: {
@@ -149,37 +153,6 @@ export class BubbleChartRenderer {
       colors: { ...defaultConfig.colors, ...(userConfig.colors || {}) },
       tooltip: { ...defaultConfig.tooltip, ...(userConfig.tooltip || {}) }
     };
-  }
-
-  /**
-   * Samples large datasets to improve rendering performance
-   *
-   * For large datasets (> 1000 points), automatic data sampling is applied
-   * to maintain performance. Configure with `maxDataPoints` and `enableSampling` options.
-   *
-   * @private
-   * @param {Array} data - Original dataset
-   * @param {number} maxPoints - Maximum number of points to render (default: 1000)
-   * @returns {Array} - Sampled dataset
-   */
-  _sampleData(data, maxPoints = 1000) {
-    if (!Array.isArray(data) || data.length <= maxPoints) {
-      return data;
-    }
-
-    const step = Math.ceil(data.length / maxPoints);
-    const sampled = [];
-
-    for (let i = 0; i < data.length; i += step) {
-      sampled.push(data[i]);
-    }
-
-    // Always include last data point
-    if (sampled[sampled.length - 1] !== data[data.length - 1]) {
-      sampled.push(data[data.length - 1]);
-    }
-
-    return sampled;
   }
 
   /**
@@ -328,7 +301,7 @@ export class BubbleChartRenderer {
     // Apply sampling if enabled and dataset is large
     let sampledData = this.data;
     if (this.config.enableSampling && this.data.length > this.config.maxDataPoints) {
-      sampledData = this._sampleData(this.data, this.config.maxDataPoints);
+      sampledData = sampleData(this.data, this.config.maxDataPoints);
       console.info(`[BubbleChartRenderer] Sampled ${this.data.length} points to ${sampledData.length} for performance`);
     }
 
@@ -426,10 +399,7 @@ export class BubbleChartRenderer {
    * chart.destroy();
    */
   destroy() {
-    if (this.chartInstance) {
-      this.chartInstance.destroy();
-      this.chartInstance = null;
-    }
+    this.chartInstance = destroyChart(this.chartInstance);
 
     // Remove from global registry
     if (window.chartInstances && window.chartInstances[this.canvasId]) {

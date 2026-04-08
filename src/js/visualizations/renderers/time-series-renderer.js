@@ -19,6 +19,9 @@
  * renderer.destroy();
  */
 
+import { sampleData, keyToLabel, destroyChart } from '../chart-utils.js';
+import { ChartTheme } from '../chart-theme.js';
+
 export class TimeSeriesRenderer {
   /**
    * Create a TimeSeriesRenderer instance
@@ -66,37 +69,6 @@ export class TimeSeriesRenderer {
   }
 
   /**
-   * Samples large datasets to improve rendering performance
-   *
-   * For large datasets (> 1000 points), automatic data sampling is applied
-   * to maintain performance. Configure with `maxDataPoints` and `enableSampling` options.
-   *
-   * @private
-   * @param {Array} data - Original dataset
-   * @param {number} maxPoints - Maximum number of points to render (default: 1000)
-   * @returns {Array} - Sampled dataset
-   */
-  _sampleData(data, maxPoints = 1000) {
-    if (!Array.isArray(data) || data.length <= maxPoints) {
-      return data;
-    }
-
-    const step = Math.ceil(data.length / maxPoints);
-    const sampled = [];
-
-    for (let i = 0; i < data.length; i += step) {
-      sampled.push(data[i]);
-    }
-
-    // Always include last data point
-    if (sampled[sampled.length - 1] !== data[data.length - 1]) {
-      sampled.push(data[data.length - 1]);
-    }
-
-    return sampled;
-  }
-
-  /**
    * Merge user config with defaults
    * @private
    * @param {Object} userConfig - User-provided configuration
@@ -111,12 +83,12 @@ export class TimeSeriesRenderer {
       maintainAspectRatio: false,
       maxDataPoints: 1000,
       enableSampling: true,
-      colors: ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'],
+      colors: ChartTheme.getColors(6),
       legend: {
         position: 'bottom',
         labels: {
           padding: 15,
-          font: { size: 11 }
+          font: { size: ChartTheme.font.sizeSmall }
         }
       },
       tooltip: {
@@ -127,7 +99,7 @@ export class TimeSeriesRenderer {
         y: {
           beginAtZero: true,
           grid: {
-            color: '#f3f4f6'
+            color: ChartTheme.grid.color()
           }
         },
         x: {
@@ -157,9 +129,7 @@ export class TimeSeriesRenderer {
    * @returns {string} Formatted label (e.g., 'Total Revenue')
    */
   _formatMetricLabel(key) {
-    return key
-      .replace(/_/g, ' ')
-      .replace(/\b\w/g, char => char.toUpperCase());
+    return keyToLabel(key);
   }
 
   /**
@@ -241,7 +211,7 @@ export class TimeSeriesRenderer {
     // Apply sampling if enabled and dataset is large
     let sampledTimeSeries = this.timeSeries;
     if (this.config.enableSampling && this.timeSeries.length > this.config.maxDataPoints) {
-      sampledTimeSeries = this._sampleData(this.timeSeries, this.config.maxDataPoints);
+      sampledTimeSeries = sampleData(this.timeSeries, this.config.maxDataPoints);
       console.info(`[TimeSeriesRenderer] Sampled ${this.timeSeries.length} points to ${sampledTimeSeries.length} for performance`);
     }
 
@@ -312,10 +282,7 @@ export class TimeSeriesRenderer {
    * renderer.destroy();
    */
   destroy() {
-    if (this.chartInstance) {
-      this.chartInstance.destroy();
-      this.chartInstance = null;
-    }
+    this.chartInstance = destroyChart(this.chartInstance);
   }
 
   /**

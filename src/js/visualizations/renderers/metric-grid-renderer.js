@@ -27,6 +27,9 @@
  * renderer.destroy();
  */
 
+import { destroyChart } from '../chart-utils.js';
+import { ChartTheme } from '../chart-theme.js';
+
 /**
  * MetricGridRenderer class
  * Renders a grid of metric cards with status indicators, values, and drilldown integration
@@ -147,9 +150,7 @@ export class MetricGridRenderer {
   destroy() {
     // Destroy all chart instances
     Object.values(this.chartInstances).forEach(chart => {
-      if (chart && typeof chart.destroy === 'function') {
-        chart.destroy();
-      }
+      destroyChart(chart);
     });
     this.chartInstances = {};
 
@@ -333,19 +334,18 @@ export class MetricGridRenderer {
     const ctx = canvas.getContext('2d');
 
     // Destroy existing chart
-    if (this.chartInstances[canvasId]) {
-      this.chartInstances[canvasId].destroy();
-    }
+    this.chartInstances[canvasId] = destroyChart(this.chartInstances[canvasId]);
 
     // Prepare data for horizontal bar chart (sorted by count descending)
     const sortedData = [...metric.current].sort((a, b) => (b.count || 0) - (a.count || 0));
     const labels = sortedData.map(item => item.label || 'Unknown');
     const counts = sortedData.map(item => item.count || 0);
 
-    // Generate gradient colors (indigo with varying opacity)
+    // Generate gradient colors (primary chart color with varying opacity)
+    const primaryColor = ChartTheme.getColors(1)[0];
     const backgroundColors = labels.map((_, i) => {
       const intensity = 1 - (i / labels.length) * 0.5;
-      return `rgba(99, 102, 241, ${intensity})`;
+      return ChartTheme.hexToRgba(primaryColor, intensity);
     });
 
     const chart = new Chart(ctx, {

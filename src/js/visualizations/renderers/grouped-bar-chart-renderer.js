@@ -30,6 +30,8 @@
  * renderer.destroy();
  */
 
+import { sampleData, escapeHtml, hexToRgba, destroyChart } from '../chart-utils.js';
+
 /**
  * GroupedBarChartRenderer class
  * Renders grouped (multi-series) bar charts using Chart.js
@@ -132,37 +134,6 @@ export class GroupedBarChartRenderer {
   }
 
   /**
-   * Samples large datasets to improve rendering performance
-   *
-   * For large datasets (> 1000 points), automatic data sampling is applied
-   * to maintain performance. Configure with `maxDataPoints` and `enableSampling` options.
-   *
-   * @private
-   * @param {Array} data - Original dataset
-   * @param {number} maxPoints - Maximum number of points to render (default: 1000)
-   * @returns {Array} - Sampled dataset
-   */
-  _sampleData(data, maxPoints = 1000) {
-    if (!Array.isArray(data) || data.length <= maxPoints) {
-      return data;
-    }
-
-    const step = Math.ceil(data.length / maxPoints);
-    const sampled = [];
-
-    for (let i = 0; i < data.length; i += step) {
-      sampled.push(data[i]);
-    }
-
-    // Always include last data point
-    if (sampled[sampled.length - 1] !== data[data.length - 1]) {
-      sampled.push(data[data.length - 1]);
-    }
-
-    return sampled;
-  }
-
-  /**
    * Render the grouped bar chart
    * Creates the DOM structure and initializes Chart.js
    *
@@ -191,7 +162,7 @@ export class GroupedBarChartRenderer {
     let dataToRender = this.data;
 
     if (this.config.enableSampling && this.data.length > this.config.maxDataPoints) {
-      dataToRender = this._sampleData(this.data, this.config.maxDataPoints);
+      dataToRender = sampleData(this.data, this.config.maxDataPoints);
       console.info(`[GroupedBarChartRenderer] Sampled ${this.data.length} points to ${dataToRender.length} for performance`);
     }
 
@@ -230,10 +201,7 @@ export class GroupedBarChartRenderer {
    */
   destroy() {
     // Destroy Chart.js instance
-    if (this.chartInstance) {
-      this.chartInstance.destroy();
-      this.chartInstance = null;
-    }
+    this.chartInstance = destroyChart(this.chartInstance);
 
     // Remove from global registry if exists
     if (window.chartInstances && this.config.uniqueId) {
@@ -324,29 +292,13 @@ export class GroupedBarChartRenderer {
   }
 
   /**
-   * Escape HTML to prevent XSS attacks
-   * @private
-   * @param {string} unsafe - Unsafe string that may contain HTML
-   * @returns {string} HTML-escaped safe string
-   */
-  _escapeHtml(unsafe) {
-    if (typeof unsafe !== 'string') return '';
-    return unsafe
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
-  }
-
-  /**
    * Create help modal HTML
    * @private
    * @description Sanitizes help text content to prevent XSS attacks
    */
   _createHelpModal(helpId) {
     // Sanitize help text content to prevent XSS attacks
-    const sanitizedContent = this._escapeHtml(this.config.helpText.content);
+    const sanitizedContent = escapeHtml(this.config.helpText.content);
 
     return `
       <div id="${helpId}" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
@@ -393,7 +345,7 @@ export class GroupedBarChartRenderer {
       return {
         label: serie.label,
         data: dataToRender.map(row => parseFloat(row[serie.field]) || 0),
-        backgroundColor: this._hexToRgba(serie.color, 0.8),
+        backgroundColor: hexToRgba(serie.color, 0.8),
         borderColor: serie.color,
         borderWidth: 1
       };
@@ -468,30 +420,6 @@ export class GroupedBarChartRenderer {
       window.chartInstances = {};
     }
     window.chartInstances[this.config.uniqueId] = this.chartInstance;
-  }
-
-  /**
-   * Convert hex color to rgba format
-   * @private
-   * @param {string} hex - Hex color code
-   * @param {number} alpha - Alpha transparency (0-1)
-   * @returns {string} RGBA color string
-   */
-  _hexToRgba(hex, alpha = 1) {
-    // Remove # if present
-    hex = hex.replace('#', '');
-
-    // Handle 3-digit hex codes
-    if (hex.length === 3) {
-      hex = hex.split('').map(char => char + char).join('');
-    }
-
-    // Parse hex values
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
-
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
   /**

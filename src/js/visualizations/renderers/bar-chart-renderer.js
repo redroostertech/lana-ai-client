@@ -8,7 +8,7 @@
  * @requires Chart.js (must be loaded globally)
  *
  * @example
- * import { BarChartRenderer } from './visualizations/renderers/bar-chart-renderer.js';
+ * import { BarChartRenderer } from './bar-chart-renderer.js';
  *
  * const renderer = new BarChartRenderer('chart-container', data, {
  *   orientation: 'horizontal',
@@ -22,6 +22,9 @@
  * // Cleanup when done
  * renderer.destroy();
  */
+
+import { sampleData, escapeHtml, hexToRgba, destroyChart } from '../chart-utils.js';
+import { ChartTheme } from '../chart-theme.js';
 
 /**
  * BarChartRenderer class
@@ -72,10 +75,10 @@ export class BarChartRenderer {
 
     // Default colors that will be merged with user-provided colors
     const defaultColors = {
-      positive: '#10b981',
-      negative: '#ef4444',
-      neutral: '#6b7280',
-      default: '#6366f1' // Default indigo color
+      positive: ChartTheme.status.success(),
+      negative: ChartTheme.status.danger(),
+      neutral: ChartTheme.status.neutral(),
+      default: ChartTheme.getColors(1)[0]
     };
 
     this.config = {
@@ -111,37 +114,6 @@ export class BarChartRenderer {
   }
 
   /**
-   * Samples large datasets to improve rendering performance
-   *
-   * For large datasets (> 1000 points), automatic data sampling is applied
-   * to maintain performance. Configure with `maxDataPoints` and `enableSampling` options.
-   *
-   * @private
-   * @param {Array} data - Original dataset
-   * @param {number} maxPoints - Maximum number of points to render (default: 1000)
-   * @returns {Array} - Sampled dataset
-   */
-  _sampleData(data, maxPoints = 1000) {
-    if (!Array.isArray(data) || data.length <= maxPoints) {
-      return data;
-    }
-
-    const step = Math.ceil(data.length / maxPoints);
-    const sampled = [];
-
-    for (let i = 0; i < data.length; i += step) {
-      sampled.push(data[i]);
-    }
-
-    // Always include last data point
-    if (sampled[sampled.length - 1] !== data[data.length - 1]) {
-      sampled.push(data[data.length - 1]);
-    }
-
-    return sampled;
-  }
-
-  /**
    * Render the bar chart
    * Creates the DOM structure and initializes Chart.js
    *
@@ -170,8 +142,8 @@ export class BarChartRenderer {
     let valuesToRender = this.data.values;
 
     if (this.config.enableSampling && this.data.labels.length > this.config.maxDataPoints) {
-      labelsToRender = this._sampleData(this.data.labels, this.config.maxDataPoints);
-      valuesToRender = this._sampleData(this.data.values, this.config.maxDataPoints);
+      labelsToRender = sampleData(this.data.labels, this.config.maxDataPoints);
+      valuesToRender = sampleData(this.data.values, this.config.maxDataPoints);
       console.info(`[BarChartRenderer] Sampled ${this.data.labels.length} points to ${labelsToRender.length} for performance`);
     }
 
@@ -210,10 +182,7 @@ export class BarChartRenderer {
    */
   destroy() {
     // Destroy Chart.js instance
-    if (this.chartInstance) {
-      this.chartInstance.destroy();
-      this.chartInstance = null;
-    }
+    this.chartInstance = destroyChart(this.chartInstance);
 
     // Remove from global registry if exists
     if (window.chartInstances && this.config.uniqueId) {
@@ -302,29 +271,13 @@ export class BarChartRenderer {
   }
 
   /**
-   * Escape HTML to prevent XSS attacks
-   * @private
-   * @param {string} unsafe - Unsafe string that may contain HTML
-   * @returns {string} HTML-escaped safe string
-   */
-  _escapeHtml(unsafe) {
-    if (typeof unsafe !== 'string') return '';
-    return unsafe
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
-  }
-
-  /**
    * Create help modal HTML
    * @private
    * @description Sanitizes help text content to prevent XSS attacks
    */
   _createHelpModal(helpId) {
     // Sanitize help text content to prevent XSS attacks
-    const sanitizedContent = this._escapeHtml(this.config.helpText.content);
+    const sanitizedContent = escapeHtml(this.config.helpText.content);
 
     return `
       <div id="${helpId}" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
@@ -451,10 +404,10 @@ export class BarChartRenderer {
         try {
           const colorKey = this._evaluateColorRule(this.config.colorRule, value);
           const colorHex = this.config.colors[colorKey] || this.config.colors.neutral || '#6b7280';
-          return this._hexToRgba(colorHex, 0.8);
+          return hexToRgba(colorHex, 0.8);
         } catch (error) {
           console.warn('[BarChartRenderer] Error evaluating colorRule:', error);
-          return this._hexToRgba(this.config.colors.default, 0.8);
+          return hexToRgba(this.config.colors.default, 0.8);
         }
       });
 
@@ -470,7 +423,7 @@ export class BarChartRenderer {
       });
     } else {
       // Default single color (indigo)
-      backgroundColors = this._hexToRgba(this.config.colors.default, 0.8);
+      backgroundColors = hexToRgba(this.config.colors.default, 0.8);
       borderColors = this.config.colors.default;
     }
 
@@ -594,27 +547,6 @@ export class BarChartRenderer {
         }
       }
     };
-  }
-
-  /**
-   * Convert hex color to rgba format
-   * @private
-   */
-  _hexToRgba(hex, alpha = 1) {
-    // Remove # if present
-    hex = hex.replace('#', '');
-
-    // Handle 3-digit hex codes
-    if (hex.length === 3) {
-      hex = hex.split('').map(char => char + char).join('');
-    }
-
-    // Parse hex values
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
-
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
   /**
