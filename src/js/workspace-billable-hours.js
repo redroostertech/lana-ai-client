@@ -34,6 +34,7 @@
     _loadSummary(matter);
     _loadEntries(matter);
     _wireGenerateButton(matter);
+    _wireManualEntryButton(matter);
   };
 
   // ═══════════════════════════════════════════════════════════════
@@ -708,6 +709,102 @@
           if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.error('Generation failed');
         });
     });
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Manual Entry
+  // ═══════════════════════════════════════════════════════════════
+
+  function _wireManualEntryButton(matter) {
+    var btn = document.getElementById('bhAddManualBtn');
+    if (!btn || btn._bhWired) return;
+    btn._bhWired = true;
+
+    btn.addEventListener('click', function () {
+      _showManualEntryForm(matter);
+    });
+  }
+
+  function _showManualEntryForm(matter) {
+    var today = new Date().toISOString().substring(0, 10);
+    var inputStyle = 'width:100%;padding:0.375rem 0.625rem;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.375rem;font-size:0.8125rem;';
+
+    var html = '<div style="display:flex;flex-direction:column;gap:1rem;">';
+
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">';
+    html += '<div><label style="font-size:0.75rem;font-weight:600;color:var(--lex-text-muted);display:block;margin-bottom:0.25rem;">Date</label>';
+    html += '<input type="date" id="manualEntryDate" value="' + today + '" style="' + inputStyle + '"></div>';
+    html += '<div><label style="font-size:0.75rem;font-weight:600;color:var(--lex-text-muted);display:block;margin-bottom:0.25rem;">Hours</label>';
+    html += '<input type="number" id="manualEntryHours" value="0.5" step="0.1" min="0.1" max="24" style="' + inputStyle + '"></div>';
+    html += '</div>';
+
+    html += '<div><label style="font-size:0.75rem;font-weight:600;color:var(--lex-text-muted);display:block;margin-bottom:0.25rem;">Activity Type</label>';
+    html += '<select id="manualEntryType" style="' + inputStyle + '">';
+    html += '<option value="general">General</option>';
+    html += '<option value="research">Research</option>';
+    html += '<option value="review">Review</option>';
+    html += '<option value="drafting">Drafting</option>';
+    html += '<option value="communication">Communication</option>';
+    html += '<option value="case_management">Case Management</option>';
+    html += '</select></div>';
+
+    html += '<div><label style="font-size:0.75rem;font-weight:600;color:var(--lex-text-muted);display:block;margin-bottom:0.25rem;">Description</label>';
+    html += '<textarea id="manualEntryDesc" style="' + inputStyle + 'min-height:4rem;resize:vertical;" placeholder="Describe the work performed..."></textarea></div>';
+
+    html += '<div style="display:flex;align-items:center;gap:0.5rem;">';
+    html += '<input type="checkbox" id="manualEntryBillable" checked>';
+    html += '<label for="manualEntryBillable" style="font-size:0.8125rem;color:var(--lex-text-secondary);">Billable</label>';
+    html += '</div>';
+
+    html += '</div>';
+
+    Lex.Drawer.open({
+      heading: 'Add Time Entry',
+      content: html,
+      width: 'md',
+      buttons: [
+        { label: 'Add Entry', variant: 'primary', id: 'manualEntrySaveBtn' }
+      ]
+    });
+
+    setTimeout(function () {
+      var saveBtn = document.getElementById('manualEntrySaveBtn');
+      if (saveBtn) {
+        saveBtn.addEventListener('click', function () {
+          var dateVal = document.getElementById('manualEntryDate').value;
+          var hoursVal = parseFloat(document.getElementById('manualEntryHours').value) || 0.5;
+          var typeVal = document.getElementById('manualEntryType').value;
+          var descVal = document.getElementById('manualEntryDesc').value.trim();
+          var billableVal = document.getElementById('manualEntryBillable').checked;
+
+          if (!descVal) {
+            if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.error('Description is required');
+            return;
+          }
+
+          var body = {
+            matter_id: _matterId,
+            staff_user_id: window._currentUserId || '',
+            date: dateVal,
+            duration_minutes: Math.round(hoursVal * 60),
+            activity_type: typeVal,
+            description: descVal,
+            is_billable: billableVal,
+            rate: 0
+          };
+
+          api.post('/api/v1/time-entries', body)
+            .then(function () {
+              if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.success('Time entry added');
+              if (typeof Lex !== 'undefined' && Lex.Drawer) Lex.Drawer.close();
+              _refresh();
+            })
+            .catch(function () {
+              if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.error('Failed to add entry');
+            });
+        });
+      }
+    }, 100);
   }
 
   // ═══════════════════════════════════════════════════════════════
