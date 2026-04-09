@@ -808,31 +808,49 @@
     });
   }
 
+  // Defines what connected data to fetch per entity type.
+  // Each entry: { view, filterField, label, columns, labels }
+  var CONNECTED_DATA_MAP = {
+    mcp_client_matters: [
+      { view: 'mcp_documents', filterField: 'matter_id', filterSource: 'matter_id', label: 'Documents', columns: 'filename,document_type,status,file_size_mb,created_at', labels: 'Filename,Type,Status,Size (MB),Created' },
+      { view: 'mcp_tasks', filterField: 'matter_id', filterSource: 'matter_id', label: 'Tasks', columns: 'title,status,priority,due_date,assigned_to_name', labels: 'Title,Status,Priority,Due Date,Assigned To' },
+      { view: 'mcp_conversations', filterField: 'matter_id', filterSource: 'matter_id', label: 'Conversations', columns: 'title,context_type,message_count,last_activity', labels: 'Title,Context,Messages,Last Activity' },
+      { view: 'mcp_notes', filterField: 'matter_id', filterSource: 'matter_id', label: 'Notes', columns: 'note_text,note_type,created_by_name,created_at', labels: 'Note,Type,Created By,Created' },
+      { view: 'mcp_connector_data', filterField: 'matter_id', filterSource: 'matter_id', label: 'Connector Data', columns: 'entity_type,external_id,status,synced_at', labels: 'Entity Type,External ID,Status,Synced' }
+    ],
+    mcp_documents: [
+      { view: 'mcp_document_chunks', filterField: 'document_id', filterSource: 'id', label: 'Chunks', columns: 'chunk_index,chunk_type,chunk_length,word_count,page_number', labels: 'Chunk #,Type,Length,Words,Page' }
+    ],
+    mcp_conversations: [
+      { view: 'mcp_messages', filterField: 'thread_id', filterSource: 'thread_id', label: 'Messages', columns: 'role,content,created_at', labels: 'Role,Content,Created' }
+    ],
+    mcp_integration_sources: [
+      { view: 'mcp_connector_sync_logs', filterField: 'integration_source_id', filterSource: 'id', label: 'Sync Logs', columns: 'sync_type,sync_status,records_processed,records_created,records_failed,duration_seconds,started_at', labels: 'Type,Status,Processed,Created,Failed,Duration (s),Started' },
+      { view: 'mcp_connector_data', filterField: 'integration_source_id', filterSource: 'id', label: 'Records', columns: 'entity_type,external_id,client_name,status,synced_at', labels: 'Entity Type,External ID,Client,Status,Synced' }
+    ]
+  };
+
   function _openDetailDrawer(row) {
-    // Build a readable title from common fields
     var title = row.matter_name || row.filename || row.title || row.source_name
       || row.skill_name || row.name || row.entity_type || 'Record Details';
 
-    // Build key-value detail content
-    var html = '<div style="display:flex;flex-direction:column;gap:0.75rem;">';
+    // Build record detail section
+    var html = '<div id="drawerDetailContent">';
+    html += _buildRecordFields(row);
 
-    var keys = Object.keys(row);
-    for (var i = 0; i < keys.length; i++) {
-      var key = keys[i];
-      var val = row[key];
-
-      // Skip internal/large fields
-      if (key === 'embedding' || key === 'search_vector' || key === 'search_vector_weighted') continue;
-
-      var label = key.split('_').map(function (w) {
-        return w.charAt(0).toUpperCase() + w.substring(1);
-      }).join(' ');
-
-      var displayVal = _formatDetailValue(key, val);
-
-      html += '<div style="border-bottom:1px solid var(--lex-border-default, #e5e7eb);padding-bottom:0.5rem;">';
-      html += '<div style="font-size:0.7rem;font-weight:600;color:var(--lex-text-muted, #6b7280);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.15rem;">' + Lex.Utils.escapeHtml(label) + '</div>';
-      html += '<div style="font-size:0.875rem;color:var(--lex-text-primary, #111827);word-break:break-word;">' + displayVal + '</div>';
+    // Connected data sections (load async)
+    var viewName = _getEffectiveView();
+    var connections = CONNECTED_DATA_MAP[viewName] || [];
+    if (connections.length > 0) {
+      html += '<div style="margin-top:1.5rem;border-top:2px solid var(--lex-border-default,#e5e7eb);padding-top:1rem;">';
+      html += '<div style="font-size:0.8rem;font-weight:700;color:var(--lex-text-primary,#111827);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.75rem;">Connected Data</div>';
+      for (var ci = 0; ci < connections.length; ci++) {
+        var conn = connections[ci];
+        html += '<div id="connected-' + conn.view + '" style="margin-bottom:1rem;">';
+        html += '<div style="font-size:0.75rem;font-weight:600;color:var(--lex-text-muted,#6b7280);margin-bottom:0.25rem;">' + Lex.Utils.escapeHtml(conn.label) + '</div>';
+        html += '<div style="font-size:0.8rem;color:var(--lex-text-muted,#9ca3af);">Loading...</div>';
+        html += '</div>';
+      }
       html += '</div>';
     }
 
@@ -841,8 +859,105 @@
     Lex.Drawer.open({
       heading: Lex.Utils.escapeHtml(String(title)),
       content: html,
-      width: 'md'
+      width: 'lg'
     });
+
+    // Fetch connected data async
+    for (var fi = 0; fi < connections.length; fi++) {
+      _fetchConnectedData(connections[fi], row);
+    }
+  }
+
+  function _buildRecordFields(row) {
+    var html = '<div style="display:flex;flex-direction:column;gap:0.75rem;">';
+    var keys = Object.keys(row);
+    for (var i = 0; i < keys.length; i++) {
+      var key = keys[i];
+      var val = row[key];
+      if (key === 'embedding' || key === 'search_vector' || key === 'search_vector_weighted') continue;
+
+      var label = key.split('_').map(function (w) {
+        return w.charAt(0).toUpperCase() + w.substring(1);
+      }).join(' ');
+
+      html += '<div style="border-bottom:1px solid var(--lex-border-default,#e5e7eb);padding-bottom:0.5rem;">';
+      html += '<div style="font-size:0.7rem;font-weight:600;color:var(--lex-text-muted,#6b7280);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.15rem;">' + Lex.Utils.escapeHtml(label) + '</div>';
+      html += '<div style="font-size:0.875rem;color:var(--lex-text-primary,#111827);word-break:break-word;">' + _formatDetailValue(key, val) + '</div>';
+      html += '</div>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function _fetchConnectedData(conn, parentRow) {
+    var filterValue = parentRow[conn.filterSource];
+    if (!filterValue) {
+      _renderConnectedSection(conn.view, []);
+      return;
+    }
+
+    var url = '/api/v1/mcp-data/' + conn.view +
+      '?filter_' + conn.filterField + '=' + encodeURIComponent(filterValue) +
+      '&limit=20&sort_dir=desc';
+
+    api.get(url)
+      .then(function (result) {
+        var rows = (result && result.data) || [];
+        _renderConnectedSection(conn.view, rows, conn);
+      })
+      .catch(function () {
+        _renderConnectedSection(conn.view, []);
+      });
+  }
+
+  function _renderConnectedSection(viewName, rows, conn) {
+    var container = document.getElementById('connected-' + viewName);
+    if (!container) return;
+
+    if (!rows || rows.length === 0) {
+      container.innerHTML = '<div style="font-size:0.75rem;font-weight:600;color:var(--lex-text-muted,#6b7280);margin-bottom:0.25rem;">' +
+        Lex.Utils.escapeHtml((conn && conn.label) || viewName) + '</div>' +
+        '<div style="font-size:0.8rem;color:var(--lex-text-muted,#9ca3af);font-style:italic;">None found</div>';
+      return;
+    }
+
+    var cols = conn ? conn.columns.split(',') : [];
+    var labels = conn ? conn.labels.split(',') : [];
+
+    // Build a compact table
+    var html = '<div style="font-size:0.75rem;font-weight:600;color:var(--lex-text-muted,#6b7280);margin-bottom:0.5rem;">' +
+      Lex.Utils.escapeHtml(conn.label) + ' (' + rows.length + ')' + '</div>';
+    html += '<div style="overflow-x:auto;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.375rem;">';
+    html += '<table style="width:100%;font-size:0.75rem;border-collapse:collapse;">';
+
+    // Header
+    html += '<thead><tr style="background:var(--lex-bg-muted,#f9fafb);">';
+    for (var hi = 0; hi < labels.length; hi++) {
+      html += '<th style="padding:0.375rem 0.5rem;text-align:left;font-weight:600;color:var(--lex-text-muted,#6b7280);white-space:nowrap;">' + Lex.Utils.escapeHtml(labels[hi]) + '</th>';
+    }
+    html += '</tr></thead>';
+
+    // Body
+    html += '<tbody>';
+    for (var ri = 0; ri < rows.length; ri++) {
+      var bgStyle = ri % 2 === 1 ? 'background:var(--lex-bg-muted,#f9fafb);' : '';
+      html += '<tr style="' + bgStyle + 'border-top:1px solid var(--lex-border-default,#e5e7eb);">';
+      for (var ci2 = 0; ci2 < cols.length; ci2++) {
+        var cellVal = rows[ri][cols[ci2]];
+        var cellStr = cellVal == null ? '-' : String(cellVal);
+        if (cellStr.length > 80) cellStr = cellStr.substring(0, 77) + '...';
+        // Format dates inline
+        if (cols[ci2].indexOf('_at') !== -1 || cols[ci2].indexOf('date') !== -1) {
+          var fmtd = fmtDateTime(cellVal);
+          if (fmtd) cellStr = fmtd;
+        }
+        html += '<td style="padding:0.375rem 0.5rem;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis;">' + Lex.Utils.escapeHtml(cellStr) + '</td>';
+      }
+      html += '</tr>';
+    }
+    html += '</tbody></table></div>';
+
+    container.innerHTML = html;
   }
 
   function _formatDetailValue(key, val) {
