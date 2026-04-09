@@ -334,14 +334,15 @@
           var desc = e.description || '';
           if (desc.length > 80) desc = desc.substring(0, 77) + '...';
 
-          html += '<div class="bh-approval-row" data-id="' + e.id + '" style="display:grid;grid-template-columns:2rem 1.5fr 1.5fr 0.7fr 0.7fr 2fr 5rem;gap:0.5rem;padding:0.625rem 1rem;font-size:0.8125rem;align-items:center;' + bg + '">';
-          html += '<div><input type="checkbox" class="bh-approval-cb" data-id="' + e.id + '" style="cursor:pointer;"></div>';
+          var safeId = _escapeHtml(e.id);
+          html += '<div class="bh-approval-row" data-id="' + safeId + '" style="display:grid;grid-template-columns:2rem 1.5fr 1.5fr 0.7fr 0.7fr 2fr 5rem;gap:0.5rem;padding:0.625rem 1rem;font-size:0.8125rem;align-items:center;' + bg + '">';
+          html += '<div><input type="checkbox" class="bh-approval-cb" data-id="' + safeId + '" style="cursor:pointer;"></div>';
           html += '<div style="font-weight:600;">' + _escapeHtml(name) + '</div>';
           html += '<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _escapeHtml(e.matter_name || e.matter_id) + '</div>';
           html += '<div style="text-align:right;font-weight:600;color:var(--lex-color-blue-700,#1d4ed8);">' + hours + 'h</div>';
           html += '<div style="color:var(--lex-text-muted);">' + _escapeHtml(e.activity_type || '-') + '</div>';
           html += '<div style="color:var(--lex-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _escapeHtml(desc) + '</div>';
-          html += '<div><button class="bh-approval-approve-btn" data-id="' + e.id + '" style="padding:0.25rem 0.625rem;font-size:0.75rem;font-weight:600;background:var(--lex-color-green-50,#f0fdf4);color:var(--lex-color-green-700,#15803d);border:1px solid var(--lex-color-green-200,#bbf7d0);border-radius:0.25rem;cursor:pointer;">Approve</button></div>';
+          html += '<div><button class="bh-approval-approve-btn" data-id="' + safeId + '" style="padding:0.25rem 0.625rem;font-size:0.75rem;font-weight:600;background:var(--lex-color-green-50,#f0fdf4);color:var(--lex-color-green-700,#15803d);border:1px solid var(--lex-color-green-200,#bbf7d0);border-radius:0.25rem;cursor:pointer;">Approve</button></div>';
           html += '</div>';
         }
 
