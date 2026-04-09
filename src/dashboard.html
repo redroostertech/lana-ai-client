@@ -244,6 +244,42 @@
           </lex-card>
         </div>
 
+        <!-- Zone F center — Billable Hours Today -->
+        <div id="ccZoneFBillable">
+          <lex-card padding="compact">
+            <div class="cc-section-header">
+              <div>
+                <div class="cc-section-title">Billable Hours</div>
+                <div class="cc-section-subtitle">Today's tracked time</div>
+              </div>
+            </div>
+
+            <!-- Loading skeleton -->
+            <div id="billableHoursLoading" class="animate-pulse" style="padding:0.5rem 0;">
+              <div class="cc-skeleton" style="width:40%;height:2rem;margin-bottom:0.75rem;"></div>
+              <div class="cc-skeleton cc-skeleton--text-sm" style="width:70%;margin-bottom:0.5rem;"></div>
+              <div class="cc-skeleton cc-skeleton--text-sm" style="width:55%;margin-bottom:0.5rem;"></div>
+              <div class="cc-skeleton cc-skeleton--text-sm" style="width:60%;"></div>
+            </div>
+
+            <!-- Content -->
+            <div id="billableHoursContent" class="hidden">
+              <div style="margin-bottom:0.75rem;">
+                <span id="billableTotalHours" style="font-size:1.5rem;font-weight:700;color:var(--lex-text-primary);">0.0</span>
+                <span style="font-size:0.875rem;color:var(--lex-text-muted);margin-left:0.25rem;">hours</span>
+              </div>
+
+              <!-- Per-matter breakdown -->
+              <div id="billableMatterList" style="display:flex;flex-direction:column;gap:0.375rem;max-height:12rem;overflow-y:auto;">
+              </div>
+
+              <!-- Drafts pending -->
+              <div id="billableDraftsInfo" style="margin-top:0.75rem;padding-top:0.5rem;border-top:1px solid var(--lex-border-subtle,#e5e7eb);font-size:0.8rem;color:var(--lex-text-muted);">
+              </div>
+            </div>
+          </lex-card>
+        </div>
+
         <!-- Zone F right — Data Pulse -->
         <div id="ccZoneFRight">
           <lex-card padding="compact">

@@ -54,7 +54,7 @@
 
 .cc-signals-row {
   display: grid;
-  grid-template-columns: 3fr 2fr;
+  grid-template-columns: 3fr 1.5fr 2fr;
   gap: 1.25rem;
 }
 

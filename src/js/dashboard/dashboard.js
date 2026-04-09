@@ -1046,6 +1046,82 @@
    * Splits by activity: Active vs Needs Attention. Capped at 10 rows.
    * @returns {Promise<void>}
    */
+  // ═══════════════════════════════════════════════════════════════
+  // Zone F Center — Billable Hours Today
+  // ═══════════════════════════════════════════════════════════════
+
+  async function loadBillableHours() {
+    var loadingEl = el('billableHoursLoading');
+    var contentEl = el('billableHoursContent');
+    if (!contentEl) return;
+
+    try {
+      var result = await api.get('/api/v1/billable-hours/current');
+      var data = result && result.data;
+
+      if (loadingEl) loadingEl.classList.add('hidden');
+      contentEl.classList.remove('hidden');
+
+      // Total hours
+      var totalEl = el('billableTotalHours');
+      if (totalEl) {
+        totalEl.textContent = (data && data.billable_hours != null) ? data.billable_hours.toFixed(1) : '0.0';
+      }
+
+      // Per-matter breakdown
+      var listEl = el('billableMatterList');
+      if (listEl && data && data.matters) {
+        var html = '';
+        var matters = data.matters.filter(function (m) { return m.hours > 0; });
+        if (matters.length === 0) {
+          html = '<div style="font-size:0.8rem;color:var(--lex-text-muted);font-style:italic;">No billable activity yet today</div>';
+        } else {
+          for (var i = 0; i < matters.length && i < 8; i++) {
+            var m = matters[i];
+            var matterId = m.matter_id || '-';
+            var label = matterId.length > 20 ? matterId.substring(0, 17) + '...' : matterId;
+            html += '<div style="display:flex;justify-content:space-between;align-items:center;font-size:0.8rem;padding:0.25rem 0;">';
+            html += '<span style="color:var(--lex-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:65%;" title="' + Lex.Utils.escapeHtml(matterId) + '">' + Lex.Utils.escapeHtml(label) + '</span>';
+            html += '<span style="font-weight:600;color:var(--lex-text-primary);flex-shrink:0;">' + m.hours.toFixed(1) + 'h</span>';
+            html += '</div>';
+          }
+          if (matters.length > 8) {
+            html += '<div style="font-size:0.75rem;color:var(--lex-text-muted);margin-top:0.25rem;">+' + (matters.length - 8) + ' more matters</div>';
+          }
+        }
+        listEl.innerHTML = html;
+      }
+
+      // Drafts pending info
+      var draftsEl = el('billableDraftsInfo');
+      if (draftsEl) {
+        try {
+          var draftsResult = await api.get('/api/v1/billable-hours/drafts?status=draft&limit=1');
+          var draftCount = (draftsResult && draftsResult.pagination && draftsResult.pagination.total) || 0;
+          if (draftCount > 0) {
+            draftsEl.innerHTML = '<span style="color:var(--lex-color-amber-600,#d97706);">' + draftCount + ' draft' + (draftCount !== 1 ? 's' : '') + ' pending review</span>';
+          } else {
+            draftsEl.innerHTML = 'No pending drafts';
+          }
+        } catch (_) {
+          draftsEl.innerHTML = '';
+        }
+      }
+
+    } catch (err) {
+      console.warn('[Dashboard] loadBillableHours failed:', err);
+      if (loadingEl) loadingEl.classList.add('hidden');
+      if (contentEl) {
+        contentEl.classList.remove('hidden');
+        contentEl.innerHTML = '<div style="font-size:0.8rem;color:var(--lex-text-muted);font-style:italic;">Billable hours unavailable</div>';
+      }
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Zone F Right — Data Pulse
+  // ═══════════════════════════════════════════════════════════════
+
   async function renderZoneFRight() {
     var loadingEl = el('ccZoneFRightLoading');
     var contentEl = el('ccZoneFRightContent');
@@ -1901,7 +1977,8 @@
       renderZoneFRight(),         // 2 — data pulse
       loadUserProductivity(null), // 3 — heatmap
       loadActivityForUser(null),  // 4 — activity feed
-      renderZoneD()               // 5 — Lana Tasks status
+      renderZoneD(),              // 5 — Lana Tasks status
+      loadBillableHours()         // 6 — billable hours today
     ]);
 
     // ── 5. Update Zone A matters button once we have the count ─────────────
