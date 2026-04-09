@@ -1108,7 +1108,7 @@
               var dHours = ((d.duration_minutes || 0) / 60).toFixed(1);
               var dDesc = d.description || d.activity_type || 'Time entry';
               if (dDesc.length > 50) dDesc = dDesc.substring(0, 47) + '...';
-              var dMatter = d.matter_id || '';
+              var dMatter = d.matter_number || d.matter_id || '';
 
               draftHtml += '<div style="display:flex;align-items:center;gap:0.5rem;padding:0.375rem 0;font-size:0.8rem;">';
               // Hours badge
