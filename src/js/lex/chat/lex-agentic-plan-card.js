@@ -560,8 +560,12 @@
       this._loading = loading;
       const approveBtn = this.$('[data-action="approve"]');
       const cancelBtn  = this.$('[data-action="cancel"]');
+      const submitBtn  = this.$('[data-action="submit-edit"]');
+      const cancelEditBtn = this.$('[data-action="cancel-edit"]');
       if (approveBtn) approveBtn.disabled = loading;
       if (cancelBtn)  cancelBtn.disabled  = loading;
+      if (submitBtn)  submitBtn.disabled  = loading;
+      if (cancelEditBtn) cancelEditBtn.disabled = loading;
     }
   }
 
