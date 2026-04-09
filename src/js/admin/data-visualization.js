@@ -815,22 +815,60 @@
   // conversation_memory), while others use the string matter_id (documents, tasks,
   // conversations, notes). Use filterSource 'id' for UUID views, 'matter_id' for varchar.
   var CONNECTED_DATA_MAP = {
+    // ── Matters: the central hub ──
     mcp_client_matters: [
       { view: 'mcp_documents', filterField: 'matter_id', filterSource: 'matter_id', label: 'Documents', columns: 'filename,document_type,status,file_size_mb,created_at', labels: 'Filename,Type,Status,Size (MB),Created' },
       { view: 'mcp_tasks', filterField: 'matter_id', filterSource: 'matter_id', label: 'Tasks', columns: 'title,status,priority,due_date,assigned_to_name', labels: 'Title,Status,Priority,Due Date,Assigned To' },
       { view: 'mcp_conversations', filterField: 'matter_id', filterSource: 'matter_id', label: 'Conversations', columns: 'title,context_type,message_count,last_activity', labels: 'Title,Context,Messages,Last Activity' },
       { view: 'mcp_notes', filterField: 'matter_id', filterSource: 'matter_id', label: 'Notes', columns: 'note_text,note_type,created_by_name,created_at', labels: 'Note,Type,Created By,Created' },
-      { view: 'mcp_connector_data', filterField: 'matter_id', filterSource: 'id', label: 'Connector Data', columns: 'entity_type,external_id,status,synced_at', labels: 'Entity Type,External ID,Status,Synced' }
+      { view: 'mcp_matter_contacts', filterField: 'matter_id', filterSource: 'matter_id', label: 'Contacts', columns: 'contact_id,role,is_primary,created_at', labels: 'Contact ID,Role,Primary,Added' },
+      { view: 'mcp_connector_data', filterField: 'matter_id', filterSource: 'id', label: 'Connector Data', columns: 'entity_type,external_id,status,synced_at', labels: 'Entity Type,External ID,Status,Synced' },
+      { view: 'mcp_time_entries', filterField: 'matter_id', filterSource: 'matter_id', label: 'Time Entries', columns: 'description,hours,rate,status,created_at', labels: 'Description,Hours,Rate,Status,Created' },
+      { view: 'mcp_invoices', filterField: 'matter_id', filterSource: 'matter_id', label: 'Invoices', columns: 'invoice_number,total_amount,status,due_date,created_at', labels: 'Invoice #,Amount,Status,Due Date,Created' },
+      { view: 'mcp_calendar_events', filterField: 'matter_id', filterSource: 'matter_id', label: 'Calendar Events', columns: 'title,start_time,end_time,location', labels: 'Title,Start,End,Location' },
+      { view: 'mcp_emails', filterField: 'matter_id', filterSource: 'matter_id', label: 'Emails', columns: 'subject,from_address,to_address,created_at', labels: 'Subject,From,To,Date' }
     ],
+    // ── Documents ──
     mcp_documents: [
       { view: 'mcp_document_chunks', filterField: 'document_id', filterSource: 'id', label: 'Chunks', columns: 'chunk_index,chunk_type,chunk_length,word_count,page_number', labels: 'Chunk #,Type,Length,Words,Page' }
     ],
+    // ── Tasks ──
+    mcp_tasks: [
+      { view: 'mcp_comments', filterField: 'object_id', filterSource: 'id', label: 'Comments', columns: 'content,comment_type,created_at', labels: 'Content,Type,Created' }
+    ],
+    // ── Contacts ──
+    mcp_contacts: [
+      { view: 'mcp_matter_contacts', filterField: 'contact_id', filterSource: 'id', label: 'Matter Associations', columns: 'matter_id,role,is_primary,created_at', labels: 'Matter ID,Role,Primary,Added' }
+    ],
+    // ── Notes ──
+    mcp_notes: [
+      { view: 'mcp_comments', filterField: 'object_id', filterSource: 'id', label: 'Comments', columns: 'content,comment_type,created_at', labels: 'Content,Type,Created' }
+    ],
+    // ── Conversations ──
     mcp_conversations: [
       { view: 'mcp_messages', filterField: 'thread_id', filterSource: 'thread_id', label: 'Messages', columns: 'role,content,created_at', labels: 'Role,Content,Created' }
     ],
+    // ── Connector Data ──
+    mcp_connector_data: [
+      { view: 'mcp_connector_data', filterField: 'integration_source_id', filterSource: 'integration_source_id', label: 'Related Records (Same Source)', columns: 'entity_type,external_id,status,synced_at', labels: 'Entity Type,External ID,Status,Synced' }
+    ],
+    // ── Integration Sources ──
     mcp_integration_sources: [
       { view: 'mcp_connector_sync_logs', filterField: 'integration_source_id', filterSource: 'id', label: 'Sync Logs', columns: 'sync_type,sync_status,records_processed,records_created,records_failed,duration_seconds,started_at', labels: 'Type,Status,Processed,Created,Failed,Duration (s),Started' },
       { view: 'mcp_connector_data', filterField: 'integration_source_id', filterSource: 'id', label: 'Records', columns: 'entity_type,external_id,client_name,status,synced_at', labels: 'Entity Type,External ID,Client,Status,Synced' }
+    ],
+    // ── Users ──
+    mcp_users: [
+      { view: 'mcp_tasks', filterField: 'assigned_to', filterSource: 'id', label: 'Assigned Tasks', columns: 'title,status,priority,due_date,matter_id', labels: 'Title,Status,Priority,Due Date,Matter' },
+      { view: 'mcp_conversations', filterField: 'user_id', filterSource: 'id', label: 'Conversations', columns: 'title,context_type,message_count,last_activity', labels: 'Title,Context,Messages,Last Activity' }
+    ],
+    // ── Emails ──
+    mcp_emails: [
+      { view: 'mcp_connector_data', filterField: 'external_id', filterSource: 'email_id', label: 'Source Record', columns: 'entity_type,integration_source_id,status,synced_at', labels: 'Entity Type,Source,Status,Synced' }
+    ],
+    // ── Comments ──
+    mcp_comments: [
+      { view: 'mcp_comments', filterField: 'parent_comment_id', filterSource: 'id', label: 'Replies', columns: 'content,comment_type,created_at', labels: 'Content,Type,Created' }
     ]
   };
 
