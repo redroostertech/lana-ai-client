@@ -965,7 +965,7 @@
           if (fmtd) cellStr = fmtd;
         }
         // Make clickable: row has full data, clicking navigates to that record
-        var isClickableRow = (colName === 'filename' || colName === 'title' || colName === 'note_text' || colName === 'source_name' || colName === 'entity_type');
+        var isClickableRow = (colName === 'filename' || colName === 'title' || colName === 'note_text' || colName === 'source_name');
         if (isClickableRow && cellVal != null) {
           var rowIdx = ri;
           html += '<td style="padding:0.375rem 0.5rem;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis;">' +
