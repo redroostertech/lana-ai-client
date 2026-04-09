@@ -159,8 +159,8 @@
             role: m.role,
             content: m.content,
             timestamp: m.created_at || m.timestamp,
-            citations: m.citations || [],
-            artifacts: m.artifacts || [],
+            citations: (m.metadata && m.metadata.citations) || m.citations || [],
+            artifacts: (m.metadata && m.metadata.artifacts) || m.artifacts || [],
             duration: m.duration_ms || null,
             tokenCount: m.token_count || null
           };
@@ -420,6 +420,22 @@
             totalSteps: data.total_steps,
             phase: data.phase,
             message: data.message,
+            status: data.status
+          };
+
+        case 'plan_ready':
+          return {
+            type: 'plan_ready',
+            approval_id: data.approval_id,
+            plan: data.plan,
+            message: data.message
+          };
+
+        case 'agentic_approval_required':
+          return {
+            type: 'agentic_approval_required',
+            approval_id: data.approval_id,
+            plan: data.plan,
             status: data.status
           };
 
