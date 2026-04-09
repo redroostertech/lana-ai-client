@@ -8,70 +8,97 @@
   <link rel="stylesheet" href="../css/lex-tokens.css">
   <link rel="stylesheet" href="../css/components.css">
   <link rel="stylesheet" href="../css/tailwind-output.css">
-
-  <!-- Lex Core -->
-  <script src="../js/lex/core/lex.core.js"></script>
-  <script src="../js/lex/core/lex.loader.js"></script>
-  <script src="../js/lex/core/lex.router.js"></script>
-
-  <!-- Lex Components -->
-  <script src="../js/lex/components/lex-card.js"></script>
-  <script src="../js/lex/components/lex-btn.js"></script>
-  <script src="../js/lex/components/lex-banner.js"></script>
-  <script src="../js/lex/components/lex-modal.js"></script>
-  <script src="../js/lex/components/lex-select.js"></script>
-  <script src="../js/lex/components/lex-empty.js"></script>
-  <script src="../js/lex/components/layout/lex-app.js"></script>
-  <script src="../js/lex/components/layout/lex-sidebar.js"></script>
-  <script src="../js/lex/components/layout/lex-topbar.js"></script>
-
-  <!-- API + Auth -->
-  <script src="../js/api.js"></script>
-  <script src="../js/config.js"></script>
+  <link rel="stylesheet" href="../css/lex-chat.css">
+  <script src="../js/tailwind-loader.js"></script>
 </head>
 <body>
-  <lex-app page-title="Block Billing Rules" active-nav-id="reports">
-    <template id="page-content">
-      <div style="max-width:72rem;margin:0 auto;padding:1.5rem;">
 
-        <!-- Header -->
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
-          <div>
-            <div style="font-size:0.75rem;color:var(--lex-text-muted);">
-              <a href="analytics.html" style="color:var(--lex-color-blue-600);text-decoration:none;">Analytics</a>
-              <span style="margin:0 0.25rem;">></span>
-              <a href="billable-hours.html" style="color:var(--lex-color-blue-600);text-decoration:none;">Billable Hours</a>
-              <span style="margin:0 0.25rem;">></span>
-              Block Billing Rules
-            </div>
-            <h1 style="font-size:1.5rem;font-weight:700;color:var(--lex-text-primary);margin-top:0.25rem;">Block Billing Rules</h1>
-            <p style="font-size:0.875rem;color:var(--lex-text-muted);margin-top:0.25rem;">Define rules to group related activities into coherent billing blocks with UTBMS codes.</p>
+  <lex-loader theme="light"></lex-loader>
+
+  <lex-app
+    logo-src="../img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="../dashboard.html"
+    active-nav-id="reports"
+    page-title="Block Billing Rules"
+  ></lex-app>
+
+  <template id="page-content">
+    <div style="max-width:72rem;margin:0 auto;padding:1.5rem;">
+
+      <!-- Header -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+        <div>
+          <div style="font-size:0.75rem;color:var(--lex-text-muted);">
+            <a href="admin/analytics.html" style="color:var(--lex-color-blue-600);text-decoration:none;">Analytics</a>
+            <span style="margin:0 0.25rem;">></span>
+            <a href="admin/billable-hours.html" style="color:var(--lex-color-blue-600);text-decoration:none;">Billable Hours</a>
+            <span style="margin:0 0.25rem;">></span>
+            Block Billing Rules
           </div>
-          <div style="display:flex;gap:0.5rem;">
-            <lex-btn id="bbInitBtn" variant="outline" size="sm">Initialize Defaults</lex-btn>
-            <lex-btn id="bbCreateBtn" variant="primary" size="sm">Create Rule</lex-btn>
-          </div>
+          <h1 style="font-size:1.5rem;font-weight:700;color:var(--lex-text-primary);margin-top:0.25rem;">Block Billing Rules</h1>
+          <p style="font-size:0.875rem;color:var(--lex-text-muted);margin-top:0.25rem;">Define rules to group related activities into coherent billing blocks with UTBMS codes.</p>
         </div>
-
-        <!-- Rules table -->
-        <lex-card>
-          <div id="bbRulesLoading" style="padding:2rem;text-align:center;">
-            <div class="animate-pulse"><div class="cc-skeleton" style="height:2rem;width:100%;margin-bottom:0.5rem;"></div><div class="cc-skeleton" style="height:2rem;width:100%;"></div></div>
-          </div>
-          <div id="bbRulesTable" class="hidden"></div>
-          <div id="bbRulesEmpty" class="hidden" style="padding:3rem;text-align:center;">
-            <lex-empty heading="No block billing rules" description="Click 'Initialize Defaults' to load recommended rules for legal work, or create custom rules."></lex-empty>
-          </div>
-        </lex-card>
-
+        <div style="display:flex;gap:0.5rem;">
+          <lex-btn id="bbInitBtn" variant="outline" size="sm">Initialize Defaults</lex-btn>
+          <lex-btn id="bbCreateBtn" variant="primary" size="sm">Create Rule</lex-btn>
+        </div>
       </div>
-    </template>
-  </lex-app>
+
+      <!-- Rules table -->
+      <lex-card>
+        <div id="bbRulesLoading" style="padding:2rem;text-align:center;">
+          <div class="animate-pulse"><div class="cc-skeleton" style="height:2rem;width:100%;margin-bottom:0.5rem;"></div><div class="cc-skeleton" style="height:2rem;width:100%;"></div></div>
+        </div>
+        <div id="bbRulesTable" class="hidden"></div>
+        <div id="bbRulesEmpty" class="hidden" style="padding:3rem;text-align:center;">
+          <lex-empty heading="No block billing rules" description="Click 'Initialize Defaults' to load recommended rules for legal work, or create custom rules."></lex-empty>
+        </div>
+      </lex-card>
+
+    </div>
+  </template>
+
+  <!-- Lex Framework Core -->
+  <script src="../js/lex/lex.core.js"></script>
+  <script src="../js/lex/lex.icons.js"></script>
+  <script src="../js/lex/lex.data.js"></script>
+  <script src="../js/lex/lex.forms.js"></script>
+  <script src="../js/lex/lex.state.js"></script>
+  <script src="../js/lex/lex.utils.js"></script>
+  <script src="../js/lex/lex.auth.js"></script>
+  <script src="../js/lex/lex-nav.js"></script>
+
+  <!-- Lex Components -->
+  <script src="../js/lex/components/foundation/lex-loader.js"></script>
+  <script src="../js/lex/components/foundation/lex-toast.js"></script>
+  <script src="../js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="../js/lex/components/foundation/lex-btn.js"></script>
+  <script src="../js/lex/components/foundation/lex-empty.js"></script>
+  <script src="../js/lex/components/foundation/lex-spacer.js"></script>
+  <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
+  <script src="../js/lex/components/foundation/lex-banner.js"></script>
+  <script src="../js/lex/components/foundation/lex-card.js"></script>
+  <script src="../js/lex/components/foundation/lex-drawer.js"></script>
+  <script src="../js/lex/components/form/lex-select.js"></script>
+
+  <!-- Lex Layout -->
+  <script src="../js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="../js/lex/components/layout/lex-topbar.js"></script>
+  <script src="../js/lex/components/layout/lex-notification-panel.js"></script>
+  <script src="../js/lex/components/layout/lex-app.js"></script>
+
+  <!-- Lex Page Init -->
+  <script src="../js/lex/lex-page-init.js"></script>
+
+  <!-- Dependencies -->
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
 
   <!-- Page controller -->
   <script src="../js/admin/block-billing-rules.js"></script>
 
-  <!-- Auth guard -->
+  <!-- Auth guard (MUST be last) -->
   <script src="../js/auth-guard.js"></script>
 </body>
 </html>
