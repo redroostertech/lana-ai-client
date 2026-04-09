@@ -19,7 +19,7 @@ async function renderSkillsTab(matter) {
   content.innerHTML = `
     <div class="flex items-center justify-center py-12">
       <div class="text-center">
-        <div class="animate-spin w-8 h-8 border-4 border-purple-200 border-t-purple-600 rounded-full mx-auto mb-4"></div>
+        <div class="animate-spin w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full mx-auto mb-4"></div>
         <p class="text-gray-500">Loading skills...</p>
       </div>
     </div>
@@ -40,18 +40,8 @@ async function renderSkillsTab(matter) {
             <p class="text-sm text-gray-500 mt-1">Automate workflows and enhance productivity with AI-powered skills</p>
           </div>
           <div class="flex gap-2">
-            <button onclick="createNewSkill('${matter.matter_id}')" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-              </svg>
-              Create Skill
-            </button>
-            <button onclick="importSkill('${matter.matter_id}')" class="px-4 py-2 bg-white text-purple-600 border border-purple-600 rounded-lg hover:bg-purple-50 transition-colors flex items-center gap-2">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-              </svg>
-              Import
-            </button>
+            <lex-btn variant="primary" size="sm" onclick="createNewSkill('${matter.matter_id}')">+ Create Skill</lex-btn>
+            <lex-btn variant="outline" size="sm" onclick="importSkill('${matter.matter_id}')">Import</lex-btn>
           </div>
         </div>
 
@@ -59,30 +49,20 @@ async function renderSkillsTab(matter) {
         <div class="space-y-4">
           ${matterSkills.length === 0 ? `
             <div class="bg-white border-2 border-dashed border-gray-300 rounded-xl p-12 text-center">
-              <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style="background:var(--lex-bg-accent-subtle,#eff6ff);">
+                <svg class="w-8 h-8" style="color:var(--lex-color-blue-600,#2563eb);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z"></path>
                 </svg>
               </div>
               <h3 class="text-lg font-semibold text-gray-900 mb-2">No Skills Enabled Yet</h3>
               <p class="text-gray-500 mb-6">Create a new skill or import an existing one to automate tasks and workflows for this matter.</p>
               <div class="flex gap-3 justify-center">
-                <button onclick="createNewSkill('${matter.matter_id}')" class="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                  </svg>
-                  Create Skill
-                </button>
-                <button onclick="importSkill('${matter.matter_id}')" class="px-6 py-3 bg-white text-purple-600 border-2 border-purple-600 rounded-lg hover:bg-purple-50 transition-colors flex items-center gap-2">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-                  </svg>
-                  Import Skill
-                </button>
+                <lex-btn variant="primary" onclick="createNewSkill('${matter.matter_id}')">+ Create Skill</lex-btn>
+                <lex-btn variant="outline" onclick="importSkill('${matter.matter_id}')">Import Skill</lex-btn>
               </div>
             </div>
           ` : matterSkills.map(ms => `
-            <div class="bg-white border border-gray-200 rounded-xl p-6 hover:border-purple-300 transition-colors">
+            <div class="bg-white border border-gray-200 rounded-xl p-6 hover:border-blue-300 transition-colors">
               <div class="flex justify-between items-start">
                 <div class="flex-1">
                   <div class="flex items-center gap-3 mb-2">
@@ -106,11 +86,11 @@ async function renderSkillsTab(matter) {
                 <!-- Actions -->
                 <div class="flex items-center gap-2">
                   <button onclick="toggleMatterSkill('${matter.matter_id}', '${ms.skill_id}', ${!ms.is_enabled})"
-                          class="px-3 py-1.5 text-sm font-medium rounded-lg ${ms.is_enabled ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'} transition-colors">
+                          class="px-3 py-1.5 text-sm font-medium rounded-lg ${ms.is_enabled ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'} transition-colors">
                     ${ms.is_enabled ? 'Disable' : 'Enable'}
                   </button>
                   <button onclick="executeMatterSkill('${matter.matter_id}', '${ms.skill_id}')"
-                          class="px-3 py-1.5 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors ${ms.is_enabled ? '' : 'opacity-50 cursor-not-allowed'}"
+                          class="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors ${ms.is_enabled ? '' : 'opacity-50 cursor-not-allowed'}"
                           ${ms.is_enabled ? '' : 'disabled'}>
                     Execute
                   </button>
