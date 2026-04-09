@@ -953,7 +953,8 @@
     html += '<tbody>';
     for (var ri = 0; ri < rows.length; ri++) {
       var bgStyle = ri % 2 === 1 ? 'background:var(--lex-bg-muted,#f9fafb);' : '';
-      html += '<tr style="' + bgStyle + 'border-top:1px solid var(--lex-border-default,#e5e7eb);">';
+      // Make entire row clickable — opens the full record detail
+      html += '<tr data-nav-view="' + Lex.Utils.escapeHtml(conn.view) + '" data-nav-row="' + ri + '" class="drawer-nav-row" style="' + bgStyle + 'border-top:1px solid var(--lex-border-default,#e5e7eb);cursor:pointer;" onmouseover="this.style.background=\'var(--lex-bg-accent-subtle,#eff6ff)\'" onmouseout="this.style.background=\'' + (ri % 2 === 1 ? 'var(--lex-bg-muted,#f9fafb)' : '') + '\'">';
       for (var ci2 = 0; ci2 < cols.length; ci2++) {
         var colName = cols[ci2];
         var cellVal = rows[ri][colName];
@@ -964,16 +965,11 @@
           var fmtd = fmtDateTime(cellVal);
           if (fmtd) cellStr = fmtd;
         }
-        // Make clickable: row has full data, clicking navigates to that record
-        var isClickableRow = (colName === 'filename' || colName === 'title' || colName === 'note_text' || colName === 'source_name');
-        if (isClickableRow && cellVal != null) {
-          var rowIdx = ri;
-          html += '<td style="padding:0.375rem 0.5rem;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis;">' +
-            '<a href="#" data-nav-view="' + Lex.Utils.escapeHtml(conn.view) + '" data-nav-row="' + rowIdx + '" style="color:var(--lex-color-blue-600,#2563eb);text-decoration:none;cursor:pointer;" class="drawer-nav-link">' +
-            Lex.Utils.escapeHtml(cellStr) + '</a></td>';
-        } else {
-          html += '<td style="padding:0.375rem 0.5rem;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis;">' + Lex.Utils.escapeHtml(cellStr) + '</td>';
-        }
+        // First column gets a subtle link color to hint clickability
+        var cellStyle = ci2 === 0
+          ? 'padding:0.375rem 0.5rem;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis;color:var(--lex-color-blue-600,#2563eb);'
+          : 'padding:0.375rem 0.5rem;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis;';
+        html += '<td style="' + cellStyle + '">' + Lex.Utils.escapeHtml(cellStr) + '</td>';
       }
       html += '</tr>';
     }
@@ -1054,27 +1050,32 @@
   }
 
   function _attachNavHandler(container) {
-    // Delegated click handler for all nav links inside the drawer
+    // Delegated click handler for nav links and clickable rows inside the drawer
     container.addEventListener('click', function (e) {
+      // Check for ID field links first
       var link = e.target.closest('.drawer-nav-link');
-      if (!link) return;
-      e.preventDefault();
-
-      var navView = link.getAttribute('data-nav-view');
-      var navRow = link.getAttribute('data-nav-row');
-
-      if (navView && navRow != null) {
-        var rows = _connectedRows[navView];
-        if (rows && rows[parseInt(navRow, 10)]) {
-          // Close current drawer and open new one for this record
-          _navigateToRecord(navView, rows[parseInt(navRow, 10)]);
+      if (link) {
+        e.preventDefault();
+        var navId = link.getAttribute('data-nav-id');
+        var navField = link.getAttribute('data-nav-field');
+        if (navId && navField) {
+          _navigateToRecordById(navField, navId);
+          return;
         }
       }
 
-      var navId = link.getAttribute('data-nav-id');
-      var navField = link.getAttribute('data-nav-field');
-      if (navId && navField) {
-        _navigateToRecordById(navField, navId);
+      // Check for clickable connected data rows
+      var row = e.target.closest('.drawer-nav-row');
+      if (row) {
+        e.preventDefault();
+        var navView = row.getAttribute('data-nav-view');
+        var navRowIdx = row.getAttribute('data-nav-row');
+        if (navView && navRowIdx != null) {
+          var rows = _connectedRows[navView];
+          if (rows && rows[parseInt(navRowIdx, 10)]) {
+            _navigateToRecord(navView, rows[parseInt(navRowIdx, 10)]);
+          }
+        }
       }
     });
   }
