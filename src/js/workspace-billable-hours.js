@@ -518,10 +518,30 @@
     }
     html += '</div>';
 
-    // Split button for drafts
-    if (isDraft && entry.duration_minutes > 6) {
-      html += '<div style="padding-top:0.5rem;border-top:1px solid var(--lex-border-default,#e5e7eb);">';
-      html += '<button id="bhSplitBtn" style="font-size:0.75rem;color:var(--lex-color-blue-600);cursor:pointer;background:none;border:none;padding:0;">Split this entry into two</button>';
+    // Split + Merge buttons for drafts
+    if (isDraft) {
+      html += '<div style="padding-top:0.5rem;border-top:1px solid var(--lex-border-default,#e5e7eb);display:flex;gap:1rem;">';
+      if (entry.duration_minutes > 6) {
+        html += '<button id="bhSplitBtn" style="font-size:0.75rem;color:var(--lex-color-blue-600);cursor:pointer;background:none;border:none;padding:0;">Split this entry into two</button>';
+      }
+      // Merge: show dropdown of other drafts for the same matter
+      var mergeTargets = _entries.filter(function (e) {
+        return e.id !== entry.id && e.status === 'draft' && e.matter_id === entry.matter_id;
+      });
+      if (mergeTargets.length > 0) {
+        html += '<div style="display:flex;align-items:center;gap:0.25rem;">';
+        html += '<span style="font-size:0.75rem;color:var(--lex-color-blue-600);">Merge with:</span>';
+        html += '<select id="bhMergeTarget" style="font-size:0.75rem;padding:0.125rem 0.25rem;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.25rem;">';
+        for (var mi = 0; mi < mergeTargets.length; mi++) {
+          var mt = mergeTargets[mi];
+          var mtHours = ((mt.duration_minutes || 0) / 60).toFixed(1);
+          var mtLabel = mtHours + 'h — ' + (mt.activity_type || 'general');
+          html += '<option value="' + mt.id + '">' + Lex.Utils.escapeHtml(mtLabel) + '</option>';
+        }
+        html += '</select>';
+        html += '<button id="bhMergeBtn" style="font-size:0.75rem;color:var(--lex-color-blue-600);cursor:pointer;background:none;border:none;padding:0;font-weight:600;">Merge</button>';
+        html += '</div>';
+      }
       html += '</div>';
     }
 
@@ -606,6 +626,23 @@
             })
             .catch(function () {
               if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.error('Failed to split entry');
+            });
+        });
+      }
+
+      var mergeBtn = document.getElementById('bhMergeBtn');
+      if (mergeBtn) {
+        mergeBtn.addEventListener('click', function () {
+          var select = document.getElementById('bhMergeTarget');
+          if (!select || !select.value) return;
+          api.post('/api/v1/billable-hours/drafts/' + entry.id + '/merge', { merge_with_id: select.value })
+            .then(function () {
+              if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.success('Entries merged');
+              if (typeof Lex !== 'undefined' && Lex.Drawer) Lex.Drawer.close();
+              _refresh();
+            })
+            .catch(function () {
+              if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.error('Failed to merge entries');
             });
         });
       }
