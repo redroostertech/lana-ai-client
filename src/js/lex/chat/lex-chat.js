@@ -297,6 +297,7 @@
       this._streamingContent = '';
       this._groundingContext = null;
       this._sendStartTime = Date.now();
+      this._planReadyReceived = false;
 
       // Add user message to thread
       if (this._threadEl) {
@@ -365,7 +366,9 @@
       if (this._activityEl) this._activityEl.hide();
       if (this._composerEl) this._composerEl.setGenerating(false);
 
-      if (!responseStarted && this._threadEl) {
+      // Suppress fallback when the stream intentionally yielded a plan card
+      // instead of streaming content (plan_ready flow has no 'content' events).
+      if (!responseStarted && !this._planReadyReceived && this._threadEl) {
         this._threadEl.addMessage('assistant', 'No response received.');
       }
 
@@ -403,6 +406,8 @@
               this._threadEl.addMessage(m.role, m.content, {
                 messageId: m.id || m.message_id,
                 timestamp: m.timestamp || m.created_at,
+                citations: m.citations && m.citations.length > 0 ? m.citations : undefined,
+                artifacts: m.artifacts && m.artifacts.length > 0 ? m.artifacts : undefined,
                 duration: m.duration || null,
                 tokenCount: m.tokenCount || null
               });
@@ -557,6 +562,15 @@
           }
           break;
 
+        case 'plan_ready':
+          // Backend generated a plan that requires user approval before execution.
+          // Hide the activity indicator and insert a plan card into the thread.
+          // Mark flag so the "No response received" fallback is suppressed.
+          this._planReadyReceived = true;
+          if (this._activityEl) this._activityEl.hide();
+          this._insertPlanCard(event);
+          break;
+
         case 'agentic_complete':
           if (event.artifacts) {
             this._artifacts.push(...event.artifacts);
@@ -693,6 +707,42 @@
         this._documentsEl.documents = docs;
         this._documentsEl.mode = state.mode || 'general';
       }
+    }
+
+    /**
+     * Insert a lex-agentic-plan-card into the thread container.
+     * Called when the backend emits a `plan_ready` SSE event.
+     * The card handles its own Approve / Cancel API calls.
+     *
+     * @param {Object} event - { approval_id, plan, message }
+     */
+    _insertPlanCard(event) {
+      if (!this._threadEl || !this._threadEl._container) return;
+
+      // Hide welcome screen if present (mirrors addMessage behaviour)
+      const welcome = this._threadEl._container.querySelector('.lex-chat-welcome');
+      if (welcome) welcome.remove();
+
+      const card = document.createElement('lex-agentic-plan-card');
+      if (event.approval_id) card.setAttribute('approval-id', event.approval_id);
+      card.setAttribute('status', 'pending');
+
+      // Pass the plan object as a JS property — it is a complex object
+      if (event.plan) card.plan = event.plan;
+
+      this._threadEl._container.appendChild(card);
+
+      // Scroll into view
+      if (this._threadEl._isNearBottom && this._threadEl._isNearBottom()) {
+        this._threadEl.scrollToBottom();
+      }
+
+      // Emit so pages can react (e.g. disable composer while plan is pending)
+      this.emit('lex-chat-plan-ready', {
+        approvalId: event.approval_id,
+        plan: event.plan,
+        message: event.message
+      });
     }
 
     _showSystemMessage(msg) {
