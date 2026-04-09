@@ -313,7 +313,7 @@
         var html = '';
 
         // Bulk actions bar
-        html += '<div id="bhApprovalBulkBar" style="display:none;margin-bottom:0.75rem;display:flex;gap:0.5rem;align-items:center;">';
+        html += '<div id="bhApprovalBulkBar" style="display:none;margin-bottom:0.75rem;gap:0.5rem;align-items:center;">';
         html += '<lex-btn id="bhApprovalBulkApprove" variant="primary" size="sm">Approve Selected</lex-btn>';
         html += '<span id="bhApprovalSelectedCount" style="font-size:0.75rem;color:var(--lex-text-muted);"></span>';
         html += '</div>';
@@ -417,7 +417,15 @@
         api.post('/api/v1/billable-hours/admin/bulk-approve', { ids: ids })
           .then(function (result) {
             var data = (result && result.data) || {};
-            if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.success(data.approved + ' entries approved');
+            var approved = data.approved || 0;
+            var failed = data.failed || 0;
+            if (typeof Lex !== 'undefined' && Lex.Toast) {
+              if (failed > 0) {
+                Lex.Toast.warning(approved + ' approved, ' + failed + ' skipped (already processed or error)');
+              } else {
+                Lex.Toast.success(approved + ' entries approved');
+              }
+            }
             _approvalSelectedIds = {};
             _loadApprovalQueue();
             _loadSummary();

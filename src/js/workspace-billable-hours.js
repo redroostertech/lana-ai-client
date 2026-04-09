@@ -50,7 +50,7 @@
       '<label style="font-size:0.75rem;color:var(--lex-text-muted);font-weight:600;">To</label>' +
       '<input type="date" id="bhDateTo" value="' + Lex.Utils.escapeHtml(_dateTo) + '" style="padding:0.25rem 0.5rem;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.375rem;font-size:0.8125rem;">' +
       '<lex-btn id="bhFilterApplyBtn" variant="outline" size="sm">Apply</lex-btn>' +
-      '<div id="bhBulkActions" style="display:none;margin-left:auto;gap:0.5rem;display:flex;">' +
+      '<div id="bhBulkActions" style="display:none;margin-left:auto;gap:0.5rem;">' +
         '<lex-btn id="bhBulkApproveBtn" variant="primary" size="sm">Approve Selected</lex-btn>' +
         '<lex-btn id="bhBulkRejectBtn" variant="danger" size="sm">Reject Selected</lex-btn>' +
       '</div>' +
@@ -117,7 +117,7 @@
       var valueColor = c.highlight ? 'var(--lex-color-amber-600,#d97706)' : 'var(--lex-text-primary)';
       html += '<div style="background:var(--lex-bg-muted,#f9fafb);border-radius:0.5rem;padding:0.75rem 1rem;">';
       html += '<div style="font-size:0.7rem;font-weight:600;color:var(--lex-text-muted);text-transform:uppercase;letter-spacing:0.05em;">' + Lex.Utils.escapeHtml(c.label) + '</div>';
-      html += '<div style="font-size:1.25rem;font-weight:700;color:' + valueColor + ';">' + c.value + c.suffix + '</div>';
+      html += '<div style="font-size:1.25rem;font-weight:700;color:' + valueColor + ';">' + Lex.Utils.escapeHtml(String(c.value)) + Lex.Utils.escapeHtml(c.suffix) + '</div>';
       html += '</div>';
     }
     return html;
@@ -197,11 +197,11 @@
       var bgStyle = i % 2 === 1 ? 'background:var(--lex-bg-muted,#f9fafb);' : '';
       var isChecked = !!_selectedIds[e.id];
 
-      html += '<div class="bh-entry-row" data-entry-id="' + e.id + '" style="' + bgStyle + 'display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background=\'var(--lex-bg-accent-subtle,#eff6ff)\'" onmouseout="this.style.background=\'' + (i % 2 === 1 ? 'var(--lex-bg-muted,#f9fafb)' : '') + '\'">';
+      html += '<div class="bh-entry-row" data-entry-id="' + Lex.Utils.escapeHtml(e.id) + '" style="' + bgStyle + 'display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background=\'var(--lex-bg-accent-subtle,#eff6ff)\'" onmouseout="this.style.background=\'' + (i % 2 === 1 ? 'var(--lex-bg-muted,#f9fafb)' : '') + '\'">';
 
       // Checkbox for drafts
       if (e.status === 'draft') {
-        html += '<input type="checkbox" class="bh-entry-checkbox" data-id="' + e.id + '" ' + (isChecked ? 'checked' : '') + ' style="cursor:pointer;" onclick="event.stopPropagation();">';
+        html += '<input type="checkbox" class="bh-entry-checkbox" data-id="' + Lex.Utils.escapeHtml(e.id) + '" ' + (isChecked ? 'checked' : '') + ' style="cursor:pointer;" onclick="event.stopPropagation();">';
       } else if (hasDrafts) {
         html += '<div style="width:1rem;"></div>';
       }
@@ -221,8 +221,8 @@
       // Action buttons for drafts
       if (e.status === 'draft') {
         html += '<div style="display:flex;gap:0.25rem;flex-shrink:0;">';
-        html += '<button class="bh-approve-btn" data-id="' + e.id + '" style="padding:0.25rem 0.5rem;font-size:0.7rem;font-weight:600;background:var(--lex-color-green-50,#f0fdf4);color:var(--lex-color-green-700,#15803d);border:1px solid var(--lex-color-green-200,#bbf7d0);border-radius:0.25rem;cursor:pointer;">Approve</button>';
-        html += '<button class="bh-reject-btn" data-id="' + e.id + '" style="padding:0.25rem 0.5rem;font-size:0.7rem;font-weight:600;background:var(--lex-color-red-50,#fef2f2);color:var(--lex-color-red-700,#b91c1c);border:1px solid var(--lex-color-red-200,#fecaca);border-radius:0.25rem;cursor:pointer;">Reject</button>';
+        html += '<button class="bh-approve-btn" data-id="' + Lex.Utils.escapeHtml(e.id) + '" style="padding:0.25rem 0.5rem;font-size:0.7rem;font-weight:600;background:var(--lex-color-green-50,#f0fdf4);color:var(--lex-color-green-700,#15803d);border:1px solid var(--lex-color-green-200,#bbf7d0);border-radius:0.25rem;cursor:pointer;">Approve</button>';
+        html += '<button class="bh-reject-btn" data-id="' + Lex.Utils.escapeHtml(e.id) + '" style="padding:0.25rem 0.5rem;font-size:0.7rem;font-weight:600;background:var(--lex-color-red-50,#fef2f2);color:var(--lex-color-red-700,#b91c1c);border:1px solid var(--lex-color-red-200,#fecaca);border-radius:0.25rem;cursor:pointer;">Reject</button>';
         html += '</div>';
       }
 
@@ -667,7 +667,9 @@
     if (Object.keys(updates).length > 0) {
       api.patch('/api/v1/time-entries/' + entry.id, updates)
         .then(function () { _approveEntry(entry.id); })
-        .catch(function () { _approveEntry(entry.id); });
+        .catch(function () {
+          if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.error('Failed to save edits — entry not approved');
+        });
     } else {
       _approveEntry(entry.id);
     }
