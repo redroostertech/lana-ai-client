@@ -810,13 +810,16 @@
 
   // Defines what connected data to fetch per entity type.
   // Each entry: { view, filterField, label, columns, labels }
+  // Note: some views use UUID for matter_id (connector_data, generated_documents,
+  // conversation_memory), while others use the string matter_id (documents, tasks,
+  // conversations, notes). Use filterSource 'id' for UUID views, 'matter_id' for varchar.
   var CONNECTED_DATA_MAP = {
     mcp_client_matters: [
       { view: 'mcp_documents', filterField: 'matter_id', filterSource: 'matter_id', label: 'Documents', columns: 'filename,document_type,status,file_size_mb,created_at', labels: 'Filename,Type,Status,Size (MB),Created' },
       { view: 'mcp_tasks', filterField: 'matter_id', filterSource: 'matter_id', label: 'Tasks', columns: 'title,status,priority,due_date,assigned_to_name', labels: 'Title,Status,Priority,Due Date,Assigned To' },
       { view: 'mcp_conversations', filterField: 'matter_id', filterSource: 'matter_id', label: 'Conversations', columns: 'title,context_type,message_count,last_activity', labels: 'Title,Context,Messages,Last Activity' },
       { view: 'mcp_notes', filterField: 'matter_id', filterSource: 'matter_id', label: 'Notes', columns: 'note_text,note_type,created_by_name,created_at', labels: 'Note,Type,Created By,Created' },
-      { view: 'mcp_connector_data', filterField: 'matter_id', filterSource: 'matter_id', label: 'Connector Data', columns: 'entity_type,external_id,status,synced_at', labels: 'Entity Type,External ID,Status,Synced' }
+      { view: 'mcp_connector_data', filterField: 'matter_id', filterSource: 'id', label: 'Connector Data', columns: 'entity_type,external_id,status,synced_at', labels: 'Entity Type,External ID,Status,Synced' }
     ],
     mcp_documents: [
       { view: 'mcp_document_chunks', filterField: 'document_id', filterSource: 'id', label: 'Chunks', columns: 'chunk_index,chunk_type,chunk_length,word_count,page_number', labels: 'Chunk #,Type,Length,Words,Page' }
