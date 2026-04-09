@@ -401,6 +401,7 @@
   var _pageSize    = 50;
   var _availableViews = [];     // populated from /api/v1/mcp-data/views
   var _rawRows     = [];        // unformatted rows for detail drawer
+  var _connectedRows = {};      // connected data rows keyed by view name
   // _chatEl / _threadsEl removed — managed by lex-lana-panel
 
   // ═══════════════════════════════════════════════════════════════
@@ -859,11 +860,17 @@
 
     html += '</div>';
 
+    // Reset connected rows cache for this drawer session
+    _connectedRows = {};
+
     Lex.Drawer.open({
       heading: Lex.Utils.escapeHtml(String(title)),
       content: html,
       width: 'lg'
     });
+
+    // Wire navigation links via delegation on the drawer content
+    _wireDrawerNavLinks();
 
     // Fetch connected data async
     for (var fi = 0; fi < connections.length; fi++) {
@@ -906,9 +913,11 @@
     api.get(url)
       .then(function (result) {
         var rows = (result && result.data) || [];
+        _connectedRows[conn.view] = rows;
         _renderConnectedSection(conn.view, rows, conn);
       })
       .catch(function () {
+        _connectedRows[conn.view] = [];
         _renderConnectedSection(conn.view, []);
       });
   }
@@ -946,15 +955,25 @@
       var bgStyle = ri % 2 === 1 ? 'background:var(--lex-bg-muted,#f9fafb);' : '';
       html += '<tr style="' + bgStyle + 'border-top:1px solid var(--lex-border-default,#e5e7eb);">';
       for (var ci2 = 0; ci2 < cols.length; ci2++) {
-        var cellVal = rows[ri][cols[ci2]];
+        var colName = cols[ci2];
+        var cellVal = rows[ri][colName];
         var cellStr = cellVal == null ? '-' : String(cellVal);
         if (cellStr.length > 80) cellStr = cellStr.substring(0, 77) + '...';
         // Format dates inline
-        if (cols[ci2].indexOf('_at') !== -1 || cols[ci2].indexOf('date') !== -1) {
+        if (colName.indexOf('_at') !== -1 || colName.indexOf('date') !== -1) {
           var fmtd = fmtDateTime(cellVal);
           if (fmtd) cellStr = fmtd;
         }
-        html += '<td style="padding:0.375rem 0.5rem;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis;">' + Lex.Utils.escapeHtml(cellStr) + '</td>';
+        // Make clickable: row has full data, clicking navigates to that record
+        var isClickableRow = (colName === 'filename' || colName === 'title' || colName === 'note_text' || colName === 'source_name' || colName === 'entity_type');
+        if (isClickableRow && cellVal != null) {
+          var rowIdx = ri;
+          html += '<td style="padding:0.375rem 0.5rem;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis;">' +
+            '<a href="#" data-nav-view="' + Lex.Utils.escapeHtml(conn.view) + '" data-nav-row="' + rowIdx + '" style="color:var(--lex-color-blue-600,#2563eb);text-decoration:none;cursor:pointer;" class="drawer-nav-link">' +
+            Lex.Utils.escapeHtml(cellStr) + '</a></td>';
+        } else {
+          html += '<td style="padding:0.375rem 0.5rem;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis;">' + Lex.Utils.escapeHtml(cellStr) + '</td>';
+        }
       }
       html += '</tr>';
     }
@@ -985,9 +1004,17 @@
       return '<pre style="font-size:0.75rem;background:var(--lex-bg-muted,#f9fafb);padding:0.5rem;border-radius:0.375rem;overflow-x:auto;margin:0;white-space:pre-wrap;">' + Lex.Utils.escapeHtml(jsonStr) + '</pre>';
     }
 
-    // Format UUIDs (monospace)
+    // Format UUIDs — make navigable if the field maps to a known view
     if (str.length === 36 && str.charAt(8) === '-' && str.charAt(13) === '-') {
+      if (ID_TO_VIEW_MAP[key]) {
+        return '<a href="#" class="drawer-nav-link" data-nav-field="' + Lex.Utils.escapeHtml(key) + '" data-nav-id="' + Lex.Utils.escapeHtml(str) + '" style="font-size:0.75rem;font-family:monospace;background:var(--lex-bg-muted,#f9fafb);padding:0.125rem 0.375rem;border-radius:0.25rem;color:var(--lex-color-blue-600,#2563eb);text-decoration:none;cursor:pointer;">' + Lex.Utils.escapeHtml(str) + '</a>';
+      }
       return '<code style="font-size:0.75rem;background:var(--lex-bg-muted,#f9fafb);padding:0.125rem 0.375rem;border-radius:0.25rem;">' + Lex.Utils.escapeHtml(str) + '</code>';
+    }
+
+    // Also handle non-UUID IDs (e.g., matter_id = "MATT-XXXXX")
+    if (ID_TO_VIEW_MAP[key] && str.length > 0 && str !== '-') {
+      return '<a href="#" class="drawer-nav-link" data-nav-field="' + Lex.Utils.escapeHtml(key) + '" data-nav-id="' + Lex.Utils.escapeHtml(str) + '" style="font-size:0.875rem;color:var(--lex-color-blue-600,#2563eb);text-decoration:none;cursor:pointer;">' + Lex.Utils.escapeHtml(str) + '</a>';
     }
 
     // Long text — show with wrap
@@ -996,6 +1023,108 @@
     }
 
     return Lex.Utils.escapeHtml(str);
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Drawer navigation (clickable IDs)
+  // ═══════════════════════════════════════════════════════════════
+
+  /**
+   * Maps an ID field name to the MCP view it references.
+   * Used to resolve where to fetch a record when an ID is clicked.
+   */
+  var ID_TO_VIEW_MAP = {
+    matter_id:             'mcp_client_matters',
+    document_id:           'mcp_documents',
+    thread_id:             'mcp_conversations',
+    user_id:               'mcp_users',
+    contact_id:            'mcp_contacts',
+    integration_source_id: 'mcp_integration_sources',
+    connector_id:          'mcp_integration_sources',
+    group_id:              'mcp_groups'
+  };
+
+  function _wireDrawerNavLinks() {
+    // The drawer DOM is created async by Lex.Drawer.open().
+    // Wait a tick for it to render, then attach handler to the drawer body.
+    setTimeout(function () {
+      var body = document.querySelector('.lex-drawer-body');
+      if (body) _attachNavHandler(body);
+    }, 50);
+  }
+
+  function _attachNavHandler(container) {
+    // Delegated click handler for all nav links inside the drawer
+    container.addEventListener('click', function (e) {
+      var link = e.target.closest('.drawer-nav-link');
+      if (!link) return;
+      e.preventDefault();
+
+      var navView = link.getAttribute('data-nav-view');
+      var navRow = link.getAttribute('data-nav-row');
+
+      if (navView && navRow != null) {
+        var rows = _connectedRows[navView];
+        if (rows && rows[parseInt(navRow, 10)]) {
+          // Close current drawer and open new one for this record
+          _navigateToRecord(navView, rows[parseInt(navRow, 10)]);
+        }
+      }
+
+      var navId = link.getAttribute('data-nav-id');
+      var navField = link.getAttribute('data-nav-field');
+      if (navId && navField) {
+        _navigateToRecordById(navField, navId);
+      }
+    });
+  }
+
+  /**
+   * Navigate to a record by opening its detail drawer with connected data.
+   */
+  function _navigateToRecord(viewName, row) {
+    // Temporarily set the effective view so connected data map resolves
+    var savedTab = _currentTab;
+    var savedSubView = _subViewMode;
+
+    // Find the tab that maps to this view
+    for (var tabKey in TAB_VIEW_MAP) {
+      if (TAB_VIEW_MAP[tabKey] === viewName) {
+        _currentTab = tabKey;
+        _subViewMode = 'primary';
+        break;
+      }
+    }
+
+    _openDetailDrawer(row);
+
+    // Restore
+    _currentTab = savedTab;
+    _subViewMode = savedSubView;
+  }
+
+  /**
+   * Navigate to a record by fetching it from its view by ID.
+   */
+  function _navigateToRecordById(fieldName, idValue) {
+    var targetView = ID_TO_VIEW_MAP[fieldName];
+    if (!targetView) return;
+
+    var filterField = fieldName === 'matter_id' ? 'matter_id' : 'id';
+    var url = '/api/v1/mcp-data/' + targetView +
+      '?filter_' + filterField + '=' + encodeURIComponent(idValue) +
+      '&limit=1';
+
+    api.get(url)
+      .then(function (result) {
+        var rows = (result && result.data) || [];
+        if (rows.length > 0) {
+          _navigateToRecord(targetView, rows[0]);
+        }
+      })
+      .catch(function () {
+        // Silent — couldn't fetch the linked record
+      });
   }
 
   // ═══════════════════════════════════════════════════════════════
