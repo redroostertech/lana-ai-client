@@ -599,7 +599,7 @@
     // Wire change (only once)
     if (!segmented._dataVizWired) {
       segmented._dataVizWired = true;
-      segmented.addEventListener('change', function (e) {
+      segmented.addEventListener('lex-change', function (e) {
         var val = e.detail && (e.detail.value || e.detail);
         if (typeof val === 'string' && val !== _subViewMode) {
           _subViewMode = val;
@@ -805,7 +805,7 @@
       var displayRow = rawRow || clickedRow;
       if (!displayRow || Object.keys(displayRow).length === 0) return;
 
-      _openDetailDrawer(displayRow);
+      _openDetailDrawer(displayRow, _getEffectiveView());
     });
   }
 
@@ -834,12 +834,59 @@
     ]
   };
 
-  function _openDetailDrawer(row) {
+  /**
+   * Get action buttons for a record based on its view type.
+   */
+  function _getRecordActions(viewName, row) {
+    var actions = [];
+
+    // Documents: View File button → opens file-viewer.html
+    if (viewName === 'mcp_documents' && row.id) {
+      actions.push({
+        label: 'View File',
+        href: '../file-viewer.html?id=' + encodeURIComponent(row.id)
+      });
+    }
+
+    // Matters: View Workspace → opens workspace-details.html
+    if (viewName === 'mcp_client_matters' && row.matter_id) {
+      actions.push({
+        label: 'View Workspace',
+        href: '../workspace-details.html?matter_id=' + encodeURIComponent(row.matter_id)
+      });
+    }
+
+    // Conversations: View Chat → opens chat.html with thread
+    if (viewName === 'mcp_conversations' && row.thread_id) {
+      actions.push({
+        label: 'View Chat',
+        href: '../chat.html?conversation_id=' + encodeURIComponent(row.thread_id)
+      });
+    }
+
+    return actions;
+  }
+
+  function _openDetailDrawer(row, explicitViewName) {
+    var viewName = explicitViewName || _getEffectiveView();
     var title = row.matter_name || row.filename || row.title || row.source_name
       || row.skill_name || row.name || row.entity_type || 'Record Details';
 
     // Build record detail section
     var html = '<div id="drawerDetailContent">';
+
+    // Action buttons based on entity type
+    var actions = _getRecordActions(viewName, row);
+    if (actions.length > 0) {
+      html += '<div style="display:flex;gap:0.5rem;margin-bottom:1rem;">';
+      for (var ai = 0; ai < actions.length; ai++) {
+        var act = actions[ai];
+        html += '<a href="' + Lex.Utils.escapeHtml(act.href) + '" style="display:inline-flex;align-items:center;gap:0.375rem;padding:0.375rem 0.75rem;font-size:0.8rem;font-weight:500;background:var(--lex-bg-accent,#4f46e5);color:#fff;border-radius:0.375rem;text-decoration:none;cursor:pointer;">' +
+          Lex.Utils.escapeHtml(act.label) + '</a>';
+      }
+      html += '</div>';
+    }
+
     html += _buildRecordFields(row);
 
     // Connected data sections (load async)
@@ -1084,24 +1131,7 @@
    * Navigate to a record by opening its detail drawer with connected data.
    */
   function _navigateToRecord(viewName, row) {
-    // Temporarily set the effective view so connected data map resolves
-    var savedTab = _currentTab;
-    var savedSubView = _subViewMode;
-
-    // Find the tab that maps to this view
-    for (var tabKey in TAB_VIEW_MAP) {
-      if (TAB_VIEW_MAP[tabKey] === viewName) {
-        _currentTab = tabKey;
-        _subViewMode = 'primary';
-        break;
-      }
-    }
-
-    _openDetailDrawer(row);
-
-    // Restore
-    _currentTab = savedTab;
-    _subViewMode = savedSubView;
+    _openDetailDrawer(row, viewName);
   }
 
   /**
