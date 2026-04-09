@@ -254,6 +254,17 @@
   }
 
   function _deleteRule(ruleId) {
+    function doDelete() {
+      api.del('/api/v1/billable-hours/block-billing/rules/' + ruleId)
+        .then(function () {
+          if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.success('Rule deactivated');
+          _loadRules();
+        })
+        .catch(function () {
+          if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.error('Failed to deactivate rule');
+        });
+    }
+
     if (typeof Lex !== 'undefined' && Lex.Modal && Lex.Modal.confirm) {
       Lex.Modal.confirm({
         heading: 'Deactivate Rule',
@@ -261,16 +272,10 @@
         confirmLabel: 'Deactivate',
         confirmVariant: 'danger'
       }).then(function (confirmed) {
-        if (!confirmed) return;
-        api.del('/api/v1/billable-hours/block-billing/rules/' + ruleId)
-          .then(function () {
-            if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.success('Rule deactivated');
-            _loadRules();
-          })
-          .catch(function () {
-            if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.error('Failed to deactivate rule');
-          });
+        if (confirmed) doDelete();
       });
+    } else if (window.confirm('Deactivate this block billing rule?')) {
+      doDelete();
     }
   }
 
