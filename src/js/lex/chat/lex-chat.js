@@ -716,33 +716,69 @@
      *
      * @param {Object} event - { approval_id, plan, message }
      */
-    _insertPlanCard(event) {
-      if (!this._threadEl || !this._threadEl._container) return;
+    /**
+     * Insert any web component into the chat stream.
+     * Generic mechanism for injecting dynamic UI (plan cards, artifact
+     * previews, approval prompts, progress trackers, etc.) without
+     * hardcoding per-feature insertion logic.
+     *
+     * @param {string} tagName - Custom element tag (e.g. 'lex-agentic-plan-card')
+     * @param {Object} [attributes] - String attributes to set via setAttribute
+     * @param {Object} [properties] - JS properties to assign directly (for complex objects)
+     * @param {string} [eventName] - Optional event to emit after insertion
+     * @param {Object} [eventDetail] - Optional event detail payload
+     * @returns {HTMLElement|null} The inserted element, or null if container not available
+     */
+    insertComponent(tagName, attributes, properties, eventName, eventDetail) {
+      if (!this._threadEl || !this._threadEl._container) return null;
 
       // Hide welcome screen if present (mirrors addMessage behaviour)
       const welcome = this._threadEl._container.querySelector('.lex-chat-welcome');
       if (welcome) welcome.remove();
 
-      const card = document.createElement('lex-agentic-plan-card');
-      if (event.approval_id) card.setAttribute('approval-id', event.approval_id);
-      card.setAttribute('status', 'pending');
+      const el = document.createElement(tagName);
 
-      // Pass the plan object as a JS property — it is a complex object
-      if (event.plan) card.plan = event.plan;
+      // Set string attributes
+      if (attributes) {
+        var attrKeys = Object.keys(attributes);
+        for (var i = 0; i < attrKeys.length; i++) {
+          if (attributes[attrKeys[i]] != null) {
+            el.setAttribute(attrKeys[i], String(attributes[attrKeys[i]]));
+          }
+        }
+      }
 
-      this._threadEl._container.appendChild(card);
+      // Set JS properties (for complex objects like plan data)
+      if (properties) {
+        var propKeys = Object.keys(properties);
+        for (var j = 0; j < propKeys.length; j++) {
+          el[propKeys[j]] = properties[propKeys[j]];
+        }
+      }
+
+      this._threadEl._container.appendChild(el);
 
       // Scroll into view
       if (this._threadEl._isNearBottom && this._threadEl._isNearBottom()) {
         this._threadEl.scrollToBottom();
       }
 
-      // Emit so pages can react (e.g. disable composer while plan is pending)
-      this.emit('lex-chat-plan-ready', {
-        approvalId: event.approval_id,
-        plan: event.plan,
-        message: event.message
-      });
+      // Emit event if specified
+      if (eventName) {
+        this.emit(eventName, eventDetail || {});
+      }
+
+      return el;
+    }
+
+    _insertPlanCard(event) {
+      this.insertComponent(
+        'lex-agentic-plan-card',
+        { 'approval-id': event.approval_id, status: 'pending' },
+        { plan: event.plan },
+        'lex-chat-plan-ready',
+        { approvalId: event.approval_id, plan: event.plan, message: event.message }
+      );
     }
 
     _showSystemMessage(msg) {

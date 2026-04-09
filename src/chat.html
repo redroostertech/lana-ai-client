@@ -4870,14 +4870,9 @@
                   planHtml += '<button onclick="window._rejectPlan(\'' + escapeHtml(data.approval_id) + '\')" style="padding:0.375rem 0.75rem;font-size:0.8125rem;font-weight:600;background:none;color:var(--lex-text-muted);border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.375rem;cursor:pointer;">Cancel</button>';
                   planHtml += '</div></div>';
 
-                  // Insert into the chat message area
-                  var chatArea = document.getElementById('chat-area') || document.querySelector('.chat-messages');
-                  if (chatArea) {
-                    var planDiv = document.createElement('div');
-                    planDiv.className = 'message assistant';
-                    planDiv.innerHTML = planHtml;
-                    chatArea.appendChild(planDiv);
-                    planDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                  // Insert into the chat stream via generic card injector
+                  if (typeof window.addSystemCard === 'function') {
+                    window.addSystemCard(planHtml, { id: 'plan-msg-' + escapeHtml(data.approval_id) });
                   }
                 }
 
@@ -9718,6 +9713,33 @@
   </div>
 
   <script>
+    /**
+     * Inject a dynamic UI card into the chat stream.
+     * Generic mechanism for inserting interactive components (plan cards,
+     * artifact previews, approval prompts, progress trackers, etc.)
+     * without hardcoding per-feature insertion logic.
+     *
+     * @param {string} html - HTML content for the card
+     * @param {Object} [options] - { id, className, scrollIntoView }
+     * @returns {HTMLElement|null} The inserted message element
+     */
+    window.addSystemCard = function (html, options) {
+      options = options || {};
+      var chatArea = document.getElementById('chat-area') || document.querySelector('.chat-messages');
+      if (!chatArea) return null;
+
+      var wrapper = document.createElement('div');
+      wrapper.className = 'message assistant ' + (options.className || '');
+      if (options.id) wrapper.id = options.id;
+      wrapper.innerHTML = html;
+      chatArea.appendChild(wrapper);
+
+      if (options.scrollIntoView !== false) {
+        wrapper.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }
+      return wrapper;
+    };
+
     // Plan approval handlers for HITL agentic flow
     window._approvePlan = function (approvalId) {
       if (!approvalId) return;
