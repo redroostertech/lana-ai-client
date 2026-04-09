@@ -577,7 +577,7 @@
   }
 
   function switchMatterTab(tab) {
-    var tabs = ['activity', 'notes', 'tasks', 'comments', 'documents', 'conversations', 'skills', 'docGeneration', 'analytics'];
+    var tabs = ['activity', 'notes', 'tasks', 'comments', 'documents', 'conversations', 'skills', 'billableHours', 'docGeneration', 'analytics'];
     var activeBtn = null;
 
     tabs.forEach(function (t) {
@@ -635,6 +635,9 @@
       case 'skills':
         renderSkillsTab(m.matter);
         break;
+      case 'billableHours':
+        renderBillableHoursTab(m.matter);
+        break;
       case 'docGeneration':
         renderDocGenerationTab(m.matter);
         break;
@@ -648,7 +651,7 @@
   }
 
   function getCurrentActiveTab() {
-    var tabs = ['activity', 'notes', 'tasks', 'comments', 'documents', 'conversations', 'skills', 'docGeneration', 'analytics'];
+    var tabs = ['activity', 'notes', 'tasks', 'comments', 'documents', 'conversations', 'skills', 'billableHours', 'docGeneration', 'analytics'];
     for (var i = 0; i < tabs.length; i++) {
       var content = document.getElementById('tabContent' + tabs[i].charAt(0).toUpperCase() + tabs[i].substring(1));
       if (content && !content.classList.contains('hidden')) return tabs[i];

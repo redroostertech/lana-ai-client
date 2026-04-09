@@ -96,6 +96,9 @@
             <button id="tabSkills" data-tab="skills" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap transition-colors">
               Skills
             </button>
+            <button id="tabBillableHours" data-tab="billableHours" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap transition-colors">
+              Billable Hours
+            </button>
             <!-- Generate tab hidden — Skills flow will subsume this -->
             <button id="tabDocGeneration" data-tab="docGeneration" class="hidden px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap transition-colors">
               Generate
@@ -136,6 +139,30 @@
             <div id="tabContentDocuments" class="hidden p-6"></div>
             <div id="tabContentConversations" class="hidden p-6"></div>
             <div id="tabContentSkills" class="hidden p-6"></div>
+            <div id="tabContentBillableHours" class="hidden p-6">
+              <!-- Summary card -->
+              <div id="bhSummaryCard" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:1rem;margin-bottom:1.5rem;">
+              </div>
+              <!-- Time entries table -->
+              <div id="bhEntriesSection">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+                  <div style="font-size:0.9rem;font-weight:600;color:var(--lex-text-primary);">Time Entries</div>
+                  <div style="display:flex;gap:0.5rem;">
+                    <lex-btn id="bhGenerateBtn" variant="outline" size="sm">Generate for Today</lex-btn>
+                  </div>
+                </div>
+                <div id="bhEntriesLoading" class="animate-pulse" style="display:flex;flex-direction:column;gap:0.5rem;">
+                  <div class="cc-skeleton" style="height:2.5rem;width:100%;"></div>
+                  <div class="cc-skeleton" style="height:2.5rem;width:100%;"></div>
+                  <div class="cc-skeleton" style="height:2.5rem;width:100%;"></div>
+                </div>
+                <div id="bhEntriesList" class="hidden" style="display:flex;flex-direction:column;gap:0;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.5rem;overflow:hidden;">
+                </div>
+                <div id="bhEntriesEmpty" class="hidden" style="text-align:center;padding:2rem;color:var(--lex-text-muted);font-size:0.875rem;">
+                  No time entries for this matter yet. Click "Generate for Today" to create drafts from today's activity.
+                </div>
+              </div>
+            </div>
             <div id="tabContentDocGeneration" class="hidden p-6"></div>
             <div id="tabContentAnalytics" class="hidden p-6">
               <div id="matterAnalyticsCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:1rem;"></div>
@@ -1126,6 +1153,7 @@
   <script src="js/services/docx-template-modal.js"></script>
 
   <!-- Page controller (MUST be last before auth-guard) -->
+  <script src="js/workspace-billable-hours.js"></script>
   <script src="js/workspace-details.js"></script>
 
   <!-- Auth guard + loader dismiss (MUST be last) -->
