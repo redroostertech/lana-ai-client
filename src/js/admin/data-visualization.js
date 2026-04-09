@@ -400,6 +400,7 @@
   var _currentPage = 1;
   var _pageSize    = 50;
   var _availableViews = [];     // populated from /api/v1/mcp-data/views
+  var _rawRows     = [];        // unformatted rows for detail drawer
   // _chatEl / _threadsEl removed — managed by lex-lana-panel
 
   // ═══════════════════════════════════════════════════════════════
@@ -448,6 +449,7 @@
         _setupTabs();
         _wirePagination();
         _wireRefresh();
+        _wireRowClick();
         _initLanaPanel();
         _loadData();
       })
@@ -710,6 +712,9 @@
         var pagination = (result && result.pagination) || {};
         var total = pagination.total || rows.length;
 
+        // Store raw rows for detail drawer
+        _rawRows = rows;
+
         // Format rows for display
         var formatted = rows.map(function (row) {
           return _formatRow(row, config);
@@ -768,6 +773,112 @@
   }
 
   // _setupChat() removed — managed by lex-lana-panel component
+
+  // ═══════════════════════════════════════════════════════════════
+  // Row detail drawer
+  // ═══════════════════════════════════════════════════════════════
+
+  function _wireRowClick() {
+    var table = el('dataVizTable');
+    if (!table || table._dataVizRowWired) return;
+    table._dataVizRowWired = true;
+
+    table.addEventListener('row-click', function (e) {
+      var detail = e.detail || {};
+      var rowId = detail.id;
+      var clickedRow = detail.row || {};
+
+      // Find the raw (unformatted) row by matching id field
+      var rawRow = null;
+      if (rowId && _rawRows.length > 0) {
+        for (var i = 0; i < _rawRows.length; i++) {
+          var raw = _rawRows[i];
+          if (String(raw.id) === String(rowId)) {
+            rawRow = raw;
+            break;
+          }
+        }
+      }
+
+      // Fall back to the formatted row if raw not found
+      var displayRow = rawRow || clickedRow;
+      if (!displayRow || Object.keys(displayRow).length === 0) return;
+
+      _openDetailDrawer(displayRow);
+    });
+  }
+
+  function _openDetailDrawer(row) {
+    // Build a readable title from common fields
+    var title = row.matter_name || row.filename || row.title || row.source_name
+      || row.skill_name || row.name || row.entity_type || 'Record Details';
+
+    // Build key-value detail content
+    var html = '<div style="display:flex;flex-direction:column;gap:0.75rem;">';
+
+    var keys = Object.keys(row);
+    for (var i = 0; i < keys.length; i++) {
+      var key = keys[i];
+      var val = row[key];
+
+      // Skip internal/large fields
+      if (key === 'embedding' || key === 'search_vector' || key === 'search_vector_weighted') continue;
+
+      var label = key.split('_').map(function (w) {
+        return w.charAt(0).toUpperCase() + w.substring(1);
+      }).join(' ');
+
+      var displayVal = _formatDetailValue(key, val);
+
+      html += '<div style="border-bottom:1px solid var(--lex-border-default, #e5e7eb);padding-bottom:0.5rem;">';
+      html += '<div style="font-size:0.7rem;font-weight:600;color:var(--lex-text-muted, #6b7280);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.15rem;">' + Lex.Utils.escapeHtml(label) + '</div>';
+      html += '<div style="font-size:0.875rem;color:var(--lex-text-primary, #111827);word-break:break-word;">' + displayVal + '</div>';
+      html += '</div>';
+    }
+
+    html += '</div>';
+
+    Lex.Drawer.open({
+      heading: Lex.Utils.escapeHtml(String(title)),
+      content: html,
+      width: 'md'
+    });
+  }
+
+  function _formatDetailValue(key, val) {
+    if (val == null) return '<span style="color:var(--lex-text-muted,#9ca3af);">-</span>';
+
+    var str = String(val);
+
+    // Format timestamps
+    if (key.indexOf('_at') !== -1 || key.indexOf('date') !== -1 || key === 'last_activity') {
+      var formatted = fmtDateTime(val);
+      if (formatted) return Lex.Utils.escapeHtml(formatted);
+    }
+
+    // Format booleans
+    if (val === true || val === 'true' || val === 't') return '<span style="color:var(--lex-color-green-600,#16a34a);font-weight:500;">Yes</span>';
+    if (val === false || val === 'false' || val === 'f') return '<span style="color:var(--lex-text-muted,#9ca3af);">No</span>';
+
+    // Format JSON objects
+    if (typeof val === 'object') {
+      var jsonStr = JSON.stringify(val, null, 2);
+      if (jsonStr.length > 500) jsonStr = jsonStr.substring(0, 497) + '...';
+      return '<pre style="font-size:0.75rem;background:var(--lex-bg-muted,#f9fafb);padding:0.5rem;border-radius:0.375rem;overflow-x:auto;margin:0;white-space:pre-wrap;">' + Lex.Utils.escapeHtml(jsonStr) + '</pre>';
+    }
+
+    // Format UUIDs (monospace)
+    if (str.length === 36 && str.charAt(8) === '-' && str.charAt(13) === '-') {
+      return '<code style="font-size:0.75rem;background:var(--lex-bg-muted,#f9fafb);padding:0.125rem 0.375rem;border-radius:0.25rem;">' + Lex.Utils.escapeHtml(str) + '</code>';
+    }
+
+    // Long text — show with wrap
+    if (str.length > 200) {
+      return '<div style="max-height:120px;overflow-y:auto;font-size:0.8125rem;line-height:1.4;">' + Lex.Utils.escapeHtml(str) + '</div>';
+    }
+
+    return Lex.Utils.escapeHtml(str);
+  }
 
   // ═══════════════════════════════════════════════════════════════
   // Start
