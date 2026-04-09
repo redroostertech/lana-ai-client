@@ -54,8 +54,12 @@
 
 .cc-signals-row {
   display: grid;
-  grid-template-columns: 3fr 1.5fr 2fr;
+  grid-template-columns: 2fr 1fr;
   gap: 1.25rem;
+}
+
+.cc-signals-row > #ccZoneFRight {
+  grid-column: 1 / -1;
 }
 
 
