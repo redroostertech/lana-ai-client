@@ -1109,7 +1109,6 @@
               var dDesc = d.description || d.activity_type || 'Time entry';
               if (dDesc.length > 50) dDesc = dDesc.substring(0, 47) + '...';
               var dMatter = d.matter_id || '';
-              var reviewUrl = 'workspace-details.html?id=' + encodeURIComponent(dMatter) + '&tab=billableHours';
 
               draftHtml += '<div style="display:flex;align-items:center;gap:0.5rem;padding:0.375rem 0;font-size:0.8rem;">';
               // Hours badge
@@ -1117,10 +1116,19 @@
               // Description
               draftHtml += '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--lex-text-secondary);" title="' + Lex.Utils.escapeHtml(d.description || '') + '">' + Lex.Utils.escapeHtml(dDesc) + '</span>';
               // Review link
-              draftHtml += '<a href="' + Lex.Utils.escapeHtml(reviewUrl) + '" style="flex-shrink:0;font-size:0.7rem;font-weight:600;color:var(--lex-color-blue-600,#2563eb);text-decoration:none;">Review</a>';
+              draftHtml += '<button class="bh-draft-review-btn" data-matter="' + Lex.Utils.escapeHtml(dMatter) + '" style="flex-shrink:0;font-size:0.7rem;font-weight:600;color:var(--lex-color-blue-600,#2563eb);background:none;border:none;cursor:pointer;padding:0;">Review</button>';
               draftHtml += '</div>';
             }
             draftListEl.innerHTML = draftHtml;
+
+            // Wire review buttons via Lex.Nav.go
+            var reviewBtns = draftListEl.querySelectorAll('.bh-draft-review-btn');
+            for (var ri = 0; ri < reviewBtns.length; ri++) {
+              reviewBtns[ri].addEventListener('click', function (e) {
+                var mid = e.target.getAttribute('data-matter');
+                if (mid) Lex.Nav.go('workspace-details.html', { params: { id: mid, tab: 'billableHours' } });
+              });
+            }
 
             // Summary below
             if (draftsInfoEl) {
