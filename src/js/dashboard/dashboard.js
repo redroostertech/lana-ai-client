@@ -1092,19 +1092,51 @@
         listEl.innerHTML = html;
       }
 
-      // Drafts pending info
-      var draftsEl = el('billableDraftsInfo');
-      if (draftsEl) {
+      // Draft entries list
+      var draftListEl = el('billableDraftsList');
+      var draftsInfoEl = el('billableDraftsInfo');
+      if (draftListEl) {
         try {
-          var draftsResult = await api.get('/api/v1/billable-hours/drafts?status=draft&limit=1');
-          var draftCount = (draftsResult && draftsResult.pagination && draftsResult.pagination.total) || 0;
-          if (draftCount > 0) {
-            draftsEl.innerHTML = '<span style="color:var(--lex-color-amber-600,#d97706);">' + draftCount + ' draft' + (draftCount !== 1 ? 's' : '') + ' pending review</span>';
+          var draftsResult = await api.get('/api/v1/billable-hours/drafts?status=draft&limit=10');
+          var drafts = (draftsResult && draftsResult.data) || [];
+          var draftCount = (draftsResult && draftsResult.pagination && draftsResult.pagination.total) || drafts.length;
+
+          if (drafts.length > 0) {
+            var draftHtml = '<div style="font-size:0.7rem;font-weight:600;color:var(--lex-text-muted);text-transform:uppercase;margin-bottom:0.375rem;">Drafts Pending Review</div>';
+            for (var di = 0; di < drafts.length; di++) {
+              var d = drafts[di];
+              var dHours = ((d.duration_minutes || 0) / 60).toFixed(1);
+              var dDesc = d.description || d.activity_type || 'Time entry';
+              if (dDesc.length > 50) dDesc = dDesc.substring(0, 47) + '...';
+              var dMatter = d.matter_id || '';
+              var reviewUrl = 'workspace-details.html?id=' + encodeURIComponent(dMatter) + '&tab=billableHours';
+
+              draftHtml += '<div style="display:flex;align-items:center;gap:0.5rem;padding:0.375rem 0;font-size:0.8rem;">';
+              // Hours badge
+              draftHtml += '<span style="flex-shrink:0;min-width:2.5rem;text-align:center;padding:0.125rem 0.375rem;background:var(--lex-color-amber-50,#fffbeb);color:var(--lex-color-amber-700,#b45309);border-radius:0.25rem;font-weight:700;font-size:0.75rem;">' + dHours + 'h</span>';
+              // Description
+              draftHtml += '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--lex-text-secondary);" title="' + Lex.Utils.escapeHtml(d.description || '') + '">' + Lex.Utils.escapeHtml(dDesc) + '</span>';
+              // Review link
+              draftHtml += '<a href="' + Lex.Utils.escapeHtml(reviewUrl) + '" style="flex-shrink:0;font-size:0.7rem;font-weight:600;color:var(--lex-color-blue-600,#2563eb);text-decoration:none;">Review</a>';
+              draftHtml += '</div>';
+            }
+            draftListEl.innerHTML = draftHtml;
+
+            // Summary below
+            if (draftsInfoEl) {
+              if (draftCount > drafts.length) {
+                draftsInfoEl.innerHTML = '<a href="admin/billable-hours.html" style="color:var(--lex-color-amber-600,#d97706);text-decoration:none;font-weight:600;">' + draftCount + ' total drafts pending</a>';
+              } else {
+                draftsInfoEl.innerHTML = '';
+              }
+            }
           } else {
-            draftsEl.innerHTML = 'No pending drafts';
+            draftListEl.innerHTML = '';
+            if (draftsInfoEl) draftsInfoEl.innerHTML = 'No pending drafts';
           }
         } catch (_) {
-          draftsEl.innerHTML = '';
+          draftListEl.innerHTML = '';
+          if (draftsInfoEl) draftsInfoEl.innerHTML = '';
         }
       }
 
