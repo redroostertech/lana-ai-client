@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Billable Hours - LANA AI</title>
+
+  <link rel="stylesheet" href="../css/lex-tokens.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/tailwind-output.css">
+  <link rel="stylesheet" href="../css/lex-chat.css">
+  <script src="../js/tailwind-loader.js"></script>
+</head>
+<body>
+
+  <lex-loader theme="light"></lex-loader>
+
+  <lex-app
+    logo-src="../img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="../dashboard.html"
+    active-nav-id="reports"
+    page-title="Billable Hours"
+  ></lex-app>
+
+  <template id="page-content">
+
+    <main>
+
+      <lex-banner
+        id="bhBanner"
+        variant="light"
+        corners
+        heading="Billable Hours"
+        subtitle="Firm-wide time tracking, utilization, and approval management"
+      ></lex-banner>
+
+      <lex-spacer size="md"></lex-spacer>
+
+      <lex-breadcrumb
+        crumbs='[{"label":"Analytics","href":"admin/analytics.html"},{"label":"Billable Hours"}]'
+      ></lex-breadcrumb>
+
+      <!-- Summary Metrics -->
+      <div id="bhAdminSummary" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:1rem;margin-bottom:1.5rem;"></div>
+
+      <!-- Period Selector -->
+      <div id="bhAdminPeriod" style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1.5rem;flex-wrap:wrap;">
+        <lex-btn data-preset="last7days" variant="secondary" size="sm" class="bh-period-btn">Last 7 Days</lex-btn>
+        <lex-btn data-preset="last30days" variant="secondary" size="sm" class="bh-period-btn">Last 30 Days</lex-btn>
+        <lex-btn data-preset="thisMonth" variant="primary" size="sm" class="bh-period-btn">This Month</lex-btn>
+        <lex-btn data-preset="thisQuarter" variant="secondary" size="sm" class="bh-period-btn">This Quarter</lex-btn>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:0.5rem;">
+          <input type="date" id="bhAdminDateFrom" style="padding:0.25rem 0.5rem;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.375rem;font-size:0.8125rem;">
+          <span style="font-size:0.75rem;color:var(--lex-text-muted);">to</span>
+          <input type="date" id="bhAdminDateTo" style="padding:0.25rem 0.5rem;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.375rem;font-size:0.8125rem;">
+          <lex-btn id="bhAdminApplyDates" variant="outline" size="sm">Apply</lex-btn>
+        </div>
+      </div>
+
+      <!-- Tab navigation -->
+      <div id="bhAdminTabs" style="display:flex;gap:0;border-bottom:1px solid var(--lex-border-default,#e5e7eb);margin-bottom:1.5rem;">
+        <button data-tab="attorneys" class="bh-admin-tab" style="padding:0.75rem 1.25rem;font-size:0.875rem;font-weight:600;border-bottom:2px solid var(--lex-color-blue-600,#2563eb);color:var(--lex-color-blue-600,#2563eb);background:none;cursor:pointer;">By Attorney</button>
+        <button data-tab="matters" class="bh-admin-tab" style="padding:0.75rem 1.25rem;font-size:0.875rem;font-weight:600;border-bottom:2px solid transparent;color:var(--lex-text-muted);background:none;cursor:pointer;">By Matter</button>
+        <button data-tab="approvals" class="bh-admin-tab" style="padding:0.75rem 1.25rem;font-size:0.875rem;font-weight:600;border-bottom:2px solid transparent;color:var(--lex-text-muted);background:none;cursor:pointer;">Approval Queue</button>
+      </div>
+
+      <!-- Tab contents -->
+      <div id="bhAdminTabAttorneys"></div>
+      <div id="bhAdminTabMatters" class="hidden"></div>
+      <div id="bhAdminTabApprovals" class="hidden"></div>
+
+    </main>
+
+  </template>
+
+  <!-- Dependencies -->
+  <script src="../js/config.js"></script>
+  <script src="../js/lex/lex-loader.js"></script>
+  <script src="../js/api.js"></script>
+
+  <!-- Page controller -->
+  <script src="../js/admin/billable-hours-reporting.js"></script>
+
+  <!-- Auth guard (MUST be last) -->
+  <script src="../js/auth-guard.js"></script>
+
+</body>
+</html>
