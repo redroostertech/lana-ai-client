@@ -411,7 +411,55 @@
                 duration: m.duration || null,
                 tokenCount: m.tokenCount || null
               });
+
+              // Re-hydrate dynamic cards from persisted message metadata.
+              // LexDynamicCardRenderer is loaded before lex-chat.js in every
+              // HTML page so it is guaranteed to be present here.
+              if (m.metadata && Array.isArray(m.metadata.dynamic_cards) &&
+                  this._threadEl._container &&
+                  global.LexDynamicCardRenderer) {
+                for (var _ci = 0; _ci < m.metadata.dynamic_cards.length; _ci++) {
+                  global.LexDynamicCardRenderer.renderCard(
+                    m.metadata.dynamic_cards[_ci],
+                    this._threadEl._container
+                  );
+                }
+              }
             }
+
+            // Batch-refresh card states after all messages are rendered so
+            // cards reflect their real current state (e.g. approved) rather
+            // than the state that was saved when the message was persisted.
+            if (global.LexDynamicCardRenderer) {
+              var _allDescriptors = [];
+              for (var _mi = 0; _mi < result.messages.length; _mi++) {
+                var _msg = result.messages[_mi];
+                if (_msg.metadata && Array.isArray(_msg.metadata.dynamic_cards)) {
+                  for (var _di = 0; _di < _msg.metadata.dynamic_cards.length; _di++) {
+                    _allDescriptors.push(_msg.metadata.dynamic_cards[_di]);
+                  }
+                }
+              }
+
+              if (_allDescriptors.length > 0) {
+                global.LexDynamicCardRenderer.refreshCardStates(_allDescriptors)
+                  .then(function (states) {
+                    // Apply refreshed states to already-rendered card elements
+                    var stateKeys = Object.keys(states);
+                    for (var _ki = 0; _ki < stateKeys.length; _ki++) {
+                      var _cardId = stateKeys[_ki];
+                      var _cardEl = document.querySelector('[card-id="' + _cardId + '"]');
+                      if (_cardEl && states[_cardId]) {
+                        _cardEl.setAttribute('status', states[_cardId]);
+                      }
+                    }
+                  })
+                  .catch(function (err) {
+                    console.warn('[lex-chat] Dynamic card state refresh failed:', err && err.message);
+                  });
+              }
+            }
+
             this._threadEl.scrollToBottom(true);
           }
           if (this._threadEl) {
@@ -772,13 +820,51 @@
     }
 
     _insertPlanCard(event) {
-      this.insertComponent(
-        'lex-agentic-plan-card',
-        { 'approval-id': event.approval_id, status: 'pending' },
-        { plan: event.plan },
-        'lex-chat-plan-ready',
-        { approvalId: event.approval_id, plan: event.plan, message: event.message }
-      );
+      if (!this._threadEl || !this._threadEl._container) return;
+
+      // Remove the welcome placeholder if it is still visible
+      var welcome = this._threadEl._container.querySelector('.lex-chat-welcome');
+      if (welcome) welcome.remove();
+
+      if (event.card && global.LexDynamicCardRenderer) {
+        // Preferred path: backend sent a full card descriptor in the SSE event.
+        // The renderer handles element creation, props, data, and actions.
+        global.LexDynamicCardRenderer.renderCard(event.card, this._threadEl._container);
+      } else {
+        // Backward-compat fallback: build a minimal descriptor from the legacy
+        // event fields so old-format SSE events still render a card.
+        var fallbackDescriptor = {
+          type: 'lex-agentic-plan-card',
+          card_id: 'plan_' + event.approval_id,
+          state: 'pending',
+          props: { 'approval-id': event.approval_id, status: 'pending' },
+          data: { plan: event.plan },
+          actions: []
+        };
+
+        if (global.LexDynamicCardRenderer) {
+          global.LexDynamicCardRenderer.renderCard(fallbackDescriptor, this._threadEl._container);
+        } else {
+          // Last resort: original insertComponent path
+          this.insertComponent(
+            'lex-agentic-plan-card',
+            { 'approval-id': event.approval_id, status: 'pending' },
+            { plan: event.plan },
+            null,
+            null
+          );
+        }
+      }
+
+      if (this._threadEl._isNearBottom && this._threadEl._isNearBottom()) {
+        this._threadEl.scrollToBottom();
+      }
+
+      this.emit('lex-chat-plan-ready', {
+        approvalId: event.approval_id,
+        plan: event.plan,
+        message: event.message
+      });
     }
 
     _showSystemMessage(msg) {

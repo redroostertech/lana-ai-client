@@ -4,23 +4,37 @@
    Shown when the backend emits a `plan_ready` SSE event before executing
    an agentic task. The user must explicitly approve or cancel.
 
+   DATA-DRIVEN DESIGN
+   ------------------
+   Buttons are rendered entirely from the `actions` property (an array of
+   action descriptors set by LexDynamicCardRenderer). The component contains
+   NO hardcoded endpoint URLs, action IDs, or button labels — everything
+   comes from the descriptor so adding new actions requires only a backend
+   change.
+
+   Action descriptor shape:
+     {
+       id:                 string   — unique identifier, used as data-action-id
+       label:              string   — button text
+       variant:            string   — lex-btn variant ('primary'|'outline'|'ghost')
+       endpoint?:          string   — "METHOD /path" (e.g. "POST /api/v1/approvals/:id/approve")
+       payload?:           object   — JSON body for the HTTP call
+       action_type?:       string   — special client-side action ('toggle_edit_mode')
+       on_success?:        object   — { set_state?, toast? }
+       disabled_when_state?: string[] — list of status values that disable this button
+     }
+
    Properties:
-     plan        (Object)  — Execution plan with steps array
-     approval-id (String)  — The approval request ID from the backend
+     plan        (Object)  — Execution plan with steps array (set as JS property)
+     actions     (Array)   — Action descriptor array (set as JS property by renderer)
+     approval-id (String)  — The approval request ID (kept for edit-submit fallback)
      status      (String)  — 'pending' | 'approved' | 'rejected' | 'expired'
 
    Status transitions:
-     pending  → shows Approve & Run / Cancel buttons, neutral styling
+     pending  → shows action buttons, neutral styling
      approved → hides buttons, shows "Approved — executing in background", green accent
      rejected → hides buttons, shows "Cancelled", muted styling
      expired  → hides buttons, shows "Expired", muted styling
-
-   Usage:
-     const card = document.createElement('lex-agentic-plan-card');
-     card.setAttribute('approval-id', 'apr_abc123');
-     card.setAttribute('status', 'pending');
-     card.plan = { goal: '...', steps: ['Step 1...', 'Step 2...'] };
-     threadContainer.appendChild(card);
    ========================================================================== */
 
 (function (global) {
@@ -264,13 +278,21 @@
        * @type {{ goal?: string, steps?: (string|{description:string})[] } | null}
        */
       this._plan = null;
+      /**
+       * Action descriptors from the backend card descriptor. The component
+       * iterates this array and renders buttons dynamically. Each item has:
+       *   id, label, variant, endpoint?, payload?, action_type?, on_success?,
+       *   disabled_when_state?
+       * @type {Array|null}
+       */
+      this._actions = null;
       this._loading = false;
       this._editing = false;
     }
 
     /**
      * Set the plan object. Triggers a re-render.
-     * @param {Object} plan
+     * @param {Object} value
      */
     set plan(value) {
       this._plan = value;
@@ -281,6 +303,23 @@
 
     get plan() {
       return this._plan;
+    }
+
+    /**
+     * Set the actions array from the card descriptor. Triggers a re-render.
+     * The renderer calls this after creating the element:
+     *   el.actions = descriptor.actions;
+     * @param {Array} value
+     */
+    set actions(value) {
+      this._actions = Array.isArray(value) ? value : null;
+      if (this._initialized) {
+        this._performUpdate();
+      }
+    }
+
+    get actions() {
+      return this._actions;
     }
 
     connected() {
@@ -302,10 +341,11 @@
 
       // Status badge label
       const badgeLabels = {
-        pending:  'Awaiting Approval',
-        approved: 'Approved',
-        rejected: 'Cancelled',
-        expired:  'Expired'
+        pending:   'Awaiting Approval',
+        approved:  'Approved',
+        rejected:  'Cancelled',
+        expired:   'Expired',
+        cancelled: 'Cancelled'
       };
       const badgeLabel = badgeLabels[status] || status;
 
@@ -332,24 +372,8 @@
 
       // Footer content depends on status
       let footerHtml = '';
-      if (status === 'pending' && !this._editing) {
-        footerHtml = `
-          <div class="lex-plan-card__footer">
-            <lex-btn variant="primary" size="sm" data-action="approve">Approve &amp; Run</lex-btn>
-            <lex-btn variant="outline" size="sm" data-action="edit">Edit Plan</lex-btn>
-            <lex-btn variant="ghost" size="sm" data-action="cancel">Cancel</lex-btn>
-          </div>`;
-      } else if (status === 'pending' && this._editing) {
-        footerHtml = `
-          <div class="lex-plan-card__footer" style="flex-direction:column;gap:8px;">
-            <div style="width:100%;display:flex;gap:8px;">
-              <input type="text" data-ref="edit-input" placeholder="Describe changes... e.g. 'Remove step 3' or 'Also email the results'"
-                style="flex:1;padding:6px 10px;border:1px solid var(--lex-border-default);border-radius:var(--lex-radius-md,6px);font-size:var(--lex-body-sm-size,0.875rem);color:var(--lex-text-primary);outline:none;">
-              <lex-btn variant="primary" size="sm" data-action="submit-edit">Update Plan</lex-btn>
-              <lex-btn variant="ghost" size="sm" data-action="cancel-edit">Back</lex-btn>
-            </div>
-          </div>`;
-      } else if (status === 'approved') {
+
+      if (status === 'approved') {
         footerHtml = `
           <div class="lex-plan-card__footer">
             <div class="lex-plan-card__confirmation lex-plan-card__confirmation--approved">
@@ -357,7 +381,7 @@
               <span>Approved — executing in background</span>
             </div>
           </div>`;
-      } else if (status === 'rejected') {
+      } else if (status === 'rejected' || status === 'cancelled') {
         footerHtml = `
           <div class="lex-plan-card__footer">
             <div class="lex-plan-card__confirmation lex-plan-card__confirmation--rejected">
@@ -373,6 +397,23 @@
               <span>Expired</span>
             </div>
           </div>`;
+      } else if (this._editing) {
+        // Edit mode — always shown regardless of action descriptor
+        footerHtml = `
+          <div class="lex-plan-card__footer" style="flex-direction:column;gap:8px;">
+            <div style="width:100%;display:flex;gap:8px;">
+              <input type="text" data-ref="edit-input" placeholder="Describe changes... e.g. 'Remove step 3' or 'Also email the results'"
+                style="flex:1;padding:6px 10px;border:1px solid var(--lex-border-default);border-radius:var(--lex-radius-md,6px);font-size:var(--lex-body-sm-size,0.875rem);color:var(--lex-text-primary);outline:none;">
+              <lex-btn variant="primary" size="sm" data-action="submit-edit">Update Plan</lex-btn>
+              <lex-btn variant="ghost" size="sm" data-action="cancel-edit">Back</lex-btn>
+            </div>
+          </div>`;
+      } else {
+        // Pending (or unknown) state — render action buttons from descriptor
+        const actionButtons = this._renderActionButtons(status);
+        if (actionButtons) {
+          footerHtml = `<div class="lex-plan-card__footer">${actionButtons}</div>`;
+        }
       }
 
       return `
@@ -391,20 +432,52 @@
         </div>`;
     }
 
+    /**
+     * Render action buttons from the actions descriptor array.
+     * Each button gets a `data-action-id` attribute matching the action's id
+     * so the generic click handler can look up the descriptor by id.
+     *
+     * @param {string} currentStatus - Current status value
+     * @returns {string} HTML string of <lex-btn> elements
+     */
+    _renderActionButtons(currentStatus) {
+      var actions = this._actions;
+
+      // Fallback to legacy static buttons if no descriptor was provided
+      // (backward compatibility with pre-descriptor plan cards in history)
+      if (!actions || actions.length === 0) {
+        return `
+          <lex-btn variant="primary" size="sm" data-action-id="approve">Approve &amp; Run</lex-btn>
+          <lex-btn variant="outline" size="sm" data-action-id="edit">Edit Plan</lex-btn>
+          <lex-btn variant="ghost" size="sm" data-action-id="cancel">Cancel</lex-btn>`;
+      }
+
+      var html = '';
+      for (var i = 0; i < actions.length; i++) {
+        var action = actions[i];
+        var isDisabled = false;
+
+        if (Array.isArray(action.disabled_when_state)) {
+          isDisabled = action.disabled_when_state.indexOf(currentStatus) > -1;
+        }
+
+        var disabledAttr = isDisabled ? ' disabled' : '';
+        var variant = this.escapeHtml(action.variant || 'outline');
+        var label = this.escapeHtml(action.label || action.id || '');
+
+        html += `<lex-btn variant="${variant}" size="sm" data-action-id="${this.escapeHtml(action.id)}"${disabledAttr}>${label}</lex-btn>`;
+      }
+
+      return html;
+    }
+
     updated() {
-      // Approve button
-      this.listen('[data-action="approve"]', 'click', this._handleApprove.bind(this));
+      // Wire up the generic action click handler for all data-action-id buttons
+      // This single handler covers every action from the descriptor array
+      this.listen('[data-action-id]', 'click', this._handleAction.bind(this));
 
-      // Cancel button
-      this.listen('[data-action="cancel"]', 'click', this._handleCancel.bind(this));
-
-      // Edit button — toggle edit mode
-      this.listen('[data-action="edit"]', 'click', this._handleEditToggle.bind(this));
-
-      // Submit edit
+      // Edit submit and cancel — these are special internal actions
       this.listen('[data-action="submit-edit"]', 'click', this._handleSubmitEdit.bind(this));
-
-      // Cancel edit — back to buttons
       this.listen('[data-action="cancel-edit"]', 'click', this._handleCancelEdit.bind(this));
 
       // Enter key in edit input
@@ -421,82 +494,178 @@
       }
     }
 
-    // ── Action handlers ────────────────────────────────────────────────────
+    // ── Generic action handler ────────────────────────────────────────────
 
-    _handleApprove() {
-      if (this._loading || this.status !== 'pending') return;
-      const approvalId = this.approvalId;
-      if (!approvalId) {
-        console.warn('[lex-agentic-plan-card] approval-id is not set');
+    /**
+     * Handle any action button click by looking up the action descriptor by
+     * its id (stored in data-action-id). Dispatches to the appropriate handler:
+     *   - action_type === 'toggle_edit_mode' → enter edit mode (client-side only)
+     *   - endpoint present                   → fire HTTP request
+     *
+     * @param {Event} event - Click event
+     */
+    _handleAction(event) {
+      if (this._loading) return;
+
+      var btn = event.currentTarget || event.target;
+      // Walk up to the element with the data-action-id attribute in case the
+      // click landed on a child element inside the button
+      while (btn && !btn.dataset.actionId) {
+        btn = btn.parentElement;
+      }
+      if (!btn) return;
+
+      var actionId = btn.dataset.actionId;
+      var action = this._findAction(actionId);
+
+      // Fallback: if no descriptor was set, handle by id directly
+      if (!action) {
+        action = this._buildFallbackAction(actionId);
+      }
+
+      if (!action) {
+        console.warn('[lex-agentic-plan-card] No action found for id:', actionId);
         return;
       }
 
-      this._setLoading(true);
-
-      const api = global.api;
-      if (!api || typeof api.post !== 'function') {
-        console.error('[lex-agentic-plan-card] global api not available');
-        this._setLoading(false);
+      // Check disabled_when_state — guard even if the button rendered enabled
+      var currentStatus = this.status || 'pending';
+      if (Array.isArray(action.disabled_when_state) &&
+          action.disabled_when_state.indexOf(currentStatus) > -1) {
         return;
       }
 
-      api.post('/api/v1/approvals/' + approvalId + '/approve', {
-        comments: 'Approved from chat'
-      }).then(() => {
-        this.status = 'approved';
-        this._loading = false;
-        if (global.Lex && global.Lex.Toast) {
-          global.Lex.Toast.success('Plan approved — LANA is working on it');
-        }
-        this.emit('lex-plan-approved', { approvalId });
-      }).catch((err) => {
-        console.error('[lex-agentic-plan-card] Approve failed:', err);
-        this._setLoading(false);
-        if (global.Lex && global.Lex.Toast) {
-          global.Lex.Toast.error('Failed to approve plan');
-        }
-      });
+      // Special client-side actions
+      if (action.action_type === 'toggle_edit_mode') {
+        this._editing = true;
+        this._performUpdate();
+        return;
+      }
+
+      // HTTP action
+      if (action.endpoint) {
+        this._fireEndpointAction(action);
+        return;
+      }
+
+      console.warn('[lex-agentic-plan-card] Action has no endpoint or action_type:', action.id);
     }
 
-    _handleCancel() {
-      if (this._loading || this.status !== 'pending') return;
-      const approvalId = this.approvalId;
-      if (!approvalId) {
-        console.warn('[lex-agentic-plan-card] approval-id is not set');
+    /**
+     * Look up an action descriptor from the actions array by its id.
+     * @param {string} actionId
+     * @returns {Object|null}
+     */
+    _findAction(actionId) {
+      if (!this._actions) return null;
+      for (var i = 0; i < this._actions.length; i++) {
+        if (this._actions[i].id === actionId) return this._actions[i];
+      }
+      return null;
+    }
+
+    /**
+     * Fallback action descriptors for cards that were persisted before the
+     * data-driven system was introduced. The approval-id attribute is used
+     * to construct endpoint URLs.
+     *
+     * @param {string} actionId - 'approve' | 'edit' | 'cancel'
+     * @returns {Object|null}
+     */
+    _buildFallbackAction(actionId) {
+      var approvalId = this.approvalId;
+      if (!approvalId) return null;
+
+      if (actionId === 'approve') {
+        return {
+          id: 'approve',
+          endpoint: 'POST /api/v1/approvals/' + approvalId + '/approve',
+          payload: { comments: 'Approved from chat' },
+          on_success: { set_state: 'approved', toast: 'Plan approved — LANA is working on it' },
+          disabled_when_state: ['approved', 'rejected', 'expired', 'cancelled']
+        };
+      }
+
+      if (actionId === 'edit') {
+        return {
+          id: 'edit',
+          action_type: 'toggle_edit_mode',
+          disabled_when_state: ['approved', 'rejected', 'expired', 'cancelled']
+        };
+      }
+
+      if (actionId === 'cancel') {
+        return {
+          id: 'cancel',
+          endpoint: 'POST /api/v1/approvals/' + approvalId + '/reject',
+          payload: { comments: 'Cancelled from chat' },
+          on_success: { set_state: 'rejected' },
+          disabled_when_state: ['approved', 'rejected', 'expired', 'cancelled']
+        };
+      }
+
+      return null;
+    }
+
+    /**
+     * Fire an HTTP action from a descriptor endpoint string.
+     * Endpoint format: "METHOD /path" (e.g. "POST /api/v1/approvals/:id/approve")
+     *
+     * On success: applies on_success.set_state and shows on_success.toast if set.
+     *
+     * @param {Object} action - Action descriptor with endpoint set
+     */
+    _fireEndpointAction(action) {
+      var parts = action.endpoint.split(' ');
+      var method = parts[0].toLowerCase();
+      var path = parts.slice(1).join(' ');
+
+      var api = global.api;
+      if (!api || typeof api[method] !== 'function') {
+        console.error('[lex-agentic-plan-card] global.api not available or method not supported:', method);
         return;
       }
 
       this._setLoading(true);
 
-      const api = global.api;
-      if (!api || typeof api.post !== 'function') {
-        console.error('[lex-agentic-plan-card] global api not available');
-        this._setLoading(false);
-        return;
-      }
+      api[method](path, action.payload || {})
+        .then(() => {
+          this._loading = false;
 
-      api.post('/api/v1/approvals/' + approvalId + '/reject', {
-        comments: 'Cancelled from chat'
-      }).then(() => {
-        this.status = 'rejected';
-        this._loading = false;
-        this.emit('lex-plan-rejected', { approvalId });
-      }).catch((err) => {
-        console.error('[lex-agentic-plan-card] Cancel failed:', err);
-        this._setLoading(false);
-        if (global.Lex && global.Lex.Toast) {
-          global.Lex.Toast.error('Failed to cancel plan');
-        }
-      });
+          // Apply on_success state transition
+          if (action.on_success && action.on_success.set_state) {
+            this.status = action.on_success.set_state;
+          }
+
+          // Show toast if requested
+          if (action.on_success && action.on_success.toast) {
+            if (global.Lex && global.Lex.Toast) {
+              global.Lex.Toast.success(action.on_success.toast);
+            }
+          }
+
+          // Re-render to apply new status and re-evaluate button disabled states
+          this._performUpdate();
+
+          // Emit legacy events for backward compatibility with pages that
+          // listen to lex-plan-approved / lex-plan-rejected
+          var approvalId = this.approvalId;
+          if (action.id === 'approve') {
+            this.emit('lex-plan-approved', { approvalId });
+          } else if (action.id === 'cancel') {
+            this.emit('lex-plan-rejected', { approvalId });
+          }
+        })
+        .catch((err) => {
+          console.error('[lex-agentic-plan-card] Action failed:', action.id, err);
+          this._setLoading(false);
+          if (global.Lex && global.Lex.Toast) {
+            global.Lex.Toast.error('Action failed — please try again');
+          }
+        });
     }
 
     // ── Edit handlers ────────────────────────────────────────────────────
-
-    _handleEditToggle() {
-      if (this._loading || this.status !== 'pending') return;
-      this._editing = true;
-      this._performUpdate();
-    }
 
     _handleCancelEdit() {
       this._editing = false;
@@ -514,8 +683,8 @@
 
       this._setLoading(true);
 
-      // Send edit as a structured chat message with plan context attached
-      // The backend detects the pending approval and treats this as a plan edit
+      // Send edit as a structured chat message with plan context attached.
+      // The backend detects the pending approval and treats this as a plan edit.
       var chatEl = this.closest('lex-chat');
       if (chatEl && typeof chatEl.send === 'function') {
         chatEl.send(instructions, {
@@ -558,13 +727,14 @@
      */
     _setLoading(loading) {
       this._loading = loading;
-      const approveBtn = this.$('[data-action="approve"]');
-      const cancelBtn  = this.$('[data-action="cancel"]');
-      const submitBtn  = this.$('[data-action="submit-edit"]');
-      const cancelEditBtn = this.$('[data-action="cancel-edit"]');
-      if (approveBtn) approveBtn.disabled = loading;
-      if (cancelBtn)  cancelBtn.disabled  = loading;
-      if (submitBtn)  submitBtn.disabled  = loading;
+      // Disable/enable all action buttons generically
+      var actionBtns = this.querySelectorAll('[data-action-id]');
+      for (var i = 0; i < actionBtns.length; i++) {
+        actionBtns[i].disabled = loading;
+      }
+      var submitBtn = this.$('[data-action="submit-edit"]');
+      var cancelEditBtn = this.$('[data-action="cancel-edit"]');
+      if (submitBtn) submitBtn.disabled = loading;
       if (cancelEditBtn) cancelEditBtn.disabled = loading;
     }
   }
