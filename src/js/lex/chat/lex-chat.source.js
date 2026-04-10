@@ -162,7 +162,8 @@
             citations: (m.metadata && m.metadata.citations) || m.citations || [],
             artifacts: (m.metadata && m.metadata.artifacts) || m.artifacts || [],
             duration: m.duration_ms || null,
-            tokenCount: m.token_count || null
+            tokenCount: m.token_count || null,
+            metadata: m.metadata || {}  // Preserve full metadata for dynamic_cards re-hydration
           };
         });
 
