@@ -75,6 +75,10 @@
         this.setAttribute('data-lex-theme', this.theme);
       }
 
+      // Clear stale global chatMode from localStorage (legacy). Chat mode is now
+      // per-component state and should not persist across conversations/pages.
+      try { localStorage.removeItem('chatMode'); } catch (_) {}
+
       this._buildDOM();
       this._bindChildEvents();
       this._initSource();
@@ -185,14 +189,14 @@
         this._loadMoreHistory();
       });
 
-      // Composer tool selection
+      // Composer tool selection — set component state, not global localStorage
       this.addEventListener('lex-composer-tool-select', (e) => {
         const { toolId } = e.detail;
         if (toolId === 'document_chat') {
           this._props.chatMode = 'document';
           if (this._documentsEl) this._documentsEl.mode = 'document';
         } else if (toolId === 'agentic') {
-          localStorage.setItem('chatMode', 'agentic');
+          this._props.chatMode = 'agentic';
         } else if (toolId === 'insights_chat') {
           this._props.chatMode = 'insights';
         }
@@ -208,7 +212,7 @@
             if (this._documentsEl) this._documentsEl.mode = 'general';
           }
         } else if (toolId === 'agentic') {
-          localStorage.setItem('chatMode', 'general');
+          this._props.chatMode = 'general';
         } else if (toolId === 'insights_chat') {
           this._props.chatMode = 'general';
         }
@@ -323,8 +327,8 @@
       // Prepare source options
       const sendOpts = { ...opts };
       // Map chat mode to backend context_type enum
-      const chatModeStored = localStorage.getItem('chatMode');
-      if (chatModeStored === 'agentic' || this.chatMode === 'agentic') {
+      // Use component state only — no global localStorage that persists across conversations
+      if (this.chatMode === 'agentic') {
         sendOpts.contextType = 'agentic_mode';
       } else if (this.chatMode === 'document') {
         sendOpts.contextType = 'document_chat';
