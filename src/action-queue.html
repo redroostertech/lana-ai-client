@@ -29,18 +29,22 @@
 
     <main>
 
-      <!-- Page header -->
-      <div class="aq-header">
-        <div class="aq-header-title">Action Queue</div>
-        <div class="aq-header-subtitle">All pending actions sorted by most recent</div>
-      </div>
+      <!-- Banner -->
+      <lex-banner
+        variant="light"
+        heading="Action Queue"
+        subtitle="All pending actions sorted by most recent"
+      ></lex-banner>
+
+      <!-- Breadcrumb -->
+      <lex-breadcrumb style="margin:8px 0;" items='[{"label":"Dashboard","href":"dashboard.html"},{"label":"Action Queue"}]'></lex-breadcrumb>
 
       <!-- Filter bar -->
       <div class="aq-filters">
         <lex-segmented
           id="aqTypeFilter"
           value="all"
-          options='[{"value":"all","label":"All"},{"value":"alert","label":"Alerts"},{"value":"scheduled_task","label":"Tasks"},{"value":"approval_required","label":"Approvals"},{"value":"sync_failure","label":"Sync Failures"}]'
+          options='[{"value":"all","label":"All"},{"value":"alert","label":"Alerts"},{"value":"scheduled_task","label":"Scheduled Jobs"},{"value":"approval_required","label":"Approvals"},{"value":"sync_failure","label":"Sync Failures"}]'
         ></lex-segmented>
 
         <lex-select
@@ -69,10 +73,8 @@
       <!-- Pagination -->
       <lex-pagination id="aqPagination" class="hidden" page="1" total-pages="1" total="0" limit="20"></lex-pagination>
 
-      <!-- Empty state -->
-      <div id="aqEmpty" class="hidden">
-        <lex-empty icon="inbox" message="No actions pending" description="Your action queue is empty"></lex-empty>
-      </div>
+      <!-- Empty state (content updated by JS based on active filter) -->
+      <div id="aqEmpty" class="hidden"></div>
 
     </main>
 
@@ -127,6 +129,8 @@
   <!-- Page-specific Lex components -->
   <script src="js/lex/components/foundation/lex-action-card.js"></script>
   <script src="js/lex/components/foundation/lex-badge.js"></script>
+  <script src="js/lex/components/foundation/lex-banner.js"></script>
+  <script src="js/lex/components/foundation/lex-breadcrumb.js"></script>
   <script src="js/lex/components/foundation/lex-card.js"></script>
   <script src="js/lex/components/foundation/lex-modal.js"></script>
   <script src="js/lex/components/foundation/lex-drawer.js"></script>

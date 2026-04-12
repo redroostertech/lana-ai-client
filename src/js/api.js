@@ -2041,6 +2041,22 @@ class ApiClient {
   }
 
   // ============================================================
+  // Traces
+  // ============================================================
+  async getTraceById(traceId) {
+    return this.get(`/api/v1/traces/${traceId}`);
+  }
+
+  async getConversationTraces(conversationId, limit = 50, offset = 0) {
+    const params = new URLSearchParams({ limit, offset });
+    return this.get(`/api/v1/conversations/${conversationId}/traces?${params}`);
+  }
+
+  async getMessageTrace(messageId) {
+    return this.get(`/api/v1/messages/${messageId}/trace`);
+  }
+
+  // ============================================================
   // Health & System
   // ============================================================
   async getHealthSummary() {
@@ -2310,16 +2326,24 @@ class ApiClient {
   }
 
   /**
-   * Poll for document processing completion
-   * @param {string} documentId - Document ID
-   * @param {number} maxAttempts - Maximum polling attempts (default: 60)
-   * @param {number} intervalMs - Polling interval in ms (default: 2000)
+   * Poll for document processing completion.
+   * Accepts an optional AbortSignal so callers can cancel the loop
+   * (e.g., on page navigation).
+   *
+   * @param {string}      documentId
+   * @param {number}      [maxAttempts=60]
+   * @param {number}      [intervalMs=2000]
+   * @param {AbortSignal} [signal]  — pass to cancel the loop early.
    * @returns {Promise<Object>}
    */
-  async pollDocumentProcessing(documentId, maxAttempts = 60, intervalMs = 2000) {
+  async pollDocumentProcessing(documentId, maxAttempts = 60, intervalMs = 2000, signal) {
     let attempts = 0;
 
     while (attempts < maxAttempts) {
+      if (signal && signal.aborted) {
+        throw new DOMException('Poll aborted', 'AbortError');
+      }
+
       const status = await this.getDocumentProcessingStatus(documentId);
 
       if (status.stage === 'completed') {
@@ -2330,8 +2354,12 @@ class ApiClient {
         throw new Error(`Document processing failed: ${status.status}`);
       }
 
-      // Wait before next poll
-      await new Promise(resolve => setTimeout(resolve, intervalMs));
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(resolve, intervalMs);
+        if (signal) {
+          signal.addEventListener('abort', () => { clearTimeout(timer); reject(new DOMException('Poll aborted', 'AbortError')); }, { once: true });
+        }
+      });
       attempts++;
     }
 

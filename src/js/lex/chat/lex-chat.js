@@ -30,6 +30,30 @@
         font-family: var(--lex-font-sans);
         overflow: hidden;
       }
+      .lex-chat-context-meter {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 16px;
+        font-size: 11px;
+        color: var(--lex-text-muted, #6b7280);
+      }
+      .lex-chat-context-meter-bar {
+        flex: 0 0 80px;
+        height: 4px;
+        border-radius: 2px;
+        background: var(--lex-border, #e5e7eb);
+        overflow: hidden;
+      }
+      .lex-chat-context-meter-fill {
+        height: 100%;
+        border-radius: 2px;
+        background: #22c55e;
+        transition: width .3s ease, background .3s ease;
+        width: 0%;
+      }
+      .lex-chat-context-meter-fill[data-warn] { background: #f59e0b; }
+      .lex-chat-context-meter-fill[data-danger] { background: #ef4444; }
     `;
     document.head.appendChild(style);
   }
@@ -59,6 +83,8 @@
       this._artifacts = [];
       this._streamingContent = '';
       this._initialized = false;
+      this._contextWarningShown = false;
+      this._contextMeterEl = null;
 
       // Sub-component references
       this._documentsEl = null;
@@ -97,6 +123,10 @@
         <lex-chat-documents></lex-chat-documents>
         <lex-chat-thread></lex-chat-thread>
         <lex-chat-activity hidden></lex-chat-activity>
+        <div class="lex-chat-context-meter" style="display:none">
+          <div class="lex-chat-context-meter-bar"><div class="lex-chat-context-meter-fill"></div></div>
+          <span class="lex-chat-context-meter-text"></span>
+        </div>
         ${this.showComposer ? '<lex-chat-composer></lex-chat-composer>' : ''}
       `;
 
@@ -104,6 +134,7 @@
       this._threadEl = this.querySelector('lex-chat-thread');
       this._activityEl = this.querySelector('lex-chat-activity');
       this._composerEl = this.querySelector('lex-chat-composer');
+      this._contextMeterEl = this.querySelector('.lex-chat-context-meter');
 
       // Apply initial props
       if (this._composerEl) {
@@ -174,9 +205,16 @@
         }
       });
 
-      // Citation click (bubble up from message)
+      // Citation click — emit cancelable event, then open document as default.
+      // Pages can call e.preventDefault() on lex-chat-citation-click to override.
       this.addEventListener('lex-citation-click', (e) => {
-        this.emit('lex-chat-citation-click', e.detail);
+        const evt = new CustomEvent('lex-chat-citation-click', {
+          detail: e.detail, bubbles: true, composed: true, cancelable: true
+        });
+        this.dispatchEvent(evt);
+        if (!evt.defaultPrevented) {
+          this._openCitationDocument(e.detail);
+        }
       });
 
       // Artifact click (bubble up from message)
@@ -225,11 +263,13 @@
       });
 
       // Composer document selection from # picker — add document to chat context
+      // and trigger JIT processing if the document isn't vectorized yet.
       this.addEventListener('lex-composer-document-select', async (e) => {
         const { documentId, filename } = e.detail || {};
         if (documentId) {
           try {
             await this.addDocument(documentId, filename);
+            this._ensureDocumentProcessed(documentId, filename);
           } catch (err) {
             this._showSystemMessage('Failed to add document: ' + err.message);
             // Remove badge from composer on failure
@@ -302,6 +342,7 @@
       this._groundingContext = null;
       this._sendStartTime = Date.now();
       this._planReadyReceived = false;
+      this._recoveryNoticeShownForConversation = null;
 
       // Add user message to thread
       if (this._threadEl) {
@@ -345,6 +386,9 @@
       if (this.contextType) sendOpts.contextType = this.contextType;
       if (this.matterId) sendOpts.matterId = this.matterId;
 
+      // Fire-and-forget JIT processing for any #filename mentions
+      this._processMessageMentions(content);
+
       // Connect if needed
       if (!this._source.connected) {
         await this._source.connect(this.conversationId);
@@ -363,7 +407,7 @@
         }
       } catch (err) {
         console.error('[lex-chat] Send error:', err);
-        this.emit('lex-chat-error', { error: err.message, type: 'send' });
+        this.emit('lex-chat-error', { error: err.message, type: 'send', status: err.status || null });
       }
 
       // Finalize
@@ -393,6 +437,8 @@
      */
     async loadConversation(id) {
       this._props.conversationId = id;
+      this._resetContextMeter();
+      this._recoveryNoticeShownForConversation = null;
 
       if (this._source) {
         await this._source.connect(id);
@@ -404,9 +450,11 @@
         // Load history
         const result = await this._source.loadHistory(1, this.maxHistory);
         if (result && result.messages) {
+          let lastPersistedMessage = null;
           if (this._threadEl) {
             this._threadEl.clear();
             for (const m of result.messages) {
+              lastPersistedMessage = m;
               this._threadEl.addMessage(m.role, m.content, {
                 messageId: m.id || m.message_id,
                 timestamp: m.timestamp || m.created_at,
@@ -470,7 +518,35 @@
             this._threadEl.hasMore = result.hasMore || false;
           }
         }
+
+        // Detect a generation already in flight for this conversation
+        // (e.g. started in another tab/device). Host pages can listen for
+        // `lex-chat-generation-active` and render their own banner.
+        try {
+          const status = await this._source.checkActiveGeneration(id);
+          if (status && status.active) {
+            this._showPendingGenerationRecovery(lastPersistedMessage, { activeGeneration: true });
+            this.dispatchEvent(new CustomEvent('lex-chat-generation-active', {
+              bubbles: true,
+              composed: true,
+              detail: { conversationId: id, ...status }
+            }));
+          } else {
+            this._showPendingGenerationRecovery(lastPersistedMessage, { activeGeneration: false });
+          }
+        } catch (_) { /* best-effort */ }
       }
+    }
+
+    /**
+     * Check whether a generation is already running on the current
+     * conversation. Returns the status payload from the backend.
+     */
+    async checkActiveGeneration(conversationId) {
+      if (!this._source) return { active: false };
+      return await this._source.checkActiveGeneration(
+        conversationId || this.conversationId
+      );
     }
 
     /**
@@ -480,6 +556,7 @@
       this._props.conversationId = null;
       this._citations = [];
       this._artifacts = [];
+      this._resetContextMeter();
       if (this._threadEl) {
         this._threadEl.clear();
         this._threadEl.showWelcome();
@@ -524,9 +601,13 @@
       switch (event.type) {
 
         case 'connected':
-          if (event.threadId && !this.conversationId) {
+          if (event.threadId) {
+            var isNew = !this.conversationId || this.conversationId !== event.threadId || !this._conversationRegistered;
             this._props.conversationId = event.threadId;
-            this.emit('lex-chat-conversation-created', { conversationId: event.threadId });
+            if (isNew) {
+              this._conversationRegistered = true;
+              this.emit('lex-chat-conversation-created', { conversationId: event.threadId });
+            }
           }
           // Capture backend-resolved matter ID early (before handler runs)
           if (event.matterId && !this.matterId) {
@@ -600,6 +681,7 @@
           break;
 
         case 'context_usage':
+          this._updateContextMeter(event.percentUsed, event.percentUntilCompact);
           this.emit('lex-chat-context-usage', {
             percentUsed: event.percentUsed,
             tokensUsed: event.tokensUsed,
@@ -670,9 +752,17 @@
           if (this._activityEl) {
             this._activityEl.update('Auto-compacting conversation...', 'compacting');
           }
+          this.emit('lex-chat-auto-compact-start', {
+            messagesToSummarize: event.messagesToSummarize || null
+          });
           break;
 
         case 'auto_compact_complete':
+          this.emit('lex-chat-auto-compact-complete', {
+            newPercentUsed: event.newPercentUsed,
+            tokensSaved: event.tokensSaved || null,
+            durationMs: event.durationMs || null
+          });
           this.emit('lex-chat-context-usage', {
             percentUsed: event.newPercentUsed,
             tokensUsed: null,
@@ -741,7 +831,11 @@
           } else {
             this._showSystemMessage('Error: ' + (event.error || 'Unknown error'));
           }
-          this.emit('lex-chat-error', { error: event.error, type: 'stream' });
+          this.emit('lex-chat-error', {
+            error: event.error,
+            type: 'stream',
+            status: event.status || null
+          });
           break;
       }
     }
@@ -875,6 +969,142 @@
       if (this._threadEl) {
         this._threadEl.addSystemMessage(msg);
       }
+    }
+
+    _showPendingGenerationRecovery(lastMessage, options = {}) {
+      const { activeGeneration = false } = options;
+      if (!this._threadEl || !lastMessage || lastMessage.role !== 'user') return;
+      if (this._recoveryNoticeShownForConversation === this.conversationId) return;
+
+      this._recoveryNoticeShownForConversation = this.conversationId;
+
+      if (activeGeneration) {
+        if (this._activityEl) {
+          this._activityEl.clearReasoning();
+          this._activityEl.show('LANA is generating a response…', 'thinking');
+        }
+        if (this._composerEl) {
+          this._composerEl.setGenerating(true);
+        }
+        this._showSystemMessage('LANA was still generating a response when this page loaded. Keep this conversation open for a moment or resend the last message if nothing appears.');
+        return;
+      }
+
+      this._showSystemMessage('The last user message does not have a saved assistant response yet. The previous generation may have been interrupted by a refresh. Resend the message to retry.');
+    }
+
+    // ---------------------------------------------------------------------------
+    // JIT document processing
+    // ---------------------------------------------------------------------------
+
+    _jitCallbacks() {
+      return {
+        onReady: (filename) => this._showSystemMessage(`Document "${filename}" processed and ready`),
+        onError: (filename, err) => {
+          const reason = err && err.message ? ': ' + err.message : '';
+          this._showSystemMessage(`Failed to process "${filename}"${reason}`);
+        }
+      };
+    }
+
+    _ensureDocumentProcessed(documentId, filename) {
+      const svc = global.DocumentProcessingService;
+      if (!svc) return;
+      svc.ensureReadyBackground(documentId, filename, this._jitCallbacks());
+    }
+
+    _processMessageMentions(content) {
+      const svc = global.DocumentProcessingService;
+      if (!svc) return;
+      const docs = (this._documents || []).concat(this._getAvailableDocuments());
+      if (docs.length === 0) return;
+      svc.processMessageMentions(content, docs, this._jitCallbacks());
+    }
+
+    _getAvailableDocuments() {
+      if (global.ChatFileDrawer && typeof global.ChatFileDrawer.getMentionItems === 'function') {
+        return global.ChatFileDrawer.getMentionItems() || [];
+      }
+      return [];
+    }
+
+    // ---------------------------------------------------------------------------
+    // Default citation click — open document at cited page
+    // ---------------------------------------------------------------------------
+
+    async _openCitationDocument(detail) {
+      const docId = detail && detail.documentId;
+      if (!docId) return;
+
+      const page = detail.page || 1;
+
+      try {
+        const apiClient = global.api;
+        if (!apiClient || typeof apiClient.get !== 'function') {
+          throw new Error('API client not available');
+        }
+
+        const resp = await fetch(
+          apiClient.baseUrl + '/api/v1/documents/' + encodeURIComponent(docId) + '/download',
+          { headers: { 'Authorization': 'Bearer ' + (apiClient.token || localStorage.getItem('token') || '') } }
+        );
+
+        if (!resp.ok) throw new Error('Download failed: ' + resp.status);
+
+        const blob = await resp.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        window.open(blobUrl + '#page=' + page, '_blank');
+
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+      } catch (err) {
+        console.error('[lex-chat] Citation document open failed:', err);
+        this._showSystemMessage('Could not open document. Please try again.');
+      }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Context meter — shows token usage above the composer
+    // ---------------------------------------------------------------------------
+
+    _updateContextMeter(percentUsed, percentUntilCompact) {
+      if (!this._contextMeterEl) return;
+      const available = Math.max(0, 100 - (percentUsed || 0));
+      const fill = this._contextMeterEl.querySelector('.lex-chat-context-meter-fill');
+      const text = this._contextMeterEl.querySelector('.lex-chat-context-meter-text');
+
+      if (fill) {
+        fill.style.width = (percentUsed || 0) + '%';
+        fill.removeAttribute('data-warn');
+        fill.removeAttribute('data-danger');
+        if (percentUsed >= 90) fill.setAttribute('data-danger', '');
+        else if (percentUsed >= 75) fill.setAttribute('data-warn', '');
+      }
+      if (text) {
+        text.textContent = percentUntilCompact != null
+          ? `Context available: ${available}% (${percentUntilCompact}% until auto-compact)`
+          : `Context available: ${available}%`;
+      }
+      this._contextMeterEl.style.display = '';
+
+      // Warning fires when the bar turns red (90%) — aligned with the visual danger state.
+      if (percentUsed >= 90 && !this._contextWarningShown) {
+        this._contextWarningShown = true;
+        this._showSystemMessage('Conversation getting long. Consider starting a new chat for best results.');
+      }
+    }
+
+    _resetContextMeter() {
+      if (!this._contextMeterEl) return;
+      this._contextMeterEl.style.display = 'none';
+      this._contextWarningShown = false;
+      const fill = this._contextMeterEl.querySelector('.lex-chat-context-meter-fill');
+      if (fill) {
+        fill.style.width = '0%';
+        fill.removeAttribute('data-warn');
+        fill.removeAttribute('data-danger');
+      }
+      const text = this._contextMeterEl.querySelector('.lex-chat-context-meter-text');
+      if (text) text.textContent = '';
     }
 
     async _loadMoreHistory() {

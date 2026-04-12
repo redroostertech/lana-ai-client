@@ -237,6 +237,11 @@
       if (typeof api === 'undefined') return;
 
       try {
+        // Stop any active LLM generation for this thread before deleting.
+        // Fire-and-forget — don't block delete on stop success.
+        api.post('/api/v1/streaming/sessions/' + threadId + '/stop', {})
+          .catch(function () { /* best-effort — generation may not be active */ });
+
         await api.delete('/api/v1/conversation-threads/' + threadId);
         this.removeThread(threadId);
       } catch (err) {

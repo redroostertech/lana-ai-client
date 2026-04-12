@@ -12,6 +12,10 @@
   <script src="js/tailwind-loader.js"></script>
   <link rel="stylesheet" href="css/lex-chat.css">
   <link rel="stylesheet" href="css/chat-v2.css">
+  <style>
+    @keyframes cv2-pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    @keyframes cv2-spin  { to{transform:rotate(360deg)} }
+  </style>
 
 </head>
 <body>
@@ -89,6 +93,29 @@
       </div>
       <!-- /cv2-stage-center -->
 
+      <!-- ── Gap 1: Active generation banner (hidden until lex-chat-generation-active fires) ── -->
+      <div id="cv2-generation-banner" style="display:none;align-items:center;justify-content:space-between;padding:8px 16px;background:var(--lex-color-warning-subtle,#fefce8);border-bottom:1px solid var(--lex-color-warning-border,#fde047);font-size:var(--lex-body-sm-size,13px);">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--lex-color-warning,#ca8a04)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;animation:cv2-pulse 1.5s ease-in-out infinite;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span style="color:var(--lex-text-primary);">AI is still responding — Generation started <span id="cv2-generation-duration">a moment ago</span></span>
+        </div>
+        <button id="cv2-stop-generation-btn" style="flex-shrink:0;padding:4px 12px;font-size:var(--lex-body-sm-size,13px);font-weight:500;color:var(--lex-text-primary);background:var(--lex-bg-primary);border:1px solid var(--lex-border-default);border-radius:var(--lex-radius-sm);cursor:pointer;">Stop</button>
+      </div>
+
+      <!-- ── Gap 4: Auto-compaction banner (hidden until auto_compact_start) ── -->
+      <div id="cv2-compact-banner" style="display:none;align-items:center;gap:10px;padding:8px 16px;background:var(--lex-bg-tertiary);border-bottom:1px solid var(--lex-border-subtle);font-size:var(--lex-body-sm-size,13px);color:var(--lex-text-secondary);">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;animation:cv2-spin 1s linear infinite;"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
+        <span>Optimising conversation context…</span>
+      </div>
+
+      <!-- ── Gap 3: Context meter — shown in ACTIVE stage ── -->
+      <div id="cv2-context-meter" style="display:none;padding:4px 16px;font-size:var(--lex-body-xs-size,11px);color:var(--lex-text-tertiary);text-align:right;">
+        <span id="cv2-context-text">Context available: 100%</span>
+      </div>
+
+      <!-- ── Gap 5: Followup chip row — shown above the composer after agentic followup ── -->
+      <div id="cv2-followup-chips" style="display:none;padding:6px 16px;flex-wrap:wrap;gap:6px;border-top:1px solid var(--lex-border-subtle);background:var(--lex-bg-primary);"></div>
+
       <!-- ── Stage: ACTIVE — messages area ── -->
       <div id="cv2-messages-area" class="cv2-messages-area">
         <!-- lex-chat component mounted here by JS after conversation ID exists -->
@@ -162,6 +189,9 @@
 
   <!-- Mermaid diagram rendering (before chat format) -->
   <script src="js/vendor/mermaid.min.js"></script>
+
+  <!-- Services used by chat components -->
+  <script src="js/services/document-processing.service.js"></script>
 
   <!-- Chat component chain (dependency order) -->
   <script src="js/lex/chat/lex-chat.format.js"></script>

@@ -629,7 +629,7 @@
     var items = [];
 
     try {
-      var result = await api.get('/api/v1/action-queue?limit=5&sort_by=severity&sort_order=desc');
+      var result = await api.get('/api/v1/action-queue?limit=5&sort_by=created_at&sort_order=desc');
       items = (result && (result.items || result.actions || result.data)) || [];
     } catch (err) {
       console.warn('[Dashboard Zone C] Could not load action queue:', err && err.message);

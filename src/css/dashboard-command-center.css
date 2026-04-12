@@ -29,11 +29,14 @@
 
 .cc-action-row {
   display: grid;
-  grid-template-columns: 3fr 2fr;
+  grid-template-columns: 1fr; /* Full width — Zone D (Lana Tasks) hidden */
   gap: 1.25rem;
   margin-bottom: 1.25rem;
   align-items: start;
 }
+/* Restore two-column when Zone D is re-enabled:
+   grid-template-columns: 3fr 2fr;
+*/
 
 
 /* ==========================================================================

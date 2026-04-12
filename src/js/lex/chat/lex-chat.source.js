@@ -47,6 +47,11 @@
     /** Stop an active generation. */
     async stop() {}
 
+    /** Check whether a generation is already in flight for a conversation. */
+    async checkActiveGeneration(conversationId) {
+      return { active: false };
+    }
+
     /** Cleanup on disconnect. */
     disconnect() {
       this._connected = false;
@@ -279,19 +284,60 @@
         this._abortController.abort();
       }
 
-      // Server-side stop
-      if (this._sessionId) {
-        try {
-          const baseUrl = await this._resolveBaseUrl();
-          const token = this._getToken();
-          await fetch(`${baseUrl}/api/v1/streaming/sessions/${this._sessionId}/stop`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            }
-          });
-        } catch (_) { /* best-effort */ }
+      // Server-side stop — key by sessionId if we have one (in-flight stream
+      // this client started), otherwise fall back to conversationId to cover
+      // generations started elsewhere (other tab/device). Backend resolves
+      // either against its connection registry.
+      const key = this._sessionId || this._conversationId;
+      if (!key) return { success: false, reason: 'no-session-or-conversation' };
+
+      try {
+        const baseUrl = await this._resolveBaseUrl();
+        const token = this._getToken();
+        const res = await fetch(`${baseUrl}/api/v1/streaming/sessions/${key}/stop`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (!res.ok) return { success: false, status: res.status };
+        return await res.json().catch(() => ({ success: true }));
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+    }
+
+    /**
+     * Check whether an active generation exists for a conversation.
+     * Used on page load / thread switch to detect generations started
+     * in another tab or device.
+     *
+     * @param {string} [conversationId] defaults to the currently-bound conversation
+     * @returns {Promise<{active:boolean, startedAt?:string, durationSeconds?:number, clientId?:string}>}
+     */
+    async checkActiveGeneration(conversationId) {
+      const id = conversationId || this._conversationId;
+      if (!id) return { active: false };
+
+      try {
+        const baseUrl = await this._resolveBaseUrl();
+        const token = this._getToken();
+        const res = await fetch(`${baseUrl}/api/v1/streaming/sessions/${id}/status`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) return { active: false };
+        const data = await res.json();
+        if (!data.active) return { active: false };
+        return {
+          active: true,
+          sessionId: data.session_id || id,
+          clientId: data.client_id || null,
+          startedAt: data.started_at || null,
+          durationSeconds: data.duration_seconds || 0
+        };
+      } catch (_) {
+        return { active: false };
       }
     }
 

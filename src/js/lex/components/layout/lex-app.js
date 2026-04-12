@@ -640,7 +640,7 @@
           {
             id: 'tools',
             items: [
-              { id: 'lana-tasks', label: 'Lana Tasks', icon: 'list-checks', href: 'agentic-tasks.html' },
+              // { id: 'lana-tasks', label: 'Lana Tasks', icon: 'list-checks', href: 'agentic-tasks.html' }, // HIDDEN until tasks integration complete
               { id: 'connectors', label: 'Data Connectors', icon: 'plug', href: 'data-connectors.html' },
               { id: 'reports', label: 'Analytics', icon: 'bar-chart-2', href: 'admin/analytics.html' }
             ]

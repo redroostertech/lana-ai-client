@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat Traces - LANA AI</title>
+
+  <!-- CSS + Tailwind in head — behavioral scripts at end of body -->
+  <link rel="stylesheet" href="../css/lex-tokens.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/tailwind-output.css">
+  <script src="../js/tailwind-loader.js"></script>
+
+  <style>
+    .timeline-item {
+      position: relative;
+      padding-left: 2rem;
+    }
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      left: 0.5rem;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: var(--lex-border-default, #E5E7EB);
+    }
+    .timeline-item:last-child::before {
+      display: none;
+    }
+    .timeline-dot {
+      position: absolute;
+      left: 0;
+      top: 0.5rem;
+      width: 1.25rem;
+      height: 1.25rem;
+      border-radius: 50%;
+      border: 2px solid var(--lex-bg-primary, white);
+      box-shadow: 0 0 0 2px var(--lex-border-default, #E5E7EB);
+    }
+  </style>
+
+</head>
+<body>
+
+  <!-- Branded loader -->
+  <lex-loader theme="light"></lex-loader>
+
+  <!-- App shell -->
+  <lex-app
+    logo-src="../img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="../dashboard.html"
+    active-nav-id="admin"
+    page-title="Chat Traces"
+  ></lex-app>
+
+  <!-- Page content as inert <template> -->
+  <template id="page-content">
+
+    <main class="p-4 lg:p-8">
+
+      <!-- Page header -->
+      <lex-banner
+        variant="light"
+        heading="Chat Traces"
+        subtitle="Debug and observability for AI chat interactions"
+      ></lex-banner>
+
+      <lex-breadcrumb items='[{"label":"Administration","href":"admin/index.html"},{"label":"Chat Traces"}]'></lex-breadcrumb>
+
+      <!-- ══════════════════════════════════════════════════════════════
+           Trace List View
+           ══════════════════════════════════════════════════════════════ -->
+      <div id="traceListView">
+
+        <!-- Filters -->
+        <lex-card compact style="margin-bottom:1.5rem;">
+          <h3 class="text-sm font-semibold lex-text-primary mb-3">Filters</h3>
+          <div class="flex flex-wrap gap-4 items-end">
+            <div class="flex-1 min-w-[200px]">
+              <lex-input
+                id="filterConversation"
+                label="Conversation ID"
+                placeholder="CONV-..."
+              ></lex-input>
+            </div>
+            <div class="flex-1 min-w-[140px]">
+              <lex-select
+                id="filterStatus"
+                label="Status"
+                placeholder="All Statuses"
+                options='[{"value":"completed","label":"Completed"},{"value":"failed","label":"Failed"},{"value":"pending","label":"Pending"},{"value":"aborted","label":"Aborted"}]'
+              ></lex-select>
+            </div>
+            <div class="flex-1 min-w-[140px]">
+              <lex-select
+                id="filterMode"
+                label="Chat Mode"
+                placeholder="All Modes"
+                options='[{"value":"rag","label":"RAG"},{"value":"simple","label":"Simple"},{"value":"agentic","label":"Agentic"}]'
+              ></lex-select>
+            </div>
+            <div class="flex-1 min-w-[140px]">
+              <lex-input
+                id="filterDate"
+                type="date"
+                label="Date"
+              ></lex-input>
+            </div>
+            <div class="flex gap-2" style="padding-bottom:2px;">
+              <lex-btn id="applyFiltersBtn" variant="primary" size="md">Apply</lex-btn>
+              <lex-btn id="clearFiltersBtn" variant="secondary" size="md">Clear</lex-btn>
+            </div>
+          </div>
+        </lex-card>
+
+        <!-- Traces Table -->
+        <lex-card padding="none">
+          <lex-table
+            id="tracesTable"
+            columns="timestamp,user_message,chat_mode,status,duration,llm_calls"
+            labels="Timestamp,User Message,Mode,Status,Duration,LLM Calls"
+            empty-text="Enter a Conversation ID above to search traces"
+          ></lex-table>
+
+          <!-- Pagination -->
+          <div id="paginationRow" class="flex items-center justify-between" style="padding:0.75rem 1.5rem;">
+            <span id="paginationInfo" class="text-xs lex-text-tertiary"></span>
+            <div class="flex gap-2">
+              <lex-btn id="prevPageBtn" variant="secondary" size="sm" disabled>Previous</lex-btn>
+              <lex-btn id="nextPageBtn" variant="secondary" size="sm" disabled>Next</lex-btn>
+            </div>
+          </div>
+        </lex-card>
+
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════════
+           Trace Detail View (hidden by default)
+           ══════════════════════════════════════════════════════════════ -->
+      <div id="traceDetailView" class="hidden">
+
+        <!-- Back button -->
+        <div style="margin-bottom:1rem;">
+          <lex-btn id="backToListBtn" variant="secondary" size="sm">Back to List</lex-btn>
+        </div>
+
+        <!-- Overview Card -->
+        <lex-card style="margin-bottom:1.5rem;">
+          <div class="flex items-start justify-between mb-4">
+            <div class="flex-1">
+              <h2 class="text-lg font-semibold lex-text-primary">Trace Details</h2>
+              <p id="traceIdDisplay" class="text-xs lex-text-tertiary mt-1 font-mono"></p>
+            </div>
+            <lex-badge id="detailStatusBadge" variant="neutral">--</lex-badge>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <div>
+              <p class="text-xs lex-text-tertiary">Total Duration</p>
+              <p id="detailDuration" class="text-lg font-semibold lex-text-primary">--</p>
+            </div>
+            <div>
+              <p class="text-xs lex-text-tertiary">LLM Calls</p>
+              <p id="detailLlmCount" class="text-lg font-semibold lex-text-primary">--</p>
+            </div>
+            <div>
+              <p class="text-xs lex-text-tertiary">RAG Retrievals</p>
+              <p id="detailRagCount" class="text-lg font-semibold lex-text-primary">--</p>
+            </div>
+            <div>
+              <p class="text-xs lex-text-tertiary">Chat Mode</p>
+              <p id="detailChatMode" class="text-lg font-semibold lex-text-primary">--</p>
+            </div>
+          </div>
+
+          <div style="background:var(--lex-bg-secondary,#F5F5F0);border:1px solid var(--lex-border-default);border-radius:var(--lex-radius-md,6px);padding:0.75rem 1rem;">
+            <p class="text-xs font-medium lex-text-secondary mb-1">User Message:</p>
+            <p id="detailUserMessage" class="text-sm lex-text-primary"></p>
+          </div>
+
+          <!-- Response Text (collapsible) -->
+          <div id="detailResponseSection" class="mt-4 hidden">
+            <details>
+              <summary class="cursor-pointer text-sm font-medium" style="color:var(--lex-color-primary-600);">View AI Response</summary>
+              <pre id="detailResponseText" class="mt-2 text-xs lex-text-primary" style="background:var(--lex-bg-secondary,#F5F5F0);border:1px solid var(--lex-border-default);border-radius:var(--lex-radius-md,6px);padding:0.75rem 1rem;white-space:pre-wrap;word-break:break-word;max-height:24rem;overflow-y:auto;"></pre>
+            </details>
+          </div>
+
+          <!-- Classification Data (collapsible) -->
+          <div id="detailClassificationSection" class="mt-4 hidden">
+            <details>
+              <summary class="cursor-pointer text-sm font-medium" style="color:var(--lex-color-primary-600);">Classification Data</summary>
+              <pre id="detailClassificationData" class="mt-2 text-xs" style="background:var(--lex-bg-secondary,#F5F5F0);border:1px solid var(--lex-border-default);border-radius:var(--lex-radius-md,6px);padding:0.75rem 1rem;overflow-x:auto;max-height:16rem;overflow-y:auto;color:var(--lex-text-primary);"></pre>
+            </details>
+          </div>
+
+          <!-- Enrichment Data (collapsible) -->
+          <div id="detailEnrichmentSection" class="mt-4 hidden">
+            <details>
+              <summary class="cursor-pointer text-sm font-medium" style="color:var(--lex-color-primary-600);">Enrichment Data</summary>
+              <pre id="detailEnrichmentData" class="mt-2 text-xs" style="background:var(--lex-bg-secondary,#F5F5F0);border:1px solid var(--lex-border-default);border-radius:var(--lex-radius-md,6px);padding:0.75rem 1rem;overflow-x:auto;max-height:16rem;overflow-y:auto;color:var(--lex-text-primary);"></pre>
+            </details>
+          </div>
+        </lex-card>
+
+        <!-- Execution Timeline -->
+        <lex-card style="margin-bottom:1.5rem;">
+          <h3 class="text-base font-semibold lex-text-primary mb-4">Execution Timeline</h3>
+          <div id="timelineContainer" class="space-y-4">
+            <p class="text-sm lex-text-tertiary">No timeline data</p>
+          </div>
+        </lex-card>
+
+        <!-- LLM Calls -->
+        <lex-card style="margin-bottom:1.5rem;">
+          <h3 class="text-base font-semibold lex-text-primary mb-4">LLM Calls</h3>
+          <div id="llmCallsContainer" class="space-y-4">
+            <p class="text-sm lex-text-tertiary">No LLM calls recorded</p>
+          </div>
+        </lex-card>
+
+        <!-- RAG Retrievals -->
+        <lex-card style="margin-bottom:1.5rem;">
+          <h3 class="text-base font-semibold lex-text-primary mb-4">RAG Retrievals</h3>
+          <div id="ragRetrievalsContainer" class="space-y-4">
+            <p class="text-sm lex-text-tertiary">No RAG retrievals recorded</p>
+          </div>
+        </lex-card>
+
+        <!-- SSE Events -->
+        <lex-card>
+          <h3 class="text-base font-semibold lex-text-primary mb-4">SSE Events</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr style="border-bottom:1px solid var(--lex-border-default);">
+                  <th class="px-4 py-2 text-left text-xs font-medium lex-text-tertiary uppercase">Event Type</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium lex-text-tertiary uppercase">Timestamp</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium lex-text-tertiary uppercase">Data</th>
+                </tr>
+              </thead>
+              <tbody id="sseEventsContainer">
+                <tr>
+                  <td colspan="3" class="px-4 py-4 text-sm lex-text-tertiary text-center">No SSE events recorded</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </lex-card>
+
+      </div>
+
+    </main>
+
+  </template>
+
+  <noscript>
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;color:#666;">
+      Please enable JavaScript to use LANA AI.
+    </div>
+  </noscript>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       Scripts at end of body — HTML renders first, scripts load after
+       ══════════════════════════════════════════════════════════════════ -->
+
+  <!-- Universal shell scripts -->
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/version.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/navigation-helpers.js"></script>
+  <script src="../js/new-project-modal.js"></script>
+  <script src="../js/conversation-menu.js"></script>
+  <script src="../js/conversation-search-modal.js"></script>
+  <script src="../js/contact-search-modal.js"></script>
+  <script src="../js/notifications.js"></script>
+
+  <!-- Lex UI core -->
+  <script src="../js/lex/lex.core.js"></script>
+  <script src="../js/lex/lex.icons.js"></script>
+  <script src="../js/lex/lex.data.js"></script>
+  <script src="../js/lex/lex.forms.js"></script>
+  <script src="../js/lex/lex.state.js"></script>
+  <script src="../js/lex/lex.utils.js"></script>
+  <script src="../js/lex/lex.auth.js"></script>
+  <script src="../js/lex/lex-nav.js"></script>
+
+  <!-- Lex UI foundation + layout -->
+  <script src="../js/lex/components/foundation/lex-loader.js"></script>
+  <script src="../js/lex/components/foundation/lex-toast.js"></script>
+  <script src="../js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="../js/lex/components/foundation/lex-btn.js"></script>
+  <script src="../js/lex/components/foundation/lex-empty.js"></script>
+  <script src="../js/lex/components/form/lex-segmented.js"></script>
+  <script src="../js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="../js/lex/components/layout/lex-topbar.js"></script>
+  <script src="../js/lex/components/layout/lex-conversation-item.js"></script>
+  <script src="../js/lex/components/layout/lex-notification-panel.js"></script>
+  <script src="../js/lex/components/layout/lex-app.js"></script>
+
+  <!-- Page-specific Lex components (BEFORE inject) -->
+  <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
+  <script src="../js/lex/components/foundation/lex-banner.js"></script>
+  <script src="../js/lex/components/foundation/lex-card.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/data/lex-table.js"></script>
+  <script src="../js/lex/components/form/lex-select.js"></script>
+  <script src="../js/lex/components/form/lex-input.js"></script>
+
+  <!-- Inject page content + hoist modals -->
+  <script src="../js/lex/lex-page-init.js"></script>
+
+  <!-- Page controller -->
+  <script src="../js/admin/admin-traces.js"></script>
+
+  <!-- Auth guard + loader dismiss (MUST be last) -->
+  <script src="../js/auth-guard.js"></script>
+</body>
+</html>

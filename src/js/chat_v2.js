@@ -40,6 +40,9 @@
   // Poll interval for waiting on conversation creation
   var _pollInterval = null;
 
+  // Generation banner duration ticker (Gap 1)
+  var _generationDurationInterval = null;
+
   // Guard against double enterActive() calls
   var _enterActiveInvoked = false;
 
@@ -76,6 +79,17 @@
     dom.messagesArea      = document.getElementById('cv2-messages-area');
     dom.stageCenterEl     = document.getElementById('cv2-stage-center');
     dom.app               = document.querySelector('lex-app');
+    // Gap 1 — generation banner
+    dom.generationBanner  = document.getElementById('cv2-generation-banner');
+    dom.generationDuration = document.getElementById('cv2-generation-duration');
+    dom.stopGenerationBtn = document.getElementById('cv2-stop-generation-btn');
+    // Gap 3 — context meter
+    dom.contextMeter      = document.getElementById('cv2-context-meter');
+    dom.contextText       = document.getElementById('cv2-context-text');
+    // Gap 4 — compaction banner
+    dom.compactBanner     = document.getElementById('cv2-compact-banner');
+    // Gap 5 — followup chip row
+    dom.followupChips     = document.getElementById('cv2-followup-chips');
   }
 
   // =========================================================================
@@ -472,6 +486,11 @@
     }
 
     dom.messagesArea.appendChild(chatEl);
+
+    // Reset context meter and clear any stale followup chips for the new conversation
+    resetContextMeter();
+    clearFollowupChips();
+
     wireChatEvents(chatEl);
 
     // Add intent suggestions to the composer after lex-chat builds its DOM
@@ -532,6 +551,10 @@
     }
 
     dom.messagesArea.appendChild(chatEl);
+
+    // Reset context meter and clear any stale followup chips for the new conversation
+    resetContextMeter();
+    clearFollowupChips();
 
     // Wire all lex-chat events
     wireChatEvents(chatEl);
@@ -619,10 +642,37 @@
       }
     });
 
-    // Context usage — log for V1
+    // Gap 3 — Context meter: update display on every context_usage event.
     listen('lex-chat-context-usage', function (e) {
       var detail = e.detail || {};
-      console.log('[chat_v2] Context usage:', detail.percentUsed + '% used');
+      updateContextMeter(detail.percentUsed, detail.percentUntilCompact);
+    });
+
+    // Gap 4 — Auto-compaction: dedicated events from lex-chat.js.
+    listen('lex-chat-auto-compact-start', function () {
+      if (dom.compactBanner) dom.compactBanner.style.display = '';
+      // Disable composer send while compacting
+      var composerEl = chatEl.querySelector('lex-chat-composer');
+      if (composerEl && typeof composerEl.setGenerating === 'function') {
+        composerEl.setGenerating(true);
+      }
+    });
+
+    listen('lex-chat-auto-compact-complete', function (e) {
+      var detail = e.detail || {};
+      if (dom.compactBanner) dom.compactBanner.style.display = 'none';
+      var composerEl = chatEl.querySelector('lex-chat-composer');
+      if (composerEl && typeof composerEl.setGenerating === 'function') {
+        composerEl.setGenerating(false);
+      }
+      var saved = detail.tokensSaved;
+      var dur   = detail.durationMs;
+      if (saved || dur) {
+        var msg = 'Context optimised';
+        if (saved) msg += ' — saved ' + (saved > 999 ? (saved / 1000).toFixed(1) + 'K' : saved) + ' tokens';
+        if (dur)   msg += ' in ' + (dur / 1000).toFixed(1) + 's';
+        showSuccessToast(msg);
+      }
     });
 
     // Response end — feature tracking
@@ -679,43 +729,64 @@
         });
     });
 
-    // Agentic followup — display followup suggestions in thread
+    // Gap 5 — Agentic followup: render suggestion chips above the composer.
     listen('lex-chat-agentic-followup', function (e) {
       var detail = e.detail || {};
-      var followups = detail.followups || [];
+      var followups = detail.followups || detail.options || [];
       var message = detail.message || '';
       if (followups.length === 0 && !message) return;
+      showFollowupChips(followups, message, chatEl);
+    });
 
-      // Build a system-level message with followup buttons
-      var html = '';
-      if (message) {
-        html += '<div style="margin-bottom: 8px; color: var(--lex-text-secondary); font-size: var(--lex-body-sm-size);">' + escapeHtml(message) + '</div>';
+    // Gap 5 — Clear chips on next user send.
+    listen('lex-chat-send', function () {
+      clearFollowupChips();
+    });
+
+    // #-mention JIT processing — scan outgoing message for #filename refs and
+    // trigger background document processing for any that aren't parsed yet.
+    // Fire-and-forget: never blocks the send, mirrors legacy chat.js:1516-1590.
+    listen('lex-chat-send', function (e) {
+      var content = (e.detail && e.detail.content) || '';
+      handleDocumentMentions(content);
+    });
+
+    // Gap 1 — Generation banner: fires when loadConversation() detects an in-flight
+    // generation on the backend (e.g. user reloaded mid-stream or switched tabs).
+    // lex-chat.js uses dispatchEvent() directly (not emit()), so the event still
+    // reaches addEventListener on the same element.
+    listen('lex-chat-generation-active', function (e) {
+      var detail = e.detail || {};
+      if (detail.active) {
+        showGenerationBanner(detail.startedAt || new Date().toISOString());
+      } else {
+        hideGenerationBanner();
       }
+    });
 
-      for (var i = 0; i < followups.length; i++) {
-        var f = followups[i];
-        html += '<lex-btn variant="outline" size="sm" style="margin: 4px 4px 4px 0;" data-followup-idx="' + i + '">';
-        html += escapeHtml(f.description || f.label || f.entity_type || 'Follow up');
-        html += '</lex-btn>';
-      }
+    // Wire stop button (one-time, not via listen() since it's not on chatEl)
+    if (dom.stopGenerationBtn) {
+      dom.stopGenerationBtn.onclick = function () {
+        hideGenerationBanner();
+        if (chatEl && typeof chatEl.stop === 'function') chatEl.stop();
+      };
+    }
 
-      // Add the followup card as a system message in the thread
-      var threadEl = chatEl.querySelector('lex-chat-thread');
-      if (threadEl && typeof threadEl.addMessage === 'function') {
-        threadEl.addMessage('system', html);
-      }
+    // Gap 1 — Also hide banner when a response ends normally.
+    listen('lex-chat-response-end', function () {
+      hideGenerationBanner();
+    });
 
-      // Wire followup button clicks to send as new message
-      var followupBtns = chatEl.querySelectorAll('[data-followup-idx]');
-      for (var j = 0; j < followupBtns.length; j++) {
-        followupBtns[j].addEventListener('click', function (evt) {
-          var idx = parseInt(evt.currentTarget.getAttribute('data-followup-idx'), 10);
-          var fu = followups[idx];
-          if (fu && typeof chatEl.send === 'function') {
-            var prompt = fu.description || fu.label || 'Yes, proceed';
-            chatEl.send(prompt);
-          }
-        });
+    // Gap 2 — Session expired: lex-chat-error detail now includes `status` from the
+    // underlying SSE source. 401 → clear token + redirect to login.
+    listen('lex-chat-error', function (e) {
+      var detail = e.detail || {};
+      if (detail.status === 401) {
+        try { localStorage.removeItem('token'); } catch (_) {}
+        showErrorToast('Your session has expired. Please log in again.');
+        setTimeout(function () {
+          window.location.href = 'index.html';
+        }, 1500);
       }
     });
 
@@ -851,6 +922,181 @@
   }
 
   // =========================================================================
+  // Gap 1 — Generation banner helpers
+  // =========================================================================
+
+  /**
+   * Show the generation banner and start the duration ticker.
+   * @param {string} startedAt  ISO timestamp from the backend status response.
+   */
+  function showGenerationBanner(startedAt) {
+    if (!dom.generationBanner) return;
+    dom.generationBanner.style.display = 'flex';
+
+    function updateDuration() {
+      if (!dom.generationDuration) return;
+      var seconds = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
+      if (seconds < 60) {
+        dom.generationDuration.textContent = seconds + (seconds === 1 ? ' second ago' : ' seconds ago');
+      } else {
+        var mins = Math.floor(seconds / 60);
+        dom.generationDuration.textContent = mins + (mins === 1 ? ' minute ago' : ' minutes ago');
+      }
+    }
+
+    updateDuration();
+    clearInterval(_generationDurationInterval);
+    _generationDurationInterval = setInterval(updateDuration, 1000);
+  }
+
+  /**
+   * Hide the generation banner and clear the duration ticker.
+   */
+  function hideGenerationBanner() {
+    if (dom.generationBanner) dom.generationBanner.style.display = 'none';
+    clearInterval(_generationDurationInterval);
+    _generationDurationInterval = null;
+  }
+
+  // =========================================================================
+  // Gap 3 — Context meter helpers
+  // =========================================================================
+
+  /**
+   * Show the context meter in the header area and update its text.
+   * @param {number} percentUsed         0-100, percentage of context window consumed.
+   * @param {number|null} percentUntilCompact  percentage remaining before auto-compact triggers.
+   */
+  function updateContextMeter(percentUsed, percentUntilCompact) {
+    if (!dom.contextText) return;
+    var available = Math.max(0, 100 - (percentUsed || 0));
+    if (percentUntilCompact != null) {
+      dom.contextText.textContent = 'Context available: ' + available + '% (' + percentUntilCompact + '% until auto-compact)';
+    } else {
+      dom.contextText.textContent = 'Context available: ' + available + '%';
+    }
+    if (dom.contextMeter) dom.contextMeter.style.display = 'block';
+    console.log('[chat_v2] Context usage:', percentUsed + '% used');
+  }
+
+  /**
+   * Reset context meter to the default 100% display and hide it.
+   * Called when a new conversation loads.
+   */
+  function resetContextMeter() {
+    if (dom.contextText) dom.contextText.textContent = 'Context available: 100% (85% until auto-compact)';
+    if (dom.contextMeter) dom.contextMeter.style.display = 'none';
+  }
+
+  // =========================================================================
+  // #-mention JIT processing
+  // =========================================================================
+
+  /**
+   * Scan an outgoing message for `#filename` tokens and trigger background
+   * document processing for any matched documents that aren't parsed yet.
+   * Fire-and-forget — never blocks the user's message.
+   */
+  function handleDocumentMentions(message) {
+    if (!message || typeof message !== 'string') return;
+    var mentions = message.match(/#([a-zA-Z0-9_\-\.]+)/g);
+    if (!mentions || mentions.length === 0) return;
+    if (!window.ChatFileDrawer || typeof window.ChatFileDrawer.getMentionItems !== 'function') return;
+    if (!window.api || typeof window.api.triggerDocumentProcessing !== 'function') return;
+
+    var docs = window.ChatFileDrawer.getMentionItems() || [];
+    if (docs.length === 0) return;
+
+    var seen = {};
+    for (var i = 0; i < mentions.length; i++) {
+      var filename = mentions[i].substring(1);
+      if (seen[filename]) continue;
+      seen[filename] = true;
+
+      var doc = findDocByFilename(docs, filename);
+      if (!doc) continue;
+
+      (function (d, name) {
+        window.api.getDocumentProcessingStatus(d.id)
+          .then(function (status) {
+            if (status && status.stage !== 'pending' && status.hasExtractedText) return null;
+            return window.api.triggerDocumentProcessing(d.id, 'chat_reference')
+              .then(function () { return window.api.pollDocumentProcessing(d.id); })
+              .then(function () {
+                showSuccessToast('Document "' + name + '" processed and ready');
+              });
+          })
+          .catch(function (err) {
+            console.error('[chat_v2] JIT processing failed for ' + name + ':', err);
+          });
+      })(doc, filename);
+    }
+  }
+
+  function findDocByFilename(docs, filename) {
+    var lower = filename.toLowerCase();
+    for (var i = 0; i < docs.length; i++) {
+      var d = docs[i];
+      var name = (d.filename || d.name || '').toLowerCase();
+      if (name === lower) return d;
+    }
+    // Fallback: prefix match (handles truncated mentions)
+    for (var j = 0; j < docs.length; j++) {
+      var d2 = docs[j];
+      var n2 = (d2.filename || d2.name || '').toLowerCase();
+      if (n2.indexOf(lower) === 0) return d2;
+    }
+    return null;
+  }
+
+  // =========================================================================
+  // Gap 5 — Followup chip helpers
+  // =========================================================================
+
+  /**
+   * Render followup suggestion chips above the composer and wire click handlers.
+   * @param {Array}  followups  Array of followup objects from agentic_followup.
+   * @param {string} message    Optional header message to display above chips.
+   * @param {HTMLElement} chatEl  The lex-chat element (for chatEl.send()).
+   */
+  function showFollowupChips(followups, message, chatEl) {
+    if (!dom.followupChips) return;
+    dom.followupChips.innerHTML = '';
+
+    if (message) {
+      var label = document.createElement('span');
+      label.style.cssText = 'width:100%;font-size:var(--lex-body-sm-size,13px);color:var(--lex-text-secondary);margin-bottom:4px;';
+      label.textContent = message;
+      dom.followupChips.appendChild(label);
+    }
+
+    for (var i = 0; i < followups.length; i++) {
+      (function (fu) {
+        var chip = document.createElement('button');
+        chip.style.cssText = 'padding:5px 12px;font-size:var(--lex-body-sm-size,13px);color:var(--lex-text-primary);background:var(--lex-bg-tertiary);border:1px solid var(--lex-border-default);border-radius:var(--lex-radius-full,9999px);cursor:pointer;transition:background var(--lex-transition-fast);white-space:nowrap;';
+        chip.textContent = fu.description || fu.label || fu.entity_type || 'Follow up';
+        chip.addEventListener('mouseenter', function () { chip.style.background = 'var(--lex-bg-secondary)'; });
+        chip.addEventListener('mouseleave', function () { chip.style.background = 'var(--lex-bg-tertiary)'; });
+        chip.addEventListener('click', function () {
+          clearFollowupChips();
+          var prompt = fu.description || fu.label || 'Yes, proceed';
+          if (chatEl && typeof chatEl.send === 'function') chatEl.send(prompt);
+        });
+        dom.followupChips.appendChild(chip);
+      })(followups[i]);
+    }
+
+    dom.followupChips.style.display = 'flex';
+  }
+
+  /** Hide and empty the followup chip row. */
+  function clearFollowupChips() {
+    if (!dom.followupChips) return;
+    dom.followupChips.style.display = 'none';
+    dom.followupChips.innerHTML = '';
+  }
+
+  // =========================================================================
   // Cleanup helpers
   // =========================================================================
 
@@ -868,6 +1114,12 @@
     // Remove lex-chat from DOM (triggers disconnected() for SSE cleanup)
     dom.messagesArea.innerHTML = '';
     dom.messagesArea.classList.remove('cv2-visible');
+
+    // Hide banners, clear generation ticker, reset context meter and chips
+    hideGenerationBanner();
+    if (dom.compactBanner) dom.compactBanner.style.display = 'none';
+    resetContextMeter();
+    clearFollowupChips();
 
     // Reset guards
     _enterActiveInvoked = false;
@@ -1213,6 +1465,8 @@
       clearInterval(_pollInterval);
       _pollInterval = null;
     }
+    // Ensure generation duration ticker is cleared (safety net)
+    hideGenerationBanner();
     // Clean up ACTIVE stage (lex-chat, event listeners)
     cleanupActiveStage();
     // Remove workspace details button
