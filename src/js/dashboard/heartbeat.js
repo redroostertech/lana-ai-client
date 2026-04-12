@@ -320,7 +320,10 @@
 
   function startHeartbeatPolling(intervalsArray) {
     pollHeartbeat();
-    _heartbeatInterval = setInterval(pollHeartbeat, 60000);
+    _heartbeatInterval = setInterval(function () {
+      if (document.visibilityState === 'hidden') return;
+      pollHeartbeat();
+    }, 60000);
     if (intervalsArray) intervalsArray.push(_heartbeatInterval);
   }
 

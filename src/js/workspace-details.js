@@ -2286,7 +2286,10 @@
       var oldIdx = _intervals.indexOf(commentPollInterval);
       if (oldIdx !== -1) _intervals.splice(oldIdx, 1);
     }
-    commentPollInterval = trackInterval(setInterval(function () { loadComments(matter.matter_id); }, 30000));
+    commentPollInterval = trackInterval(setInterval(function () {
+      if (document.visibilityState === 'hidden') return;
+      loadComments(matter.matter_id);
+    }, 30000));
   }
 
   async function _loadMentionableUsers(matterId) {

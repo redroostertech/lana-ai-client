@@ -703,8 +703,10 @@
       // Initial check
       this._checkNotifications();
 
-      // Poll every 60 seconds
+      // Poll every 60 seconds — but skip when tab is hidden to reduce
+      // request volume on memory-constrained machines (GAP-PERF.2 fix)
       this._notificationInterval = setInterval(() => {
+        if (document.visibilityState === 'hidden') return;
         this._checkNotifications();
       }, 60000);
     }
@@ -789,8 +791,9 @@
       var self = this;
       this._reachabilityTimer = setTimeout(function () {
         self._checkReachability();
-        // Then poll every 30 seconds
+        // Then poll every 30 seconds — skip when tab is hidden (GAP-PERF.2 fix)
         self._reachabilityInterval = setInterval(function () {
+          if (document.visibilityState === 'hidden') return;
           self._checkReachability();
         }, 30000);
       }, 5000);
