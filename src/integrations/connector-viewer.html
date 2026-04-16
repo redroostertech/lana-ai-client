@@ -5,16 +5,112 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Connector - LANA AI</title>
 
-  <!-- CSS + Tailwind in head — behavioral scripts at end of body -->
   <link rel="stylesheet" href="../css/lex-tokens.css">
   <link rel="stylesheet" href="../css/components.css">
   <link rel="stylesheet" href="../css/tailwind-output.css">
   <script src="../js/tailwind-loader.js"></script>
 
+  <style>
+    .connector-tab.active {
+      border-color: #2563eb;
+      color: #2563eb;
+      background: #eff6ff;
+    }
+
+    .connector-tabpane {
+      display: none;
+    }
+
+    .connector-tabpane.active {
+      display: block;
+    }
+
+    .connector-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 1rem;
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    }
+
+    .connector-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #6b7280;
+    }
+
+    .connector-value {
+      color: #111827;
+    }
+
+    .connector-mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .docs-frame {
+      min-height: 70vh;
+    }
+
+    .docs-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      border-radius: 9999px;
+      padding: 0.25rem 0.75rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-green {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .badge-yellow {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .badge-red {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .badge-slate {
+      background: #e5e7eb;
+      color: #334155;
+    }
+
+    .output-layout {
+      display: grid;
+      gap: 1.5rem;
+    }
+
+    .output-sidebar,
+    .output-main {
+      min-width: 0;
+    }
+
+    @media (min-width: 1024px) {
+      .output-layout {
+        grid-template-columns: 340px minmax(0, 1fr);
+        align-items: start;
+      }
+
+      .output-sidebar {
+        position: sticky;
+        top: 1.5rem;
+      }
+    }
+  </style>
 </head>
 <body>
-
-  <!-- Branded loader -->
   <lex-loader theme="light"></lex-loader>
 
   <lex-app
@@ -23,416 +119,290 @@
     logo-href="../dashboard.html"
     active-nav-id="connectors"
     page-title="Connector"
+    chrome="embedded"
+    back-href="../data-connectors.html"
   ></lex-app>
 
   <template id="page-content">
+    <main class="p-4 lg:p-8">
+      <lex-breadcrumb id="connectorBreadcrumb" items='[{"label":"Data Connectors","href":"data-connectors.html"},{"label":"Connector"}]'></lex-breadcrumb>
 
-    <lex-breadcrumb id="connectorBreadcrumb" items='[{"label":"Data Connectors","href":"data-connectors.html"},{"label":"Connector"}]'></lex-breadcrumb>
+      <div id="pageAlert" class="hidden mb-6 rounded-2xl border px-4 py-3 text-sm"></div>
 
-    <!-- Connector UI iframe container -->
-    <div id="iframe-container" class="fixed inset-0 lg:ml-64 flex flex-col" style="top: 105px;">
-      <!-- Loading Overlay -->
-      <div id="loading-overlay" class="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center z-10 transition-opacity">
-        <div class="text-center">
-          <div class="spinner w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
-          <p class="text-white text-lg font-medium">Loading connector...</p>
+      <div id="viewerLoading" class="flex items-center justify-center py-20">
+        <div class="flex items-center gap-3 text-gray-600">
+          <div class="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600"></div>
+          <span>Loading connector workspace...</span>
         </div>
       </div>
 
-      <!-- Error Screen -->
-      <div id="error-screen" class="hidden absolute inset-0 bg-white flex items-center justify-center z-10">
-        <div class="max-w-md text-center px-6">
-          <svg class="w-16 h-16 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div id="viewerError" class="hidden connector-card p-10 text-center">
+        <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-100 text-red-600">
+          <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
           </svg>
-          <h2 class="text-2xl font-bold text-gray-900 mb-2">Failed to Load Connector</h2>
-          <p class="text-gray-600 mb-6" id="error-message">An error occurred while loading the connector UI.</p>
-          <button onclick="goBack()" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">
-            Back to Connectors
-          </button>
         </div>
+        <h2 class="mb-2 text-xl font-semibold text-gray-900">Failed to load connector</h2>
+        <p id="viewerErrorMessage" class="mx-auto max-w-2xl text-sm text-gray-600"></p>
       </div>
 
-      <!-- Connector UI iframe -->
-      <iframe
-        id="connector-frame"
-        class="w-full h-full border-0"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
-        allow="clipboard-read; clipboard-write"
-      ></iframe>
-    </div>
+      <div id="viewerContent" class="hidden space-y-6">
+        <section class="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          <div class="connector-card p-5">
+            <div class="connector-label">Setup</div>
+            <div id="setupStatus" class="mt-3"></div>
+            <div id="setupMessage" class="mt-3 text-sm text-gray-500"></div>
+          </div>
+          <div class="connector-card p-5">
+            <div class="connector-label">Authentication</div>
+            <div id="authStatus" class="mt-3 text-xl font-semibold text-gray-900">-</div>
+            <div id="authType" class="mt-2 text-sm text-gray-500">-</div>
+          </div>
+          <div class="connector-card p-5">
+            <div class="connector-label">Last Sync</div>
+            <div id="lastSyncStatus" class="mt-3 text-xl font-semibold text-gray-900">Never</div>
+            <div id="lastSyncTime" class="mt-2 text-sm text-gray-500">No sync recorded</div>
+          </div>
+          <div class="connector-card p-5">
+            <div class="connector-label">Records Synced</div>
+            <div id="recordsSynced" class="mt-3 text-xl font-semibold text-gray-900">0</div>
+            <div id="entityCountSummary" class="mt-2 text-sm text-gray-500">No connector data yet</div>
+          </div>
+        </section>
 
-    <style>
-      #loading-overlay.hidden {
-        opacity: 0;
-        pointer-events: none;
-      }
-      #error-screen.show {
-        display: flex !important;
-      }
-      @keyframes spin {
-        to { transform: rotate(360deg); }
-      }
-      .animate-spin {
-        animation: spin 1s linear infinite;
-      }
-    </style>
+        <section class="connector-card overflow-hidden">
+          <div class="border-b border-gray-200 px-4">
+            <nav id="tabNav" class="flex flex-wrap gap-2 py-3">
+              <button type="button" class="connector-tab rounded-full border border-transparent px-4 py-2 text-sm font-medium text-gray-600 transition" data-tab="overview">Overview</button>
+              <button type="button" class="connector-tab rounded-full border border-transparent px-4 py-2 text-sm font-medium text-gray-600 transition" data-tab="configuration">Configuration</button>
+              <button type="button" class="connector-tab rounded-full border border-transparent px-4 py-2 text-sm font-medium text-gray-600 transition" data-tab="run">Run</button>
+              <button type="button" class="connector-tab rounded-full border border-transparent px-4 py-2 text-sm font-medium text-gray-600 transition" data-tab="data">Output</button>
+              <button type="button" class="connector-tab rounded-full border border-transparent px-4 py-2 text-sm font-medium text-gray-600 transition" data-tab="logs">Execution Logs</button>
+              <button type="button" class="connector-tab rounded-full border border-transparent px-4 py-2 text-sm font-medium text-gray-600 transition" data-tab="docs">Documentation</button>
+            </nav>
+          </div>
 
-    <main class="hidden p-4 lg:p-8">
-      <!-- Original dashboard content hidden -->
+          <div class="p-6">
+            <section id="tab-overview" class="connector-tabpane space-y-6">
+              <div id="overviewContent" class="space-y-8"></div>
+            </section>
 
-      <!-- Global Search Bar -->
-      <div id="globalSearchSection" class="mb-8 hidden">
-        <div class="relative max-w-3xl mx-auto">
-          <input
-            type="text"
-            id="globalSearchInput"
-            class="w-full px-6 py-4 text-lg border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-lg bg-white text-gray-900"
-            placeholder="Search across all your connected data sources..."
-            autocomplete="off"
-            onkeypress="if(event.key==='Enter'){const q=document.getElementById('globalSearchInput').value; if(q.trim()) window.location.href='search-results.html?q='+encodeURIComponent(q);}"
-          />
-          <button
-            type="button"
-            class="absolute right-2 top-1/2 transform -translate-y-1/2 bg-indigo-600 text-white px-6 py-2 rounded-full hover:bg-indigo-700 transition-colors"
-            onclick="const q=document.getElementById('globalSearchInput').value; if(q.trim()) window.location.href='search-results.html?q='+encodeURIComponent(q);"
-          >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-            </svg>
-          </button>
-        </div>
-        <p class="text-center mt-3 text-sm text-gray-500">
-          Powered by AI semantic search • Search across ActionStep, SharePoint, Google Drive, and more
-        </p>
-      </div>
+            <section id="tab-configuration" class="connector-tabpane space-y-6">
+              <div id="apiConnectionPanel" class="rounded-2xl border border-gray-200 p-5"></div>
 
-      <!-- Stats Grid - Loading State -->
-      <div id="statsLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
-          <div class="flex items-center justify-between mb-4">
-            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
-          </div>
-          <div class="h-8 bg-gray-200 rounded w-16 mb-2"></div>
-          <div class="h-4 bg-gray-200 rounded w-24"></div>
-        </div>
-        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
-          <div class="flex items-center justify-between mb-4">
-            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
-          </div>
-          <div class="h-8 bg-gray-200 rounded w-12 mb-2"></div>
-          <div class="h-4 bg-gray-200 rounded w-20"></div>
-        </div>
-        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
-          <div class="flex items-center justify-between mb-4">
-            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
-          </div>
-          <div class="h-8 bg-gray-200 rounded w-14 mb-2"></div>
-          <div class="h-4 bg-gray-200 rounded w-20"></div>
-        </div>
-        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 animate-pulse">
-          <div class="flex items-center justify-between mb-4">
-            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
-          </div>
-          <div class="h-8 bg-gray-200 rounded w-20 mb-2"></div>
-          <div class="h-4 bg-gray-200 rounded w-24"></div>
-        </div>
-      </div>
+              <div class="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+                <form id="configForm" class="space-y-5 rounded-2xl border border-gray-200 p-5"></form>
 
-      <!-- Stats Grid - Content -->
-      <div id="statsContent" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-          <div class="flex items-center justify-between mb-4">
-            <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
-              </svg>
-            </div>
-          </div>
-          <h3 class="text-2xl font-bold text-gray-900" id="statMatters">-</h3>
-          <p class="text-gray-500 text-sm" id="statMattersLabel">My Matters</p>
-          <div id="mattersBreakdown" class="mt-3 pt-3 border-t border-gray-200 text-xs text-gray-600 hidden">
-            <span id="mattersBreakdownText"></span>
-          </div>
-        </div>
+                <div class="space-y-5">
+                  <div class="rounded-2xl border border-gray-200 p-5">
+                    <div class="connector-label">Sync Settings</div>
+                    <div class="mt-4 space-y-4">
+                      <div>
+                        <label for="syncFrequency" class="mb-2 block text-sm font-medium text-gray-700">Sync Frequency</label>
+                        <select id="syncFrequency" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                          <option value="manual">Manual</option>
+                          <option value="hourly">Hourly</option>
+                          <option value="daily">Daily</option>
+                          <option value="weekly">Weekly</option>
+                        </select>
+                      </div>
+                      <div id="scheduledTimeGroup" class="hidden">
+                        <label for="scheduledSyncTime" class="mb-2 block text-sm font-medium text-gray-700">Scheduled Time</label>
+                        <input id="scheduledSyncTime" type="time" step="1" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                      </div>
+                    </div>
+                  </div>
 
-        <div id="statUsersCard" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 hidden">
-          <div class="flex items-center justify-between mb-4">
-            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
-              </svg>
-            </div>
-          </div>
-          <h3 class="text-2xl font-bold text-gray-900" id="statUsers">-</h3>
-          <p class="text-gray-500 text-sm">Total Users</p>
-          <div id="userBreakdown" class="mt-3 pt-3 border-t border-gray-200 text-xs text-gray-600 space-y-1 hidden">
-            <div class="flex justify-between">
-              <span>Active:</span>
-              <span id="activeUsers" class="font-medium text-gray-900">-</span>
-            </div>
-            <div class="flex justify-between">
-              <span>Other:</span>
-              <span id="otherUsers" class="font-medium text-gray-600">-</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-          <div class="flex items-center justify-between mb-4">
-            <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-              <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-              </svg>
-            </div>
-          </div>
-          <h3 class="text-2xl font-bold text-gray-900" id="statDocuments">-</h3>
-          <p class="text-gray-500 text-sm">Documents</p>
-          <div id="documentBreakdown" class="mt-3 pt-3 border-t border-gray-200 text-xs text-gray-600 space-y-1 hidden">
-            <div class="flex justify-between">
-              <span>Active:</span>
-              <span id="activeDocuments" class="font-medium text-gray-900">-</span>
-            </div>
-            <div class="flex justify-between">
-              <span>Marked for deletion:</span>
-              <span id="deletedDocuments" class="font-medium text-orange-600">-</span>
-            </div>
-          </div>
-        </div>
-
-        <div id="statStorageCard" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 hidden">
-          <div class="flex items-center justify-between mb-4">
-            <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-              <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path>
-              </svg>
-            </div>
-          </div>
-          <h3 class="text-2xl font-bold text-gray-900" id="statStorage">-</h3>
-          <p class="text-gray-500 text-sm">Storage Used <span id="storageUsagePercent" class="font-semibold"></span></p>
-          <div id="storageBreakdown" class="mt-3 pt-3 border-t border-gray-200 text-xs text-gray-600 space-y-1 hidden">
-            <div class="flex justify-between">
-              <span>Database:</span>
-              <span id="databaseStorage" class="font-medium text-gray-900">-</span>
-            </div>
-            <div id="volumeStorageList" class="space-y-1">
-              <!-- Volume items will be added dynamically -->
-            </div>
-          </div>
-          <div class="mt-3 pt-3 border-t border-gray-200">
-            <a href="admin/health.html" class="inline-flex items-center justify-center w-full px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
-              View details
-            </a>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- User Productivity Widget (Full Width) -->
-      <div id="userProductivityWidget" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-8">
-        <div class="mb-4">
-          <div class="flex items-start justify-between gap-4">
-            <div class="flex items-start gap-2">
-              <div>
-                <h3 class="text-lg font-semibold text-gray-900">Activity Overview</h3>
-                <p class="text-sm text-gray-500 mt-1">Last 90 days of organization activity</p>
+                  <div class="rounded-2xl border border-gray-200 bg-gray-50 p-5">
+                    <div class="connector-label">Current Status</div>
+                    <div id="configStatusSummary" class="mt-4 space-y-3 text-sm text-gray-700"></div>
+                  </div>
+                </div>
               </div>
-              <div class="flex-shrink-0">
-                <button id="activityHeatmapInfoBtn" type="button" class="p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors" aria-label="How to read the heatmap" title="How to read the heatmap">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
-                    <circle cx="12" cy="12" r="10"/>
-                    <path d="M12 16v-4M12 8h.01"/>
-                  </svg>
+            </section>
+
+            <section id="tab-run" class="connector-tabpane space-y-6">
+              <div id="runTabContent" class="space-y-6"></div>
+            </section>
+
+            <section id="tab-data" class="connector-tabpane space-y-6">
+              <div class="output-layout">
+                <aside class="output-sidebar space-y-6">
+                  <div class="rounded-2xl border border-gray-200 p-5">
+                    <div class="flex flex-wrap items-start justify-between gap-4">
+                      <div>
+                        <div class="connector-label">Data Filters</div>
+                        <div class="mt-2 text-sm text-gray-500">Use broad search plus field rules to narrow synced connector data the way analytics tools do.</div>
+                      </div>
+                      <div class="flex flex-wrap gap-2">
+                        <button type="button" onclick="addDataRule()" class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                          Add Rule
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="mt-5 space-y-5">
+                      <label class="block">
+                        <div class="mb-2 text-sm font-medium text-gray-900">Search Everything</div>
+                        <input id="dataSearchInput" type="search" placeholder="Search IDs, names, emails, payload text..." class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                      </label>
+
+                      <label class="block">
+                        <div class="mb-2 text-sm font-medium text-gray-900">Entity Type</div>
+                        <select id="entityTypeFilter" onchange="refreshDataPreview()" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                          <option value="">All entity types</option>
+                        </select>
+                      </label>
+
+                      <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-1">
+                        <label class="block">
+                          <div class="mb-2 text-sm font-medium text-gray-900">Sort By</div>
+                          <select id="dataSortBy" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                            <option value="synced_at">Last Synced</option>
+                            <option value="source_created_at">Source Created</option>
+                            <option value="source_updated_at">Source Updated</option>
+                            <option value="entity_type">Entity Type</option>
+                            <option value="external_id">External ID</option>
+                            <option value="annotation_count">Annotations</option>
+                          </select>
+                        </label>
+                        <label class="block">
+                          <div class="mb-2 text-sm font-medium text-gray-900">Direction</div>
+                          <select id="dataSortDir" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                            <option value="desc">Descending</option>
+                            <option value="asc">Ascending</option>
+                          </select>
+                        </label>
+                      </div>
+
+                      <div id="dataRulesContainer" class="space-y-3"></div>
+
+                      <div class="flex flex-wrap gap-3">
+                        <button type="button" onclick="clearDataFilters()" class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                          Clear
+                        </button>
+                        <button type="button" onclick="applyDataFilters()" class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                          Apply Filters
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="rounded-2xl border border-gray-200 bg-gray-50 p-5">
+                    <div class="connector-label">Bulk Actions</div>
+                    <div class="mt-2 text-sm text-gray-500">Assign filtered or selected data to a matter, or shortlist records for correction without mutating the source snapshot.</div>
+
+                    <div class="mt-5 space-y-5">
+                      <label class="block">
+                        <div class="mb-2 text-sm font-medium text-gray-900">Assign To Matter</div>
+                        <select id="dataMatterSelect" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                          <option value="">Unassigned</option>
+                        </select>
+                      </label>
+
+                      <div class="space-y-3">
+                        <button type="button" onclick="assignSelectedToMatter()" class="w-full rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-white">
+                          Assign Selected
+                        </button>
+                        <button type="button" onclick="assignFilteredToMatter()" class="w-full rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-white">
+                          Assign Filtered Results
+                        </button>
+                        <button type="button" onclick="shortlistSelectedForEdit()" class="w-full rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600">
+                          Shortlist Selected For Edit
+                        </button>
+                      </div>
+
+                      <div id="bulkActionSummary" class="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-600"></div>
+                    </div>
+                  </div>
+
+                  <div id="dataGroupsPanel" class="rounded-2xl border border-gray-200 p-5"></div>
+                </aside>
+
+                <div class="output-main space-y-6">
+                  <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 p-4">
+                    <div>
+                      <div class="connector-label">Synced Data</div>
+                      <div id="dataPreviewMeta" class="mt-2 text-sm text-gray-500"></div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3">
+                      <button type="button" onclick="refreshDataPreview()" class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                        Refresh Data
+                      </button>
+                      <div id="selectedDataSummary" class="text-sm text-gray-500"></div>
+                    </div>
+                  </div>
+
+                  <div id="dataPreviewTable" class="overflow-x-auto rounded-2xl border border-gray-200"></div>
+                </div>
+              </div>
+              <div id="recordDetailBackdrop" class="hidden fixed inset-0 z-30 bg-slate-900/20 backdrop-blur-[1px]" onclick="closeRecordDetail()"></div>
+              <div id="recordDetailPanel" class="hidden fixed inset-y-0 right-0 z-40 w-full max-w-2xl overflow-y-auto border-l border-gray-200 bg-white shadow-2xl"></div>
+            </section>
+
+            <section id="tab-logs" class="connector-tabpane space-y-6">
+              <div class="flex flex-wrap items-center gap-3">
+                <button type="button" onclick="refreshLogs()" class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                  Refresh Logs
                 </button>
               </div>
-            </div>
-            <!-- User Filter Dropdown (Admins Only) -->
-            <div id="activityUserFilterContainer" class="hidden">
-              <select id="activityUserFilter" class="block w-64 rounded-lg border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500">
-                <option value="me">My Activity</option>
-                <option value="all">All Users</option>
-              </select>
-            </div>
-          </div>
-        </div>
 
-        <!-- Stats Summary - Simple GitHub-style -->
-        <div class="flex items-center gap-6 mb-6 text-sm text-gray-600">
-          <div>
-            <span id="totalActivities" class="font-semibold text-gray-900">-</span> activities in the last 90 days
-          </div>
-        </div>
+              <div id="logsMeta" class="text-sm text-gray-500"></div>
+              <div id="logsTable" class="overflow-x-auto rounded-2xl border border-gray-200"></div>
+            </section>
 
-        <!-- Side-by-side Layout: Heatmap + Recent Activity -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <section id="tab-docs" class="connector-tabpane space-y-6">
+              <div id="generatedDocsGuide" class="rounded-2xl border border-gray-200 bg-white p-5"></div>
 
-          <!-- Left: Activity Heatmap -->
-          <div class="flex flex-col">
-            <div id="activityHeatmapContainer" class="w-full min-w-0">
-              <!-- Heatmap will be rendered here -->
-            </div>
-          </div>
-
-          <!-- Right: Recent Activity -->
-          <div class="flex flex-col">
-            <div class="mb-4 flex items-center justify-between">
-              <h4 class="text-base font-semibold text-gray-900">Recent Activity</h4>
-              <div class="flex items-center gap-3">
-                <button id="refreshActivityFeedBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                  </svg>
-                </button>
-                <button id="viewAllActivityHeaderBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">View all</button>
+              <div class="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+                This tab loads the connector package in setup-guide mode. LANA keeps configuration, syncs, output, and logs in the shared shell while the embedded package contributes vendor-specific connection instructions.
               </div>
-            </div>
-            <!-- Activity Loading Skeleton -->
-            <div id="activityFeedLoading" class="divide-y divide-gray-100">
-              <div class="p-4 animate-pulse">
-                <div class="flex items-start gap-3">
-                  <div class="w-10 h-10 bg-gray-200 rounded-full flex-shrink-0"></div>
-                  <div class="flex-1">
-                    <div class="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                    <div class="h-3 bg-gray-200 rounded w-1/2 mb-2"></div>
-                    <div class="h-3 bg-gray-200 rounded w-24"></div>
+
+              <div id="docsEmpty" class="hidden rounded-2xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500">
+                No connector UI bundle is attached to this connector.
+              </div>
+
+              <div id="docsFrameShell" class="hidden relative overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                <div id="docsOverlay" class="docs-overlay absolute inset-0 z-10 flex items-center justify-center bg-white/90 transition-opacity">
+                  <div class="flex items-center gap-3 text-gray-600">
+                    <div class="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600"></div>
+                    <span>Loading connector documentation...</span>
                   </div>
                 </div>
-              </div>
-              <div class="p-4 animate-pulse">
-                <div class="flex items-start gap-3">
-                  <div class="w-10 h-10 bg-gray-200 rounded-full flex-shrink-0"></div>
-                  <div class="flex-1">
-                    <div class="h-4 bg-gray-200 rounded w-2/3 mb-2"></div>
-                    <div class="h-3 bg-gray-200 rounded w-1/3 mb-2"></div>
-                    <div class="h-3 bg-gray-200 rounded w-20"></div>
+                <div id="docsError" class="hidden absolute inset-0 z-10 flex items-center justify-center bg-white p-8 text-center">
+                  <div>
+                    <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600">
+                      <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                      </svg>
+                    </div>
+                    <p id="docsErrorMessage" class="text-sm text-gray-600"></p>
                   </div>
                 </div>
+                <iframe
+                  id="connector-frame"
+                  class="docs-frame h-full w-full border-0"
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+                  allow="clipboard-read; clipboard-write"
+                ></iframe>
               </div>
-              <div class="p-4 animate-pulse">
-                <div class="flex items-start gap-3">
-                  <div class="w-10 h-10 bg-gray-200 rounded-full flex-shrink-0"></div>
-                  <div class="flex-1">
-                    <div class="h-4 bg-gray-200 rounded w-4/5 mb-2"></div>
-                    <div class="h-3 bg-gray-200 rounded w-2/5 mb-2"></div>
-                    <div class="h-3 bg-gray-200 rounded w-28"></div>
-                  </div>
-                </div>
-              </div>
-              <div class="p-4 animate-pulse">
-                <div class="flex items-start gap-3">
-                  <div class="w-10 h-10 bg-gray-200 rounded-full flex-shrink-0"></div>
-                  <div class="flex-1">
-                    <div class="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
-                    <div class="h-3 bg-gray-200 rounded w-1/4 mb-2"></div>
-                    <div class="h-3 bg-gray-200 rounded w-16"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <!-- Activity Content -->
-            <div id="activityFeed" class="hidden divide-y divide-gray-100 max-h-96 overflow-y-auto">
-            </div>
+            </section>
           </div>
-
-        </div>
+        </section>
       </div>
-
     </main>
-  </div>
-
-  <!-- Overlay for mobile sidebar -->
-  <div id="sidebarOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden lg:hidden"></div>
-
-  <!-- Activity Heatmap Info Modal -->
-  <div id="activityHeatmapInfoModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 9999;" onclick="if(event.target === this) closeActivityHeatmapInfoModal()">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
-      <div class="flex items-center justify-between p-6 border-b border-gray-200">
-        <h2 class="text-xl font-semibold text-gray-900">Understanding the Activity Overview</h2>
-        <button type="button" onclick="closeActivityHeatmapInfoModal()" class="text-gray-400 hover:text-gray-600 transition-colors" aria-label="Close">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-      <div class="p-6 space-y-6">
-        <div>
-          <h3 class="text-sm font-semibold text-gray-900 mb-2">What is this?</h3>
-          <p class="text-sm text-gray-600 leading-relaxed">The Activity Overview is a calendar-style chart that shows <strong>when your organization was active</strong> over the last 90 days. Each small square represents one day; the color shows how much activity happened that day.</p>
-        </div>
-        <div>
-          <h3 class="text-sm font-semibold text-gray-900 mb-2">Why does it matter?</h3>
-          <p class="text-sm text-gray-600 leading-relaxed">It helps you spot patterns at a glance: which days of the week are busiest, whether activity is steady or concentrated in certain weeks, and how engagement has changed over time. Use it to understand how your team uses the system and when activity peaks.</p>
-        </div>
-        <div>
-          <h3 class="text-sm font-semibold text-gray-900 mb-2">How we track activity</h3>
-          <p class="text-sm text-gray-600 leading-relaxed mb-2">Activity is counted from usage across your whole organization. Each time someone in your org uses Lana (for example, starting or replying to conversations, viewing or uploading documents, running searches, or other interactions), that counts as activity. The chart adds up all of these actions per day so you can see when your org is most engaged.</p>
-          <p class="text-sm text-gray-600 leading-relaxed">The numbers you see are <strong>total activity events</strong> for that day, not unique users. So a busy day might show a high count because many people used the system or because a few people were very active.</p>
-        </div>
-        <div>
-          <h3 class="text-sm font-semibold text-gray-900 mb-2">What am I looking at?</h3>
-          <ul class="text-sm text-gray-600 space-y-2 list-disc pl-5">
-            <li><strong class="text-gray-900">Rows.</strong> Each row is a day of the week (Sunday at the top through Saturday at the bottom).</li>
-            <li><strong class="text-gray-900">Columns.</strong> Each column is one week. Time runs left to right: older weeks on the left, recent weeks on the right.</li>
-            <li><strong class="text-gray-900">Colors.</strong> Each square’s color shows how much activity happened that day. See “Color scale” below for the exact ranges.</li>
-          </ul>
-        </div>
-        <div>
-          <h3 class="text-sm font-semibold text-gray-900 mb-2">Color scale</h3>
-          <p class="text-sm text-gray-600 leading-relaxed mb-2">The chart uses five levels based on the number of activity events that day:</p>
-          <ul class="text-sm text-gray-600 space-y-1.5 list-disc pl-5">
-            <li><strong class="text-gray-900">Light gray:</strong> No activity (0 events)</li>
-            <li><strong class="text-gray-900">Light green:</strong> Low activity (1 to 4 events)</li>
-            <li><strong class="text-gray-900">Medium green:</strong> Moderate activity (5 to 9 events)</li>
-            <li><strong class="text-gray-900">Dark green:</strong> High activity (10 to 14 events)</li>
-            <li><strong class="text-gray-900">Darkest green:</strong> Very high activity (15 or more events)</li>
-          </ul>
-          <p class="text-sm text-gray-600 leading-relaxed mt-2">The legend under the chart shows “Less” to “More” as a quick reference.</p>
-        </div>
-        <div>
-          <h3 class="text-sm font-semibold text-gray-900 mb-2">How do I use it?</h3>
-          <p class="text-sm text-gray-600 leading-relaxed mb-2"><strong class="text-gray-900">Interacting with the chart.</strong> Hover over any square to see the exact date and activity count for that day. No clicking required; just move your cursor over the chart to explore.</p>
-          <p class="text-sm text-gray-600 leading-relaxed mb-2"><strong class="text-gray-900">Using the data for your business.</strong> Use the heatmap to see when your organization is most engaged and spot trends over time. For example:</p>
-          <ul class="text-sm text-gray-600 space-y-1.5 list-disc pl-5 mb-2">
-            <li>Compare week to week: are recent weeks busier or quieter than earlier ones?</li>
-            <li>See which days of the week are busiest (e.g. midweek vs Monday/Friday) so you can plan capacity, support, or training.</li>
-            <li>Notice quiet stretches: low or gray activity for many days in a row may mean low adoption, seasonal lulls, or a need to encourage usage.</li>
-            <li>Use the pattern as a baseline: once you know your “normal” activity, you can tell when something changes (e.g. after a rollout or a process change).</li>
-          </ul>
-          <p class="text-sm text-gray-600 leading-relaxed">The chart doesn’t tell you why activity went up or down, but it shows you when it did so you can dig in elsewhere (e.g. reports or conversations) to understand the cause.</p>
-        </div>
-      </div>
-      <div class="p-6 pt-0">
-        <button type="button" onclick="closeActivityHeatmapInfoModal()" class="w-full px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
-          Got it
-        </button>
-      </div>
-    </div>
-  </div>
-
   </template>
 
   <noscript>JavaScript is required to use LANA AI.</noscript>
 
-  <!-- Core scripts -->
   <script src="../js/error-reporter.js"></script>
   <script src="../js/config.js"></script>
-  <script src="../js/mock-data.js"></script>
   <script src="../js/api.js"></script>
-  <script src="../js/utils/event-display-names.js"></script>
-  <script src="../js/services/feature-tracker.js"></script>
   <script src="../js/components.js"></script>
   <script src="../js/version.js"></script>
   <script src="../js/menu.js"></script>
   <script src="../js/navigation-helpers.js"></script>
-  <script src="../js/new-project-modal.js"></script>
-  <script src="../js/conversation-menu.js"></script>
-  <script src="../js/conversation-search-modal.js"></script>
-  <script src="../js/notifications.js"></script>
-  <script src="../js/activity.js"></script>
-  <script src="../js/activity-heatmap.js"></script>
-  <script src="../js/services/session-tracking-service.js"></script>
 
-  <!-- Lex UI framework -->
   <script src="../js/lex/lex.core.js"></script>
   <script src="../js/lex/lex.icons.js"></script>
   <script src="../js/lex/lex.data.js"></script>
@@ -442,7 +412,6 @@
   <script src="../js/lex/lex.auth.js"></script>
   <script src="../js/lex/lex-nav.js"></script>
 
-  <!-- Lex components -->
   <script src="../js/lex/components/foundation/lex-loader.js"></script>
   <script src="../js/lex/components/foundation/lex-toast.js"></script>
   <script src="../js/lex/components/foundation/lex-spinner.js"></script>
@@ -454,230 +423,3099 @@
   <script src="../js/lex/components/layout/lex-notification-panel.js"></script>
   <script src="../js/lex/components/layout/lex-app.js"></script>
   <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
-
-  <!-- Inject page content + hoist modals -->
   <script src="../js/lex/lex-page-init.js"></script>
 
-  <!-- Page controller -->
   <script>
-
-    // ============================================================================
-    // CONNECTOR VIEWER SPECIFIC CODE
-    // ============================================================================
-
-    // Get URL parameters
     const urlParams = new URLSearchParams(window.location.search);
-    const uiEntryPoint = urlParams.get('ui');
-    const connectorName = urlParams.get('name') || 'Connector';
-    const connectorId = urlParams.get('connectorId') || '';
+    const state = {
+      sourceId: urlParams.get('sourceId') || '',
+      connectorType: urlParams.get('connectorType') || '',
+      connectorId: urlParams.get('connectorId') || '',
+      connectorName: urlParams.get('name') || 'Connector',
+      uiEntryPoint: urlParams.get('ui') || '',
+      catalog: null,
+      summary: null,
+      configResponse: null,
+      dataPreview: null,
+      dataGroups: null,
+      logs: null,
+      matterOptions: [],
+      dataRules: [],
+      selectedDataIds: [],
+      selectedRecordId: '',
+      selectedRecord: null,
+      recordAnnotations: [],
+      dynamicFieldOptions: {},
+      dynamicFieldLoading: {},
+      dynamicFieldErrors: {},
+      formDraft: null,
+      authModeDraft: '',
+      activeTab: urlParams.get('tab') || 'overview',
+      docsLoaded: false,
+      iframeOnlyFallback: false
+    };
 
-    // Update page title, lex-app header, and breadcrumb
-    document.title = `${connectorName} - LanaAI`;
-    const lexApp = document.querySelector('lex-app');
-    if (lexApp) lexApp.setAttribute('page-title', connectorName);
-    const breadcrumb = document.getElementById('connectorBreadcrumb');
-    if (breadcrumb) {
-      breadcrumb.items = [
-        { label: 'Data Connectors', href: 'data-connectors.html' },
-        { label: connectorName }
-      ];
+    function escapeHtml(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     }
 
-    // Go back to connectors page
+    function formatNumber(value) {
+      const number = Number(value || 0);
+      return Number.isFinite(number) ? number.toLocaleString() : '0';
+    }
+
+    function formatDateTime(value) {
+      if (!value) return 'Never';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return String(value);
+      return date.toLocaleString();
+    }
+
+    function timeAgo(value) {
+      if (!value) return 'Never';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return String(value);
+
+      const diffMs = Date.now() - date.getTime();
+      const minute = 60 * 1000;
+      const hour = 60 * minute;
+      const day = 24 * hour;
+      const month = 30 * day;
+
+      if (diffMs < minute) return 'just now';
+      if (diffMs < hour) return `${Math.floor(diffMs / minute)} minute${Math.floor(diffMs / minute) === 1 ? '' : 's'} ago`;
+      if (diffMs < day) return `${Math.floor(diffMs / hour)} hour${Math.floor(diffMs / hour) === 1 ? '' : 's'} ago`;
+      if (diffMs < month) return `${Math.floor(diffMs / day)} day${Math.floor(diffMs / day) === 1 ? '' : 's'} ago`;
+      return `${Math.floor(diffMs / month)} month${Math.floor(diffMs / month) === 1 ? '' : 's'} ago`;
+    }
+
+    function titleCase(value) {
+      return String(value || '')
+        .replace(/[_-]+/g, ' ')
+        .replace(/\b\w/g, (letter) => letter.toUpperCase());
+    }
+
+    function humanizeAuthType(value) {
+      const normalized = String(value || '').toLowerCase();
+      if (!normalized) return 'Unknown';
+      if (normalized === 'none') return 'No Authentication';
+      if (normalized === 'api_key') return 'API Key';
+      if (normalized === 'oauth2') return 'OAuth 2.0';
+      if (normalized === 'oauth2_or_api_key') return 'OAuth 2.0 or API Key';
+      if (normalized === 'basic') return 'Basic Auth';
+      return titleCase(normalized);
+    }
+
+    function getUiBehavior() {
+      return state.catalog?.ui_behavior || {};
+    }
+
+    function getValueByPath(source, dottedPath) {
+      if (!source || !dottedPath) return undefined;
+      return String(dottedPath)
+        .split('.')
+        .filter(Boolean)
+        .reduce((current, key) => (current == null ? undefined : current[key]), source);
+    }
+
+    function normalizeAuthType(value) {
+      return String(value || '').trim().toLowerCase();
+    }
+
+    function getAvailableAuthModes() {
+      const auth = state.catalog?.auth || {};
+      const modes = [];
+      const seen = new Set();
+      const addMode = (type, config, source) => {
+        const normalizedType = normalizeAuthType(type || config?.type);
+        if (!normalizedType || seen.has(normalizedType)) {
+          return;
+        }
+        seen.add(normalizedType);
+        modes.push({
+          type: normalizedType,
+          config: config || {},
+          source: source || 'primary'
+        });
+      };
+
+      addMode(auth.type, auth, 'primary');
+
+      if (auth.oauth2_alternative && auth.oauth2_alternative.enabled !== false) {
+        addMode(auth.oauth2_alternative.type || 'oauth2', {
+          ...auth.oauth2_alternative,
+          type: 'oauth2'
+        }, 'oauth2_alternative');
+      }
+
+      if (auth.oauth2_fallback) {
+        addMode(auth.oauth2_fallback.type || 'oauth2', {
+          ...auth.oauth2_fallback,
+          type: normalizeAuthType(auth.oauth2_fallback.type || 'oauth2') || 'oauth2'
+        }, 'oauth2_fallback');
+      }
+
+      return modes;
+    }
+
+    function getSelectedAuthModeType() {
+      const selector = document.getElementById('authModeSelect');
+      const modes = getAvailableAuthModes();
+      if (selector && selector.value && modes.some((mode) => mode.type === selector.value)) {
+        return selector.value;
+      }
+
+      if (state.authModeDraft && modes.some((mode) => mode.type === state.authModeDraft)) {
+        return state.authModeDraft;
+      }
+
+      const savedType = normalizeAuthType(state.formDraft?.auth_type || state.configResponse?.config?.auth_type);
+      if (savedType && modes.some((mode) => mode.type === savedType)) {
+        return savedType;
+      }
+
+      return modes[0]?.type || normalizeAuthType(state.catalog?.auth?.type) || 'unknown';
+    }
+
+    function getSelectedAuthMode() {
+      const selectedType = getSelectedAuthModeType();
+      return getAvailableAuthModes().find((mode) => mode.type === selectedType) || null;
+    }
+
+    function getAuthModeDisplayLabel(mode) {
+      if (!mode) {
+        return humanizeAuthType('unknown');
+      }
+
+      const authLabel = getUiBehavior().auth?.label;
+      if (authLabel && getAvailableAuthModes().length === 1) {
+        return authLabel;
+      }
+
+      return humanizeAuthType(mode.type);
+    }
+
+    function getAuthFieldsForMode(mode) {
+      if (!mode?.config) {
+        return [];
+      }
+
+      const authConfig = mode.config;
+      if (Array.isArray(authConfig.fields) && authConfig.fields.length) {
+        return authConfig.fields
+          .map((field) => normalizeCatalogField(field, field.required !== false))
+          .filter(Boolean);
+      }
+
+      if (mode.type === 'api_key') {
+        const fieldName = authConfig.api_key_field || state.catalog?.auth?.api_key_field || 'api_key';
+        return [{
+          name: fieldName,
+          label: titleCase(fieldName),
+          type: 'password',
+          description: 'API credential used to authenticate connector requests.',
+          help_text: 'This field was inferred from the connector auth schema because the connector catalog did not expose a UI field definition.',
+          required: true
+        }];
+      }
+
+      if (mode.type === 'basic') {
+        return [
+          {
+            name: 'username',
+            label: 'Username',
+            type: 'text',
+            description: 'Username used for connector authentication.',
+            required: true
+          },
+          {
+            name: 'password',
+            label: 'Password',
+            type: 'password',
+            description: 'Password used for connector authentication.',
+            required: true
+          }
+        ];
+      }
+
+      if (mode.type === 'oauth2') {
+        const clientIdField = authConfig.client_id_field || 'client_id';
+        const clientSecretField = authConfig.client_secret_field || 'client_secret';
+        return [
+          {
+            name: clientIdField,
+            label: 'Client ID',
+            type: 'text',
+            description: 'OAuth client ID used to start the authorization flow.',
+            help_text: authConfig.note || 'Store the client credentials in LANA, then use Connect to complete authorization.',
+            required: true
+          },
+          {
+            name: clientSecretField,
+            label: 'Client Secret',
+            type: 'password',
+            description: 'OAuth client secret used to exchange authorization codes for tokens.',
+            required: true
+          }
+        ];
+      }
+
+      return [];
+    }
+
+    function getAuthTypeDisplayLabel() {
+      const mode = getSelectedAuthMode();
+      const authFields = getCatalogAuthFields();
+      if (authFields.length > 1 && mode?.type === 'api_key') {
+        return 'API Credentials';
+      }
+
+      return getAuthModeDisplayLabel(mode);
+    }
+
+    function humanizeStatus(value) {
+      const normalized = String(value || '').toLowerCase();
+      if (!normalized) return 'Unknown';
+      if (normalized === 'not_configured') return 'Not Configured';
+      if (normalized === 'active') return 'Connected';
+      if (normalized === 'completed') return 'Completed';
+      if (normalized === 'failed') return 'Failed';
+      if (normalized === 'queued') return 'Queued';
+      if (normalized === 'running') return 'Running';
+      if (normalized === 'processing') return 'Processing';
+      return titleCase(normalized);
+    }
+
+    function truncateJson(value) {
+      try {
+        const text = JSON.stringify(value, null, 2);
+        return text.length > 700 ? `${text.slice(0, 700)}\n...` : text;
+      } catch (_error) {
+        return String(value);
+      }
+    }
+
+    function getBadgeHtml(label, variant) {
+      return `<span class="badge ${variant}">${escapeHtml(label)}</span>`;
+    }
+
+    function showPageAlert(message, type) {
+      const node = document.getElementById('pageAlert');
+      if (!node) return;
+
+      if (!message) {
+        node.classList.add('hidden');
+        node.textContent = '';
+        node.className = 'hidden mb-6 rounded-2xl border px-4 py-3 text-sm';
+        return;
+      }
+
+      const typeClass = type === 'error'
+        ? 'border-red-200 bg-red-50 text-red-700'
+        : type === 'success'
+          ? 'border-green-200 bg-green-50 text-green-700'
+          : 'border-blue-200 bg-blue-50 text-blue-700';
+
+      node.className = `mb-6 rounded-2xl border px-4 py-3 text-sm ${typeClass}`;
+      node.textContent = message;
+    }
+
+    function setLoading(isLoading) {
+      document.getElementById('viewerLoading').classList.toggle('hidden', !isLoading);
+      document.getElementById('viewerContent').classList.toggle('hidden', isLoading);
+      if (!isLoading) {
+        document.getElementById('viewerError').classList.add('hidden');
+      }
+    }
+
+    function showViewerError(message) {
+      document.getElementById('viewerLoading').classList.add('hidden');
+      document.getElementById('viewerContent').classList.add('hidden');
+      document.getElementById('viewerErrorMessage').textContent = message;
+      document.getElementById('viewerError').classList.remove('hidden');
+    }
+
+    function applyPageIdentity() {
+      document.title = `${state.connectorName} - LANA AI`;
+      const lexApp = document.querySelector('lex-app');
+      if (lexApp) {
+        lexApp.setAttribute('page-title', state.connectorName);
+      }
+
+      const breadcrumb = document.getElementById('connectorBreadcrumb');
+      if (breadcrumb) {
+        breadcrumb.items = [
+          { label: 'Data Connectors', href: 'data-connectors.html' },
+          { label: state.connectorName }
+        ];
+      }
+    }
+
+    function connectorApi(path) {
+      if (!state.sourceId) {
+        throw new Error('Integration source ID is required');
+      }
+      return `/api/v1/generic-connectors/integration-sources/${state.sourceId}${path}`;
+    }
+
+    function normalizeFieldOption(option) {
+      if (option == null) {
+        return null;
+      }
+
+      if (typeof option !== 'object') {
+        const value = String(option);
+        return { value, label: value };
+      }
+
+      const value = option.value == null ? '' : String(option.value);
+      if (!value) {
+        return null;
+      }
+
+      return {
+        value,
+        label: String(option.label == null ? option.value : option.label)
+      };
+    }
+
+    function getSelectableFieldOptions(field, value) {
+      const normalized = [];
+      const seen = new Set();
+      const appendOption = (option) => {
+        const normalizedOption = normalizeFieldOption(option);
+        if (!normalizedOption || seen.has(normalizedOption.value)) {
+          return;
+        }
+        seen.add(normalizedOption.value);
+        normalized.push(normalizedOption);
+      };
+
+      const fieldOptions = Array.isArray(field.options) ? field.options : [];
+      fieldOptions.forEach(appendOption);
+
+      const dynamicOptions = Array.isArray(state.dynamicFieldOptions[field.name])
+        ? state.dynamicFieldOptions[field.name]
+        : [];
+      dynamicOptions.forEach(appendOption);
+
+      const selectedValues = Array.isArray(value)
+        ? value
+        : (typeof value === 'string' && value
+          ? value.split(',').map((item) => item.trim()).filter(Boolean)
+          : []);
+      selectedValues.forEach((selectedValue) => appendOption({ value: selectedValue, label: selectedValue }));
+
+      return normalized;
+    }
+
+    function getDynamicDiscoveryButtonLabel(field) {
+      if (field.discovery_button_label) {
+        return String(field.discovery_button_label);
+      }
+
+      const rawLabel = String(field.label || field.name || 'Options').trim();
+      const lowerLabel = rawLabel.toLowerCase();
+      const splitIndex = lowerLabel.indexOf(' to ');
+      const shortened = splitIndex > -1 ? rawLabel.slice(0, splitIndex).trim() : rawLabel;
+      return `Discover ${shortened || 'Options'}`;
+    }
+
+    async function resolveConnectorContext() {
+      if (state.sourceId && state.connectorType && state.uiEntryPoint) {
+        applyPageIdentity();
+        return;
+      }
+
+      const result = await api.get('/api/v1/integrations/connectors');
+      const connectors = Array.isArray(result.connectors) ? result.connectors : [];
+      const match = connectors.find((connector) => {
+        if (state.sourceId && connector.id === state.sourceId) {
+          return true;
+        }
+
+        if (!state.sourceId && state.connectorId) {
+          return connector.id === state.connectorId ||
+            connector.connector_id === state.connectorId ||
+            connector.connector_type === state.connectorId ||
+            connector.type === state.connectorId;
+        }
+
+        if (!state.sourceId && !state.connectorId && state.connectorType) {
+          return connector.connector_id === state.connectorType || connector.connector_type === state.connectorType;
+        }
+
+        return false;
+      });
+
+      if (match) {
+        state.sourceId = state.sourceId || match.id || '';
+        state.connectorType = state.connectorType || match.connector_id || match.connector_type || '';
+        state.connectorName = match.name || state.connectorName;
+        state.uiEntryPoint = state.uiEntryPoint || match.ui_entry_point || '';
+      }
+
+      applyPageIdentity();
+
+      if (!state.sourceId) {
+        state.iframeOnlyFallback = true;
+        state.activeTab = 'docs';
+      }
+    }
+
+    async function loadCatalog() {
+      if (!state.connectorType) {
+        state.catalog = null;
+        return;
+      }
+
+      const result = await api.get(`/api/v1/integrations/connectors/catalog/${encodeURIComponent(state.connectorType)}`);
+      state.catalog = result.connector || null;
+    }
+
+    function normalizeCatalogField(field, fallbackRequired) {
+      if (!field || !field.name) {
+        return null;
+      }
+
+      const normalizedType = field.type === 'multi_select' ? 'multiselect' : (field.type || 'text');
+
+      return {
+        ...field,
+        type: normalizedType,
+        required: field.required !== undefined ? Boolean(field.required) : Boolean(fallbackRequired)
+      };
+    }
+
+    function getCatalogAuthFields() {
+      return getAuthFieldsForMode(getSelectedAuthMode());
+    }
+
+    function getCatalogSettingsFields() {
+      if (!state.catalog) {
+        return [];
+      }
+
+      if (!state.catalog.configuration) {
+        return [];
+      }
+
+      const required = Array.isArray(state.catalog.configuration.required_fields)
+        ? state.catalog.configuration.required_fields.map((field) => normalizeCatalogField(field, true))
+        : [];
+      const optional = Array.isArray(state.catalog.configuration.optional_fields)
+        ? state.catalog.configuration.optional_fields.map((field) => normalizeCatalogField(field, false))
+        : [];
+
+      return [...required, ...optional].filter(Boolean);
+    }
+
+    function getCatalogFields() {
+      const authFields = getCatalogAuthFields();
+      const settingsFields = getCatalogSettingsFields();
+      const deduped = new Map();
+
+      [...authFields, ...settingsFields].forEach((field) => {
+        if (!field?.name) return;
+        if (!deduped.has(field.name)) {
+          deduped.set(field.name, field);
+          return;
+        }
+
+        deduped.set(field.name, {
+          ...deduped.get(field.name),
+          ...field
+        });
+      });
+
+      return [...deduped.values()];
+    }
+
+    function getCatalogDynamicFields() {
+      if (!state.catalog?.configuration?.dynamic_fields) {
+        return [];
+      }
+
+      return Array.isArray(state.catalog.configuration.dynamic_fields)
+        ? state.catalog.configuration.dynamic_fields
+        : [];
+    }
+
+    function isApiConnector() {
+      return Boolean(state.catalog && state.catalog.api && state.catalog.api.base_url);
+    }
+
+    function getDocumentationLink() {
+      return state.catalog?.documentation?.api_reference_url
+        || state.catalog?.documentation?.docs_url
+        || state.catalog?.metadata?.documentation_url
+        || state.catalog?.metadata?.docs_url
+        || state.catalog?.metadata?.website
+        || '';
+    }
+
+    function getLastSuccessfulSync() {
+      return state.summary && state.summary.last_sync ? state.summary.last_sync : null;
+    }
+
+    function getLastSyncAttempt() {
+      return state.summary && state.summary.last_attempt ? state.summary.last_attempt : null;
+    }
+
+    function getLastSyncHeadline() {
+      const lastSync = getLastSuccessfulSync();
+      const lastAttempt = getLastSyncAttempt();
+
+      if (lastSync) {
+        return {
+          status: lastSync.sync_status || 'completed',
+          detail: formatDateTime(lastSync.completed_at || lastSync.started_at),
+          relative: timeAgo(lastSync.completed_at || lastSync.started_at),
+          helper: ''
+        };
+      }
+
+      if (lastAttempt) {
+        return {
+          status: 'Never',
+          detail: `Last attempt ${String(lastAttempt.sync_status || 'unknown')} on ${formatDateTime(lastAttempt.completed_at || lastAttempt.started_at)}`,
+          relative: 'Never',
+          helper: `Last attempt ${String(lastAttempt.sync_status || 'unknown')} ${timeAgo(lastAttempt.completed_at || lastAttempt.started_at)}`
+        };
+      }
+
+      return {
+        status: 'Never',
+        detail: 'No sync recorded',
+        relative: 'Never',
+        helper: ''
+      };
+    }
+
+    function isConnectorConfigured() {
+      return Boolean(state.summary && state.summary.configured);
+    }
+
+    function isOAuthConnector() {
+      return getSelectedAuthModeType() === 'oauth2';
+    }
+
+    function isOAuthAuthorized() {
+      if (!isOAuthConnector()) {
+        return true;
+      }
+
+      const authStatus = String(state.configResponse?.auth_status || '').toLowerCase();
+      return authStatus === 'connected' || authStatus === 'active';
+    }
+
+    function isConnectorReady() {
+      if (!isConnectorConfigured()) {
+        return false;
+      }
+
+      if (isOAuthConnector()) {
+        return isOAuthAuthorized();
+      }
+
+      return true;
+    }
+
+    function getConnectorSetupState() {
+      if (!isConnectorConfigured()) {
+        return {
+          label: 'Needs Setup',
+          badge: 'badge-yellow',
+          message: 'Credentials or settings still need to be saved.'
+        };
+      }
+
+      if (isOAuthConnector() && !isOAuthAuthorized()) {
+        return {
+          label: 'Authorization Required',
+          badge: 'badge-yellow',
+          message: 'Credentials are saved. Finish OAuth authorization before syncing.'
+        };
+      }
+
+      return {
+        label: 'Connected',
+        badge: 'badge-green',
+        message: 'Integration is configured in LANA.'
+      };
+    }
+
+    function getGeneratedConnectSteps() {
+      const fields = getCatalogFields().filter((field) => field.required);
+      const fieldLabels = fields.map((field) => field.label || titleCase(field.name));
+      const authType = getSelectedAuthModeType() || 'connector auth';
+      const authTypeLabel = getAuthTypeDisplayLabel();
+
+      if (authType === 'oauth2') {
+        return [
+          `Open the Configuration tab for ${state.connectorName}.`,
+          fieldLabels.length
+            ? `Enter the required OAuth client values: ${fieldLabels.join(', ')}.`
+            : 'Enter the required OAuth client values for this connector.',
+          'Save the connector configuration to store the OAuth client credentials inside LANA.',
+          `Click Connect ${state.connectorName} to complete the OAuth authorization flow.`,
+          'Return to the Run tab and trigger a manual sync after authorization succeeds.',
+          'Review imported records in Output and assign the right records to matters.'
+        ];
+      }
+
+      const steps = [
+        `Open the Configuration tab for ${state.connectorName}.`,
+        fieldLabels.length
+          ? `Enter the required ${authTypeLabel} values: ${fieldLabels.join(', ')}.`
+          : `Enter the required ${authTypeLabel} values for this connector.`,
+        'Save the connector configuration to store credentials inside LANA.',
+        'Run Test Connection to verify the credentials before syncing.',
+        'Choose a sync frequency or keep the connector in manual mode.',
+        'Open the Run tab and trigger a manual sync or ad-hoc request.',
+        'Review imported records in Output and assign the right records to matters.'
+      ];
+
+      if (!isApiConnector()) {
+        steps.splice(4, 2,
+          'Choose a sync frequency or keep the connector in manual mode.',
+          'Run a manual sync from the Run tab to pull data into LANA.'
+        );
+      }
+
+      return steps;
+    }
+
+    function getConfigValue(name, fallback) {
+      const config = state.configResponse && state.configResponse.config ? state.configResponse.config : {};
+      return Object.prototype.hasOwnProperty.call(config, name) ? config[name] : fallback;
+    }
+
+    function normalizeAbsoluteUrl(value) {
+      const raw = String(value || '').trim();
+      if (!raw) return '';
+
+      try {
+        const parsed = new URL(raw);
+        return `${parsed.origin}${parsed.pathname}`.replace(/\/$/, '');
+      } catch (_error) {
+        return '';
+      }
+    }
+
+    function getEffectiveApiBase() {
+      const explicitBase = normalizeAbsoluteUrl(
+        getConfigValue('api_base_url', '')
+          || getConfigValue('base_url', '')
+          || getConfigValue('endpoint_url', '')
+          || getConfigValue('s3_endpoint_url', '')
+      );
+
+      if (explicitBase) {
+        return explicitBase;
+      }
+
+      const apiBaseBehavior = getUiBehavior().api_base || {};
+      if (apiBaseBehavior.config_field) {
+        const configValue = String(getConfigValue(apiBaseBehavior.config_field, '') || '').trim();
+        if (configValue) {
+          if (apiBaseBehavior.template) {
+            return apiBaseBehavior.template.replace('{value}', configValue);
+          }
+          const normalizedConfigBase = normalizeAbsoluteUrl(configValue);
+          return normalizedConfigBase || configValue;
+        }
+        return apiBaseBehavior.empty_label || 'Derived from configuration';
+      }
+
+      if (apiBaseBehavior.region_field && apiBaseBehavior.region_template) {
+        const regionValue = String(getConfigValue(apiBaseBehavior.region_field, '') || '').trim();
+        if (regionValue) {
+          return apiBaseBehavior.region_template.replace('{value}', regionValue);
+        }
+        return apiBaseBehavior.empty_label || 'Derived from configuration';
+      }
+
+      return state.catalog?.api?.base_url || 'Not exposed';
+    }
+
+    function usesHookSignedAuth() {
+      const template = String(state.catalog?.auth?.header_value_template || '').toLowerCase();
+      return template.includes('computed by custom-api hook') || Boolean(getUiBehavior().auth?.signed_via_hooks);
+    }
+
+    function supportsSharedCredentialTest() {
+      const authType = getSelectedAuthModeType();
+      if (usesHookSignedAuth()) {
+        return false;
+      }
+
+      return ['api_key', 'basic'].includes(authType);
+    }
+
+    function getRunTabModel() {
+      const runBehavior = getUiBehavior().run || {};
+      if (Object.keys(runBehavior).length) {
+        return {
+          supportsDateRange: Boolean(runBehavior.supports_date_range),
+          supportsValidationHarness: Boolean(runBehavior.supports_validation_harness),
+          syncTitle: String(runBehavior.sync_title || `Run Sync Against ${state.connectorName}`).replaceAll('{{connectorName}}', state.connectorName),
+          syncDescription: runBehavior.sync_description || 'Trigger a manual sync for this connector.',
+          quickRanges: Array.isArray(runBehavior.quick_ranges) ? runBehavior.quick_ranges : [],
+          buttonLabel: runBehavior.button_label || 'Run Manual Sync',
+          aboutTitle: runBehavior.about_title || 'About Manual Sync',
+          aboutBody: runBehavior.about_body || 'Run a manual sync to validate the connector and inspect the resulting records.',
+          runGuidance: Array.isArray(runBehavior.guidance) && runBehavior.guidance.length
+            ? runBehavior.guidance
+            : ['Run a manual sync to validate the connector end to end.']
+        };
+      }
+
+      return {
+        supportsDateRange: true,
+        supportsValidationHarness: supportsSharedCredentialTest(),
+        syncTitle: `Run Sync Against ${state.connectorName}`,
+        syncDescription: 'Choose a date range for a targeted validation sync, or leave the range blank to let the connector use its normal sync behavior.',
+        quickRanges: [7, 30, 90, 180, 365],
+        buttonLabel: 'Run Manual Sync',
+        aboutTitle: 'About Manual Sync',
+        aboutBody: 'Use quick ranges for common validation windows or pick custom dates. If no range is selected, the connector falls back to its full sync behavior. Execution Logs shows the actual sync history, timing, and failures.',
+        runGuidance: [
+          supportsSharedCredentialTest()
+            ? 'Use Test Connection first if credentials were changed in Configuration.'
+            : 'Save credentials, then use a manual sync to validate the connector end to end.',
+          'Manual sync is the safe place to validate a connector before enabling automation.',
+          'After sync, use Output to search, assign, and shortlist edits instead of manually overwriting connector payloads.',
+          'Use Execution Logs for server-side failures and status transitions.'
+        ]
+      };
+    }
+
+    function getUiBehaviorContext() {
+      return {
+        config: state.configResponse?.config || {},
+        summary: state.summary || {},
+        auth_status: state.configResponse?.auth_status || '',
+        sync_status: state.configResponse?.sync_status || ''
+      };
+    }
+
+    function getComputedUiValue(key) {
+      const config = state.configResponse?.config || {};
+      const lastSyncDisplay = getLastSyncHeadline();
+
+      switch (String(key || '')) {
+        case 'configured_bases':
+          return Array.isArray(config.bases) ? config.bases.length : 0;
+        case 'sync_frequency':
+          return titleCase(config.sync_frequency || 'manual');
+        case 'last_sync_relative':
+          return lastSyncDisplay.relative;
+        case 'auth_status':
+          return humanizeStatus(state.configResponse?.auth_status || 'unknown');
+        case 'sync_status':
+          return humanizeStatus(state.configResponse?.sync_status || 'unknown');
+        default:
+          return undefined;
+      }
+    }
+
+    function getBehaviorFieldValue(field) {
+      if (!field) return '';
+
+      let rawValue;
+      if (field.computed) {
+        rawValue = getComputedUiValue(field.computed);
+      } else if (field.path) {
+        rawValue = getValueByPath(getUiBehaviorContext(), field.path);
+      }
+
+      if (rawValue == null || rawValue === '') {
+        return field.empty_label || 'Not set';
+      }
+
+      if (Array.isArray(rawValue)) {
+        return rawValue.length ? rawValue.join(', ') : (field.empty_label || 'Not set');
+      }
+
+      if (typeof rawValue === 'boolean') {
+        return rawValue ? 'Yes' : 'No';
+      }
+
+      if (typeof rawValue === 'number') {
+        return formatNumber(rawValue);
+      }
+
+      return String(rawValue);
+    }
+
+    function renderBehaviorFieldRows(fields) {
+      if (!Array.isArray(fields) || !fields.length) {
+        return '';
+      }
+
+      return fields.map((field) => `
+        <div class="flex items-center justify-between text-sm">
+          <span class="text-gray-500">${escapeHtml(field.label || 'Value')}</span>
+          <span class="font-medium text-gray-900">${escapeHtml(getBehaviorFieldValue(field))}</span>
+        </div>
+      `).join('');
+    }
+
+    function getArrayFieldValuesFromDom(fieldName, options) {
+      const preserveEmpty = Boolean(options && options.preserveEmpty);
+      const rows = document.querySelectorAll(`[data-array-field="${fieldName}"] [data-array-item]`);
+      const items = Array.from(rows).map((row) => {
+        const item = {};
+        row.querySelectorAll('[data-item-field]').forEach((input) => {
+          const key = input.getAttribute('data-item-field');
+          if (!key) return;
+          const rawValue = input.type === 'checkbox' ? Boolean(input.checked) : input.value;
+          if (rawValue === '' || rawValue == null) return;
+          item[key] = rawValue;
+        });
+        return item;
+      });
+
+      return preserveEmpty ? items : items.filter((item) => Object.keys(item).length > 0);
+    }
+
+    function getArrayFieldCurrentValue(fieldName) {
+      const domValues = getArrayFieldValuesFromDom(fieldName, { preserveEmpty: true });
+      if (domValues.length) {
+        return domValues;
+      }
+
+      const current = getConfigValue(fieldName, []);
+      return Array.isArray(current) ? current : [];
+    }
+
+    function addArrayFieldItem(fieldName) {
+      const field = getCatalogDynamicFields().find((entry) => entry.name === fieldName);
+      if (!field) return;
+      const items = getArrayFieldCurrentValue(fieldName);
+      items.push({});
+      renderArrayField(field, items);
+    }
+
+    function removeArrayFieldItem(fieldName, index) {
+      const field = getCatalogDynamicFields().find((entry) => entry.name === fieldName);
+      if (!field) return;
+      const items = getArrayFieldCurrentValue(fieldName);
+      items.splice(index, 1);
+      renderArrayField(field, items);
+    }
+
+    function renderArrayField(field, value) {
+      const container = document.getElementById(`dynamic-field-${field.name}`);
+      if (!container) return;
+
+      const items = Array.isArray(value) && value.length ? value : [{}];
+
+      container.innerHTML = `
+        <div class="rounded-2xl border border-gray-200 bg-gray-50 p-5">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <div class="text-sm font-semibold text-gray-900">${escapeHtml(field.label || titleCase(field.name))}</div>
+              <div class="mt-2 text-sm text-gray-500">${escapeHtml(field.description || '')}</div>
+            </div>
+            <div class="text-xs text-gray-500">${field.max_items ? `Up to ${field.max_items}` : ''}</div>
+          </div>
+          <div class="mt-5 space-y-4" data-array-field="${escapeHtml(field.name)}">
+            ${items.map((item, index) => `
+              <div class="rounded-xl border border-yellow-200 bg-white p-4" data-array-item="${index}">
+                <div class="mb-4 flex items-center justify-between gap-3">
+                  <div class="text-sm font-semibold text-gray-900">${escapeHtml((field.item_label_prefix || 'Base') + ' ' + (index + 1))}</div>
+                  ${items.length > 1 ? `
+                    <button type="button" onclick="removeArrayFieldItem('${escapeHtml(field.name)}', ${index})" class="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50">
+                      Remove
+                    </button>
+                  ` : ''}
+                </div>
+                <div class="grid gap-4 md:grid-cols-2">
+                  ${(field.item_fields || []).map((itemField) => `
+                    <label class="block ${itemField.name === 'max_records' ? 'md:col-span-2' : ''}">
+                      <div class="mb-2 text-sm font-medium text-gray-900">${escapeHtml(itemField.label || titleCase(itemField.name))}${itemField.required ? ' *' : ''}</div>
+                      <input
+                        type="text"
+                        data-item-field="${escapeHtml(itemField.name)}"
+                        value="${escapeHtml(item?.[itemField.name] == null ? '' : String(item[itemField.name]))}"
+                        placeholder="${escapeHtml(itemField.placeholder || '')}"
+                        class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                      >
+                      ${itemField.help_text ? `<p class="mt-2 text-xs text-gray-500">${escapeHtml(itemField.help_text)}</p>` : ''}
+                    </label>
+                  `).join('')}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+          ${(!field.max_items || items.length < field.max_items) ? `
+            <div class="mt-4">
+              <button type="button" onclick="addArrayFieldItem('${escapeHtml(field.name)}')" class="rounded-xl border border-yellow-300 bg-yellow-50 px-4 py-2 text-sm font-semibold text-yellow-800 hover:bg-yellow-100">
+                Add ${escapeHtml(field.item_label_prefix || 'Base')}
+              </button>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    function captureConfigFormDraft() {
+      const form = document.getElementById('configForm');
+      if (!form) {
+        return {};
+      }
+
+      const draft = {};
+      const processed = new Set();
+      Array.from(form.querySelectorAll('[name]')).forEach((element) => {
+        const name = element.name;
+        if (!name || processed.has(name)) {
+          return;
+        }
+        processed.add(name);
+
+        if (element.type === 'checkbox') {
+          draft[name] = Boolean(element.checked);
+          return;
+        }
+
+        if (element.multiple) {
+          draft[name] = Array.from(element.selectedOptions || [])
+            .map((option) => option.value)
+            .filter(Boolean);
+          return;
+        }
+
+        draft[name] = element.value;
+      });
+
+      getCatalogDynamicFields().forEach((field) => {
+        if (field.type === 'array') {
+          draft[field.name] = getArrayFieldValuesFromDom(field.name, { preserveEmpty: true });
+        }
+      });
+
+      const selector = document.getElementById('authModeSelect');
+      if (selector && selector.value) {
+        draft.auth_type = selector.value;
+      }
+
+      return draft;
+    }
+
+    function handleAuthModeChange() {
+      const selector = document.getElementById('authModeSelect');
+      if (!selector) return;
+      state.formDraft = captureConfigFormDraft();
+      state.authModeDraft = selector.value || '';
+      renderConfiguration();
+    }
+
+    function updateSyncSettingsVisibility() {
+      const syncFrequency = document.getElementById('syncFrequency');
+      const scheduledGroup = document.getElementById('scheduledTimeGroup');
+      if (!syncFrequency || !scheduledGroup) return;
+      const visible = ['daily', 'weekly'].includes(syncFrequency.value);
+      scheduledGroup.classList.toggle('hidden', !visible);
+    }
+
+    function buildDocumentationModel() {
+      const documentation = state.catalog && state.catalog.documentation ? state.catalog.documentation : {};
+      const metadata = state.catalog && state.catalog.metadata ? state.catalog.metadata : {};
+      const entities = (state.summary && state.summary.stats && state.summary.stats.entities) || {};
+      const entityEntries = Object.entries(entities);
+      const primaryDescription = documentation.description
+        || metadata.description
+        || state.catalog?.description
+        || `${state.connectorName} is connected to LANA through the shared generic connector framework.`;
+
+      const overview = Array.isArray(documentation.overview) && documentation.overview.length
+        ? documentation.overview
+        : [primaryDescription];
+
+      const keyFeatures = Array.isArray(documentation.key_features) && documentation.key_features.length
+        ? documentation.key_features
+        : [
+            `Shared LANA configuration and debugging for ${state.connectorName}`,
+            'Unified sync controls, logs, and data preview',
+            `Auth type: ${getAuthTypeDisplayLabel()}`,
+            entityEntries.length
+              ? `Tracks ${entityEntries.length} connector data type${entityEntries.length === 1 ? '' : 's'}`
+              : 'Connector data appears here after the first successful sync'
+          ];
+
+      const dataTypes = Array.isArray(documentation.data_types) && documentation.data_types.length
+        ? documentation.data_types
+        : (entityEntries.length
+          ? entityEntries.map(([entityType]) => ({
+              name: titleCase(entityType),
+              description: `${titleCase(entityType)} records synced into connector data.`
+            }))
+          : (state.catalog?.sync?.entity_type
+            ? [{ name: titleCase(state.catalog.sync.entity_type), description: `${titleCase(state.catalog.sync.entity_type)} records synced into connector data.` }]
+            : []));
+
+      const gettingStarted = Array.isArray(documentation.getting_started) && documentation.getting_started.length
+        ? documentation.getting_started
+        : [
+            'Confirm the connector is configured in the Configuration section below.',
+            'Save credentials or connector settings if they are not already present.',
+            'Run a sync from the Overview tab to pull data into LANA.',
+            'Review imported records in the Data tab and failures in the Logs tab.'
+          ];
+
+      const requiredFiles = Array.isArray(documentation.required_files) ? documentation.required_files : [];
+      const troubleshooting = Array.isArray(documentation.troubleshooting) && documentation.troubleshooting.length
+        ? documentation.troubleshooting
+        : [
+            { title: 'Not Configured', detail: 'Open the Configuration tab and save the required connector credentials or settings.' },
+            { title: 'Sync Failed', detail: isOAuthConnector() ? 'Check the Logs tab for the latest sync error and confirm the connector is fully authorized.' : 'Check the Logs tab for the latest sync error and verify the connection with Test Connection.' },
+            { title: 'No Data Appears', detail: 'Run a sync, then refresh the Data tab to confirm records were written into connector_data.' }
+          ];
+      const support = documentation.support || `Need help with the ${state.connectorName} integration? Contact your LANA administrator or support team.`;
+      const connectSteps = Array.isArray(documentation.connect_steps) && documentation.connect_steps.length
+        ? documentation.connect_steps
+        : getGeneratedConnectSteps();
+
+      return {
+        title: documentation.title || `${state.connectorName} Integration`,
+        overview,
+        keyFeatures,
+        dataTypes,
+        gettingStarted,
+        connectSteps,
+        requiredFiles,
+        troubleshooting,
+        support,
+        docsUrl: getDocumentationLink()
+      };
+    }
+
+    function renderImportedDataList(entityEntries) {
+      const importedDataFields = getUiBehavior().overview?.imported_data;
+      if (Array.isArray(importedDataFields) && importedDataFields.length) {
+        return `
+          <div>
+            <h4 class="mb-3 text-sm font-medium text-gray-900">Imported Data</h4>
+            <div class="space-y-2">
+              ${importedDataFields.map((field) => `
+                <div class="flex items-center justify-between text-sm">
+                  <span class="text-gray-600">${escapeHtml(field.label || 'Value')}</span>
+                  <span class="font-semibold text-gray-900">${escapeHtml(getBehaviorFieldValue(field))}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      if (!entityEntries.length) {
+        return `
+          <div class="flex items-center justify-center rounded-lg bg-gray-50 p-8">
+            <div class="text-center">
+              <svg class="mx-auto mb-2 h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              <p class="text-sm text-gray-500">No data imported yet</p>
+            </div>
+          </div>
+        `;
+      }
+
+      return `
+        <div>
+          <h4 class="mb-3 text-sm font-medium text-gray-900">Imported Data</h4>
+          <div class="space-y-2">
+            ${entityEntries.map(([entityType, total]) => `
+              <div class="flex items-center justify-between text-sm">
+                <span class="text-gray-600">${escapeHtml(titleCase(entityType))}</span>
+                <span class="font-semibold text-gray-900">${formatNumber(total)}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderDocumentationGuide() {
+      const node = document.getElementById('generatedDocsGuide');
+      if (!node) return;
+      const docsUrl = getDocumentationLink();
+
+      node.innerHTML = `
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div class="connector-label">Documentation</div>
+            <h3 class="mt-2 text-lg font-semibold text-gray-900">${escapeHtml(state.connectorName)} Reference</h3>
+            <p class="mt-2 max-w-3xl text-sm text-gray-600">Connector-specific setup guidance from the installed package is shown below.</p>
+          </div>
+          ${docsUrl ? `
+            <a href="${escapeHtml(docsUrl)}" target="_blank" rel="noreferrer" class="rounded-xl border border-blue-300 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
+              Open Vendor Docs
+            </a>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    function renderOverview() {
+      const summary = state.summary || {};
+      const configured = Boolean(summary.configured);
+      const entities = (summary.stats && summary.stats.entities) || {};
+      const entityEntries = Object.entries(entities);
+      const lastSync = getLastSuccessfulSync();
+      const lastSyncDisplay = getLastSyncHeadline();
+      const setupNode = document.getElementById('setupStatus');
+      const setupMessage = document.getElementById('setupMessage');
+      const authStatus = state.configResponse ? state.configResponse.auth_status : 'unknown';
+      const config = state.configResponse && state.configResponse.config ? state.configResponse.config : {};
+      const documentation = buildDocumentationModel();
+      const setupState = getConnectorSetupState();
+      const overviewStatusFields = Array.isArray(getUiBehavior().overview?.status_fields)
+        ? getUiBehavior().overview.status_fields
+        : [];
+      const overviewNode = document.getElementById('overviewContent');
+
+      setupNode.innerHTML = getBadgeHtml(setupState.label, setupState.badge);
+      setupMessage.textContent = summary.message || setupState.message;
+
+      document.getElementById('authStatus').textContent = humanizeStatus(authStatus);
+      document.getElementById('authType').textContent = state.catalog && state.catalog.auth
+        ? `Auth type: ${getAuthTypeDisplayLabel()}`
+        : 'Auth type unavailable';
+
+      document.getElementById('lastSyncStatus').textContent = lastSyncDisplay.status;
+      document.getElementById('lastSyncTime').textContent = lastSyncDisplay.detail;
+      document.getElementById('recordsSynced').textContent = formatNumber(lastSync && (lastSync.records_processed || lastSync.records_fetched || 0));
+      document.getElementById('entityCountSummary').textContent = entityEntries.length
+        ? `${entityEntries.length} entity type${entityEntries.length === 1 ? '' : 's'} tracked`
+        : (lastSyncDisplay.helper || 'No connector data yet');
+
+      overviewNode.innerHTML = `
+        <div class="max-w-5xl space-y-8">
+          <div class="rounded-lg border border-gray-200 bg-white">
+            <div class="border-b border-gray-200 px-6 py-4">
+              <h3 class="text-lg font-semibold text-gray-900">Configuration Status</h3>
+            </div>
+            <div class="p-6">
+              <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div>
+                  <div class="mb-4 flex items-center gap-3">
+                    ${setupState.badge === 'badge-green' ? `
+                      <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
+                        <svg class="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                      </div>
+                    ` : `
+                      <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-yellow-100">
+                        <svg class="h-5 w-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        </svg>
+                      </div>
+                    `}
+                    <div>
+                      <p class="font-medium text-gray-900">${escapeHtml(setupState.label)}</p>
+                      <p class="text-sm text-gray-500">${escapeHtml(setupState.message)}</p>
+                    </div>
+                  </div>
+
+                  ${configured ? `
+                    <div class="space-y-3">
+                      ${overviewStatusFields.length ? `
+                        ${renderBehaviorFieldRows(overviewStatusFields)}
+                      ` : `
+                        ${isOAuthConnector() ? `
+                          <div class="flex items-center justify-between text-sm">
+                            <span class="text-gray-500">OAuth Status</span>
+                            <span class="font-medium text-gray-900">${escapeHtml(humanizeStatus(state.configResponse?.auth_status || 'unknown'))}</span>
+                          </div>
+                          <div class="flex items-center justify-between text-sm">
+                            <span class="text-gray-500">Authorization</span>
+                            <span class="font-medium text-gray-900">${escapeHtml(isOAuthAuthorized() ? 'Connected' : 'Pending')}</span>
+                          </div>
+                        ` : config.import_directory || config.import_dir || config.documents_directory ? `
+                          <div class="flex items-center justify-between text-sm">
+                            <span class="text-gray-500">Import Directory</span>
+                            <code class="rounded bg-gray-100 px-2 py-1 text-right text-xs font-mono text-gray-900">${escapeHtml(config.import_directory || config.import_dir || config.documents_directory || 'Not set')}</code>
+                          </div>
+                        ` : ''}
+                        <div class="flex items-center justify-between text-sm">
+                          <span class="text-gray-500">Sync Frequency</span>
+                          <span class="font-medium text-gray-900">${escapeHtml(titleCase(config.sync_frequency || 'manual'))}</span>
+                        </div>
+                        <div class="flex items-center justify-between text-sm">
+                          <span class="text-gray-500">Last Sync</span>
+                          <span class="font-medium text-gray-900">${escapeHtml(lastSyncDisplay.relative)}</span>
+                        </div>
+                      `}
+                      ${lastSyncDisplay.helper ? `
+                        <div class="text-xs text-amber-700">${escapeHtml(lastSyncDisplay.helper)}</div>
+                      ` : ''}
+                      ${isOAuthConnector() && !isOAuthAuthorized() ? `
+                        <div class="text-xs text-amber-700">${escapeHtml(setupState.message)}</div>
+                      ` : ''}
+                    </div>
+                  ` : `
+                    <div class="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 p-4">
+                      <p class="mb-1 text-sm font-medium text-yellow-900">Configuration Required</p>
+                      <p class="text-sm text-yellow-700">This integration needs credentials or setup before LANA can sync data from it.</p>
+                    </div>
+                    <button type="button" onclick="switchTab('configuration')" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+                      Go to Configuration
+                    </button>
+                  `}
+                </div>
+
+                ${renderImportedDataList(entityEntries)}
+              </div>
+            </div>
+          </div>
+
+          <div class="prose prose-sm max-w-none">
+            <h2 class="mb-4 text-2xl font-bold text-gray-900">${escapeHtml(documentation.title)}</h2>
+
+            <section class="mb-8">
+              <h3 class="mb-3 text-lg font-semibold text-gray-900">Overview</h3>
+              ${documentation.overview.map((paragraph) => `
+                <p class="mb-4 leading-relaxed text-gray-600">${escapeHtml(paragraph)}</p>
+              `).join('')}
+            </section>
+
+            <section class="mb-8">
+              <h3 class="mb-3 text-lg font-semibold text-gray-900">Key Features</h3>
+              <ul class="list-inside list-disc space-y-2 text-gray-600">
+                ${documentation.keyFeatures.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}
+              </ul>
+            </section>
+
+            ${documentation.dataTypes.length ? `
+              <section class="mb-8">
+                <h3 class="mb-3 text-lg font-semibold text-gray-900">Data Types</h3>
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  ${documentation.dataTypes.map((item) => `
+                    <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                      <h4 class="mb-2 font-medium text-gray-900">${escapeHtml(item.name || titleCase(item.entity_type || 'Data'))}</h4>
+                      <p class="text-sm text-gray-600">${escapeHtml(item.description || '')}</p>
+                    </div>
+                  `).join('')}
+                </div>
+              </section>
+            ` : ''}
+
+            <section class="mb-8">
+              <h3 class="mb-3 text-lg font-semibold text-gray-900">Getting Started</h3>
+              <ol class="list-inside list-decimal space-y-2 text-gray-600">
+                ${documentation.gettingStarted.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}
+              </ol>
+            </section>
+
+            ${documentation.requiredFiles.length ? `
+              <section class="mb-8">
+                <h3 class="mb-3 text-lg font-semibold text-gray-900">Required Files</h3>
+                <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                  <ul class="space-y-2 text-sm">
+                    ${documentation.requiredFiles.map((item) => `
+                      <li class="flex items-start gap-2">
+                        <code class="rounded bg-gray-200 px-2 py-1 text-xs font-mono">${escapeHtml(item.path || item.name || '')}</code>
+                        <span class="text-gray-600">${escapeHtml(item.description || '')}</span>
+                      </li>
+                    `).join('')}
+                  </ul>
+                </div>
+              </section>
+            ` : ''}
+
+            <section class="mb-8">
+              <h3 class="mb-3 text-lg font-semibold text-gray-900">Troubleshooting</h3>
+              <div class="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                <p class="mb-2 text-sm font-medium text-blue-900">Common Issues:</p>
+                <ul class="ml-4 list-inside list-disc space-y-1 text-sm text-blue-700">
+                  ${documentation.troubleshooting.map((item) => `
+                    <li><strong>${escapeHtml(item.title || 'Issue')}:</strong> ${escapeHtml(item.detail || item)}</li>
+                  `).join('')}
+                </ul>
+              </div>
+            </section>
+
+            <section>
+              <h3 class="mb-3 text-lg font-semibold text-gray-900">Support</h3>
+              <p class="mb-3 text-gray-600">${escapeHtml(documentation.support)}</p>
+              <button type="button" onclick="window.location.href='/help.html'" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+                Submit Support Ticket
+              </button>
+            </section>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderConfiguration() {
+      const connectionPanel = document.getElementById('apiConnectionPanel');
+      const configForm = document.getElementById('configForm');
+      const authModes = getAvailableAuthModes();
+      const selectedAuthMode = getSelectedAuthMode();
+      const selectedAuthType = getSelectedAuthModeType();
+      const authFields = getCatalogAuthFields();
+      const settingsFields = getCatalogSettingsFields();
+      const dynamicFields = getCatalogDynamicFields();
+      const savedConfig = state.configResponse && state.configResponse.config ? state.configResponse.config : {};
+      const currentConfig = {
+        ...savedConfig,
+        ...(state.formDraft || {})
+      };
+      const fields = [...authFields, ...settingsFields];
+      const lastSyncDisplay = getLastSyncHeadline();
+      const docsUrl = getDocumentationLink();
+      const effectiveApiBase = getEffectiveApiBase();
+      const authTypeLabel = getAuthTypeDisplayLabel();
+      const supportsCredentialTest = supportsSharedCredentialTest();
+      const isOauthConnector = isOAuthConnector();
+      const oauthAuthorized = isOAuthAuthorized();
+      const setupState = getConnectorSetupState();
+      const maskedFields = fields
+        .filter((field) => currentConfig[field.name] && field.type === 'password')
+        .map((field) => ({
+          label: field.label || titleCase(field.name),
+          value: currentConfig[field.name]
+        }));
+
+      connectionPanel.innerHTML = `
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div class="connector-label">${escapeHtml(state.connectorName)} Connection</div>
+            <div class="mt-2 text-sm text-gray-500">This shared panel keeps API-flow connector setup opinionated and consistent across every connector UI.</div>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            ${isOauthConnector ? `
+              <button type="button" id="connectOAuthBtn" onclick="connectOAuthConnector()" class="rounded-xl border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
+                ${oauthAuthorized ? 'Reconnect' : `Connect ${escapeHtml(state.connectorName)}`}
+              </button>
+            ` : ''}
+            ${supportsCredentialTest ? `
+              <button type="button" id="testConnectionBtn" onclick="testConnection()" class="rounded-xl border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
+                Test Connection
+              </button>
+            ` : ''}
+            <button type="button" id="disconnectConnectorBtn" onclick="disconnectConnector()" class="rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50">
+              Disconnect
+            </button>
+          </div>
+        </div>
+
+        <div class="mt-6 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          <div class="rounded-xl border border-gray-200 p-4">
+            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Status</div>
+            <div class="mt-3">${getBadgeHtml(setupState.label, setupState.badge)}</div>
+            <div class="mt-3 text-sm text-gray-500">${escapeHtml(setupState.message)}</div>
+          </div>
+          <div class="rounded-xl border border-gray-200 p-4">
+            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Auth Type</div>
+            <div class="mt-3 text-lg font-semibold text-gray-900">${escapeHtml(authTypeLabel)}</div>
+            <div class="mt-2 text-sm text-gray-500">${escapeHtml(humanizeStatus(state.configResponse ? state.configResponse.auth_status : 'unknown'))}</div>
+          </div>
+          <div class="rounded-xl border border-gray-200 p-4">
+            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Last Sync</div>
+            <div class="mt-3 text-lg font-semibold text-gray-900">${escapeHtml(lastSyncDisplay.relative)}</div>
+            <div class="mt-2 text-sm text-gray-500">${escapeHtml(lastSyncDisplay.detail)}</div>
+          </div>
+          <div class="rounded-xl border border-gray-200 p-4">
+            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">API Base</div>
+            <div class="mt-3 break-all text-sm font-semibold text-gray-900">${escapeHtml(effectiveApiBase)}</div>
+            <div class="mt-2 text-sm text-gray-500">${docsUrl ? `<a href="${escapeHtml(docsUrl)}" target="_blank" rel="noreferrer" class="text-blue-600 hover:text-blue-700">API Documentation</a>` : 'Connector docs not provided in catalog.'}</div>
+          </div>
+        </div>
+
+        ${maskedFields.length ? `
+          <div class="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <div class="text-sm font-semibold text-gray-900">Stored Credentials</div>
+            <div class="mt-3 grid gap-6 md:grid-cols-2">
+              ${maskedFields.map((field) => `
+                <div class="rounded-lg border border-gray-200 bg-white px-3 py-2">
+                  <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">${escapeHtml(field.label)}</div>
+                  <div class="mt-1 connector-mono text-sm text-gray-900">${escapeHtml(field.value)}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+      `;
+
+      if (!fields.length) {
+        configForm.innerHTML = `
+          <div class="rounded-2xl border border-dashed border-gray-300 p-6 text-sm text-gray-500">
+            This connector does not expose configurable fields in the catalog yet.
+          </div>
+        `;
+      } else {
+        configForm.innerHTML = `
+          ${authFields.length ? `
+            <div>
+              <div class="connector-label">Authentication</div>
+              <div class="mt-2 text-sm text-gray-500">Provide the credentials required by this connector.</div>
+            </div>
+            ${authModes.length > 1 ? `
+              <label class="block">
+                <div class="mb-2 text-sm font-medium text-gray-900">Authentication Method</div>
+                <select
+                  id="authModeSelect"
+                  name="auth_type"
+                  onchange="handleAuthModeChange()"
+                  class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                >
+                  ${authModes.map((mode) => `
+                    <option value="${escapeHtml(mode.type)}" ${mode.type === selectedAuthType ? 'selected' : ''}>${escapeHtml(getAuthModeDisplayLabel(mode))}</option>
+                  `).join('')}
+                </select>
+                <p class="mt-2 text-xs text-gray-500">The shared viewer renders the selected auth path from the connector package. Save before testing or connecting.</p>
+              </label>
+            ` : ''}
+            ${authFields.map((field) => renderField(field, currentConfig[field.name])).join('')}
+          ` : ''}
+
+          ${settingsFields.length || dynamicFields.length ? `
+            <div>
+              <div class="connector-label">Connector Settings</div>
+              <div class="mt-2 text-sm text-gray-500">Fields are rendered from the connector catalog so every connector follows the same shared UI contract.</div>
+            </div>
+            ${settingsFields.map((field) => renderField(field, currentConfig[field.name])).join('')}
+          ` : ''}
+
+          ${dynamicFields.map((field) => `<div id="dynamic-field-${escapeHtml(field.name)}"></div>`).join('')}
+          <div class="flex flex-wrap gap-3 pt-2">
+            <button type="button" onclick="saveConfiguration()" class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+              Save Configuration
+            </button>
+            ${supportsCredentialTest ? `
+              <button type="button" onclick="testConnection()" class="rounded-xl border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
+                Test Connection
+              </button>
+            ` : ''}
+          </div>
+        `;
+      }
+
+      dynamicFields.forEach((field) => {
+        if (field.type === 'array') {
+          renderArrayField(field, currentConfig[field.name]);
+        }
+      });
+
+      const syncFrequency = document.getElementById('syncFrequency');
+      const scheduledSyncTime = document.getElementById('scheduledSyncTime');
+      const syncValue = currentConfig.sync_frequency || 'manual';
+      syncFrequency.value = ['manual', 'hourly', 'daily', 'weekly'].includes(syncValue) ? syncValue : 'manual';
+      scheduledSyncTime.value = currentConfig.scheduled_sync_time || '';
+      syncFrequency.onchange = updateSyncSettingsVisibility;
+      updateSyncSettingsVisibility();
+
+      const configStatusSummary = document.getElementById('configStatusSummary');
+      const configuredFields = Object.keys(currentConfig).filter((key) => !key.endsWith('_configured') && !['sync_frequency', 'scheduled_sync_time', 'sync_interval_minutes'].includes(key));
+      const configSummaryFields = Array.isArray(getUiBehavior().configuration?.summary_items)
+        ? getUiBehavior().configuration.summary_items
+        : [];
+      const summaryItems = [
+        `<div class="flex items-start justify-between gap-6"><span class="text-gray-500">Configured fields</span><span class="font-medium text-gray-900">${configuredFields.length}</span></div>`,
+        ...configSummaryFields.map((field) => `<div class="flex items-start justify-between gap-6"><span class="text-gray-500">${escapeHtml(field.label || 'Value')}</span><span class="font-medium text-gray-900">${escapeHtml(getBehaviorFieldValue(field))}</span></div>`),
+        `<div class="flex items-start justify-between gap-6"><span class="text-gray-500">Auth status</span><span class="font-medium text-gray-900">${escapeHtml(humanizeStatus(state.configResponse ? state.configResponse.auth_status : 'unknown'))}</span></div>`,
+        `<div class="flex items-start justify-between gap-6"><span class="text-gray-500">Sync status</span><span class="font-medium text-gray-900">${escapeHtml(humanizeStatus(state.configResponse ? state.configResponse.sync_status : 'unknown'))}</span></div>`,
+        `<div class="flex items-start justify-between gap-6"><span class="text-gray-500">Sync frequency</span><span class="font-medium text-gray-900">${escapeHtml(titleCase(currentConfig.sync_frequency || 'manual'))}</span></div>`
+      ];
+      configStatusSummary.innerHTML = summaryItems.join('');
+
+      const testButton = document.getElementById('testConnectionBtn');
+      if (testButton) {
+        testButton.classList.toggle('hidden', !supportsCredentialTest || state.iframeOnlyFallback);
+      }
+
+      state.authModeDraft = selectedAuthMode?.type || '';
+    }
+
+    function renderRunTab() {
+      const node = document.getElementById('runTabContent');
+      if (!node) return;
+
+      const lastSyncDisplay = getLastSyncHeadline();
+      const syncFrequency = getConfigValue('sync_frequency', 'manual');
+      const ready = isConnectorReady();
+      const setupState = getConnectorSetupState();
+      const docsUrl = getDocumentationLink();
+      const disabledAttr = ready ? '' : 'disabled aria-disabled="true"';
+      const buttonDisabledClass = ready ? '' : ' opacity-60 cursor-not-allowed';
+      const inputDisabledClass = ready ? '' : ' bg-gray-100 text-gray-500 cursor-not-allowed';
+      const runModel = getRunTabModel();
+      const supportsValidationHarness = Boolean(runModel.supportsValidationHarness && isApiConnector());
+
+      node.innerHTML = `
+        <div class="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,1fr)]">
+          <div class="space-y-6">
+            <div class="rounded-2xl border border-gray-200 p-5">
+              <div class="connector-label">Manual Sync</div>
+              <div class="mt-2 text-sm text-gray-500">Use this tab to trigger syncs manually and validate that the connector configuration behaves correctly.</div>
+              <div class="mt-8 space-y-8">
+                ${ready ? '' : `
+                  <div class="rounded-2xl border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-900">
+                    <div class="font-semibold">${escapeHtml(setupState.label)}</div>
+                    <p class="mt-2">${escapeHtml(setupState.message)}</p>
+                  </div>
+                `}
+                <div class="grid gap-6 md:grid-cols-3">
+                  <div class="rounded-xl border border-gray-200 p-4">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Last Sync</div>
+                    <div class="mt-2 text-lg font-semibold text-gray-900">${escapeHtml(lastSyncDisplay.relative)}</div>
+                    <div class="mt-2 text-sm text-gray-500">${escapeHtml(lastSyncDisplay.detail)}</div>
+                  </div>
+                  <div class="rounded-xl border border-gray-200 p-4">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Sync Frequency</div>
+                    <div class="mt-2 text-lg font-semibold text-gray-900">${escapeHtml(titleCase(syncFrequency))}</div>
+                  </div>
+                  <div class="rounded-xl border border-gray-200 p-4">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Status</div>
+                    <div class="mt-2 text-lg font-semibold text-gray-900">${escapeHtml(humanizeStatus(state.configResponse ? state.configResponse.sync_status : 'unknown'))}</div>
+                  </div>
+                </div>
+
+                <div class="rounded-2xl border border-green-200 bg-green-50 p-6">
+                  <div class="text-sm font-semibold text-gray-900">${escapeHtml(runModel.syncTitle)}</div>
+                  <div class="mt-2 text-sm text-gray-600">${escapeHtml(runModel.syncDescription)}</div>
+                  ${runModel.quickRanges.length ? `
+                    <div class="mt-6 flex flex-wrap gap-3">
+                      ${runModel.quickRanges.map((days) => `
+                        <button type="button" onclick="setDateRange(${days})" ${disabledAttr} class="rounded-xl border border-green-200 bg-white px-3 py-2 text-sm font-semibold text-green-700 hover:bg-green-100${buttonDisabledClass}">${days === 7 ? 'Last 7 days' : days === 30 ? 'Last 30 days' : days === 90 ? 'Last 90 days' : days === 180 ? 'Last 6 months' : 'Last year'}</button>
+                      `).join('')}
+                    </div>
+                    <div class="mt-6 grid gap-6 md:grid-cols-2">
+                      <label class="block">
+                        <div class="mb-2 text-sm font-medium text-gray-900">Start Date</div>
+                        <input id="runStartDate" type="date" ${disabledAttr} class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200${inputDisabledClass}">
+                      </label>
+                      <label class="block">
+                        <div class="mb-2 text-sm font-medium text-gray-900">End Date</div>
+                        <input id="runEndDate" type="date" ${disabledAttr} class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200${inputDisabledClass}">
+                      </label>
+                    </div>
+                  ` : `
+                    <div class="mt-6 rounded-xl border border-green-200 bg-white p-4 text-sm text-green-900">
+                      This connector does not use run-time date windows. Adjust scope in Configuration, then run a full manual sync.
+                    </div>
+                  `}
+                  <div class="mt-6">
+                    <button type="button" onclick="runManualSync()" ${disabledAttr} class="rounded-xl bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700${buttonDisabledClass}">
+                      ${escapeHtml(runModel.buttonLabel)}
+                    </button>
+                  </div>
+                </div>
+
+                <div class="rounded-2xl border border-blue-200 bg-blue-50 p-6 text-sm text-blue-900">
+                  <div class="font-semibold">${escapeHtml(runModel.aboutTitle)}</div>
+                  <p class="mt-2">${escapeHtml(runModel.aboutBody)}</p>
+                </div>
+              </div>
+            </div>
+
+            ${isApiConnector() && supportsValidationHarness ? `
+              <div class="rounded-2xl border border-gray-200 p-5">
+                <div class="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <div class="connector-label">Validation Harness</div>
+                    <div class="mt-2 text-sm text-gray-500">Make ad-hoc API requests against ${escapeHtml(state.connectorName)} to validate credentials, inspect payloads, or test specific endpoints.</div>
+                  </div>
+                  ${docsUrl ? `<a href="${escapeHtml(docsUrl)}" target="_blank" rel="noreferrer" class="text-sm font-semibold text-blue-600 hover:text-blue-700">API Documentation</a>` : ''}
+                </div>
+                <div class="mt-8 space-y-8">
+                  <div class="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
+                    <div class="font-semibold">Rate Limit & Responsible Usage</div>
+                    <p class="mt-2">Use this harness for validation and small targeted checks. Avoid repeated large-volume calls and rely on normal sync runs for regular collection.</p>
+                  </div>
+
+                  <div class="space-y-7">
+                    <label class="block">
+                      <div class="mb-3 text-sm font-medium text-gray-900">Method</div>
+                      <select id="customRequestMethod" ${disabledAttr} class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200${inputDisabledClass}">
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="PATCH">PATCH</option>
+                        <option value="DELETE">DELETE</option>
+                      </select>
+                    </label>
+
+                    <label class="block">
+                      <div class="mb-3 text-sm font-medium text-gray-900">Endpoint Path</div>
+                      <input id="customRequestPath" type="text" placeholder="/users/me" ${disabledAttr} class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200${inputDisabledClass}">
+                    </label>
+
+                    <div class="grid gap-6 md:grid-cols-2">
+                      <label class="block">
+                        <div class="mb-3 text-sm font-medium text-gray-900">Query Parameters (optional)</div>
+                        <textarea id="customRequestQuery" rows="5" ${disabledAttr} class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm font-mono focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200${inputDisabledClass}">{}</textarea>
+                      </label>
+                      <label class="block">
+                        <div class="mb-3 text-sm font-medium text-gray-900">JSON Body (optional)</div>
+                        <textarea id="customRequestBody" rows="5" ${disabledAttr} class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm font-mono focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200${inputDisabledClass}">{}</textarea>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="flex flex-wrap gap-3">
+                    <button type="button" onclick="executeCustomApiRequest()" ${disabledAttr} class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700${buttonDisabledClass}">
+                      Execute Request
+                    </button>
+                    <button type="button" onclick="clearCustomApiRequest()" ${disabledAttr} class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50${buttonDisabledClass}">
+                      Clear
+                    </button>
+                  </div>
+
+                  <pre id="customRequestResponse" class="min-h-[160px] overflow-x-auto rounded-xl bg-gray-950 p-4 text-xs text-gray-100">Run a request to see the response here.</pre>
+                </div>
+              </div>
+            ` : isApiConnector() ? `
+              <div class="rounded-2xl border border-gray-200 bg-gray-50 p-5">
+                <div class="connector-label">Validation Harness</div>
+                <div class="mt-3 text-sm text-gray-600">This connector signs requests through package hooks, so the shared ad-hoc request harness is not available yet. Save the configuration and use a manual sync as the validation path for now.</div>
+                ${docsUrl ? `<div class="mt-4"><a href="${escapeHtml(docsUrl)}" target="_blank" rel="noreferrer" class="text-sm font-semibold text-blue-600 hover:text-blue-700">API Documentation</a></div>` : ''}
+              </div>
+            ` : ''}
+          </div>
+
+          <div class="space-y-6">
+            <div class="rounded-2xl border border-gray-200 bg-gray-50 p-5">
+              <div class="connector-label">Run Guidance</div>
+              <ul class="mt-4 space-y-3 text-sm text-gray-700">
+                ${runModel.runGuidance.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}
+              </ul>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderDataRuleBuilder() {
+      const container = document.getElementById('dataRulesContainer');
+      if (!container) return;
+
+      if (!state.dataRules.length) {
+        container.innerHTML = `
+          <div class="rounded-xl border border-dashed border-gray-300 p-4 text-sm text-gray-500">
+            No rules yet. Add rules for field-level matching such as email contains, status equals, or source field exists.
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = state.dataRules.map((rule, index) => `
+        <div class="data-rule-row grid gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 lg:grid-cols-[minmax(0,1.3fr)_180px_minmax(0,1fr)_56px]" data-index="${index}">
+          <input data-role="field" type="text" value="${escapeHtml(rule.field || '')}" placeholder="Field key or external_id" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+          <select data-role="operator" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+            ${['contains', 'not_contains', 'equals', 'not_equals', 'starts_with', 'ends_with', 'exists', 'not_exists'].map((operator) => `
+              <option value="${operator}" ${rule.operator === operator ? 'selected' : ''}>${operator}</option>
+            `).join('')}
+          </select>
+          <input data-role="value" type="text" value="${escapeHtml(rule.value || '')}" placeholder="Filter value" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+          <button type="button" onclick="removeDataRule(${index})" class="rounded-xl border border-red-200 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50">X</button>
+        </div>
+      `).join('');
+    }
+
+    function syncDataRulesFromDom() {
+      const rows = document.querySelectorAll('.data-rule-row');
+      state.dataRules = Array.from(rows).map((row) => ({
+        field: row.querySelector('[data-role="field"]').value.trim(),
+        operator: row.querySelector('[data-role="operator"]').value,
+        value: row.querySelector('[data-role="value"]').value
+      })).filter((rule) => rule.field);
+    }
+
+    function addDataRule() {
+      syncDataRulesFromDom();
+      state.dataRules.push({ field: '', operator: 'contains', value: '' });
+      renderDataRuleBuilder();
+    }
+
+    function removeDataRule(index) {
+      syncDataRulesFromDom();
+      state.dataRules.splice(index, 1);
+      renderDataRuleBuilder();
+    }
+
+    function getCurrentDataFilters() {
+      syncDataRulesFromDom();
+      return {
+        q: document.getElementById('dataSearchInput')?.value.trim() || '',
+        entity_type: document.getElementById('entityTypeFilter')?.value || '',
+        sort_by: document.getElementById('dataSortBy')?.value || 'synced_at',
+        sort_dir: document.getElementById('dataSortDir')?.value || 'desc',
+        filters: state.dataRules
+      };
+    }
+
+    function renderField(field, value) {
+      const safeName = escapeHtml(field.name);
+      const safeLabel = escapeHtml(field.label || field.name);
+      const safeHelp = field.help_text ? `<p class="mt-2 text-xs text-gray-500">${escapeHtml(field.help_text)}</p>` : '';
+      const requiredMark = field.required ? '<span class="text-red-500">*</span>' : '';
+      const fieldOptions = getSelectableFieldOptions(field, value);
+
+      if (field.type === 'boolean') {
+        return `
+          <label class="block rounded-2xl border border-gray-200 p-4">
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <div class="text-sm font-medium text-gray-900">${safeLabel} ${requiredMark}</div>
+                ${safeHelp}
+              </div>
+              <input type="checkbox" name="${safeName}" ${value ? 'checked' : ''} class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+            </div>
+          </label>
+        `;
+      }
+
+      if (field.type === 'select') {
+        const currentValue = value == null ? '' : String(value);
+        return `
+          <label class="block">
+            <div class="mb-2 text-sm font-medium text-gray-900">${safeLabel} ${requiredMark}</div>
+            <select
+              name="${safeName}"
+              data-required="${field.required ? 'true' : 'false'}"
+              ${field.required ? 'required' : ''}
+              class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            >
+              ${fieldOptions.map((option) => {
+                const optionValue = String(option?.value ?? '');
+                const optionLabel = String(option?.label ?? optionValue);
+                return `<option value="${escapeHtml(optionValue)}" ${optionValue === currentValue ? 'selected' : ''}>${escapeHtml(optionLabel)}</option>`;
+              }).join('')}
+            </select>
+            ${safeHelp}
+          </label>
+        `;
+      }
+
+      if (field.type === 'multiselect') {
+        const selectedValues = Array.isArray(value)
+          ? value.map((item) => String(item))
+          : (typeof value === 'string' && value
+            ? value.split(',').map((item) => item.trim()).filter(Boolean)
+            : []);
+        return `
+          <label class="block">
+            <div class="mb-2 text-sm font-medium text-gray-900">${safeLabel} ${requiredMark}</div>
+            <select
+              name="${safeName}"
+              multiple
+              data-required="${field.required ? 'true' : 'false'}"
+              ${field.required ? 'required' : ''}
+              class="min-h-[140px] w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            >
+              ${fieldOptions.map((option) => {
+                const optionValue = String(option?.value ?? '');
+                const optionLabel = String(option?.label ?? optionValue);
+                return `<option value="${escapeHtml(optionValue)}" ${selectedValues.includes(optionValue) ? 'selected' : ''}>${escapeHtml(optionLabel)}</option>`;
+              }).join('')}
+            </select>
+            ${safeHelp}
+          </label>
+        `;
+      }
+
+      if (field.type === 'multiselect_dynamic') {
+        const selectedValues = Array.isArray(value)
+          ? value.map((item) => String(item))
+          : (typeof value === 'string' && value
+            ? value.split(',').map((item) => item.trim()).filter(Boolean)
+            : []);
+        const isLoading = Boolean(state.dynamicFieldLoading[field.name]);
+        const errorMessage = state.dynamicFieldErrors[field.name];
+        const buttonLabel = getDynamicDiscoveryButtonLabel(field);
+        return `
+          <label class="block">
+            <div class="mb-2 flex flex-wrap items-center justify-between gap-3">
+              <div class="text-sm font-medium text-gray-900">${safeLabel} ${requiredMark}</div>
+              <button
+                type="button"
+                onclick="discoverDynamicFieldOptions('${escapeHtml(field.name)}')"
+                class="rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50 ${isLoading ? 'opacity-60 cursor-wait' : ''}"
+                ${isLoading ? 'disabled aria-disabled="true"' : ''}
+              >
+                ${escapeHtml(isLoading ? 'Loading…' : buttonLabel)}
+              </button>
+            </div>
+            <select
+              name="${safeName}"
+              multiple
+              data-required="${field.required ? 'true' : 'false'}"
+              ${field.required ? 'required' : ''}
+              class="min-h-[140px] w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            >
+              ${fieldOptions.map((option) => {
+                const optionValue = String(option?.value ?? '');
+                const optionLabel = String(option?.label ?? optionValue);
+                return `<option value="${escapeHtml(optionValue)}" ${selectedValues.includes(optionValue) ? 'selected' : ''}>${escapeHtml(optionLabel)}</option>`;
+              }).join('')}
+            </select>
+            ${safeHelp}
+            <p class="mt-2 text-xs text-gray-500">${fieldOptions.length ? `${fieldOptions.length} option${fieldOptions.length === 1 ? '' : 's'} available.` : 'No options loaded yet. Discover options after entering the required configuration above.'}</p>
+            ${errorMessage ? `<p class="mt-2 text-xs text-red-600">${escapeHtml(errorMessage)}</p>` : ''}
+          </label>
+        `;
+      }
+
+      const inputType = field.type === 'password'
+        ? 'password'
+        : field.type === 'number'
+          ? 'number'
+          : field.type === 'date'
+            ? 'date'
+          : 'text';
+      const inputValue = value == null ? '' : String(value);
+
+      return `
+        <label class="block">
+          <div class="mb-2 text-sm font-medium text-gray-900">${safeLabel} ${requiredMark}</div>
+          <input
+            name="${safeName}"
+            type="${inputType}"
+            value="${escapeHtml(inputValue)}"
+            data-required="${field.required ? 'true' : 'false'}"
+            ${field.required ? 'required' : ''}
+            class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+          >
+          ${safeHelp}
+        </label>
+      `;
+    }
+
+    function renderBulkActionSummary() {
+      const node = document.getElementById('bulkActionSummary');
+      if (!node) return;
+
+      const rows = state.dataPreview && Array.isArray(state.dataPreview.data) ? state.dataPreview.data : [];
+      node.innerHTML = `
+        <div class="space-y-2">
+          <div class="flex items-center justify-between gap-4">
+            <span>Selected rows</span>
+            <span class="font-semibold text-gray-900">${state.selectedDataIds.length}</span>
+          </div>
+          <div class="flex items-center justify-between gap-4">
+            <span>Visible rows</span>
+            <span class="font-semibold text-gray-900">${rows.length}</span>
+          </div>
+          <div class="flex items-center justify-between gap-4">
+            <span>Filtered total</span>
+            <span class="font-semibold text-gray-900">${formatNumber(state.dataPreview?.pagination?.total || 0)}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderDataGroups() {
+      const node = document.getElementById('dataGroupsPanel');
+      if (!node) return;
+      const groups = state.dataGroups && Array.isArray(state.dataGroups.groups) ? state.dataGroups.groups : [];
+
+      if (!groups.length) {
+        node.innerHTML = `
+          <div class="connector-label">Grouped Collections</div>
+          <div class="mt-3 text-sm text-gray-500">No group breakdown is available for the current filter yet.</div>
+        `;
+        return;
+      }
+
+      node.innerHTML = `
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div class="connector-label">Grouped Collections</div>
+            <div class="mt-2 text-sm text-gray-500">Assign collections such as sheets or entity groups to matters without hand-editing records one by one.</div>
+          </div>
+        </div>
+        <div class="mt-4 overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200 text-sm">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-3 text-left font-semibold text-gray-600">Group</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-600">Type</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-600">Rows</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-600">Assigned</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-600">Action</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 bg-white">
+              ${groups.slice(0, 12).map((group) => `
+                <tr>
+                  <td class="px-4 py-3 align-top">
+                    <div class="font-semibold text-gray-900">${escapeHtml(group.label || group.sheet_name || titleCase(group.entity_type))}</div>
+                    <div class="mt-1 text-xs text-gray-500">${escapeHtml(group.group_key)}</div>
+                  </td>
+                  <td class="px-4 py-3 align-top text-gray-700">${escapeHtml(group.group_type)}</td>
+                  <td class="px-4 py-3 align-top text-gray-700">${formatNumber(group.row_count)}</td>
+                  <td class="px-4 py-3 align-top text-gray-700">${escapeHtml(group.assigned_matter_name || 'Unassigned')}</td>
+                  <td class="px-4 py-3 align-top">
+                    <button type="button" onclick="assignGroupToMatter('${encodeURIComponent(group.group_type || '')}', '${encodeURIComponent(group.spreadsheet_id || '')}', '${encodeURIComponent(group.sheet_name || '')}', '${encodeURIComponent(group.entity_type || '')}')" class="rounded-lg border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+                      Assign Group
+                    </button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function renderRecordDetail() {
+      const node = document.getElementById('recordDetailPanel');
+      const backdrop = document.getElementById('recordDetailBackdrop');
+      if (!node) return;
+
+      if (!state.selectedRecord) {
+        node.className = 'hidden fixed inset-y-0 right-0 z-40 w-full max-w-2xl overflow-y-auto border-l border-gray-200 bg-white shadow-2xl';
+        node.innerHTML = '';
+        if (backdrop) {
+          backdrop.classList.add('hidden');
+        }
+        return;
+      }
+
+      const record = state.selectedRecord;
+      const annotations = Array.isArray(state.recordAnnotations) ? state.recordAnnotations : [];
+      node.className = 'fixed inset-y-0 right-0 z-40 w-full max-w-2xl overflow-y-auto border-l border-gray-200 bg-white shadow-2xl';
+      if (backdrop) {
+        backdrop.classList.remove('hidden');
+      }
+
+      node.innerHTML = `
+        <div class="min-h-full bg-white">
+          <div class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-gray-200 bg-white px-6 py-5">
+            <div>
+              <div class="connector-label">Record Detail</div>
+              <div class="mt-2 text-sm text-gray-500">Inspect the source payload, review annotations, and shortlist corrections without overwriting the synced snapshot.</div>
+            </div>
+            <button type="button" onclick="closeRecordDetail()" class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+              Close
+            </button>
+          </div>
+
+          <div class="space-y-6 p-6">
+            <div class="grid gap-6 md:grid-cols-2">
+              <div class="rounded-xl border border-gray-200 bg-white p-4">
+                <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Entity</div>
+                <div class="mt-2 text-lg font-semibold text-gray-900">${escapeHtml(record.entity_type || '')}</div>
+              </div>
+              <div class="rounded-xl border border-gray-200 bg-white p-4">
+                <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">External ID</div>
+                <div class="mt-2 connector-mono text-sm font-semibold text-gray-900">${escapeHtml(record.external_id || '')}</div>
+              </div>
+            </div>
+
+            <div class="rounded-xl border border-gray-200 bg-white p-4">
+              <div class="text-sm font-semibold text-gray-900">Source Payload</div>
+              <pre class="mt-4 max-h-[420px] overflow-auto rounded-xl bg-gray-950 p-4 text-xs text-gray-100">${escapeHtml(JSON.stringify(record.data || {}, null, 2))}</pre>
+            </div>
+
+            <div class="rounded-xl border border-gray-200 bg-white p-4">
+              <div class="text-sm font-semibold text-gray-900">Shortlist A Correction</div>
+              <div class="mt-2 text-sm text-gray-500">Propose an edit without overwriting the source record. LANA stores the suggested change as a correction annotation.</div>
+              <div class="mt-4 space-y-3">
+                <label class="block">
+                  <div class="mb-2 text-sm font-medium text-gray-900">Field Key</div>
+                  <input id="recordCorrectionField" type="text" placeholder="email, status, title..." class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                </label>
+                <label class="block">
+                  <div class="mb-2 text-sm font-medium text-gray-900">Proposed Value</div>
+                  <textarea id="recordCorrectionValue" rows="4" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"></textarea>
+                </label>
+                <label class="block">
+                  <div class="mb-2 text-sm font-medium text-gray-900">Notes</div>
+                  <textarea id="recordCorrectionNotes" rows="3" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" placeholder="Why this should be corrected or reviewed"></textarea>
+                </label>
+                <button type="button" onclick="submitRecordCorrection()" class="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600">
+                  Shortlist Correction
+                </button>
+              </div>
+            </div>
+
+            <div class="rounded-xl border border-gray-200 bg-white p-4">
+              <div class="text-sm font-semibold text-gray-900">Annotations</div>
+              <div class="mt-3 space-y-3">
+                ${annotations.length ? annotations.map((annotation) => `
+                  <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <div class="flex items-center justify-between gap-3">
+                      <span>${renderLogStatus(annotation.annotation_type || 'note')}</span>
+                      <span class="text-xs text-gray-500">${escapeHtml(formatDateTime(annotation.created_at))}</span>
+                    </div>
+                    <div class="mt-2 text-xs font-semibold uppercase tracking-wide text-gray-500">${escapeHtml(annotation.field_key || 'record')}</div>
+                    <pre class="mt-2 overflow-x-auto whitespace-pre-wrap rounded-lg bg-white p-3 text-xs text-gray-700">${escapeHtml(JSON.stringify(annotation.value || {}, null, 2))}</pre>
+                  </div>
+                `).join('') : '<div class="text-sm text-gray-500">No annotations on this record yet.</div>'}
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function closeRecordDetail() {
+      state.selectedRecordId = '';
+      state.selectedRecord = null;
+      state.recordAnnotations = [];
+      renderDataPreview();
+    }
+
+    function renderDataPreview() {
+      const meta = document.getElementById('dataPreviewMeta');
+      const container = document.getElementById('dataPreviewTable');
+      const selectedSummary = document.getElementById('selectedDataSummary');
+      const response = state.dataPreview;
+      const rows = response && Array.isArray(response.data) ? response.data : [];
+      const pagination = response && response.pagination ? response.pagination : null;
+
+      if (!rows.length) {
+        state.selectedDataIds = [];
+        selectedSummary.textContent = 'No rows selected';
+        renderBulkActionSummary();
+        renderRecordDetail();
+        meta.textContent = 'No connector data found for this filter.';
+        container.innerHTML = '<div class="p-8 text-center text-sm text-gray-500">No records to preview.</div>';
+        return;
+      }
+
+      if (state.selectedRecordId) {
+        state.selectedRecord = rows.find((row) => row.id === state.selectedRecordId) || state.selectedRecord;
+      }
+
+      meta.textContent = pagination
+        ? `Showing ${rows.length} of ${formatNumber(pagination.total)} records`
+        : `Showing ${rows.length} records`;
+      selectedSummary.textContent = `${state.selectedDataIds.length} selected`;
+
+      container.innerHTML = `
+        <table class="min-w-full divide-y divide-gray-200 text-sm">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-3 text-left font-semibold text-gray-600">
+                <input type="checkbox" ${state.selectedDataIds.length && state.selectedDataIds.length === rows.length ? 'checked' : ''} onchange="toggleAllDataSelection(this.checked)">
+              </th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-600">Entity</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-600">External ID</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-600">Matter</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-600">Health</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-600">Synced</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-600">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200 bg-white">
+            ${rows.map((row) => `
+              <tr class="${state.selectedRecordId === row.id ? 'bg-blue-50' : ''}">
+                <td class="px-4 py-3 align-top">
+                  <input type="checkbox" ${state.selectedDataIds.includes(row.id) ? 'checked' : ''} onchange="toggleDataSelection('${escapeHtml(row.id)}', this.checked)">
+                </td>
+                <td class="px-4 py-3 align-top">
+                  <div class="font-semibold text-gray-900">${escapeHtml(titleCase(row.entity_type || 'record'))}</div>
+                </td>
+                <td class="px-4 py-3 align-top connector-mono text-gray-700">${escapeHtml(row.external_id || '')}</td>
+                <td class="px-4 py-3 align-top text-gray-700">${escapeHtml(row.matter_name || 'Unassigned')}</td>
+                <td class="px-4 py-3 align-top">
+                  <div class="flex flex-wrap gap-2">
+                    ${row.has_corrections ? getBadgeHtml('Corrections', 'badge-yellow') : getBadgeHtml('Clean', 'badge-green')}
+                    ${row.annotation_count ? getBadgeHtml(`${row.annotation_count} annotations`, 'badge-slate') : ''}
+                  </div>
+                </td>
+                <td class="px-4 py-3 align-top text-gray-600">${escapeHtml(formatDateTime(row.synced_at))}</td>
+                <td class="px-4 py-3 align-top">
+                  <div class="flex flex-wrap gap-2">
+                    <button type="button" onclick="openRecordDetail('${escapeHtml(row.id)}')" class="rounded-lg border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50">Inspect</button>
+                    <button type="button" onclick="shortlistSingleRecord('${escapeHtml(row.id)}')" class="rounded-lg border border-amber-200 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50">Shortlist</button>
+                  </div>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+
+      renderBulkActionSummary();
+      renderRecordDetail();
+    }
+
+    function renderLogs() {
+      const meta = document.getElementById('logsMeta');
+      const container = document.getElementById('logsTable');
+      const response = state.logs;
+      const rows = response && Array.isArray(response.logs) ? response.logs : [];
+      const pagination = response && response.pagination ? response.pagination : null;
+
+      if (!rows.length) {
+        meta.textContent = 'No sync logs recorded yet.';
+        container.innerHTML = '<div class="p-8 text-center text-sm text-gray-500">No execution logs yet.</div>';
+        return;
+      }
+
+      meta.textContent = pagination
+        ? `Showing ${rows.length} of ${formatNumber(pagination.total)} logs`
+        : `Showing ${rows.length} logs`;
+
+      container.innerHTML = `
+        <table class="min-w-full divide-y divide-gray-200 text-sm">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-3 text-left font-semibold text-gray-600">Started</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-600">Records</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-600">Error</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200 bg-white">
+            ${rows.map((row) => `
+              <tr>
+                <td class="px-4 py-3 align-top text-gray-700">${escapeHtml(formatDateTime(row.started_at))}</td>
+                <td class="px-4 py-3 align-top">${renderLogStatus(row.status)}</td>
+                <td class="px-4 py-3 align-top text-gray-700">
+                  Processed ${formatNumber(row.records && row.records.processed)}<br>
+                  Failed ${formatNumber(row.records && row.records.failed)}
+                </td>
+                <td class="px-4 py-3 align-top text-gray-600">${escapeHtml(row.error_message || '')}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderLogStatus(status) {
+      const normalized = String(status || 'unknown');
+      if (normalized === 'completed') return getBadgeHtml('Completed', 'badge-green');
+      if (normalized === 'failed') return getBadgeHtml('Failed', 'badge-red');
+      if (normalized === 'running' || normalized === 'queued' || normalized === 'processing') return getBadgeHtml(normalized, 'badge-yellow');
+      return getBadgeHtml(normalized, 'badge-slate');
+    }
+
+    function renderEntityFilterOptions() {
+      const select = document.getElementById('entityTypeFilter');
+      const entities = (state.summary && state.summary.stats && state.summary.stats.entities) || {};
+      const currentValue = select.value;
+      const options = ['<option value="">All entity types</option>']
+        .concat(Object.keys(entities).sort().map((entityType) => (
+          `<option value="${escapeHtml(entityType)}">${escapeHtml(entityType)}</option>`
+        )));
+
+      select.innerHTML = options.join('');
+      if ([...select.options].some((option) => option.value === currentValue)) {
+        select.value = currentValue;
+      }
+    }
+
+    function switchTab(tabName) {
+      state.activeTab = tabName;
+      document.querySelectorAll('.connector-tab').forEach((button) => {
+        button.classList.toggle('active', button.dataset.tab === tabName);
+      });
+      document.querySelectorAll('.connector-tabpane').forEach((pane) => {
+        pane.classList.toggle('active', pane.id === `tab-${tabName}`);
+      });
+
+      if (tabName === 'docs') {
+        loadConnectorDocs();
+      }
+    }
+
+    function serializeConfigForm() {
+      const form = document.getElementById('configForm');
+      const fields = getCatalogFields();
+      const dynamicFields = getCatalogDynamicFields();
+      const payload = {};
+      const authModes = getAvailableAuthModes();
+
+      if (authModes.length > 1) {
+        payload.auth_type = getSelectedAuthModeType();
+      }
+
+      fields.forEach((field) => {
+        const element = form.elements[field.name];
+        if (!element) return;
+
+        if (field.type === 'boolean') {
+          payload[field.name] = Boolean(element.checked);
+          return;
+        }
+
+        const rawValue = element.value;
+        if (rawValue === '' && !field.required) {
+          return;
+        }
+
+        if (field.type === 'number') {
+          payload[field.name] = rawValue === '' ? null : Number(rawValue);
+          return;
+        }
+
+        if (field.type === 'multiselect' || field.type === 'multiselect_dynamic') {
+          const selectedValues = Array.from(element.selectedOptions || [])
+            .map((option) => option.value)
+            .filter(Boolean);
+          if (!selectedValues.length && !field.required) {
+            return;
+          }
+          payload[field.name] = selectedValues;
+          return;
+        }
+
+        payload[field.name] = rawValue;
+      });
+
+      dynamicFields.forEach((field) => {
+        if (field.type === 'array') {
+          payload[field.name] = getArrayFieldValuesFromDom(field.name);
+        }
+      });
+
+      return payload;
+    }
+
+    async function discoverDynamicFieldOptions(fieldName) {
+      if (!state.sourceId) return;
+
+      const field = getCatalogFields().find((entry) => entry?.name === fieldName && entry?.type === 'multiselect_dynamic');
+      if (!field || !field.dynamic_source) {
+        return;
+      }
+
+      try {
+        state.formDraft = captureConfigFormDraft();
+        state.dynamicFieldLoading[fieldName] = true;
+        delete state.dynamicFieldErrors[fieldName];
+        renderConfiguration();
+
+        const payload = serializeConfigForm();
+        const result = await api.post(connectorApi(`/discovery/${encodeURIComponent(field.dynamic_source)}`), {
+          config: payload
+        });
+
+        state.dynamicFieldOptions[fieldName] = Array.isArray(result?.options) ? result.options : [];
+        delete state.dynamicFieldErrors[fieldName];
+        showPageAlert(`${field.label || titleCase(field.name)} options loaded.`, 'success');
+      } catch (error) {
+        console.error('[Connector Viewer] Failed to discover dynamic field options', error);
+        state.dynamicFieldErrors[fieldName] = error.message || 'Failed to load options.';
+        showPageAlert(error.message || 'Failed to load connector options.', 'error');
+      } finally {
+        state.dynamicFieldLoading[fieldName] = false;
+        renderConfiguration();
+      }
+    }
+
+    async function refreshBaseData(showNotice) {
+      if (!state.sourceId) {
+        renderViewer();
+        return;
+      }
+
+      const [summary, configResponse] = await Promise.all([
+        api.get(connectorApi('/summary')),
+        api.get(connectorApi('/config'))
+      ]);
+
+      state.summary = summary;
+      state.configResponse = configResponse;
+      state.formDraft = null;
+      state.authModeDraft = '';
+      renderViewer();
+      await loadMatterOptions();
+
+      if (showNotice) {
+        showPageAlert('Connector data refreshed.', 'success');
+      }
+    }
+
+    async function loadMatterOptions() {
+      if (!state.sourceId) return;
+      const result = await api.get(`${connectorApi('/matters')}`);
+      state.matterOptions = Array.isArray(result.matters) ? result.matters : [];
+
+      const select = document.getElementById('dataMatterSelect');
+      if (select) {
+        const currentValue = select.value;
+        select.innerHTML = ['<option value="">Unassigned</option>']
+          .concat(state.matterOptions.map((matter) => (
+            `<option value="${escapeHtml(matter.id)}">${escapeHtml(matter.name || matter.matter_id || matter.client_name || 'Matter')}</option>`
+          )))
+          .join('');
+
+        if ([...select.options].some((option) => option.value === currentValue)) {
+          select.value = currentValue;
+        }
+      }
+    }
+
+    async function refreshDataGroups() {
+      if (!state.sourceId) return;
+      const filters = getCurrentDataFilters();
+      const query = new URLSearchParams();
+      if (filters.entity_type) query.set('entity_type', filters.entity_type);
+      if (filters.q) query.set('q', filters.q);
+      if (filters.filters.length) query.set('filters', JSON.stringify(filters.filters));
+      state.dataGroups = await api.get(`${connectorApi('/data/groups')}?${query.toString()}`);
+      renderDataGroups();
+    }
+
+    async function refreshDataPreview() {
+      if (!state.sourceId) return;
+
+      const filters = getCurrentDataFilters();
+      const query = new URLSearchParams({ limit: '25' });
+      if (filters.entity_type) query.set('entity_type', filters.entity_type);
+      if (filters.q) query.set('q', filters.q);
+      if (filters.sort_by) query.set('sort_by', filters.sort_by);
+      if (filters.sort_dir) query.set('sort_dir', filters.sort_dir);
+      if (filters.filters.length) query.set('filters', JSON.stringify(filters.filters));
+      state.dataPreview = await api.get(`${connectorApi('/data')}?${query.toString()}`);
+      renderDataPreview();
+      await refreshDataGroups();
+    }
+
+    async function refreshLogs() {
+      if (!state.sourceId) return;
+      state.logs = await api.get(`${connectorApi('/logs')}?limit=25`);
+      renderLogs();
+    }
+
+    async function saveConfiguration(options = {}) {
+      if (!state.sourceId) return;
+
+      try {
+        const form = document.getElementById('configForm');
+        if (form && typeof form.reportValidity === 'function' && !form.reportValidity()) {
+          throw new Error('Fill in the required configuration fields before saving.');
+        }
+
+        if (!options.silentLoading) {
+          showPageAlert('Saving configuration...', 'info');
+        }
+        const configPayload = serializeConfigForm();
+        const syncFrequency = document.getElementById('syncFrequency').value;
+        const scheduledSyncTime = document.getElementById('scheduledSyncTime').value;
+
+        await api.patch(connectorApi('/config'), configPayload);
+        await api.patch(connectorApi('/sync-settings'), {
+          sync_frequency: syncFrequency,
+          ...(syncFrequency === 'daily' || syncFrequency === 'weekly'
+            ? { scheduled_sync_time: scheduledSyncTime || '08:00:00' }
+            : {})
+        });
+
+        state.formDraft = null;
+        state.authModeDraft = '';
+        await refreshBaseData(false);
+        if (!options.silentSuccess) {
+          showPageAlert('Configuration saved.', 'success');
+        }
+        return true;
+      } catch (error) {
+        console.error('[Connector Viewer] Failed to save configuration', error);
+        showPageAlert(error.message || 'Failed to save configuration.', 'error');
+        throw error;
+      }
+    }
+
+    async function connectOAuthConnector() {
+      if (!state.sourceId || !isOAuthConnector()) return;
+
+      try {
+        showPageAlert(`Saving ${state.connectorName} configuration before redirecting to OAuth...`, 'info');
+        await saveConfiguration({ silentLoading: true, silentSuccess: true });
+
+        const returnUrl = new URL(window.location.href);
+        returnUrl.searchParams.set('tab', 'configuration');
+        returnUrl.searchParams.delete('oauth_success');
+        returnUrl.searchParams.delete('oauth_error');
+        returnUrl.searchParams.delete('connector_id');
+
+        const result = await api.get(
+          `/api/v1/integrations/connectors/${encodeURIComponent(state.sourceId)}/authorize?return_to=${encodeURIComponent(returnUrl.pathname + returnUrl.search)}`
+        );
+
+        if (!result?.authorization_url) {
+          throw new Error('OAuth authorization URL was not returned by the server.');
+        }
+
+        window.location.href = result.authorization_url;
+      } catch (error) {
+        console.error('[Connector Viewer] Failed to start OAuth flow', error);
+        showPageAlert(error.message || 'Failed to start OAuth flow.', 'error');
+      }
+    }
+
+    async function disconnectConnector() {
+      if (!state.sourceId) return;
+
+      try {
+        showPageAlert('Clearing connector configuration...', 'info');
+        await api.delete(connectorApi('/config'));
+        state.selectedDataIds = [];
+        state.selectedRecordId = '';
+        state.selectedRecord = null;
+        state.recordAnnotations = [];
+        await Promise.all([refreshBaseData(false), refreshDataPreview(), refreshLogs()]);
+        showPageAlert('Connector configuration cleared.', 'success');
+      } catch (error) {
+        console.error('[Connector Viewer] Failed to clear configuration', error);
+        showPageAlert(error.message || 'Failed to clear configuration.', 'error');
+      }
+    }
+
+    async function testConnection() {
+      if (!state.sourceId) return;
+
+      try {
+        showPageAlert('Testing connector connection...', 'info');
+        const payload = serializeConfigForm();
+        const result = await api.post(connectorApi('/test-connection'), { config: payload });
+
+        if (result.success) {
+          showPageAlert(result.message || 'Connection test succeeded.', 'success');
+        } else {
+          showPageAlert(result.error || 'Connection test failed.', 'error');
+        }
+      } catch (error) {
+        console.error('[Connector Viewer] Connection test failed', error);
+        showPageAlert(error.message || 'Connection test failed.', 'error');
+      }
+    }
+
+    function setDateRange(days) {
+      const startNode = document.getElementById('runStartDate');
+      const endNode = document.getElementById('runEndDate');
+      if (!startNode || !endNode) return;
+
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+
+      startNode.value = startDate.toISOString().slice(0, 10);
+      endNode.value = endDate.toISOString().slice(0, 10);
+    }
+
+    async function runManualSync() {
+      if (!state.sourceId) return;
+
+      try {
+        if (!isConnectorReady()) {
+          throw new Error(getConnectorSetupState().message);
+        }
+
+        const startDate = document.getElementById('runStartDate')?.value || '';
+        const endDate = document.getElementById('runEndDate')?.value || '';
+        const payload = {};
+
+        if (startDate) payload.startDate = `${startDate}T00:00:00.000Z`;
+        if (endDate) payload.endDate = `${endDate}T23:59:59.999Z`;
+
+        showPageAlert('Starting manual sync...', 'info');
+        const result = await api.post(connectorApi('/sync'), payload);
+        showPageAlert(result.message || 'Manual sync started.', 'success');
+        await Promise.all([refreshBaseData(false), refreshLogs()]);
+      } catch (error) {
+        console.error('[Connector Viewer] Failed to run manual sync', error);
+        showPageAlert(error.message || 'Failed to start manual sync.', 'error');
+      }
+    }
+
+    async function executeCustomApiRequest() {
+      if (!state.sourceId) return;
+
+      try {
+        if (!isConnectorReady()) {
+          throw new Error(getConnectorSetupState().message);
+        }
+
+        const method = document.getElementById('customRequestMethod')?.value || 'GET';
+        const path = document.getElementById('customRequestPath')?.value.trim() || '';
+        const queryText = document.getElementById('customRequestQuery')?.value.trim() || '{}';
+        const bodyText = document.getElementById('customRequestBody')?.value.trim() || '{}';
+        const queryParams = queryText ? JSON.parse(queryText) : {};
+        const body = bodyText ? JSON.parse(bodyText) : {};
+
+        showPageAlert('Executing custom API request...', 'info');
+        const result = await api.post(connectorApi('/custom-request'), {
+          method,
+          path,
+          queryParams,
+          body
+        });
+
+        document.getElementById('customRequestResponse').textContent = JSON.stringify(result, null, 2);
+        showPageAlert('Custom request completed.', 'success');
+      } catch (error) {
+        console.error('[Connector Viewer] Custom API request failed', error);
+        const responseNode = document.getElementById('customRequestResponse');
+        if (responseNode) {
+          responseNode.textContent = String(error.message || error);
+        }
+        showPageAlert(error.message || 'Custom request failed.', 'error');
+      }
+    }
+
+    function clearCustomApiRequest() {
+      const pathNode = document.getElementById('customRequestPath');
+      const queryNode = document.getElementById('customRequestQuery');
+      const bodyNode = document.getElementById('customRequestBody');
+      const responseNode = document.getElementById('customRequestResponse');
+      if (pathNode) pathNode.value = '';
+      if (queryNode) queryNode.value = '{}';
+      if (bodyNode) bodyNode.value = '{}';
+      if (responseNode) responseNode.textContent = 'Run a request to see the response here.';
+    }
+
+    async function triggerSync() {
+      return runManualSync();
+    }
+
+    function applyDataFilters() {
+      refreshDataPreview().catch((error) => {
+        console.error('[Connector Viewer] Failed to apply data filters', error);
+        showPageAlert(error.message || 'Failed to apply filters.', 'error');
+      });
+    }
+
+    function clearDataFilters() {
+      state.dataRules = [];
+      const searchNode = document.getElementById('dataSearchInput');
+      const entityNode = document.getElementById('entityTypeFilter');
+      const sortByNode = document.getElementById('dataSortBy');
+      const sortDirNode = document.getElementById('dataSortDir');
+      if (searchNode) searchNode.value = '';
+      if (entityNode) entityNode.value = '';
+      if (sortByNode) sortByNode.value = 'synced_at';
+      if (sortDirNode) sortDirNode.value = 'desc';
+      renderDataRuleBuilder();
+      applyDataFilters();
+    }
+
+    function toggleDataSelection(recordId, isChecked) {
+      if (isChecked) {
+        if (!state.selectedDataIds.includes(recordId)) {
+          state.selectedDataIds.push(recordId);
+        }
+      } else {
+        state.selectedDataIds = state.selectedDataIds.filter((id) => id !== recordId);
+      }
+      renderDataPreview();
+    }
+
+    function toggleAllDataSelection(isChecked) {
+      const rows = state.dataPreview && Array.isArray(state.dataPreview.data) ? state.dataPreview.data : [];
+      state.selectedDataIds = isChecked ? rows.map((row) => row.id) : [];
+      renderDataPreview();
+    }
+
+    async function openRecordDetail(recordId) {
+      const rows = state.dataPreview && Array.isArray(state.dataPreview.data) ? state.dataPreview.data : [];
+      state.selectedRecordId = recordId;
+      state.selectedRecord = rows.find((row) => row.id === recordId) || null;
+
+      try {
+        const response = await api.get(`${connectorApi(`/data-records/${recordId}/annotations`)}?limit=25`);
+        state.recordAnnotations = Array.isArray(response.annotations) ? response.annotations : [];
+      } catch (error) {
+        console.error('[Connector Viewer] Failed to load record annotations', error);
+        state.recordAnnotations = [];
+      }
+
+      renderDataPreview();
+    }
+
+    async function submitRecordCorrection() {
+      if (!state.selectedRecordId || !state.selectedRecord) return;
+
+      try {
+        const fieldKey = document.getElementById('recordCorrectionField')?.value.trim() || '';
+        const proposedValue = document.getElementById('recordCorrectionValue')?.value || '';
+        const notes = document.getElementById('recordCorrectionNotes')?.value.trim() || '';
+        if (!fieldKey || !proposedValue) {
+          throw new Error('Field key and proposed value are required');
+        }
+
+        await api.post(connectorApi(`/data-records/${state.selectedRecordId}/annotations`), {
+          annotation_type: 'correction',
+          field_key: fieldKey,
+          value: {
+            proposed_value: proposedValue,
+            notes,
+            original_value: state.selectedRecord.data ? state.selectedRecord.data[fieldKey] : null,
+            status: 'shortlisted'
+          }
+        });
+
+        showPageAlert('Correction shortlisted for review.', 'success');
+        await Promise.all([openRecordDetail(state.selectedRecordId), refreshDataPreview()]);
+      } catch (error) {
+        console.error('[Connector Viewer] Failed to shortlist correction', error);
+        showPageAlert(error.message || 'Failed to shortlist correction.', 'error');
+      }
+    }
+
+    async function shortlistSingleRecord(recordId) {
+      state.selectedDataIds = [recordId];
+      renderDataPreview();
+      await shortlistSelectedForEdit();
+    }
+
+    async function shortlistSelectedForEdit() {
+      if (!state.sourceId) return;
+
+      try {
+        if (!state.selectedDataIds.length) {
+          throw new Error('Select one or more rows first');
+        }
+
+        await api.post(connectorApi('/data/annotations/bulk'), {
+          annotation_type: 'flag',
+          value: {
+            flag: 'shortlisted_for_edit',
+            source: 'connector-viewer'
+          },
+          data_ids: state.selectedDataIds
+        });
+
+        showPageAlert('Selected rows were shortlisted for edit.', 'success');
+        await refreshDataPreview();
+      } catch (error) {
+        console.error('[Connector Viewer] Failed to shortlist rows', error);
+        showPageAlert(error.message || 'Failed to shortlist rows.', 'error');
+      }
+    }
+
+    async function assignSelectedToMatter() {
+      if (!state.sourceId) return;
+
+      try {
+        if (!state.selectedDataIds.length) {
+          throw new Error('Select one or more rows first');
+        }
+
+        await api.post(connectorApi('/data/assign-matter'), {
+          matter_id: document.getElementById('dataMatterSelect')?.value || null,
+          data_ids: state.selectedDataIds
+        });
+
+        showPageAlert('Selected rows were assigned.', 'success');
+        await Promise.all([refreshDataPreview(), refreshBaseData(false)]);
+      } catch (error) {
+        console.error('[Connector Viewer] Failed to assign selected rows', error);
+        showPageAlert(error.message || 'Failed to assign selected rows.', 'error');
+      }
+    }
+
+    async function assignFilteredToMatter() {
+      if (!state.sourceId) return;
+
+      try {
+        const filters = getCurrentDataFilters();
+        await api.post(connectorApi('/data/assign-matter'), {
+          matter_id: document.getElementById('dataMatterSelect')?.value || null,
+          q: filters.q,
+          entity_type: filters.entity_type || null,
+          filters: filters.filters
+        });
+
+        showPageAlert('Filtered result set was assigned.', 'success');
+        await Promise.all([refreshDataPreview(), refreshBaseData(false)]);
+      } catch (error) {
+        console.error('[Connector Viewer] Failed to assign filtered rows', error);
+        showPageAlert(error.message || 'Failed to assign filtered rows.', 'error');
+      }
+    }
+
+    async function assignGroupToMatter(groupType, spreadsheetId, sheetName, entityType) {
+      if (!state.sourceId) return;
+
+      try {
+        const decodedGroupType = decodeURIComponent(groupType || '');
+        const decodedSpreadsheetId = decodeURIComponent(spreadsheetId || '');
+        const decodedSheetName = decodeURIComponent(sheetName || '');
+        const decodedEntityType = decodeURIComponent(entityType || '');
+        await api.post(connectorApi('/data/assign-matter'), {
+          matter_id: document.getElementById('dataMatterSelect')?.value || null,
+          group: decodedGroupType === 'source_collection'
+            ? {
+                group_type: 'source_collection',
+                spreadsheet_id: decodedSpreadsheetId,
+                sheet_name: decodedSheetName
+              }
+            : {
+                group_type: 'entity_type',
+                entity_type: decodedEntityType
+              }
+        });
+
+        showPageAlert('Group assignment updated.', 'success');
+        await Promise.all([refreshDataPreview(), refreshBaseData(false)]);
+      } catch (error) {
+        console.error('[Connector Viewer] Failed to assign group', error);
+        showPageAlert(error.message || 'Failed to assign group.', 'error');
+      }
+    }
+
+    function renderViewer() {
+      applyPageIdentity();
+      setLoading(false);
+
+      if (state.iframeOnlyFallback) {
+        showPageAlert('This connector link did not include an integration source ID. Generic controls are unavailable for this launch, so LANA is falling back to the embedded connector documentation only.', 'info');
+        ['overview', 'configuration', 'data', 'logs'].forEach((tabName) => {
+          const button = document.querySelector(`.connector-tab[data-tab="${tabName}"]`);
+          if (button) {
+            button.classList.add('hidden');
+          }
+        });
+        switchTab('docs');
+        return;
+      }
+
+      renderOverview();
+      renderDocumentationGuide();
+      renderConfiguration();
+      renderRunTab();
+      renderDataRuleBuilder();
+      renderEntityFilterOptions();
+      renderDataGroups();
+      renderDataPreview();
+      renderBulkActionSummary();
+      renderRecordDetail();
+      renderLogs();
+      switchTab(state.activeTab);
+    }
+
+    function buildSetupOnlyDocsScript() {
+      return `
+        <script>
+          (function() {
+            var SETUP_LABEL_PATTERNS = [
+              /setup guide/i,
+              /setup instructions/i,
+              /oauth setup/i,
+              /getting started/i,
+              /connection guide/i,
+              /documentation/i,
+              /instructions/i,
+              /setup/i
+            ];
+
+            function normalizeText(value) {
+              return String(value || '').replace(/\\s+/g, ' ').trim();
+            }
+
+            function isVisible(node) {
+              if (!node) return false;
+              var style = window.getComputedStyle(node);
+              if (style.display === 'none' || style.visibility === 'hidden') return false;
+              if (node.hidden) return false;
+              return true;
+            }
+
+            function isSetupLabel(text) {
+              var normalized = normalizeText(text);
+              return normalized && SETUP_LABEL_PATTERNS.some(function(pattern) {
+                return pattern.test(normalized);
+              });
+            }
+
+            function scoreSetupCandidate(node) {
+              var text = normalizeText(node.textContent);
+              if (!isSetupLabel(text)) return -1;
+              if (/setup guide/i.test(text)) return 100;
+              if (/setup instructions/i.test(text)) return 90;
+              if (/getting started/i.test(text)) return 80;
+              if (/oauth setup/i.test(text)) return 70;
+              if (/documentation/i.test(text)) return 50;
+              if (/instructions/i.test(text)) return 40;
+              return 20;
+            }
+
+            function findSetupControl() {
+              var candidates = Array.from(document.querySelectorAll('button, a, [role="tab"], .tab-btn, [data-tab]'))
+                .filter(function(node) { return isVisible(node); })
+                .map(function(node) {
+                  return { node: node, score: scoreSetupCandidate(node) };
+                })
+                .filter(function(entry) { return entry.score > -1; })
+                .sort(function(a, b) { return b.score - a.score; });
+
+              return candidates.length ? candidates[0].node : null;
+            }
+
+            function findSetupPanel() {
+              var candidates = Array.from(document.querySelectorAll('[id], [data-tab], [data-panel], section, article, div'))
+                .filter(function(node) {
+                  if (!isVisible(node)) return false;
+                  var text = normalizeText(node.id || node.getAttribute('data-tab') || node.getAttribute('data-panel') || '');
+                  if (isSetupLabel(text)) return true;
+                  var heading = node.querySelector && node.querySelector('h1, h2, h3, h4, .text-xl, .text-lg');
+                  return !!(heading && isSetupLabel(heading.textContent));
+                });
+
+              return candidates[0] || null;
+            }
+
+            function hideSiblingNodes(parent, keepNodes) {
+              if (!parent) return;
+              Array.from(parent.children).forEach(function(child) {
+                if (keepNodes.indexOf(child) === -1) {
+                  child.style.display = 'none';
+                }
+              });
+            }
+
+            function reduceEmbeddedChrome(activeControl, activePanel) {
+              var nav = activeControl && activeControl.closest('nav, [role="tablist"], .tabs, .tab-nav, .tab-buttons, .border-b');
+              var cardShell = (nav && nav.closest('.bg-white, .rounded-xl, .rounded-2xl, section, article, main, div'))
+                || (activePanel && activePanel.closest('.bg-white, .rounded-xl, .rounded-2xl, section, article, main, div'));
+              var pageShell = cardShell && cardShell.parentElement;
+
+              if (pageShell && cardShell) {
+                hideSiblingNodes(pageShell, [cardShell]);
+              }
+
+              if (nav && nav.parentElement) {
+                nav.style.display = 'none';
+              }
+
+              document.body.style.background = '#ffffff';
+              document.body.style.padding = '0';
+              document.body.style.margin = '0';
+
+              if (activePanel && typeof activePanel.scrollIntoView === 'function') {
+                activePanel.scrollIntoView({ block: 'start' });
+              }
+            }
+
+            function activateSetupMode() {
+              var setupControl = findSetupControl();
+              if (setupControl) {
+                try {
+                  setupControl.click();
+                } catch (error) {
+                  console.warn('[LANA Docs Mode] Failed to activate setup control', error);
+                }
+              }
+
+              window.requestAnimationFrame(function() {
+                window.requestAnimationFrame(function() {
+                  var activePanel = findSetupPanel();
+                  reduceEmbeddedChrome(setupControl, activePanel);
+                });
+              });
+            }
+
+            if (document.readyState === 'loading') {
+              document.addEventListener('DOMContentLoaded', activateSetupMode);
+            } else {
+              activateSetupMode();
+            }
+          })();
+        <\/script>
+      `;
+    }
+
+    async function loadConnectorDocs() {
+      const docsEmpty = document.getElementById('docsEmpty');
+      const docsShell = document.getElementById('docsFrameShell');
+      const docsError = document.getElementById('docsError');
+      const docsOverlay = document.getElementById('docsOverlay');
+
+      if (!state.uiEntryPoint) {
+        docsEmpty.classList.remove('hidden');
+        docsShell.classList.add('hidden');
+        return;
+      }
+
+      docsEmpty.classList.add('hidden');
+      docsShell.classList.remove('hidden');
+
+      if (state.docsLoaded) {
+        return;
+      }
+
+      try {
+        const iframe = document.getElementById('connector-frame');
+        docsError.classList.add('hidden');
+        docsOverlay.classList.remove('hidden');
+
+        if (!/^file:|^https?:/i.test(state.uiEntryPoint)) {
+          throw new Error(`Invalid connector URL format: ${state.uiEntryPoint}`);
+        }
+
+        const cacheBustUrl = state.uiEntryPoint + (state.uiEntryPoint.indexOf('?') === -1 ? '?' : '&') + '_cb=' + Date.now();
+        const response = await fetch(cacheBustUrl);
+        const originalHtml = await response.text();
+        const token = (typeof api !== 'undefined' && api.token)
+          || localStorage.getItem('token')
+          || localStorage.getItem('lana_token')
+          || localStorage.getItem('lana_automation_token')
+          || '';
+        const resolvedApiBase = (typeof api !== 'undefined' && api.baseUrl)
+          || (window.LanaConfig && window.LanaConfig.API_BASE_URL)
+          || ((/^https?:$/i.test(window.location.protocol)) ? window.location.origin : '')
+          || '';
+        const injectedLanaConfig = Object.assign(
+          {},
+          window.LanaConfig || {},
+          resolvedApiBase ? { API_BASE_URL: resolvedApiBase } : {}
+        );
+        const baseUrl = state.uiEntryPoint.substring(0, state.uiEntryPoint.lastIndexOf('/') + 1);
+
+        let html = originalHtml.replace(/<link[^>]*href=["']\/css\/tailwind\.css["'][^>]*>/gi, '');
+        html = html.replace(/src=["']assets\//gi, `src="${baseUrl}assets/`);
+        html = html.replace(/href=["']assets\//gi, `href="${baseUrl}assets/`);
+        html = html.replace(/src=["']js\//gi, `src="${baseUrl}js/`);
+
+        const configScript = `
+          <script>
+            window.LanaConfig = ${JSON.stringify(injectedLanaConfig)};
+            window.LanaConnectorId = "${state.connectorType || state.connectorId || ''}";
+            window.LanaConnectorType = "${state.connectorType || ''}";
+            window.LanaIntegrationSourceId = "${state.sourceId || ''}";
+            window.api = { token: "${token}" };
+            localStorage.setItem('lana_token', "${token}");
+            localStorage.setItem('token', "${token}");
+            (function() {
+              var _originalFetch = window.fetch;
+              var _apiBase = (window.LanaConfig && window.LanaConfig.API_BASE_URL) || '';
+              window.fetch = function(input, init) {
+                if (typeof input === 'string' && input.startsWith('/') && _apiBase) {
+                  input = _apiBase + input;
+                }
+                return _originalFetch.call(this, input, init);
+              };
+            })();
+          <\/script>
+        `;
+        const tailwindScript = '<script src="https://cdn.tailwindcss.com"><\/script>';
+        const docsModeScript = buildSetupOnlyDocsScript();
+        html = html.replace('<head>', '<head>' + configScript + docsModeScript + tailwindScript);
+
+        const blob = new Blob([html], { type: 'text/html' });
+        const blobUrl = URL.createObjectURL(blob);
+
+        iframe.onload = function() {
+          docsOverlay.classList.add('hidden');
+          state.docsLoaded = true;
+          URL.revokeObjectURL(blobUrl);
+        };
+
+        iframe.onerror = function() {
+          docsOverlay.classList.add('hidden');
+          docsError.classList.remove('hidden');
+          document.getElementById('docsErrorMessage').textContent = 'Failed to load connector documentation.';
+          URL.revokeObjectURL(blobUrl);
+        };
+
+        iframe.src = blobUrl;
+      } catch (error) {
+        console.error('[Connector Viewer] Failed to load connector docs', error);
+        docsOverlay.classList.add('hidden');
+        docsError.classList.remove('hidden');
+        document.getElementById('docsErrorMessage').textContent = error.message || 'Failed to load connector documentation.';
+      }
+    }
+
+    function handleOAuthRedirectResult() {
+      const params = new URLSearchParams(window.location.search);
+      const oauthSuccess = params.get('oauth_success');
+      const oauthError = params.get('oauth_error');
+
+      if (oauthSuccess === 'true') {
+        showPageAlert(`${state.connectorName} authorization completed.`, 'success');
+      } else if (oauthError) {
+        showPageAlert(oauthError, 'error');
+      } else {
+        return;
+      }
+
+      params.delete('oauth_success');
+      params.delete('oauth_error');
+      params.delete('connector_id');
+      const query = params.toString();
+      const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}`;
+      window.history.replaceState({}, '', nextUrl);
+    }
+
+    async function init() {
+      try {
+        setLoading(true);
+        applyPageIdentity();
+        await resolveConnectorContext();
+
+        if (!state.iframeOnlyFallback) {
+          await loadCatalog();
+          await refreshBaseData(false);
+          await Promise.all([loadMatterOptions(), refreshDataPreview(), refreshLogs()]);
+        } else {
+          renderViewer();
+        }
+
+        document.querySelectorAll('.connector-tab').forEach((button) => {
+          button.addEventListener('click', () => switchTab(button.dataset.tab));
+        });
+        handleOAuthRedirectResult();
+      } catch (error) {
+        console.error('[Connector Viewer] Initialization failed', error);
+        showViewerError(error.message || 'An unexpected error occurred while loading the connector viewer.');
+      }
+    }
+
     function goBack() {
       window.history.back();
     }
 
-    // Show error screen
-    function showError(message) {
-      document.getElementById('error-message').textContent = message;
-      document.getElementById('error-screen').classList.add('show');
-      document.getElementById('loading-overlay').classList.add('hidden');
-    }
-
-    // Load connector UI
-    async function loadConnectorUI() {
-      try {
-        // Validate parameters
-        if (!uiEntryPoint) {
-          showError('No connector UI specified. Please select a connector from the list.');
-          return;
-        }
-
-        console.log('[Connector Viewer] Loading UI:', uiEntryPoint);
-
-        // Guard: if uiEntryPoint is a relative path (e.g. "ui/index.html"), attempt to
-        // construct a full MinIO URL using the default MinIO endpoint.
-        if (uiEntryPoint && !uiEntryPoint.startsWith('file://') && !uiEntryPoint.startsWith('http://') && !uiEntryPoint.startsWith('https://')) {
-          console.warn('[Connector Viewer] ui_entry_point is a relative path, not a full URL:', uiEntryPoint);
-          showError(
-            'Invalid connector URL format. The connector UI entry point is a relative path ("' + uiEntryPoint + '") ' +
-            'instead of a full URL. This usually means the connector needs to be re-imported. ' +
-            'Please re-upload the connector ZIP or contact support.'
-          );
-          return;
-        }
-
-        // Support both file:// URLs and HTTP URLs (MinIO S3-compatible serving)
-        if (uiEntryPoint.startsWith('file://') || uiEntryPoint.startsWith('http://') || uiEntryPoint.startsWith('https://')) {
-          const iframe = document.getElementById('connector-frame');
-
-          // Fetch the HTML, inject config BEFORE loading, then load modified HTML
-          // Add cache-busting parameter to bypass browser/MinIO caching
-          var cacheBustUrl = uiEntryPoint + (uiEntryPoint.indexOf('?') === -1 ? '?' : '&') + '_cb=' + Date.now();
-          fetch(cacheBustUrl)
-            .then(response => response.text())
-            .then(html => {
-              console.log('[Connector Viewer] Fetched connector HTML, injecting config...');
-
-              // Build config injection script
-              // Get token from global api instance (created by api.js)
-              const token = (typeof api !== 'undefined' && api.token) || localStorage.getItem('token') || '';
-              console.log('[Connector Viewer] Injecting token:', token ? token.substring(0, 20) + '...' : 'NO TOKEN');
-
-              const configScript = `
-                <script>
-                  // Injected by connector-viewer - available before any other scripts run
-                  window.LanaConfig = ${JSON.stringify(window.LanaConfig || {})};
-                  window.LanaConnectorId = "${connectorId}";
-                  window.api = { token: "${token}" };
-                  localStorage.setItem('lana_token', "${token}");
-                  localStorage.setItem('token', "${token}");
-                  console.log('[Connector UI] Config injected - API URL:', window.LanaConfig.API_BASE_URL);
-                  console.log('[Connector UI] Token injected:', "${token}" ? "${token}".substring(0, 20) + "..." : "NO TOKEN");
-
-                  // Patch fetch to resolve relative URLs against the API base URL
-                  // (blob:// origins cannot resolve relative paths like /api/...)
-                  (function() {
-                    var _originalFetch = window.fetch;
-                    var _apiBase = (window.LanaConfig && window.LanaConfig.API_BASE_URL) || '';
-                    window.fetch = function(input, init) {
-                      if (typeof input === 'string' && input.startsWith('/') && _apiBase) {
-                        input = _apiBase + input;
-                      }
-                      return _originalFetch.call(this, input, init);
-                    };
-                  })();
-                <\/script>
-              `;
-
-              // Remove broken CSS links
-              html = html.replace(/<link[^>]*href=["']\/css\/tailwind\.css["'][^>]*>/gi, '');
-
-              // Fix relative asset URLs to use absolute MinIO URLs
-              // Extract base URL from uiEntryPoint (e.g., http://localhost:9000/lana-connectors/.../v2/ui/)
-              const baseUrl = uiEntryPoint.substring(0, uiEntryPoint.lastIndexOf('/') + 1);
-              // Replace relative asset paths with absolute URLs
-              html = html.replace(/src=["']assets\//gi, `src="${baseUrl}assets/`);
-              html = html.replace(/href=["']assets\//gi, `href="${baseUrl}assets/`);
-              html = html.replace(/src=["']js\//gi, `src="${baseUrl}js/`);
-
-              // Inject config script, Tailwind, and tab styles at the beginning of <head>
-              const tailwindScript = '<script src="https://cdn.tailwindcss.com"><\/script>';
-              const tabStyles = `
-                <style>
-                  /* Ensure tabs display correctly */
-                  .tab-button {
-                    background: none;
-                    border: none;
-                    cursor: pointer;
-                    position: relative;
-                  }
-                  .tab-button.active {
-                    border-bottom: 2px solid #2563eb !important;
-                  }
-                </style>
-              `;
-              html = html.replace('<head>', '<head>' + configScript + tailwindScript + tabStyles);
-
-              // Create blob URL and load modified HTML
-              const blob = new Blob([html], { type: 'text/html' });
-              const blobUrl = URL.createObjectURL(blob);
-
-              iframe.onload = function() {
-                console.log('[Connector Viewer] UI loaded successfully');
-                document.getElementById('loading-overlay').classList.add('hidden');
-                // Clean up blob URL after load
-                URL.revokeObjectURL(blobUrl);
-              };
-
-              iframe.onerror = function(error) {
-                console.error('[Connector Viewer] Failed to load UI:', error);
-                showError('Failed to load connector UI.');
-                URL.revokeObjectURL(blobUrl);
-              };
-
-              iframe.src = blobUrl;
-            })
-            .catch(error => {
-              console.error('[Connector Viewer] Failed to fetch UI:', error);
-              showError('Failed to load connector UI: ' + error.message);
-            });
-
-          // Timeout after 30 seconds
-          setTimeout(() => {
-            const loadingOverlay = document.getElementById('loading-overlay');
-            if (!loadingOverlay.classList.contains('hidden')) {
-              console.error('[Connector Viewer] Timeout loading UI');
-              showError('Loading timeout. The connector UI took too long to load.');
-            }
-          }, 30000);
-
-        } else {
-          // Invalid URL format
-          showError('Invalid connector URL format. URL must start with file://, http://, or https://');
-        }
-
-      } catch (error) {
-        console.error('[Connector Viewer] Error:', error);
-        showError(error.message || 'An unexpected error occurred.');
-      }
-    }
-
-    // Initialize on page load
-    loadConnectorUI();
-
-    // ──────────────────────────────────────────────────────────────────
-    // postMessage bridge: iframe ↔ parent ↔ Electron IPC
-    // ──────────────────────────────────────────────────────────────────
-
-    // Forward iframe requests to open external URLs (for OAuth flow)
-    window.addEventListener('message', (event) => {
-      if (event.data && event.data.type === 'lana-open-external') {
-        console.log('[Connector Viewer] Opening external URL:', event.data.url);
-        if (window.electronAPI && window.electronAPI.openExternal) {
-          window.electronAPI.openExternal(event.data.url);
-        } else {
-          window.open(event.data.url, '_blank');
-        }
-      }
-    });
-
-    // Forward Electron OAuth callbacks into the iframe
-    if (window.electronAPI && window.electronAPI.onOAuthCallback) {
-      window.electronAPI.onOAuthCallback((callbackData) => {
-        console.log('[Connector Viewer] Forwarding OAuth callback to iframe');
-        const iframe = document.getElementById('connector-frame');
-        if (iframe && iframe.contentWindow) {
-          iframe.contentWindow.postMessage({
-            type: 'lana-oauth-callback',
-            data: callbackData
-          }, '*');
-        }
-      });
-    }
-
-    // Handle keyboard shortcuts
-    document.addEventListener('keydown', (e) => {
-      // ESC to go back
-      if (e.key === 'Escape') {
-        e.preventDefault();
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
         goBack();
       }
     });
+
+    window.saveConfiguration = saveConfiguration;
+    window.connectOAuthConnector = connectOAuthConnector;
+    window.testConnection = testConnection;
+    window.triggerSync = triggerSync;
+    window.disconnectConnector = disconnectConnector;
+    window.setDateRange = setDateRange;
+    window.runManualSync = runManualSync;
+    window.executeCustomApiRequest = executeCustomApiRequest;
+    window.clearCustomApiRequest = clearCustomApiRequest;
+    window.addArrayFieldItem = addArrayFieldItem;
+    window.removeArrayFieldItem = removeArrayFieldItem;
+    window.addDataRule = addDataRule;
+    window.removeDataRule = removeDataRule;
+    window.applyDataFilters = applyDataFilters;
+    window.clearDataFilters = clearDataFilters;
+    window.toggleDataSelection = toggleDataSelection;
+    window.toggleAllDataSelection = toggleAllDataSelection;
+    window.openRecordDetail = openRecordDetail;
+    window.submitRecordCorrection = submitRecordCorrection;
+    window.shortlistSingleRecord = shortlistSingleRecord;
+    window.shortlistSelectedForEdit = shortlistSelectedForEdit;
+    window.assignSelectedToMatter = assignSelectedToMatter;
+    window.assignFilteredToMatter = assignFilteredToMatter;
+    window.assignGroupToMatter = assignGroupToMatter;
+    window.refreshBaseData = refreshBaseData;
+    window.refreshDataPreview = refreshDataPreview;
+    window.refreshLogs = refreshLogs;
+    window.closeRecordDetail = closeRecordDetail;
+    window.switchTab = switchTab;
+    window.discoverDynamicFieldOptions = discoverDynamicFieldOptions;
+
+    init();
   </script>
 
-  <!-- Auth guard + loader dismiss (MUST be last) -->
   <script src="../js/auth-guard.js"></script>
 </body>
 </html>

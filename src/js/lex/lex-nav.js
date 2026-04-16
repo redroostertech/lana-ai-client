@@ -52,7 +52,7 @@
     'workflows/builder.html':                 { template: 'string' },
     'workflows/document-generation.html':     { matterId: 'string', temp_doc: 'string', save: 'string' },
     'integrations/integration-config.html':   { id: 'string', connector_id: 'string' },
-    'integrations/connector-viewer.html':     { ui: 'string', name: 'string', tab: 'string' },
+    'integrations/connector-viewer.html':     { ui: 'string', name: 'string', tab: 'string', connectorId: 'string', connectorType: 'string', sourceId: 'string' },
     'admin/user-details.html':                { userId: 'string' },
     'admin/session-details.html':             { sessionId: 'string' },
     'admin/roles_manager.html':               { id: 'string' },

@@ -45,6 +45,14 @@
         background: var(--lex-bg-secondary);
       }
 
+      /* ── Embedded chrome: hide sidebar, full-width body ── */
+      lex-app[chrome="embedded"] lex-sidebar {
+        display: none;
+      }
+      lex-app[chrome="embedded"] lex-body {
+        margin-left: 0;
+      }
+
       /* ── Skip link ── */
       .lex-app-skip-link {
         position: absolute;
@@ -200,7 +208,10 @@
         logoAlt:      { type: String,  default: 'LANA AI' },
         logoHref:     { type: String,  default: 'dashboard.html' },
         loading:      { type: Boolean, default: false },
-        sidebarOpen:  { type: Boolean, default: false, reflect: true }
+        sidebarOpen:  { type: Boolean, default: false, reflect: true },
+        chrome:       { type: String,  default: 'full', reflect: true },
+        backHref:     { type: String,  default: '' },
+        backLabel:    { type: String,  default: 'Back' }
       };
     }
 
@@ -232,6 +243,11 @@
     }
 
     _buildShell() {
+      const embedded = this.chrome === 'embedded';
+      const topbarBackAttrs = embedded
+        ? ` show-back back-label="${this.escapeHtml(this.backLabel)}" back-href="${this.escapeHtml(this.backHref)}"`
+        : '';
+
       this.innerHTML = `
         <a class="lex-app-skip-link" href="#lex-main-content">Skip to content</a>
 
@@ -246,7 +262,7 @@
           <lex-header role="banner">
             <lex-topbar
               heading="${this.escapeHtml(this.pageTitle)}"
-              sticky
+              sticky${topbarBackAttrs}
             ></lex-topbar>
           </lex-header>
 
@@ -359,11 +375,38 @@
         if (content) content.dataset.loading = String(this.loading);
       }
 
+      if (
+        changedProps.has('chrome') ||
+        changedProps.has('backHref') ||
+        changedProps.has('backLabel')
+      ) {
+        const topbar = this.$('lex-topbar');
+        if (topbar) {
+          const embedded = this.chrome === 'embedded';
+          topbar.showBack = embedded;
+          topbar.backHref = this.backHref;
+          topbar.backLabel = this.backLabel;
+        }
+      }
+
       // ── Event delegation ──
 
       // Hamburger toggle
       this.delegate('topbar-menu-toggle', 'lex-topbar', () => {
         this.sidebarOpen = !this.sidebarOpen;
+      });
+
+      // Back button (embedded chrome mode)
+      this.delegate('topbar-back-click', 'lex-topbar', (e) => {
+        const detail = e.detail || {};
+        const href = detail.href || this.backHref;
+        if (href && window.Lex && window.Lex.Nav) {
+          window.Lex.Nav.go(href);
+        } else if (href) {
+          window.location.href = href;
+        } else if (window.history && window.history.length > 1) {
+          window.history.back();
+        }
       });
 
       // Sidebar close (mobile close button, or nav click on mobile)

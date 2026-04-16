@@ -190,7 +190,7 @@
       }
 
       try {
-        // Fetch connector config from registry
+        // Fetch connector definition from the backend-owned catalog
         connectorConfig = await ConnectorRegistry.getConnectorConfig(connectorId);
 
         // Update page title
@@ -211,10 +211,16 @@
     // Load integration status from backend
     async function loadIntegrationStatus() {
       try {
-        const result = await api.get(`/api/v1/integrations/connectors/${connectorId}`);
-        integrationSource = result.connector;
+        const result = await Connectors.getAll();
+        const connectors = result.connectors || [];
+        integrationSource = connectors.find(conn =>
+          conn.id === connectorId ||
+          conn.connector_id === connectorId ||
+          conn.connector_type === connectorId ||
+          conn.source_type === connectorId
+        ) || null;
 
-        if (integrationSource && integrationSource.status === 'connected') {
+        if (integrationSource && (integrationSource.status === 'connected' || integrationSource.auth_status === 'connected')) {
           showConfiguredState();
         } else {
           showNotConfiguredState();
@@ -356,10 +362,7 @@
 
       try {
         Toast.info('Testing connection...');
-        await api.post(`/api/v1/integrations/connectors/${connectorId}/configure`, {
-          connector_config: connectorConfig,
-          credentials: config
-        });
+        await Connectors.configure(connectorId, config);
 
         Toast.success('Connected successfully!');
         await loadIntegrationStatus();

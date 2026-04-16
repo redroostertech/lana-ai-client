@@ -23,6 +23,8 @@
     logo-href="../dashboard.html"
     active-nav-id="connectors"
     page-title="ActionStep Dashboard"
+    chrome="embedded"
+    back-href="../data-connectors.html"
   ></lex-app>
 
   <template id="page-content">
@@ -365,6 +367,18 @@
 
     let dashboardData = null;
     let currentTab = 'overview';
+    const integrationSourceId = new URLSearchParams(window.location.search).get('id');
+
+    function requireIntegrationSourceId() {
+      if (!integrationSourceId) {
+        throw new Error('Missing integration source id');
+      }
+      return integrationSourceId;
+    }
+
+    function connectorApi(path = '') {
+      return `/api/v1/generic-connectors/integration-sources/${requireIntegrationSourceId()}${path}`;
+    }
 
     // Format number
     function formatNumber(num) {
@@ -493,9 +507,10 @@
     async function checkAndReconnectRunningOperations() {
       try {
         // Check for running CSV sync operations
-        const syncResult = await api.get('/api/v1/actionstep/sync-logs?status=running,queued&limit=5&sortBy=started_at&sortOrder=DESC');
-        if (syncResult.sync_logs && syncResult.sync_logs.length > 0) {
-          const runningSync = syncResult.sync_logs[0];
+        const syncResult = await api.get(`${connectorApi('/logs')}?limit=5`);
+        const runningLogs = (syncResult.logs || []).filter(log => log.status === 'running' || log.status === 'queued');
+        if (runningLogs.length > 0) {
+          const runningSync = runningLogs[0];
           if (runningSync.status === 'running' || runningSync.status === 'queued') {
             console.log('Found running CSV sync, reconnecting to SSE stream:', runningSync.id);
 
@@ -523,7 +538,7 @@
 
         // Check for running AI ingestion operations
         try {
-          const aiStatus = await api.get('/api/v1/actionstep/ingest-ai/status');
+          const aiStatus = await api.get(connectorApi('/analysis/status'));
           if (aiStatus.status === 'running' || aiStatus.status === 'active') {
             console.log('Found running AI ingestion, reconnecting to SSE stream');
 
@@ -559,7 +574,7 @@
         if (!token) return;
 
         const baseUrl = api.baseUrl || window.location.origin;
-        const streamUrl = `${baseUrl}/api/v1/actionstep/sync/status/${syncLogId}/stream?token=${encodeURIComponent(token)}`;
+        const streamUrl = `${baseUrl}${connectorApi(`/sync/status/${syncLogId}/stream`)}?token=${encodeURIComponent(token)}`;
 
         const syncEventSource = new EventSource(streamUrl);
 
@@ -643,7 +658,7 @@
         if (!token) return;
 
         const baseUrl = api.baseUrl || window.location.origin;
-        const streamUrl = `${baseUrl}/api/v1/actionstep/ingest-ai/status/${logId}/stream?token=${encodeURIComponent(token)}`;
+        const streamUrl = `${baseUrl}${connectorApi(`/analysis/status/${logId}/stream`)}?token=${encodeURIComponent(token)}`;
 
         const ingestionEventSource = new EventSource(streamUrl);
 
@@ -719,7 +734,7 @@
       document.getElementById('dashboardContent').classList.add('hidden');
 
       try {
-        const result = await api.get('/api/v1/actionstep/dashboard');
+        const result = await api.get(`${connectorApi('/summary')}?_=${Date.now()}`);
         dashboardData = result;
 
         // Always show dashboard content with tabs, regardless of configuration status
@@ -752,9 +767,12 @@
           document.getElementById('statDocsProcessing').textContent = 'All processed';
         }
 
-        // Update last sync time
+        // Update last sync time if a banner target is present
         if (result.last_sync) {
-          document.getElementById('lastSyncTime').textContent = `Last sync: ${timeAgo(result.last_sync.completed_at || result.last_sync.started_at)}`;
+          const lastSyncBannerEl = document.getElementById('lastSyncTime');
+          if (lastSyncBannerEl) {
+            lastSyncBannerEl.textContent = `Last sync: ${timeAgo(result.last_sync.completed_at || result.last_sync.started_at)}`;
+          }
         }
 
         // Load AI ingestion status
@@ -1140,7 +1158,7 @@
 
       // Create uploader instance
       chunkedUploader = new ChunkedUploader({
-        apiBaseUrl: `${api.baseUrl}/api/v1/storage`,
+        apiBaseUrl: `${api.baseUrl}${connectorApi('')}`,
         onProgress: (progress) => {
           // Update progress bar (with null checks)
           const progressBar = document.getElementById('uploadProgressBar');
@@ -1497,16 +1515,16 @@
         params.append('status', statusFilter);
       }
 
-      const result = await api.get(`/api/v1/actionstep/matters?${params.toString()}`);
+      const result = await api.get(`${connectorApi('/data/matters')}?${params.toString()}`);
 
-      if (!result.matters || result.matters.length === 0) {
+      if (!result.records || result.records.length === 0) {
         panel.innerHTML = '<div class="text-center text-gray-500 py-8">No matters found</div>';
         updateOutputPagination(0);
         return;
       }
 
       // Update pagination
-      const total = result.pagination?.total || result.matters.length;
+      const total = result.pagination?.total || result.records.length;
       updateOutputPagination(total);
 
       // Render table
@@ -1524,7 +1542,7 @@
             <tbody class="bg-white divide-y divide-gray-200">
       `;
 
-      result.matters.forEach(matter => {
+      result.records.forEach(matter => {
         html += `
           <tr class="hover:bg-gray-50 cursor-pointer transition-colors"
               data-matter-id="${matter.id}"
@@ -1549,9 +1567,9 @@
     // Similar functions for other data types
     async function loadParticipantsInOutput() {
       const panel = document.getElementById('outputDataPanel');
-      const result = await api.get('/api/v1/actionstep/participants?limit=25');
+      const result = await api.get(`${connectorApi('/data/participants')}?limit=25`);
 
-      if (!result.participants || result.participants.length === 0) {
+      if (!result.records || result.records.length === 0) {
         panel.innerHTML = '<div class="text-center text-gray-500 py-8">No participants found</div>';
         return;
       }
@@ -1562,7 +1580,7 @@
       html += '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>';
       html += '</tr></thead><tbody class="bg-white divide-y divide-gray-200">';
 
-      result.participants.forEach(p => {
+      result.records.forEach(p => {
         const participantType = p.is_company ? 'Company' : 'Individual';
         html += `<tr class="hover:bg-gray-50 cursor-pointer transition-colors" onclick="openParticipantDetail('${p.id}')">
           <td class="px-6 py-4 text-sm font-medium text-gray-900">${p.display_name || '-'}</td>
@@ -1577,9 +1595,9 @@
 
     async function loadTasksInOutput() {
       const panel = document.getElementById('outputDataPanel');
-      const result = await api.get('/api/v1/actionstep/tasks?limit=25');
+      const result = await api.get(`${connectorApi('/data/tasks')}?limit=25`);
 
-      if (!result.tasks || result.tasks.length === 0) {
+      if (!result.records || result.records.length === 0) {
         panel.innerHTML = '<div class="text-center text-gray-500 py-8">No tasks found</div>';
         return;
       }
@@ -1590,7 +1608,7 @@
       html += '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Due Date</th>';
       html += '</tr></thead><tbody class="bg-white divide-y divide-gray-200">';
 
-      result.tasks.forEach(t => {
+      result.records.forEach(t => {
         const dueDate = t.due_date ? new Date(t.due_date).toLocaleDateString() : '-';
         html += `<tr class="hover:bg-gray-50 cursor-pointer transition-colors" onclick="openTaskDetail('${t.id}')">
           <td class="px-6 py-4 text-sm font-medium text-gray-900">${t.task_name || '-'}</td>
@@ -1605,9 +1623,9 @@
 
     async function loadFileNotesInOutput() {
       const panel = document.getElementById('outputDataPanel');
-      const result = await api.get('/api/v1/actionstep/file-notes?limit=25');
+      const result = await api.get(`${connectorApi('/data/file-notes')}?limit=25`);
 
-      if (!result.file_notes || result.file_notes.length === 0) {
+      if (!result.records || result.records.length === 0) {
         panel.innerHTML = '<div class="text-center text-gray-500 py-8">No file notes found</div>';
         return;
       }
@@ -1618,7 +1636,7 @@
       html += '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>';
       html += '</tr></thead><tbody class="bg-white divide-y divide-gray-200">';
 
-      result.file_notes.forEach(note => {
+      result.records.forEach(note => {
         // Use first 100 chars of note_text as subject
         const subject = note.note_text ? note.note_text.substring(0, 100) + (note.note_text.length > 100 ? '...' : '') : '-';
         html += `<tr class="hover:bg-gray-50 cursor-pointer transition-colors" onclick="openFileNoteDetail('${note.id}')">
@@ -1634,7 +1652,7 @@
 
     async function loadDocumentsInOutput() {
       const panel = document.getElementById('outputDataPanel');
-      const result = await api.get('/api/v1/actionstep/documents?limit=25');
+      const result = await api.get(`${connectorApi('/documents')}?limit=25`);
 
       if (!result.documents || result.documents.length === 0) {
         panel.innerHTML = '<div class="text-center text-gray-500 py-8">No documents found</div>';
@@ -1661,10 +1679,10 @@
 
     // Load matters
     async function loadMatters() {
-      const result = await api.get('/api/v1/actionstep/matters?limit=25');
+      const result = await api.get(`${connectorApi('/data/matters')}?limit=25`);
       const content = document.getElementById('tabContent');
 
-      if (!result.matters || result.matters.length === 0) {
+      if (!result.records || result.records.length === 0) {
         content.innerHTML = '<div class="text-center text-gray-500 py-8">No matters found. Click "Import CSV Data" to import from ActionStep.</div>';
         return;
       }
@@ -1689,7 +1707,7 @@
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-              ${result.matters.map(m => `
+              ${result.records.map(m => `
                 <tr class="hover:bg-gray-50">
                   <td class="px-4 py-3 font-medium text-gray-900">${m.matter_name || 'Untitled'}</td>
                   <td class="px-4 py-3 text-sm text-gray-600">${m.file_reference || '-'}</td>
@@ -1704,16 +1722,16 @@
             </tbody>
           </table>
         </div>
-        <div class="mt-4 text-sm text-gray-500 text-center">Showing ${result.matters.length} of ${result.pagination?.total || result.matters.length} matters</div>
+        <div class="mt-4 text-sm text-gray-500 text-center">Showing ${result.records.length} of ${result.pagination?.total || result.records.length} matters</div>
       `;
     }
 
     // Load participants
     async function loadParticipants() {
-      const result = await api.get('/api/v1/actionstep/participants?limit=25');
+      const result = await api.get(`${connectorApi('/data/participants')}?limit=25`);
       const content = document.getElementById('tabContent');
 
-      if (!result.participants || result.participants.length === 0) {
+      if (!result.records || result.records.length === 0) {
         content.innerHTML = '<div class="text-center text-gray-500 py-8">No participants found</div>';
         return;
       }
@@ -1731,7 +1749,7 @@
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-              ${result.participants.map(p => `
+              ${result.records.map(p => `
                 <tr class="hover:bg-gray-50">
                   <td class="px-4 py-3">
                     <div class="font-medium text-gray-900">${p.display_name || p.company_name || 'Unknown'}</div>
@@ -1748,16 +1766,16 @@
             </tbody>
           </table>
         </div>
-        <div class="mt-4 text-sm text-gray-500 text-center">Showing ${result.participants.length} of ${result.pagination?.total || result.participants.length} participants</div>
+        <div class="mt-4 text-sm text-gray-500 text-center">Showing ${result.records.length} of ${result.pagination?.total || result.records.length} participants</div>
       `;
     }
 
     // Load tasks
     async function loadTasks() {
-      const result = await api.get('/api/v1/actionstep/tasks?limit=25');
+      const result = await api.get(`${connectorApi('/data/tasks')}?limit=25`);
       const content = document.getElementById('tabContent');
 
-      if (!result.tasks || result.tasks.length === 0) {
+      if (!result.records || result.records.length === 0) {
         content.innerHTML = '<div class="text-center text-gray-500 py-8">No tasks found</div>';
         return;
       }
@@ -1771,7 +1789,7 @@
 
       content.innerHTML = `
         <div class="space-y-3">
-          ${result.tasks.map(t => {
+          ${result.records.map(t => {
             const isOverdue = !t.completed_timestamp && t.due_date && new Date(t.due_date) < new Date();
             const displayStatus = isOverdue ? 'Overdue' : (t.current_status || 'Pending');
             return `
@@ -1793,23 +1811,23 @@
             `;
           }).join('')}
         </div>
-        <div class="mt-4 text-sm text-gray-500 text-center">Showing ${result.tasks.length} of ${result.pagination?.total || result.tasks.length} tasks</div>
+        <div class="mt-4 text-sm text-gray-500 text-center">Showing ${result.records.length} of ${result.pagination?.total || result.records.length} tasks</div>
       `;
     }
 
     // Load file notes
     async function loadFileNotes() {
-      const result = await api.get('/api/v1/actionstep/file-notes?limit=25');
+      const result = await api.get(`${connectorApi('/data/file-notes')}?limit=25`);
       const content = document.getElementById('tabContent');
 
-      if (!result.file_notes || result.file_notes.length === 0) {
+      if (!result.records || result.records.length === 0) {
         content.innerHTML = '<div class="text-center text-gray-500 py-8">No file notes found</div>';
         return;
       }
 
       content.innerHTML = `
         <div class="space-y-4">
-          ${result.file_notes.map(n => `
+          ${result.records.map(n => `
             <div class="p-4 bg-gray-50 rounded-lg">
               <div class="flex items-center justify-between mb-2">
                 <div class="font-medium text-gray-900">${n.matter_name || 'Unknown Matter'}</div>
@@ -1822,13 +1840,13 @@
             </div>
           `).join('')}
         </div>
-        <div class="mt-4 text-sm text-gray-500 text-center">Showing ${result.file_notes.length} of ${result.pagination?.total || result.file_notes.length} notes</div>
+        <div class="mt-4 text-sm text-gray-500 text-center">Showing ${result.records.length} of ${result.pagination?.total || result.records.length} notes</div>
       `;
     }
 
     // Load sync history
     async function loadSyncHistory() {
-      const result = await api.get('/api/v1/actionstep/sync-logs?limit=20');
+      const result = await api.get(`${connectorApi('/logs')}?limit=20`);
       const content = document.getElementById('tabContent');
 
       if (!result.logs || result.logs.length === 0) {
@@ -1866,9 +1884,9 @@
                     <td class="px-4 py-3 font-medium text-gray-900">${l.sync_type || 'Full'}</td>
                     <td class="px-4 py-3 text-sm text-gray-600">${l.started_at ? timeAgo(l.started_at) : '-'}</td>
                     <td class="px-4 py-3 text-sm text-gray-600">${duration}</td>
-                    <td class="px-4 py-3 text-sm text-right text-gray-600">${formatNumber(l.records_processed)}</td>
-                    <td class="px-4 py-3 text-sm text-right text-green-600">${formatNumber(l.records_created)}</td>
-                    <td class="px-4 py-3 text-sm text-right ${l.records_failed > 0 ? 'text-red-600' : 'text-gray-600'}">${formatNumber(l.records_failed)}</td>
+                    <td class="px-4 py-3 text-sm text-right text-gray-600">${formatNumber(l.records?.processed || 0)}</td>
+                    <td class="px-4 py-3 text-sm text-right text-green-600">${formatNumber(l.records?.created || 0)}</td>
+                    <td class="px-4 py-3 text-sm text-right ${(l.records?.failed || 0) > 0 ? 'text-red-600' : 'text-gray-600'}">${formatNumber(l.records?.failed || 0)}</td>
                     <td class="px-4 py-3 text-center">
                       <span class="px-2 py-1 text-xs font-medium rounded-full ${statusColors[l.status] || 'bg-gray-100'}">${l.status || 'unknown'}</span>
                     </td>
@@ -2127,22 +2145,15 @@
         </div>
       `;
 
-      // Load last sync time if configured
+      // Load last sync time from the generic summary payload
       if (isConfigured) {
-        try {
-          const result = await api.get('/api/v1/actionstep/sync-logs?limit=1');
-          const lastSyncEl = document.getElementById('overviewLastSync');
-          if (lastSyncEl) {
-            if (result.logs && result.logs.length > 0) {
-              lastSyncEl.textContent = timeAgo(result.logs[0].started_at);
-            } else {
-              lastSyncEl.textContent = 'Never';
-            }
-          }
-        } catch (error) {
-          const lastSyncEl = document.getElementById('overviewLastSync');
-          if (lastSyncEl) {
-            lastSyncEl.textContent = 'Unknown';
+        const lastSyncEl = document.getElementById('overviewLastSync');
+        if (lastSyncEl) {
+          const lastSync = dashboardData?.last_sync;
+          if (lastSync?.completed_at || lastSync?.started_at) {
+            lastSyncEl.textContent = timeAgo(lastSync.completed_at || lastSync.started_at);
+          } else {
+            lastSyncEl.textContent = 'Never';
           }
         }
       }
@@ -2410,7 +2421,7 @@
         statusEl.textContent = 'Testing path and checking for required files...';
         statusEl.classList.remove('hidden');
 
-        const result = await api.post('/api/v1/filesystem/validate-path', {
+        const result = await api.post(connectorApi('/filesystem/validate-path'), {
           path: importDir
         });
 
@@ -2467,7 +2478,12 @@
         statusEl.textContent = 'Saving configuration...';
         statusEl.classList.remove('hidden');
 
-        await api.post('/api/v1/actionstep/config', config);
+        await api.patch(connectorApi('/config'), {
+          import_directory: config.import_directory
+        });
+        await api.patch(connectorApi('/sync-settings'), {
+          sync_frequency: config.sync_frequency
+        });
 
         statusEl.className = 'text-center py-3 rounded-lg bg-green-100 text-green-800';
         statusEl.textContent = 'Configuration saved successfully! Reloading...';
@@ -2489,6 +2505,36 @@
       const statusEl = document.getElementById('autoConfigStatus');
       const btn = document.getElementById('autoConfigureBtn');
 
+      function normalizeAutoConfig(rawConfig) {
+        const nested = rawConfig?.config || {};
+        const importDirectory = rawConfig?.import_directory || nested.import_directory || '';
+        const documentsDirectory = rawConfig?.documents_directory || nested.documents_directory || '';
+        const syncFrequency = rawConfig?.sync_frequency || nested.sync_frequency || 'manual';
+        return {
+          import_directory: importDirectory,
+          documents_directory: documentsDirectory,
+          sync_frequency: syncFrequency
+        };
+      }
+
+      function applyAutoConfigToDashboard(rawConfig) {
+        const normalized = normalizeAutoConfig(rawConfig);
+        dashboardData = {
+          ...(dashboardData || {}),
+          configured: true,
+          config: {
+            ...(dashboardData?.config || {}),
+            import_dir: normalized.import_directory,
+            import_directory: normalized.import_directory,
+            documents_directory: normalized.documents_directory,
+            sync_frequency: normalized.sync_frequency,
+            source: rawConfig?.source || dashboardData?.config?.source || 'Database'
+          }
+        };
+        loadTabContent(currentTab);
+        return normalized;
+      }
+
       try {
         btn.disabled = true;
         btn.innerHTML = `
@@ -2502,12 +2548,13 @@
         statusEl.className = 'mt-2 text-sm text-gray-600';
         statusEl.textContent = 'Setting up temporary directory...';
 
-        const result = await api.post('/api/v1/actionstep/config/auto-configure');
+        const result = await api.post(connectorApi('/auto-configure'));
 
         // Handle successful configuration
         if (result.success) {
+          const normalized = applyAutoConfigToDashboard(result.config);
           statusEl.className = 'mt-2 text-sm text-emerald-700 font-medium';
-          statusEl.innerHTML = `✓ Configuration complete!<br><span class="text-xs text-emerald-600">Import directory: ${result.config.import_directory}</span>`;
+          statusEl.innerHTML = `✓ Configuration complete!<br><span class="text-xs text-emerald-600">Import directory: ${normalized.import_directory || 'Configured'}</span>`;
 
           Toast.success('ActionStep configured successfully!');
 
@@ -2518,8 +2565,9 @@
         }
         // Handle "already configured" case - treat as success
         else if (!result.success && result.config && result.error?.includes('already exists')) {
+          const normalized = applyAutoConfigToDashboard(result.config);
           statusEl.className = 'mt-2 text-sm text-emerald-700 font-medium';
-          statusEl.innerHTML = `✓ Already configured!<br><span class="text-xs text-emerald-600">Import directory: ${result.config.import_directory}</span>`;
+          statusEl.innerHTML = `✓ Already configured!<br><span class="text-xs text-emerald-600">Import directory: ${normalized.import_directory || 'Configured'}</span>`;
 
           Toast.success('ActionStep is already configured');
 
@@ -2536,8 +2584,9 @@
         // API client stores response data in error.data
         if (error.data?.config && error.message?.includes('already exists')) {
           const config = error.data.config;
+          const normalized = applyAutoConfigToDashboard(config);
           statusEl.className = 'mt-2 text-sm text-emerald-700 font-medium';
-          statusEl.innerHTML = `✓ Already configured!<br><span class="text-xs text-emerald-600">Import directory: ${config.import_directory}</span>`;
+          statusEl.innerHTML = `✓ Already configured!<br><span class="text-xs text-emerald-600">Import directory: ${normalized.import_directory || 'Configured'}</span>`;
 
           Toast.success('ActionStep is already configured');
 
@@ -2685,8 +2734,8 @@
       try {
         // Fetch both active ingestion jobs and active upload sessions
         const [ingestJobs, uploadSessions] = await Promise.all([
-          api.get('/api/v1/storage/jobs?status=pending,processing&integration_source=actionstep&limit=20'),
-          api.get('/api/v1/storage/upload-sessions?limit=20')
+          api.get(`${connectorApi('/processing-jobs')}?status=pending,processing&limit=20`),
+          api.get(`${connectorApi('/upload-sessions')}?limit=20`)
         ]);
 
         const container = document.getElementById('activeJobsContent');
@@ -2843,10 +2892,10 @@
 
         // Fetch ActionStep-specific job history (sync logs, document imports, processing jobs, AI ingestions)
         const [syncLogsResult, documentImportsResult, processingJobsResult] = await Promise.all([
-          api.get(`/api/v1/actionstep/sync-logs?limit=${logsHistoryPageSize}&offset=${offset}`),
-          api.get(`/api/v1/actionstep/documents?limit=${logsHistoryPageSize}&offset=${offset}`),
+          api.get(`${connectorApi('/logs')}?limit=${logsHistoryPageSize}&offset=${offset}`),
+          api.get(`${connectorApi('/documents')}?limit=${logsHistoryPageSize}&offset=${offset}`),
           // NEW: Fetch ALL ActionStep processing jobs (completed, failed, cancelled)
-          api.get(`/api/v1/storage/jobs?integration_source=actionstep&limit=100`)
+          api.get(`${connectorApi('/processing-jobs')}?limit=100`)
         ]);
 
         const container = document.getElementById('jobHistoryContent');
@@ -2861,13 +2910,13 @@
             status: log.status,
             created_at: log.started_at,
             completed_at: log.completed_at,
-            processed_count: log.records_fetched || log.records_processed || 0,
+            processed_count: log.records?.processed || log.records_fetched || log.records_processed || 0,
             error_message: log.error_message,
             _isSync: true,
             details: {
-              records_created: log.records_created || 0,
-              records_updated: log.records_updated || 0,
-              records_failed: log.records_failed || 0
+              records_created: log.records?.created || log.records_created || 0,
+              records_updated: log.records?.updated || log.records_updated || 0,
+              records_failed: log.records?.failed || log.records_failed || 0
             }
           };
         });
@@ -3215,10 +3264,10 @@
       try {
         if (isUpload) {
           // Cancel upload session
-          await api.delete(`/api/v1/storage/upload/${jobId}`);
+          await api.delete(connectorApi(`/upload-sessions/${jobId}`));
         } else {
           // Cancel ingest job
-          await api.post(`/api/v1/storage/jobs/${jobId}/cancel`, {});
+          await api.post(connectorApi(`/processing-jobs/${jobId}/cancel`), {});
         }
 
         Toast.success('Job cancelled successfully');
@@ -3496,7 +3545,7 @@
 
       try {
         // Start the sync - returns sync_log_id immediately
-        const result = await api.post('/api/v1/actionstep/sync', {});
+        const result = await api.post(connectorApi('/sync'), {});
         const syncLogId = result.sync_log_id;
 
         if (!syncLogId) {
@@ -3510,7 +3559,7 @@
         }
 
         const baseUrl = api.baseUrl || window.location.origin;
-        const streamUrl = `${baseUrl}/api/v1/actionstep/sync/status/${syncLogId}/stream?token=${encodeURIComponent(token)}`;
+        const streamUrl = `${baseUrl}${connectorApi(`/sync/status/${syncLogId}/stream`)}?token=${encodeURIComponent(token)}`;
         importEventSource = new EventSource(streamUrl);
 
         importEventSource.addEventListener('connected', () => {
@@ -3664,7 +3713,7 @@
       progressDetails.innerHTML = '';
 
       // Start the import (don't await - let it run in background for large imports)
-      api.post('/api/v1/actionstep/documents/import', {
+      api.post(connectorApi('/documents/import'), {
         folder_path: dashboardData?.config?.import_directory ?
           dashboardData.config.import_directory + '/documents' : undefined
       })
@@ -3716,7 +3765,7 @@
     function startDocImportPolling(progressText, progressBar, progressDetails, batchId) {
       docImportPollingInterval = setInterval(async () => {
         try {
-          const result = await api.get('/api/v1/actionstep/documents/status' + (batchId ? `?batch_id=${batchId}` : ''));
+          const result = await api.get(connectorApi('/documents/status') + (batchId ? `?batch_id=${batchId}` : ''));
 
           if (result.statuses) {
             // Batch-specific status
@@ -3835,7 +3884,7 @@
 
       // Load available volumes
       try {
-        const result = await api.get('/api/v1/filesystem/volumes');
+        const result = await api.get(connectorApi('/filesystem/volumes'));
         availableVolumes = result.volumes || [];
 
         const volumeSelector = document.getElementById('volumeSelector');
@@ -3913,7 +3962,7 @@
 
         // Build query string manually since api.get doesn't support params object
         const encodedPath = encodeURIComponent(fullPath);
-        const result = await api.get(`/api/v1/filesystem/browse?path=${encodedPath}`);
+        const result = await api.get(`${connectorApi('/filesystem/browse')}?path=${encodedPath}`);
 
         console.log('Browse result:', result);
         const directories = result.directories || [];
@@ -4076,7 +4125,7 @@
 
       try {
         const newPath = `${currentBrowsePath}/${folderName}`.replace(/\/+/g, '/');
-        await api.post('/api/v1/filesystem/create-dir', {
+        await api.post(connectorApi('/filesystem/create-dir'), {
           path: newPath
         });
 
@@ -4232,7 +4281,7 @@
         confirmBtn.disabled = true;
         confirmBtn.textContent = 'Deleting...';
 
-        await api.delete('/api/v1/actionstep/config');
+        await api.delete(connectorApi(''));
 
         closeDeleteConfigDialog();
         Toast.success('Configuration deleted successfully');
@@ -4255,7 +4304,7 @@
     // Load and display AI ingestion status
     async function loadAIIngestionStatus() {
       try {
-        const status = await api.get('/api/v1/actionstep/ingest-ai/status');
+        const status = await api.get(connectorApi('/analysis/status'));
         const statusEl = document.getElementById('aiAnalysisStatus');
         const btnText = document.getElementById('aiIngestionBtnText');
         const btnIcon = document.getElementById('aiIngestionBtnIcon');
@@ -4303,7 +4352,7 @@
 
       try {
         // Call AI ingestion endpoint
-        const result = await api.post('/api/v1/actionstep/ingest-ai');
+        const result = await api.post(connectorApi('/analysis'));
 
         // Show success message with info about background processing
         Toast.success(`AI analysis started! Processing ${result.total_matters || 0} matters in background. This may take 10-15 minutes.`);
@@ -4311,7 +4360,9 @@
         // Connect to SSE stream for real-time updates
         const logId = result.log_id;
         if (logId) {
-          const streamUrl = `${baseUrl}/api/v1/actionstep/ingest-ai/status/${logId}/stream?token=${encodeURIComponent(token)}`;
+          const token = api.token;
+          const baseUrl = api.baseUrl || window.location.origin;
+          const streamUrl = `${baseUrl}${connectorApi(`/analysis/status/${logId}/stream`)}?token=${encodeURIComponent(token)}`;
           const ingestionEventSource = new EventSource(streamUrl);
 
           ingestionEventSource.addEventListener('connected', () => {
@@ -4387,7 +4438,7 @@
           // Fallback to polling if no log_id
           const pollInterval = setInterval(async () => {
             await loadAIIngestionStatus();
-            const currentStatus = await api.get('/api/v1/actionstep/ingest-ai/status');
+            const currentStatus = await api.get(connectorApi('/analysis/status'));
             if (currentStatus.status === 'completed' || currentStatus.status === 'failed') {
               clearInterval(pollInterval);
               Toast.success('AI analysis completed!');
@@ -4435,7 +4486,7 @@
 
       try {
         // Fetch matter details from API
-        const result = await api.get(`/api/v1/actionstep/matters/${matterId}`);
+        const result = await api.get(connectorApi(`/data/matters/${matterId}`));
 
         if (!result || !result.matter) {
           throw new Error('Matter not found');
@@ -4737,7 +4788,7 @@
       content.innerHTML = '<div class="flex items-center justify-center py-12"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div></div>';
 
       try {
-        const result = await api.get(`/api/v1/actionstep/participants/${participantId}`);
+        const result = await api.get(connectorApi(`/data/participants/${participantId}`));
         renderParticipantDetail(result);
       } catch (error) {
         content.innerHTML = `<div class="text-center text-red-600 py-8"><p class="font-medium">Failed to load participant details</p><p class="text-sm mt-2">${error.message}</p></div>`;
@@ -4853,11 +4904,11 @@
 
       try {
         // Fetch task details - note: you may need to add this endpoint
-        const task = await api.get(`/api/v1/actionstep/tasks/${taskId}`).catch(() => null);
+        const task = await api.get(connectorApi(`/data/tasks/${taskId}`)).catch(() => null);
         if (!task) {
           // Fallback: fetch all tasks and find the one we need
-          const result = await api.get(`/api/v1/actionstep/tasks?limit=1000`);
-          const foundTask = result.tasks.find(t => t.id === taskId);
+          const result = await api.get(`${connectorApi('/data/tasks')}?limit=1000`);
+          const foundTask = (result.records || []).find(t => t.id === taskId);
           if (foundTask) {
             renderTaskDetail({ task: foundTask });
           } else {
@@ -4940,13 +4991,8 @@
 
       try {
         // Fallback: fetch all notes and find the one we need
-        const result = await api.get(`/api/v1/actionstep/file-notes?limit=1000`);
-        const foundNote = result.file_notes.find(n => n.id === noteId);
-        if (foundNote) {
-          renderFileNoteDetail({ file_note: foundNote });
-        } else {
-          throw new Error('File note not found');
-        }
+        const result = await api.get(connectorApi(`/data/file-notes/${noteId}`));
+        renderFileNoteDetail(result);
       } catch (error) {
         content.innerHTML = `<div class="text-center text-red-600 py-8"><p class="font-medium">Failed to load file note details</p><p class="text-sm mt-2">${error.message}</p></div>`;
       }

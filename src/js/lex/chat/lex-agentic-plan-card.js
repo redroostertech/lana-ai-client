@@ -472,9 +472,9 @@
     }
 
     updated() {
-      // Wire up the generic action click handler for all data-action-id buttons
-      // This single handler covers every action from the descriptor array
-      this.listen('[data-action-id]', 'click', this._handleAction.bind(this));
+      // Wire up the generic action click handler for ALL data-action-id buttons
+      // using event delegation so every button is covered (listen only binds the first match)
+      this.delegate('click', '[data-action-id]', this._handleAction.bind(this));
 
       // Edit submit and cancel — these are special internal actions
       this.listen('[data-action="submit-edit"]', 'click', this._handleSubmitEdit.bind(this));
@@ -504,12 +504,12 @@
      *
      * @param {Event} event - Click event
      */
-    _handleAction(event) {
+    _handleAction(event, delegateTarget) {
       if (this._loading) return;
 
-      var btn = event.currentTarget || event.target;
-      // Walk up to the element with the data-action-id attribute in case the
-      // click landed on a child element inside the button
+      // When called via delegate(), the matched element is passed as the second arg.
+      // Fall back to walking up from event.target for direct addEventListener usage.
+      var btn = delegateTarget || event.currentTarget || event.target;
       while (btn && !btn.dataset.actionId) {
         btn = btn.parentElement;
       }
@@ -574,7 +574,21 @@
      */
     _buildFallbackAction(actionId) {
       var approvalId = this.approvalId;
-      if (!approvalId) return null;
+
+      // Edit is purely client-side — no approval ID needed
+      if (actionId === 'edit') {
+        return {
+          id: 'edit',
+          action_type: 'toggle_edit_mode',
+          disabled_when_state: ['approved', 'rejected', 'expired', 'cancelled']
+        };
+      }
+
+      // Approve and Cancel require an approval ID for the backend endpoint
+      if (!approvalId) {
+        console.warn('[lex-agentic-plan-card] No approval-id set — cannot build fallback for:', actionId);
+        return null;
+      }
 
       if (actionId === 'approve') {
         return {
@@ -582,14 +596,6 @@
           endpoint: 'POST /api/v1/approvals/' + approvalId + '/approve',
           payload: { comments: 'Approved from chat' },
           on_success: { set_state: 'approved', toast: 'Plan approved — LANA is working on it' },
-          disabled_when_state: ['approved', 'rejected', 'expired', 'cancelled']
-        };
-      }
-
-      if (actionId === 'edit') {
-        return {
-          id: 'edit',
-          action_type: 'toggle_edit_mode',
           disabled_when_state: ['approved', 'rejected', 'expired', 'cancelled']
         };
       }

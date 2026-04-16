@@ -95,7 +95,7 @@
 
   <div class="section">
     <h2>Configuration</h2>
-    <p><strong>Registry URL:</strong> <span id="registryUrl">-</span></p>
+    <p><strong>Catalog URL:</strong> <span id="registryUrl">-</span></p>
     <p><strong>Development Mode:</strong> <span id="devMode">-</span></p>
     <p><strong>Demo Mode:</strong> <span id="demoMode">-</span></p>
   </div>
@@ -149,30 +149,30 @@
     }
 
     // Initialize
-    document.getElementById('registryUrl').textContent = window.LanaConfig.CONNECTOR_REGISTRY_URL;
+    document.getElementById('registryUrl').textContent = `${window.LanaConfig.API_BASE_URL}/api/v1/integrations/connectors/available`;
     document.getElementById('devMode').textContent = window.LanaConfig.DEVELOPMENT_MODE;
     document.getElementById('demoMode').textContent = window.LanaConfig.DEMO_MODE;
 
     log('Configuration loaded');
-    log(`Registry URL: ${window.LanaConfig.CONNECTOR_REGISTRY_URL}`);
+    log(`Catalog URL: ${window.LanaConfig.API_BASE_URL}/api/v1/integrations/connectors/available`);
 
-    // Test 1: Test registry connection
+    // Test 1: Test backend catalog connection
     async function testRegistryConnection() {
-      log('Testing registry connection...');
+      log('Testing backend catalog connection...');
       try {
-        const url = ConnectorRegistry.getRegistryUrl();
-        const response = await fetch(`${url}/index.json`);
+        const url = `${window.LanaConfig.API_BASE_URL}/api/v1/integrations/connectors/available`;
+        const response = await fetch(url);
 
         if (response.ok) {
-          showStatus('registryStatus', 'success', `Connected to registry at ${url}`);
-          log('Registry connection successful!', 'success');
+          showStatus('registryStatus', 'success', `Connected to backend catalog at ${url}`);
+          log('Backend catalog connection successful!', 'success');
         } else {
           showStatus('registryStatus', 'error', `Failed to connect: ${response.status} ${response.statusText}`);
-          log(`Registry connection failed: ${response.status}`, 'error');
+          log(`Backend catalog connection failed: ${response.status}`, 'error');
         }
       } catch (error) {
         showStatus('registryStatus', 'error', `Error: ${error.message}`);
-        log(`Registry connection error: ${error.message}`, 'error');
+        log(`Backend catalog connection error: ${error.message}`, 'error');
       }
     }
 
@@ -186,7 +186,7 @@
 
         let html = `
           <div style="margin-top: 10px;">
-            <p><strong>Registry Version:</strong> ${catalog.registry_version}</p>
+            <p><strong>Catalog Source:</strong> ${catalog.registry_version}</p>
             <p><strong>Updated:</strong> ${new Date(catalog.updated_at).toLocaleString()}</p>
             <p><strong>Connectors:</strong> ${catalog.connectors.length}</p>
           </div>
@@ -238,17 +238,17 @@
       }
     }
 
-    // Test 4: Test install flow
+    // Test 4: Test setup flow
     async function testInstall(connectorId) {
-      log(`Testing install flow for ${connectorId}...`);
+      log(`Testing setup flow for ${connectorId}...`);
       try {
         const result = await ConnectorRegistry.installConnector(connectorId);
 
-        log(`Install completed for ${connectorId}`, 'success');
+        log(`Setup preparation completed for ${connectorId}`, 'success');
 
         const html = `
           <div style="margin-top: 10px;">
-            <p class="status success">Successfully installed ${connectorId}!</p>
+            <p class="status success">${connectorId} is ready to configure.</p>
             <pre style="background: #f3f4f6; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 11px;">${JSON.stringify(result, null, 2)}</pre>
           </div>
         `;

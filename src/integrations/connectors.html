@@ -296,11 +296,11 @@
           </div>
         </section>
 
-        <!-- Available Connectors from Registry -->
+        <!-- Available Connectors from Local Catalog -->
         <section id="availableConnectorsSection" class="hidden">
           <div class="mb-4">
-            <h2 class="text-lg font-semibold text-gray-900">Available to Install</h2>
-            <p class="text-sm text-gray-500 mt-1">Ready-to-install connectors from the registry</p>
+            <h2 class="text-lg font-semibold text-gray-900">Available to Configure</h2>
+            <p class="text-sm text-gray-500 mt-1">Connector packages available in the local platform catalog</p>
           </div>
 
           <!-- Search and Filter Controls -->
@@ -341,7 +341,7 @@
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="availableConnectors">
-            <!-- Available connector cards from registry will be rendered here -->
+            <!-- Available connector cards from the backend catalog will be rendered here -->
           </div>
 
           <!-- No Results Message -->
@@ -724,7 +724,7 @@
         : `<span class="text-lg font-bold text-gray-400">${normalizedConnector.name.charAt(0)}</span>`;
 
       return `
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 ${isComingSoon ? 'opacity-60' : 'hover:shadow-md'} transition-shadow ${isComingSoon ? '' : 'cursor-pointer'}" ${isComingSoon ? '' : hasCustomUI ? `onclick="openCustomConnectorUI('${normalizedConnector.ui_entry_point}', '${normalizedConnector.name}', '${normalizedConnector.id}')"` : `onclick="openConnector('${normalizedConnector.id}', '${normalizedConnector.category}')"`}>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 ${isComingSoon ? 'opacity-60' : 'hover:shadow-md'} transition-shadow ${isComingSoon ? '' : 'cursor-pointer'}" ${isComingSoon ? '' : hasCustomUI ? `onclick="openCustomConnectorUI('${normalizedConnector.ui_entry_point}', '${normalizedConnector.name}', '${normalizedConnector.id}', '${normalizedConnector.connector_id || normalizedConnector.connector_type || ''}')"` : `onclick="openConnector('${normalizedConnector.id}', '${normalizedConnector.category}')"`}>
           <div class="flex items-start justify-between mb-4">
             <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
               ${logoHtml}
@@ -804,7 +804,7 @@
         return;
       }
 
-      // All other connectors (registry-based) use the generic integration management page
+      // All other connectors from the local catalog use the generic integration management page
       window.location.href = `integration-manage.html?id=${connectorId}`;
     }
 
@@ -814,14 +814,16 @@
     }
 
     // Open custom connector UI - navigate to local wrapper page
-    function openCustomConnectorUI(uiEntryPoint, connectorName, connectorId) {
+    function openCustomConnectorUI(uiEntryPoint, connectorName, sourceId, connectorType) {
       console.log('[Connector UI] Opening via wrapper:', uiEntryPoint);
 
       // Navigate to local wrapper page with URL parameters
       const params = new URLSearchParams({
         ui: uiEntryPoint,
         name: connectorName,
-        connectorId: connectorId || ''
+        connectorId: connectorType || sourceId || '',
+        connectorType: connectorType || '',
+        sourceId: sourceId || ''
       });
 
       window.location.href = `connector-viewer.html?${params.toString()}`;
@@ -843,7 +845,7 @@
       }
     }
 
-    // Render available connector card from registry
+    // Render available connector card from the local catalog
     function renderAvailableConnectorCard(connector, installedConnectors) {
       const isInstalled = ConnectorRegistry.isConnectorInstalled(connector.id, installedConnectors);
       const isComingSoon = connector.status === 'coming_soon';
@@ -896,7 +898,7 @@
         actionButton = `
           <div class="flex gap-2">
             <button onclick="installConnector('${connector.id}')" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
-              Install
+              Set Up
             </button>
             <button onclick="showConnectorDetails('${connector.id}', event)" class="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -928,18 +930,18 @@
       `;
     }
 
-    // Install a connector from the registry
+    // Prepare a connector from the local catalog for configuration
     async function installConnector(connectorId) {
       // Disable the button to prevent double-clicks
       const button = event?.target;
       if (button) {
         button.disabled = true;
-        button.textContent = 'Installing...';
+        button.textContent = 'Setting Up...';
       }
 
       try {
         // Show loading toast
-        const toastId = Toast.info(`Installing ${connectorId}...`, { duration: 0 });
+        const toastId = Toast.info(`Preparing ${connectorId}...`, { duration: 0 });
 
         // Call the install API
         const result = await ConnectorRegistry.installConnector(connectorId);
@@ -948,7 +950,7 @@
         Toast.dismiss(toastId);
 
         if (result.success) {
-          Toast.success(`${connectorId} installed successfully!`);
+          Toast.success(`${connectorId} is ready to configure.`);
 
           // Redirect to configuration page
           setTimeout(() => {
@@ -963,17 +965,17 @@
         // Better error messages for common issues
         let errorMessage = error.message;
         if (error.message.includes('404')) {
-          errorMessage = 'Backend installation endpoint not yet implemented. Contact your administrator.';
+          errorMessage = 'Connector catalog entry not found on the backend.';
         } else if (error.message.includes('fetch')) {
           errorMessage = 'Network error. Check your connection and try again.';
         }
 
-        Toast.error(`Installation failed: ${errorMessage}`);
+        Toast.error(`Setup failed: ${errorMessage}`);
 
         // Re-enable button on error
         if (button) {
           button.disabled = false;
-          button.textContent = 'Install Connector';
+          button.textContent = 'Set Up';
         }
       }
     }
@@ -1323,7 +1325,12 @@
 
       if (hasCustomUI) {
         // Navigate to custom connector UI
-        openCustomConnectorUI(connector.ui_entry_point, connector.manifest?.name || connector.name, connector.id || connector.connector_id);
+        openCustomConnectorUI(
+          connector.ui_entry_point,
+          connector.manifest?.name || connector.name,
+          connector.id || '',
+          connector.connector_id || connector.connector_type || connector.id || ''
+        );
       } else {
         // Navigate to standard connector management page
         openConnectorManage(connector.id);
@@ -1748,7 +1755,7 @@
           }
         }
 
-        // Process registry connectors
+        // Process catalog connectors
         if (registryData.status === 'fulfilled') {
           const availableConnectors = registryData.value.connectors;
 
@@ -1784,7 +1791,7 @@
             }
           }
         } else {
-          console.warn('Registry unavailable:', registryData.reason);
+          console.warn('Connector catalog unavailable:', registryData.reason);
 
           // Show a friendly message to users
           const availableSection = document.getElementById('availableConnectorsSection');
@@ -1795,8 +1802,8 @@
               <svg class="w-12 h-12 text-yellow-600 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
               </svg>
-              <p class="text-sm text-yellow-800 font-medium mb-1">Connector registry unavailable</p>
-              <p class="text-xs text-yellow-700">Cannot fetch available connectors from the registry. Check your network connection or contact support.</p>
+              <p class="text-sm text-yellow-800 font-medium mb-1">Connector catalog unavailable</p>
+              <p class="text-xs text-yellow-700">Cannot fetch available connectors from the backend catalog. You can still use the ZIP import flow.</p>
             </div>
           `;
           availableSection.classList.remove('hidden');

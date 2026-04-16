@@ -225,7 +225,7 @@
     var cardClick = '';
     if (!isComingSoon) {
       if (hasCustomUI) {
-        cardClick = 'onclick="openCustomConnectorUI(\'' + normalizedConnector.ui_entry_point + '\', \'' + normalizedConnector.name + '\', \'' + normalizedConnector.id + '\')"';
+        cardClick = 'onclick="openCustomConnectorUI(\'' + normalizedConnector.ui_entry_point + '\', \'' + normalizedConnector.name + '\', \'' + normalizedConnector.id + '\', \'' + (normalizedConnector.connector_id || normalizedConnector.connector_type || '') + '\')"';
       } else {
         cardClick = 'onclick="openConnector(\'' + normalizedConnector.id + '\', \'' + normalizedConnector.category + '\')"';
       }
@@ -306,7 +306,7 @@
       actionButton = '<lex-btn variant="ghost" size="sm" onclick="showConnectorDetails(\'' + connector.id + '\', event)" style="width:100%">View Details</lex-btn>';
     } else {
       actionButton = '<div class="flex gap-2">' +
-        '<lex-btn variant="primary" size="sm" onclick="installConnector(\'' + connector.id + '\', event)" style="flex:1">Install</lex-btn>' +
+        '<lex-btn variant="primary" size="sm" onclick="installConnector(\'' + connector.id + '\', event)" style="flex:1">Set Up</lex-btn>' +
         '<lex-btn variant="ghost" size="sm" icon="true" onclick="showConnectorDetails(\'' + connector.id + '\', event)" aria-label="View details">' + infoIconSvgAvail + '</lex-btn>' +
         '</div>';
     }
@@ -333,25 +333,40 @@
 
   function openConnectorManage(connectorId) {
     var connector = findConnectorById(connectorId);
-    var connectorType = (connector && (connector.connector_type || connector.connector_id)) || connectorId;
+    // Prefer the catalog slug (connector_id) from integration_sources. Falls
+    // back to the row id when the caller passed a slug directly.
+    var connectorSlug = String(
+      (connector && (connector.connector_id || connector.connector_type)) || connectorId || ''
+    ).toLowerCase();
 
-    var specialPages = {
-      'case-actionstep': 'integrations/actionstep.html',
-      'crm-leadly': 'integrations/leadly.html'
-    };
-
-    if (specialPages[connectorType]) {
+    if (connectorSlug === 'actionstep') {
+      var actionstepUrl = 'integrations/actionstep.html?id=' + encodeURIComponent(connectorId);
       if (window.LexRouter) {
-        LexRouter.navigate(specialPages[connectorType] + '?id=' + connectorId);
+        LexRouter.navigate(actionstepUrl);
       } else {
-        window.location.href = specialPages[connectorType] + '?id=' + connectorId;
+        window.location.href = actionstepUrl;
+      }
+      return;
+    }
+
+    if (connectorSlug === 'leadly') {
+      var leadlyUrl = 'integrations/leadly.html?id=' + encodeURIComponent(connectorId);
+      if (window.LexRouter) {
+        LexRouter.navigate(leadlyUrl);
+      } else {
+        window.location.href = leadlyUrl;
       }
       return;
     }
 
     // Connector with custom UI — open in connector-viewer
     if (connector && connector.ui_entry_point) {
-      openCustomConnectorUI(connector.ui_entry_point, connector.name || 'Connector', connector.id || connector.connector_id);
+      openCustomConnectorUI(
+        connector.ui_entry_point,
+        connector.name || 'Connector',
+        connector.id || '',
+        connector.connector_id || connector.connector_type || connector.id || ''
+      );
       return;
     }
 
@@ -367,11 +382,13 @@
     openConnectorManage(connectorId);
   }
 
-  function openCustomConnectorUI(uiEntryPoint, connectorName, connectorId) {
+  function openCustomConnectorUI(uiEntryPoint, connectorName, sourceId, connectorType) {
     var params = new URLSearchParams({
       ui: uiEntryPoint,
       name: connectorName,
-      connectorId: connectorId || ''
+      connectorId: connectorType || sourceId || '',
+      connectorType: connectorType || '',
+      sourceId: sourceId || ''
     });
 
     if (window.LexRouter) {
@@ -392,7 +409,7 @@
 
     ConnectorRegistry.installConnector(connectorId).then(function (result) {
       if (result.success) {
-        Lex.Toast.success(connectorId + ' installed successfully!');
+        Lex.Toast.success(connectorId + ' is ready to configure.');
         var tid = setTimeout(function () {
           if (window.LexRouter) {
             LexRouter.navigate('integrations/integration-config.html?id=' + connectorId);
@@ -409,16 +426,16 @@
 
       var errorMessage = error.message;
       if (errorMessage.includes('404')) {
-        errorMessage = 'Backend installation endpoint not yet implemented. Contact your administrator.';
+        errorMessage = 'Connector catalog entry not found on the backend.';
       } else if (errorMessage.includes('fetch')) {
         errorMessage = 'Network error. Check your connection and try again.';
       }
 
-      Lex.Toast.error('Installation failed: ' + errorMessage);
+      Lex.Toast.error('Setup failed: ' + errorMessage);
 
       if (button) {
         button.disabled = false;
-        button.textContent = 'Install Connector';
+        button.textContent = 'Set Up';
       }
     });
   }
@@ -599,7 +616,12 @@
     closeConnectorActionsModal();
 
     if (hasCustomUI) {
-      openCustomConnectorUI(connector.ui_entry_point, (connector.manifest && connector.manifest.name) || connector.name, connector.id || connector.connector_id);
+      openCustomConnectorUI(
+        connector.ui_entry_point,
+        (connector.manifest && connector.manifest.name) || connector.name,
+        connector.id || '',
+        connector.connector_id || connector.connector_type || connector.id || ''
+      );
     } else {
       openConnectorManage(connector.id);
     }
@@ -886,7 +908,7 @@
         }
       }
 
-      // Process registry connectors
+      // Process catalog connectors
       if (registryData.status === 'fulfilled') {
         var availableConnectors = registryData.value.connectors;
 
@@ -918,7 +940,7 @@
           }
         }
       } else {
-        console.warn('Registry unavailable:', registryData.reason);
+        console.warn('Connector catalog unavailable:', registryData.reason);
 
         var availableSection = document.getElementById('availableConnectorsSection');
         var availableContainer = document.getElementById('availableConnectors');
@@ -929,8 +951,8 @@
               '<svg class="w-12 h-12 mx-auto mb-3" style="color:var(--lex-icon-warning)" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
                 '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>' +
               '</svg>' +
-              '<p class="text-sm font-medium mb-1" style="color:var(--lex-status-warning-text)">Connector registry unavailable</p>' +
-              '<p class="text-xs" style="color:var(--lex-status-warning-text)">Cannot fetch available connectors from the registry. Check your network connection or contact support.</p>' +
+              '<p class="text-sm font-medium mb-1" style="color:var(--lex-status-warning-text)">Connector catalog unavailable</p>' +
+              '<p class="text-xs" style="color:var(--lex-status-warning-text)">Cannot fetch available connectors from the backend catalog. You can still use the ZIP import flow.</p>' +
             '</div>';
         }
         if (availableSection) availableSection.classList.remove('hidden');

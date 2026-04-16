@@ -94,6 +94,31 @@
         }
       }
 
+      /* ── Back button (embedded chrome mode) ── */
+
+      .lex-topbar-back {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.5rem;
+        border: none;
+        background: none;
+        color: var(--lex-topbar-icon-color);
+        cursor: pointer;
+        border-radius: var(--lex-radius-md);
+        transition: color var(--lex-transition-fast),
+                    background var(--lex-transition-fast);
+      }
+
+      .lex-topbar-back:hover {
+        color: var(--lex-topbar-icon-hover);
+        background: var(--lex-bg-tertiary);
+      }
+
+      .lex-topbar-back svg {
+        display: block;
+      }
+
       /* ── Center section ─────────────────────────────────── */
 
       .lex-topbar-center {
@@ -104,7 +129,7 @@
 
       @media (min-width: 1024px) {
         .lex-topbar-center {
-          padding: 0;
+          padding: 0 0 0 1rem;
         }
       }
 
@@ -281,6 +306,9 @@
         notificationCount: { type: Number,  default: 0 },
         showNotifications: { type: Boolean, default: true },
         showSettings:      { type: Boolean, default: true },
+        showBack:          { type: Boolean, default: false },
+        backLabel:         { type: String,  default: 'Back' },
+        backHref:          { type: String,  default: '' },
         menuItems:         { type: Array,   default: [] }
       };
     }
@@ -335,7 +363,11 @@
 
       // ── Left ──
       html += `<div class="lex-topbar-left">`;
-      if (this.showMenuToggle) {
+      if (this.showBack) {
+        html += `<button type="button" class="lex-topbar-back" data-action="back" aria-label="${this.escapeHtml(this.backLabel)}">
+          ${icon('arrow-left', 'medium')}
+        </button>`;
+      } else if (this.showMenuToggle) {
         html += `<button type="button" class="lex-topbar-hamburger" data-action="menu-toggle">
           ${icon('menu', 'medium')}
         </button>`;
@@ -384,6 +416,10 @@
     updated() {
       this.delegate('click', '[data-action="menu-toggle"]', () => {
         this.emit('topbar-menu-toggle');
+      });
+
+      this.delegate('click', '[data-action="back"]', () => {
+        this.emit('topbar-back-click', { href: this.backHref });
       });
 
       this.delegate('click', '[data-action="refresh"]', () => {

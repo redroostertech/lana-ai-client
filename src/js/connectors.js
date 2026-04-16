@@ -321,7 +321,10 @@ const Connectors = {
       }
       result = { success: true, connector };
     } else {
-      result = await api.post(`/api/v1/integrations/connectors/${connectorId}/configure`, config);
+      result = await api.post('/api/v1/integrations/connectors/configure', {
+        connector_type: connectorId,
+        config: config
+      });
     }
 
     // Track integration connection
@@ -470,44 +473,41 @@ const Connectors = {
 };
 
 /**
- * ConnectorRegistry - Fetch available connectors from the connector registry
- * Registry URL can be configured via window.config.connectorRegistryUrl
+ * ConnectorRegistry - Frontend client for the backend-owned connector catalog.
+ * Browser-side direct registry fetches have been removed.
  */
 const ConnectorRegistry = {
-  /**
-   * Get connector registry URL from config or use default
-   */
-  getRegistryUrl() {
-    // Production: https://www.redroostertec.com
-    return window.LanaConfig?.CONNECTOR_REGISTRY_URL || 'http://localhost:3001';
+  normalizeCatalogConnector(connector) {
+    return {
+      id: connector.id || connector.type,
+      type: connector.type || connector.id,
+      name: connector.name || connector.id || connector.type || 'Unknown Connector',
+      description: connector.description || '',
+      category: connector.category || 'other',
+      version: connector.version || '1.0.0',
+      auth_type: connector.auth_type || connector.authType || 'unknown',
+      authType: connector.authType || connector.auth_type || 'unknown',
+      entityType: connector.entityType || null,
+      documentation_url: connector.documentation_url || null,
+      source: connector.source || 'local'
+    };
   },
 
   /**
-   * Fetch the connector catalog from the registry API
-   * Returns list of all available connectors
-   * API: GET /lana-ai/v1/catalog/connectors
+   * Fetch the connector catalog from the backend-owned local catalog.
    */
   async getCatalog() {
     try {
-      const baseUrl = this.getRegistryUrl();
-      const response = await fetch(`${baseUrl}/lana-ai/v1/catalog/connectors`);
-
-      if (!response.ok) {
-        throw new Error(`Registry returned ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      // Filter to only show active connectors
-      const activeConnectors = (data.connectors || []).filter(c => c.is_active === true);
+      const data = await api.get('/api/v1/integrations/connectors/available');
+      const connectors = (data.connectors || []).map(this.normalizeCatalogConnector.bind(this));
       return {
-        connectors: activeConnectors,
-        registry_version: data.version,
-        updated_at: data.last_updated
+        connectors: connectors,
+        registry_version: data.source || 'local',
+        updated_at: new Date().toISOString()
       };
     } catch (error) {
-      console.error('Failed to fetch connector catalog from registry:', error);
+      console.error('Failed to fetch connector catalog from backend:', error);
 
-      // If registry is unavailable in demo mode, return empty catalog
       if (api.isDemoMode()) {
         return { connectors: [], registry_version: '1.0.0', updated_at: new Date().toISOString() };
       }
@@ -517,62 +517,48 @@ const ConnectorRegistry = {
   },
 
   /**
-   * Fetch a specific connector configuration from the registry API
-   * API: GET /lana-ai/v1/catalog/connectors/:connector_id
-   * @param {string} connectorId - The connector ID (e.g., 'hubspot-crm', 'google-drive')
+   * Fetch a specific connector definition from the backend-owned local catalog.
    */
   async getConnectorConfig(connectorId) {
     try {
-      const baseUrl = this.getRegistryUrl();
-      const response = await fetch(`${baseUrl}/lana-ai/v1/catalog/connectors/${connectorId}`);
-
-      if (!response.ok) {
-        throw new Error(`Connector ${connectorId} not found in registry`);
-      }
-
-      const data = await response.json();
+      const data = await api.get(`/api/v1/integrations/connectors/catalog/${connectorId}`);
       return data.connector;
     } catch (error) {
-      console.error(`Failed to fetch connector config for ${connectorId}:`, error);
+      console.error(`Failed to fetch connector config for ${connectorId} from backend catalog:`, error);
       throw error;
     }
   },
 
   /**
-   * Install a connector from the registry
-   * This sends the connector configuration to the backend to create an integration_source
-   * @param {string} connectorId - The connector ID from the registry
+   * Prepare a catalog connector for configuration.
+   * Connector package installation now happens via ZIP import, not browser-side registry fetch.
    */
   async installConnector(connectorId) {
     try {
-      // 1. Fetch connector config from registry API
-      const connectorConfig = await this.getConnectorConfig(connectorId);
+      await this.getConnectorConfig(connectorId);
 
-      // 2. Send to backend to create integration source
       if (api.isDemoMode()) {
         await MockData.delay(500);
-        // In demo mode, just add to the connectors list
         const newConnector = {
           id: `doc-${connectorId}`,
-          name: connectorConfig.name,
-          category: connectorConfig.category,
-          description: connectorConfig.description,
+          name: connectorId,
+          category: 'other',
+          description: 'Connector ready to configure',
           status: 'disconnected',
           records: 0,
           lastSync: null,
           config: {},
-          connector_id: connectorId,
-          authType: connectorConfig.auth_type
+          connector_id: connectorId
         };
         ConnectorsMockData.connectors.push(newConnector);
         return { success: true, connector: newConnector };
       }
 
-      // Production: Send to backend API
-      return api.post('/api/v1/integrations/registry/install', {
+      return {
+        success: true,
         connector_id: connectorId,
-        connector_config: connectorConfig
-      });
+        requires_configuration: true
+      };
     } catch (error) {
       console.error(`Failed to install connector ${connectorId}:`, error);
       throw error;
@@ -580,8 +566,8 @@ const ConnectorRegistry = {
   },
 
   /**
-   * Check if a connector from the registry is already installed
-   * @param {string} connectorId - The registry connector ID
+   * Check if a connector from the local catalog is already installed
+   * @param {string} connectorId - The catalog connector ID
    * @param {Array} installedConnectors - List of connectors from backend API
    */
   isConnectorInstalled(connectorId, installedConnectors) {

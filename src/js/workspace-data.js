@@ -1373,7 +1373,8 @@
         var params = new URLSearchParams({
           ui: fullRow.connector_ui_url,
           name: fullRow.connector_name || fullRow.connector_id || '',
-          connectorId: fullRow.connector_id || ''
+          connectorId: fullRow.connector_id || '',
+          connectorType: fullRow.connector_id || ''
         });
         var href = 'integrations/connector-viewer.html?' + params.toString();
 

@@ -50,22 +50,17 @@ window.LanaConfig = {
    *   'http://api.company.local:3000' - Local DNS name
    *   'https://api.lana.company.com'  - Production server
    */
-  API_BASE_URL: 'http://localhost:8080',
-
-  /**
-   * Connector Registry URL
-   *
-   * Base URL of the connector registry API server
-   *
-   * Production: 'https://www.redroostertec.com' (RedRooster hosted)
-   * API endpoints: /lana-ai/v1/catalog/connectors
-   *
-   * Can be manually overridden by setting a specific URL
-   */
-  get CONNECTOR_REGISTRY_URL() {
-    // Use live RedRooster URL for connector registry
-    return 'https://www.redroostertec.com';
-  },
+  API_BASE_URL: (function () {
+    // When lana-client is served under the @automation app's /lex-framework
+    // mount, route API calls through same-origin so they pass through the
+    // automation server's /api proxy to LANA-AI. Prevents cross-origin CORS
+    // issues and keeps the auth cookie/header pipeline single-hop.
+    if (typeof window !== 'undefined' && window.location && window.location.pathname &&
+        window.location.pathname.indexOf('/lex-framework/') === 0) {
+      return '';
+    }
+    return 'http://localhost:8080';
+  })(),
 
   // ============================================================
   // DEMO MODE CONFIGURATION
@@ -211,5 +206,4 @@ window.LanaConfig = {
    */
   DEVELOPMENT_MODE: true
 };
-
 
