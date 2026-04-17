@@ -363,40 +363,7 @@
             </section>
 
             <section id="tab-docs" class="connector-tabpane space-y-6">
-              <div id="generatedDocsGuide" class="rounded-2xl border border-gray-200 bg-white p-5"></div>
-
-              <div class="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
-                This tab loads the connector package in setup-guide mode. LANA keeps configuration, syncs, output, and logs in the shared shell while the embedded package contributes vendor-specific connection instructions.
-              </div>
-
-              <div id="docsEmpty" class="hidden rounded-2xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500">
-                No connector UI bundle is attached to this connector.
-              </div>
-
-              <div id="docsFrameShell" class="hidden relative overflow-hidden rounded-2xl border border-gray-200 bg-white">
-                <div id="docsOverlay" class="docs-overlay absolute inset-0 z-10 flex items-center justify-center bg-white/90 transition-opacity">
-                  <div class="flex items-center gap-3 text-gray-600">
-                    <div class="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600"></div>
-                    <span>Loading connector documentation...</span>
-                  </div>
-                </div>
-                <div id="docsError" class="hidden absolute inset-0 z-10 flex items-center justify-center bg-white p-8 text-center">
-                  <div>
-                    <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600">
-                      <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                      </svg>
-                    </div>
-                    <p id="docsErrorMessage" class="text-sm text-gray-600"></p>
-                  </div>
-                </div>
-                <iframe
-                  id="connector-frame"
-                  class="docs-frame h-full w-full border-0"
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
-                  allow="clipboard-read; clipboard-write"
-                ></iframe>
-              </div>
+              <div id="generatedDocsGuide" class="rounded-2xl border border-gray-200 bg-white p-6"></div>
             </section>
           </div>
         </section>
@@ -1844,25 +1811,219 @@
       `;
     }
 
+    /**
+     * Render the Documentation tab entirely from connector.json.
+     *
+     * Preferred structure (authored per-connector):
+     *
+     *   documentation.setup_guide = {
+     *     intro: "string — what this guide helps the user accomplish",
+     *     audience_note: "string — optional line written for non-technical readers",
+     *     prerequisites: ["string", ...],
+     *     steps: [
+     *       {
+     *         title: "Step title",
+     *         body: "string or [string]",
+     *         instructions: ["explicit line-by-line sub-steps"],
+     *         tip: "optional helpful note",
+     *         warning: "optional hard warning",
+     *         code: { label: "what this value is", value: "literal text to copy" },
+     *         external_link: { label: "Where to go", url: "https://..." }
+     *       },
+     *       ...
+     *     ],
+     *     troubleshooting: [{ title, detail }],
+     *     support: "string"
+     *   }
+     *
+     * Falls back to the legacy `documentation.connect_steps` list + the
+     * existing `troubleshooting` / `getting_started` fields when no
+     * setup_guide is authored, so connectors not yet rewritten still render.
+     */
     function renderDocumentationGuide() {
       const node = document.getElementById('generatedDocsGuide');
       if (!node) return;
       const docsUrl = getDocumentationLink();
+      const catalog = state.catalog || {};
+      const documentation = catalog.documentation || {};
+      const guide = documentation.setup_guide || null;
 
-      node.innerHTML = `
+      const title = documentation.title || `${state.connectorName || 'Connector'} Setup Guide`;
+      const description = documentation.description || '';
+
+      // Normalize to the rich structure. Legacy packages emit only
+      // connect_steps + getting_started — we'll render those as a bare list.
+      const intro = guide?.intro || description || '';
+      const audienceNote = guide?.audience_note || 'Follow each step in order. You don\'t need to be technical — every click and field is spelled out below.';
+      const prerequisites = Array.isArray(guide?.prerequisites) ? guide.prerequisites : [];
+      const steps = Array.isArray(guide?.steps) ? guide.steps : normalizeLegacyConnectSteps(documentation.connect_steps);
+      const troubleshooting = Array.isArray(guide?.troubleshooting)
+        ? guide.troubleshooting
+        : (Array.isArray(documentation.troubleshooting) ? documentation.troubleshooting : []);
+      const support = guide?.support || documentation.support || '';
+      const gettingStarted = Array.isArray(documentation.getting_started) ? documentation.getting_started : [];
+
+      const headerHtml = `
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div class="connector-label">Documentation</div>
-            <h3 class="mt-2 text-lg font-semibold text-gray-900">${escapeHtml(state.connectorName)} Reference</h3>
-            <p class="mt-2 max-w-3xl text-sm text-gray-600">Connector-specific setup guidance from the installed package is shown below.</p>
+            <div class="connector-label">Setup Guide</div>
+            <h3 class="mt-2 text-2xl font-semibold text-gray-900">${escapeHtml(title)}</h3>
+            ${intro ? `<p class="mt-3 max-w-3xl text-sm text-gray-600">${escapeHtml(intro)}</p>` : ''}
+            ${audienceNote ? `<p class="mt-2 max-w-3xl text-xs text-gray-500">${escapeHtml(audienceNote)}</p>` : ''}
           </div>
           ${docsUrl ? `
             <a href="${escapeHtml(docsUrl)}" target="_blank" rel="noreferrer" class="rounded-xl border border-blue-300 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
-              Open Vendor Docs
+              Vendor API Docs
             </a>
           ` : ''}
         </div>
       `;
+
+      const prereqHtml = prerequisites.length ? `
+        <div class="mt-8 rounded-xl border border-blue-200 bg-blue-50 p-5">
+          <div class="text-sm font-semibold text-blue-900">Before you start</div>
+          <ul class="mt-3 list-disc space-y-2 pl-5 text-sm text-blue-900">
+            ${prerequisites.map((p) => `<li>${escapeHtml(p)}</li>`).join('')}
+          </ul>
+        </div>
+      ` : '';
+
+      const stepsHtml = steps.length ? `
+        <ol class="mt-8 space-y-6">
+          ${steps.map((step, index) => renderDocStep(step, index + 1)).join('')}
+        </ol>
+      ` : `
+        <div class="mt-8 rounded-xl border border-dashed border-gray-300 p-6 text-sm text-gray-500">
+          No step-by-step guide has been authored for this connector yet.
+          Vendor-provided documentation is available${docsUrl ? ` <a class="text-blue-700 underline" href="${escapeHtml(docsUrl)}" target="_blank" rel="noreferrer">here</a>` : ''}.
+        </div>
+      `;
+
+      const gettingStartedHtml = gettingStarted.length ? `
+        <div class="mt-10">
+          <h4 class="text-base font-semibold text-gray-900">After you\'re connected</h4>
+          <ul class="mt-3 list-disc space-y-2 pl-5 text-sm text-gray-700">
+            ${gettingStarted.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}
+          </ul>
+        </div>
+      ` : '';
+
+      const troubleshootingHtml = troubleshooting.length ? `
+        <div class="mt-10">
+          <h4 class="text-base font-semibold text-gray-900">Troubleshooting</h4>
+          <div class="mt-3 space-y-3">
+            ${troubleshooting.map((entry) => `
+              <div class="rounded-xl border border-gray-200 p-4">
+                <div class="text-sm font-semibold text-gray-900">${escapeHtml(entry.title || 'Issue')}</div>
+                ${entry.detail ? `<div class="mt-2 text-sm text-gray-600">${escapeHtml(entry.detail)}</div>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : '';
+
+      const supportHtml = support ? `
+        <div class="mt-10 rounded-xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-700">
+          <span class="font-semibold text-gray-900">Need more help?</span>
+          <span class="ml-1">${escapeHtml(support)}</span>
+        </div>
+      ` : '';
+
+      node.innerHTML = headerHtml + prereqHtml + stepsHtml + gettingStartedHtml + troubleshootingHtml + supportHtml;
+    }
+
+    function renderDocStep(step, number) {
+      if (!step) return '';
+      const title = step.title || `Step ${number}`;
+      const bodyLines = Array.isArray(step.body) ? step.body : (step.body ? [step.body] : []);
+      const instructions = Array.isArray(step.instructions) ? step.instructions : [];
+      const tip = step.tip || '';
+      const warning = step.warning || '';
+      const link = step.external_link || null;
+      const code = step.code || null;
+      const image = step.image || '';
+
+      return `
+        <li class="rounded-2xl border border-gray-200 bg-white p-5">
+          <div class="flex items-start gap-4">
+            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700">${number}</div>
+            <div class="min-w-0 flex-1">
+              <h4 class="text-base font-semibold text-gray-900">${escapeHtml(title)}</h4>
+              ${bodyLines.length ? bodyLines.map((line) => `<p class="mt-2 text-sm text-gray-700">${escapeHtml(line)}</p>`).join('') : ''}
+
+              ${instructions.length ? `
+                <ol class="mt-3 list-decimal space-y-1.5 pl-5 text-sm text-gray-700">
+                  ${instructions.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}
+                </ol>
+              ` : ''}
+
+              ${link ? `
+                <a href="${escapeHtml(link.url)}" target="_blank" rel="noreferrer" class="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-blue-700 hover:text-blue-800">
+                  ${escapeHtml(link.label || 'Open link')}
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                </a>
+              ` : ''}
+
+              ${code ? `
+                <div class="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  ${code.label ? `<div class="text-xs font-semibold uppercase tracking-wide text-gray-500">${escapeHtml(code.label)}</div>` : ''}
+                  <div class="mt-1 flex items-center gap-2">
+                    <code class="connector-mono break-all text-xs text-gray-900">${escapeHtml(code.value || '')}</code>
+                    <button type="button" class="shrink-0 rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-white" onclick="copyTextToClipboard('${escapeJsString(code.value || '')}')">Copy</button>
+                  </div>
+                </div>
+              ` : ''}
+
+              ${image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(title)}" class="mt-3 max-w-full rounded-lg border border-gray-200">` : ''}
+
+              ${tip ? `
+                <div class="mt-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-900">
+                  <span class="font-semibold">Tip:</span> ${escapeHtml(tip)}
+                </div>
+              ` : ''}
+
+              ${warning ? `
+                <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  <span class="font-semibold">Heads up:</span> ${escapeHtml(warning)}
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        </li>
+      `;
+    }
+
+    function normalizeLegacyConnectSteps(connectSteps) {
+      if (!Array.isArray(connectSteps) || !connectSteps.length) return [];
+      return connectSteps.map((line, idx) => ({
+        title: `Step ${idx + 1}`,
+        body: line
+      }));
+    }
+
+    function escapeJsString(value) {
+      return String(value || '').split('\\').join('\\\\').split("'").join("\\'").split('\n').join('\\n');
+    }
+
+    function copyTextToClipboard(value) {
+      if (!value) return;
+      const str = String(value);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(str).then(
+          () => showPageAlert('Copied to clipboard.', 'success'),
+          () => showPageAlert('Clipboard copy blocked by browser.', 'error')
+        );
+        return;
+      }
+      const textarea = document.createElement('textarea');
+      textarea.value = str;
+      textarea.style.position = 'fixed';
+      textarea.style.top = '-1000px';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try { document.execCommand('copy'); showPageAlert('Copied to clipboard.', 'success'); }
+      catch (_e) { showPageAlert('Clipboard copy blocked by browser.', 'error'); }
+      document.body.removeChild(textarea);
     }
 
     function renderOverview() {
@@ -2119,12 +2280,6 @@
               </div>
             ` : ''}
           </div>
-          ${isOauthConnector && !oauthAuthorized && state.sourceId ? `
-            <div class="mt-3 rounded-lg border border-blue-200 bg-white px-3 py-2">
-              <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Authorization Link</div>
-              <div id="pendingAuthorizationUrlValue" class="mt-1 connector-mono break-all text-xs text-gray-800">${state.pendingAuthorizationUrl ? escapeHtml(state.pendingAuthorizationUrl) : (state.pendingAuthorizationUrlError ? escapeHtml(state.pendingAuthorizationUrlError) : 'Generating link...')}</div>
-            </div>
-          ` : ''}
         </div>
 
         <div class="mt-6 grid gap-6 md:grid-cols-3">
@@ -3359,7 +3514,7 @@
       returnUrl.searchParams.delete('oauth_success');
       returnUrl.searchParams.delete('oauth_error');
       returnUrl.searchParams.delete('connector_id');
-      return returnUrl.pathname + returnUrl.search;
+      return returnUrl.toString();
     }
 
     async function fetchAuthorizationUrl({ force = false } = {}) {
@@ -3934,103 +4089,16 @@
       `;
     }
 
+    /**
+     * Kept as a no-op so existing callers still compile. The Docs tab is now
+     * rendered entirely from connector.json via renderDocumentationGuide().
+     * The embedded `ui/index.html` iframe has been retired — step-by-step
+     * setup instructions live in the JSON `documentation.setup_guide` block
+     * so they can be version-controlled, localized, and audited like every
+     * other package contract.
+     */
     async function loadConnectorDocs() {
-      const docsEmpty = document.getElementById('docsEmpty');
-      const docsShell = document.getElementById('docsFrameShell');
-      const docsError = document.getElementById('docsError');
-      const docsOverlay = document.getElementById('docsOverlay');
-
-      if (!state.uiEntryPoint) {
-        docsEmpty.classList.remove('hidden');
-        docsShell.classList.add('hidden');
-        return;
-      }
-
-      docsEmpty.classList.add('hidden');
-      docsShell.classList.remove('hidden');
-
-      if (state.docsLoaded) {
-        return;
-      }
-
-      try {
-        const iframe = document.getElementById('connector-frame');
-        docsError.classList.add('hidden');
-        docsOverlay.classList.remove('hidden');
-
-        if (!/^file:|^https?:/i.test(state.uiEntryPoint)) {
-          throw new Error(`Invalid connector URL format: ${state.uiEntryPoint}`);
-        }
-
-        const cacheBustUrl = state.uiEntryPoint + (state.uiEntryPoint.indexOf('?') === -1 ? '?' : '&') + '_cb=' + Date.now();
-        const response = await fetch(cacheBustUrl);
-        const originalHtml = await response.text();
-        const token = (typeof api !== 'undefined' && api.token)
-          || localStorage.getItem('token')
-          || localStorage.getItem('lana_token')
-          || localStorage.getItem('lana_automation_token')
-          || '';
-        const resolvedApiBase = getResolvedClientApiBaseUrl();
-        const injectedLanaConfig = Object.assign(
-          {},
-          window.LanaConfig || {},
-          resolvedApiBase ? { API_BASE_URL: resolvedApiBase } : {}
-        );
-        const baseUrl = state.uiEntryPoint.substring(0, state.uiEntryPoint.lastIndexOf('/') + 1);
-
-        let html = originalHtml.replace(/<link[^>]*href=["']\/css\/tailwind\.css["'][^>]*>/gi, '');
-        html = html.replace(/src=["']assets\//gi, `src="${baseUrl}assets/`);
-        html = html.replace(/href=["']assets\//gi, `href="${baseUrl}assets/`);
-        html = html.replace(/src=["']js\//gi, `src="${baseUrl}js/`);
-
-        const configScript = `
-          <script>
-            window.LanaConfig = ${JSON.stringify(injectedLanaConfig)};
-            window.LanaConnectorId = "${state.connectorType || state.connectorId || ''}";
-            window.LanaConnectorType = "${state.connectorType || ''}";
-            window.LanaIntegrationSourceId = "${state.sourceId || ''}";
-            window.api = { token: "${token}", baseUrl: "${resolvedApiBase}" };
-            localStorage.setItem('lana_token', "${token}");
-            localStorage.setItem('token', "${token}");
-            (function() {
-              var _originalFetch = window.fetch;
-              var _apiBase = (window.LanaConfig && window.LanaConfig.API_BASE_URL) || '';
-              window.fetch = function(input, init) {
-                if (typeof input === 'string' && input.startsWith('/') && _apiBase) {
-                  input = _apiBase + input;
-                }
-                return _originalFetch.call(this, input, init);
-              };
-            })();
-          <\/script>
-        `;
-        const tailwindScript = '<script src="https://cdn.tailwindcss.com"><\/script>';
-        const docsModeScript = buildSetupOnlyDocsScript();
-        html = html.replace('<head>', '<head>' + configScript + docsModeScript + tailwindScript);
-
-        const blob = new Blob([html], { type: 'text/html' });
-        const blobUrl = URL.createObjectURL(blob);
-
-        iframe.onload = function() {
-          docsOverlay.classList.add('hidden');
-          state.docsLoaded = true;
-          URL.revokeObjectURL(blobUrl);
-        };
-
-        iframe.onerror = function() {
-          docsOverlay.classList.add('hidden');
-          docsError.classList.remove('hidden');
-          document.getElementById('docsErrorMessage').textContent = 'Failed to load connector documentation.';
-          URL.revokeObjectURL(blobUrl);
-        };
-
-        iframe.src = blobUrl;
-      } catch (error) {
-        console.error('[Connector Viewer] Failed to load connector docs', error);
-        docsOverlay.classList.add('hidden');
-        docsError.classList.remove('hidden');
-        document.getElementById('docsErrorMessage').textContent = error.message || 'Failed to load connector documentation.';
-      }
+      renderDocumentationGuide();
     }
 
     function handleOAuthRedirectResult() {
@@ -4097,6 +4165,7 @@
     window.openDeleteConfigModal = openDeleteConfigModal;
     window.closeDeleteConfigModal = closeDeleteConfigModal;
     window.confirmDeleteConfig = confirmDeleteConfig;
+    window.copyTextToClipboard = copyTextToClipboard;
     window.connectOAuthConnector = connectOAuthConnector;
     window.copyAuthorizationUrl = copyAuthorizationUrl;
     window.openAuthorizationUrl = openAuthorizationUrl;
