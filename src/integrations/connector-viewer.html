@@ -176,6 +176,7 @@
               <button type="button" class="connector-tab rounded-full border border-transparent px-4 py-2 text-sm font-medium text-gray-600 transition" data-tab="overview">Overview</button>
               <button type="button" class="connector-tab rounded-full border border-transparent px-4 py-2 text-sm font-medium text-gray-600 transition" data-tab="configuration">Configuration</button>
               <button type="button" class="connector-tab rounded-full border border-transparent px-4 py-2 text-sm font-medium text-gray-600 transition" data-tab="run">Run</button>
+              <button type="button" id="webhooksTabButton" class="connector-tab hidden rounded-full border border-transparent px-4 py-2 text-sm font-medium text-gray-600 transition" data-tab="webhooks">Webhooks</button>
               <button type="button" class="connector-tab rounded-full border border-transparent px-4 py-2 text-sm font-medium text-gray-600 transition" data-tab="data">Output</button>
               <button type="button" class="connector-tab rounded-full border border-transparent px-4 py-2 text-sm font-medium text-gray-600 transition" data-tab="logs">Execution Logs</button>
               <button type="button" class="connector-tab rounded-full border border-transparent px-4 py-2 text-sm font-medium text-gray-600 transition" data-tab="docs">Documentation</button>
@@ -223,6 +224,10 @@
 
             <section id="tab-run" class="connector-tabpane space-y-6">
               <div id="runTabContent" class="space-y-6"></div>
+            </section>
+
+            <section id="tab-webhooks" class="connector-tabpane space-y-6">
+              <div id="webhooksTabContent" class="space-y-6"></div>
             </section>
 
             <section id="tab-data" class="connector-tabpane space-y-6">
@@ -398,6 +403,7 @@
   <script src="../js/error-reporter.js"></script>
   <script src="../js/config.js"></script>
   <script src="../js/api.js"></script>
+  <script src="../js/url-utils.js"></script>
   <script src="../js/components.js"></script>
   <script src="../js/version.js"></script>
   <script src="../js/menu.js"></script>
@@ -912,7 +918,16 @@
         ? state.catalog.configuration.optional_fields.map((field) => normalizeCatalogField(field, false))
         : [];
 
-      return [...required, ...optional].filter(Boolean);
+      const authFieldNames = new Set(
+        getAvailableAuthModes()
+          .flatMap((mode) => getAuthFieldsForMode(mode))
+          .map((field) => field?.name)
+          .filter(Boolean)
+      );
+
+      return [...required, ...optional]
+        .filter(Boolean)
+        .filter((field) => !authFieldNames.has(field.name));
     }
 
     function getCatalogFields() {
@@ -944,6 +959,76 @@
       return Array.isArray(state.catalog.configuration.dynamic_fields)
         ? state.catalog.configuration.dynamic_fields
         : [];
+    }
+
+    function getWebhookConfig() {
+      if (state.catalog?.webhooks && state.catalog.webhooks.enabled !== false) {
+        return state.catalog.webhooks;
+      }
+
+      if (state.catalog?.features?.supports_webhooks) {
+        return {
+          enabled: true,
+          description: `This connector advertises webhook support. LANA will use the generated endpoint URL for this connector instance.`,
+          config_fields: []
+        };
+      }
+
+      return null;
+    }
+
+    function hasWebhookTab() {
+      // LANA is polling-first: inbound webhooks require a cloud relay we have
+      // intentionally not built (to keep on-prem Mac Studios fully outbound
+      // and customer data off our infra). The Webhooks tab stays hidden
+      // unless WEBHOOKS_ENABLED is explicitly turned on.
+      //
+      // Webhook metadata remains in connector.json packages as reference
+      // documentation for vendor contracts and for the day we re-enable the
+      // tab with a relay in place.
+      const webhooksEnabled = Boolean(
+        (typeof window !== 'undefined' && window.LanaConfig && window.LanaConfig.WEBHOOKS_ENABLED === true)
+      );
+      if (!webhooksEnabled) return false;
+      return Boolean(getWebhookConfig());
+    }
+
+    function getWebhookFields() {
+      const webhookConfig = getWebhookConfig();
+      if (!webhookConfig?.config_fields || !Array.isArray(webhookConfig.config_fields)) {
+        return [];
+      }
+
+      return webhookConfig.config_fields
+        .map((field) => normalizeCatalogField(field, false))
+        .filter(Boolean);
+    }
+
+    function getResolvedClientApiBaseUrl() {
+      if (window.URLUtils && typeof window.URLUtils.getPreferredBaseUrlSync === 'function') {
+        return window.URLUtils.getPreferredBaseUrlSync();
+      }
+
+      return (typeof api !== 'undefined' && api.baseUrl)
+        || (window.LanaConfig && window.LanaConfig.API_BASE_URL)
+        || '';
+    }
+
+    function getGeneratedWebhookEndpointUrl() {
+      if (!state.sourceId) {
+        return '';
+      }
+
+      const apiBase = getResolvedClientApiBaseUrl();
+      if (!apiBase) {
+        return `/api/v1/generic-connectors/integration-sources/${encodeURIComponent(state.sourceId)}/webhook`;
+      }
+
+      return `${String(apiBase).replace(/\/+$/, '')}/api/v1/generic-connectors/integration-sources/${encodeURIComponent(state.sourceId)}/webhook`;
+    }
+
+    function getRenderableWebhookFields() {
+      return getWebhookFields().filter((field) => field.name !== 'webhook_endpoint_url');
     }
 
     function isApiConnector() {
@@ -1366,14 +1451,11 @@
       `;
     }
 
-    function captureConfigFormDraft() {
-      const form = document.getElementById('configForm');
+    function collectNamedFormDraft(form, draft, processed) {
       if (!form) {
-        return {};
+        return;
       }
 
-      const draft = {};
-      const processed = new Set();
       Array.from(form.querySelectorAll('[name]')).forEach((element) => {
         const name = element.name;
         if (!name || processed.has(name)) {
@@ -1395,6 +1477,19 @@
 
         draft[name] = element.value;
       });
+    }
+
+    function captureConfigFormDraft() {
+      const configForm = document.getElementById('configForm');
+      const webhooksForm = document.getElementById('webhooksForm');
+      if (!configForm && !webhooksForm) {
+        return {};
+      }
+
+      const draft = {};
+      const processed = new Set();
+      collectNamedFormDraft(configForm, draft, processed);
+      collectNamedFormDraft(webhooksForm, draft, processed);
 
       getCatalogDynamicFields().forEach((field) => {
         if (field.type === 'array') {
@@ -1936,6 +2031,146 @@
       }
 
       state.authModeDraft = selectedAuthMode?.type || '';
+    }
+
+    function renderWebhooksTab() {
+      const node = document.getElementById('webhooksTabContent');
+      if (!node) return;
+
+      const webhookConfig = getWebhookConfig();
+      if (!webhookConfig) {
+        node.innerHTML = `
+          <div class="rounded-2xl border border-dashed border-gray-300 p-6 text-sm text-gray-500">
+            This connector does not declare webhook configuration in the package catalog.
+          </div>
+        `;
+        return;
+      }
+
+      const savedConfig = state.configResponse && state.configResponse.config ? state.configResponse.config : {};
+      const currentConfig = {
+        ...savedConfig,
+        ...(state.formDraft || {})
+      };
+      const generatedEndpointUrl = getGeneratedWebhookEndpointUrl();
+      if (generatedEndpointUrl) {
+        currentConfig.webhook_endpoint_url = generatedEndpointUrl;
+      }
+      const webhookFields = getRenderableWebhookFields();
+      const hasGeneratedEndpointField = getWebhookFields().some((field) => field.name === 'webhook_endpoint_url');
+      const supportedEntities = Array.isArray(webhookConfig.supported_entities) ? webhookConfig.supported_entities : [];
+      const notes = Array.isArray(webhookConfig.notes) ? webhookConfig.notes : [];
+      const verification = webhookConfig.verification || {};
+      const directionLabel = webhookConfig.direction === 'lana_to_provider' ? 'Outbound' : 'Inbound';
+      const supportsCredentialTest = supportsSharedCredentialTest();
+
+      node.innerHTML = `
+        <div class="rounded-2xl border border-gray-200 p-5">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div class="connector-label">Webhook Configuration</div>
+              <div class="mt-2 text-sm text-gray-500">${escapeHtml(webhookConfig.description || `Configure ${state.connectorName} webhook settings, secrets, and entity subscriptions through the shared connector shell.`)}</div>
+            </div>
+            <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+              <div><span class="font-semibold text-gray-900">Direction:</span> ${escapeHtml(directionLabel)}</div>
+              ${webhookConfig.endpoint_path ? `<div class="mt-1 break-all"><span class="font-semibold text-gray-900">Path:</span> ${escapeHtml(webhookConfig.endpoint_path)}</div>` : ''}
+            </div>
+          </div>
+        </div>
+
+        ${generatedEndpointUrl ? `
+          <div class="rounded-2xl border border-gray-200 p-5">
+            <div class="connector-label">Webhook Endpoint</div>
+            <div class="mt-2 text-sm text-gray-500">Use this generated instance URL when registering ${escapeHtml(state.connectorName)} webhooks. Each configured connector instance gets its own endpoint.</div>
+            <div class="mt-5 flex flex-wrap items-center gap-3">
+              <code class="min-w-0 flex-1 break-all rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900">${escapeHtml(generatedEndpointUrl)}</code>
+              <button type="button" onclick="copyWebhookEndpointUrl()" class="rounded-xl border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
+                Copy URL
+              </button>
+            </div>
+          </div>
+        ` : ''}
+
+        <form id="webhooksForm" class="space-y-5 rounded-2xl border border-gray-200 p-5">
+          ${webhookFields.length ? `
+            <div>
+              <div class="connector-label">Webhook Fields</div>
+              <div class="mt-2 text-sm text-gray-500">These fields are declared by the connector package and saved with the rest of the connector configuration.</div>
+            </div>
+            ${hasGeneratedEndpointField ? `<input type="hidden" name="webhook_endpoint_url" value="${escapeHtml(generatedEndpointUrl)}">` : ''}
+            ${webhookFields.map((field) => renderField(field, currentConfig[field.name])).join('')}
+            <div class="flex flex-wrap gap-3 pt-2">
+              <button type="button" onclick="saveConfiguration()" class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                Save Configuration
+              </button>
+              ${supportsCredentialTest ? `
+                <button type="button" onclick="testConnection()" class="rounded-xl border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
+                  Test Connection
+                </button>
+              ` : ''}
+            </div>
+          ` : `
+            <div class="rounded-2xl border border-dashed border-gray-300 p-6 text-sm text-gray-500">
+              This connector declares webhook support but does not require additional webhook fields.
+            </div>
+          `}
+        </form>
+
+        ${(verification.signature_header || verification.secret_field || verification.verifier_token_field || verification.challenge_query_param || verification.challenge_header) ? `
+          <div class="rounded-2xl border border-gray-200 bg-gray-50 p-5">
+            <div class="connector-label">Verification</div>
+            <div class="mt-4 grid gap-4 md:grid-cols-2">
+              ${verification.signature_header ? `<div><div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Signature Header</div><div class="mt-1 text-sm text-gray-900">${escapeHtml(verification.signature_header)}</div></div>` : ''}
+              ${verification.secret_field ? `<div><div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Secret Field</div><div class="mt-1 text-sm text-gray-900">${escapeHtml(verification.secret_field)}</div></div>` : ''}
+              ${verification.verifier_token_field ? `<div><div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Verifier Token Field</div><div class="mt-1 text-sm text-gray-900">${escapeHtml(verification.verifier_token_field)}</div></div>` : ''}
+              ${verification.challenge_query_param ? `<div><div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Challenge Query Param</div><div class="mt-1 text-sm text-gray-900">${escapeHtml(verification.challenge_query_param)}</div></div>` : ''}
+              ${verification.challenge_header ? `<div><div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Challenge Header</div><div class="mt-1 text-sm text-gray-900">${escapeHtml(verification.challenge_header)}</div></div>` : ''}
+            </div>
+          </div>
+        ` : ''}
+
+        ${supportedEntities.length ? `
+          <div class="rounded-2xl border border-gray-200 p-5">
+            <div class="connector-label">Webhook Entity Map</div>
+            <div class="mt-2 text-sm text-gray-500">Provider entities are mapped to LANA standard or namespaced entity types before the full record is fetched and transformed.</div>
+            <div class="mt-5 overflow-x-auto rounded-xl border border-gray-200">
+              <table class="min-w-full divide-y divide-gray-200 text-sm">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-700">Provider Entity</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-700">LANA Entity</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-700">Fetch Endpoint</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-700">Status</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 bg-white">
+                  ${supportedEntities.map((entry) => `
+                    <tr>
+                      <td class="px-4 py-3 align-top">
+                        <div class="font-medium text-gray-900">${escapeHtml(entry.provider_entity || '-')}</div>
+                        ${Array.isArray(entry.operations) && entry.operations.length ? `<div class="mt-1 text-xs text-gray-500">Events: ${escapeHtml(entry.operations.join(', '))}</div>` : ''}
+                      </td>
+                      <td class="px-4 py-3 align-top text-gray-700">${escapeHtml(entry.entity_type || '-')}</td>
+                      <td class="px-4 py-3 align-top text-gray-700">${escapeHtml(entry.fetch_endpoint || '-')}</td>
+                      <td class="px-4 py-3 align-top">${getBadgeHtml(humanizeStatus(entry.status || 'enabled'), entry.status === 'enabled' ? 'badge-green' : entry.status === 'staged' ? 'badge-yellow' : 'badge-slate')}</td>
+                    </tr>
+                    ${entry.description ? `<tr><td colspan="4" class="px-4 pb-3 pt-0 text-xs text-gray-500">${escapeHtml(entry.description)}</td></tr>` : ''}
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ` : ''}
+
+        ${notes.length ? `
+          <div class="rounded-2xl border border-gray-200 bg-gray-50 p-5">
+            <div class="connector-label">Notes</div>
+            <ul class="mt-4 list-disc space-y-2 pl-5 text-sm text-gray-600">
+              ${notes.map((note) => `<li>${escapeHtml(note)}</li>`).join('')}
+            </ul>
+          </div>
+        ` : ''}
+      `;
     }
 
     function renderRunTab() {
@@ -2613,6 +2848,9 @@
     }
 
     function switchTab(tabName) {
+      if (tabName === 'webhooks' && !hasWebhookTab()) {
+        tabName = 'overview';
+      }
       state.activeTab = tabName;
       document.querySelectorAll('.connector-tab').forEach((button) => {
         button.classList.toggle('active', button.dataset.tab === tabName);
@@ -2626,9 +2864,27 @@
       }
     }
 
+    function updateTabVisibility() {
+      const webhooksButton = document.getElementById('webhooksTabButton');
+      const webhooksPane = document.getElementById('tab-webhooks');
+      const enabled = hasWebhookTab() && !state.iframeOnlyFallback;
+
+      if (webhooksButton) {
+        webhooksButton.classList.toggle('hidden', !enabled);
+      }
+
+      if (webhooksPane) {
+        webhooksPane.classList.toggle('hidden', !enabled);
+      }
+
+      if (!enabled && state.activeTab === 'webhooks') {
+        state.activeTab = 'overview';
+      }
+    }
+
     function serializeConfigForm() {
-      const form = document.getElementById('configForm');
-      const fields = getCatalogFields();
+      const forms = [document.getElementById('configForm'), document.getElementById('webhooksForm')].filter(Boolean);
+      const fields = [...getCatalogFields(), ...getWebhookFields()];
       const dynamicFields = getCatalogDynamicFields();
       const payload = {};
       const authModes = getAvailableAuthModes();
@@ -2638,7 +2894,9 @@
       }
 
       fields.forEach((field) => {
-        const element = form.elements[field.name];
+        const element = forms
+          .map((form) => form.elements[field.name])
+          .find(Boolean);
         if (!element) return;
 
         if (field.type === 'boolean') {
@@ -2790,8 +3048,9 @@
       if (!state.sourceId) return;
 
       try {
-        const form = document.getElementById('configForm');
-        if (form && typeof form.reportValidity === 'function' && !form.reportValidity()) {
+        const forms = [document.getElementById('configForm'), document.getElementById('webhooksForm')].filter(Boolean);
+        const invalidForm = forms.find((form) => typeof form.reportValidity === 'function' && !form.reportValidity());
+        if (invalidForm) {
           throw new Error('Fill in the required configuration fields before saving.');
         }
 
@@ -2849,6 +3108,22 @@
       } catch (error) {
         console.error('[Connector Viewer] Failed to start OAuth flow', error);
         showPageAlert(error.message || 'Failed to start OAuth flow.', 'error');
+      }
+    }
+
+    async function copyWebhookEndpointUrl() {
+      const generatedUrl = getGeneratedWebhookEndpointUrl();
+      if (!generatedUrl) {
+        showPageAlert('Webhook URL is not available until this connector instance exists.', 'error');
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(generatedUrl);
+        showPageAlert('Webhook URL copied to clipboard.', 'success');
+      } catch (error) {
+        console.error('[Connector Viewer] Failed to copy webhook URL', error);
+        showPageAlert('Failed to copy webhook URL.', 'error');
       }
     }
 
@@ -3169,7 +3444,7 @@
 
       if (state.iframeOnlyFallback) {
         showPageAlert('This connector link did not include an integration source ID. Generic controls are unavailable for this launch, so LANA is falling back to the embedded connector documentation only.', 'info');
-        ['overview', 'configuration', 'data', 'logs'].forEach((tabName) => {
+        ['overview', 'configuration', 'webhooks', 'data', 'logs'].forEach((tabName) => {
           const button = document.querySelector(`.connector-tab[data-tab="${tabName}"]`);
           if (button) {
             button.classList.add('hidden');
@@ -3182,6 +3457,7 @@
       renderOverview();
       renderDocumentationGuide();
       renderConfiguration();
+      renderWebhooksTab();
       renderRunTab();
       renderDataRuleBuilder();
       renderEntityFilterOptions();
@@ -3190,6 +3466,7 @@
       renderBulkActionSummary();
       renderRecordDetail();
       renderLogs();
+      updateTabVisibility();
       switchTab(state.activeTab);
     }
 
@@ -3360,10 +3637,7 @@
           || localStorage.getItem('lana_token')
           || localStorage.getItem('lana_automation_token')
           || '';
-        const resolvedApiBase = (typeof api !== 'undefined' && api.baseUrl)
-          || (window.LanaConfig && window.LanaConfig.API_BASE_URL)
-          || ((/^https?:$/i.test(window.location.protocol)) ? window.location.origin : '')
-          || '';
+        const resolvedApiBase = getResolvedClientApiBaseUrl();
         const injectedLanaConfig = Object.assign(
           {},
           window.LanaConfig || {},
@@ -3382,7 +3656,7 @@
             window.LanaConnectorId = "${state.connectorType || state.connectorId || ''}";
             window.LanaConnectorType = "${state.connectorType || ''}";
             window.LanaIntegrationSourceId = "${state.sourceId || ''}";
-            window.api = { token: "${token}" };
+            window.api = { token: "${token}", baseUrl: "${resolvedApiBase}" };
             localStorage.setItem('lana_token', "${token}");
             localStorage.setItem('token', "${token}");
             (function() {
@@ -3484,6 +3758,7 @@
 
     window.saveConfiguration = saveConfiguration;
     window.connectOAuthConnector = connectOAuthConnector;
+    window.copyWebhookEndpointUrl = copyWebhookEndpointUrl;
     window.testConnection = testConnection;
     window.triggerSync = triggerSync;
     window.disconnectConnector = disconnectConnector;
