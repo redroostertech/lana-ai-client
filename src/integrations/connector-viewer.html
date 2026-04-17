@@ -1956,12 +1956,6 @@
                           <span class="font-medium text-gray-900">${escapeHtml(lastSyncDisplay.relative)}</span>
                         </div>
                       `}
-                      ${lastSyncDisplay.helper ? `
-                        <div class="text-xs text-amber-700">${escapeHtml(lastSyncDisplay.helper)}</div>
-                      ` : ''}
-                      ${isOAuthConnector() && !isOAuthAuthorized() ? `
-                        <div class="text-xs text-amber-700">${escapeHtml(setupState.message)}</div>
-                      ` : ''}
                     </div>
                   ` : `
                     <div class="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 p-4">
