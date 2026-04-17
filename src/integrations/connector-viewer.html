@@ -211,6 +211,12 @@
                         <label for="scheduledSyncTime" class="mb-2 block text-sm font-medium text-gray-700">Scheduled Time</label>
                         <input id="scheduledSyncTime" type="time" step="1" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
                       </div>
+                      <div class="flex flex-wrap items-center gap-3 pt-2">
+                        <button type="button" id="saveSyncSettingsBtn" onclick="saveSyncSettings()" class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
+                          Update Sync Settings
+                        </button>
+                        <span id="saveSyncSettingsHint" class="text-xs text-gray-500"></span>
+                      </div>
                     </div>
                   </div>
 
@@ -458,7 +464,10 @@
       authModeDraft: '',
       activeTab: urlParams.get('tab') || 'overview',
       docsLoaded: false,
-      iframeOnlyFallback: false
+      iframeOnlyFallback: false,
+      pendingAuthorizationUrl: null,
+      pendingAuthorizationUrlLoading: false,
+      pendingAuthorizationUrlError: null
     };
 
     function escapeHtml(value) {
@@ -1519,6 +1528,61 @@
       if (!syncFrequency || !scheduledGroup) return;
       const visible = ['daily', 'weekly'].includes(syncFrequency.value);
       scheduledGroup.classList.toggle('hidden', !visible);
+      refreshSyncSettingsButtonState();
+    }
+
+    function refreshSyncSettingsButtonState() {
+      const button = document.getElementById('saveSyncSettingsBtn');
+      const hint = document.getElementById('saveSyncSettingsHint');
+      if (!button) return;
+      const ready = isConnectorReady();
+      button.disabled = !ready;
+      if (hint) {
+        if (ready) {
+          hint.textContent = '';
+        } else if (!isConnectorConfigured()) {
+          hint.textContent = 'Save credentials first to update sync settings.';
+        } else if (isOAuthConnector() && !isOAuthAuthorized()) {
+          hint.textContent = 'Complete OAuth authorization first.';
+        } else {
+          hint.textContent = '';
+        }
+      }
+    }
+
+    async function saveSyncSettings() {
+      if (!state.sourceId) return;
+      if (!isConnectorReady()) {
+        showPageAlert('Save credentials and complete setup before updating sync settings.', 'error');
+        return;
+      }
+      const button = document.getElementById('saveSyncSettingsBtn');
+      const syncFrequency = document.getElementById('syncFrequency');
+      const scheduledSyncTime = document.getElementById('scheduledSyncTime');
+      if (!syncFrequency) return;
+
+      const originalLabel = button ? button.textContent : '';
+      try {
+        if (button) {
+          button.disabled = true;
+          button.textContent = 'Saving...';
+        }
+        const payload = { sync_frequency: syncFrequency.value };
+        if (syncFrequency.value === 'daily' || syncFrequency.value === 'weekly') {
+          payload.scheduled_sync_time = (scheduledSyncTime && scheduledSyncTime.value) || '08:00:00';
+        }
+        await api.patch(connectorApi('/sync-settings'), payload);
+        await refreshBaseData(false);
+        showPageAlert('Sync settings updated.', 'success');
+      } catch (error) {
+        console.error('[Connector Viewer] Failed to save sync settings', error);
+        showPageAlert(error.message || 'Failed to update sync settings.', 'error');
+      } finally {
+        if (button) {
+          button.textContent = originalLabel || 'Update Sync Settings';
+          refreshSyncSettingsButtonState();
+        }
+      }
     }
 
     function buildDocumentationModel() {
@@ -1928,6 +1992,26 @@
           </div>
         </div>
 
+        ${isOauthConnector && !oauthAuthorized && state.sourceId ? `
+          <div class="mt-5 rounded-xl border border-blue-200 bg-blue-50 p-4" id="pendingAuthorizationCard">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div class="text-sm font-semibold text-gray-900">Complete OAuth Authorization</div>
+                <div class="mt-1 text-sm text-gray-600">Credentials are saved. Open the authorization link below to finish connecting ${escapeHtml(state.connectorName)}. You can share the link with the account owner if the connection needs a different Google user.</div>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <button type="button" onclick="copyAuthorizationUrl()" class="rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100">Copy Link</button>
+                <button type="button" onclick="openAuthorizationUrl()" class="rounded-xl bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700">Open in Browser</button>
+                <button type="button" onclick="refreshAuthorizationUrl()" class="rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100" title="Regenerate link">Refresh</button>
+              </div>
+            </div>
+            <div class="mt-3 rounded-lg border border-blue-200 bg-white px-3 py-2">
+              <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Authorization Link</div>
+              <div id="pendingAuthorizationUrlValue" class="mt-1 connector-mono break-all text-xs text-gray-800">${state.pendingAuthorizationUrl ? escapeHtml(state.pendingAuthorizationUrl) : (state.pendingAuthorizationUrlError ? escapeHtml(state.pendingAuthorizationUrlError) : 'Generating link...')}</div>
+            </div>
+          </div>
+        ` : ''}
+
         ${maskedFields.length ? `
           <div class="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-4">
             <div class="text-sm font-semibold text-gray-900">Stored Credentials</div>
@@ -1942,6 +2026,13 @@
           </div>
         ` : ''}
       `;
+
+      if (isOauthConnector && !oauthAuthorized && state.sourceId) {
+        ensurePendingAuthorizationUrl();
+      } else if (oauthAuthorized) {
+        state.pendingAuthorizationUrl = null;
+        state.pendingAuthorizationUrlError = null;
+      }
 
       if (!fields.length) {
         configForm.innerHTML = `
@@ -3090,24 +3181,102 @@
         showPageAlert(`Saving ${state.connectorName} configuration before redirecting to OAuth...`, 'info');
         await saveConfiguration({ silentLoading: true, silentSuccess: true });
 
-        const returnUrl = new URL(window.location.href);
-        returnUrl.searchParams.set('tab', 'configuration');
-        returnUrl.searchParams.delete('oauth_success');
-        returnUrl.searchParams.delete('oauth_error');
-        returnUrl.searchParams.delete('connector_id');
+        const authUrl = await fetchAuthorizationUrl({ force: true });
+        window.location.href = authUrl;
+      } catch (error) {
+        console.error('[Connector Viewer] Failed to start OAuth flow', error);
+        showPageAlert(error.message || 'Failed to start OAuth flow.', 'error');
+      }
+    }
 
+    function buildAuthorizationReturnUrl() {
+      const returnUrl = new URL(window.location.href);
+      returnUrl.searchParams.set('tab', 'configuration');
+      returnUrl.searchParams.delete('oauth_success');
+      returnUrl.searchParams.delete('oauth_error');
+      returnUrl.searchParams.delete('connector_id');
+      return returnUrl.pathname + returnUrl.search;
+    }
+
+    async function fetchAuthorizationUrl({ force = false } = {}) {
+      if (!state.sourceId || !isOAuthConnector()) {
+        throw new Error('OAuth is not configured for this connector.');
+      }
+
+      if (!force && state.pendingAuthorizationUrl) {
+        return state.pendingAuthorizationUrl;
+      }
+
+      state.pendingAuthorizationUrlLoading = true;
+      state.pendingAuthorizationUrlError = null;
+      updatePendingAuthorizationUrlDisplay('Generating link...');
+
+      try {
         const result = await api.get(
-          `/api/v1/integrations/connectors/${encodeURIComponent(state.sourceId)}/authorize?return_to=${encodeURIComponent(returnUrl.pathname + returnUrl.search)}`
+          `/api/v1/integrations/connectors/${encodeURIComponent(state.sourceId)}/authorize?return_to=${encodeURIComponent(buildAuthorizationReturnUrl())}`
         );
 
         if (!result?.authorization_url) {
           throw new Error('OAuth authorization URL was not returned by the server.');
         }
 
-        window.location.href = result.authorization_url;
+        state.pendingAuthorizationUrl = result.authorization_url;
+        updatePendingAuthorizationUrlDisplay(result.authorization_url);
+        return result.authorization_url;
       } catch (error) {
-        console.error('[Connector Viewer] Failed to start OAuth flow', error);
-        showPageAlert(error.message || 'Failed to start OAuth flow.', 'error');
+        const message = error?.message || 'Failed to generate authorization link.';
+        state.pendingAuthorizationUrl = null;
+        state.pendingAuthorizationUrlError = message;
+        updatePendingAuthorizationUrlDisplay(message);
+        throw error;
+      } finally {
+        state.pendingAuthorizationUrlLoading = false;
+      }
+    }
+
+    function updatePendingAuthorizationUrlDisplay(text) {
+      const el = document.getElementById('pendingAuthorizationUrlValue');
+      if (el) el.textContent = text;
+    }
+
+    async function ensurePendingAuthorizationUrl() {
+      if (!isOAuthConnector() || isOAuthAuthorized() || !state.sourceId) return;
+      if (state.pendingAuthorizationUrl || state.pendingAuthorizationUrlLoading) return;
+      try {
+        await fetchAuthorizationUrl();
+      } catch (error) {
+        console.error('[Connector Viewer] Failed to generate authorization link', error);
+      }
+    }
+
+    async function copyAuthorizationUrl() {
+      try {
+        const url = state.pendingAuthorizationUrl || await fetchAuthorizationUrl();
+        await navigator.clipboard.writeText(url);
+        showPageAlert('Authorization link copied to clipboard.', 'success');
+      } catch (error) {
+        console.error('[Connector Viewer] Failed to copy authorization link', error);
+        showPageAlert(error.message || 'Failed to copy authorization link.', 'error');
+      }
+    }
+
+    async function openAuthorizationUrl() {
+      try {
+        const url = state.pendingAuthorizationUrl || await fetchAuthorizationUrl();
+        window.open(url, '_blank', 'noopener');
+      } catch (error) {
+        console.error('[Connector Viewer] Failed to open authorization link', error);
+        showPageAlert(error.message || 'Failed to open authorization link.', 'error');
+      }
+    }
+
+    async function refreshAuthorizationUrl() {
+      try {
+        await fetchAuthorizationUrl({ force: true });
+        showPageAlert('Authorization link refreshed.', 'success');
+      } catch (error) {
+        console.error('[Connector Viewer] Failed to refresh authorization link', error);
+        showPageAlert(error.message || 'Failed to refresh authorization link.', 'error');
       }
     }
 
@@ -3757,7 +3926,11 @@
     });
 
     window.saveConfiguration = saveConfiguration;
+    window.saveSyncSettings = saveSyncSettings;
     window.connectOAuthConnector = connectOAuthConnector;
+    window.copyAuthorizationUrl = copyAuthorizationUrl;
+    window.openAuthorizationUrl = openAuthorizationUrl;
+    window.refreshAuthorizationUrl = refreshAuthorizationUrl;
     window.copyWebhookEndpointUrl = copyWebhookEndpointUrl;
     window.testConnection = testConnection;
     window.triggerSync = triggerSync;
