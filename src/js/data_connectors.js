@@ -1161,6 +1161,153 @@
     });
   }
 
+  // ── Connector accounts (GAP-10: set default for template engine) ───
+
+  /**
+   * Opens the Manage Accounts modal and loads sources for the currently
+   * selected connector. The modal lists every integration_sources row
+   * sharing the same connector_id slug, allowing the user to mark one
+   * as the default for template-engine resolution.
+   */
+  function showConnectorAccountsModal() {
+    if (!selectedConnectorForActions) return;
+
+    // Close the actions modal first
+    closeConnectorActionsModal(false);
+
+    var modal = document.getElementById('connectorAccountsModal');
+    if (!modal) return;
+
+    // Reset to loading state
+    var listEl = document.getElementById('connectorAccountsList');
+    if (listEl) {
+      listEl.innerHTML =
+        '<div class="flex items-center justify-center py-8"><lex-spinner size="sm"></lex-spinner></div>';
+    }
+
+    modal.open = true;
+
+    loadConnectorAccounts();
+  }
+
+  /**
+   * Fetches all integration_sources rows for the connector slug of the
+   * currently selected connector and renders them as account rows.
+   * Each row has a "Set as default" button that calls setConnectorDefault().
+   */
+  function loadConnectorAccounts() {
+    if (!selectedConnectorForActions) return;
+
+    var connector = selectedConnectorForActions;
+    var connectorSlug = String(
+      connector.connector_id || connector.connector_type || connector.id || ''
+    ).toLowerCase();
+
+    var listEl = document.getElementById('connectorAccountsList');
+    if (!listEl) return;
+
+    api.get('/api/v1/integrations/sources?connector_id=' + encodeURIComponent(connectorSlug))
+      .then(function (data) {
+        var sources = (data && (data.sources || data.data || data)) || [];
+
+        // Normalize: accept plain array or { sources: [] }
+        if (!Array.isArray(sources)) {
+          sources = [];
+        }
+
+        if (sources.length === 0) {
+          listEl.innerHTML =
+            '<p class="text-sm text-center py-6" style="color:var(--lex-text-tertiary)">No connected accounts found for this connector.</p>';
+          return;
+        }
+
+        listEl.innerHTML = sources.map(function (source) {
+          return renderAccountRow(source, connectorSlug);
+        }).join('');
+      })
+      .catch(function (error) {
+        console.error('Failed to load connector accounts:', error);
+        listEl.innerHTML =
+          '<p class="text-sm text-center py-6" style="color:var(--lex-status-danger-text)">Failed to load accounts. Please try again.</p>';
+      });
+  }
+
+  /**
+   * Renders a single integration_sources row inside the accounts modal.
+   * @param {Object} source - integration_sources row
+   * @param {string} connectorSlug - connector_id slug (for context only)
+   * @returns {string} HTML string
+   */
+  function renderAccountRow(source, connectorSlug) {
+    void connectorSlug; // available for future use
+
+    var isDefault = source.is_default === true;
+    var authStatus = source.auth_status || 'unknown';
+    var sourceName = Lex.Utils.escapeHtml(source.source_name || source.connector_name || 'Unnamed account');
+    var sourceId = source.id || '';
+
+    var statusColorMap = {
+      active: 'green',
+      connected: 'green',
+      error: 'red',
+      expired: 'yellow',
+      disconnected: 'gray'
+    };
+    var statusColor = statusColorMap[authStatus] || 'gray';
+    var statusLabel = authStatus.charAt(0).toUpperCase() + authStatus.slice(1);
+
+    var defaultBadge = isDefault
+      ? '<lex-badge color="indigo" label="Default" size="sm"></lex-badge>'
+      : '';
+
+    var setDefaultBtn = isDefault
+      ? '<span class="text-xs" style="color:var(--lex-text-tertiary)">Default account</span>'
+      : '<lex-btn variant="ghost" size="sm" onclick="setConnectorDefault(\'' + sourceId + '\')">Set as default</lex-btn>';
+
+    return '<div class="flex items-center gap-3 px-4 py-3 rounded-xl" style="background:var(--lex-card-bg);border:1px solid var(--lex-card-border)">' +
+      '<div class="flex-1 min-w-0">' +
+        '<div class="flex items-center gap-2 flex-wrap">' +
+          '<span class="font-medium text-sm" style="color:var(--lex-text-primary)">' + sourceName + '</span>' +
+          defaultBadge +
+        '</div>' +
+        '<div class="flex items-center gap-2 mt-1">' +
+          '<lex-badge color="' + statusColor + '" label="' + statusLabel + '" size="sm"></lex-badge>' +
+        '</div>' +
+      '</div>' +
+      '<div class="flex-shrink-0">' +
+        setDefaultBtn +
+      '</div>' +
+    '</div>';
+  }
+
+  /**
+   * Calls PATCH /api/v1/integrations/sources/:id/default to mark a
+   * source as the default account for its connector slug.
+   * @param {string} sourceId - UUID of the integration_sources row
+   */
+  function setConnectorDefault(sourceId) {
+    if (!sourceId) return;
+
+    api.patch('/api/v1/integrations/sources/' + encodeURIComponent(sourceId) + '/default', {
+      is_default: true
+    }).then(function (result) {
+      // Backend returns { success: true, data: { source_name, ... } }
+      var row = (result && result.data) || result || {};
+      var name = row.source_name || row.connector_name || 'Account';
+      Lex.Toast.success(Lex.Utils.escapeHtml(name) + ' set as the default account.');
+      // Reload the list so the UI reflects the new default
+      loadConnectorAccounts();
+    }).catch(function (error) {
+      console.error('Failed to set default account:', error);
+      Lex.Toast.error('Failed to set default: ' + (error.message || 'Unknown error'));
+    });
+  }
+
+  function closeConnectorAccountsModal() {
+    var modal = document.getElementById('connectorAccountsModal');
+    if (modal) modal.open = false;
+  }
+
   // ── Update connector (reimport ZIP without deleting data) ──────────
 
   function updateConnector() {
@@ -1324,6 +1471,9 @@
     exposeGlobal('showConnectorActionsModal', showConnectorActionsModal);
     exposeGlobal('closeConnectorActionsModal', closeConnectorActionsModal);
     exposeGlobal('navigateToConnectorDashboard', navigateToConnectorDashboard);
+    exposeGlobal('showConnectorAccountsModal', showConnectorAccountsModal);
+    exposeGlobal('closeConnectorAccountsModal', closeConnectorAccountsModal);
+    exposeGlobal('setConnectorDefault', setConnectorDefault);
     exposeGlobal('updateConnector', updateConnector);
     exposeGlobal('handleUpdateConnectorFile', handleUpdateConnectorFile);
     exposeGlobal('uninstallConnector', uninstallConnector);

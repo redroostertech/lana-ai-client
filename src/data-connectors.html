@@ -268,6 +268,22 @@
             </svg>
           </button>
 
+          <!-- Manage Accounts (set default when multiple sources) -->
+          <button id="actionManageAccounts" onclick="showConnectorAccountsModal()" class="w-full group flex items-center gap-4 px-5 py-4 rounded-xl transition-all duration-200 border-2 hover:opacity-90" style="background:var(--lex-card-bg);border-color:var(--lex-border-default);color:var(--lex-text-primary)">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style="background:var(--lex-bg-accent-muted)">
+              <svg class="w-5 h-5" style="color:var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+              </svg>
+            </div>
+            <div class="text-left flex-1">
+              <div class="font-semibold text-base">Manage Accounts</div>
+              <div class="text-xs" style="color:var(--lex-text-secondary)">Set default account for templates</div>
+            </div>
+            <svg class="w-5 h-5" style="color:var(--lex-text-tertiary)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+          </button>
+
           <!-- Delete (only for non-system connectors) -->
           <button id="actionDelete" onclick="deleteConnector()" class="w-full group flex items-center gap-4 px-5 py-4 rounded-xl transition-all duration-200 border-2 hover:opacity-90" style="background:var(--lex-card-bg);border-color:var(--lex-border-default);color:var(--lex-text-primary)">
             <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style="background:var(--lex-status-danger-bg)">
@@ -288,6 +304,25 @@
           <div class="pt-1">
             <lex-btn variant="secondary" onclick="closeConnectorActionsModal()" style="width:100%">Cancel</lex-btn>
           </div>
+        </div>
+      </div>
+    </lex-modal>
+
+    <!-- Connector Accounts Modal (GAP-10: set default account for template engine) -->
+    <lex-modal id="connectorAccountsModal" heading="Manage Accounts" size="md" hide-actions close-on-overlay>
+      <div id="connectorAccountsContent">
+        <p class="text-sm mb-4" style="color:var(--lex-text-secondary)">
+          When multiple accounts are connected for this integration, mark one as the default.
+          Skill templates using <code>&#123;&#123;user.connectors.&lt;slug&gt;.id&#125;&#125;</code> will resolve to the default account.
+        </p>
+        <div id="connectorAccountsList" class="space-y-3">
+          <!-- Populated by loadConnectorAccounts() -->
+          <div class="flex items-center justify-center py-8">
+            <lex-spinner size="sm"></lex-spinner>
+          </div>
+        </div>
+        <div class="pt-4 mt-2" style="border-top:1px solid var(--lex-border-subtle)">
+          <lex-btn variant="secondary" onclick="closeConnectorAccountsModal()" style="width:100%">Close</lex-btn>
         </div>
       </div>
     </lex-modal>

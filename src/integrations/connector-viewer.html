@@ -1223,6 +1223,7 @@
 
     function getRunTabModel() {
       const runBehavior = getUiBehavior().run || {};
+      const options = Array.isArray(runBehavior.options) ? runBehavior.options : [];
       if (Object.keys(runBehavior).length) {
         return {
           supportsDateRange: Boolean(runBehavior.supports_date_range),
@@ -1235,7 +1236,10 @@
           aboutBody: runBehavior.about_body || 'Run a manual sync to validate the connector and inspect the resulting records.',
           runGuidance: Array.isArray(runBehavior.guidance) && runBehavior.guidance.length
             ? runBehavior.guidance
-            : ['Run a manual sync to validate the connector end to end.']
+            : ['Run a manual sync to validate the connector end to end.'],
+          options,
+          optionsHeader: runBehavior.options_header || 'Advanced options',
+          optionsDescription: runBehavior.options_description || 'Override saved configuration for this manual run only. Leave everything empty to use the saved Configuration values.'
         };
       }
 
@@ -1255,8 +1259,25 @@
           'Manual sync is the safe place to validate a connector before enabling automation.',
           'After sync, use Output to search, assign, and shortlist edits instead of manually overwriting connector payloads.',
           'Use Execution Logs for server-side failures and status transitions.'
-        ]
+        ],
+        options: [],
+        optionsHeader: 'Advanced options',
+        optionsDescription: ''
       };
+    }
+
+    function getRunOptionPrefillValue(option) {
+      const savedConfig = state.configResponse?.config || {};
+      if (option.default_from_config && Object.prototype.hasOwnProperty.call(savedConfig, option.default_from_config)) {
+        const fromConfig = savedConfig[option.default_from_config];
+        if (fromConfig !== null && fromConfig !== undefined && fromConfig !== '') {
+          return fromConfig;
+        }
+      }
+      if (option.default !== undefined) return option.default;
+      if (option.type === 'boolean') return false;
+      if (option.type === 'multiselect' || option.type === 'multiselect_dynamic') return [];
+      return '';
     }
 
     function getUiBehaviorContext() {
@@ -2651,6 +2672,20 @@
                       This connector does not use run-time date windows. Adjust scope in Configuration, then run a full manual sync.
                     </div>
                   `}
+                  ${runModel.options.length ? `
+                    <details class="mt-6 rounded-xl border border-green-200 bg-white" id="runOptionsDetails">
+                      <summary class="flex cursor-pointer items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-gray-900 hover:bg-green-50">
+                        <span>${escapeHtml(runModel.optionsHeader)}</span>
+                        <span class="text-xs text-gray-500">${runModel.options.length} option${runModel.options.length === 1 ? '' : 's'} &middot; click to expand</span>
+                      </summary>
+                      <div class="border-t border-green-200 px-4 py-4">
+                        ${runModel.optionsDescription ? `<p class="mb-4 text-xs text-gray-500">${escapeHtml(runModel.optionsDescription)}</p>` : ''}
+                        <form id="runOptionsForm" class="space-y-4" onsubmit="event.preventDefault()">
+                          ${runModel.options.map((option) => renderField(option, getRunOptionPrefillValue(option))).join('')}
+                        </form>
+                      </div>
+                    </details>
+                  ` : ''}
                   <div class="mt-6">
                     <button type="button" onclick="runManualSync()" ${disabledAttr} class="rounded-xl bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700${buttonDisabledClass}">
                       ${escapeHtml(runModel.buttonLabel)}
@@ -3665,6 +3700,43 @@
       endNode.value = endDate.toISOString().slice(0, 10);
     }
 
+    function collectRunOptionOverrides() {
+      const runModel = getRunTabModel();
+      if (!runModel.options.length) return {};
+
+      const form = document.getElementById('runOptionsForm');
+      if (!form) return {};
+
+      const draft = {};
+      const processed = new Set();
+      collectNamedFormDraft(form, draft, processed);
+
+      // Drop empty values so they don't override saved config with blanks,
+      // unless an explicit default is declared (meaning user can reset to that value).
+      const overrides = {};
+      runModel.options.forEach((option) => {
+        if (!Object.prototype.hasOwnProperty.call(draft, option.name)) return;
+        const value = draft[option.name];
+        if (option.type === 'boolean') {
+          overrides[option.name] = Boolean(value);
+          return;
+        }
+        if (Array.isArray(value)) {
+          if (value.length > 0) overrides[option.name] = value;
+          return;
+        }
+        if (value === '' || value === null || value === undefined) return;
+        if (option.type === 'number') {
+          const num = Number(value);
+          if (!Number.isNaN(num)) overrides[option.name] = num;
+          return;
+        }
+        overrides[option.name] = value;
+      });
+
+      return overrides;
+    }
+
     async function runManualSync() {
       if (!state.sourceId) return;
 
@@ -3679,6 +3751,14 @@
 
         if (startDate) payload.startDate = `${startDate}T00:00:00.000Z`;
         if (endDate) payload.endDate = `${endDate}T23:59:59.999Z`;
+
+        const overrides = collectRunOptionOverrides();
+        if (Object.keys(overrides).length) {
+          payload.runtime_overrides = overrides;
+          if (Object.prototype.hasOwnProperty.call(overrides, 'force_full_resync')) {
+            payload.forceFullSync = Boolean(overrides.force_full_resync);
+          }
+        }
 
         showPageAlert('Starting manual sync...', 'info');
         const result = await api.post(connectorApi('/sync'), payload);

@@ -1820,7 +1820,8 @@
   }
 
   /**
-   * Open skill details modal
+   * Open skill details modal (GAP-1, GAP-2, GAP-12)
+   * Renders three tabs: Overview, Settings (with Matter Attachments), Runs.
    */
   function openSkillDetails(skill) {
     selectedSkill = skill;
@@ -1832,14 +1833,27 @@
     var category = skill.category || 'automation';
     var version = skill.version || '1.0.0';
     var tags = skill.tags || [];
+    var skillId = skill.skill_id;
 
-    var html = '<div class="skill-detail-section">'
+    // ── Tab shell ──────────────────────────────────────────────────
+    var tabBar = '<div class="flex border-b mb-4" style="border-color:var(--lex-border-default);">'
+      + '<button class="ld-tab px-4 py-2 text-sm font-medium border-b-2 transition-colors" data-tab="overview" style="border-color:var(--lex-text-accent);color:var(--lex-text-accent);">Overview</button>'
+      + '<button class="ld-tab px-4 py-2 text-sm font-medium border-b-2 text-gray-500 border-transparent hover:text-gray-700 transition-colors" data-tab="settings">Settings</button>'
+      + '<button class="ld-tab px-4 py-2 text-sm font-medium border-b-2 text-gray-500 border-transparent hover:text-gray-700 transition-colors" data-tab="runs">Runs</button>'
+      + '</div>';
+
+    // ── Overview tab content ───────────────────────────────────────
+    var overviewHtml = '<div class="ld-tab-panel" data-panel="overview">'
+      + '<div class="skill-detail-section">'
       + '<div class="flex items-start gap-4 mb-4">'
       + '<div class="skill-list-icon">' + getCategoryIcon(category) + '</div>'
       + '<div class="flex-1">'
       + '<h2 class="text-2xl font-bold text-gray-900 mb-1">' + escapeHtml(skill.skill_name) + '</h2>'
       + '<p class="text-gray-600">v' + escapeHtml(version) + ' &bull; ' + (skill.skill_type === 'custom' ? 'Custom Skill' : 'Built-in Skill') + '</p>'
-      + '</div></div>'
+      + '</div>'
+      + '<button id="ld-attach-matter-btn" class="px-3 py-1.5 text-sm font-medium text-white rounded-lg transition-colors" style="background:var(--lex-text-accent);">'
+      + 'Attach to Matter</button>'
+      + '</div>'
       + '<p class="text-gray-700">' + escapeHtml(skill.description || 'No description available') + '</p>'
       + '</div>'
       + '<div class="skill-detail-section">'
@@ -1848,7 +1862,7 @@
       + '<div class="skill-detail-info-item"><p class="skill-detail-info-label">Category</p>'
       + '<p class="skill-detail-info-value"><span class="category-badge category-' + category + '">' + formatCategory(category) + '</span></p></div>'
       + '<div class="skill-detail-info-item"><p class="skill-detail-info-label">Installations</p>'
-      + '<p class="skill-detail-info-value">' + skill.installation_count + ' matters</p></div>'
+      + '<p class="skill-detail-info-value">' + (skill.installation_count || 0) + ' matters</p></div>'
       + '<div class="skill-detail-info-item"><p class="skill-detail-info-label">Created</p>'
       + '<p class="skill-detail-info-value">' + formatDate(skill.created_at) + '</p></div>'
       + '<div class="skill-detail-info-item"><p class="skill-detail-info-label">Last Updated</p>'
@@ -1856,7 +1870,7 @@
       + '</div></div>';
 
     if (tags.length > 0) {
-      html += '<div class="skill-detail-section">'
+      overviewHtml += '<div class="skill-detail-section">'
         + '<h4 class="skill-detail-section-title">Tags</h4>'
         + '<div class="skill-tags">'
         + tags.map(function(tag) { return '<span class="skill-tag">' + escapeHtml(tag) + '</span>'; }).join('')
@@ -1864,29 +1878,477 @@
     }
 
     if (skill.trigger_event) {
-      html += '<div class="skill-detail-section">'
+      overviewHtml += '<div class="skill-detail-section">'
         + '<h4 class="skill-detail-section-title">Trigger Event</h4>'
         + '<p class="text-sm text-gray-700"><code class="skill-detail-code">' + escapeHtml(skill.trigger_event) + '</code></p>'
         + '</div>';
     }
 
-    if (skill.trigger_conditions && Object.keys(skill.trigger_conditions).length > 0) {
-      html += '<div class="skill-detail-section">'
-        + '<h4 class="skill-detail-section-title">Trigger Conditions</h4>'
-        + '<pre class="skill-detail-code">' + JSON.stringify(skill.trigger_conditions, null, 2) + '</pre>'
-        + '</div>';
-    }
-
     if (skill.actions && skill.actions.length > 0) {
-      html += '<div class="skill-detail-section">'
+      overviewHtml += '<div class="skill-detail-section">'
         + '<h4 class="skill-detail-section-title">Actions (' + skill.actions.length + ')</h4>'
         + '<ul class="skill-detail-list">'
-        + skill.actions.map(function(action) { return '<li>' + escapeHtml(action.action_type) + '</li>'; }).join('')
+        + skill.actions.map(function(a) { return '<li>' + escapeHtml(a.action_type) + '</li>'; }).join('')
         + '</ul></div>';
     }
 
-    body.innerHTML = html;
+    overviewHtml += '</div>';
+
+    // ── Settings tab (GAP-1: Matter Attachments) ──────────────────
+    var settingsHtml = '<div class="ld-tab-panel hidden" data-panel="settings">'
+      + '<div class="skill-detail-section">'
+      + '<div class="flex items-center justify-between mb-3">'
+      + '<h4 class="skill-detail-section-title mb-0">Matter Attachments</h4>'
+      + '<button id="ld-settings-attach-btn" class="px-3 py-1.5 text-xs font-medium text-white rounded-lg transition-colors" style="background:var(--lex-text-accent);">+ Attach to Matter</button>'
+      + '</div>'
+      + '<div id="ld-attachments-list" class="space-y-2">'
+      + '<div class="flex justify-center py-6"><div class="animate-spin w-5 h-5 border-2 border-gray-300 border-t-blue-600 rounded-full"></div></div>'
+      + '</div></div></div>';
+
+    // ── Runs tab (GAP-2 + GAP-12) ─────────────────────────────────
+    var runsHtml = '<div class="ld-tab-panel hidden" data-panel="runs">'
+      + '<div class="skill-detail-section">'
+      + '<div class="flex items-center justify-between mb-3">'
+      + '<h4 class="skill-detail-section-title mb-0">Run History</h4>'
+      + '<span class="text-xs text-gray-500">Direct runs + matter-attached runs</span>'
+      + '</div>'
+      + '<div id="ld-runs-list" class="space-y-2">'
+      + '<div class="flex justify-center py-6"><div class="animate-spin w-5 h-5 border-2 border-gray-300 border-t-blue-600 rounded-full"></div></div>'
+      + '</div>'
+      + '<div id="ld-runs-pagination" class="mt-3 flex gap-2 items-center justify-between hidden">'
+      + '<button id="ld-runs-prev" class="px-3 py-1 text-sm border rounded-lg disabled:opacity-50" style="border-color:var(--lex-border-default);">Prev</button>'
+      + '<span id="ld-runs-info" class="text-xs text-gray-500"></span>'
+      + '<button id="ld-runs-next" class="px-3 py-1 text-sm border rounded-lg disabled:opacity-50" style="border-color:var(--lex-border-default);">Next</button>'
+      + '</div>'
+      + '</div></div>';
+
+    // ── Modal override — hide the Install button while we're in detail view ──
+    var installBtn = document.getElementById('modal-install-btn');
+    if (installBtn) installBtn.classList.add('hidden');
+
+    body.innerHTML = tabBar + overviewHtml + settingsHtml + runsHtml;
     modal.classList.remove('hidden');
+
+    // ── Wire tab switching ─────────────────────────────────────────
+    var tabBtns = body.querySelectorAll('.ld-tab');
+    var tabPanels = body.querySelectorAll('.ld-tab-panel');
+    tabBtns.forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var target = btn.dataset.tab;
+        tabBtns.forEach(function(b) {
+          b.style.borderColor = 'transparent';
+          b.style.color = '';
+          b.classList.add('text-gray-500');
+          b.classList.remove('font-semibold');
+        });
+        btn.style.borderColor = 'var(--lex-text-accent)';
+        btn.style.color = 'var(--lex-text-accent)';
+        btn.classList.remove('text-gray-500');
+        tabPanels.forEach(function(p) { p.classList.add('hidden'); });
+        var activePanel = body.querySelector('[data-panel="' + target + '"]');
+        if (activePanel) activePanel.classList.remove('hidden');
+
+        if (target === 'settings' && !ldAttachmentsLoaded) {
+          ldAttachmentsLoaded = true;
+          loadSkillMatterAttachments(skillId);
+        }
+        if (target === 'runs' && !ldRunsLoaded) {
+          ldRunsLoaded = true;
+          loadSkillRunsUnified(skillId);
+        }
+      });
+    });
+
+    // ── Wire "Attach to Matter" buttons ────────────────────────────
+    var attachBtn1 = document.getElementById('ld-attach-matter-btn');
+    var attachBtn2 = document.getElementById('ld-settings-attach-btn');
+    function openAttachModal() { openAttachToMatterModal(skillId); }
+    if (attachBtn1) attachBtn1.addEventListener('click', openAttachModal);
+    if (attachBtn2) attachBtn2.addEventListener('click', openAttachModal);
+
+    // ── Runs pagination state ──────────────────────────────────────
+    ldRunsOffset = 0;
+    ldRunsTotal = 0;
+    ldRunsLoaded = false;
+    ldAttachmentsLoaded = false;
+  }
+
+  // Runs + attachments lazy-load flags (reset each openSkillDetails call)
+  var ldRunsOffset = 0;
+  var ldRunsTotal = 0;
+  var ldRunsLimit = 25;
+  var ldRunsLoaded = false;
+  var ldAttachmentsLoaded = false;
+
+  /**
+   * Load unified runs (GAP-2 + GAP-12) for the current skill detail view.
+   * @param {string} skillId
+   */
+  function loadSkillRunsUnified(skillId) {
+    if (!skillId) return;
+    var container = document.getElementById('ld-runs-list');
+    var paginationEl = document.getElementById('ld-runs-pagination');
+    if (!container) return;
+
+    container.innerHTML = '<div class="flex justify-center py-6"><div class="animate-spin w-5 h-5 border-2 border-gray-300 border-t-blue-600 rounded-full"></div></div>';
+
+    var url = '/api/v1/automation/skills/' + encodeURIComponent(skillId)
+      + '/runs-unified?limit=' + ldRunsLimit + '&offset=' + ldRunsOffset;
+
+    (window.api ? window.api.get(url) : fetch(url, { headers: { 'Authorization': 'Bearer ' + getAuthToken() } }).then(function(r) { return r.json(); }))
+      .then(function(res) {
+        var data = (res && res.data) ? res.data : [];
+        var pagination = (res && res.pagination) ? res.pagination : {};
+        ldRunsTotal = pagination.total || 0;
+
+        if (data.length === 0) {
+          container.innerHTML = '<div class="text-center py-8 text-gray-400 text-sm">No runs yet</div>';
+          if (paginationEl) paginationEl.classList.add('hidden');
+          return;
+        }
+
+        container.innerHTML = data.map(function(run) {
+          return renderUnifiedRunRow(run);
+        }).join('');
+
+        // Wire expand toggles
+        container.querySelectorAll('.ld-run-row').forEach(function(row) {
+          row.addEventListener('click', function() {
+            var detail = row.nextElementSibling;
+            if (detail && detail.classList.contains('ld-run-detail')) {
+              detail.classList.toggle('hidden');
+            }
+          });
+        });
+
+        // Pagination
+        if (paginationEl) {
+          var infoEl = document.getElementById('ld-runs-info');
+          var prevBtn = document.getElementById('ld-runs-prev');
+          var nextBtn = document.getElementById('ld-runs-next');
+          if (infoEl) infoEl.textContent = (ldRunsOffset + 1) + '–' + Math.min(ldRunsOffset + ldRunsLimit, ldRunsTotal) + ' of ' + ldRunsTotal;
+          if (prevBtn) prevBtn.disabled = ldRunsOffset === 0;
+          if (nextBtn) nextBtn.disabled = (ldRunsOffset + ldRunsLimit) >= ldRunsTotal;
+          paginationEl.classList.remove('hidden');
+
+          if (prevBtn) prevBtn.onclick = function() {
+            ldRunsOffset = Math.max(0, ldRunsOffset - ldRunsLimit);
+            loadSkillRunsUnified(skillId);
+          };
+          if (nextBtn) nextBtn.onclick = function() {
+            ldRunsOffset = ldRunsOffset + ldRunsLimit;
+            loadSkillRunsUnified(skillId);
+          };
+        }
+      })
+      .catch(function(err) {
+        if (container) container.innerHTML = '<div class="text-center py-4 text-red-500 text-sm">Failed to load runs: ' + escapeHtml((err && err.message) || 'Unknown error') + '</div>';
+      });
+  }
+
+  /**
+   * Render a single run row for the unified runs list (GAP-2 + GAP-12).
+   */
+  function renderUnifiedRunRow(run) {
+    var statusColor = {
+      completed: 'bg-green-100 text-green-800',
+      failed: 'bg-red-100 text-red-800',
+      pending: 'bg-yellow-100 text-yellow-800',
+      in_progress: 'bg-blue-100 text-blue-800',
+      cancelled: 'bg-gray-100 text-gray-600'
+    }[run.status] || 'bg-gray-100 text-gray-600';
+
+    // GAP-1 + GAP-2: source badge
+    var sourceBadge = run.source_type === 'matter'
+      ? '<span class="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-800">Matter: ' + escapeHtml(run.matter_name || run.matter_id || 'Unknown') + '</span>'
+      : '<span class="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600">Direct run</span>';
+
+    // GAP-12: triggered-by attribution
+    var triggeredByLabel = '';
+    if (run.triggered_by_name) {
+      var src = run.trigger_source || 'unknown';
+      var srcLabel = src;
+      if (src === 'manual' || src === 'manual_execute') srcLabel = 'Run Now';
+      else if (typeof src === 'string' && src.indexOf('schedule.') === 0) srcLabel = src;
+      else if (typeof src === 'string' && src.indexOf('event.') === 0) srcLabel = src;
+      triggeredByLabel = escapeHtml(run.triggered_by_name) + ' (' + escapeHtml(srcLabel) + ')';
+    } else if (run.trigger_source) {
+      triggeredByLabel = escapeHtml(run.trigger_source);
+    } else {
+      triggeredByLabel = 'System';
+    }
+
+    var duration = run.duration_ms ? (run.duration_ms / 1000).toFixed(1) + 's' : '—';
+    var startedAt = run.started_at ? formatDate(run.started_at) : '—';
+
+    var rowId = 'ld-run-' + (run.execution_id || Math.random().toString(36).slice(2));
+
+    return '<div class="ld-run-row flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors" style="border:1px solid var(--lex-border-default);margin-bottom:2px;" id="' + rowId + '">'
+      + '<span class="px-2 py-0.5 text-xs font-medium rounded-full ' + statusColor + '">' + escapeHtml(run.status || 'unknown') + '</span>'
+      + sourceBadge
+      + '<span class="text-xs text-gray-500 flex-1">' + startedAt + '</span>'
+      + '<span class="text-xs text-gray-400">' + duration + '</span>'
+      + '</div>'
+      + '<div class="ld-run-detail hidden px-4 py-3 text-xs text-gray-600 rounded-b-lg -mt-px mb-2" style="background:var(--lex-bg-secondary);border:1px solid var(--lex-border-default);border-top:none;">'
+      + '<p><strong>Triggered by:</strong> ' + triggeredByLabel + '</p>'
+      + (run.matter_name ? '<p><strong>Matter:</strong> ' + escapeHtml(run.matter_name) + ' (' + escapeHtml(run.matter_number || run.matter_id || '') + ')</p>' : '')
+      + (run.error_message ? '<p class="text-red-600"><strong>Error:</strong> ' + escapeHtml(run.error_message) + '</p>' : '')
+      + (run.result_summary ? '<p><strong>Steps:</strong> ' + (run.step_count || 0) + '</p>' : '')
+      + '<p class="mt-1 text-gray-400">ID: ' + escapeHtml(run.execution_id || '') + '</p>'
+      + '</div>';
+  }
+
+  /**
+   * Load matter attachments for this skill in the Settings tab (GAP-1).
+   * @param {string} skillId
+   */
+  function loadSkillMatterAttachments(skillId) {
+    if (!skillId) return;
+    var container = document.getElementById('ld-attachments-list');
+    if (!container) return;
+
+    container.innerHTML = '<div class="flex justify-center py-6"><div class="animate-spin w-5 h-5 border-2 border-gray-300 border-t-blue-600 rounded-full"></div></div>';
+
+    var url = '/api/v1/automation/skills/' + encodeURIComponent(skillId) + '/matter-attachments';
+    (window.api ? window.api.get(url) : fetch(url, { headers: { 'Authorization': 'Bearer ' + getAuthToken() } }).then(function(r) { return r.json(); }))
+      .then(function(res) {
+        var data = (res && res.data) ? res.data : [];
+
+        if (data.length === 0) {
+          container.innerHTML = '<p class="text-sm text-gray-400 py-4 text-center">Not attached to any matters yet.</p>';
+          return;
+        }
+
+        container.innerHTML = data.map(function(row) {
+          return renderAttachmentRow(row, skillId);
+        }).join('');
+
+        // Wire detach buttons
+        container.querySelectorAll('.ld-detach-btn').forEach(function(btn) {
+          btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            var matterId = btn.dataset.matterId;
+            if (!matterId) return;
+            if (!confirm('Detach this skill from the matter?')) return;
+            detachSkillFromMatter(matterId, skillId, function() {
+              loadSkillMatterAttachments(skillId);
+              showToast('Skill detached from matter', 'success');
+            });
+          });
+        });
+
+        // Wire edit-overrides buttons
+        container.querySelectorAll('.ld-edit-overrides-btn').forEach(function(btn) {
+          btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            var matterId = btn.dataset.matterId;
+            var overrides = btn.dataset.overrides || '{}';
+            openEditOverridesModal(matterId, skillId, overrides, function() {
+              loadSkillMatterAttachments(skillId);
+            });
+          });
+        });
+      })
+      .catch(function(err) {
+        if (container) container.innerHTML = '<p class="text-sm text-red-500 py-4 text-center">Failed to load: ' + escapeHtml((err && err.message) || 'Unknown error') + '</p>';
+      });
+  }
+
+  /**
+   * Render a single matter-attachment row.
+   */
+  function renderAttachmentRow(row, skillId) {
+    var enabledBadge = row.is_enabled
+      ? '<span class="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800">Enabled</span>'
+      : '<span class="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-500">Disabled</span>';
+
+    var overridesJson = JSON.stringify(row.config_overrides || {});
+    var safeOverrides = overridesJson.replace(/"/g, '&quot;');
+
+    return '<div class="flex items-center gap-3 p-3 rounded-lg" style="border:1px solid var(--lex-border-default);">'
+      + '<div class="flex-1">'
+      + '<p class="text-sm font-medium text-gray-900">' + escapeHtml(row.matter_name || row.client_matter_id || 'Unknown matter') + '</p>'
+      + '<p class="text-xs text-gray-500">' + escapeHtml(row.matter_number || '') + (row.last_executed_at ? ' &bull; Last run: ' + formatDate(row.last_executed_at) : '') + '</p>'
+      + '</div>'
+      + enabledBadge
+      + '<button class="ld-edit-overrides-btn px-2 py-1 text-xs border rounded-lg hover:bg-gray-50" style="border-color:var(--lex-border-default);" data-matter-id="' + escapeHtml(row.client_matter_id) + '" data-overrides="' + safeOverrides + '">Edit Overrides</button>'
+      + '<button class="ld-detach-btn px-2 py-1 text-xs border rounded-lg hover:bg-red-50 text-red-600" style="border-color:var(--lex-border-default);" data-matter-id="' + escapeHtml(row.client_matter_id) + '">Detach</button>'
+      + '</div>';
+  }
+
+  /**
+   * Detach a skill from a matter (GAP-1).
+   * DELETE /api/v1/matters/:matterId/skills/:skillId
+   */
+  function detachSkillFromMatter(matterId, skillId, callback) {
+    var url = '/api/v1/matters/' + encodeURIComponent(matterId) + '/skills/' + encodeURIComponent(skillId);
+    (window.api ? window.api.delete(url) : fetch(window.api ? window.api.baseUrl + url : url, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + getAuthToken() } }).then(function(r) { return r.json(); }))
+      .then(callback)
+      .catch(function(err) {
+        showToast('Failed to detach: ' + ((err && err.message) || 'Unknown error'), 'error');
+      });
+  }
+
+  /**
+   * Open a simple JSON-editor modal for config overrides (GAP-1).
+   */
+  function openEditOverridesModal(matterId, skillId, currentOverridesJson, callback) {
+    // Reuse the learn-more modal slot as a temporary container; or inject inline modal
+    var existing = document.getElementById('ld-overrides-modal');
+    if (existing) existing.remove();
+
+    var parsed = '{}';
+    try { parsed = JSON.stringify(JSON.parse(currentOverridesJson), null, 2); } catch (e) { parsed = '{}'; }
+
+    var modal = document.createElement('div');
+    modal.id = 'ld-overrides-modal';
+    modal.className = 'modal';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:10010;display:flex;align-items:center;justify-content:center;';
+    modal.innerHTML = '<div class="modal-overlay" style="position:absolute;inset:0;background:rgba(0,0,0,0.5);"></div>'
+      + '<div style="position:relative;background:#fff;border-radius:12px;padding:24px;width:480px;max-height:80vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">'
+      + '<h3 class="text-lg font-semibold mb-3" style="color:var(--lex-text-primary);">Edit Config Overrides</h3>'
+      + '<p class="text-xs text-gray-500 mb-3">JSON overrides applied when this skill runs in this matter context.</p>'
+      + '<textarea id="ld-overrides-input" rows="8" style="width:100%;font-family:monospace;font-size:12px;border:1px solid var(--lex-border-default);border-radius:8px;padding:10px;resize:vertical;" spellcheck="false">' + escapeHtml(parsed) + '</textarea>'
+      + '<div id="ld-overrides-error" class="text-xs text-red-500 mt-1 hidden"></div>'
+      + '<div class="flex gap-2 justify-end mt-4">'
+      + '<button id="ld-overrides-cancel" class="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50" style="border-color:var(--lex-border-default);">Cancel</button>'
+      + '<button id="ld-overrides-save" class="px-4 py-2 text-sm text-white rounded-lg" style="background:var(--lex-text-accent);">Save</button>'
+      + '</div></div>';
+
+    document.body.appendChild(modal);
+
+    modal.querySelector('.modal-overlay').addEventListener('click', function() { modal.remove(); });
+    modal.querySelector('#ld-overrides-cancel').addEventListener('click', function() { modal.remove(); });
+    modal.querySelector('#ld-overrides-save').addEventListener('click', function() {
+      var txt = modal.querySelector('#ld-overrides-input').value;
+      var errEl = modal.querySelector('#ld-overrides-error');
+      var parsed2;
+      try { parsed2 = JSON.parse(txt); } catch (e) {
+        errEl.textContent = 'Invalid JSON: ' + e.message;
+        errEl.classList.remove('hidden');
+        return;
+      }
+      errEl.classList.add('hidden');
+
+      var url = '/api/v1/matters/' + encodeURIComponent(matterId) + '/skills/' + encodeURIComponent(skillId) + '/config';
+      var saveBtn = modal.querySelector('#ld-overrides-save');
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+
+      (window.api ? window.api.patch(url, { config_overrides: parsed2 }) : fetch(url, { method: 'PATCH', headers: { 'Authorization': 'Bearer ' + getAuthToken(), 'Content-Type': 'application/json' }, body: JSON.stringify({ config_overrides: parsed2 }) }).then(function(r) { return r.json(); }))
+        .then(function() {
+          modal.remove();
+          showToast('Config overrides saved', 'success');
+          if (callback) callback();
+        })
+        .catch(function(err) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save';
+          errEl.textContent = 'Save failed: ' + ((err && err.message) || 'Unknown error');
+          errEl.classList.remove('hidden');
+        });
+    });
+  }
+
+  /**
+   * Open the "Attach to Matter" modal (GAP-1).
+   * Fetches active matters, lets user pick one, POSTs to associate.
+   */
+  function openAttachToMatterModal(skillId) {
+    var existing = document.getElementById('ld-attach-modal');
+    if (existing) existing.remove();
+
+    var modal = document.createElement('div');
+    modal.id = 'ld-attach-modal';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:10010;display:flex;align-items:center;justify-content:center;';
+    modal.innerHTML = '<div class="modal-overlay" style="position:absolute;inset:0;background:rgba(0,0,0,0.5);"></div>'
+      + '<div style="position:relative;background:#fff;border-radius:12px;padding:24px;width:520px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">'
+      + '<h3 class="text-lg font-semibold mb-3" style="color:var(--lex-text-primary);">Attach Skill to Matter</h3>'
+      + '<input id="ld-attach-search" type="text" placeholder="Search matters..." class="mb-3 px-3 py-2 text-sm border rounded-lg w-full" style="border-color:var(--lex-border-default);">'
+      + '<div id="ld-attach-matters" class="flex-1 overflow-y-auto space-y-1 mb-4" style="max-height:320px;border:1px solid var(--lex-border-default);border-radius:8px;padding:8px;">'
+      + '<div class="flex justify-center py-4"><div class="animate-spin w-4 h-4 border-2 border-gray-300 border-t-blue-600 rounded-full"></div></div>'
+      + '</div>'
+      + '<div class="flex gap-2 justify-end">'
+      + '<button id="ld-attach-cancel" class="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50" style="border-color:var(--lex-border-default);">Cancel</button>'
+      + '<button id="ld-attach-confirm" class="px-4 py-2 text-sm text-white rounded-lg disabled:opacity-50" style="background:var(--lex-text-accent);" disabled>Attach</button>'
+      + '</div></div>';
+
+    document.body.appendChild(modal);
+
+    modal.querySelector('.modal-overlay').addEventListener('click', function() { modal.remove(); });
+    modal.querySelector('#ld-attach-cancel').addEventListener('click', function() { modal.remove(); });
+
+    var selectedMatterId = null;
+
+    // Load matters
+    var mattersContainer = modal.querySelector('#ld-attach-matters');
+    var allFetchedMatters = [];
+
+    function renderMatterList(matters) {
+      if (matters.length === 0) {
+        mattersContainer.innerHTML = '<p class="text-sm text-gray-400 text-center py-4">No active matters found.</p>';
+        return;
+      }
+      mattersContainer.innerHTML = matters.map(function(m) {
+        var mId = m.matter_id || m.id;
+        return '<div class="ld-matter-pick flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors" data-matter-id="' + escapeHtml(mId) + '">'
+          + '<div class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold" style="background:var(--lex-text-accent);">' + escapeHtml((m.matter_name || m.name || '?').charAt(0).toUpperCase()) + '</div>'
+          + '<div class="flex-1"><p class="text-sm font-medium text-gray-900">' + escapeHtml(m.matter_name || m.name || mId) + '</p>'
+          + '<p class="text-xs text-gray-500">' + escapeHtml(m.matter_number || m.client_name || '') + '</p></div>'
+          + '</div>';
+      }).join('');
+
+      mattersContainer.querySelectorAll('.ld-matter-pick').forEach(function(row) {
+        row.addEventListener('click', function() {
+          mattersContainer.querySelectorAll('.ld-matter-pick').forEach(function(r) { r.style.background = ''; });
+          row.style.background = 'var(--lex-bg-accent-subtle, #eff6ff)';
+          selectedMatterId = row.dataset.matterId;
+          var confirmBtn = modal.querySelector('#ld-attach-confirm');
+          if (confirmBtn) confirmBtn.disabled = false;
+        });
+      });
+    }
+
+    (window.api ? window.api.get('/api/v1/matters?limit=100&status=active') : fetch('/api/v1/matters?limit=100&status=active', { headers: { 'Authorization': 'Bearer ' + getAuthToken() } }).then(function(r) { return r.json(); }))
+      .then(function(res) {
+        allFetchedMatters = (res && (res.matters || res.data)) || [];
+        renderMatterList(allFetchedMatters);
+      })
+      .catch(function() {
+        mattersContainer.innerHTML = '<p class="text-sm text-red-500 text-center py-4">Failed to load matters.</p>';
+      });
+
+    // Live search filter
+    modal.querySelector('#ld-attach-search').addEventListener('input', function() {
+      var term = this.value.toLowerCase();
+      var filtered = allFetchedMatters.filter(function(m) {
+        return ((m.matter_name || m.name || '') + ' ' + (m.matter_number || '')).toLowerCase().indexOf(term) !== -1;
+      });
+      renderMatterList(filtered);
+    });
+
+    // Confirm attach
+    modal.querySelector('#ld-attach-confirm').addEventListener('click', function() {
+      if (!selectedMatterId) return;
+      var confirmBtn = modal.querySelector('#ld-attach-confirm');
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = 'Attaching...';
+
+      var url = '/api/v1/matters/' + encodeURIComponent(selectedMatterId) + '/skills';
+      (window.api ? window.api.post(url, { skill_id: skillId, enabled: true, config_overrides: {} }) : fetch(url, { method: 'POST', headers: { 'Authorization': 'Bearer ' + getAuthToken(), 'Content-Type': 'application/json' }, body: JSON.stringify({ skill_id: skillId, enabled: true, config_overrides: {} }) }).then(function(r) { return r.json(); }))
+        .then(function() {
+          modal.remove();
+          showToast('Skill attached to matter', 'success');
+          // Refresh attachments if the settings tab is open
+          ldAttachmentsLoaded = false;
+          loadSkillMatterAttachments(skillId);
+        })
+        .catch(function(err) {
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = 'Attach';
+          showToast('Failed to attach: ' + ((err && err.message) || 'Unknown error'), 'error');
+        });
+    });
   }
 
   /**

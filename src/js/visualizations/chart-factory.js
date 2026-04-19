@@ -54,6 +54,8 @@ import { FunnelChartRenderer } from './renderers/funnel-chart-renderer.js';
 import { BarChartRenderer } from './renderers/bar-chart-renderer.js';
 import { BubbleChartRenderer } from './renderers/bubble-chart-renderer.js';
 import { MetricGridRenderer } from './renderers/metric-grid-renderer.js';
+import { GroupedBarChartRenderer } from './renderers/grouped-bar-chart-renderer.js';
+import { GaugeChartRenderer } from './renderers/gauge-chart-renderer.js';
 
 /**
  * ChartFactory class
@@ -71,14 +73,20 @@ export class ChartFactory {
    * @type {Object.<string, Function>}
    */
   static RENDERER_MAP = {
+    // Canonical types
     time_series: TimeSeriesRenderer,
     pie_chart: PieChartRenderer,
     funnel_chart: FunnelChartRenderer,
     bar_chart: BarChartRenderer,
     bubble_chart: BubbleChartRenderer,
     metric_grid: MetricGridRenderer,
+    grouped_bar_chart: GroupedBarChartRenderer,
+    gauge_chart: GaugeChartRenderer,
 
-    // Aliases for common variations
+    // Semantic alias: comparison_chart wraps grouped-bar with a current-vs-prior data shape
+    comparison_chart: GroupedBarChartRenderer,
+
+    // Short-form aliases — kept because they're documented in renderer JSDoc examples
     timeseries: TimeSeriesRenderer,
     pie: PieChartRenderer,
     funnel: FunnelChartRenderer,
@@ -88,7 +96,9 @@ export class ChartFactory {
     bubble: BubbleChartRenderer,
     grid: MetricGridRenderer,
     metrics: MetricGridRenderer,
-    metric: MetricGridRenderer
+    metric: MetricGridRenderer,
+    grouped_bar: GroupedBarChartRenderer,
+    gauge: GaugeChartRenderer
   };
 
   /**
@@ -270,5 +280,7 @@ export {
   FunnelChartRenderer,
   BarChartRenderer,
   BubbleChartRenderer,
-  MetricGridRenderer
+  MetricGridRenderer,
+  GroupedBarChartRenderer,
+  GaugeChartRenderer
 };
