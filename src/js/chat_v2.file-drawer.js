@@ -14,6 +14,26 @@
   var _drawerEl = null;
   var _documents = { active: [], available: [] };
 
+  function getDocumentLifecycle(doc) {
+    var status = String((doc && doc.status) || '').toLowerCase();
+    var processingStatus = String((doc && doc.processing_status) || '').toLowerCase();
+    var hasCompletedWork = Boolean((doc && doc.processed_at) || (doc && doc.chunk_count > 0) || (doc && doc.vector_count > 0));
+
+    if (processingStatus === 'failed' || status === 'failed' || status === 'error') return 'needs_attention';
+    if (processingStatus === 'processing' || status === 'processing' || status === 'text_extracted') return 'processing';
+    if (processingStatus === 'completed' || status === 'completed' || status === 'active' || hasCompletedWork) return 'ready';
+    if (status === 'queued' || status === 'pending' || status === 'ready') return 'uploaded';
+    return hasCompletedWork ? 'ready' : (status ? 'uploaded' : 'ready');
+  }
+
+  function getDocumentStatusLabel(doc) {
+    var lifecycle = getDocumentLifecycle(doc);
+    if (lifecycle === 'processing') return 'Processing';
+    if (lifecycle === 'uploaded') return 'Uploaded';
+    if (lifecycle === 'needs_attention') return 'Needs attention';
+    return '';
+  }
+
   // =========================================================================
   // Public API
   // =========================================================================
@@ -71,7 +91,7 @@
       var items = [];
       for (var i = 0; i < all.length; i++) {
         var doc = all[i];
-        if (doc.status === 'completed' || !doc.status) {
+        if (getDocumentLifecycle(doc) === 'ready') {
           items.push({ id: doc.id, label: doc.filename || doc.name || 'Document' });
         }
       }
@@ -238,8 +258,8 @@
 
   function buildDocItem(doc, isActive) {
     var fileSize = formatFileSize(doc.file_size);
-    var statusLabel = getStatusLabel(doc.status);
-    var isCompleted = doc.status === 'completed' || !doc.status;
+    var statusLabel = getDocumentStatusLabel(doc);
+    var isCompleted = getDocumentLifecycle(doc) === 'ready';
 
     var html = '';
     html += '<div class="cv2-drawer-doc" data-doc-id="' + escapeAttr(doc.id) + '" style="' +
@@ -327,13 +347,6 @@
     var sizes = ['B', 'KB', 'MB', 'GB'];
     var i = Math.floor(Math.log(bytes) / Math.log(k));
     return Math.round(bytes / Math.pow(k, i) * 10) / 10 + ' ' + sizes[i];
-  }
-
-  function getStatusLabel(status) {
-    if (status === 'processing') return 'Processing';
-    if (status === 'pending') return 'Pending';
-    if (status === 'failed') return 'Failed';
-    return '';
   }
 
   function getFileIcon(mimeType) {
