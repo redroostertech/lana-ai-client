@@ -330,8 +330,11 @@
     'document.updated': 'Triggered when document metadata or content is modified',
     'document.deleted': 'Triggered when a document is deleted',
     'document.uploaded': 'Triggered when a file is uploaded to the system',
+    'document.parsed': 'Triggered when document text and layout parsing completes',
+    'document.indexed': 'Triggered when document content is indexed for search',
+    'document.ready': 'Triggered when a document is ready for use in the platform',
+    'document.summarized': 'Triggered when document summarization completes',
     'document.processed': 'Triggered when document processing (OCR, parsing) completes',
-    'document.indexed': 'Triggered when document is indexed for search',
     'document.shared': 'Triggered when a document is shared with users or external parties',
     'document.downloaded': 'Triggered when a document is downloaded',
     'document_version.created': 'Triggered when a new document version is created',
@@ -470,8 +473,12 @@
    * Build event type <option> groups for the trigger select
    */
   function buildEventOptions() {
+    if (window.LanaEventCatalog && typeof window.LanaEventCatalog.buildSelectOptions === 'function') {
+      return window.LanaEventCatalog.buildSelectOptions();
+    }
+
     var groups = {
-      'Document Events': ['document.created','document.updated','document.deleted','document.uploaded','document.processed','document.indexed','document.shared','document.downloaded','document_version.created','document_version.restored'],
+      'Document Events': ['document.created','document.updated','document.deleted','document.uploaded','document.parsed','document.indexed','document.ready','document.summarized','document.processed','document.shared','document.downloaded','document_version.created','document_version.restored'],
       'Matter Events': ['matter.created','matter.updated','matter.closed','matter.reopened','matter.archived','matter.assigned','matter.linked_to_workspace','matter.linked_to_matter','matter.unlinked'],
       'Workspace Events': ['workspace.linked_to_matter'],
       'Entity Link Events': ['entity_link.created','entity_link.deleted'],
@@ -522,6 +529,15 @@
       html += '</optgroup>';
     }
     return html;
+  }
+
+  function renderEventSummaryHtml(selectedEvent) {
+    if (window.LanaEventBrowser && typeof window.LanaEventBrowser.renderSummaryHtml === 'function') {
+      return window.LanaEventBrowser.renderSummaryHtml(selectedEvent);
+    }
+
+    var description = EVENT_DEFINITIONS[selectedEvent] || 'No description available';
+    return '<p class="text-xs text-blue-800"><strong>Description:</strong> ' + escapeHtml(description) + '</p>';
   }
 
   /**
@@ -663,6 +679,9 @@
                   }
                   if (!populateConfig.prompt_template && populateConfig.prompt) {
                     populateConfig.prompt_template = populateConfig.prompt;
+                  }
+                  if (!populateConfig.prompt_mode) {
+                    populateConfig.prompt_mode = populateConfig.system_prompt ? 'custom' : 'default';
                   }
                 }
                 // For notification steps, derive notification_type from backend action_type
@@ -925,11 +944,14 @@
     if (type === 'trigger') {
       configHtml = '<div class="space-y-3"><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Event Type</label>'
-        + '<select id="event-type-select-' + stepId + '" class="event-type-select w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500" data-step-id="' + stepId + '">'
+        + '<div class="flex flex-wrap items-center gap-2">'
+        + '<select id="event-type-select-' + stepId + '" class="event-type-select flex-1 min-w-[220px] px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500" data-step-id="' + stepId + '">'
         + buildEventOptions()
         + '</select>'
+        + '<button type="button" class="px-3 py-2 text-xs font-semibold rounded-lg border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100" data-event-browser-open-step="' + stepId + '">Browse Events</button>'
+        + '</div>'
         + '<div id="event-description-' + stepId + '" class="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">'
-        + '<p class="text-xs text-blue-800"><strong>Description:</strong> ' + EVENT_DEFINITIONS['document.created'] + '</p>'
+        + renderEventSummaryHtml('document.created')
         + '</div></div></div>';
     } else if (type === 'condition') {
       configHtml = '<div class="space-y-3"><div>'
@@ -955,6 +977,14 @@
         + '<option value="classify">Classify Content</option>'
         + '<option value="generate">Generate Text</option>'
         + '</select></div><div>'
+        + '<label class="block text-xs font-medium text-gray-700 mb-1.5">AI Instructions Mode</label>'
+        + '<select class="ai-prompt-mode-select w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
+        + '<option value="default">Use Default AI Instructions</option>'
+        + '<option value="custom">Use Custom System Prompt</option>'
+        + '</select></div><div class="ai-system-prompt-field hidden">'
+        + '<label class="block text-xs font-medium text-gray-700 mb-1.5">System Prompt</label>'
+        + '<textarea rows="3" placeholder="You are a concise estate deadline specialist..." class="ai-system-prompt-input w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 text-sm resize-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"></textarea>'
+        + '</div><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Prompt Template</label>'
         + '<textarea rows="3" placeholder="Summarize the key points from {{trigger.data.document}}..." class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 text-sm resize-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"></textarea>'
         + '</div></div>';
@@ -1050,6 +1080,13 @@
           updateEventDescription(stepId);
         });
       }
+
+      var browseButton = configContainer.querySelector('[data-event-browser-open-step="' + stepId + '"]');
+      if (browseButton) {
+        browseButton.addEventListener('click', function() {
+          openEventBrowserForStep(stepId);
+        });
+      }
     }
 
     // Attach live-sync listeners for all form elements in this step
@@ -1067,6 +1104,17 @@
       updateStepStatus(stepId, true);
       debouncedUpdateMXDiagnostics();
     };
+
+    var promptModeSelect = configContainer.querySelector('.ai-prompt-mode-select');
+    var systemPromptField = configContainer.querySelector('.ai-system-prompt-field');
+    var updateAiPromptModeVisibility = function() {
+      if (!promptModeSelect || !systemPromptField) return;
+      systemPromptField.classList.toggle('hidden', promptModeSelect.value !== 'custom');
+    };
+    if (type === 'ai-action' && promptModeSelect) {
+      updateAiPromptModeVisibility();
+      promptModeSelect.addEventListener('change', updateAiPromptModeVisibility);
+    }
 
     for (var si = 0; si < allSelects.length; si++) {
       allSelects[si].addEventListener('change', syncHandler);
@@ -1100,9 +1148,25 @@
     var descEl = document.getElementById('event-description-' + stepId);
     if (selectEl && descEl) {
       var selectedEvent = selectEl.value;
-      var description = EVENT_DEFINITIONS[selectedEvent] || 'No description available';
-      descEl.innerHTML = '<p class="text-xs text-blue-800"><strong>Description:</strong> ' + escapeHtml(description) + '</p>';
+      descEl.innerHTML = renderEventSummaryHtml(selectedEvent);
     }
+  }
+
+  function openEventBrowserForStep(stepId) {
+    var selectEl = document.getElementById('event-type-select-' + stepId);
+    var descEl = document.getElementById('event-description-' + stepId);
+    if (!selectEl || !window.LanaEventBrowser) return;
+
+    window.LanaEventBrowser.open({
+      currentValue: selectEl.value,
+      onSelect: function(eventType) {
+        selectEl.value = eventType;
+        if (descEl) {
+          descEl.innerHTML = renderEventSummaryHtml(eventType);
+        }
+        selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
   }
 
   /**
@@ -1216,7 +1280,11 @@
       var aiSelects = container.querySelectorAll('select');
       var textareas = container.querySelectorAll('textarea');
       if (aiSelects.length >= 1) config.task = aiSelects[0].value;
-      if (textareas.length >= 1) config.prompt_template = textareas[0].value;
+      if (aiSelects.length >= 2) config.prompt_mode = aiSelects[1].value;
+      if (textareas.length >= 1 && aiSelects.length >= 2 && aiSelects[1].value === 'custom') {
+        config.system_prompt = textareas[0].value;
+      }
+      if (textareas.length >= 2) config.prompt_template = textareas[1].value;
     } else if (stepType === 'database') {
       var dbOpSelect = container.querySelector('.db-operation-select');
       var dbTableSelect = container.querySelector('.db-table-select');
@@ -1319,6 +1387,8 @@
     if (stepType === 'ai-action') {
       return {
         task: stepCfg.task || 'summarize',
+        prompt_mode: stepCfg.prompt_mode || 'default',
+        system_prompt: stepCfg.system_prompt || '',
         prompt_template: stepCfg.prompt_template || '',
         prompt: stepCfg.prompt_template || ''
       };
@@ -1389,9 +1459,18 @@
       var aiSelects = container.querySelectorAll('select');
       var textareas = container.querySelectorAll('textarea');
       var taskVal = configData.task || '';
+      var promptModeVal = configData.prompt_mode || (configData.system_prompt ? 'custom' : 'default');
+      var systemPromptVal = configData.system_prompt || '';
       var promptVal = configData.prompt_template || configData.prompt || '';
       if (aiSelects.length >= 1 && taskVal) aiSelects[0].value = taskVal;
-      if (textareas.length >= 1 && promptVal) textareas[0].value = promptVal;
+      if (aiSelects.length >= 2) aiSelects[1].value = promptModeVal;
+      if (textareas.length >= 1) textareas[0].value = systemPromptVal;
+      if (textareas.length >= 2 && promptVal) textareas[1].value = promptVal;
+      var promptModeSelect = container.querySelector('.ai-prompt-mode-select');
+      var systemPromptField = container.querySelector('.ai-system-prompt-field');
+      if (promptModeSelect && systemPromptField) {
+        systemPromptField.classList.toggle('hidden', promptModeSelect.value !== 'custom');
+      }
     } else if (stepType === 'database') {
       var dbOpSelect = container.querySelector('.db-operation-select');
       var dbTableSelect = container.querySelector('.db-table-select');

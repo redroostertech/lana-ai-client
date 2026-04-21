@@ -488,8 +488,11 @@ const EVENT_DEFINITIONS = {
   'document.updated': 'Triggered when document metadata or content is modified',
   'document.deleted': 'Triggered when a document is deleted',
   'document.uploaded': 'Triggered when a file is uploaded to the system',
+  'document.parsed': 'Triggered when document text and layout parsing completes',
+  'document.indexed': 'Triggered when document content is indexed for search',
+  'document.ready': 'Triggered when a document is ready for use in the platform',
+  'document.summarized': 'Triggered when document summarization completes',
   'document.processed': 'Triggered when document processing (OCR, parsing) completes',
-  'document.indexed': 'Triggered when document is indexed for search',
   'document.shared': 'Triggered when a document is shared with users or external parties',
   'document.downloaded': 'Triggered when a document is downloaded',
   'document_version.created': 'Triggered when a new document version is created',
@@ -765,6 +768,19 @@ function updateMXDiagnostics() {
   if (actionCountEl) actionCountEl.textContent = mxDiagnostics.actionCount;
 }
 
+function renderMatterEventSummaryHtml(selectedEvent) {
+  if (window.LanaEventBrowser && typeof window.LanaEventBrowser.renderSummaryHtml === 'function') {
+    return window.LanaEventBrowser.renderSummaryHtml(selectedEvent);
+  }
+
+  const description = EVENT_DEFINITIONS[selectedEvent] || 'No description available';
+  return `
+    <p class="text-xs text-blue-800">
+      <strong>Description:</strong> ${description}
+    </p>
+  `;
+}
+
 /**
  * Add a new skill step
  */
@@ -894,217 +910,32 @@ function updateStepConfigUI(stepId, type) {
         <div class="space-y-3">
           <div>
             <label class="block text-xs font-medium text-gray-700 mb-1.5">Event Type</label>
-            <select id="event-type-select-${stepId}" onchange="updateEventDescription('${stepId}')" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-              <optgroup label="Document Events">
-                <option value="document.created">document.created</option>
-                <option value="document.updated">document.updated</option>
-                <option value="document.deleted">document.deleted</option>
-                <option value="document.uploaded">document.uploaded</option>
-                <option value="document.processed">document.processed</option>
-                <option value="document.indexed">document.indexed</option>
-                <option value="document.shared">document.shared</option>
-                <option value="document.downloaded">document.downloaded</option>
-                <option value="document_version.created">document_version.created</option>
-                <option value="document_version.restored">document_version.restored</option>
-              </optgroup>
-              <optgroup label="Matter Events">
-                <option value="matter.created">matter.created</option>
-                <option value="matter.updated">matter.updated</option>
-                <option value="matter.closed">matter.closed</option>
-                <option value="matter.reopened">matter.reopened</option>
-                <option value="matter.archived">matter.archived</option>
-                <option value="matter.assigned">matter.assigned</option>
-                <option value="matter.linked_to_workspace">matter.linked_to_workspace</option>
-                <option value="matter.linked_to_matter">matter.linked_to_matter</option>
-                <option value="matter.unlinked">matter.unlinked</option>
-              </optgroup>
-              <optgroup label="Workspace Events">
-                <option value="workspace.linked_to_matter">workspace.linked_to_matter</option>
-              </optgroup>
-              <optgroup label="Entity Link Events">
-                <option value="entity_link.created">entity_link.created</option>
-                <option value="entity_link.deleted">entity_link.deleted</option>
-              </optgroup>
-              <optgroup label="Contact Events">
-                <option value="contact.created">contact.created</option>
-                <option value="contact.updated">contact.updated</option>
-                <option value="contact.deleted">contact.deleted</option>
-                <option value="contact.linked_to_matter">contact.linked_to_matter</option>
-                <option value="contact.unlinked_from_matter">contact.unlinked_from_matter</option>
-                <option value="contact.synced_from_connector">contact.synced_from_connector</option>
-              </optgroup>
-              <optgroup label="Lead Events">
-                <option value="lead.created">lead.created</option>
-                <option value="lead.updated">lead.updated</option>
-                <option value="lead.deleted">lead.deleted</option>
-                <option value="lead.converted">lead.converted</option>
-              </optgroup>
-              <optgroup label="Opportunity Events">
-                <option value="opportunity.created">opportunity.created</option>
-                <option value="opportunity.updated">opportunity.updated</option>
-                <option value="opportunity.closed_won">opportunity.closed_won</option>
-                <option value="opportunity.closed_lost">opportunity.closed_lost</option>
-              </optgroup>
-              <optgroup label="Project Events">
-                <option value="project.created">project.created</option>
-                <option value="project.updated">project.updated</option>
-                <option value="project.completed">project.completed</option>
-                <option value="project.archived">project.archived</option>
-              </optgroup>
-              <optgroup label="Task Events">
-                <option value="task.created">task.created</option>
-                <option value="task.updated">task.updated</option>
-                <option value="task.completed">task.completed</option>
-                <option value="task.deleted">task.deleted</option>
-                <option value="task.assigned">task.assigned</option>
-                <option value="task.overdue">task.overdue</option>
-              </optgroup>
-              <optgroup label="Checklist Events">
-                <option value="checklist.created">checklist.created</option>
-                <option value="checklist.completed">checklist.completed</option>
-                <option value="checklist.deleted">checklist.deleted</option>
-              </optgroup>
-              <optgroup label="Checklist Item Events">
-                <option value="checklist_item.created">checklist_item.created</option>
-                <option value="checklist_item.completed">checklist_item.completed</option>
-                <option value="checklist_item.deleted">checklist_item.deleted</option>
-              </optgroup>
-              <optgroup label="Email Events">
-                <option value="email.received">email.received</option>
-                <option value="email.sent">email.sent</option>
-                <option value="email.opened">email.opened</option>
-                <option value="email.bounced">email.bounced</option>
-              </optgroup>
-              <optgroup label="Call Events">
-                <option value="call.logged">call.logged</option>
-                <option value="call.completed">call.completed</option>
-              </optgroup>
-              <optgroup label="Communication Events">
-                <option value="conversation.created">conversation.created</option>
-                <option value="conversation.updated">conversation.updated</option>
-                <option value="message.sent">message.sent</option>
-                <option value="message.received">message.received</option>
-                <option value="meeting.scheduled">meeting.scheduled</option>
-                <option value="meeting.completed">meeting.completed</option>
-              </optgroup>
-              <optgroup label="Calendar Events">
-                <option value="calendar_event.created">calendar_event.created</option>
-                <option value="calendar_event.updated">calendar_event.updated</option>
-                <option value="calendar_event.deleted">calendar_event.deleted</option>
-                <option value="calendar_event.rsvp">calendar_event.rsvp</option>
-              </optgroup>
-              <optgroup label="Campaign Events">
-                <option value="campaign.created">campaign.created</option>
-                <option value="campaign.sent">campaign.sent</option>
-                <option value="campaign.opened">campaign.opened</option>
-              </optgroup>
-              <optgroup label="Milestone Events">
-                <option value="milestone.created">milestone.created</option>
-                <option value="milestone.completed">milestone.completed</option>
-                <option value="milestone.missed">milestone.missed</option>
-              </optgroup>
-              <optgroup label="Note Events">
-                <option value="note.created">note.created</option>
-                <option value="note.updated">note.updated</option>
-                <option value="note.deleted">note.deleted</option>
-              </optgroup>
-              <optgroup label="Workflow Events">
-                <option value="workflow.started">workflow.started</option>
-                <option value="workflow.completed">workflow.completed</option>
-                <option value="workflow.failed">workflow.failed</option>
-              </optgroup>
-              <optgroup label="Custom Skill Events">
-                <option value="custom_skill.created">custom_skill.created</option>
-                <option value="custom_skill.updated">custom_skill.updated</option>
-                <option value="custom_skill.deleted">custom_skill.deleted</option>
-                <option value="custom_skill.published">custom_skill.published</option>
-              </optgroup>
-              <optgroup label="Matter Skill Events">
-                <option value="matter_skill.enabled">matter_skill.enabled</option>
-                <option value="matter_skill.disabled">matter_skill.disabled</option>
-                <option value="matter_skill.executed">matter_skill.executed</option>
-                <option value="matter_skill.failed">matter_skill.failed</option>
-              </optgroup>
-              <optgroup label="Integration Events">
-                <option value="connector.synced">connector.synced</option>
-                <option value="connector.error">connector.error</option>
-                <option value="integration.data_received">integration.data_received</option>
-              </optgroup>
-              <optgroup label="User Events">
-                <option value="user.login">user.login</option>
-                <option value="user.logout">user.logout</option>
-                <option value="user.created">user.created</option>
-                <option value="user.updated">user.updated</option>
-              </optgroup>
-              <optgroup label="Invoice Events">
-                <option value="invoice.created">invoice.created</option>
-                <option value="invoice.sent">invoice.sent</option>
-                <option value="invoice.paid">invoice.paid</option>
-                <option value="invoice.voided">invoice.voided</option>
-              </optgroup>
-              <optgroup label="Expense Events">
-                <option value="expense.created">expense.created</option>
-                <option value="expense.approved">expense.approved</option>
-                <option value="expense.rejected">expense.rejected</option>
-                <option value="expense.paid">expense.paid</option>
-              </optgroup>
-              <optgroup label="Disbursement Events">
-                <option value="disbursement.created">disbursement.created</option>
-                <option value="disbursement.approved">disbursement.approved</option>
-                <option value="disbursement.paid">disbursement.paid</option>
-              </optgroup>
-              <optgroup label="Payment Events">
-                <option value="payment.received">payment.received</option>
-                <option value="payment.refunded">payment.refunded</option>
-              </optgroup>
-              <optgroup label="Estimate Events">
-                <option value="estimate.created">estimate.created</option>
-                <option value="estimate.sent">estimate.sent</option>
-                <option value="estimate.approved">estimate.approved</option>
-              </optgroup>
-              <optgroup label="Budget Events">
-                <option value="budget.created">budget.created</option>
-                <option value="budget.updated">budget.updated</option>
-                <option value="budget.exceeded">budget.exceeded</option>
-              </optgroup>
-              <optgroup label="Time Entry Events">
-                <option value="time_entry.created">time_entry.created</option>
-                <option value="time_entry.updated">time_entry.updated</option>
-                <option value="time_entry.deleted">time_entry.deleted</option>
-              </optgroup>
-              <optgroup label="Trust Entry Events">
-                <option value="trust_entry.created">trust_entry.created</option>
-                <option value="trust_entry.reconciled">trust_entry.reconciled</option>
-              </optgroup>
-              <optgroup label="Notification Events">
-                <option value="notification.sent">notification.sent</option>
-                <option value="reminder.triggered">reminder.triggered</option>
-                <option value="alert.created">alert.created</option>
-              </optgroup>
-              <optgroup label="Folder Events">
-                <option value="folder.created">folder.created</option>
-                <option value="folder.renamed">folder.renamed</option>
-                <option value="folder.deleted">folder.deleted</option>
-              </optgroup>
-              <optgroup label="Generated Document Events">
-                <option value="generated_document.created">generated_document.created</option>
-                <option value="generated_document.failed">generated_document.failed</option>
-              </optgroup>
-              <optgroup label="Pipeline Events">
-                <option value="pipeline.created">pipeline.created</option>
-                <option value="pipeline.updated">pipeline.updated</option>
-                <option value="pipeline.stage_changed">pipeline.stage_changed</option>
-              </optgroup>
-              <optgroup label="AI Events">
-                <option value="ai.analysis_completed">ai.analysis_completed</option>
-                <option value="ai.summary_generated">ai.summary_generated</option>
-                <option value="ai.extraction_completed">ai.extraction_completed</option>
-              </optgroup>
-            </select>
+            <div class="flex flex-wrap items-center gap-2">
+              <select id="event-type-select-${stepId}" onchange="updateEventDescription('${stepId}')" class="flex-1 min-w-[220px] px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                ${window.LanaEventCatalog && typeof window.LanaEventCatalog.buildSelectOptions === 'function'
+                  ? window.LanaEventCatalog.buildSelectOptions()
+                  : `
+                    <optgroup label="Document Events">
+                      <option value="document.created">document.created</option>
+                      <option value="document.updated">document.updated</option>
+                      <option value="document.deleted">document.deleted</option>
+                      <option value="document.uploaded">document.uploaded</option>
+                      <option value="document.parsed">document.parsed</option>
+                      <option value="document.indexed">document.indexed</option>
+                      <option value="document.ready">document.ready</option>
+                      <option value="document.summarized">document.summarized</option>
+                      <option value="document.processed">document.processed</option>
+                      <option value="document.shared">document.shared</option>
+                      <option value="document.downloaded">document.downloaded</option>
+                      <option value="document_version.created">document_version.created</option>
+                      <option value="document_version.restored">document_version.restored</option>
+                    </optgroup>
+                  `}
+              </select>
+              <button type="button" class="px-3 py-2 text-xs font-semibold rounded-lg border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100" data-event-browser-open-step="${stepId}">Browse Events</button>
+            </div>
             <div id="event-description-${stepId}" class="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <p class="text-xs text-blue-800">
-                <strong>Description:</strong> ${EVENT_DEFINITIONS['document.created']}
-              </p>
+              ${renderMatterEventSummaryHtml('document.created')}
             </div>
           </div>
         </div>
@@ -1152,6 +983,18 @@ function updateStepConfigUI(stepId, type) {
             </select>
           </div>
           <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1.5">AI Instructions Mode</label>
+            <select class="ai-prompt-mode-select w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+              <option value="default">Use Default AI Instructions</option>
+              <option value="custom">Use Custom System Prompt</option>
+            </select>
+          </div>
+          <div class="ai-system-prompt-field hidden">
+            <label class="block text-xs font-medium text-gray-700 mb-1.5">System Prompt</label>
+            <textarea rows="3" placeholder="You are a concise estate deadline specialist..."
+                      class="ai-system-prompt-input w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 text-sm resize-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"></textarea>
+          </div>
+          <div>
             <label class="block text-xs font-medium text-gray-700 mb-1.5">Prompt Template</label>
             <textarea rows="3" placeholder="Summarize the key points from {{trigger.data.document}}..."
                       class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 text-sm resize-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"></textarea>
@@ -1194,6 +1037,77 @@ function updateStepConfigUI(stepId, type) {
   }
 
   configContainer.innerHTML = configHtml;
+
+  if (type === 'trigger') {
+    const browseButton = configContainer.querySelector('[data-event-browser-open-step]');
+    if (browseButton) {
+      browseButton.addEventListener('click', function() {
+        openMatterEventBrowserForStep(stepId);
+      });
+    }
+  }
+
+  var step = skillSteps.find(s => s.id === stepId);
+  var syncStepConfig = function() {
+    if (!step) return;
+
+    if (type === 'trigger') {
+      var eventSelect = configContainer.querySelector('select');
+      step.config = { event_type: eventSelect ? eventSelect.value : 'manual' };
+      return;
+    }
+
+    if (type === 'condition') {
+      var conditionInputs = configContainer.querySelectorAll('input');
+      var conditionSelect = configContainer.querySelector('select');
+      step.config = {
+        field: conditionInputs[0] ? conditionInputs[0].value : '',
+        operator: conditionSelect ? conditionSelect.value : 'equals',
+        value: conditionInputs[1] ? conditionInputs[1].value : ''
+      };
+      return;
+    }
+
+    if (type === 'ai-action') {
+      var aiSelects = configContainer.querySelectorAll('select');
+      var aiTextareas = configContainer.querySelectorAll('textarea');
+      step.config = {
+        task: aiSelects[0] ? aiSelects[0].value : 'summarize',
+        prompt_mode: aiSelects[1] ? aiSelects[1].value : 'default',
+        system_prompt: aiSelects[1] && aiSelects[1].value === 'custom' && aiTextareas[0] ? aiTextareas[0].value : '',
+        prompt_template: aiTextareas[1] ? aiTextareas[1].value : ''
+      };
+      return;
+    }
+
+    if (type === 'integration') {
+      var integrationSelect = configContainer.querySelector('select');
+      step.config = { action_type: integrationSelect ? integrationSelect.value : 'send_email' };
+      return;
+    }
+
+    if (type === 'transform') {
+      var transformSelect = configContainer.querySelector('select');
+      step.config = { operation: transformSelect ? transformSelect.value : 'map' };
+    }
+  };
+
+  var promptModeSelect = configContainer.querySelector('.ai-prompt-mode-select');
+  var systemPromptField = configContainer.querySelector('.ai-system-prompt-field');
+  if (promptModeSelect && systemPromptField) {
+    var updateAiPromptModeVisibility = function() {
+      systemPromptField.classList.toggle('hidden', promptModeSelect.value !== 'custom');
+    };
+    updateAiPromptModeVisibility();
+    promptModeSelect.addEventListener('change', updateAiPromptModeVisibility);
+  }
+
+  var formFields = configContainer.querySelectorAll('select, input, textarea');
+  formFields.forEach(function(field) {
+    field.addEventListener('change', syncStepConfig);
+    field.addEventListener('input', syncStepConfig);
+  });
+  syncStepConfig();
 }
 
 /**
@@ -1216,14 +1130,25 @@ function updateEventDescription(stepId) {
 
   if (selectEl && descEl) {
     const selectedEvent = selectEl.value;
-    const description = EVENT_DEFINITIONS[selectedEvent] || 'No description available';
-
-    descEl.innerHTML = `
-      <p class="text-xs text-blue-800">
-        <strong>Description:</strong> ${description}
-      </p>
-    `;
+    descEl.innerHTML = renderMatterEventSummaryHtml(selectedEvent);
   }
+}
+
+function openMatterEventBrowserForStep(stepId) {
+  const selectEl = document.getElementById(`event-type-select-${stepId}`);
+  const descEl = document.getElementById(`event-description-${stepId}`);
+  if (!selectEl || !window.LanaEventBrowser) return;
+
+  window.LanaEventBrowser.open({
+    currentValue: selectEl.value,
+    onSelect: function(eventType) {
+      selectEl.value = eventType;
+      if (descEl) {
+        descEl.innerHTML = renderMatterEventSummaryHtml(eventType);
+      }
+      selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  });
 }
 
 /**
@@ -1284,7 +1209,9 @@ async function saveSkill() {
     return {
       type: actionType,
       label: step.label || step.type,
-      config: step.config || {}
+      config: Object.assign({}, step.config || {}, {
+        prompt: step.config?.prompt_template || step.config?.prompt || ''
+      })
     };
   });
 

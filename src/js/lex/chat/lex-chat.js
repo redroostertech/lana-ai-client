@@ -999,10 +999,10 @@
 
     _jitCallbacks() {
       return {
-        onReady: (filename) => this._showSystemMessage(`Document "${filename}" processed and ready`),
+        onReady: (filename) => this._showSystemMessage(`Document "${filename}" is ready for use`),
         onError: (filename, err) => {
           const reason = err && err.message ? ': ' + err.message : '';
-          this._showSystemMessage(`Failed to process "${filename}"${reason}`);
+          this._showSystemMessage(`Failed to prepare "${filename}"${reason}`);
         }
       };
     }

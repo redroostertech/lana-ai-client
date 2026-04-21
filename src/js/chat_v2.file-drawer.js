@@ -15,6 +15,10 @@
   var _documents = { active: [], available: [] };
 
   function getDocumentLifecycle(doc) {
+    if (window.documentLifecycle && typeof window.documentLifecycle.getDocumentLifecycle === 'function') {
+      return window.documentLifecycle.getDocumentLifecycle(doc);
+    }
+
     var status = String((doc && doc.status) || '').toLowerCase();
     var processingStatus = String((doc && doc.processing_status) || '').toLowerCase();
     var hasCompletedWork = Boolean((doc && doc.processed_at) || (doc && doc.chunk_count > 0) || (doc && doc.vector_count > 0));
@@ -27,11 +31,20 @@
   }
 
   function getDocumentStatusLabel(doc) {
+    var display = getDocumentStatusDisplay(doc);
+    return display && display.progressLabel ? display.progressLabel : '';
+  }
+
+  function getDocumentStatusDisplay(doc) {
+    if (window.documentLifecycle && typeof window.documentLifecycle.getDocumentLifecycleDisplay === 'function') {
+      return window.documentLifecycle.getDocumentLifecycleDisplay(doc);
+    }
+
     var lifecycle = getDocumentLifecycle(doc);
-    if (lifecycle === 'processing') return 'Processing';
-    if (lifecycle === 'uploaded') return 'Uploaded';
-    if (lifecycle === 'needs_attention') return 'Needs attention';
-    return '';
+    if (lifecycle === 'processing') return { label: 'Processing', progressLabel: 'Processing', secondaryLabel: '', badgeClass: '' };
+    if (lifecycle === 'uploaded') return { label: 'Uploaded', progressLabel: 'Uploaded', secondaryLabel: '', badgeClass: '' };
+    if (lifecycle === 'needs_attention') return { label: 'Needs attention', progressLabel: 'Needs attention', secondaryLabel: '', badgeClass: '' };
+    return { label: 'Ready', progressLabel: 'Ready', secondaryLabel: '', badgeClass: '' };
   }
 
   // =========================================================================
@@ -91,7 +104,7 @@
       var items = [];
       for (var i = 0; i < all.length; i++) {
         var doc = all[i];
-        if (getDocumentLifecycle(doc) === 'ready') {
+        if (window.documentLifecycle && typeof window.documentLifecycle.isDocumentActionableInChat === 'function' ? window.documentLifecycle.isDocumentActionableInChat(doc) : getDocumentLifecycle(doc) === 'ready') {
           items.push({ id: doc.id, label: doc.filename || doc.name || 'Document' });
         }
       }
@@ -258,8 +271,11 @@
 
   function buildDocItem(doc, isActive) {
     var fileSize = formatFileSize(doc.file_size);
-    var statusLabel = getDocumentStatusLabel(doc);
-    var isCompleted = getDocumentLifecycle(doc) === 'ready';
+    var statusDisplay = getDocumentStatusDisplay(doc);
+    var statusLabel = statusDisplay.progressLabel || getDocumentStatusLabel(doc);
+    var isCompleted = window.documentLifecycle && typeof window.documentLifecycle.isDocumentActionableInChat === 'function'
+      ? window.documentLifecycle.isDocumentActionableInChat(doc)
+      : getDocumentLifecycle(doc) === 'ready';
 
     var html = '';
     html += '<div class="cv2-drawer-doc" data-doc-id="' + escapeAttr(doc.id) + '" style="' +

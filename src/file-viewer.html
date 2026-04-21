@@ -158,6 +158,13 @@
                 </span>
                 <span id="metaChunkCount" class="font-semibold" style="color: var(--lex-text-primary)">--</span>
               </div>
+              <div class="flex justify-between items-center pt-2 border-t" style="border-color: var(--lex-border-accent)">
+                <span class="font-medium flex items-center gap-1.5" style="color: var(--lex-text-secondary)">
+                  <svg class="w-4 h-4" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                  Lifecycle
+                </span>
+                <span id="metaLifecycleBadge" class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium">--</span>
+              </div>
             </div>
           </div>
 
@@ -411,6 +418,7 @@
        Page dependencies
        ═══════════════════════════════════════════════════════════════════════ -->
   <script src="js/vendor/mammoth.min.js"></script>
+  <script src="js/utils/document-lifecycle.js"></script>
   <script src="js/utils/metadata-formatter.js"></script>
   <script src="js/services/metadata-service.js"></script>
   <script src="js/vendor/marked.min.js"></script>

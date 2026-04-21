@@ -214,6 +214,10 @@
       };
       state.metadataChanged = false;
 
+      var lifecycleDisplay = window.documentLifecycle && typeof window.documentLifecycle.getDocumentLifecycleDisplay === 'function'
+        ? window.documentLifecycle.getDocumentLifecycleDisplay(response)
+        : null;
+
       // Update header
       document.getElementById('viewerFileName').textContent = response.filename;
       document.getElementById('viewerFileInfo').textContent =
@@ -229,6 +233,12 @@
       // Load content + metadata
       await loadFileContent(response);
       loadMetadata(response);
+
+      var lifecycleBadge = document.getElementById('metaLifecycleBadge');
+      if (lifecycleBadge && lifecycleDisplay) {
+        lifecycleBadge.textContent = lifecycleDisplay.label || 'Uploaded';
+        lifecycleBadge.className = 'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ' + (lifecycleDisplay.badgeClass || 'bg-blue-100 text-blue-700');
+      }
       _updateTemplateButtons();
 
       // Dismiss loader
@@ -400,6 +410,9 @@
     var summarySection = document.getElementById('metaSummarySection');
     var summaryView = document.getElementById('metaSummaryView');
     var summaryTs = document.getElementById('metaSummaryTimestamp');
+    var summaryState = window.documentLifecycle && typeof window.documentLifecycle.getDocumentSummaryState === 'function'
+      ? window.documentLifecycle.getDocumentSummaryState(file)
+      : (file.summary ? 'summarized' : 'unavailable');
     if (summarySection && summaryView) {
       if (file.summary) {
         summaryView.textContent = file.summary;
@@ -409,8 +422,14 @@
           summaryTs.textContent = '';
         }
         summarySection.classList.remove('hidden');
+      } else if (summaryState === 'pending') {
+        summaryView.textContent = 'Summary pending';
+        if (summaryTs) summaryTs.textContent = '';
+        summarySection.classList.remove('hidden');
       } else {
-        summarySection.classList.add('hidden');
+        summaryView.textContent = 'Summary unavailable';
+        if (summaryTs) summaryTs.textContent = '';
+        summarySection.classList.remove('hidden');
       }
     }
 

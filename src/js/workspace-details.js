@@ -1360,6 +1360,10 @@
   }
 
   function getDocumentLifecycle(doc) {
+    if (window.documentLifecycle && typeof window.documentLifecycle.getDocumentLifecycle === 'function') {
+      return window.documentLifecycle.getDocumentLifecycle(doc);
+    }
+
     var status = String((doc && doc.status) || '').toLowerCase();
     var processingStatus = String((doc && doc.processing_status) || '').toLowerCase();
     var hasCompletedWork = Boolean((doc && doc.processed_at) || (doc && doc.chunk_count > 0) || (doc && doc.vector_count > 0));
@@ -1383,6 +1387,10 @@
   }
 
   function getDocumentStatusDisplay(doc) {
+    if (window.documentLifecycle && typeof window.documentLifecycle.getDocumentLifecycleDisplay === 'function') {
+      return window.documentLifecycle.getDocumentLifecycleDisplay(doc);
+    }
+
     var lifecycle = getDocumentLifecycle(doc);
     var presentations = {
       'ready': {
@@ -1505,8 +1513,10 @@
 
         var statusDisplay = getDocumentStatusDisplay(doc);
         var lifecycle = getDocumentLifecycle(doc);
-        var isReady = lifecycle === 'ready';
-        var isBusy = lifecycle === 'processing' || lifecycle === 'uploaded';
+        var isReady = lifecycle === 'ready' || lifecycle === 'summarized';
+        var isBusy = statusDisplay && typeof statusDisplay.isInProgress === 'boolean'
+          ? statusDisplay.isInProgress
+          : (lifecycle === 'processing' || lifecycle === 'uploaded' || lifecycle === 'parsed' || lifecycle === 'indexed');
         var needsAttention = lifecycle === 'needs_attention';
 
         var actionButtons = '';

@@ -76,6 +76,30 @@ function formatProcessingStatus(status) {
   }
 
   const statusMap = {
+    'uploaded': {
+      text: 'Uploaded',
+      icon: 'upload',
+      className: 'text-blue-600 bg-blue-50 border-blue-200',
+      showSpinner: false
+    },
+    'parsed': {
+      text: 'Parsed',
+      icon: 'file-text',
+      className: 'text-indigo-600 bg-indigo-50 border-indigo-200',
+      showSpinner: false
+    },
+    'indexed': {
+      text: 'Indexed',
+      icon: 'database',
+      className: 'text-amber-600 bg-amber-50 border-amber-200',
+      showSpinner: false
+    },
+    'ready': {
+      text: 'Ready',
+      icon: 'check-circle',
+      className: 'text-green-600 bg-green-50 border-green-200',
+      showSpinner: false
+    },
     'pending': {
       text: 'Pending',
       icon: 'clock',
@@ -108,6 +132,55 @@ function formatProcessingStatus(status) {
     className: 'text-gray-600 bg-gray-50 border-gray-200',
     showSpinner: false
   };
+}
+
+/**
+ * Format document lifecycle state for display
+ * @param {object} documentData - Document object
+ * @returns {object} - Lifecycle display data
+ */
+function formatDocumentLifecycle(documentData) {
+  if (window.documentLifecycle && typeof window.documentLifecycle.getDocumentLifecycleDisplay === 'function') {
+    return window.documentLifecycle.getDocumentLifecycleDisplay(documentData);
+  }
+
+  const processingStatus = documentData && documentData.processing_status ? documentData.processing_status : null;
+  const status = formatProcessingStatus(processingStatus);
+  return {
+    state: processingStatus || 'unknown',
+    summaryState: documentData && documentData.summary ? 'summarized' : 'unavailable',
+    label: status.text,
+    badgeClass: status.className,
+    progressLabel: status.text,
+    secondaryLabel: null,
+    isReady: processingStatus === 'completed',
+    isTerminal: processingStatus === 'completed' || processingStatus === 'failed',
+    isInProgress: processingStatus === 'processing',
+    isActionableInChat: processingStatus === 'completed'
+  };
+}
+
+/**
+ * Format summary state for display
+ * @param {object} documentData - Document object
+ * @returns {object} - Summary display data
+ */
+function formatSummaryState(documentData) {
+  if (window.documentLifecycle && typeof window.documentLifecycle.getDocumentSummaryState === 'function') {
+    const summaryState = window.documentLifecycle.getDocumentSummaryState(documentData);
+    if (summaryState === 'summarized') {
+      return { state: 'summarized', text: 'Summarized', className: 'text-green-700 bg-green-50 border-green-200' };
+    }
+    if (summaryState === 'pending') {
+      return { state: 'pending', text: 'Summary pending', className: 'text-amber-700 bg-amber-50 border-amber-200' };
+    }
+    return { state: 'unavailable', text: 'Summary unavailable', className: 'text-gray-600 bg-gray-50 border-gray-200' };
+  }
+
+  if (documentData && documentData.summary) {
+    return { state: 'summarized', text: 'Summarized', className: 'text-green-700 bg-green-50 border-green-200' };
+  }
+  return { state: 'unavailable', text: 'Summary unavailable', className: 'text-gray-600 bg-gray-50 border-gray-200' };
 }
 
 /**
@@ -348,6 +421,8 @@ window.metadataFormatter = {
   formatDocumentType,
   formatPrivilegeStatus,
   formatProcessingStatus,
+  formatDocumentLifecycle,
+  formatSummaryState,
   formatDate,
   formatTimestamp,
   formatTimestampFull,

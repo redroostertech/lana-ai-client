@@ -67,8 +67,19 @@ class DocumentMetadataViewer {
       }
 
       // Start auto-refresh if enabled
-      if (this.options.autoRefreshInterval && metadata.processing_status === 'processing') {
-        this.startAutoRefresh();
+      if (this.options.autoRefreshInterval) {
+        var shouldRefresh = true;
+        if (window.documentLifecycle && typeof window.documentLifecycle.isDocumentTerminal === 'function') {
+          shouldRefresh = !window.documentLifecycle.isDocumentTerminal(metadata);
+        } else {
+          shouldRefresh = metadata.processing_status === 'processing';
+        }
+
+        if (shouldRefresh) {
+          this.startAutoRefresh();
+        } else {
+          this.stopAutoRefresh();
+        }
       }
 
     } catch (error) {
@@ -100,7 +111,14 @@ class DocumentMetadataViewer {
     this.stopAutoRefresh(); // Clear existing timer
 
     this.autoRefreshTimer = setInterval(async () => {
-      if (this.currentDocumentId && this.metadata && this.metadata.processing_status === 'processing') {
+      var shouldRefresh = this.currentDocumentId && this.metadata;
+      if (shouldRefresh && window.documentLifecycle && typeof window.documentLifecycle.isDocumentTerminal === 'function') {
+        shouldRefresh = !window.documentLifecycle.isDocumentTerminal(this.metadata);
+      } else if (shouldRefresh) {
+        shouldRefresh = this.metadata.processing_status === 'processing';
+      }
+
+      if (shouldRefresh) {
         console.log('[DocumentMetadataViewer] Auto-refreshing...');
         await this.refresh();
       } else {
@@ -286,6 +304,11 @@ class DocumentMetadataViewer {
   renderMetadata() {
     const sections = [];
 
+    // Lifecycle section
+    if (this.hasLifecycleMetadata() || this.options.showEmptySections) {
+      sections.push(this.renderProcessingSection());
+    }
+
     // AI Summary section
     if (this.metadata.summary || !this.options.showEmptySections) {
       sections.push(this.renderSummarySection());
@@ -327,6 +350,27 @@ class DocumentMetadataViewer {
   }
 
   /**
+   * Check if document has lifecycle metadata
+   */
+  hasLifecycleMetadata() {
+    if (!this.metadata) return false;
+    const nested = this.metadata.metadata || {};
+    return Boolean(
+      this.metadata.processing_status ||
+      this.metadata.processing_triggered_by ||
+      this.metadata.processing_triggered_at ||
+      this.metadata.processing_completed_at ||
+      this.metadata.chunk_count ||
+      this.metadata.vector_count ||
+      this.metadata.ai_indexed_at ||
+      this.metadata.summary_generated_at ||
+      this.metadata.summary_method ||
+      nested.ingestion_stage ||
+      nested.parser_provenance
+    );
+  }
+
+  /**
    * Check if document has extracted entities
    */
   hasExtractedEntities() {
@@ -345,6 +389,7 @@ class DocumentMetadataViewer {
   renderSummarySection() {
     const isExpanded = this.expandedSections.has('summary');
     const summary = this.metadata.summary;
+    const summaryState = window.metadataFormatter.formatSummaryState(this.metadata);
 
     if (!summary) {
       return `
@@ -361,7 +406,7 @@ class DocumentMetadataViewer {
             </svg>
           </div>
           <div class="metadata-section__content ${isExpanded ? '' : 'collapsed'}">
-            <p class="metadata-field__value--empty">No AI summary available</p>
+            <p class="metadata-field__value--empty">${summaryState.text}</p>
           </div>
         </div>
       `;
@@ -557,11 +602,12 @@ class DocumentMetadataViewer {
   }
 
   /**
-   * Render Processing Information section
+   * Render Document Lifecycle section
    */
   renderProcessingSection() {
     const isExpanded = this.expandedSections.has('processing');
-    const status = window.metadataFormatter.formatProcessingStatus(this.metadata.processing_status);
+    const lifecycle = window.metadataFormatter.formatDocumentLifecycle(this.metadata);
+    const summaryState = window.metadataFormatter.formatSummaryState(this.metadata);
     const trigger = window.metadataFormatter.formatProcessingTrigger(this.metadata.processing_triggered_by);
     const startTime = window.metadataFormatter.formatTimestamp(this.metadata.processing_triggered_at);
     const endTime = window.metadataFormatter.formatTimestamp(this.metadata.processing_completed_at);
@@ -569,16 +615,28 @@ class DocumentMetadataViewer {
       this.metadata.processing_triggered_at,
       this.metadata.processing_completed_at
     );
+    const nested = this.metadata.metadata || {};
 
     const fields = [
+      { label: 'Lifecycle', value: lifecycle.label },
+      { label: 'Lifecycle Detail', value: lifecycle.progressLabel },
+      { label: 'Summary', value: summaryState.text },
       { label: 'Triggered By', value: trigger },
       { label: 'Started', value: startTime },
       { label: 'Completed', value: endTime },
       { label: 'Duration', value: duration },
       { label: 'Page Count', value: this.metadata.page_count ? `${this.metadata.page_count} pages` : null },
       { label: 'Chunks Generated', value: this.metadata.chunk_count ? `${this.metadata.chunk_count} chunks` : null },
-      { label: 'Embeddings', value: this.metadata.vector_count ? `${this.metadata.vector_count} vectors` : null }
+      { label: 'Embeddings', value: this.metadata.vector_count ? `${this.metadata.vector_count} vectors` : null },
+      { label: 'AI Indexed At', value: window.metadataFormatter.formatTimestamp(this.metadata.ai_indexed_at) },
+      { label: 'Ingestion Stage', value: nested.ingestion_stage || null },
+      { label: 'Parser Provenance', value: nested.parser_provenance || null },
+      { label: 'Summary Method', value: window.metadataFormatter.formatSummaryMethod(this.metadata.summary_method) }
     ].filter(f => f.value && f.value !== '—');
+    const badgeState = lifecycle.state === 'ready' || lifecycle.state === 'summarized'
+      ? 'completed'
+      : (lifecycle.state === 'parsed' || lifecycle.state === 'indexed' ? 'processing'
+        : (lifecycle.state === 'needs_attention' ? 'failed' : 'pending'));
 
     return `
       <div class="metadata-section">
@@ -587,7 +645,7 @@ class DocumentMetadataViewer {
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
             </svg>
-            Processing Information
+            Document Lifecycle
           </h4>
           <svg class="metadata-section__toggle ${isExpanded ? 'expanded' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -597,16 +655,24 @@ class DocumentMetadataViewer {
           <div class="metadata-field">
             <div class="metadata-field__label">Status:</div>
             <div class="metadata-field__value">
-              <span class="metadata-badge metadata-badge--${this.metadata.processing_status}">
-                ${status.showSpinner ? `
+              <span class="metadata-badge metadata-badge--${badgeState}">
+                ${lifecycle.isInProgress ? `
                   <svg class="metadata-badge__icon animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                   </svg>
                 ` : ''}
-                ${status.text}
+                ${lifecycle.label}
               </span>
             </div>
           </div>
+          ${lifecycle.summaryState === 'pending' ? `
+            <div class="metadata-field">
+              <div class="metadata-field__label">Summary:</div>
+              <div class="metadata-field__value" style="color: #d97706;">
+                Summary pending
+              </div>
+            </div>
+          ` : ''}
           ${this.metadata.processing_status === 'failed' && this.metadata.processing_error ? `
             <div class="metadata-field">
               <div class="metadata-field__label">Error:</div>

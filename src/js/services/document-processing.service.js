@@ -1,9 +1,9 @@
 /**
- * Document Processing Service (JIT — Just-In-Time)
+ * Document Readiness Service
  *
- * Ensures a document is vectorized and ready for RAG before it enters a
- * chat conversation.  Wraps the check-status → trigger → poll pipeline
- * exposed by api.js.
+ * Ensures a document is available for chat context before it enters a
+ * conversation. Wraps the check-status → trigger → poll pipeline exposed
+ * by api.js.
  *
  * Poll loops are automatically cancelled on page unload via a shared
  * AbortController that is reset each time the page loads.
@@ -31,7 +31,7 @@ const DocumentProcessingService = {
   },
 
   /**
-   * Ensure a single document is processed and ready for chat context.
+   * Ensure a single document is ready for chat context.
    * Returns immediately if the document is already vectorized.
    *
    * @param {string} documentId
@@ -66,7 +66,7 @@ const DocumentProcessingService = {
 
   /**
    * Fire-and-forget variant — logs success/failure but never throws.
-   * Calls `onReady` when the document finishes processing, or `onError`.
+   * Calls `onReady` when the document is ready, or `onError`.
    * AbortError from navigation is silently swallowed.
    *
    * @param {string}   documentId
@@ -84,7 +84,7 @@ const DocumentProcessingService = {
       })
       .catch((err) => {
         if (err && err.name === 'AbortError') return;
-        console.error(`[DocumentProcessingService] JIT failed for "${filename}":`, err);
+        console.error(`[DocumentProcessingService] Readiness check failed for "${filename}":`, err);
         if (callbacks.onError) callbacks.onError(filename, err);
       });
   },

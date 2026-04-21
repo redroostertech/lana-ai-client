@@ -213,6 +213,36 @@ const EventTypes = [
   { value: 'followup.missed', label: 'Follow-up Missed' }
 ];
 
+function getWorkflowEventSummaryHtml(eventType) {
+  if (window.LanaEventBrowser && typeof window.LanaEventBrowser.renderSummaryHtml === 'function') {
+    return window.LanaEventBrowser.renderSummaryHtml(eventType);
+  }
+
+  const label = EventTypes.find((entry) => entry.value === eventType)?.label || eventType;
+  return `
+    <div class="rounded-xl border border-gray-200 bg-blue-50 p-3">
+      <p class="text-xs text-blue-800"><strong>Description:</strong> ${label}</p>
+    </div>
+  `;
+}
+
+function openWorkflowEventBrowser() {
+  const selectEl = document.getElementById('config-event');
+  const descEl = document.getElementById('workflow-event-description');
+  if (!selectEl || !window.LanaEventBrowser) return;
+
+  window.LanaEventBrowser.open({
+    currentValue: selectEl.value,
+    onSelect: function(eventType) {
+      selectEl.value = eventType;
+      if (descEl) {
+        descEl.innerHTML = getWorkflowEventSummaryHtml(eventType);
+      }
+      selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  });
+}
+
 // SVG Icons for nodes
 const NodeIcons = {
   clock: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
@@ -437,9 +467,15 @@ class WorkflowBuilder {
         formFields = `
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Event Type</label>
-            <select id="config-event" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
-              ${EventTypes.map(e => `<option value="${e.value}" ${config.event === e.value ? 'selected' : ''}>${e.label}</option>`).join('')}
-            </select>
+            <div class="flex flex-wrap items-center gap-2">
+              <select id="config-event" class="flex-1 min-w-[220px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
+                ${EventTypes.map(e => `<option value="${e.value}" ${config.event === e.value ? 'selected' : ''}>${e.label}</option>`).join('')}
+              </select>
+              <button type="button" class="px-3 py-2 text-xs font-semibold rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100" onclick="openWorkflowEventBrowser()">Browse Events</button>
+            </div>
+            <div id="workflow-event-description" class="mt-2">
+              ${getWorkflowEventSummaryHtml(config.event || EventTypes[0].value)}
+            </div>
           </div>
         `;
         break;
