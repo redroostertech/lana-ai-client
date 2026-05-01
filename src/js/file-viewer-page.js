@@ -98,6 +98,42 @@
     return mimeType;
   }
 
+  function getFileMatterId(file) {
+    return file && (file.client_matter || file.matter_id || file.matterId || file.clientMatter || '');
+  }
+
+  function getFileDownloadUrl(fileOrId) {
+    var file = typeof fileOrId === 'object' ? fileOrId : null;
+    var fileId = file ? file.id : fileOrId;
+    var matterId = getFileMatterId(file || state.currentFile);
+    if (api && typeof api.getFileDownloadUrl === 'function' && matterId) {
+      return api.getFileDownloadUrl(fileId, matterId);
+    }
+    var url = api.baseUrl + '/api/v1/storage/files/' + encodeURIComponent(fileId) + '/download';
+    if (matterId) {
+      url += '?matter_id=' + encodeURIComponent(matterId);
+    }
+    return url;
+  }
+
+  function getAuthHeaders() {
+    return api && api.token ? { 'Authorization': 'Bearer ' + api.token } : {};
+  }
+
+  async function assertFetchOk(response, fallbackMessage) {
+    if (response.ok) return;
+
+    var detail = '';
+    try {
+      var text = await response.text();
+      if (text) {
+        detail = ': ' + text.substring(0, 180);
+      }
+    } catch (_) {}
+
+    throw new Error(fallbackMessage + ' (' + response.status + ' ' + response.statusText + ')' + detail);
+  }
+
   function formatDocumentType(type) {
     if (!type) return null;
     var map = {
@@ -287,10 +323,10 @@
   }
 
   async function loadPDF(file) {
-    var response = await fetch(api.baseUrl + '/api/v1/storage/files/' + file.id + '/download', {
-      headers: { 'Authorization': 'Bearer ' + api.token }
+    var response = await fetch(getFileDownloadUrl(file), {
+      headers: getAuthHeaders()
     });
-    if (!response.ok) throw new Error('Failed to fetch PDF');
+    await assertFetchOk(response, 'Failed to fetch PDF');
     var blob = await response.blob();
     var objectUrl = URL.createObjectURL(blob);
     var iframe = document.getElementById('viewerIframe');
@@ -300,10 +336,10 @@
   }
 
   async function loadImage(file) {
-    var response = await fetch(api.baseUrl + '/api/v1/storage/files/' + file.id + '/download', {
-      headers: { 'Authorization': 'Bearer ' + api.token }
+    var response = await fetch(getFileDownloadUrl(file), {
+      headers: getAuthHeaders()
     });
-    if (!response.ok) throw new Error('Failed to fetch image');
+    await assertFetchOk(response, 'Failed to fetch image');
     var blob = await response.blob();
     var objectUrl = URL.createObjectURL(blob);
     var img = document.getElementById('viewerImage');
@@ -318,10 +354,10 @@
   }
 
   async function loadText(file) {
-    var response = await fetch(api.baseUrl + '/api/v1/storage/files/' + file.id + '/download', {
-      headers: { 'Authorization': 'Bearer ' + api.token }
+    var response = await fetch(getFileDownloadUrl(file), {
+      headers: getAuthHeaders()
     });
-    if (!response.ok) throw new Error('Failed to fetch file');
+    await assertFetchOk(response, 'Failed to fetch file');
     var text = await response.text();
     var pre = document.getElementById('viewerText');
     pre.textContent = text;
@@ -333,10 +369,10 @@
     if (typeof mammoth === 'undefined') {
       throw new Error('Mammoth library not loaded');
     }
-    var response = await fetch(api.baseUrl + '/api/v1/storage/files/' + file.id + '/download', {
-      headers: { 'Authorization': 'Bearer ' + api.token }
+    var response = await fetch(getFileDownloadUrl(file), {
+      headers: getAuthHeaders()
     });
-    if (!response.ok) throw new Error('Failed to fetch file');
+    await assertFetchOk(response, 'Failed to fetch file');
     var arrayBuffer = await response.arrayBuffer();
     var container = document.getElementById('viewerDocx');
     var result = await mammoth.convertToHtml({
@@ -367,10 +403,10 @@
 
   async function downloadFile(fileId, filename) {
     try {
-      var response = await fetch(api.baseUrl + '/api/v1/storage/files/' + fileId + '/download', {
-        headers: { 'Authorization': 'Bearer ' + api.token }
+      var response = await fetch(getFileDownloadUrl(fileId), {
+        headers: getAuthHeaders()
       });
-      if (!response.ok) throw new Error('Failed to download: ' + response.status);
+      await assertFetchOk(response, 'Failed to download');
       var blob = await response.blob();
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');

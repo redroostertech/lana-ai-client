@@ -348,7 +348,12 @@
 
     setTimeout(function () {
       if (window.Lex && window.Lex.Nav) {
-        window.Lex.Nav.go('matters.html', { open: _matterId, tab: 'documents' });
+        window.Lex.Nav.go('workspace-details.html', {
+          params: { id: _matterId, tab: 'documents', upload: 'documents' },
+          context: { matterId: _matterId, tab: 'documents', upload: 'documents', source: 'chat-file-drawer', conversationId: _sessionId }
+        });
+      } else {
+        window.location.href = 'workspace-details.html?id=' + encodeURIComponent(_matterId) + '&tab=documents&upload=documents';
       }
     }, 400);
   }

@@ -1649,7 +1649,7 @@
     // Configure heading, action label, action href
     var config = {
       team:    { heading: 'Team Overview',     actionLabel: 'View all members',   actionHref: 'admin/users.html' },
-      docs:    { heading: 'Recent Documents',  actionLabel: '',                   actionHref: '' },
+      docs:    { heading: 'Recent Documents',  actionLabel: 'View all documents', actionHref: 'storage.html?view=documents' },
       storage: { heading: 'Storage Breakdown', actionLabel: 'View system health', actionHref: 'admin/health.html' }
     };
     var c = config[key];
@@ -1780,24 +1780,27 @@
 
       var html = '<div>';
 
+      var activeSlots = Math.min(active.length, 10);
+      var remainingSlots = Math.max(0, 10 - activeSlots);
+
       // Most Active section — users with events in last 30 days
       if (active.length > 0) {
-        var topActive = active.slice(0, 3);
+        var topActive = active.slice(0, activeSlots);
         html +=
           '<lex-text variant="tertiary" size="overline" weight="semibold" tag="div" style="margin-bottom:0.5rem;">Most Active — last 30 days</lex-text>';
         html += buildUserRows(topActive);
       }
 
       // Needs Attention section — users with 0 events in last 30 days
-      if (inactive.length > 0) {
-        var topInactive = inactive.slice(0, 3);
+      if (inactive.length > 0 && remainingSlots > 0) {
+        var topInactive = inactive.slice(0, remainingSlots);
         html +=
           '<lex-text variant="tertiary" size="overline" weight="semibold" tag="div" style="margin-bottom:0.5rem;' + (active.length > 0 ? 'margin-top:0.75rem;' : '') + '">Needs Attention</lex-text>';
         html += buildUserRows(topInactive);
 
         // Overflow message for remaining inactive users
-        if (inactive.length > 3) {
-          var remaining = inactive.length - 3;
+        if (inactive.length > remainingSlots) {
+          var remaining = inactive.length - remainingSlots;
           html +=
             '<div class="text-xs lex-text-tertiary mt-2" style="padding-left:0.5rem;">' +
               'There ' + (remaining === 1 ? 'is' : 'are') + ' ' + escHtml(String(remaining)) +
@@ -1816,8 +1819,8 @@
 
   /**
    * Render recent documents snapshot in the detail panel.
-   * Source: /api/v1/storage/recent?limit=5 (cross-matter, based on file_activity)
-   * Shows 5 most recently accessed documents with filename, matter name, timestamp.
+   * Source: /api/v1/storage/recent?limit=10 (cross-matter, falls back to upload date)
+   * Shows up to 10 documents with filename, matter name, timestamp.
    * @param {Element} panel
    * @returns {Promise<void>}
    */
@@ -1828,7 +1831,7 @@
     content.innerHTML = '<div class="py-4 text-center"><lex-spinner size="sm"></lex-spinner></div>';
 
     try {
-      var result = await api.get('/api/v1/storage/recent?limit=5');
+      var result = await api.get('/api/v1/storage/recent?limit=10');
       var docs = (result && (result.files || result.documents || result.data)) || [];
 
       if (docs.length === 0) {

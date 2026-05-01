@@ -704,7 +704,7 @@
     // Manage documents — open file drawer
     listen('lex-chat-manage-documents', function () {
       if (window.ChatFileDrawer && _conversationId) {
-        window.ChatFileDrawer.open(_conversationId, _matter ? _matter.id : null);
+        window.ChatFileDrawer.open(_conversationId, _matter ? (_matter.matter_id || _matter.id) : null);
       }
     });
 

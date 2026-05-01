@@ -2268,13 +2268,10 @@
         // Topbar refresh button
         document.addEventListener('lex-refresh', function (e) {
           e.preventDefault();
-          loadSummaryMetrics();
           loadMatters();
         });
 
-        // Set up metric interactions and load summary + matters in parallel
-        setupMetricInteractions();
-        loadSummaryMetrics(); // fire-and-forget (non-blocking)
+        // Summary metrics are intentionally hidden for now.
         await loadMatters();
 
         // Check for matter_id or open URL parameter and auto-open drawer

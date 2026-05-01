@@ -16,6 +16,7 @@ const storageState = {
   currentMatterName: null,  // Store matter name for breadcrumbs
   currentFolderId: null,
   currentFolderPath: [],
+  view: 'matters',
   viewMode: 'grid', // 'grid' or 'list'
   folders: [],
   files: [],
@@ -50,13 +51,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   storageState.currentMatterId = urlParams.get('matter_id') || null;
   storageState.currentMatterName = urlParams.get('matter_name') || null;
   storageState.currentFolderId = urlParams.get('folder_id') || null;
+  storageState.view = urlParams.get('view') === 'documents' ? 'documents' : 'matters';
+  if (storageState.currentMatterId) {
+    storageState.view = 'matter';
+  }
 
   // If no matter_id, we're at ROOT level - show all matters as folders
   console.log('[Storage] Initialization:', {
     matterId: storageState.currentMatterId,
     matterName: storageState.currentMatterName,
     folderId: storageState.currentFolderId,
-    isRootView: !storageState.currentMatterId
+    isRootView: !storageState.currentMatterId,
+    view: storageState.view
   });
 
   // Set up event listeners
@@ -98,15 +104,36 @@ document.addEventListener('DOMContentLoaded', async () => {
 function updateViewButtons() {
   const uploadBtn = document.getElementById('uploadBtn');
   const newFolderBtn = document.getElementById('newFolderBtn');
+  const searchInput = document.getElementById('searchInput');
+  const sourceFilter = document.getElementById('sourceFilter');
+  const sortSelect = document.getElementById('sortSelect');
 
   if (storageState.currentMatterId) {
     // Inside a matter: show ONLY upload button (no subfolders yet)
     uploadBtn?.classList.remove('hidden');
     newFolderBtn?.classList.add('hidden');
+  } else if (storageState.view === 'documents') {
+    // Organization-wide documents: uploads still need a target matter.
+    uploadBtn?.classList.add('hidden');
+    newFolderBtn?.classList.add('hidden');
+    if (searchInput) searchInput.placeholder = 'Search documents by name or matter...';
+    if (sourceFilter) sourceFilter.closest('div')?.classList.add('hidden');
+    if (sortSelect) {
+      sortSelect.innerHTML = [
+        '<option value="name">Name</option>',
+        '<option value="created_at">Created Date</option>',
+        '<option value="updated_at">Modified Date</option>',
+        '<option value="file_size">File Size</option>',
+        '<option value="status">Status</option>'
+      ].join('');
+      sortSelect.value = storageState.sortBy;
+    }
   } else {
     // Root view: show ONLY new folder button (creates matters)
     uploadBtn?.classList.add('hidden');
     newFolderBtn?.classList.remove('hidden');
+    if (searchInput) searchInput.placeholder = 'Search matters by name or ID...';
+    if (sourceFilter) sourceFilter.closest('div')?.classList.remove('hidden');
   }
 }
 
@@ -502,8 +529,18 @@ function updateResultsCount() {
   const resultsCountEl = document.getElementById('resultsCount');
   if (!resultsCountEl) return;
 
-  // ROOT VIEW: Show pagination results
-  if (!storageState.currentMatterId) {
+  // ORGANIZATION DOCUMENTS VIEW: Show document pagination results
+  if (!storageState.currentMatterId && storageState.view === 'documents') {
+    const start = storageState.totalResults > 0 ? (storageState.currentPage - 1) * 100 + 1 : 0;
+    const end = Math.min(storageState.currentPage * 100, storageState.totalResults);
+
+    if (storageState.totalResults === 0) {
+      resultsCountEl.textContent = 'No documents found';
+    } else {
+      resultsCountEl.textContent = `Showing ${start}-${end} of ${storageState.totalResults} documents`;
+    }
+  } else if (!storageState.currentMatterId) {
+    // ROOT VIEW: Show pagination results
     const start = storageState.totalResults > 0 ? (storageState.currentPage - 1) * 100 + 1 : 0;
     const end = Math.min(storageState.currentPage * 100, storageState.totalResults);
 
@@ -548,6 +585,36 @@ async function loadFolderContents() {
   emptyEl?.classList.add('hidden');
 
   try {
+    // ORGANIZATION DOCUMENTS VIEW: Load all documents in the organization
+    if (!storageState.currentMatterId && storageState.view === 'documents') {
+      const params = new URLSearchParams({
+        page: storageState.currentPage,
+        page_size: 100,
+        sort_by: storageState.sortBy,
+        sort_order: storageState.sortOrder
+      });
+
+      if (storageState.searchQuery) {
+        params.append('search', storageState.searchQuery);
+      }
+
+      const response = await api.get(`/api/v1/storage/documents?${params.toString()}`);
+      storageState.folders = [];
+      storageState.files = response.files || response.data?.files || [];
+
+      if (response.pagination) {
+        storageState.totalResults = response.pagination.total;
+        storageState.totalPages = response.pagination.total_pages;
+      } else {
+        storageState.totalResults = storageState.files.length;
+        storageState.totalPages = 1;
+      }
+
+      updateResultsCount();
+      renderFolderContents();
+      return;
+    }
+
     // ROOT VIEW: Load all matters as folders from /api/v1/storage/root
     if (!storageState.currentMatterId) {
       // Build query parameters from state
@@ -678,7 +745,10 @@ function renderFolderContents() {
 
   // Get folders at current level
   let foldersToShow = [];
-  if (!storageState.currentMatterId) {
+  if (!storageState.currentMatterId && storageState.view === 'documents') {
+    // ORGANIZATION DOCUMENTS VIEW: Show files only
+    foldersToShow = [];
+  } else if (!storageState.currentMatterId) {
     // ROOT VIEW: Show all matters as folders
     foldersToShow = storageState.folders.filter(f => f.isMatter);
   } else {
@@ -705,7 +775,9 @@ function renderFolderContents() {
 
   // Sort: folders first (alphabetically), then files (by modified date)
   const sortedFolders = [...foldersToShow].sort((a, b) => a.name.localeCompare(b.name));
-  const sortedFiles = [...storageState.files].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+  const sortedFiles = storageState.view === 'documents'
+    ? storageState.files
+    : [...storageState.files].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
 
   if (storageState.viewMode === 'grid') {
     renderGridView(sortedFolders, sortedFiles);
@@ -790,6 +862,7 @@ function renderGridView(folders, files) {
       <div class="flex flex-col items-center">
         ${getFileIcon(file.filename)}
         <h3 class="text-sm font-medium text-gray-900 text-center truncate w-full mt-2">${escapeHtml(file.filename)}</h3>
+        ${file.client_matter ? `<p class="text-xs text-gray-500 mt-1">${escapeHtml(file.matter_name || file.client_matter)}</p>` : ''}
         <p class="text-xs text-gray-500 mt-1">${formatFileSize(file.file_size)}</p>
         <p class="text-xs text-gray-400">${formatDate(file.updated_at)}</p>
       </div>
@@ -869,7 +942,10 @@ function renderListView(folders, files) {
       <td class="px-6 py-4 whitespace-nowrap">
         <div class="flex items-center">
           ${getFileIconSmall(file.filename)}
-          <span class="text-sm font-medium text-gray-900">${escapeHtml(file.filename)}</span>
+          <div class="min-w-0">
+            <div class="text-sm font-medium text-gray-900 truncate">${escapeHtml(file.filename)}</div>
+            ${file.client_matter ? `<div class="text-xs text-gray-500 truncate">${escapeHtml(file.matter_name || file.client_matter)}</div>` : ''}
+          </div>
         </div>
       </td>
       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${escapeHtml(file.created_by_username || 'Unknown')}</td>
@@ -2273,7 +2349,9 @@ function getFileIconSVG(contentType) {
  */
 function _navToFileViewer(fileId) {
   var referrer = 'storage.html';
-  if (storageState.currentMatterId) {
+  if (storageState.view === 'documents') {
+    referrer += '?view=documents';
+  } else if (storageState.currentMatterId) {
     referrer += '?matter_id=' + encodeURIComponent(storageState.currentMatterId);
     if (storageState.currentMatterName) {
       referrer += '&matter_name=' + encodeURIComponent(storageState.currentMatterName);

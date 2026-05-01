@@ -40,6 +40,7 @@
   var customFieldValues = [];
   var _tabIndicatorInitialized = false;
   var _navContext = null;              // navigation context (source, conversationId, etc.)
+  var AUTOMATION_APP_URL = 'http://127.0.0.1:2470/';
 
   // Document tab pagination/search state
   var _docPage = 1;
@@ -291,7 +292,7 @@
         permissions: permissions,
         activities: activityData.activities || [],
         activityPagination: activityData.pagination || {},
-        chats: chatsData.sessions || [],
+        chats: getConversationList(chatsData),
         chatPagination: chatsData.pagination || {},
         documents: docsData.files || [],
         docPagination: docsData.pagination || { total_count: 0 },
@@ -577,7 +578,12 @@
   }
 
   function switchMatterTab(tab) {
-    var tabs = ['activity', 'notes', 'tasks', 'comments', 'documents', 'conversations', 'skills', 'billableHours', 'docGeneration', 'analytics'];
+    if (tab === 'skills') {
+      openAutomationApp();
+      return;
+    }
+
+    var tabs = ['activity', 'notes', 'tasks', 'comments', 'documents', 'conversations', 'billableHours', 'docGeneration', 'analytics'];
     var activeBtn = null;
 
     tabs.forEach(function (t) {
@@ -632,9 +638,6 @@
       case 'notes':
         renderNotesTab(m.matter);
         break;
-      case 'skills':
-        renderSkillsTab(m.matter);
-        break;
       case 'billableHours':
         renderBillableHoursTab(m.matter);
         break;
@@ -651,12 +654,19 @@
   }
 
   function getCurrentActiveTab() {
-    var tabs = ['activity', 'notes', 'tasks', 'comments', 'documents', 'conversations', 'skills', 'billableHours', 'docGeneration', 'analytics'];
+    var tabs = ['activity', 'notes', 'tasks', 'comments', 'documents', 'conversations', 'billableHours', 'docGeneration', 'analytics'];
     for (var i = 0; i < tabs.length; i++) {
       var content = document.getElementById('tabContent' + tabs[i].charAt(0).toUpperCase() + tabs[i].substring(1));
       if (content && !content.classList.contains('hidden')) return tabs[i];
     }
     return 'activity';
+  }
+
+  function openAutomationApp() {
+    var opened = window.open(AUTOMATION_APP_URL, '_blank', 'noopener');
+    if (!opened) {
+      window.location.href = AUTOMATION_APP_URL;
+    }
   }
 
   // =========================================================================
@@ -1869,6 +1879,28 @@
     }
   }
 
+  function focusDocumentUploadExperience() {
+    var attempts = 0;
+
+    function focusUpload() {
+      attempts += 1;
+      var dropZone = document.getElementById('drawerDocDropZone') || document.getElementById('drawerEmptyDropZone');
+      if (!dropZone && attempts < 10) {
+        _timeouts.push(setTimeout(focusUpload, 100));
+        return;
+      }
+      if (!dropZone) return;
+
+      dropZone.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      dropZone.classList.add('lex-border-accent', 'lex-bg-accent-muted');
+      _timeouts.push(setTimeout(function () {
+        dropZone.classList.remove('lex-border-accent', 'lex-bg-accent-muted');
+      }, 1800));
+    }
+
+    _timeouts.push(setTimeout(focusUpload, 100));
+  }
+
   // Refresh the documents tab after an upload/delete operation (fetches from API)
   async function refreshDrawerDocuments(matterId) {
     try {
@@ -2177,12 +2209,64 @@
   // Conversations Tab
   // =========================================================================
 
+  function getConversationList(result) {
+    if (!result) return [];
+    return result.sessions || result.conversations || result.data || [];
+  }
+
+  function getConversationIdFromSession(session) {
+    if (!session) return '';
+    return session.thread_id || session.id || session.session_id || '';
+  }
+
+  async function createMatterConversation(matterId, matterName) {
+    if (!matterId) {
+      Lex.Toast.error('Matter ID is required to create a conversation');
+      return;
+    }
+
+    try {
+      if (!matterName && currentMatterData && currentMatterData.matter) {
+        matterName = currentMatterData.matter.matter_name || currentMatterData.matter.name || '';
+      }
+      var title = matterName ? matterName + ' Conversation' : 'Matter Conversation';
+      var response = await api.post('/api/v1/chat/sessions', {
+        matter_id: matterId,
+        title: title
+      });
+      var session = response && (response.session || response.data || response);
+      var conversationId = getConversationIdFromSession(session);
+
+      if (!conversationId) {
+        throw new Error('No conversation ID returned');
+      }
+
+      if (window.Lex && window.Lex.state) {
+        window.Lex.state.setActiveConversation(conversationId);
+      }
+
+      if (window.NavigationHelpers && typeof window.NavigationHelpers.navigateToConversation === 'function') {
+        window.NavigationHelpers.navigateToConversation(conversationId, matterId);
+        return;
+      }
+
+      Lex.Nav.go('chat-v2.html', {
+        params: { session: conversationId, matter: matterId }
+      });
+    } catch (error) {
+      console.error('[createMatterConversation] Failed:', error);
+      Lex.Toast.error(error.message || 'Failed to create conversation');
+    }
+  }
+
+  window.createMatterConversation = createMatterConversation;
+  _trackGlobal('createMatterConversation');
+
   function renderConversationsTab(matter, chats, pagination) {
     var content = document.getElementById('tabContentConversations');
     if (!content) return;
 
     if (!chats || chats.length === 0) {
-      var matterNameSafe = escapeHtml(matter.matter_name || matter.name || '');
       content.innerHTML =
         '<div class="text-center py-12">' +
           '<svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
@@ -2190,7 +2274,7 @@
           '</svg>' +
           '<h4 class="text-lg font-semibold text-gray-900 mb-2">No conversations yet</h4>' +
           '<p class="text-gray-500 mb-6">Start a conversation in this matter to organize all related chats</p>' +
-          '<button onclick="createMatterConversation(' + "'" + matter.matter_id + "'" + ', ' + "'" + matterNameSafe + "'" + ')" class="inline-flex items-center gap-2 px-4 py-2 lex-bg-accent hover:lex-bg-accent text-white rounded-lg font-medium">' +
+          '<button onclick="createMatterConversation(\'' + matter.matter_id + '\')" class="inline-flex items-center gap-2 px-4 py-2 lex-bg-accent hover:lex-bg-accent text-white rounded-lg font-medium">' +
             '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
               '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>' +
             '</svg>' +
@@ -2208,11 +2292,12 @@
     var totalPages = Math.ceil(total / limit);
 
     var chatRows = chats.map(function (chat) {
-      var title = escapeHtml((chat.metadata && chat.metadata.title) || 'Untitled Conversation');
+      var title = escapeHtml(chat.title || (chat.metadata && chat.metadata.title) || 'Untitled Conversation');
       var msgCount = chat.metadata && chat.metadata.messageCount
         ? '<span>&#8226; ' + chat.metadata.messageCount + ' messages</span>'
         : '';
-      return '<div onclick="NavigationHelpers.navigateToConversation(\'' + chat.thread_id + '\', \'' + matter.matter_id + '\')" class="block bg-white border border-gray-200 hover:lex-border-accent hover:shadow-sm rounded-lg p-4 transition-all group cursor-pointer">' +
+      var conversationId = getConversationIdFromSession(chat);
+      return '<div onclick="NavigationHelpers.navigateToConversation(\'' + conversationId + '\', \'' + matter.matter_id + '\')" class="block bg-white border border-gray-200 hover:lex-border-accent hover:shadow-sm rounded-lg p-4 transition-all group cursor-pointer">' +
         '<div class="flex items-start gap-3">' +
           '<div class="w-10 h-10 bg-gradient-to-br lex-bg-accent rounded-lg flex items-center justify-center flex-shrink-0">' +
             '<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
@@ -2238,12 +2323,11 @@
       paginationHtml = '<lex-pagination id="convoPagination" class="mt-6 border-t pt-4" page="' + currentPage + '" total-pages="' + totalPages + '" total="' + total + '" limit="' + limit + '"></lex-pagination>';
     }
 
-    var matterNameSafe2 = escapeHtml(matter.matter_name || matter.name || '');
     content.innerHTML =
       '<div class="space-y-4">' +
         '<div class="flex items-center justify-between">' +
           '<p class="text-sm text-gray-500">' + total + ' conversation' + (total !== 1 ? 's' : '') + '</p>' +
-          '<button onclick="createMatterConversation(\'' + matter.matter_id + '\', \'' + matterNameSafe2 + '\')" class="inline-flex items-center gap-2 px-3 py-1.5 lex-bg-accent hover:lex-bg-accent text-white text-sm rounded-lg font-medium">' +
+          '<button onclick="createMatterConversation(\'' + matter.matter_id + '\')" class="inline-flex items-center gap-2 px-3 py-1.5 lex-bg-accent hover:lex-bg-accent text-white text-sm rounded-lg font-medium">' +
             '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
               '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>' +
             '</svg>' +
@@ -2270,7 +2354,7 @@
       var result = await api.getMatterConversations(matterId, limit, offset);
 
       if (currentMatterData) {
-        currentMatterData.chats = result.conversations || [];
+        currentMatterData.chats = getConversationList(result);
         currentMatterData.chatPagination = result.pagination || { total: 0, limit: limit, offset: offset };
         renderConversationsTab(currentMatterData.matter, currentMatterData.chats, currentMatterData.chatPagination);
       }
@@ -8542,6 +8626,7 @@
     var matterId = params.get('id');
     var defaultTab = params.get('tab') || 'activity';
     var openFileId = params.get('open_file') || null;
+    var uploadTarget = params.get('upload') || null;
 
     // Consume context (one-shot read from Lex.Nav.go context param)
     var ctx = Lex.Nav.consume();
@@ -8551,6 +8636,7 @@
     if (!matterId && ctx && ctx.matterId) {
       matterId = ctx.matterId;
       defaultTab = ctx.tab || defaultTab;
+      uploadTarget = ctx.upload || uploadTarget;
     }
 
     // Fallback 2: check sessionStorage (persists across router timing gaps)
@@ -8596,6 +8682,10 @@
 
     // Render default tab
     switchMatterTab(defaultTab);
+
+    if (defaultTab === 'documents' && uploadTarget === 'documents') {
+      focusDocumentUploadExperience();
+    }
 
     // Remove redacted shimmer
     redactPage(false);

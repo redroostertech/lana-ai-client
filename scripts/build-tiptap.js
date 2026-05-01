@@ -1,14 +1,24 @@
 const esbuild = require('esbuild');
 
-esbuild.build({
+const baseConfig = {
   entryPoints: ['src/js/tiptap-bundle.js'],
   bundle: true,
-  outfile: 'src/js/tiptap-bundle-built.js',
   format: 'iife',
   globalName: 'TiptapBundle',
   platform: 'browser',
   minify: false,
   sourcemap: true,
-}).then(() => {
-  console.log('✓ Tiptap bundle created successfully');
+};
+
+Promise.all([
+  esbuild.build({
+    ...baseConfig,
+    outfile: 'src/js/tiptap-bundle-built.js',
+  }),
+  esbuild.build({
+    ...baseConfig,
+    outfile: 'public_html/js/tiptap-bundle-built.js',
+  }),
+]).then(() => {
+  console.log('✓ Tiptap bundles created successfully');
 }).catch(() => process.exit(1));
