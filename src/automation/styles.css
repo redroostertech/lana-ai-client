@@ -747,6 +747,19 @@ button:disabled {
   font-size: clamp(1.8rem, 2.6vw, 2.4rem);
 }
 
+.automation-page-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.automation-page-banner-badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .home-shell {
   display: flex;
   flex-direction: column;
@@ -2015,16 +2028,15 @@ button:disabled {
 .template-carousel-card {
   width: min(420px, 78vw);
   flex: 0 0 auto;
-  background: transparent;
-  box-shadow: none;
 }
 
-.template-preview-line {
-  margin: 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+.template-carousel-card .lex-acard {
+  min-height: 112px;
+  height: 100%;
+}
+
+.template-carousel-card.selected .lex-acard {
+  border-color: var(--black-700);
 }
 
 .choice-card,

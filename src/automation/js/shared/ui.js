@@ -86,11 +86,13 @@ export function filterToolbar({ viewKey, searchPlaceholder, totalCount, visibleC
 
 export function sectionIntro({ eyebrow, title, copy, badges = [] }) {
   return `
-    <section class="section-intro">
-      <div class="eyebrow">${escapeHtml(eyebrow)}</div>
-      <h2>${escapeHtml(title)}</h2>
-      <p>${escapeHtml(copy)}</p>
-      ${badges.length ? `<div class="badge-row">${badges.join('')}</div>` : ''}
+    <section class="automation-page-banner" aria-label="${escapeAttribute(eyebrow)}">
+      <lex-banner
+        variant="light"
+        heading="${escapeAttribute(title)}"
+        subtitle="${escapeAttribute(copy)}"
+      ></lex-banner>
+      ${badges.length ? `<div class="automation-page-banner-badges">${badges.join('')}</div>` : ''}
     </section>
   `;
 }

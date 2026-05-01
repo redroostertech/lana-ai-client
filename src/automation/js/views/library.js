@@ -180,21 +180,14 @@ export function renderLibrary(context) {
         <div class="template-carousel">
           <div class="template-carousel-track">
             ${templateLibrary.map((template) => `
-            <article class="choice-card template-carousel-card ${template.id === context.state.builder.templateId ? 'selected' : ''}">
-              <div class="badge-row">
-                ${badge(template.category)}
-                ${badge(template.trigger)}
-              </div>
-              <h3>${escapeHtml(template.name)}</h3>
-              <p class="template-preview-line">${escapeHtml(template.description || '')}</p>
-              <div class="badge-row">
-                ${(template.connectorHints || []).map((hint) => badge(hint)).join('')}
-              </div>
-              <div class="row-actions">
-                <lex-btn variant="primary" size="sm" data-template-id="${escapeAttribute(template.id)}">Use Template</lex-btn>
-                <lex-btn variant="ghost" size="sm" data-template-check-data="${escapeAttribute(template.id)}">Check Data First</lex-btn>
-              </div>
-            </article>
+            <lex-action-card
+              class="template-carousel-card ${template.id === context.state.builder.templateId ? 'selected' : ''}"
+              title="${escapeAttribute(template.name)}"
+              description="${escapeAttribute(template.description || '')}"
+              tag="${escapeAttribute(template.category || template.trigger || 'Template')}"
+              action="use-template"
+              data-template-id="${escapeAttribute(template.id)}"
+            ></lex-action-card>
           `).join('')}
           </div>
         </div>
