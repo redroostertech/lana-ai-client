@@ -108,6 +108,60 @@ export function surface({ title, subtitle = '', body = '', footer = '' }) {
   `;
 }
 
+export function lexDataTable({
+  id,
+  columns,
+  labels,
+  emptyText,
+  sortBy = '',
+  sortDir = 'asc',
+  idKey = '',
+  limit = 20,
+  ariaLabel = '',
+  selectable = false
+}) {
+  return `
+    <lex-table
+      id="${escapeAttribute(id)}"
+      columns="${escapeAttribute(columns.join(','))}"
+      labels="${escapeAttribute(labels.join(','))}"
+      ${sortBy ? `sort-by="${escapeAttribute(sortBy)}"` : ''}
+      sort-dir="${escapeAttribute(sortDir)}"
+      ${idKey ? `id-key="${escapeAttribute(idKey)}"` : ''}
+      limit="${escapeAttribute(String(limit))}"
+      empty-text="${escapeAttribute(emptyText)}"
+      ${ariaLabel ? `aria-label="${escapeAttribute(ariaLabel)}"` : ''}
+      ${selectable ? 'selectable' : ''}
+      searchable
+      filterable
+      column-filters
+      compact
+    ></lex-table>
+  `;
+}
+
+export function hydrateLexDataTable(id, rows, onRowClick) {
+  const hydrate = () => {
+    const table = document.getElementById(id);
+    if (!table || typeof table.setData !== 'function') return;
+
+    table.setData(rows);
+
+    if (typeof onRowClick === 'function' && table.dataset.rowClickBound !== 'true') {
+      table.dataset.rowClickBound = 'true';
+      table.addEventListener('row-click', (event) => {
+        onRowClick(event.detail?.row, event.detail?.id, event);
+      });
+    }
+  };
+
+  if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+    window.requestAnimationFrame(hydrate);
+  } else {
+    setTimeout(hydrate, 0);
+  }
+}
+
 export function listItem({ title, detailLines = [], body = '', aside = '' }) {
   return `
     <article class="list-item">
@@ -130,9 +184,9 @@ export function metricCard(label, value) {
   `;
 }
 
-export function metaGrid(items) {
+export function metaGrid(items, className = 'meta-grid') {
   return `
-    <div class="meta-grid">
+    <div class="${escapeAttribute(className)}">
       ${items.map((item) => `
         <div class="meta-item">
           <span class="meta-label">${escapeHtml(item.label)}</span>
@@ -158,4 +212,37 @@ export function badge(label, tone = '') {
 
 export function emptyState(message) {
   return `<lex-empty message="${escapeAttribute(message)}" icon="inbox"></lex-empty>`;
+}
+
+export function lexEmpty({ message, description = '', icon = 'inbox' }) {
+  return `
+    <lex-empty
+      message="${escapeAttribute(message)}"
+      ${description ? `description="${escapeAttribute(description)}"` : ''}
+      icon="${escapeAttribute(icon)}"
+    ></lex-empty>
+  `;
+}
+
+export function drawerSection({ title, body = '', className = '' }) {
+  return `
+    <section class="automation-detail-section ${escapeAttribute(className)}">
+      <lex-card heading="${escapeAttribute(title)}" variant="outlined">
+        <div class="automation-detail-section-body">${body}</div>
+      </lex-card>
+    </section>
+  `;
+}
+
+export function drawerStatGrid(items) {
+  return `
+    <div class="automation-detail-stat-grid">
+      ${items.map((item) => `
+        <lex-card variant="flat" class="automation-detail-stat">
+          <div class="automation-detail-stat-label">${escapeHtml(item.label)}</div>
+          <div class="automation-detail-stat-value">${item.isHtml ? item.value : escapeHtml(item.value)}</div>
+        </lex-card>
+      `).join('')}
+    </div>
+  `;
 }

@@ -30,6 +30,69 @@ function visibilityLabel(v) {
   return v === 'org_wide' ? 'Org-Wide' : 'Private';
 }
 
+function normalizeScopeType(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'organization' || normalized === 'org' || normalized === 'org_wide' || normalized === 'organization-wide') {
+    return 'organization';
+  }
+  if (normalized === 'matter' || normalized === 'matter_scoped' || normalized === 'specific_matter') {
+    return 'matter';
+  }
+  return '';
+}
+
+function resolveAutomationScope(automation) {
+  const config = automation?.automation_config || automation?.config || {};
+  const scope = config.scope && typeof config.scope === 'object' ? config.scope : { type: config.scope };
+  const type = normalizeScopeType(
+    scope.type
+    || scope.scope_type
+    || automation?.scope_type
+    || automation?.scopeType
+    || ((scope.matter_id || scope.matterId || automation?.matter_id || automation?.client_matter_id) ? 'matter' : 'organization')
+  ) || 'organization';
+  const matterId = scope.matter_id
+    || scope.matterId
+    || (scope.resource_type === 'matter' ? scope.resource_id : '')
+    || automation?.matter_id
+    || automation?.client_matter_id
+    || '';
+  const matterName = scope.matter_name || automation?.matter_name || matterId;
+
+  if (type === 'matter') {
+    return {
+      type,
+      badge: 'Matter scope',
+      label: `Matter: ${matterName || 'Selected matter'}`,
+      matterId,
+      matterName
+    };
+  }
+
+  return {
+    type,
+    badge: 'Organization scope',
+    label: 'Organization-wide',
+    matterId: '',
+    matterName: ''
+  };
+}
+
+function resolveRunScope(run) {
+  const rawScope = run.automation_config?.scope || run.scope || {};
+  const configScope = rawScope && typeof rawScope === 'object' ? rawScope : { type: rawScope };
+  const matterId = configScope.matter_id
+    || configScope.matterId
+    || run.client_matter_id
+    || run.matter_id
+    || '';
+  const type = normalizeScopeType(configScope.type || configScope.scope_type || run.scope_type || run.scopeType)
+    || (String(run.source_type || '').toLowerCase() === 'matter' || matterId ? 'matter' : 'organization');
+  return type === 'matter'
+    ? { type, label: 'Matter scope' }
+    : { type, label: 'Organization scope' };
+}
+
 function canToggleVisibility(context, automation) {
   const user = context.state.user;
   if (!user || !automation) return false;
@@ -199,7 +262,8 @@ function renderRunRow(run, isExpanded, lanaClientUrl) {
   const sourceType = run.source_type || (matterId ? 'matter' : 'direct');
   const matterBadge = sourceType === 'matter' && (run.matter_name || matterId)
     ? renderMatterBadge(lanaClientUrl, matterId, run.matter_name || matterId)
-    : badge('Direct run', '');
+    : '';
+  const runScope = resolveRunScope(run);
 
   // GAP #12: audit attribution
   const triggeredBy = escapeHtml(run.triggered_by_name || 'system');
@@ -213,6 +277,7 @@ function renderRunRow(run, isExpanded, lanaClientUrl) {
       <div class="ld-run-row-summary" data-ld-toggle-run="${escapeAttribute(runId)}">
         <div class="ld-run-row-lead">
           ${badge(formatLabel(status), statusTone(status))}
+          ${badge(runScope.label, runScope.type === 'organization' ? 'info' : '')}
           ${matterBadge}
           <span class="muted" style="font-size:0.8rem;">${escapeHtml(timeAgo(run.triggered_at || run.started_at))}</span>
           <span class="muted" style="font-size:0.8rem;">${escapeHtml(formatDuration(run.duration_ms))}</span>
@@ -985,10 +1050,23 @@ function renderSettingsTab(context, automation) {
   const currentVisibility = automation.visibility || 'private';
   const nextVisibility = currentVisibility === 'org_wide' ? 'private' : 'org_wide';
   const nextVisibilityLabel = nextVisibility === 'org_wide' ? 'Make Org-Wide' : 'Make Private';
+  const automationScope = resolveAutomationScope(automation);
+  const scopeValue = automationScope.type === 'matter'
+    ? renderMatterLink(context.state.links?.lana_client_url || '', automationScope.matterId, automationScope.matterName || automationScope.matterId, { prefix: 'Matter: ' })
+    : escapeHtml(automationScope.label);
 
   return surface({
     title: 'Settings',
     body: `
+      <div class="ld-settings-section">
+        <h4>Scope</h4>
+        <p class="muted">Controls where this automation is intended to run.</p>
+        <div class="row-actions" style="margin-top:8px;">
+          ${badge(automationScope.badge, automationScope.type === 'organization' ? 'info' : '')}
+          <span>${scopeValue}</span>
+        </div>
+      </div>
+
       <div class="ld-settings-section">
         <h4>Visibility</h4>
         <p class="muted">Controls who can view and trigger this automation.</p>
@@ -1384,8 +1462,12 @@ export function renderLibraryDetail(context) {
   const activeTab = ld.activeTab || 'steps';
   const isEnabled = Boolean(automation.is_enabled);
   const visibility = automation.visibility || 'private';
+  const automationScope = resolveAutomationScope(automation);
   const showDeleteModal = Boolean(ld.deleteModalOpen);
   const showArtifactModal = Boolean(ld.artifactModalOpen);
+  const scopeMetaValue = automationScope.type === 'matter'
+    ? renderMatterLink(context.state.links?.lana_client_url || '', automationScope.matterId, automationScope.matterName || automationScope.matterId, { prefix: 'Matter: ' })
+    : escapeHtml(automationScope.label);
 
   const tabContent = activeTab === 'steps'
     ? renderStepsTab(automation)
@@ -1408,6 +1490,7 @@ export function renderLibraryDetail(context) {
               </div>
               <div class="badge-row connector-detail-badges">
                 ${badge(isEnabled ? 'Enabled' : 'Disabled', isEnabled ? 'success' : '')}
+                ${badge(automationScope.badge, automationScope.type === 'organization' ? 'info' : '')}
                 ${badge(visibilityLabel(visibility), visibilityTone(visibility))}
                 ${automation.category ? badge(escapeHtml(automation.category)) : ''}
                 ${automation.automation_type ? badge(formatLabel(automation.automation_type)) : ''}
@@ -1433,6 +1516,7 @@ export function renderLibraryDetail(context) {
         ${metaGrid([
           { label: 'Created', value: formatDate(automation.created_at) },
           { label: 'Updated', value: formatDate(automation.updated_at) },
+          { label: 'Scope', value: scopeMetaValue, isHtml: true },
           { label: 'Created By', value: escapeHtml(automation.created_by_name || 'System') }
         ])}
       </div>

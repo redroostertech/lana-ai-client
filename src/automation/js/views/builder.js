@@ -18,6 +18,61 @@ function deepClone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 
+function normalizeScopeType(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'organization' || normalized === 'org' || normalized === 'org_wide' || normalized === 'organization-wide') {
+    return 'organization';
+  }
+  if (normalized === 'matter' || normalized === 'matter_scoped' || normalized === 'specific_matter') {
+    return 'matter';
+  }
+  return '';
+}
+
+function buildAutomationScope(form) {
+  const scopeType = normalizeScopeType(form.scopeType) || 'matter';
+  if (scopeType === 'organization') {
+    return { type: 'organization' };
+  }
+
+  const matterId = String(form.matterId || '').trim();
+  return matterId
+    ? { type: 'matter', matter_id: matterId }
+    : { type: 'matter' };
+}
+
+function applyScopeToConfig(baseConfig, form) {
+  const config = baseConfig && typeof baseConfig === 'object' && !Array.isArray(baseConfig)
+    ? deepClone(baseConfig)
+    : {};
+  config.scope = buildAutomationScope(form);
+  return config;
+}
+
+function resolveAutomationScope(automation, automationConfig) {
+  const configScope = automationConfig?.scope && typeof automationConfig.scope === 'object'
+    ? automationConfig.scope
+    : { type: automationConfig?.scope };
+  const scopeType = normalizeScopeType(
+    configScope.type
+    || configScope.scope_type
+    || automation.scope_type
+    || automation.scopeType
+    || ((configScope.matter_id || configScope.matterId || automation.matter_id) ? 'matter' : 'organization')
+  ) || 'organization';
+  const scopedMatterId = configScope.matter_id
+    || configScope.matterId
+    || (configScope.resource_type === 'matter' ? configScope.resource_id : '')
+    || automation.matter_id
+    || automation.client_matter_id
+    || '';
+
+  return {
+    scopeType,
+    matterId: scopeType === 'matter' ? scopedMatterId : ''
+  };
+}
+
 function buildTriggerConfig(form) {
   const trigger = { event_type: form.triggerEvent };
   if (form.triggerConnectorId) {
@@ -505,7 +560,7 @@ export function syncBuilderJson(context) {
           : compileTemplate(selectedTemplate, context.state.builder))
     );
 
-  context.state.builder.customJson = JSON.stringify(compiled, null, 2);
+  context.state.builder.customJson = JSON.stringify(applyScopeToConfig(compiled, context.state.builder), null, 2);
 }
 
 export function addBuilderAction(context, actionType) {
@@ -2266,14 +2321,12 @@ export async function loadAutomationForEdit(context, automationId) {
       ? String(trigger.schedule.day_of_week)
       : base.dayOfWeek;
 
-    // Determine scopeType — prefer explicit scope in config, fall back to
-    // whether the automation is matter-scoped via matter_id
-    const scopeType = automationConfig.scope?.type
-      || (automation.matter_id ? 'matter' : 'organization');
-
-    const matterId = automation.matter_id
-      || automationConfig.scope?.matter_id
-      || (context.state.matters.length ? matterRef(context.state.matters[0]) : '');
+    // Determine scope from automation_config.scope first, then legacy fields.
+    const resolvedScope = resolveAutomationScope(automation, automationConfig);
+    const scopeType = resolvedScope.scopeType;
+    const matterId = resolvedScope.matterId
+      || (scopeType === 'matter' && context.state.matters.length ? matterRef(context.state.matters[0]) : '');
+    const scopedAutomationConfig = applyScopeToConfig(automationConfig, { scopeType, matterId });
 
     const triggerEvent = trigger.event_type || base.triggerEvent;
 
@@ -2305,7 +2358,7 @@ export async function loadAutomationForEdit(context, automationId) {
       scopeType,
       matterId,
       publishMode: automation.is_enabled ? 'enabled' : 'disabled',
-      customJson: JSON.stringify(automationConfig, null, 2),
+      customJson: JSON.stringify(scopedAutomationConfig, null, 2),
       overdueReminder,
       publishModalOpen: false,
       selectedActionIndex: null,
@@ -2330,7 +2383,8 @@ export async function createAutomation(context) {
   const editAutomationId = context.state.builder.editMode?.automationId || null;
 
   try {
-    const config = JSON.parse(document.getElementById('builder-json').value);
+    const config = applyScopeToConfig(JSON.parse(document.getElementById('builder-json').value), context.state.builder);
+    context.state.builder.customJson = JSON.stringify(config, null, 2);
     const payload = {
       automation_name: context.state.builder.name.trim(),
       automation_type: 'automation',

@@ -1,11 +1,5 @@
-import { badge, filterCollection, filterToolbar, listItem, sectionIntro, surface } from '../shared/ui.js';
-import { escapeAttribute, escapeHtml, formatDate, timeAgo } from '../shared/utils.js';
-
-function matchesAutomationState(item, filterState) {
-  if (filterState === 'enabled') return Boolean(item.is_enabled);
-  if (filterState === 'disabled') return !item.is_enabled;
-  return true;
-}
+import { badge, hydrateLexDataTable, lexDataTable, sectionIntro, surface } from '../shared/ui.js';
+import { escapeAttribute } from '../shared/utils.js';
 
 const SORT_FIELDS = {
   'created_at': (a) => new Date(a.created_at || 0).getTime(),
@@ -13,6 +7,48 @@ const SORT_FIELDS = {
   'automation_name': (a) => String(a.automation_name || '').toLowerCase(),
   'category': (a) => String(a.category || '').toLowerCase()
 };
+
+function formatTableDateTime(value) {
+  if (!value) return 'Unknown';
+
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return 'Unknown';
+
+  const pad = (part) => String(part).padStart(2, '0');
+  return [
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
+    `${pad(date.getHours())}:${pad(date.getMinutes())}`
+  ].join(' ');
+}
+
+function normalizeScopeType(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'organization' || normalized === 'org' || normalized === 'org_wide' || normalized === 'organization-wide') {
+    return 'organization';
+  }
+  if (normalized === 'matter' || normalized === 'matter_scoped' || normalized === 'specific_matter') {
+    return 'matter';
+  }
+  return '';
+}
+
+function scopeLabel(automation) {
+  const config = automation.automation_config || automation.config || {};
+  const scope = config.scope && typeof config.scope === 'object' ? config.scope : { type: config.scope };
+  const type = normalizeScopeType(
+    scope.type
+    || scope.scope_type
+    || automation.scope_type
+    || automation.scopeType
+    || ((scope.matter_id || scope.matterId || automation.matter_id || automation.client_matter_id) ? 'matter' : 'organization')
+  );
+
+  if (type === 'matter') {
+    return `Matter: ${automation.matter_name || scope.matter_name || scope.matter_id || scope.matterId || automation.matter_id || automation.client_matter_id || 'Selected matter'}`;
+  }
+
+  return 'Organization-wide';
+}
 
 function sortAutomations(items, filters) {
   const sortBy = SORT_FIELDS[filters.sortBy] ? filters.sortBy : 'created_at';
@@ -141,26 +177,20 @@ export async function toggleAutomation(context, automationId, isEnabled) {
 }
 
 export function renderLibrary(context) {
-  const filters = context.state.filters.library || {};
   const isLoading = Boolean(context.state.libraryLoading);
   const templateLibrary = context.getTemplateLibrary();
-  const filteredAutomations = filterCollection(
-    context.state.automations,
-    filters,
-    (automation) => [
-      automation.automation_name,
-      automation.automation_description,
-      automation.category,
-      automation.automation_type
-    ],
-    (automation, filters) => matchesAutomationState(automation, filters.state)
-  );
-  const visibleAutomations = sortAutomations(filteredAutomations, filters);
-  const perPage = Math.max(25, parseInt(filters.perPage, 10) || 25);
-  const totalPages = Math.max(1, Math.ceil(visibleAutomations.length / perPage));
-  const page = Math.min(Math.max(parseInt(filters.page, 10) || 1, 1), totalPages);
-  const start = (page - 1) * perPage;
-  const pagedAutomations = visibleAutomations.slice(start, start + perPage);
+  const automationRows = sortAutomations(context.state.automations, { sortBy: 'updated_at', sortDir: 'desc' }).map((automation) => ({
+    automation_id: automation.automation_id || '',
+    automation_name: automation.automation_name || 'Unnamed automation',
+    automation_description: automation.automation_description || automation.category || '',
+    category: automation.category || 'uncategorized',
+    automation_type: automation.automation_type || 'automation',
+    scope: scopeLabel(automation),
+    visibility: automation.visibility === 'org_wide' ? 'Org-Wide' : 'Private',
+    state: automation.is_enabled ? 'active' : 'inactive',
+    updated_at: formatTableDateTime(automation.updated_at || automation.created_at),
+    created_at: automation.created_at || ''
+  }));
 
   context.els.viewContent.innerHTML = `
     ${sectionIntro({
@@ -198,102 +228,31 @@ export function renderLibrary(context) {
       title: 'Live Automations',
       subtitle: 'Existing automations already published through the shared API.',
       body: `
-        ${filterToolbar({
-          viewKey: 'library',
-          searchPlaceholder: 'Search live automations by name, category, or description',
-          totalCount: context.state.automations.length,
-          visibleCount: visibleAutomations.length,
-          filterDefs: [
-            {
-              field: 'state',
-              label: 'State',
-              options: [
-                ['all', 'All'],
-                ['enabled', 'Enabled'],
-                ['disabled', 'Disabled']
-              ]
-            },
-            {
-              field: 'sortBy',
-              label: 'Sort by',
-              options: [
-                ['created_at', 'Created'],
-                ['updated_at', 'Last updated'],
-                ['automation_name', 'Name'],
-                ['category', 'Category']
-              ]
-            },
-            {
-              field: 'sortDir',
-              label: 'Order',
-              options: [
-                ['desc', 'Newest first'],
-                ['asc', 'Oldest first']
-              ]
-            }
-          ],
-          filters: {
-            ...filters,
-            sortBy: SORT_FIELDS[filters.sortBy] ? filters.sortBy : 'created_at',
-            sortDir: filters.sortDir === 'asc' ? 'asc' : 'desc'
-          }
-        })}
-        <div class="list">
-          ${isLoading
-            ? `
-              <div class="muted" style="margin-bottom:12px;">Updating automation list…</div>
-              ${renderLibraryLoadingRows(Math.min(Math.max(perPage >= 50 ? 5 : 4, 3), 5))}
-            `
-            : pagedAutomations.length
-            ? pagedAutomations.map((automation) => `
-            <article class="list-item list-item--clickable" data-open-library-detail="${escapeAttribute(automation.automation_id || '')}">
-              <div class="list-item-main">
-                <strong>${escapeHtml(automation.automation_name || 'Unnamed automation')}</strong>
-                <div class="muted">${escapeHtml(automation.automation_description || automation.category || 'No description')}</div>
-                <div class="list-item-body">
-                  <div class="badge-row">
-                    ${badge(automation.automation_type || 'automation')}
-                    ${badge(automation.category || 'uncategorized')}
-                    ${badge(automation.visibility === 'org_wide' ? 'Org-Wide' : 'Private', automation.visibility === 'org_wide' ? 'info' : '')}
-                  </div>
-                </div>
-                <div class="list-item-meta">
-                  <span class="list-item-meta-item" title="Created ${escapeAttribute(formatDate(automation.created_at))}">
-                    <span class="list-item-meta-label">Created</span>
-                    <span class="list-item-meta-value">${escapeHtml(timeAgo(automation.created_at))}</span>
-                  </span>
-                  <span class="list-item-meta-sep">·</span>
-                  <span class="list-item-meta-item" title="Updated ${escapeAttribute(formatDate(automation.updated_at))}">
-                    <span class="list-item-meta-label">Updated</span>
-                    <span class="list-item-meta-value">${escapeHtml(timeAgo(automation.updated_at))}</span>
-                  </span>
-                </div>
-              </div>
-              <div class="list-item-aside">
-                <div class="stack-sm">
-                  <div class="badge-row">
-                    ${badge(automation.is_enabled ? 'Enabled' : 'Disabled', automation.is_enabled ? 'success' : '')}
-                  </div>
-                  <lex-btn variant="secondary" size="sm" class="automation-toggle" data-automation-id="${escapeAttribute(automation.automation_id || '')}" data-enabled="${automation.is_enabled}">
-                    ${automation.is_enabled ? 'Deactivate' : 'Activate'}
-                  </lex-btn>
-                </div>
-              </div>
-            </article>
-          `).join('')
-            : '<lex-empty message="No live automations match the current filter." icon="inbox"></lex-empty>'}
-        </div>
-        <div class="connectors-pagination">
-          <div class="connectors-page-meta">
-            Showing ${visibleAutomations.length ? start + 1 : 0}-${Math.min(start + perPage, visibleAutomations.length)} of ${visibleAutomations.length}
-          </div>
-          <div class="row-actions">
-            <lex-btn variant="secondary" size="sm" data-library-page="${page - 1}" ${page <= 1 ? 'disabled' : ''}>Previous</lex-btn>
-            <span class="connectors-page-indicator">Page ${page} of ${totalPages}</span>
-            <lex-btn variant="secondary" size="sm" data-library-page="${page + 1}" ${page >= totalPages ? 'disabled' : ''}>Next</lex-btn>
-          </div>
-        </div>
+        ${isLoading
+          ? `
+            <div class="muted" style="margin-bottom:12px;">Updating automation list...</div>
+            ${renderLibraryLoadingRows(4)}
+          `
+          : lexDataTable({
+            id: 'libraryAutomationsTable',
+            columns: ['automation_name', 'category', 'automation_type', 'scope', 'visibility', 'state', 'updated_at'],
+            labels: ['Name', 'Category', 'Type', 'Scope', 'Visibility', 'State', 'Updated'],
+            emptyText: 'No live automations found',
+            sortBy: 'updated_at',
+            sortDir: 'desc',
+            idKey: 'automation_id',
+            limit: 20,
+            ariaLabel: 'Live automations'
+          })}
       `
     })}
   `;
+
+  if (!isLoading) {
+    hydrateLexDataTable('libraryAutomationsTable', automationRows, async (row) => {
+      if (row?.automation_id && typeof context.gotoLibraryDetail === 'function') {
+        await context.gotoLibraryDetail(row.automation_id);
+      }
+    });
+  }
 }

@@ -1,5 +1,14 @@
-import { badge, sectionIntro, surface } from '../shared/ui.js';
-import { escapeHtml, formatDate, normalizeText } from '../shared/utils.js';
+import {
+  badge,
+  drawerSection,
+  drawerStatGrid,
+  hydrateLexDataTable,
+  lexDataTable,
+  lexEmpty,
+  sectionIntro,
+  surface
+} from '../shared/ui.js';
+import { escapeAttribute, escapeHtml, formatDate, normalizeText } from '../shared/utils.js';
 
 function statusClass(status) {
   const normalized = normalizeText(status);
@@ -28,11 +37,6 @@ function formatBytes(bytes) {
   if (value < 1024) return `${Math.round(value)} B`;
   if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function sortIndicator(filters, field) {
-  if (filters.sortBy !== field) return '';
-  return filters.sortDir === 'desc' ? ' ↓' : ' ↑';
 }
 
 function runActionButtons(run) {
@@ -83,27 +87,42 @@ function renderMatterLink(lanaClientUrl, matterId, matterName) {
   return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" data-run-matter-link="true" style="color:var(--lex-color-primary-600,#2563eb);text-decoration:none;" onclick="event.stopPropagation()">${escapeHtml(label)}</a>`;
 }
 
-function runTableRow(run, lanaClientUrl) {
-  const runId = run.execution_id || '';
-  return `
-    <tr class="run-row-selectable" data-open-run-detail="${escapeHtml(runId)}">
-      <td>
-        <div class="stack-sm">
-          <strong>${escapeHtml(run.automation_name || run.automation_id || 'Automation')}</strong>
-          <span class="muted">${escapeHtml(runId)}</span>
-        </div>
-      </td>
-      <td>${renderMatterLink(lanaClientUrl, run.client_matter_id, run.matter_name || run.client_matter_id || 'Org-wide')}</td>
-      <td>${escapeHtml(run.trigger_event_type || 'manual')}</td>
-      <td>${escapeHtml(formatDate(run.created_at || run.started_at))}</td>
-      <td>
-        <div class="badge-row">
-          ${badge(statusLabel(run.status), statusClass(run.status))}
-        </div>
-      </td>
-      <td>${escapeHtml(formatDuration(run.execution_duration_ms))}</td>
-    </tr>
-  `;
+function normalizeScopeType(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'organization' || normalized === 'org' || normalized === 'org_wide' || normalized === 'organization-wide') {
+    return 'organization';
+  }
+  if (normalized === 'matter' || normalized === 'matter_scoped' || normalized === 'specific_matter') {
+    return 'matter';
+  }
+  return '';
+}
+
+function runScope(run) {
+  const rawScope = run.automation_config?.scope || run.scope || {};
+  const configScope = rawScope && typeof rawScope === 'object' ? rawScope : { type: rawScope };
+  const matterId = configScope.matter_id
+    || configScope.matterId
+    || run.client_matter_id
+    || run.matter_id
+    || '';
+  const type = normalizeScopeType(configScope.type || configScope.scope_type || run.scope_type || run.scopeType)
+    || (String(run.source_type || '').toLowerCase() === 'matter' || matterId ? 'matter' : 'organization');
+  const matterLabel = configScope.matter_name || run.matter_name || matterId || 'Selected matter';
+
+  if (type === 'matter') {
+    return {
+      type,
+      label: `Matter: ${matterLabel}`,
+      badge: 'Matter scope'
+    };
+  }
+
+  return {
+    type,
+    label: 'Organization-wide',
+    badge: 'Organization scope'
+  };
 }
 
 function renderRunDetailsPanel(context) {
@@ -116,86 +135,91 @@ function renderRunDetailsPanel(context) {
   const steps = Array.isArray(detail.step_outcomes) ? detail.step_outcomes : [];
   const artifacts = Array.isArray(detail.artifacts) ? detail.artifacts : [];
   const lanaClientUrl = context.state.links?.lana_client_url || '';
+  const scope = runScope(run);
 
   return `
-    <aside class="run-detail-drawer">
-      <div class="run-detail-head">
-        <div>
-          <h3>${escapeHtml(run.automation_name || run.automation_id || 'Run')}</h3>
-          <p class="muted">${escapeHtml(run.execution_id || '')}</p>
-        </div>
-        <button type="button" class="template-modal-close" data-close-run-detail aria-label="Close run details">×</button>
-      </div>
+    <lex-drawer
+      heading="${escapeAttribute(run.automation_name || run.automation_id || 'Run')}"
+      subtitle="${escapeAttribute(run.execution_id || '')}"
+      side="right"
+      width="xl"
+      open
+      data-run-detail-drawer
+    >
+      <div class="automation-detail-drawer run-detail-content">
 
       <div class="badge-row">
         ${badge(statusLabel(run.status), statusClass(run.status))}
         ${badge(run.trigger_event_type || 'manual')}
+        ${badge(scope.badge, scope.type === 'organization' ? 'info' : '')}
       </div>
 
-      <div class="run-detail-section">
-        <h4>Run Controls</h4>
-        ${runActionButtons(run)}
-      </div>
+      ${drawerSection({
+        title: 'Run Controls',
+        body: runActionButtons(run)
+      })}
 
-      <div class="run-detail-section">
-        <h4>Execution</h4>
-        <div class="meta-grid run-detail-grid">
-          <div class="meta-item">
-            <span class="meta-label">Started</span>
-            <div class="meta-value">${escapeHtml(formatDate(run.started_at || run.created_at))}</div>
-          </div>
-          <div class="meta-item">
-            <span class="meta-label">Completed</span>
-            <div class="meta-value">${escapeHtml(formatDate(run.completed_at))}</div>
-          </div>
-          <div class="meta-item">
-            <span class="meta-label">Duration</span>
-            <div class="meta-value">${escapeHtml(formatDuration(run.execution_duration_ms))}</div>
-          </div>
-          <div class="meta-item">
-            <span class="meta-label">Matter</span>
-            <div class="meta-value">${renderMatterLink(lanaClientUrl, run.client_matter_id, run.matter_name || run.client_matter_id || 'Org-wide')}</div>
-          </div>
-        </div>
-      </div>
+      ${drawerSection({
+        title: 'Execution',
+        body: drawerStatGrid([
+          { label: 'Started', value: formatDate(run.started_at || run.created_at) },
+          { label: 'Completed', value: formatDate(run.completed_at) },
+          { label: 'Duration', value: formatDuration(run.execution_duration_ms) },
+          { label: 'Scope', value: scope.label },
+          {
+            label: 'Matter',
+            value: renderMatterLink(lanaClientUrl, run.client_matter_id, run.matter_name || run.client_matter_id || 'Org-wide'),
+            isHtml: true
+          }
+        ])
+      })}
 
-      <div class="run-detail-section">
-        <h4>Step Outcomes</h4>
-        ${steps.length
+      ${drawerSection({
+        title: 'Step Outcomes',
+        body: steps.length
           ? `
             <div class="run-detail-list">
               ${steps.map((step) => `
-                <article class="run-step-card">
+                <lex-card variant="flat" class="automation-detail-item">
                   <div class="row-between">
                     <strong>${escapeHtml(step.step_id || `Step ${step.step_index || '?'}`)}</strong>
                     <span>${badge(statusLabel(step.status), statusClass(step.status))}</span>
                   </div>
                   <p class="muted">${escapeHtml(step.step_type || 'step')} ${step.duration_ms ? `• ${escapeHtml(formatDuration(step.duration_ms))}` : ''}</p>
                   ${step.message ? `<p>${escapeHtml(step.message)}</p>` : ''}
-                </article>
+                </lex-card>
               `).join('')}
             </div>
           `
-          : '<p class="muted">No step-level outcome data was captured for this run.</p>'}
-      </div>
+          : lexEmpty({
+            message: 'No step outcomes captured',
+            description: 'This run did not return step-level execution data.',
+            icon: 'inbox'
+          })
+      })}
 
-      <div class="run-detail-section">
-        <h4>Artifacts</h4>
-        ${artifacts.length
+      ${drawerSection({
+        title: 'Artifacts',
+        body: artifacts.length
           ? `
             <div class="run-detail-list">
               ${artifacts.map((artifact) => `
-                <article class="run-step-card">
+                <lex-card variant="flat" class="automation-detail-item">
                   <strong>${escapeHtml(artifact.artifact_name || artifact.artifact_id || 'Artifact')}</strong>
                   <p class="muted">${escapeHtml(artifact.artifact_type || 'artifact')} • ${escapeHtml(artifact.storage_type || 'storage')} ${artifact.file_size_bytes ? `• ${escapeHtml(formatBytes(artifact.file_size_bytes))}` : ''}</p>
                   ${artifact.artifact_description ? `<p>${escapeHtml(artifact.artifact_description)}</p>` : ''}
-                </article>
+                </lex-card>
               `).join('')}
             </div>
           `
-          : '<p class="muted">No artifacts generated for this run.</p>'}
+          : lexEmpty({
+            message: 'No artifacts generated',
+            description: 'Generated documents and structured outputs will appear here.',
+            icon: 'document'
+          })
+      })}
       </div>
-    </aside>
+    </lex-drawer>
   `;
 }
 
@@ -212,12 +236,19 @@ export function renderRuns(context) {
   const start = visibleCount ? offset + 1 : 0;
   const end = visibleCount ? offset + visibleCount : 0;
 
-  const hasSelectedRun = Boolean(
-    context.state.selectedRunId
-    && context.state.selectedRunDetail
-    && context.state.selectedRunDetail.data
-  );
-  const lanaClientUrl = context.state.links?.lana_client_url || '';
+  const runRows = visibleRuns.map((run) => {
+    const scope = runScope(run);
+    return {
+      execution_id: run.execution_id || '',
+      automation_name: run.automation_name || run.automation_id || 'Automation',
+      scope: scope.label,
+      matter_name: run.matter_name || run.client_matter_id || 'Org-wide',
+      trigger_event_type: run.trigger_event_type || 'manual',
+      started_at: run.created_at || run.started_at || '',
+      status: normalizeText(run.status) || 'pending',
+      duration: formatDuration(run.execution_duration_ms)
+    };
+  });
 
   context.els.viewContent.innerHTML = `
     ${sectionIntro({
@@ -233,63 +264,22 @@ export function renderRuns(context) {
       ]
     })}
 
-    <div class="runs-history-layout ${hasSelectedRun ? '' : 'no-detail'}">
+    <div class="runs-history-layout no-detail">
       ${surface({
         title: 'Triggered Runs',
         subtitle: 'All automation executions across the organization.',
         body: `
-          <div class="connectors-table-toolbar">
-            <label class="toolbar-search">
-              <span class="sr-only">Search runs</span>
-              <input
-                type="search"
-                value="${escapeHtml(String(filters.query || ''))}"
-                placeholder="Search by run ID, automation, matter, trigger, or status"
-                data-filter-view="runs"
-                data-filter-field="query"
-              >
-            </label>
-            <label class="toolbar-select">
-              <span>State</span>
-              <select data-filter-view="runs" data-filter-field="state">
-                <option value="all" ${filters.state === 'all' ? 'selected' : ''}>All</option>
-                <option value="running" ${filters.state === 'running' ? 'selected' : ''}>Running</option>
-                <option value="pending" ${filters.state === 'pending' ? 'selected' : ''}>Pending</option>
-                <option value="awaiting_approval" ${filters.state === 'awaiting_approval' ? 'selected' : ''}>Awaiting Approval</option>
-                <option value="completed" ${filters.state === 'completed' ? 'selected' : ''}>Completed</option>
-                <option value="failed" ${filters.state === 'failed' ? 'selected' : ''}>Failed</option>
-                <option value="cancelled" ${filters.state === 'cancelled' ? 'selected' : ''}>Cancelled</option>
-              </select>
-            </label>
-            <label class="toolbar-select">
-              <span>Rows</span>
-              <select data-filter-view="runs" data-filter-field="perPage">
-                <option value="25" ${perPage === 25 ? 'selected' : ''}>25</option>
-                <option value="50" ${perPage === 50 ? 'selected' : ''}>50</option>
-                <option value="100" ${perPage === 100 ? 'selected' : ''}>100</option>
-              </select>
-            </label>
-          </div>
-
-          <div class="connectors-table-wrap">
-            <table class="connectors-table">
-              <thead>
-                <tr>
-                  <th><button type="button" class="connectors-sort-btn" data-runs-sort="name">Automation${sortIndicator(filters, 'name')}</button></th>
-                  <th><button type="button" class="connectors-sort-btn" data-runs-sort="matter">Matter${sortIndicator(filters, 'matter')}</button></th>
-                  <th><button type="button" class="connectors-sort-btn" data-runs-sort="trigger">Trigger${sortIndicator(filters, 'trigger')}</button></th>
-                  <th><button type="button" class="connectors-sort-btn" data-runs-sort="created_at">Started${sortIndicator(filters, 'created_at')}</button></th>
-                  <th><button type="button" class="connectors-sort-btn" data-runs-sort="status">Status${sortIndicator(filters, 'status')}</button></th>
-                  <th><button type="button" class="connectors-sort-btn" data-runs-sort="duration">Duration${sortIndicator(filters, 'duration')}</button></th>
-                </tr>
-              </thead>
-              <tbody>
-                ${visibleRuns.length
-                  ? visibleRuns.map((run) => runTableRow(run, lanaClientUrl)).join('')
-                  : '<tr><td colspan="6" class="connectors-empty">No runs match the current filters.</td></tr>'}
-              </tbody>
-            </table>
-          </div>
+          ${lexDataTable({
+            id: 'automationRunsTable',
+            columns: ['automation_name', 'scope', 'matter_name', 'trigger_event_type', 'started_at', 'status', 'duration'],
+            labels: ['Automation', 'Scope', 'Matter', 'Trigger', 'Started', 'Status', 'Duration'],
+            emptyText: 'No runs found',
+            sortBy: 'started_at',
+            sortDir: 'desc',
+            idKey: 'execution_id',
+            limit: perPage,
+            ariaLabel: 'Triggered runs'
+          })}
 
           <div class="connectors-pagination">
             <div class="connectors-page-meta">
@@ -304,7 +294,14 @@ export function renderRuns(context) {
         `
       })}
 
-      ${renderRunDetailsPanel(context)}
     </div>
+    ${renderRunDetailsPanel(context)}
   `;
+
+  hydrateLexDataTable('automationRunsTable', runRows, async (row) => {
+    if (row?.execution_id && typeof context.loadRunDetail === 'function') {
+      await context.loadRunDetail(row.execution_id);
+      context.renderCurrentView();
+    }
+  });
 }

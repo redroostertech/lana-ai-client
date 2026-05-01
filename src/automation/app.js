@@ -72,6 +72,8 @@ const state = {
   dashboard: null,
   templates: [],
   automations: [],
+  homeRecentRuns: [],
+  homeRunBusyId: null,
   actionCatalog: [],
   matters: [],
   runs: [],
@@ -125,6 +127,9 @@ const state = {
     busy: false
   },
   approvals: [],
+  selectedApprovalId: null,
+  selectedApprovalDetail: null,
+  approvalActioning: false,
   userProfile: null,
   onboardingState: null,
   filters: createFilterState(),
@@ -331,6 +336,7 @@ function bindGlobalEvents() {
   document.body.addEventListener('input', onAppInput);
   document.body.addEventListener('change', onAppInput);
   document.body.addEventListener('lex-composer-send', onHomeComposerSend);
+  document.body.addEventListener('lex-close', onAppLexClose);
   document.body.addEventListener('breadcrumb-navigate', onBreadcrumbNavigate);
   document.addEventListener('keydown', onGlobalKeydown);
 
@@ -350,6 +356,20 @@ function bindGlobalEvents() {
   }
   if (els.connectorImportDropZone) {
     setupConnectorImportDropZone(els.connectorImportDropZone);
+  }
+}
+
+function onAppLexClose(event) {
+  if (event.target?.matches?.('[data-run-detail-drawer]')) {
+    state.selectedRunId = null;
+    state.selectedRunDetail = null;
+    renderCurrentView();
+  }
+
+  if (event.target?.matches?.('[data-approval-detail-drawer]')) {
+    state.selectedApprovalId = null;
+    state.selectedApprovalDetail = null;
+    renderCurrentView();
   }
 }
 
@@ -381,6 +401,7 @@ async function bootstrapApp() {
     loadDashboard(),
     loadTemplates(),
     loadAutomations(),
+    loadHomeRecentRuns(),
     loadMatters(),
     loadConnectors(),
     // Load installed connectors at boot too, not just when the Connectors
@@ -466,6 +487,7 @@ function resolveApiFallbackPath(path) {
     ['/api/automations/', '/api/v1/automations/'],
     ['/api/matters/', '/api/v1/matters/'],
     ['/api/executions/', '/api/v1/automation/executions/'],
+    ['/api/approvals/', '/api/v1/approvals/'],
     ['/api/integrations/connectors/', '/api/v1/integrations/connectors/']
   ];
 
@@ -673,6 +695,7 @@ async function refreshCurrentView() {
         loadDashboard(),
         loadTemplates(),
         loadAutomations(),
+        loadHomeRecentRuns(),
         loadConnectors(),
         loadInstalledConnectors(),
         loadConnectorHealth()
@@ -1100,6 +1123,17 @@ async function onAppClick(event) {
     return;
   }
 
+  const homeRunButton = event.target.closest('[data-home-run-automation-id]');
+  if (homeRunButton) {
+    event.preventDefault();
+    event.stopPropagation();
+    const automationId = homeRunButton.dataset.homeRunAutomationId;
+    if (automationId) {
+      await runAutomationFromHome(automationId);
+    }
+    return;
+  }
+
   const checkDataButton = event.target.closest('[data-template-check-data]');
   if (checkDataButton) {
     openCheckDataModal(checkDataButton.dataset.templateCheckData);
@@ -1291,6 +1325,25 @@ async function onAppClick(event) {
     return;
   }
 
+  if (event.target.closest('[data-close-approval-detail]')) {
+    state.selectedApprovalId = null;
+    state.selectedApprovalDetail = null;
+    renderCurrentView();
+    return;
+  }
+
+  const approvalActionButton = event.target.closest('[data-approval-action][data-approval-id]');
+  if (approvalActionButton) {
+    const drawer = approvalActionButton.closest('[data-approval-detail-drawer]');
+    const comment = drawer?.querySelector('[data-approval-comment]')?.value || '';
+    await decideApproval(
+      approvalActionButton.dataset.approvalId,
+      approvalActionButton.dataset.approvalAction,
+      comment
+    );
+    return;
+  }
+
   const libraryPageButton = event.target.closest('[data-library-page]');
   if (libraryPageButton) {
     const page = parseInt(libraryPageButton.dataset.libraryPage, 10);
@@ -1405,9 +1458,18 @@ async function onAppInput(event) {
 
   const builderField = event.target.closest('[data-builder-field]');
   if (builderField) {
-    state.builder[builderField.dataset.builderField] = builderField.value;
+    const fieldName = builderField.dataset.builderField;
+    state.builder[fieldName] = builderField.value;
 
-    if (builderField.dataset.builderField === 'triggerMode') {
+    if (fieldName === 'scopeType') {
+      if (builderField.value !== 'matter') {
+        state.builder.matterId = '';
+      } else if (!state.builder.matterId && state.matters.length) {
+        state.builder.matterId = state.matters[0].matter_id || state.matters[0].id;
+      }
+    }
+
+    if (fieldName === 'triggerMode') {
       const triggerOptions = builderField.value === 'scheduled'
         ? ['schedule.daily', 'schedule.weekly']
         : ['document.uploaded', 'connector.synced'];
@@ -1420,11 +1482,11 @@ async function onAppInput(event) {
       return;
     }
 
-    if (builderField.dataset.builderField === 'triggerEvent') {
+    if (fieldName === 'triggerEvent') {
       state.builder.triggerMode = String(builderField.value).startsWith('schedule.') ? 'scheduled' : 'event';
     }
 
-    if (builderField.dataset.builderField !== 'customJson') {
+    if (fieldName !== 'customJson') {
       syncBuilderJson(createContext());
       const jsonField = document.getElementById('builder-json');
       if (jsonField && jsonField !== builderField) {
@@ -1432,11 +1494,7 @@ async function onAppInput(event) {
       }
     }
 
-    if (builderField.dataset.builderField === 'scopeType' && builderField.value !== 'matter') {
-      state.builder.matterId = '';
-    }
-
-    if (builderField.dataset.builderField === 'scopeType' || builderField.dataset.builderField === 'matterId' || event.type === 'change') {
+    if (fieldName === 'scopeType' || fieldName === 'matterId' || event.type === 'change') {
       renderCurrentView();
     }
 
@@ -1832,6 +1890,102 @@ async function loadRuns() {
       state.selectedRunId = null;
       state.selectedRunDetail = null;
     }
+  }
+}
+
+async function loadHomeRecentRuns() {
+  const query = new URLSearchParams();
+  query.set('limit', '10');
+  query.set('offset', '0');
+  query.set('sort_by', 'created_at');
+  query.set('sort_dir', 'desc');
+
+  try {
+    const payload = await fetchJson(`/api/executions?${query.toString()}`, {
+      headers: authHeaders()
+    });
+    state.homeRecentRuns = payload.data || payload.executions || [];
+  } catch (error) {
+    console.warn('[automation] Failed to load recent executions for Home.', error);
+    state.homeRecentRuns = [];
+  }
+}
+
+async function runAutomationFromHome(automationId) {
+  const automation = state.automations.find((item) => {
+    const id = item.automation_id || item.id;
+    return String(id || '') === String(automationId);
+  });
+  const automationName = automation?.automation_name || automation?.name || 'Automation';
+
+  state.homeRunBusyId = automationId;
+  renderCurrentView();
+
+  try {
+    await fetchJson(`/api/v1/automations/${encodeURIComponent(automationId)}/execute`, {
+      method: 'POST',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    await recordAutomationTriggeredActivity(automation, automationId);
+    await loadHomeRecentRuns();
+    rememberHomeRecentRun(automationId, automationName);
+    flash(`Triggered ${automationName}.`);
+  } catch (error) {
+    flash(error.message || 'Failed to trigger automation.', true);
+  } finally {
+    state.homeRunBusyId = null;
+    renderCurrentView();
+  }
+}
+
+function rememberHomeRecentRun(automationId, automationName) {
+  const now = new Date().toISOString();
+  state.homeRecentRuns = [
+    {
+      automation_id: automationId,
+      automation_name: automationName,
+      status: 'pending',
+      created_at: now,
+      started_at: now
+    },
+    ...(state.homeRecentRuns || []).filter((run) => {
+      return String(run.automation_id || run.automationId || '') !== String(automationId);
+    })
+  ].slice(0, 10);
+}
+
+async function recordAutomationTriggeredActivity(automation, automationId) {
+  const automationName = automation?.automation_name || automation?.name || 'Automation';
+
+  try {
+    await fetchJson('/api/v1/notifications/admin', {
+      method: 'POST',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'info',
+        title: 'Automation triggered',
+        body: `${automationName} was started from LanaAutomate Home.`,
+        action_url: 'automation/index.html#runs'
+      })
+    });
+    await refreshNotificationBadge();
+  } catch (error) {
+    console.warn('[automation] Failed to record automation trigger notification.', error);
+  }
+}
+
+async function refreshNotificationBadge() {
+  try {
+    const payload = await fetchJson('/api/v1/notifications/unread-count', {
+      headers: authHeaders()
+    });
+    const count = Number(payload?.unread_count || payload?.count || 0);
+    if (els.topbar) {
+      els.topbar.notificationCount = count;
+    }
+  } catch (error) {
+    console.warn('[automation] Failed to refresh notification badge.', error);
   }
 }
 
@@ -2579,7 +2733,66 @@ async function loadApprovals() {
   const payload = await fetchJson('/api/approvals/inbox?limit=100', {
     headers: authHeaders()
   });
-  state.approvals = payload.approvals || [];
+  state.approvals = payload.approvals || payload.data || [];
+
+  if (state.selectedApprovalId) {
+    const selectedStillVisible = state.approvals.some((approval) => {
+      const id = approval.approval_id || approval.id || approval.title || approval.approval_type || '';
+      return String(id) === String(state.selectedApprovalId);
+    });
+    if (!selectedStillVisible) {
+      state.selectedApprovalId = null;
+      state.selectedApprovalDetail = null;
+    }
+  }
+}
+
+async function loadApprovalDetail(approvalId, fallbackApproval = null) {
+  if (!approvalId) return;
+  const localApproval = fallbackApproval || state.approvals.find((approval) => {
+    const id = approval.approval_id || approval.id || approval.title || approval.approval_type || '';
+    return String(id) === String(approvalId);
+  }) || null;
+  state.selectedApprovalId = approvalId;
+  state.selectedApprovalDetail = localApproval || state.selectedApprovalDetail || null;
+
+  try {
+    const payload = await fetchJson(`/api/approvals/${encodeURIComponent(approvalId)}`, {
+      headers: authHeaders()
+    });
+    state.selectedApprovalDetail = payload.data || payload.approval || payload || localApproval || null;
+  } catch (error) {
+    if (localApproval) {
+      console.warn('Failed to load approval detail; showing inbox row payload instead.', error);
+      flash('Showing available approval details only.', true);
+      return;
+    }
+    throw error;
+  }
+}
+
+async function decideApproval(approvalId, action, comments = '') {
+  if (!approvalId || !['approve', 'reject'].includes(action)) return;
+
+  state.approvalActioning = true;
+  renderCurrentView();
+
+  try {
+    await fetchJson(`/api/approvals/${encodeURIComponent(approvalId)}/${action}`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ comments })
+    });
+    await loadApprovals();
+    state.selectedApprovalId = null;
+    state.selectedApprovalDetail = null;
+    flash(`Approval ${action === 'approve' ? 'approved' : 'rejected'}.`);
+  } catch (error) {
+    flash(error.message || `Failed to ${action} approval.`, true);
+  } finally {
+    state.approvalActioning = false;
+    renderCurrentView();
+  }
 }
 
 async function loadUserProfile() {
@@ -2900,6 +3113,10 @@ function createContext() {
     authHeaders,
     flash,
     configIsValid,
-    gotoBuilder
+    gotoBuilder,
+    gotoLibraryDetail,
+    loadRunDetail,
+    loadApprovalDetail,
+    decideApproval
   };
 }

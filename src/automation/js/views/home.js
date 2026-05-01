@@ -1,5 +1,5 @@
 import { badge } from '../shared/ui.js';
-import { escapeAttribute, escapeHtml } from '../shared/utils.js';
+import { escapeAttribute, escapeHtml, formatLabel, timeAgo } from '../shared/utils.js';
 import { countReadyConnectors } from './connectors.js';
 
 export function buildChecklist(context) {
@@ -39,6 +39,7 @@ export function renderHome(context) {
   const firstName = context.state.user?.firstName || context.state.user?.email?.split('@')[0] || 'there';
   const templates = context.getTemplateLibrary();
   const starterTemplates = templates.slice(0, 3);
+  const runnableAutomations = getHomeRunnableAutomations(context);
 
   context.els.viewContent.innerHTML = `
     <section class="home-shell">
@@ -58,6 +59,25 @@ export function renderHome(context) {
       </div>
 
       <section class="home-section">
+        <div class="home-section-head">
+          <div>
+            <h3>Run automations</h3>
+            <p>Recently used workflows ready to trigger from Home</p>
+          </div>
+        </div>
+        ${runnableAutomations.length ? `
+          <div class="home-card-grid">
+            ${runnableAutomations.map(({ automation, run }) => renderRunnableAutomation(context, automation, run)).join('')}
+          </div>
+        ` : `
+          <lex-empty
+            message="No runnable automations"
+            description="Publish an automation to run it from Home."
+          ></lex-empty>
+        `}
+      </section>
+
+      <section class="home-section">
         <h3>Starter templates</h3>
         <div class="home-card-grid">
           ${starterTemplates.map((template) => `
@@ -74,4 +94,89 @@ export function renderHome(context) {
       </section>
     </section>
   `;
+}
+
+function getHomeRunnableAutomations(context) {
+  const automationsById = new Map();
+  const picked = [];
+  const seen = new Set();
+
+  for (const automation of context.state.automations || []) {
+    const id = getAutomationId(automation);
+    if (id) automationsById.set(id, automation);
+  }
+
+  for (const run of context.state.homeRecentRuns || []) {
+    const automationId = String(run.automation_id || run.automationId || '');
+    if (!automationId || seen.has(automationId)) continue;
+    const automation = automationsById.get(automationId);
+    if (!automation) continue;
+    picked.push({ automation, run });
+    seen.add(automationId);
+    if (picked.length >= 3) return picked;
+  }
+
+  const fallback = [...(context.state.automations || [])]
+    .filter((automation) => automation.is_enabled !== false && automation.status !== 'disabled')
+    .sort((left, right) => {
+      const leftTime = new Date(left.updated_at || left.created_at || 0).getTime();
+      const rightTime = new Date(right.updated_at || right.created_at || 0).getTime();
+      return rightTime - leftTime;
+    });
+
+  for (const automation of fallback) {
+    const automationId = getAutomationId(automation);
+    if (!automationId || seen.has(automationId)) continue;
+    picked.push({ automation, run: null });
+    seen.add(automationId);
+    if (picked.length >= 3) break;
+  }
+
+  return picked;
+}
+
+function renderRunnableAutomation(context, automation, run) {
+  const automationId = getAutomationId(automation);
+  const name = automation.automation_name || automation.name || 'Untitled automation';
+  const description = automation.automation_description
+    || automation.description
+    || 'Run this published workflow now.';
+  const category = automation.category || automation.automation_type || 'Automation';
+  const trigger = automation.trigger_type
+    || automation.trigger
+    || automation.automation_config?.trigger?.type
+    || automation.automation_config?.trigger
+    || '';
+  const runTime = run?.started_at || run?.created_at || run?.completed_at || automation.updated_at || automation.created_at;
+  const isBusy = context.state.homeRunBusyId === automationId;
+
+  return `
+    <lex-card
+      class="home-run-card"
+      variant="default"
+      padding="compact"
+      heading="${escapeAttribute(name)}"
+    >
+      <div class="home-run-card-main">
+        <p class="home-run-description" title="${escapeAttribute(description)}">${escapeHtml(description)}</p>
+        <div class="home-run-meta">
+          ${badge(formatLabel(category) || 'Automation')}
+          ${trigger ? badge(formatLabel(trigger)) : ''}
+        </div>
+      </div>
+      <div class="home-run-card-actions" data-slot="footer">
+        <span class="home-run-time">${run ? `Last run ${escapeHtml(timeAgo(runTime))}` : `Updated ${escapeHtml(timeAgo(runTime))}`}</span>
+        <lex-btn
+          variant="primary"
+          size="sm"
+          data-home-run-automation-id="${escapeAttribute(automationId)}"
+          ${isBusy ? 'loading="true" disabled' : ''}
+        >${isBusy ? 'Triggering' : 'Run Now'}</lex-btn>
+      </div>
+    </lex-card>
+  `;
+}
+
+function getAutomationId(automation) {
+  return String(automation?.automation_id || automation?.id || '');
 }

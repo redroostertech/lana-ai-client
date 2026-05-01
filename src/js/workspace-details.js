@@ -8599,6 +8599,24 @@
   // Lifecycle
   // =========================================================================
 
+  function resetMatterDetailScroll() {
+    var scrollers = [
+      document.getElementById('lex-main-content'),
+      document.querySelector('lex-content'),
+      document.scrollingElement,
+      document.documentElement,
+      document.body
+    ];
+
+    scrollers.forEach(function (scroller) {
+      if (!scroller) return;
+      try {
+        scroller.scrollTop = 0;
+        scroller.scrollLeft = 0;
+      } catch (e) {}
+    });
+  }
+
   async function onEnter() {
     _preInitKeys = new Set(Object.keys(window));
 
@@ -8645,6 +8663,8 @@
     // Persist matterId so it survives page refresh / router timing issues
     try { sessionStorage.setItem('_lex_matter_detail_id', matterId); } catch (e) {}
 
+    resetMatterDetailScroll();
+
     // Apply redacted shimmer to all page sections
     redactPage(true);
 
@@ -8676,6 +8696,7 @@
 
     // Remove redacted shimmer
     redactPage(false);
+    resetMatterDetailScroll();
 
     // Auto-open file viewer if open_file param was passed (e.g. from dashboard)
     if (openFileId) {

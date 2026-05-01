@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LANA Voice</title>
+  <title>LANA Voice Agents</title>
   <link rel="stylesheet" href="../css/tailwind-output.css">
   <script src="../js/tailwind-loader.js"></script>
   <link rel="stylesheet" href="../css/lex-tokens.css">
@@ -11,96 +11,105 @@
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-  <section class="screen app-shell">
-    <lex-sidebar
-      id="app-sidebar"
-      logo-src="../img/logo-light.png"
-      logo-alt="LANA Suite"
-      logo-href="../dashboard.html"
-      active-id="voice"
-    ></lex-sidebar>
-    <main class="workspace content-shell lex-shell-main">
-      <lex-topbar id="app-topbar" heading="Voice Intake"></lex-topbar>
-      <div class="workspace-scroll">
-        <section class="voice-layout">
-          <aside class="surface voice-controls">
-            <div>
-              <p class="eyebrow">Connection</p>
-              <h1>Lana Voice</h1>
-            </div>
+  <lex-app
+    id="voice-shell"
+    logo-src="../img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="../dashboard.html"
+    active-nav-id="voice-agents"
+    page-title="Voice Agents"
+  ></lex-app>
 
-            <div class="button-row">
-              <button id="new-session-btn" type="button" class="btn btn-primary">New Session</button>
-            </div>
+  <template id="page-content">
+    <div class="workspace-scroll">
+      <section id="voice-root" class="voice-root" aria-live="polite">
+        <div id="voice-flash" class="voice-flash hidden"></div>
 
-            <div class="status-grid">
-              <div>
-                <span>Firm</span>
-                <strong id="firm-name">-</strong>
-              </div>
-              <div>
-                <span>Workflow</span>
-                <strong id="workflow-name">-</strong>
-              </div>
-              <div>
-                <span>Call ID</span>
-                <strong id="call-id">-</strong>
-              </div>
-            </div>
-          </aside>
-
-          <section class="surface voice-console">
-            <div class="console-header">
-              <div>
-                <p class="eyebrow">Test Console</p>
-                <h2>Intake Conversation</h2>
-              </div>
-              <span id="health-pill" class="pill">checking</span>
-            </div>
-
-            <div id="transcript" class="transcript" aria-live="polite"></div>
-
-            <form id="turn-form" class="turn-form">
-              <input id="turn-input" type="text" placeholder="Type a caller utterance for the local loop" autocomplete="off">
-              <button type="submit" class="btn btn-primary">Send</button>
-            </form>
-          </section>
-
-          <aside class="surface field-panel">
-            <div>
-              <p class="eyebrow">Captured Fields</p>
-              <h2>Current Intake</h2>
-            </div>
-            <div id="field-list" class="field-list"></div>
-
-            <form id="field-form" class="field-form">
-              <label>
-                <span>Field</span>
-                <select id="field-name"></select>
-              </label>
-              <label>
-                <span>Value</span>
-                <input id="field-value" type="text" autocomplete="off">
-              </label>
-              <button type="submit" class="btn btn-muted">Capture Field</button>
-            </form>
-          </aside>
+        <section class="voice-hero">
+          <div>
+            <p class="voice-eyebrow">LanaVoice</p>
+            <h1>Voice Agents</h1>
+            <p>Configure phone-ready agents for intake, routing, follow-up, and firm knowledge.</p>
+          </div>
+          <div class="voice-hero-actions">
+            <lex-btn id="refresh-agents-btn" type="button" variant="ghost" size="md" leading-icon="refresh-cw">Refresh</lex-btn>
+            <lex-btn id="create-agent-btn" type="button" variant="primary" size="md" leading-icon="plus">New Agent</lex-btn>
+          </div>
         </section>
-      </div>
-    </main>
-  </section>
+
+        <section class="voice-workspace">
+          <aside class="agent-rail" aria-label="Voice agents">
+            <div class="rail-toolbar">
+              <p class="rail-overline">Voice Agents</p>
+              <label class="rail-search">
+                <span class="sr-only">Search agents</span>
+                <input id="agent-search" type="search" placeholder="Search agents" autocomplete="off">
+              </label>
+            </div>
+            <div id="agent-list" class="agent-list"></div>
+          </aside>
+
+          <section class="agent-editor" aria-label="Agent editor">
+            <div id="editor-empty" class="editor-empty hidden">
+              <h2>No agent selected</h2>
+              <p>Create the default receptionist agent or choose an agent from the list.</p>
+              <lex-btn id="empty-create-agent-btn" type="button" variant="primary" size="md" leading-icon="plus">Create Receptionist</lex-btn>
+            </div>
+
+            <div id="editor-panel" class="editor-panel hidden">
+              <header class="editor-header">
+                <div class="agent-title-block">
+                  <p class="voice-eyebrow">Default Receptionist Agent</p>
+                  <h2 id="selected-agent-name">Receptionist</h2>
+                  <div id="selected-agent-meta" class="agent-meta"></div>
+                </div>
+                <div class="editor-actions">
+                  <lex-btn id="duplicate-agent-btn" type="button" variant="ghost" size="md" leading-icon="copy">Duplicate</lex-btn>
+                  <lex-btn id="delete-agent-btn" type="button" variant="danger" size="md" leading-icon="trash-2">Delete</lex-btn>
+                  <lex-btn id="save-agent-btn" type="button" variant="primary" size="md" leading-icon="save">Save</lex-btn>
+                </div>
+              </header>
+
+              <div class="tabs-wrap">
+                <lex-tabs id="agent-tabs" variant="pills" active="agent"></lex-tabs>
+              </div>
+
+              <form id="agent-form" class="tab-panels">
+                <section class="tab-panel" data-tab-panel="agent"></section>
+                <section class="tab-panel hidden" data-tab-panel="voice"></section>
+                <section class="tab-panel hidden" data-tab-panel="knowledge"></section>
+                <section class="tab-panel hidden" data-tab-panel="tools"></section>
+                <section class="tab-panel hidden" data-tab-panel="channels"></section>
+                <section class="tab-panel hidden" data-tab-panel="tests"></section>
+                <section class="tab-panel hidden" data-tab-panel="import-export"></section>
+              </form>
+            </div>
+          </section>
+        </section>
+      </section>
+    </div>
+  </template>
+
   <script src="../js/config.js"></script>
   <script src="../js/version.js"></script>
   <script src="../js/api.js"></script>
   <script src="../js/lex/lex.core.js"></script>
   <script src="../js/lex/lex.icons.js"></script>
+  <script src="../js/lex/lex.state.js"></script>
+  <script src="../js/lex/lex-nav.js"></script>
   <script src="../js/lex/lex.forms.js"></script>
   <script src="../js/lex/components/foundation/lex-btn.js"></script>
   <script src="../js/lex/components/foundation/lex-card.js"></script>
   <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/foundation/lex-empty.js"></script>
+  <script src="../js/lex/components/foundation/lex-modal.js"></script>
+  <script src="../js/lex/components/foundation/lex-tabs.js"></script>
   <script src="../js/lex/components/layout/lex-sidebar.js"></script>
   <script src="../js/lex/components/layout/lex-topbar.js"></script>
+  <script src="../js/lex/components/layout/lex-notification-panel.js"></script>
+  <script src="../js/lex/components/layout/lex-app.js"></script>
   <script src="../js/lex/index.js"></script>
+  <script src="../js/lex/lex-page-init.js"></script>
   <script src="../js/sidebar-footer-hydrate.js"></script>
   <script src="../js/auth-guard.js"></script>
   <script type="module" src="./app.js"></script>
