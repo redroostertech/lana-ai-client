@@ -1009,7 +1009,7 @@
 
     _getAppPrefix() {
       const path = window.location.pathname || '';
-      const nestedDirs = ['/admin/', '/automation/', '/integrations/', '/matters/', '/voice/'];
+      const nestedDirs = ['/admin/', '/automation/', '/integrations/', '/insights/', '/matters/', '/voice/'];
       return nestedDirs.some((dir) => path.indexOf(dir) !== -1) ? '../' : '';
     }
 
@@ -1051,7 +1051,13 @@
       const path = window.location.pathname || '';
       const items = this._getAppItems();
       if (path.indexOf('/automation/') !== -1) return items[1];
-      if (path.indexOf('/admin/analytics.html') !== -1) return items[2];
+      if (
+        path.indexOf('/admin/analytics.html') !== -1 ||
+        path.indexOf('/admin/reporting.html') !== -1 ||
+        path.indexOf('/admin/billable-hours.html') !== -1 ||
+        path.indexOf('/admin/data-visualization.html') !== -1 ||
+        path.indexOf('/insights/') !== -1
+      ) return items[2];
       if (path.indexOf('/voice/') !== -1) return items[3];
       return items[0];
     }

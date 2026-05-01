@@ -61,15 +61,14 @@ export function renderHome(context) {
         <h3>Starter templates</h3>
         <div class="home-card-grid">
           ${starterTemplates.map((template) => `
-            <article class="home-mini-card">
-              <strong>${escapeHtml(template.name)}</strong>
-              <p>${escapeHtml(template.description || template.bestFor || 'Template for repeatable workflow setup.')}</p>
-              <div class="badge-row">
-                ${badge(template.category)}
-                ${badge(template.trigger)}
-              </div>
-              <lex-btn variant="secondary" size="sm" data-template-id="${escapeAttribute(template.id)}">Use Template</lex-btn>
-            </article>
+            <lex-action-card
+              class="home-template-card"
+              title="${escapeAttribute(template.name)}"
+              description="${escapeAttribute(template.description || template.bestFor || 'Template for repeatable workflow setup.')}"
+              tag="${escapeAttribute(template.category || template.trigger || 'Template')}"
+              action="use-template"
+              data-template-id="${escapeAttribute(template.id)}"
+            ></lex-action-card>
           `).join('')}
         </div>
       </section>

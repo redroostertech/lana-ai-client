@@ -764,6 +764,7 @@ button:disabled {
 .home-hero h2 {
   margin: 0;
   font-size: clamp(1.2rem, 2vw, 1.8rem);
+  text-align: center;
 }
 
 .home-prompt {
@@ -815,27 +816,17 @@ button:disabled {
 .home-card-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 14px;
+  align-items: stretch;
 }
 
-.home-mini-card {
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--paper);
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.home-template-card {
+  height: 100%;
 }
 
-.home-mini-card p {
-  margin: 0;
-  color: var(--black-500);
-  font-size: 0.9rem;
-}
-
-.home-mini-card .badge-row {
-  margin-top: auto;
+.home-template-card .lex-acard {
+  min-height: 96px;
+  height: 100%;
 }
 
 .home-draft-list {
@@ -2573,7 +2564,6 @@ pre.code-preview {
     grid-template-columns: 1fr;
   }
 
-  .home-card-grid,
   .home-draft-list {
     grid-template-columns: 1fr 1fr;
   }
@@ -2667,8 +2657,13 @@ pre.code-preview {
     align-items: flex-start;
   }
 
-  .home-card-grid,
   .home-draft-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .home-card-grid {
     grid-template-columns: 1fr;
   }
 }

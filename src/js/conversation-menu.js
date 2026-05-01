@@ -12,6 +12,23 @@ const ConversationMenu = {
   page: 1,
   limit: 20,
   scrollTimeout: null,
+  scope: {
+    type: 'chat_sessions',
+    title: 'Your Chats'
+  },
+
+  setScope(scope) {
+    const nextScope = scope || { type: 'chat_sessions', title: 'Your Chats' };
+    const currentKey = JSON.stringify(this.scope || {});
+    const nextKey = JSON.stringify(nextScope);
+    this.scope = nextScope;
+
+    if (currentKey !== nextKey) {
+      this.page = 1;
+      this.conversations = [];
+      this.hasMore = true;
+    }
+  },
 
   /**
    * Initialize the conversation menu
@@ -96,9 +113,7 @@ const ConversationMenu = {
       }
 
       console.log('[ConversationMenu.loadConversations] Fetching from API...');
-      // Add cache-busting parameter when resetting to ensure fresh data after title updates
-      const cacheBuster = reset ? `&_=${Date.now()}` : '';
-      const response = await api.get(`/api/v1/chat/sessions?page=${this.page}&limit=${this.limit}&sort=updated_at&order=desc${cacheBuster}`);
+      const response = await this.fetchConversations(reset);
       const newConversations = response.sessions || [];
       console.log('[ConversationMenu.loadConversations] Received', newConversations.length, 'conversations');
 
@@ -136,6 +151,68 @@ const ConversationMenu = {
       console.log('[ConversationMenu.loadConversations] Finished, setting isLoading to false');
       this.isLoading = false;
     }
+  },
+
+  async fetchConversations(reset = false) {
+    if (this.scope && this.scope.type === 'conversation_threads') {
+      return this.fetchConversationThreads();
+    }
+
+    // Add cache-busting parameter when resetting to ensure fresh data after title updates
+    const cacheBuster = reset ? `&_=${Date.now()}` : '';
+    return api.get(`/api/v1/chat/sessions?page=${this.page}&limit=${this.limit}&sort=updated_at&order=desc${cacheBuster}`);
+  },
+
+  async fetchConversationThreads() {
+    const pageScopes = (this.scope && this.scope.pageScopes) || [];
+    const limit = this.limit;
+    const offset = (this.page - 1) * limit;
+
+    const requests = pageScopes.length > 0
+      ? pageScopes.map((pageScope) => api.get(
+          `/api/v1/conversation-threads?page_scope=${encodeURIComponent(pageScope)}&limit=100&sort_by=last_activity&sort_order=desc`
+        ))
+      : [api.get('/api/v1/conversation-threads?limit=100&sort_by=last_activity&sort_order=desc')];
+
+    const results = await Promise.all(requests);
+    const allThreads = [];
+
+    results.forEach((result) => {
+      const threads = result.data || result.threads || [];
+      threads.forEach((thread) => {
+        if (thread && thread.context_type === 'insights_chat') {
+          allThreads.push(thread);
+        }
+      });
+    });
+
+    allThreads.sort((a, b) => {
+      const aTime = new Date(a.last_activity || a.updated_at || a.created_at || 0).getTime();
+      const bTime = new Date(b.last_activity || b.updated_at || b.created_at || 0).getTime();
+      return bTime - aTime;
+    });
+
+    const pageThreads = allThreads.slice(offset, offset + limit);
+
+    return {
+      sessions: pageThreads.map((thread) => ({
+        id: thread.thread_id || thread.id,
+        thread_id: thread.thread_id || thread.id,
+        title: thread.title || thread.metadata?.title || 'Untitled Chat',
+        metadata: thread.metadata || {},
+        matter_id: thread.matter_id || '',
+        matter_name: thread.metadata?.matter_name || '',
+        created_at: thread.created_at,
+        updated_at: thread.last_activity || thread.updated_at || thread.created_at
+      })),
+      hasMore: offset + pageThreads.length < allThreads.length,
+      pagination: {
+        page: this.page,
+        limit,
+        offset,
+        total: allThreads.length
+      }
+    };
   },
 
   /**
@@ -177,7 +254,10 @@ const ConversationMenu = {
    */
   renderEmpty() {
     if (!this.container) return;
-    this.container.innerHTML = '<p class="text-sm text-gray-400 italic px-3 py-2">No conversations</p>';
+    const label = this.scope && this.scope.type === 'conversation_threads'
+      ? 'No insights chats'
+      : 'No conversations';
+    this.container.innerHTML = '<p class="text-sm text-gray-400 italic px-3 py-2">' + this.escapeHtml(label) + '</p>';
   },
 
   /**

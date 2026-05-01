@@ -224,6 +224,7 @@
       this._notificationCount = 0;
       this._notificationInterval = null;
       this._lastShowAdmin = undefined;
+      this._lastShellKey = undefined;
     }
 
     // -----------------------------------------------------------------------
@@ -661,35 +662,18 @@
       ]);
       const showAdmin = adminRoles.some(function (r) { return allRoles.has(r); });
 
-      // Only rebuild sidebar sections and menus when admin visibility changes.
+      const appContext = this._getAppContext();
+      const shellKey = (showAdmin ? 'admin' : 'user') + ':' + appContext;
+
+      // Only rebuild sidebar sections and menus when admin visibility or app context changes.
       // Both setSections() and setUserMenuItems() create new arrays which
       // increment the sidebar's generation counters, triggering a full re-render
-      // that destroys #lexConversationListContainer. Since the only structural
-      // difference between hydrations is whether the admin link is shown,
-      // skip the rebuild when admin visibility is unchanged.
-      if (this._lastShowAdmin !== showAdmin) {
+      // that destroys #lexConversationListContainer.
+      if (this._lastShowAdmin !== showAdmin || this._lastShellKey !== shellKey) {
         this._lastShowAdmin = showAdmin;
+        this._lastShellKey = shellKey;
 
-        this.setSections([
-          {
-            id: 'main',
-            isStaticTop: true,
-            items: [
-              { id: 'dashboard', label: 'Dashboard', icon: 'home', href: 'dashboard.html' },
-              { id: 'search', label: 'Search Conversations', icon: 'search', href: 'search-conversations.html' },
-              { id: 'workspaces', label: 'Workspaces', icon: 'briefcase', href: 'workspaces.html' }
-            ]
-          },
-          {
-            id: 'chats',
-            title: 'Your Chats',
-            isScrollable: true,
-            isConversationList: true,
-            items: [
-              { id: 'new-chat', label: 'New Chat', icon: 'plus', isButton: true, onClick: 'openNewProjectModal' }
-            ]
-          }
-        ]);
+        this.setSections(this._buildSidebarSections(appContext));
 
         // User menu items (role-gated)
         const menuItems = [];
@@ -711,6 +695,57 @@
       }
     }
 
+    _getAppContext() {
+      const path = window.location.pathname || '';
+      if (
+        path.indexOf('/admin/analytics.html') !== -1 ||
+        path.indexOf('/admin/reporting.html') !== -1 ||
+        path.indexOf('/admin/billable-hours.html') !== -1 ||
+        path.indexOf('/admin/data-visualization.html') !== -1 ||
+        path.indexOf('/insights/') !== -1
+      ) {
+        return 'insights';
+      }
+      return 'works';
+    }
+
+    _buildSidebarSections(appContext) {
+      const mainItems = appContext === 'insights'
+        ? [
+            { id: 'insights-dashboard', label: 'Dashboard', icon: 'home', href: 'admin/analytics.html' },
+            { id: 'firm-reporting', label: 'Firm Reporting', icon: 'bar-chart-2', href: 'admin/reporting.html' },
+            { id: 'billable-hours', label: 'Billable Hours', icon: 'clock', href: 'admin/billable-hours.html' },
+            { id: 'data-visualization', label: 'Data Visualization', icon: 'bar-chart-3', href: 'admin/data-visualization.html' }
+          ]
+        : [
+            { id: 'dashboard', label: 'Dashboard', icon: 'home', href: 'dashboard.html' },
+            { id: 'search', label: 'Search Conversations', icon: 'search', href: 'search-conversations.html' },
+            { id: 'workspaces', label: 'Workspaces', icon: 'briefcase', href: 'workspaces.html' }
+          ];
+
+      const sections = [
+        {
+          id: 'main',
+          isStaticTop: true,
+          items: mainItems
+        }
+      ];
+
+      if (appContext !== 'insights') {
+        sections.push({
+          id: 'chats',
+          title: 'Your Chats',
+          isScrollable: true,
+          isConversationList: true,
+          items: [
+            { id: 'new-chat', label: 'New Chat', icon: 'plus', isButton: true, onClick: 'openNewProjectModal' }
+          ]
+        });
+      }
+
+      return sections;
+    }
+
     // -----------------------------------------------------------------------
     // Internal — conversation menu
     // -----------------------------------------------------------------------
@@ -718,6 +753,7 @@
     _initConversationMenu() {
       requestAnimationFrame(() => {
         if (typeof window.ConversationMenu === 'undefined') return;
+        if (this._getAppContext() === 'insights') return;
 
         // Skip if ConversationMenu's container is still in the DOM —
         // avoids a visible flash + unnecessary API call on auth:changed
@@ -725,10 +761,30 @@
         var existing = window.ConversationMenu.container;
         if (existing && existing.isConnected) return;
 
+        if (typeof window.ConversationMenu.setScope === 'function') {
+          window.ConversationMenu.setScope(this._getConversationMenuScope());
+        }
+
         if (window.ConversationMenu.init('#lexConversationListContainer')) {
           window.ConversationMenu.loadConversations(true);
         }
       });
+    }
+
+    _getConversationMenuScope() {
+      const appContext = this._getAppContext();
+      if (appContext === 'insights') {
+        return {
+          type: 'conversation_threads',
+          title: 'Insights Chats',
+          pageScopes: ['dashboard', 'reporting', 'data_visualization']
+        };
+      }
+
+      return {
+        type: 'chat_sessions',
+        title: 'Your Chats'
+      };
     }
 
     // -----------------------------------------------------------------------
