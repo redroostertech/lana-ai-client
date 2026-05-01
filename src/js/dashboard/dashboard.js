@@ -1146,23 +1146,42 @@
               if (dDesc.length > 50) dDesc = dDesc.substring(0, 47) + '...';
               var dMatter = d.matter_number || d.matter_id || '';
 
+              // Anchor the draft's date in UTC so the navigated workspace
+              // tab can pre-set its filter to the same window — otherwise
+              // a draft from yesterday-UTC opens a matter whose default
+              // "first-of-month → today" filter excludes it, and the user
+              // sees an empty entry list even though the draft exists.
+              var dDate = d.start_time
+                ? new Date(d.start_time).toISOString().substring(0, 10)
+                : '';
               draftHtml += '<div style="display:flex;align-items:center;gap:0.5rem;padding:0.375rem 0;font-size:0.8rem;">';
               // Hours badge
               draftHtml += '<span style="flex-shrink:0;min-width:2.5rem;text-align:center;padding:0.125rem 0.375rem;background:var(--lex-color-amber-50,#fffbeb);color:var(--lex-color-amber-700,#b45309);border-radius:0.25rem;font-weight:700;font-size:0.75rem;">' + dHours + 'h</span>';
               // Description
               draftHtml += '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--lex-text-secondary);" title="' + Lex.Utils.escapeHtml(d.description || '') + '">' + Lex.Utils.escapeHtml(dDesc) + '</span>';
               // Review link
-              draftHtml += '<button class="bh-draft-review-btn" data-matter="' + Lex.Utils.escapeHtml(dMatter) + '" style="flex-shrink:0;font-size:0.7rem;font-weight:600;color:var(--lex-color-blue-600,#2563eb);background:none;border:none;cursor:pointer;padding:0;">Review</button>';
+              draftHtml += '<button class="bh-draft-review-btn" data-matter="' + Lex.Utils.escapeHtml(dMatter) + '" data-date="' + Lex.Utils.escapeHtml(dDate) + '" style="flex-shrink:0;font-size:0.7rem;font-weight:600;color:var(--lex-color-blue-600,#2563eb);background:none;border:none;cursor:pointer;padding:0;">Review</button>';
               draftHtml += '</div>';
             }
             draftListEl.innerHTML = draftHtml;
 
-            // Wire review buttons via Lex.Nav.go
+            // Wire review buttons via Lex.Nav.go. currentTarget pins to
+            // the <button> even when the user clicks a child element; pass
+            // the draft date through so the workspace tab can scope its
+            // filter to the row's actual day.
             var reviewBtns = draftListEl.querySelectorAll('.bh-draft-review-btn');
             for (var ri = 0; ri < reviewBtns.length; ri++) {
               reviewBtns[ri].addEventListener('click', function (e) {
-                var mid = e.target.getAttribute('data-matter');
-                if (mid) Lex.Nav.go('workspace-details.html', { params: { id: mid, tab: 'billableHours' } });
+                var btn = e.currentTarget;
+                var mid = btn.getAttribute('data-matter');
+                var draftDate = btn.getAttribute('data-date');
+                if (!mid) return;
+                var params = { id: mid, tab: 'billableHours' };
+                if (draftDate) {
+                  params.bhFrom = draftDate;
+                  params.bhTo = draftDate;
+                }
+                Lex.Nav.go('workspace-details.html', { params: params });
               });
             }
 

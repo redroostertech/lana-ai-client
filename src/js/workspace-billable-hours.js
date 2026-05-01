@@ -25,10 +25,26 @@
     _currentPage = 1;
     _selectedIds = {};
 
-    // Set default date range to current month
-    var now = new Date();
-    _dateFrom = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01';
-    _dateTo = now.toISOString().substring(0, 10);
+    // If the caller deep-linked with `bhFrom` / `bhTo` (e.g. the dashboard
+    // widget's "Review" button on a draft), honour that window so the row
+    // they came to review is actually visible. Falls back to "current month
+    // → today (UTC)" when no override is provided.
+    var navFrom = '';
+    var navTo = '';
+    if (window.Lex && Lex.Nav && typeof Lex.Nav.getParams === 'function') {
+      var p = Lex.Nav.getParams();
+      navFrom = (p && p.get('bhFrom')) || '';
+      navTo = (p && p.get('bhTo')) || '';
+    }
+
+    if (navFrom && navTo) {
+      _dateFrom = navFrom;
+      _dateTo = navTo;
+    } else {
+      var now = new Date();
+      _dateFrom = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01';
+      _dateTo = now.toISOString().substring(0, 10);
+    }
 
     _renderFilters();
     _loadSummary(matter);
@@ -216,6 +232,24 @@
       html += '<div style="font-size:0.7rem;color:var(--lex-text-muted);">' + Lex.Utils.escapeHtml(date) + ' - ' + Lex.Utils.escapeHtml(e.activity_type || 'general') + '</div>';
       html += '</div>';
 
+      // Source badge (Auto / Manual / Imported) — surfaces the row's
+      // origin so users can tell auto-tracked time from manually entered
+      // time at a glance.
+      var sourceBadge = _getSourceBadge(e.source);
+      if (sourceBadge) {
+        html += '<div title="' + Lex.Utils.escapeHtml(sourceBadge.title) + '" style="flex-shrink:0;padding:0.125rem 0.5rem;border-radius:9999px;font-size:0.65rem;font-weight:600;background:' + sourceBadge.bg + ';color:' + sourceBadge.text + ';">' + Lex.Utils.escapeHtml(sourceBadge.label) + '</div>';
+      }
+
+      // Overlap warning — flagged when this entry overlaps another on the
+      // same (user, matter, day). Clicking the badge expands an inline panel
+      // beneath the row showing the conflicting entries with resolve actions
+      // (see _toggleOverlapPanel / _renderOverlapPanel below).
+      var overlaps = Array.isArray(e.has_overlap_with) ? e.has_overlap_with : [];
+      if (overlaps.length > 0) {
+        var overlapTitle = 'Overlaps ' + overlaps.length + ' other ' + (overlaps.length === 1 ? 'entry' : 'entries') + ' — click to resolve';
+        html += '<button type="button" class="bh-overlap-badge" data-id="' + Lex.Utils.escapeHtml(e.id) + '" title="' + Lex.Utils.escapeHtml(overlapTitle) + '" style="flex-shrink:0;padding:0.125rem 0.5rem;border-radius:9999px;font-size:0.65rem;font-weight:600;background:var(--lex-color-amber-50,#fffbeb);color:var(--lex-color-amber-700,#b45309);border:1px solid var(--lex-color-amber-200,#fde68a);cursor:pointer;font-family:inherit;">⚠ Overlap</button>';
+      }
+
       // Status badge
       html += '<div style="flex-shrink:0;padding:0.125rem 0.5rem;border-radius:9999px;font-size:0.7rem;font-weight:600;background:' + statusColor.bg + ';color:' + statusColor.text + ';">' + Lex.Utils.escapeHtml(e.status || 'draft') + '</div>';
 
@@ -228,8 +262,231 @@
       }
 
       html += '</div>';
+
+      // Inline overlap-resolution panel — hidden until the user clicks the
+      // ⚠ Overlap badge on this row. Rendered as a sibling of the row so
+      // the row's hover/striping styles aren't disturbed.
+      if (overlaps.length > 0) {
+        html += '<div class="bh-overlap-panel" data-for-id="' + Lex.Utils.escapeHtml(e.id) + '" style="display:none;padding:0.75rem 1rem 0.875rem 3rem;background:var(--lex-color-amber-50,#fffbeb);border-bottom:1px solid var(--lex-color-amber-200,#fde68a);"></div>';
+      }
     }
     return html;
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Overlap resolution
+  // ─────────────────────────────────────────────────────────────
+  // Build the inline panel content for a row. Resolves the UUIDs in
+  // has_overlap_with against the already-loaded _entries array (no extra
+  // fetches). For each overlap we show hours, truncated description, source
+  // badge, a "Jump to" link and a Resolve dropdown.
+  function _renderOverlapPanel(entry) {
+    var ids = Array.isArray(entry.has_overlap_with) ? entry.has_overlap_with : [];
+    var others = ids
+      .map(function (id) { return _entries.find(function (en) { return en.id === id; }); })
+      .filter(function (x) { return !!x; });
+
+    var html = '';
+    html += '<div style="font-size:0.7rem;font-weight:600;color:var(--lex-color-amber-800,#92400e);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">Overlapping entries (' + ids.length + ')</div>';
+
+    if (others.length === 0) {
+      // Backend listed UUIDs not present in the current page — likely a row
+      // outside the current pagination/date filter. Tell the user rather
+      // than silently rendering nothing.
+      html += '<div style="font-size:0.75rem;color:var(--lex-text-muted);">';
+      html += 'Overlapping entries are outside the current filter. Adjust the date range or pagination to see them.';
+      html += '</div>';
+      return html;
+    }
+
+    html += '<div style="display:flex;flex-direction:column;gap:0.5rem;">';
+    for (var i = 0; i < others.length; i++) {
+      var o = others[i];
+      var oHours = ((o.duration_minutes || 0) / 60).toFixed(1);
+      var oDesc = o.description || 'No description';
+      if (oDesc.length > 100) oDesc = oDesc.substring(0, 97) + '...';
+      var oSource = _getSourceBadge(o.source);
+      var canMerge = entry.status === 'draft' && o.status === 'draft' && entry.matter_id === o.matter_id;
+
+      html += '<div class="bh-overlap-item" data-id="' + Lex.Utils.escapeHtml(o.id) + '" style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem 0.625rem;background:white;border:1px solid var(--lex-color-amber-200,#fde68a);border-radius:0.375rem;">';
+
+      html += '<div style="min-width:2.75rem;text-align:center;padding:0.125rem 0.375rem;background:var(--lex-bg-accent-subtle,#eff6ff);border-radius:0.25rem;font-size:0.75rem;font-weight:700;color:var(--lex-color-blue-700,#1d4ed8);">' + oHours + 'h</div>';
+
+      html += '<div style="flex:1;min-width:0;">';
+      html += '<div style="font-size:0.75rem;color:var(--lex-text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + Lex.Utils.escapeHtml(oDesc) + '</div>';
+      html += '<div style="font-size:0.65rem;color:var(--lex-text-muted);">' + Lex.Utils.escapeHtml(o.activity_type || 'general') + ' • ' + Lex.Utils.escapeHtml(o.status || 'draft') + '</div>';
+      html += '</div>';
+
+      if (oSource) {
+        html += '<div title="' + Lex.Utils.escapeHtml(oSource.title) + '" style="flex-shrink:0;padding:0.125rem 0.375rem;border-radius:9999px;font-size:0.6rem;font-weight:600;background:' + oSource.bg + ';color:' + oSource.text + ';">' + Lex.Utils.escapeHtml(oSource.label) + '</div>';
+      }
+
+      html += '<button type="button" class="bh-overlap-jump" data-id="' + Lex.Utils.escapeHtml(o.id) + '" style="flex-shrink:0;padding:0.125rem 0.375rem;font-size:0.65rem;font-weight:600;background:none;color:var(--lex-color-blue-600,#2563eb);border:1px solid var(--lex-color-blue-200,#bfdbfe);border-radius:0.25rem;cursor:pointer;">Jump to</button>';
+
+      html += '<button type="button" class="bh-overlap-resolve" data-source-id="' + Lex.Utils.escapeHtml(entry.id) + '" data-other-id="' + Lex.Utils.escapeHtml(o.id) + '" data-can-merge="' + (canMerge ? '1' : '0') + '" style="flex-shrink:0;padding:0.125rem 0.5rem;font-size:0.65rem;font-weight:600;background:var(--lex-color-amber-100,#fef3c7);color:var(--lex-color-amber-800,#92400e);border:1px solid var(--lex-color-amber-300,#fcd34d);border-radius:0.25rem;cursor:pointer;">Resolve ▾</button>';
+
+      html += '</div>'; // .bh-overlap-item
+    }
+    html += '</div>';
+
+    return html;
+  }
+
+  // Open or close the inline overlap panel for the row whose badge was
+  // clicked. Only one panel is open at a time per row, but multiple rows can
+  // be expanded simultaneously.
+  function _toggleOverlapPanel(entryId) {
+    var listEl = document.getElementById('bhEntriesList');
+    if (!listEl) return;
+    var panel = listEl.querySelector('.bh-overlap-panel[data-for-id="' + cssEscape(entryId) + '"]');
+    if (!panel) return;
+    var entry = _entries.find(function (en) { return en.id === entryId; });
+    if (!entry) return;
+
+    if (panel.style.display === 'none' || panel.style.display === '') {
+      panel.innerHTML = _renderOverlapPanel(entry);
+      panel.style.display = 'block';
+    } else {
+      panel.style.display = 'none';
+      panel.innerHTML = '';
+    }
+  }
+
+  // Smooth-scroll the list to the row identified by entry id and briefly
+  // highlight it so the user can see where they landed.
+  function _jumpToRow(entryId) {
+    var listEl = document.getElementById('bhEntriesList');
+    if (!listEl) return;
+    var row = listEl.querySelector('.bh-entry-row[data-entry-id="' + cssEscape(entryId) + '"]');
+    if (!row) return;
+    if (typeof row.scrollIntoView === 'function') {
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    var prevBg = row.style.background;
+    row.style.transition = 'background 0.4s';
+    row.style.background = 'var(--lex-color-amber-100,#fef3c7)';
+    setTimeout(function () {
+      row.style.background = prevBg;
+    }, 1200);
+  }
+
+  // Show a small chooser popover for the Resolve button. The popover offers
+  // three actions:
+  //   • Keep both       — close the chooser, no API call (informational)
+  //   • Delete this overlap — POST .../drafts/<otherId>/reject
+  //   • Merge into other  — POST .../drafts/<sourceId>/merge { merge_with_id: otherId }
+  // "Merge" is only offered when both entries are drafts on the same matter.
+  function _showResolveChooser(anchorEl, sourceId, otherId, canMerge) {
+    // Tear down any existing open chooser first.
+    var existing = document.getElementById('bhResolveChooser');
+    if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+
+    var rect = anchorEl.getBoundingClientRect();
+    var pop = document.createElement('div');
+    pop.id = 'bhResolveChooser';
+    pop.style.cssText = [
+      'position:fixed',
+      'top:' + (rect.bottom + 4) + 'px',
+      'left:' + Math.max(8, rect.right - 200) + 'px',
+      'min-width:200px',
+      'background:white',
+      'border:1px solid var(--lex-border-default,#e5e7eb)',
+      'border-radius:0.5rem',
+      'box-shadow:0 8px 24px rgba(0,0,0,0.12)',
+      'z-index:10000',
+      'padding:0.25rem',
+      'font-size:0.8125rem'
+    ].join(';');
+
+    function makeItem(label, danger) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = label;
+      btn.style.cssText = [
+        'display:block',
+        'width:100%',
+        'text-align:left',
+        'padding:0.4rem 0.625rem',
+        'background:none',
+        'border:none',
+        'border-radius:0.25rem',
+        'cursor:pointer',
+        'font-size:0.8125rem',
+        'color:' + (danger ? 'var(--lex-color-red-700,#b91c1c)' : 'var(--lex-text-primary)')
+      ].join(';');
+      btn.addEventListener('mouseover', function () {
+        btn.style.background = danger ? 'var(--lex-color-red-50,#fef2f2)' : 'var(--lex-bg-muted,#f9fafb)';
+      });
+      btn.addEventListener('mouseout', function () { btn.style.background = 'none'; });
+      return btn;
+    }
+
+    var keepBtn = makeItem('Keep both', false);
+    keepBtn.addEventListener('click', function () { closeChooser(); });
+    pop.appendChild(keepBtn);
+
+    var deleteBtn = makeItem('Delete this overlap', true);
+    deleteBtn.addEventListener('click', function () {
+      closeChooser();
+      _resolveDelete(otherId);
+    });
+    pop.appendChild(deleteBtn);
+
+    if (canMerge) {
+      var mergeBtn = makeItem('Merge into the other', false);
+      mergeBtn.addEventListener('click', function () {
+        closeChooser();
+        _resolveMerge(sourceId, otherId);
+      });
+      pop.appendChild(mergeBtn);
+    }
+
+    function closeChooser() {
+      if (pop.parentNode) pop.parentNode.removeChild(pop);
+      document.removeEventListener('click', outsideHandler, true);
+    }
+    function outsideHandler(ev) {
+      if (!pop.contains(ev.target)) closeChooser();
+    }
+    // Defer attaching the outside-click handler until the current click event
+    // has finished propagating, otherwise we'd close immediately.
+    setTimeout(function () {
+      document.addEventListener('click', outsideHandler, true);
+    }, 0);
+
+    document.body.appendChild(pop);
+  }
+
+  function _resolveDelete(entryId) {
+    api.post('/api/v1/billable-hours/drafts/' + entryId + '/reject')
+      .then(function () {
+        if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.success('Overlapping entry deleted');
+        delete _selectedIds[entryId];
+        _refresh();
+      })
+      .catch(function (err) {
+        var msg = (err && err.message) || 'Failed to delete overlap';
+        if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.error(msg);
+      });
+  }
+
+  function _resolveMerge(sourceId, otherId) {
+    api.post('/api/v1/billable-hours/drafts/' + sourceId + '/merge', { merge_with_id: otherId })
+      .then(function () {
+        if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.success('Entries merged');
+        _refresh();
+      })
+      .catch(function (err) {
+        var msg = (err && err.message) || 'Failed to merge entries';
+        if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.error(msg);
+      });
+  }
+
+  // Minimal CSS attribute-selector escaper. UUIDs don't need escaping but
+  // we guard against unexpected characters to keep querySelector safe.
+  function cssEscape(s) {
+    if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(s);
+    return String(s).replace(/[^a-zA-Z0-9_-]/g, function (c) { return '\\' + c; });
   }
 
   function _getStatusColor(status) {
@@ -240,6 +497,18 @@
       invoiced: { bg: 'var(--lex-color-purple-50,#faf5ff)', text: 'var(--lex-color-purple-700,#7e22ce)' }
     };
     return map[status] || map.draft;
+  }
+
+  // Source-of-row badge: 'activity' rows came from the incremental writer,
+  // 'manual' rows from a user-created entry, 'imported' from a connector
+  // ingest. Returns null for unknown values so the UI quietly degrades.
+  function _getSourceBadge(source) {
+    var map = {
+      activity: { label: 'Auto',     title: 'Auto-tracked from activity',           bg: 'var(--lex-bg-muted,#f3f4f6)',          text: 'var(--lex-text-muted,#6b7280)' },
+      manual:   { label: 'Manual',   title: 'Manually entered by user',             bg: 'var(--lex-color-blue-50,#eff6ff)',     text: 'var(--lex-color-blue-700,#1d4ed8)' },
+      imported: { label: 'Imported', title: 'Imported from external system',        bg: 'var(--lex-color-purple-50,#faf5ff)',   text: 'var(--lex-color-purple-700,#7e22ce)' }
+    };
+    return map[source] || null;
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -311,6 +580,42 @@
       if (rejectBtn) {
         e.stopPropagation();
         _confirmReject(rejectBtn.getAttribute('data-id'));
+        return;
+      }
+
+      // Overlap badge → toggle inline panel beneath this row.
+      var overlapBadge = e.target.closest('.bh-overlap-badge');
+      if (overlapBadge) {
+        e.stopPropagation();
+        _toggleOverlapPanel(overlapBadge.getAttribute('data-id'));
+        return;
+      }
+
+      // "Jump to" link inside an overlap panel → scroll/highlight the other row.
+      var jumpBtn = e.target.closest('.bh-overlap-jump');
+      if (jumpBtn) {
+        e.stopPropagation();
+        _jumpToRow(jumpBtn.getAttribute('data-id'));
+        return;
+      }
+
+      // "Resolve ▾" → open the chooser popover for this overlap pair.
+      var resolveBtn = e.target.closest('.bh-overlap-resolve');
+      if (resolveBtn) {
+        e.stopPropagation();
+        _showResolveChooser(
+          resolveBtn,
+          resolveBtn.getAttribute('data-source-id'),
+          resolveBtn.getAttribute('data-other-id'),
+          resolveBtn.getAttribute('data-can-merge') === '1'
+        );
+        return;
+      }
+
+      // Clicks inside an open overlap panel shouldn't bubble up to "open
+      // detail modal" — the panel is supposed to be a quiet inline UI.
+      if (e.target.closest('.bh-overlap-panel')) {
+        e.stopPropagation();
         return;
       }
 
@@ -725,20 +1030,79 @@
     });
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // Manual entry form
+  //
+  // Backed by POST /api/v1/billable-hours/manual which creates a row with
+  // source='manual'. Body accepts EITHER duration_minutes OR (start_time,
+  // end_time) — we let the user pick which pair to fill via a tab toggle.
+  // The form is rendered inside the standard Lex.Drawer; on success we
+  // surface any overlap metadata in the toast so the user knows to triage.
+  // ─────────────────────────────────────────────────────────────
   function _showManualEntryForm(matter) {
-    var today = new Date().toISOString().substring(0, 10);
-    var inputStyle = 'width:100%;padding:0.375rem 0.625rem;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.375rem;font-size:0.8125rem;';
+    var inputStyle = 'width:100%;padding:0.375rem 0.625rem;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.375rem;font-size:0.8125rem;font-family:inherit;';
+    var labelStyle = 'font-size:0.75rem;font-weight:600;color:var(--lex-text-muted);display:block;margin-bottom:0.25rem;';
+
+    // Default start/end to "now minus 30 min" → "now" so the inputs are pre-filled.
+    var now = new Date();
+    var nowStr = _toDatetimeLocal(now);
+    var halfHourAgoStr = _toDatetimeLocal(new Date(now.getTime() - 30 * 60 * 1000));
+
+    var matterIdForForm = (matter && matter.matter_id) || _matterId || '';
+    var hasPresetMatter = !!matterIdForForm;
 
     var html = '<div style="display:flex;flex-direction:column;gap:1rem;">';
 
-    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">';
-    html += '<div><label style="font-size:0.75rem;font-weight:600;color:var(--lex-text-muted);display:block;margin-bottom:0.25rem;">Date</label>';
-    html += '<input type="date" id="manualEntryDate" value="' + today + '" style="' + inputStyle + '"></div>';
-    html += '<div><label style="font-size:0.75rem;font-weight:600;color:var(--lex-text-muted);display:block;margin-bottom:0.25rem;">Hours</label>';
-    html += '<input type="number" id="manualEntryHours" value="0.5" step="0.1" min="0.1" max="24" style="' + inputStyle + '"></div>';
+    // Matter (locked when in workspace context)
+    html += '<div>';
+    html += '<label style="' + labelStyle + '">Matter</label>';
+    if (hasPresetMatter) {
+      html += '<input type="text" id="manualEntryMatterId" value="' + Lex.Utils.escapeHtml(matterIdForForm) + '" readonly style="' + inputStyle + 'background:var(--lex-bg-muted,#f9fafb);color:var(--lex-text-muted);font-family:monospace;">';
+      html += '<div style="font-size:0.7rem;color:var(--lex-text-muted);margin-top:0.25rem;">Using current matter context</div>';
+    } else {
+      // Fallback: free-text input. Workspace details page is always scoped to
+      // a matter, so this branch is unlikely to be hit — but we keep it as a
+      // safety net rather than silently failing.
+      html += '<input type="text" id="manualEntryMatterId" placeholder="Matter ID (UUID)" style="' + inputStyle + '">';
+    }
     html += '</div>';
 
-    html += '<div><label style="font-size:0.75rem;font-weight:600;color:var(--lex-text-muted);display:block;margin-bottom:0.25rem;">Activity Type</label>';
+    // Description
+    html += '<div>';
+    html += '<label style="' + labelStyle + '">Description <span style="color:var(--lex-color-red-600,#dc2626);">*</span></label>';
+    html += '<textarea id="manualEntryDesc" style="' + inputStyle + 'min-height:4.5rem;resize:vertical;" placeholder="Describe the work performed..."></textarea>';
+    html += '</div>';
+
+    // Time mode toggle: duration vs start/end
+    html += '<div>';
+    html += '<label style="' + labelStyle + '">Time</label>';
+    html += '<div role="tablist" style="display:flex;gap:0.25rem;margin-bottom:0.5rem;">';
+    html += '<button type="button" id="manualEntryModeDuration" data-mode="duration" style="flex:1;padding:0.375rem;font-size:0.75rem;font-weight:600;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.375rem;background:var(--lex-color-blue-600,#2563eb);color:white;cursor:pointer;">Duration</button>';
+    html += '<button type="button" id="manualEntryModeRange"    data-mode="range"    style="flex:1;padding:0.375rem;font-size:0.75rem;font-weight:600;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.375rem;background:white;color:var(--lex-text-secondary);cursor:pointer;">Start / End</button>';
+    html += '</div>';
+
+    // Duration pane
+    html += '<div id="manualEntryDurationPane">';
+    html += '<input type="number" id="manualEntryMinutes" value="30" step="1" min="1" max="1440" style="' + inputStyle + '" placeholder="Minutes">';
+    html += '<div style="font-size:0.7rem;color:var(--lex-text-muted);margin-top:0.25rem;">Duration in minutes</div>';
+    html += '</div>';
+
+    // Range pane
+    html += '<div id="manualEntryRangePane" style="display:none;grid-template-columns:1fr 1fr;gap:0.75rem;">';
+    html += '<div>';
+    html += '<label style="' + labelStyle + '">Start</label>';
+    html += '<input type="datetime-local" id="manualEntryStart" value="' + halfHourAgoStr + '" style="' + inputStyle + '">';
+    html += '</div>';
+    html += '<div>';
+    html += '<label style="' + labelStyle + '">End</label>';
+    html += '<input type="datetime-local" id="manualEntryEnd" value="' + nowStr + '" style="' + inputStyle + '">';
+    html += '</div>';
+    html += '</div>';
+    html += '</div>';
+
+    // Activity type
+    html += '<div>';
+    html += '<label style="' + labelStyle + '">Activity Type</label>';
     html += '<select id="manualEntryType" style="' + inputStyle + '">';
     html += '<option value="general">General</option>';
     html += '<option value="research">Research</option>';
@@ -746,65 +1110,187 @@
     html += '<option value="drafting">Drafting</option>';
     html += '<option value="communication">Communication</option>';
     html += '<option value="case_management">Case Management</option>';
-    html += '</select></div>';
-
-    html += '<div><label style="font-size:0.75rem;font-weight:600;color:var(--lex-text-muted);display:block;margin-bottom:0.25rem;">Description</label>';
-    html += '<textarea id="manualEntryDesc" style="' + inputStyle + 'min-height:4rem;resize:vertical;" placeholder="Describe the work performed..."></textarea></div>';
-
-    html += '<div style="display:flex;align-items:center;gap:0.5rem;">';
-    html += '<input type="checkbox" id="manualEntryBillable" checked>';
-    html += '<label for="manualEntryBillable" style="font-size:0.8125rem;color:var(--lex-text-secondary);">Billable</label>';
+    html += '</select>';
     html += '</div>';
+
+    // Two-column row for billing code + rate
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">';
+    html += '<div>';
+    html += '<label style="' + labelStyle + '">Billing Code</label>';
+    html += '<input type="text" id="manualEntryBillingCode" style="' + inputStyle + '" placeholder="Optional">';
+    html += '</div>';
+    html += '<div>';
+    html += '<label style="' + labelStyle + '">Hourly Rate</label>';
+    html += '<input type="number" id="manualEntryRate" step="0.01" min="0" style="' + inputStyle + '" placeholder="Optional">';
+    html += '</div>';
+    html += '</div>';
+
+    // Billable checkbox
+    html += '<div style="display:flex;align-items:center;gap:0.5rem;">';
+    html += '<input type="checkbox" id="manualEntryBillable" checked style="cursor:pointer;">';
+    html += '<label for="manualEntryBillable" style="font-size:0.8125rem;color:var(--lex-text-secondary);cursor:pointer;">Billable</label>';
+    html += '</div>';
+
+    // Inline error region (populated from API validation failures)
+    html += '<div id="manualEntryError" style="display:none;padding:0.5rem 0.75rem;background:var(--lex-color-red-50,#fef2f2);border:1px solid var(--lex-color-red-200,#fecaca);border-radius:0.375rem;color:var(--lex-color-red-700,#b91c1c);font-size:0.75rem;"></div>';
 
     html += '</div>';
 
     Lex.Drawer.open({
-      heading: 'Add Time Entry',
+      heading: 'New Time Entry',
       content: html,
       width: 'md',
       buttons: [
-        { label: 'Add Entry', variant: 'primary', id: 'manualEntrySaveBtn' }
+        { label: 'Create', variant: 'primary', id: 'manualEntrySaveBtn' }
       ]
     });
 
     setTimeout(function () {
-      var saveBtn = document.getElementById('manualEntrySaveBtn');
-      if (saveBtn) {
-        saveBtn.addEventListener('click', function () {
-          var dateVal = document.getElementById('manualEntryDate').value;
-          var hoursVal = parseFloat(document.getElementById('manualEntryHours').value) || 0.5;
-          var typeVal = document.getElementById('manualEntryType').value;
-          var descVal = document.getElementById('manualEntryDesc').value.trim();
-          var billableVal = document.getElementById('manualEntryBillable').checked;
+      // Mode toggle wiring
+      var durBtn = document.getElementById('manualEntryModeDuration');
+      var rangeBtn = document.getElementById('manualEntryModeRange');
+      var durPane = document.getElementById('manualEntryDurationPane');
+      var rangePane = document.getElementById('manualEntryRangePane');
+      var currentMode = 'duration';
 
-          if (!descVal) {
-            if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.error('Description is required');
+      function setMode(mode) {
+        currentMode = mode;
+        if (mode === 'duration') {
+          durPane.style.display = '';
+          rangePane.style.display = 'none';
+          durBtn.style.background = 'var(--lex-color-blue-600,#2563eb)';
+          durBtn.style.color = 'white';
+          rangeBtn.style.background = 'white';
+          rangeBtn.style.color = 'var(--lex-text-secondary)';
+        } else {
+          durPane.style.display = 'none';
+          rangePane.style.display = 'grid';
+          rangeBtn.style.background = 'var(--lex-color-blue-600,#2563eb)';
+          rangeBtn.style.color = 'white';
+          durBtn.style.background = 'white';
+          durBtn.style.color = 'var(--lex-text-secondary)';
+        }
+      }
+
+      if (durBtn) durBtn.addEventListener('click', function () { setMode('duration'); });
+      if (rangeBtn) rangeBtn.addEventListener('click', function () { setMode('range'); });
+
+      var saveBtn = document.getElementById('manualEntrySaveBtn');
+      if (!saveBtn) return;
+
+      saveBtn.addEventListener('click', function () {
+        var matterIdEl = document.getElementById('manualEntryMatterId');
+        var descEl = document.getElementById('manualEntryDesc');
+        var typeEl = document.getElementById('manualEntryType');
+        var billableEl = document.getElementById('manualEntryBillable');
+        var billingCodeEl = document.getElementById('manualEntryBillingCode');
+        var rateEl = document.getElementById('manualEntryRate');
+        var errorEl = document.getElementById('manualEntryError');
+
+        function showError(msg) {
+          if (!errorEl) return;
+          errorEl.textContent = msg;
+          errorEl.style.display = 'block';
+        }
+        function clearError() {
+          if (!errorEl) return;
+          errorEl.textContent = '';
+          errorEl.style.display = 'none';
+        }
+        clearError();
+
+        var matterIdVal = matterIdEl ? (matterIdEl.value || '').trim() : '';
+        var descVal = descEl ? descEl.value.trim() : '';
+        var typeVal = typeEl ? typeEl.value : 'general';
+        var billableVal = billableEl ? billableEl.checked : true;
+        var billingCodeVal = billingCodeEl ? billingCodeEl.value.trim() : '';
+        var rateRaw = rateEl ? rateEl.value : '';
+
+        if (!matterIdVal) { showError('Matter is required'); return; }
+        if (!descVal) { showError('Description is required'); return; }
+
+        var body = {
+          matter_id: matterIdVal,
+          description: descVal,
+          activity_type: typeVal,
+          is_billable: billableVal
+        };
+
+        if (currentMode === 'duration') {
+          var minutesEl = document.getElementById('manualEntryMinutes');
+          var minutesVal = minutesEl ? parseInt(minutesEl.value, 10) : NaN;
+          if (!minutesVal || minutesVal <= 0) {
+            showError('Duration must be a positive number of minutes');
             return;
           }
+          body.duration_minutes = minutesVal;
+        } else {
+          var startEl = document.getElementById('manualEntryStart');
+          var endEl = document.getElementById('manualEntryEnd');
+          var startVal = startEl ? startEl.value : '';
+          var endVal = endEl ? endEl.value : '';
+          if (!startVal || !endVal) {
+            showError('Both start and end are required');
+            return;
+          }
+          var startIso = new Date(startVal).toISOString();
+          var endIso = new Date(endVal).toISOString();
+          if (new Date(endIso) <= new Date(startIso)) {
+            showError('End time must be after start time');
+            return;
+          }
+          body.start_time = startIso;
+          body.end_time = endIso;
+        }
 
-          var body = {
-            matter_id: _matterId,
-            staff_user_id: window._currentUserId || '',
-            date: dateVal,
-            duration_minutes: Math.round(hoursVal * 60),
-            activity_type: typeVal,
-            description: descVal,
-            is_billable: billableVal,
-            rate: 0
-          };
+        if (billingCodeVal) body.billing_code = billingCodeVal;
+        if (rateRaw !== '' && rateRaw !== null) {
+          var rateNum = parseFloat(rateRaw);
+          if (!isNaN(rateNum) && rateNum >= 0) body.hourly_rate = rateNum;
+        }
 
-          api.post('/api/v1/time-entries', body)
-            .then(function () {
-              if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.success('Time entry added');
-              if (typeof Lex !== 'undefined' && Lex.Drawer) Lex.Drawer.close();
-              _refresh();
-            })
-            .catch(function () {
-              if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.error('Failed to add entry');
-            });
-        });
-      }
+        saveBtn.disabled = true;
+        var originalLabel = saveBtn.textContent;
+        saveBtn.textContent = 'Creating...';
+
+        api.post('/api/v1/billable-hours/manual', body)
+          .then(function (result) {
+            var meta = (result && result.metadata) || {};
+            var overlaps = Array.isArray(meta.overlapsWith) ? meta.overlapsWith : [];
+            if (typeof Lex !== 'undefined' && Lex.Toast) {
+              if (overlaps.length > 0) {
+                Lex.Toast.success('Entry created — overlaps ' + overlaps.length + ' other entr' + (overlaps.length === 1 ? 'y' : 'ies') + ' on this matter');
+              } else {
+                Lex.Toast.success('Time entry created');
+              }
+            }
+            if (typeof Lex !== 'undefined' && Lex.Drawer) Lex.Drawer.close();
+            _refresh();
+          })
+          .catch(function (err) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = originalLabel;
+            // ApiError carries a message; surface server-side validation
+            // detail directly in the form so the user can fix it inline.
+            var msg = (err && err.message) || 'Failed to create entry';
+            if (err && err.data) {
+              var errDetail = err.data.error && err.data.error.message;
+              if (errDetail) msg = errDetail;
+              else if (err.data.detail) msg = err.data.detail;
+            }
+            showError(msg);
+          });
+      });
     }, 100);
+  }
+
+  // Convert a Date to the value format expected by <input type="datetime-local">
+  // ("YYYY-MM-DDTHH:MM" in local time). Native toISOString returns UTC, so we
+  // build the string component-wise to keep it in the user's locale.
+  function _toDatetimeLocal(d) {
+    function pad(n) { return String(n).padStart(2, '0'); }
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+      'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
   }
 
   // ═══════════════════════════════════════════════════════════════
