@@ -709,7 +709,6 @@
         {
           id: 'tools',
           items: [
-            { id: 'connectors', label: 'Data Connectors', icon: 'plug', href: 'integrations/connectors.html' },
             { id: 'reports', label: 'Reports', icon: 'bar-chart-2', href: 'insights/module-execution.html' }
           ]
         }
@@ -724,6 +723,7 @@
       if (showAdmin) {
         menuItems.push({ id: 'admin', label: 'Administration', icon: 'users', href: 'admin/index.html' });
       }
+      menuItems.push({ id: 'connectors', label: 'Data Connectors', icon: 'plug', href: 'integrations/connectors.html' });
       menuItems.push({ id: 'settings', label: 'Settings', icon: 'settings', href: 'settings.html' });
       menuItems.push({ id: 'help', label: 'Help & Support', icon: 'help-circle', href: 'help.html' });
       menuItems.push({ id: 'signout', label: 'Sign Out', icon: 'log-out', action: 'signout', danger: true });
@@ -731,6 +731,7 @@
 
       sidebar.addEventListener('sidebar-user-action', (e) => {
         const action = e.detail && e.detail.action;
+        const href = e.detail && e.detail.href;
         if (action === 'signout') {
           if (window.api && typeof window.api.logout === 'function') {
             window.api.logout()
@@ -738,6 +739,12 @@
               .catch(() => { window.location.href = 'login.html'; });
           } else {
             window.location.href = 'login.html';
+          }
+        } else if (href) {
+          if (window.Lex && window.Lex.Nav) {
+            window.Lex.Nav.go(href);
+          } else {
+            window.location.href = href;
           }
         }
       });

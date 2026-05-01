@@ -1,20 +1,12 @@
 /**
  * URL Validation Utilities
  *
- * Shared utilities for validating URLs across all pages.
- * This is the client-side source of truth for resolving the active LANA API
- * base after discovery/login inside the automation shell and embedded views.
+ * Shared client-side helpers for resolving the active LANA API base URL.
+ * The canonical source is `window.api.baseUrl` (set by `js/api.js` from
+ * `localStorage.lana_saved_server` or, in Electron, `electronAPI.getSavedServer()`).
  */
 
 window.URLUtils = {
-  getAutomationDiscoveryStorageKey() {
-    return 'lana_automation_discovery_server_url';
-  },
-
-  getTrustedAutomationApiBaseCookieName() {
-    return 'lana_automation_api_base_url';
-  },
-
   /**
    * Check if a URL is invalid for API calls.
    *
@@ -53,47 +45,14 @@ window.URLUtils = {
     }
   },
 
-  getCookieValue(name) {
-    if (typeof document === 'undefined' || !name) return '';
-    const cookieString = document.cookie || '';
-    if (!cookieString) return '';
-    const prefix = `${name}=`;
-    const match = cookieString
-      .split(';')
-      .map((entry) => entry.trim())
-      .find((entry) => entry.startsWith(prefix));
-    if (!match) return '';
-    return decodeURIComponent(match.slice(prefix.length));
-  },
-
-  getStoredAutomationApiBaseUrl() {
-    try {
-      if (typeof localStorage === 'undefined') return '';
-      return this.normalizeBaseUrl(
-        localStorage.getItem(this.getAutomationDiscoveryStorageKey()) || ''
-      );
-    } catch (_error) {
-      return '';
-    }
-  },
-
-  getTrustedAutomationApiBaseFromCookie() {
-    return this.normalizeBaseUrl(
-      this.getCookieValue(this.getTrustedAutomationApiBaseCookieName())
-    );
-  },
-
   /**
-   * Resolve the preferred API base synchronously from the same sources the
-   * automation app uses after discovery/login.
+   * Resolve the preferred API base synchronously.
    *
    * Priority:
    * 1. Provided baseUrl parameter
    * 2. window.api.baseUrl
    * 3. window.LanaConfig.API_BASE_URL
-   * 4. automation discovery localStorage
-   * 5. trusted automation cookie
-   * 6. browser same-origin fallback
+   * 4. browser same-origin fallback (non-Electron only)
    *
    * @param {string} baseUrl
    * @returns {string}
@@ -107,12 +66,6 @@ window.URLUtils = {
 
     const configBase = this.normalizeBaseUrl(window.LanaConfig?.API_BASE_URL || '');
     if (configBase) return configBase;
-
-    const discoveredBase = this.getStoredAutomationApiBaseUrl();
-    if (discoveredBase) return discoveredBase;
-
-    const cookieBase = this.getTrustedAutomationApiBaseFromCookie();
-    if (cookieBase) return cookieBase;
 
     if (typeof window !== 'undefined' && !window.electronAPI) {
       return this.normalizeBaseUrl(window.location && window.location.origin);

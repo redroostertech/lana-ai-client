@@ -128,6 +128,29 @@ window.LanaConfig = {
    */
   WORKFLOWS_ACTIVE_ENABLED: false,
 
+  // ============================================================
+  // OPTIONAL APP FEATURE FLAGS
+  // ============================================================
+
+  /**
+   * Enable the optional Heartbeat app surfaces.
+   *
+   * When false:
+   * - Heartbeat topbar indicator is hidden
+   * - Heartbeat settings tab is hidden
+   * - Heartbeat polling is skipped
+   */
+  HEARTBEAT_APP_ENABLED: false,
+
+  /**
+   * Enable the optional My Action Queue dashboard surface.
+   *
+   * When false:
+   * - Dashboard Zone C is hidden
+   * - Action queue API polling is skipped
+   */
+  ACTION_QUEUE_ENABLED: false,
+
   /**
    * Demo User Profile
    * Used when DEMO_MODE is true for simulating authentication
@@ -206,4 +229,3 @@ window.LanaConfig = {
    */
   DEVELOPMENT_MODE: true
 };
-

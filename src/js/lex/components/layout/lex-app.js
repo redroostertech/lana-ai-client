@@ -681,14 +681,6 @@
             ]
           },
           {
-            id: 'tools',
-            items: [
-              // { id: 'lana-tasks', label: 'Lana Tasks', icon: 'list-checks', href: 'agentic-tasks.html' }, // HIDDEN until tasks integration complete
-              { id: 'connectors', label: 'Data Connectors', icon: 'plug', href: 'data-connectors.html' },
-              { id: 'reports', label: 'Analytics', icon: 'bar-chart-2', href: 'admin/analytics.html' }
-            ]
-          },
-          {
             id: 'chats',
             title: 'Your Chats',
             isScrollable: true,
@@ -704,6 +696,7 @@
         if (showAdmin) {
           menuItems.push({ id: 'admin', label: 'Administration', icon: 'users', href: 'admin/index.html' });
         }
+        menuItems.push({ id: 'connectors', label: 'Data Connectors', icon: 'plug', href: 'data-connectors.html' });
         menuItems.push({ id: 'settings', label: 'Settings', icon: 'settings', href: 'settings-v2.html' });
         menuItems.push({ id: 'help', label: 'Help & Support', icon: 'help-circle', href: 'help.html' });
         menuItems.push({ id: 'signout', label: 'Sign Out', icon: 'log-out', action: 'signout', danger: true });

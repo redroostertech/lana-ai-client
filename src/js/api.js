@@ -24,7 +24,9 @@ function getPagePath(targetPage) {
     if (currentPath.includes('/integrations/') ||
         currentPath.includes('/admin/') ||
         currentPath.includes('/workflows/') ||
-        currentPath.includes('/insights/')) {
+        currentPath.includes('/insights/') ||
+        currentPath.includes('/automation/') ||
+        currentPath.includes('/voice/')) {
       return '../' + targetPage;
     }
     return targetPage;

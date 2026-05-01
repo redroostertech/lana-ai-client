@@ -40,7 +40,6 @@
   var customFieldValues = [];
   var _tabIndicatorInitialized = false;
   var _navContext = null;              // navigation context (source, conversationId, etc.)
-  var AUTOMATION_APP_URL = 'http://127.0.0.1:2470/';
 
   // Document tab pagination/search state
   var _docPage = 1;
@@ -578,11 +577,6 @@
   }
 
   function switchMatterTab(tab) {
-    if (tab === 'skills') {
-      openAutomationApp();
-      return;
-    }
-
     var tabs = ['activity', 'notes', 'tasks', 'comments', 'documents', 'conversations', 'billableHours', 'docGeneration', 'analytics'];
     var activeBtn = null;
 
@@ -660,13 +654,6 @@
       if (content && !content.classList.contains('hidden')) return tabs[i];
     }
     return 'activity';
-  }
-
-  function openAutomationApp() {
-    var opened = window.open(AUTOMATION_APP_URL, '_blank', 'noopener');
-    if (!opened) {
-      window.location.href = AUTOMATION_APP_URL;
-    }
   }
 
   // =========================================================================

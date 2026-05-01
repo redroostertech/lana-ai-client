@@ -98,6 +98,20 @@
   }
 
   /**
+   * @returns {boolean}
+   */
+  function heartbeatAppEnabled() {
+    return Boolean(window.LanaConfig && window.LanaConfig.HEARTBEAT_APP_ENABLED);
+  }
+
+  /**
+   * @returns {boolean}
+   */
+  function actionQueueEnabled() {
+    return Boolean(window.LanaConfig && window.LanaConfig.ACTION_QUEUE_ENABLED);
+  }
+
+  /**
    * Get a display label for a severity string.
    * @param {string} severity
    * @returns {string}
@@ -624,6 +638,16 @@
   async function renderZoneC(silent) {
     var loadingEl = el('ccZoneCLoading');
     var contentEl = el('ccZoneCContent');
+    var zoneEl = el('ccZoneC');
+
+    if (!actionQueueEnabled()) {
+      if (zoneEl) zoneEl.style.display = 'none';
+      if (loadingEl) hide(loadingEl);
+      if (contentEl) hide(contentEl);
+      return;
+    }
+
+    if (zoneEl) zoneEl.style.display = '';
     if (!contentEl) return;
 
     var items = [];
@@ -1080,8 +1104,9 @@
             var m = matters[i];
             var matterId = m.matter_id || '-';
             var label = matterId.length > 20 ? matterId.substring(0, 17) + '...' : matterId;
+            var matterHref = 'workspace-details.html?id=' + encodeURIComponent(matterId) + '&tab=billableHours';
             html += '<div style="display:flex;justify-content:space-between;align-items:center;font-size:0.8rem;padding:0.25rem 0;">';
-            html += '<span style="color:var(--lex-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:65%;" title="' + Lex.Utils.escapeHtml(matterId) + '">' + Lex.Utils.escapeHtml(label) + '</span>';
+            html += '<a class="bh-matter-link" href="' + matterHref + '" data-matter="' + Lex.Utils.escapeHtml(matterId) + '" style="color:var(--lex-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:65%;text-decoration:none;" title="' + Lex.Utils.escapeHtml(matterId) + '">' + Lex.Utils.escapeHtml(label) + '</a>';
             html += '<span style="font-weight:600;color:var(--lex-text-primary);flex-shrink:0;">' + m.hours.toFixed(1) + 'h</span>';
             html += '</div>';
           }
@@ -1090,6 +1115,17 @@
           }
         }
         listEl.innerHTML = html;
+
+        var matterLinks = listEl.querySelectorAll('.bh-matter-link[data-matter]');
+        for (var mi = 0; mi < matterLinks.length; mi++) {
+          matterLinks[mi].addEventListener('click', function (e) {
+            if (window.Lex && window.Lex.Nav) {
+              e.preventDefault();
+              var mid = this.getAttribute('data-matter');
+              if (mid) Lex.Nav.go('workspace-details.html', { params: { id: mid, tab: 'billableHours' } });
+            }
+          });
+        }
       }
 
       // Draft entries list
@@ -2046,7 +2082,7 @@
 
     // ── 9. Heartbeat indicator in topbar ──────────────────────────────────
     _timeouts.push(setTimeout(function () {
-      if (typeof LanaHeartbeat !== 'undefined') {
+      if (heartbeatAppEnabled() && typeof LanaHeartbeat !== 'undefined') {
         LanaHeartbeat.inject();
         LanaHeartbeat.start(_intervals);
       }

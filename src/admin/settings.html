@@ -784,6 +784,7 @@
          * configuration, and run history.
          */
         function initHeartbeatSection() {
+            if (!(window.LanaConfig && window.LanaConfig.HEARTBEAT_APP_ENABLED)) return;
             if (!userIsAdmin()) return;
             var tab = document.getElementById('heartbeatTab');
             if (tab) tab.classList.remove('hidden');

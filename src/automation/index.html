@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LANA Automation</title>
+  <!-- Lex UI framework from lana-client -->
+  <link rel="stylesheet" href="../css/tailwind-output.css">
+  <script src="../js/tailwind-loader.js"></script>
+  <link rel="stylesheet" href="../css/lex-tokens.css">
+  <link rel="stylesheet" href="../css/lex-chat.css">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <lex-app
+    id="automation-shell"
+    logo-src="../img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="../dashboard.html"
+    active-nav-id="home"
+    page-title="Home"
+  ></lex-app>
+
+  <div id="automation-modals">
+    <div id="template-modal" class="template-modal hidden" role="dialog" aria-modal="true" aria-labelledby="template-modal-title">
+      <div class="template-modal-overlay" data-template-modal-overlay></div>
+      <div class="template-modal-panel">
+        <button class="template-modal-close" type="button" aria-label="Close template details" data-template-modal-close>&times;</button>
+        <h2 id="template-modal-title"></h2>
+        <p id="template-modal-description" class="template-modal-description"></p>
+
+        <div class="template-modal-recommended">
+          <span class="template-modal-recommended-icon">!</span>
+          <span id="template-modal-recommended"></span>
+        </div>
+
+        <div class="template-modal-section">
+          <h3>App Types That Can Be Used</h3>
+          <div id="template-modal-apps" class="template-modal-apps"></div>
+        </div>
+
+        <div class="template-modal-section">
+          <h3>How It Works</h3>
+          <ol id="template-modal-steps" class="template-modal-steps"></ol>
+        </div>
+
+        <button id="template-modal-try" class="btn btn-primary btn-full template-modal-cta" type="button" data-template-try>Try It</button>
+      </div>
+    </div>
+
+    <div id="check-data-modal" class="template-modal hidden" role="dialog" aria-modal="true" aria-labelledby="check-data-modal-title">
+      <div class="template-modal-overlay" data-check-data-modal-overlay></div>
+      <div class="template-modal-panel">
+        <button class="template-modal-close" type="button" aria-label="Close check data details" data-check-data-modal-close>&times;</button>
+        <h2 id="check-data-modal-title">Check Data Readiness</h2>
+        <p id="check-data-modal-description" class="template-modal-description"></p>
+
+        <div class="template-modal-section">
+          <h3>Connector Hints</h3>
+          <div id="check-data-modal-hints" class="template-modal-apps"></div>
+        </div>
+
+        <div class="template-modal-section">
+          <h3>Why This Matters</h3>
+          <ol id="check-data-modal-steps" class="template-modal-steps"></ol>
+        </div>
+
+        <button id="check-data-modal-go" class="btn btn-primary btn-full template-modal-cta" type="button" data-check-data-go>Go to Connectors</button>
+      </div>
+    </div>
+
+    <div id="connector-import-modal" class="template-modal hidden" role="dialog" aria-modal="true" aria-labelledby="connector-import-modal-title">
+      <div class="template-modal-overlay" data-connector-import-overlay></div>
+      <div class="template-modal-panel connector-import-panel">
+        <button class="template-modal-close" type="button" aria-label="Close connector import" data-connector-import-close>&times;</button>
+        <h2 id="connector-import-modal-title">Import Connector</h2>
+        <p class="template-modal-description">
+          Upload a ZIP package containing <code>manifest.json</code>, <code>connector.json</code>, and optional UI assets.
+          The backend validates the manifest, hook code, and UI files before installing.
+        </p>
+
+        <div id="connector-import-dropzone" class="connector-import-dropzone">
+          <svg class="connector-import-dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+          </svg>
+          <p><strong>Click to upload</strong> or drag and drop a connector ZIP package.</p>
+          <p class="muted">Maximum size depends on your deployment tier.</p>
+          <input type="file" id="connector-import-file-input" accept=".zip,application/zip" hidden>
+        </div>
+
+        <div id="connector-import-preview" class="connector-import-preview hidden">
+          <div class="connector-import-preview-main">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            <div>
+              <strong id="connector-import-file-name"></strong>
+              <div id="connector-import-file-size" class="muted"></div>
+            </div>
+          </div>
+          <lex-btn variant="ghost" size="sm" data-connector-action="import-clear">Remove</lex-btn>
+        </div>
+
+        <p id="connector-import-status" class="muted"></p>
+
+        <div class="template-modal-actions">
+          <lex-btn variant="secondary" size="md" data-connector-action="import-close">Cancel</lex-btn>
+          <lex-btn id="connector-import-submit" variant="primary" size="md" data-connector-action="import-submit" disabled>Upload Connector</lex-btn>
+        </div>
+      </div>
+    </div>
+
+    <div id="connector-add-instance-modal" class="template-modal hidden" role="dialog" aria-modal="true" aria-labelledby="connector-add-instance-title">
+      <div class="template-modal-overlay" data-add-instance-overlay></div>
+      <div class="template-modal-panel connector-add-instance-panel">
+        <button class="template-modal-close" type="button" aria-label="Close add instance" data-add-instance-close>&times;</button>
+        <h2 id="connector-add-instance-title">Add <span id="connector-add-instance-connector-name">Connector</span> Instance</h2>
+        <p class="template-modal-description">
+          Create an additional configuration of this connector. Each instance runs independently
+          and can point at a different account, database, or location.
+        </p>
+
+        <form id="connector-add-instance-form" class="connector-add-instance-form" novalidate>
+          <label class="form-field">
+            <span id="connector-add-instance-label">Instance name</span>
+            <input
+              id="connector-add-instance-key"
+              name="instance_key"
+              type="text"
+              autocomplete="off"
+              spellcheck="false"
+              required
+              maxlength="100"
+              pattern="[a-zA-Z0-9][a-zA-Z0-9-]*"
+            >
+            <span id="connector-add-instance-helper" class="muted">Use letters, numbers, and hyphens only. No spaces.</span>
+          </label>
+
+          <p id="connector-add-instance-error" class="form-error hidden"></p>
+        </form>
+
+        <div class="template-modal-actions">
+          <lex-btn variant="secondary" size="md" data-connector-action="add-instance-close">Cancel</lex-btn>
+          <lex-btn id="connector-add-instance-submit" variant="primary" size="md" data-connector-action="add-instance-submit">Create Instance</lex-btn>
+        </div>
+      </div>
+    </div>
+
+    <div id="connector-confirm-modal" class="template-modal hidden" role="dialog" aria-modal="true" aria-labelledby="connector-confirm-title">
+      <div class="template-modal-overlay" data-connector-confirm-overlay></div>
+      <div class="template-modal-panel connector-confirm-panel">
+        <button class="template-modal-close" type="button" aria-label="Close confirmation" data-connector-confirm-close>&times;</button>
+        <h2 id="connector-confirm-title">Confirm Action</h2>
+        <p id="connector-confirm-message" class="template-modal-description"></p>
+        <div class="template-modal-actions">
+          <lex-btn id="connector-confirm-cancel" variant="secondary" size="md" data-connector-action="confirm-cancel">Cancel</lex-btn>
+          <lex-btn id="connector-confirm-submit" variant="primary" size="md" data-connector-action="confirm-submit">Confirm</lex-btn>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Canonical lana-ai-client API + auth -->
+  <script src="../js/config.js"></script>
+  <script src="../js/version.js"></script>
+  <script src="../js/api.js"></script>
+
+  <!-- Lex UI core -->
+  <script src="../js/lex/lex.core.js"></script>
+  <script src="../js/lex/lex.icons.js"></script>
+  <script src="../js/lex/lex.forms.js"></script>
+  <script src="../js/lex/lex.state.js"></script>
+  <script src="../js/lex/lex-nav.js"></script>
+  <script src="../js/lex/components/foundation/lex-btn.js"></script>
+  <script src="../js/lex/components/foundation/lex-card.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/foundation/lex-empty.js"></script>
+  <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
+  <script src="../js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="../js/lex/components/layout/lex-topbar.js"></script>
+  <script src="../js/lex/components/layout/lex-notification-panel.js"></script>
+  <script src="../js/lex/components/layout/lex-app.js"></script>
+  <script src="../js/lex/chat/lex-chat.composer.js"></script>
+  <script src="../js/lex/index.js"></script>
+  <script src="../js/shared/event-catalog.js"></script>
+  <script src="../js/shared/event-browser.js"></script>
+  <script src="../js/sidebar-footer-hydrate.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

@@ -9,11 +9,15 @@
 (function () {
   'use strict';
 
+  function loginPath() {
+    return (typeof getLoginPath === 'function') ? getLoginPath() : 'login.html';
+  }
+
   function checkAuth(retries) {
     var token = localStorage.getItem('token');
     if (!token) {
       if (retries > 0) { setTimeout(function () { checkAuth(retries - 1); }, 100); return; }
-      window.location.href = 'login.html';
+      window.location.href = loginPath();
       return;
     }
     try {
@@ -23,7 +27,7 @@
         Lex.state.setAuth(token, user);
         if (Lex.state.isTokenExpired) {
           Lex.state.clearAuth();
-          window.location.href = 'login.html';
+          window.location.href = loginPath();
           return;
         }
       }

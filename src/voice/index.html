@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LANA Voice</title>
+  <link rel="stylesheet" href="../css/tailwind-output.css">
+  <script src="../js/tailwind-loader.js"></script>
+  <link rel="stylesheet" href="../css/lex-tokens.css">
+  <link rel="stylesheet" href="../css/lex-chat.css">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <section class="screen app-shell">
+    <lex-sidebar
+      id="app-sidebar"
+      logo-src="../img/logo-light.png"
+      logo-alt="LANA Suite"
+      logo-href="../dashboard.html"
+      active-id="voice"
+    ></lex-sidebar>
+    <main class="workspace content-shell lex-shell-main">
+      <lex-topbar id="app-topbar" heading="Voice Intake"></lex-topbar>
+      <div class="workspace-scroll">
+        <section class="voice-layout">
+          <aside class="surface voice-controls">
+            <div>
+              <p class="eyebrow">Connection</p>
+              <h1>Lana Voice</h1>
+            </div>
+
+            <div class="button-row">
+              <button id="new-session-btn" type="button" class="btn btn-primary">New Session</button>
+            </div>
+
+            <div class="status-grid">
+              <div>
+                <span>Firm</span>
+                <strong id="firm-name">-</strong>
+              </div>
+              <div>
+                <span>Workflow</span>
+                <strong id="workflow-name">-</strong>
+              </div>
+              <div>
+                <span>Call ID</span>
+                <strong id="call-id">-</strong>
+              </div>
+            </div>
+          </aside>
+
+          <section class="surface voice-console">
+            <div class="console-header">
+              <div>
+                <p class="eyebrow">Test Console</p>
+                <h2>Intake Conversation</h2>
+              </div>
+              <span id="health-pill" class="pill">checking</span>
+            </div>
+
+            <div id="transcript" class="transcript" aria-live="polite"></div>
+
+            <form id="turn-form" class="turn-form">
+              <input id="turn-input" type="text" placeholder="Type a caller utterance for the local loop" autocomplete="off">
+              <button type="submit" class="btn btn-primary">Send</button>
+            </form>
+          </section>
+
+          <aside class="surface field-panel">
+            <div>
+              <p class="eyebrow">Captured Fields</p>
+              <h2>Current Intake</h2>
+            </div>
+            <div id="field-list" class="field-list"></div>
+
+            <form id="field-form" class="field-form">
+              <label>
+                <span>Field</span>
+                <select id="field-name"></select>
+              </label>
+              <label>
+                <span>Value</span>
+                <input id="field-value" type="text" autocomplete="off">
+              </label>
+              <button type="submit" class="btn btn-muted">Capture Field</button>
+            </form>
+          </aside>
+        </section>
+      </div>
+    </main>
+  </section>
+  <script src="../js/config.js"></script>
+  <script src="../js/version.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/lex/lex.core.js"></script>
+  <script src="../js/lex/lex.icons.js"></script>
+  <script src="../js/lex/lex.forms.js"></script>
+  <script src="../js/lex/components/foundation/lex-btn.js"></script>
+  <script src="../js/lex/components/foundation/lex-card.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="../js/lex/components/layout/lex-topbar.js"></script>
+  <script src="../js/lex/index.js"></script>
+  <script src="../js/sidebar-footer-hydrate.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

@@ -19,6 +19,7 @@
      sidebar.userInitials = 'MW';
      sidebar.version = '4.0.0';
      sidebar.userMenuItems = [
+       { id: 'connectors', label: 'Data Connectors', icon: 'plug', href: 'data-connectors.html' },
        { id: 'settings', label: 'Settings', icon: 'settings', href: 'settings.html' },
        { id: 'signout', label: 'Sign Out', icon: 'log-out', action: 'signout', danger: true }
      ];
@@ -73,8 +74,8 @@
         width: var(--lex-sidebar-width);
         background: var(--_sb-bg);
         color: var(--_sb-text);
-        display: grid;
-        grid-template-rows: auto minmax(0, 1fr) auto;
+        display: flex;
+        flex-direction: column;
         z-index: var(--lex-z-overlay);
         transform: translateX(-100%);
         transition: transform var(--lex-transition-slide), width var(--lex-transition-slide);
@@ -228,6 +229,160 @@
       .lex-sidebar-logo {
         height: var(--lex-sidebar-logo-height);
         display: block;
+      }
+
+      .lex-sidebar-app-switcher-wrap {
+        padding: 0.75rem 0.75rem 0.5rem;
+        border-bottom: 1px solid var(--_sb-border);
+        position: relative;
+        flex-shrink: 0;
+      }
+
+      .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-app-switcher-wrap {
+        display: flex;
+        justify-content: center;
+        padding: 0.5rem;
+      }
+
+      .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-app-switcher {
+        width: 2.5rem;
+        height: 2.5rem;
+        justify-content: center;
+        padding: 0.5rem;
+        gap: 0;
+      }
+
+      .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-app-mark {
+        width: 1.5rem;
+        height: 1.5rem;
+        border-radius: 0.45rem;
+      }
+
+      .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-app-name,
+      .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-app-chevron {
+        opacity: 0;
+        width: 0;
+        overflow: hidden;
+        pointer-events: none;
+      }
+
+      .lex-sidebar-app-switcher {
+        display: flex;
+        align-items: center;
+        gap: 0.625rem;
+        min-width: 0;
+        width: 100%;
+        height: 2.875rem;
+        padding: 0.35rem 0.45rem;
+        border: 1px solid transparent;
+        border-radius: var(--lex-radius-lg);
+        background: transparent;
+        color: var(--_sb-text-active);
+        cursor: pointer;
+        text-align: left;
+        transition: background var(--lex-transition-fast), border-color var(--lex-transition-fast);
+      }
+
+      .lex-sidebar-app-switcher:hover,
+      .lex-sidebar-app-switcher[data-open="true"] {
+        background: var(--_sb-hover-bg);
+        border-color: var(--_sb-border);
+      }
+
+      .lex-sidebar-app-mark {
+        width: 2rem;
+        height: 2rem;
+        border-radius: 0.625rem;
+        border: 1px solid color-mix(in srgb, var(--_sb-border) 72%, transparent);
+        background:
+          radial-gradient(circle at 35% 35%, var(--app-mark-a, #8bd3ff), transparent 32%),
+          radial-gradient(circle at 70% 72%, var(--app-mark-b, #5b5ce2), transparent 36%),
+          linear-gradient(135deg, var(--app-mark-c, #0f766e), var(--app-mark-d, #1e293b));
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+        flex-shrink: 0;
+      }
+
+      .lex-sidebar-app-name {
+        flex: 1;
+        min-width: 0;
+        font-size: var(--lex-body-sm-size, 0.875rem);
+        font-weight: var(--lex-weight-semibold);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        transition: opacity 0.25s ease, width 0.25s ease;
+      }
+
+      .lex-sidebar-app-chevron {
+        display: flex;
+        color: var(--_sb-text-muted);
+        flex-shrink: 0;
+        transition: opacity 0.25s ease, width 0.25s ease;
+      }
+
+      .lex-sidebar-app-menu {
+        position: fixed;
+        top: calc(var(--lex-topbar-height) + 4.25rem);
+        left: 0.5rem;
+        width: min(27rem, calc(100vw - 1rem));
+        background: var(--lex-sidebar-hover-bg, #2f2b25);
+        color: var(--lex-sidebar-text-active, #f8f7f4);
+        border: 1px solid var(--lex-sidebar-border, rgba(255, 255, 255, 0.08));
+        border-radius: var(--lex-radius-xl, 14px);
+        box-shadow: var(--lex-shadow-xl, 0 24px 64px rgba(15, 23, 42, 0.18));
+        overflow: hidden;
+        z-index: 10050;
+        display: none;
+      }
+
+      .lex-sidebar-app-menu[data-open="true"] {
+        display: block;
+      }
+
+      .lex-sidebar-app-option {
+        display: flex;
+        align-items: center;
+        gap: 0.875rem;
+        width: 100%;
+        min-height: 5rem;
+        padding: 0.875rem 1rem;
+        border: 0;
+        border-bottom: 1px solid var(--lex-sidebar-border, rgba(255, 255, 255, 0.08));
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+        text-align: left;
+      }
+
+      .lex-sidebar-app-option:last-child {
+        border-bottom: 0;
+      }
+
+      .lex-sidebar-app-option:hover,
+      .lex-sidebar-app-option[data-active="true"] {
+        background: var(--lex-sidebar-bg, #1c1a17);
+      }
+
+      .lex-sidebar-app-option-copy {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+
+      .lex-sidebar-app-option-title {
+        display: block;
+        font-size: 1rem;
+        line-height: 1.25;
+        font-weight: 700;
+        color: var(--lex-sidebar-text-active, #f8f7f4);
+      }
+
+      .lex-sidebar-app-option-desc {
+        display: block;
+        margin-top: 0.25rem;
+        font-size: 0.8125rem;
+        line-height: 1.35;
+        color: var(--lex-sidebar-text-muted, #a8a29a);
       }
 
       .lex-sidebar-close {
@@ -707,7 +862,8 @@
         version:       { type: String,  default: '' },
         open:          { type: Boolean, default: false, reflect: true },
         collapsed:     { type: Boolean, default: false, reflect: true },
-        userMenuOpen:  { type: Boolean, default: false }
+        userMenuOpen:  { type: Boolean, default: false },
+        appMenuOpen:   { type: Boolean, default: false }
       };
     }
 
@@ -766,6 +922,10 @@
         this.querySelectorAll('.lex-sidebar-nav-item[data-id]').forEach(el => {
           el.dataset.active = String(el.dataset.id === this.activeId);
         });
+        const appMenu = this.querySelector('.lex-sidebar-app-menu');
+        if (appMenu) appMenu.dataset.open = String(this.appMenuOpen);
+        const appSwitcher = this.querySelector('.lex-sidebar-app-switcher');
+        if (appSwitcher) appSwitcher.dataset.open = String(this.appMenuOpen);
 
         // Check if we need a full re-render (structural props changed).
         // Use generation counters instead of JSON.stringify() to avoid O(n)
@@ -802,6 +962,8 @@
       html += `<button class="lex-sidebar-close" data-action="close">${icon('x', 'normal')}</button>`;
       html += `</div>`;
 
+      html += `<div class="lex-sidebar-app-switcher-wrap">${this._renderAppSwitcher()}</div>`;
+
       // ── Body ──
       html += `<div class="lex-sidebar-body">`;
 
@@ -837,10 +999,99 @@
 
       html += `</div>`; // end root
 
+      html += this._renderAppMenu();
+
       // ── User menu overlay ──
       html += this._renderUserOverlay();
 
       return html;
+    }
+
+    _getAppPrefix() {
+      const path = window.location.pathname || '';
+      const nestedDirs = ['/admin/', '/automation/', '/integrations/', '/matters/', '/voice/'];
+      return nestedDirs.some((dir) => path.indexOf(dir) !== -1) ? '../' : '';
+    }
+
+    _getAppItems() {
+      const prefix = this._getAppPrefix();
+      return [
+        {
+          id: 'lana-works',
+          label: 'LanaWorks',
+          description: 'Manage matters, workspaces and client operations',
+          href: prefix + 'dashboard.html',
+          colors: ['#82d8ff', '#4267df', '#126f62', '#111827']
+        },
+        {
+          id: 'lana-automations',
+          label: 'LanaAutomate',
+          description: 'Build, deploy and monitor automated workflows',
+          href: prefix + 'automation/index.html',
+          colors: ['#ffd16f', '#f97316', '#7c3aed', '#4c1d95']
+        },
+        {
+          id: 'lana-insights',
+          label: 'LanaInsights',
+          description: 'Analyze performance, trends and business intelligence',
+          href: prefix + 'admin/analytics.html',
+          colors: ['#9debd0', '#10b981', '#0f766e', '#111827']
+        },
+        {
+          id: 'lana-voice',
+          label: 'LanaVoice',
+          description: 'Capture, transcribe and route voice intake',
+          href: prefix + 'voice/index.html',
+          colors: ['#f3f4f6', '#9ca3af', '#6b7280', '#111827']
+        }
+      ];
+    }
+
+    _getCurrentApp() {
+      const path = window.location.pathname || '';
+      const items = this._getAppItems();
+      if (path.indexOf('/automation/') !== -1) return items[1];
+      if (path.indexOf('/admin/analytics.html') !== -1) return items[2];
+      if (path.indexOf('/voice/') !== -1) return items[3];
+      return items[0];
+    }
+
+    _renderAppMark(item) {
+      const colors = item.colors || [];
+      const style = [
+        `--app-mark-a:${colors[0] || '#82d8ff'}`,
+        `--app-mark-b:${colors[1] || '#4267df'}`,
+        `--app-mark-c:${colors[2] || '#126f62'}`,
+        `--app-mark-d:${colors[3] || '#111827'}`
+      ].join(';');
+      return `<span class="lex-sidebar-app-mark" style="${this.escapeHtml(style)}"></span>`;
+    }
+
+    _renderAppSwitcher() {
+      const current = this._getCurrentApp();
+      return `<button type="button" class="lex-sidebar-app-switcher" data-action="app-menu" data-open="${this.appMenuOpen}" aria-haspopup="menu" aria-expanded="${this.appMenuOpen}">
+          ${this._renderAppMark(current)}
+          <span class="lex-sidebar-app-name">${this.escapeHtml(current.label)}</span>
+          <span class="lex-sidebar-app-chevron">${icon('chevrons-up-down', 'small') || icon('chevron-down', 'small')}</span>
+        </button>`;
+    }
+
+    _renderAppMenu() {
+      const current = this._getCurrentApp();
+      const options = this._getAppItems().map((item) => {
+        const isActive = item.id === current.id;
+        return `<button type="button" class="lex-sidebar-app-option" data-app-switch="${this.escapeHtml(item.id)}" data-href="${this.escapeHtml(item.href)}" data-active="${isActive}">
+          ${this._renderAppMark(item)}
+          <span class="lex-sidebar-app-option-copy">
+            <span class="lex-sidebar-app-option-title">${this.escapeHtml(item.label)}</span>
+            <span class="lex-sidebar-app-option-desc">${this.escapeHtml(item.description)}</span>
+          </span>
+        </button>`;
+      }).join('');
+
+      return `<div class="lex-sidebar-app-menu" data-open="${this.appMenuOpen}" role="menu">
+        ${options}
+      </div>`;
     }
 
 
@@ -929,6 +1180,7 @@
       const menuItems = this.userMenuItems && this.userMenuItems.length > 0
         ? this.userMenuItems
         : [
+            { id: 'connectors', label: 'Data Connectors', icon: 'plug', href: 'data-connectors.html' },
             { id: 'settings', label: 'Settings', icon: 'settings', action: 'settings' },
             { id: 'help', label: 'Help & Support', icon: 'help-circle', action: 'help' },
             { id: 'signout', label: 'Sign Out', icon: 'log-out', action: 'signout', danger: true }
@@ -990,6 +1242,22 @@
       // Collapse toggle (desktop)
       this.delegate('click', '[data-action="collapse"]', () => {
         this.collapsed = !this.collapsed;
+      });
+
+      this.delegate('click', '[data-action="app-menu"]', () => {
+        this.appMenuOpen = !this.appMenuOpen;
+      });
+
+      this.delegate('click', '[data-app-switch]', (e, target) => {
+        e.preventDefault();
+        const href = target.dataset.href || '';
+        this.appMenuOpen = false;
+        if (!href) return;
+        if (window.Lex && window.Lex.Nav && !/^(https?:)?\/\//.test(href)) {
+          window.Lex.Nav.go(href);
+        } else {
+          window.location.href = href;
+        }
       });
 
       // Nav item click

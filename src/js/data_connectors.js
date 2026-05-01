@@ -43,7 +43,16 @@
   var _suppressActionsClose = false;
   var selectedConnectorFile = null;
   var parsedConnectorConfig = null;
+  var importTargetConnectorId = null;
+  var importTargetConnectorName = null;
   var searchTimeout = null;
+  var pinnedConnectorsStorageKey = 'lana_automation_pinned_connectors';
+  var pinnedConnectors = loadPinnedConnectors();
+  var connectorsCurrentPage = 1;
+  var connectorsPageSize = 12;
+  var connectorsSortKey = 'status';
+  var connectorsSortDirection = 'asc';
+  var connectorsFilteredCount = 0;
 
   function resetState() {
     allConnectors = [];
@@ -53,10 +62,17 @@
     _suppressActionsClose = false;
     selectedConnectorFile = null;
     parsedConnectorConfig = null;
+    importTargetConnectorId = null;
+    importTargetConnectorName = null;
+    pinnedConnectors = loadPinnedConnectors();
     if (searchTimeout) {
       clearTimeout(searchTimeout);
       searchTimeout = null;
     }
+    connectorsCurrentPage = 1;
+    connectorsSortKey = 'status';
+    connectorsSortDirection = 'asc';
+    connectorsFilteredCount = 0;
   }
 
   // ── Static data ─────────────────────────────────────────────────────
@@ -101,9 +117,36 @@
 
   // ── Helpers ──────────────────────────────────────────────────────────
 
+  function loadPinnedConnectors() {
+    if (typeof localStorage === 'undefined') return [];
+    try {
+      var raw = JSON.parse(localStorage.getItem(pinnedConnectorsStorageKey) || '[]');
+      return Array.isArray(raw) ? raw.filter(function (id) { return typeof id === 'string' && id; }) : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function savePinnedConnectors() {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(pinnedConnectorsStorageKey, JSON.stringify(pinnedConnectors));
+  }
+
   function findConnectorById(connectorId) {
+    var target = String(connectorId || '');
+    var normalizedTarget = target.toLowerCase().replace(/[\s_]+/g, '-').trim();
     return allConnectors.find(function (c) {
-      return (c.id === connectorId) || (c.connector_id === connectorId);
+      var fields = [
+        c.id,
+        c.connector_id,
+        c.connector_type,
+        c.source_type,
+        c.type
+      ];
+      if (fields.some(function (field) { return field != null && String(field) === target; })) return true;
+
+      var name = c.name || c.connector_name || c.source_name || (c.metadata && c.metadata.name) || '';
+      return name && String(name).toLowerCase().replace(/[\s_]+/g, '-').trim() === normalizedTarget;
     });
   }
 
@@ -168,6 +211,223 @@
       'basic': 'Basic Auth'
     };
     return authTypeMap[authType] || formatText(authType);
+  }
+
+  function connectorIdentity(connector) {
+    connector = connector || {};
+    return String(
+      connector.connector_id ||
+      connector.connector_type ||
+      connector.id ||
+      connector.name ||
+      ''
+    ).toLowerCase();
+  }
+
+  function getConnectorPinKey(connector) {
+    var normalized = normalizeConnector(connector);
+    return normalized.id || normalized.raw.connector_id || normalized.raw.connector_type || normalized.name || '';
+  }
+
+  function isConnectorPinned(connector) {
+    var key = getConnectorPinKey(connector);
+    return !!key && pinnedConnectors.indexOf(key) !== -1;
+  }
+
+  function toggleConnectorPin(connectorId, event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    var connector = findConnectorById(connectorId);
+    if (!connector) return;
+
+    var key = getConnectorPinKey(connector);
+    var index = pinnedConnectors.indexOf(key);
+    if (index === -1) {
+      pinnedConnectors = pinnedConnectors.concat(key);
+    } else {
+      pinnedConnectors = pinnedConnectors.filter(function (id) { return id !== key; });
+    }
+    savePinnedConnectors();
+    filterAvailableConnectors();
+  }
+
+  function normalizeConnector(connector) {
+    connector = getConnectorWithDefaults(connector || {});
+
+    var manifest = connector.manifest || {};
+    var id = connector.id || connector.connector_id || connector.connector_type || 'unknown';
+
+    return {
+      raw: connector,
+      id: id,
+      identity: connectorIdentity(connector),
+      name: manifest.name || connector.name || connector.connector_name || 'Unknown Connector',
+      description: manifest.description || connector.description || connector.connector_description || '',
+      status: String(connector.status || connector.auth_status || '').toLowerCase(),
+      category: manifest.category || connector.category || connector.connector_category || 'unknown',
+      vendor: manifest.vendor || connector.vendor || '',
+      auth_type: connector.auth_type || connector.authType || 'unknown',
+      version: connector.version || manifest.version || '1.0.0',
+      logo_url: manifest.icon || connector.logo_url || connector.logo || connector.icon || null,
+      tags: connector.tags || [],
+      ui_entry_point: connector.ui_entry_point || null,
+      ui_layout_id: connector.ui_layout_id || null,
+      hasCustomUI: !!(connector.ui_entry_point && connector.manifest)
+    };
+  }
+
+  function getConnectorStatusKey(connector, installedConnectors) {
+    var normalized = normalizeConnector(connector);
+    var rawStatus = normalized.status;
+
+    if (rawStatus === 'connected' || rawStatus === 'active') return 'connected';
+    if (rawStatus === 'syncing') return 'syncing';
+    if (rawStatus === 'error') return 'error';
+    if (rawStatus === 'coming_soon') return 'coming_soon';
+    if (rawStatus === 'installed') return 'installed';
+
+    var installed = installedConnectors || currentInstalledConnectors;
+    if (ConnectorRegistry.isConnectorInstalled(normalized.id, installed) && rawStatus !== 'disconnected') {
+      return 'installed';
+    }
+
+    return 'available';
+  }
+
+  function getConnectorStatusBadge(connector, installedConnectors) {
+    var status = getConnectorStatusKey(connector, installedConnectors);
+    var statusBadgeMap = {
+      connected:   { color: 'green',  label: 'Connected' },
+      installed:   { color: 'blue',   label: 'Installed' },
+      available:   { color: 'gray',   label: 'Available' },
+      syncing:     { color: 'blue',   label: 'Syncing' },
+      error:       { color: 'red',    label: 'Error' },
+      coming_soon: { color: 'yellow', label: 'Coming Soon' }
+    };
+    return statusBadgeMap[status] || statusBadgeMap.available;
+  }
+
+  function getConnectorSortValue(connector, key) {
+    var normalized = normalizeConnector(connector);
+    var statusRank = {
+      connected: 0,
+      installed: 1,
+      available: 2,
+      syncing: 3,
+      error: 4,
+      coming_soon: 5
+    };
+
+    if (key === 'status') {
+      var statusKey = getConnectorStatusKey(connector, currentInstalledConnectors);
+      return statusRank[statusKey] === undefined ? 99 : statusRank[statusKey];
+    }
+    if (key === 'category') return normalized.category || '';
+    if (key === 'auth') return normalized.auth_type || '';
+    if (key === 'version') return normalized.version || '';
+    return normalized.name || '';
+  }
+
+  function sortConnectors(connectors) {
+    return connectors.slice().sort(function (a, b) {
+      var aVal = getConnectorSortValue(a, connectorsSortKey);
+      var bVal = getConnectorSortValue(b, connectorsSortKey);
+      var direction = connectorsSortDirection === 'desc' ? -1 : 1;
+      var aPinned = isConnectorPinned(a);
+      var bPinned = isConnectorPinned(b);
+
+      if (aPinned !== bPinned) return aPinned ? -1 : 1;
+
+      if (aVal < bVal) return -1 * direction;
+      if (aVal > bVal) return 1 * direction;
+
+      var aName = normalizeConnector(a).name.toLowerCase();
+      var bName = normalizeConnector(b).name.toLowerCase();
+      if (aName < bName) return -1;
+      if (aName > bName) return 1;
+      return 0;
+    });
+  }
+
+  function updateSortIndicators() {
+    var indicators = document.querySelectorAll('[data-sort-indicator]');
+    indicators.forEach(function (indicator) {
+      var key = indicator.getAttribute('data-sort-indicator');
+      indicator.textContent = key === connectorsSortKey
+        ? (connectorsSortDirection === 'asc' ? '↑' : '↓')
+        : '';
+    });
+  }
+
+  function buildCombinedConnectorList(installedConnectors, catalogConnectors) {
+    var combined = [];
+    var seen = new Set();
+
+    function addConnector(connector) {
+      if (!connector) return;
+      var key = connectorIdentity(connector);
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      combined.push(connector);
+    }
+
+    installedConnectors.forEach(addConnector);
+    (catalogConnectors || []).forEach(addConnector);
+    return combined;
+  }
+
+  function escapeHtml(value) {
+    return Lex.Utils.escapeHtml(String(value == null ? '' : value));
+  }
+
+  function escapeAttribute(value) {
+    return escapeHtml(value).replace(/'/g, '&#39;');
+  }
+
+  function getConnectorAction(connector, installedConnectors) {
+    var status = getConnectorStatusKey(connector, installedConnectors);
+
+    if (status === 'coming_soon') return 'details';
+    if (status === 'available') return 'install';
+    return 'open';
+  }
+
+  function handleConnectorRowSelection(connectorId) {
+    var connector = findConnectorById(connectorId);
+    if (!connector) return;
+
+    if (getConnectorStatusKey(connector, currentInstalledConnectors) === 'coming_soon') {
+      showConnectorDetails(connectorId, null);
+      return;
+    }
+
+    openConnectorManage(connectorId);
+  }
+
+  function getConnectorUpdateSlug(connector) {
+    var normalized = normalizeConnector(connector);
+    return normalized.raw.connector_id || '';
+  }
+
+  function openConnectorUpdateModal(connectorId, event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    var connector = findConnectorById(connectorId);
+    if (!connector) return;
+    var normalized = normalizeConnector(connector);
+    var slug = getConnectorUpdateSlug(connector);
+    if (!slug) return;
+
+    openImportConnectorModal({
+      targetConnectorId: slug,
+      targetConnectorName: normalized.name
+    });
   }
 
   // ── Card rendering ──────────────────────────────────────────────────
@@ -254,84 +514,92 @@
         '</div>';
     }
 
-    var syncInfoHtml = (isActive || isInstalled)
-      ? '<div class="text-xs mb-3" style="color:var(--lex-text-tertiary)"><span>Last sync: ' + timeAgoStr + '</span></div>'
-      : '';
+    var rowClick = isComingSoon ? '' : cardClick;
 
-    return '<div class="p-5 flex flex-col ' +
-      (isComingSoon ? 'opacity-60' : 'hover:shadow-md') + ' transition-shadow ' +
-      (isComingSoon ? '' : 'cursor-pointer') + '" style="background:var(--lex-card-bg);border:1px solid var(--lex-card-border);border-radius:var(--lex-card-radius);box-shadow:var(--lex-card-shadow)" ' + cardClick + '>' +
-      '<div class="flex items-start justify-between mb-4">' +
-        '<div class="w-12 h-12 rounded-lg flex items-center justify-center" style="background:var(--lex-bg-tertiary)">' + logoHtml + '</div>' +
-        '<lex-badge color="' + badgeConfig.color + '" label="' + badgeConfig.label + '" size="sm"></lex-badge>' +
-      '</div>' +
-      '<h3 class="font-semibold mb-1" style="color:var(--lex-text-primary)">' + normalizedConnector.name + '</h3>' +
-      (normalizedConnector.vendor ? '<p class="text-xs mb-2" style="color:var(--lex-text-tertiary)">' + normalizedConnector.vendor + '</p>' : '') +
-      '<p class="text-sm mb-3 line-clamp-2" style="color:var(--lex-text-secondary)">' + normalizedConnector.description + '</p>' +
-      '<div class="mt-auto">' +
-        syncInfoHtml +
-        buttonsHtml +
-      '</div>' +
-    '</div>';
+    return '<tr class="dc-row' + (isComingSoon ? ' opacity-60' : '') + '" tabindex="0" ' + rowClick + '>' +
+      '<td>' +
+        '<div class="flex items-center gap-3">' +
+          '<div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style="background:var(--lex-bg-tertiary)">' + logoHtml + '</div>' +
+          '<div class="min-w-0">' +
+            '<div class="font-semibold" style="color:var(--lex-text-primary)">' + normalizedConnector.name + '</div>' +
+          '</div>' +
+        '</div>' +
+      '</td>' +
+      '<td>' + formatText(normalizedConnector.category) + '</td>' +
+      '<td>' + formatAuthType(normalizedConnector.auth_type) + '</td>' +
+      '<td><lex-badge color="' + badgeConfig.color + '" label="' + badgeConfig.label + '" size="sm"></lex-badge></td>' +
+      '<td>' + ((isActive || isInstalled) ? timeAgoStr : 'Never') + '</td>' +
+      '<td><div class="dc-row-actions">' + buttonsHtml + '</div></td>' +
+    '</tr>';
   }
 
   function renderAvailableConnectorCard(connector, installedConnectors) {
-    var isInstalled = ConnectorRegistry.isConnectorInstalled(connector.id, installedConnectors);
-    var isComingSoon = connector.status === 'coming_soon';
+    var normalized = normalizeConnector(connector);
+    var statusKey = getConnectorStatusKey(connector, installedConnectors);
+    var isComingSoon = statusKey === 'coming_soon';
+    var action = getConnectorAction(connector, installedConnectors);
+    var badgeConfig = getConnectorStatusBadge(connector, installedConnectors);
+    var connectorId = normalized.id;
+    var safeId = escapeAttribute(connectorId);
+    var safeName = escapeAttribute(normalized.name);
+    var pinKey = getConnectorPinKey(connector);
+    var pinned = isConnectorPinned(connector);
+    var pinLabel = pinned ? 'Unpin connector' : 'Pin connector to top';
+    var pinIcon = pinned
+      ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.39 6.96L22 9.27l-5.45 4.73L17.82 22 12 18.27 6.18 22l1.27-7.99L2 9.27l7.61-.31L12 2z"/></svg>'
+      : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l2.39 6.96L22 9.27l-5.45 4.73L17.82 22 12 18.27 6.18 22l1.27-7.99L2 9.27l7.61-.31L12 2z"/></svg>';
 
-    var logoHtml = connector.logo_url
-      ? '<img src="' + connector.logo_url + '" alt="' + connector.name + '" class="w-10 h-10 object-contain" onerror="this.parentElement.innerHTML=\'<span class=\\\'text-lg font-bold\\\' style=\\\'color:var(--lex-text-accent)\\\'>' + connector.name.charAt(0) + '</span>\'">'
-      : '<span class="text-lg font-bold" style="color:var(--lex-text-accent)">' + connector.name.charAt(0) + '</span>';
-
-    /**
-     * Determine the lex-badge config for available connector cards.
-     * Valid colors: gray | green | red | yellow | blue | indigo
-     */
-    var statusBadge = '';
-    if (isInstalled) {
-      statusBadge = '<lex-badge color="green" label="Installed" size="sm"></lex-badge>';
-    } else if (isComingSoon) {
-      statusBadge = '<lex-badge color="yellow" label="Coming Soon" size="sm"></lex-badge>';
-    } else {
-      statusBadge = '<lex-badge color="blue" label="Available" size="sm"></lex-badge>';
-    }
+    var logoHtml = normalized.logo_url
+      ? '<img src="' + escapeAttribute(normalized.logo_url) + '" alt="' + safeName + '" class="w-10 h-10 object-contain" onerror="this.parentElement.innerHTML=\'<span class=\\\'text-lg font-bold\\\' style=\\\'color:var(--lex-text-accent)\\\'>' + escapeAttribute(normalized.name.charAt(0)) + '</span>\'">'
+      : '<span class="text-lg font-bold" style="color:var(--lex-text-accent)">' + escapeHtml(normalized.name.charAt(0)) + '</span>';
 
     /** SVG icon used inside detail icon-only buttons. */
     var infoIconSvgAvail = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
 
     var actionButton = '';
-    if (isInstalled) {
-      actionButton = '<lex-btn variant="secondary" size="sm" disabled style="width:100%">Already Installed</lex-btn>';
-    } else if (isComingSoon) {
-      actionButton = '<lex-btn variant="ghost" size="sm" onclick="showConnectorDetails(\'' + connector.id + '\', event)" style="width:100%">View Details</lex-btn>';
+    if (action === 'install') {
+      actionButton = '<div class="flex gap-2">' +
+        '<lex-btn variant="primary" size="sm" onclick="installConnector(\'' + safeId + '\', event); event.stopPropagation();" style="flex:1">Set Up</lex-btn>' +
+        '<lex-btn variant="ghost" size="sm" icon="true" onclick="showConnectorDetails(\'' + safeId + '\', event); event.stopPropagation();" aria-label="View details">' + infoIconSvgAvail + '</lex-btn>' +
+        '</div>';
+    } else if (action === 'details') {
+      actionButton = '<lex-btn variant="ghost" size="sm" onclick="showConnectorDetails(\'' + safeId + '\', event); event.stopPropagation();" style="width:100%">View Details</lex-btn>';
     } else {
       actionButton = '<div class="flex gap-2">' +
-        '<lex-btn variant="primary" size="sm" onclick="installConnector(\'' + connector.id + '\', event)" style="flex:1">Set Up</lex-btn>' +
-        '<lex-btn variant="ghost" size="sm" icon="true" onclick="showConnectorDetails(\'' + connector.id + '\', event)" aria-label="View details">' + infoIconSvgAvail + '</lex-btn>' +
+        '<lex-btn variant="primary" size="sm" onclick="openConnectorManage(\'' + safeId + '\'); event.stopPropagation();" style="flex:1">Open</lex-btn>' +
+        '<lex-btn variant="ghost" size="sm" icon="true" onclick="showConnectorDetails(\'' + safeId + '\', event); event.stopPropagation();" aria-label="View details">' + infoIconSvgAvail + '</lex-btn>' +
         '</div>';
     }
 
-    return '<div class="p-5 flex flex-col ' + (isComingSoon ? 'opacity-75' : 'hover:shadow-md') + ' transition-shadow" style="background:var(--lex-card-bg);border:1px solid var(--lex-card-border);border-radius:var(--lex-card-radius);box-shadow:var(--lex-card-shadow)">' +
-      '<div class="flex items-start justify-between mb-4">' +
-        '<div class="w-12 h-12 rounded-lg flex items-center justify-center" style="background:var(--lex-bg-accent-muted)">' + logoHtml + '</div>' +
-        statusBadge +
-      '</div>' +
-      '<h3 class="font-semibold mb-1" style="color:var(--lex-text-primary)">' + connector.name + '</h3>' +
-      (connector.vendor ? '<p class="text-xs mb-2" style="color:var(--lex-text-tertiary)">' + connector.vendor + '</p>' : '') +
-      '<p class="text-sm mb-3 line-clamp-2" style="color:var(--lex-text-secondary)">' + connector.description + '</p>' +
-      '<div class="mt-auto">' +
-        '<div class="flex items-center justify-between text-xs mb-3" style="color:var(--lex-text-tertiary)">' +
-          '<span class="inline-flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>' + formatText(connector.category) + '</span>' +
-          (connector.version ? '<span>v' + connector.version + '</span>' : '') +
+    var updateSlug = getConnectorUpdateSlug(connector);
+    var updateIconSvg = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-3-6.7L21 8"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 3v5h-5"></path></svg>';
+    var updateButton = updateSlug
+      ? '<lex-btn variant="ghost" size="sm" icon="true" onclick="openConnectorUpdateModal(\'' + safeId + '\', event)" aria-label="Update ' + safeName + '" title="Update connector">' + updateIconSvg + '</lex-btn>'
+      : '';
+
+    return '<tr class="dc-row' + (isComingSoon ? ' opacity-75' : '') + '" data-connector-row="' + safeId + '" tabindex="0" role="button" aria-label="Open ' + safeName + '" onclick="handleConnectorRowSelection(\'' + safeId + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();handleConnectorRowSelection(\'' + safeId + '\')}">' +
+      '<td class="dc-pin-cell">' +
+        '<button type="button" class="dc-pin-btn' + (pinned ? ' is-pinned' : '') + '" onclick="toggleConnectorPin(\'' + escapeAttribute(pinKey) + '\', event)" aria-pressed="' + (pinned ? 'true' : 'false') + '" aria-label="' + escapeAttribute(pinLabel) + '" title="' + escapeAttribute(pinLabel) + '">' + pinIcon + '</button>' +
+      '</td>' +
+      '<td>' +
+        '<div class="flex items-center gap-3">' +
+          '<div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style="background:var(--lex-bg-accent-muted)">' + logoHtml + '</div>' +
+          '<div class="min-w-0">' +
+            '<div class="font-semibold" style="color:var(--lex-text-primary)">' + escapeHtml(normalized.name) + '</div>' +
+          '</div>' +
         '</div>' +
-        actionButton +
-      '</div>' +
-    '</div>';
+      '</td>' +
+      '<td>' + escapeHtml(formatText(normalized.category)) + '</td>' +
+      '<td>' + escapeHtml(formatAuthType(normalized.auth_type)) + '</td>' +
+      '<td><lex-badge color="' + badgeConfig.color + '" label="' + badgeConfig.label + '" size="sm"></lex-badge></td>' +
+      '<td>' + escapeHtml(normalized.version ? 'v' + normalized.version : 'v1.0.0') + '</td>' +
+      '<td><div class="dc-row-actions">' + actionButton + updateButton + '</div></td>' +
+    '</tr>';
   }
 
   // ── Navigation ──────────────────────────────────────────────────────
 
-  function openConnectorManage(connectorId) {
+  function buildConnectorManageUrl(connectorId) {
     var connector = findConnectorById(connectorId);
     // Prefer the catalog slug (connector_id) from integration_sources. Falls
     // back to the row id when the caller passed a slug directly.
@@ -339,63 +607,95 @@
       (connector && (connector.connector_id || connector.connector_type)) || connectorId || ''
     ).toLowerCase();
 
-    if (connectorSlug === 'actionstep') {
-      var actionstepUrl = 'integrations/actionstep.html?id=' + encodeURIComponent(connectorId);
-      if (window.LexRouter) {
-        LexRouter.navigate(actionstepUrl);
-      } else {
-        window.location.href = actionstepUrl;
-      }
-      return;
+    var connectorName = String(connector && (connector.name || connector.connector_name || connector.source_name) || '').toLowerCase();
+    var catalogConnectorId = connector
+      ? (connector.connector_id || connector.connector_type || connector.source_type || connector.type || connectorId)
+      : connectorId;
+
+    if (connectorSlug === 'actionstep' || connectorSlug === 'case-actionstep' || connectorName.indexOf('actionstep') !== -1) {
+      return 'integrations/actionstep.html?id=' + encodeURIComponent(connectorId) + '&chrome=embedded';
     }
 
-    if (connectorSlug === 'leadly') {
-      var leadlyUrl = 'integrations/leadly.html?id=' + encodeURIComponent(connectorId);
-      if (window.LexRouter) {
-        LexRouter.navigate(leadlyUrl);
-      } else {
-        window.location.href = leadlyUrl;
-      }
-      return;
+    if (connectorSlug === 'leadly' || connectorSlug === 'crm-leadly' || connectorName.indexOf('leadly') !== -1) {
+      return 'integrations/leadly.html?id=' + encodeURIComponent(connectorId) + '&chrome=embedded';
     }
 
     // Connector with custom UI — open in connector-viewer
     if (connector && connector.ui_entry_point) {
-      openCustomConnectorUI(
+      return buildCustomConnectorUIUrl(
         connector.ui_entry_point,
         connector.name || 'Connector',
         connector.id || '',
         connector.connector_id || connector.connector_type || connector.id || ''
       );
-      return;
     }
 
-    // Generic integration management page
-    if (window.LexRouter) {
-      LexRouter.navigate('integrations/integration-config.html?id=' + connectorId);
-    } else {
-      window.location.href = 'integrations/integration-config.html?id=' + connectorId;
-    }
+    return 'integrations/integration-config.html?id=' + encodeURIComponent(catalogConnectorId) + '&chrome=embedded';
+  }
+
+  function openConnectorManage(connectorId) {
+    var connector = findConnectorById(connectorId);
+    var url = buildConnectorManageUrl(connectorId);
+    var connectorName = connector
+      ? ((connector.manifest && connector.manifest.name) || connector.name || connector.connector_name || 'Connector Dashboard')
+      : 'Connector Dashboard';
+
+    if (!url) return;
+    openConnectorDashboardModal(url, connectorName);
   }
 
   function openConnector(connectorId, category) {
     openConnectorManage(connectorId);
   }
 
-  function openCustomConnectorUI(uiEntryPoint, connectorName, sourceId, connectorType) {
+  function buildCustomConnectorUIUrl(uiEntryPoint, connectorName, sourceId, connectorType) {
     var params = new URLSearchParams({
       ui: uiEntryPoint,
       name: connectorName,
       connectorId: connectorType || sourceId || '',
       connectorType: connectorType || '',
-      sourceId: sourceId || ''
+      sourceId: sourceId || '',
+      chrome: 'embedded'
     });
 
-    if (window.LexRouter) {
-      LexRouter.navigate('integrations/connector-viewer.html?' + params.toString());
-    } else {
-      window.location.href = 'integrations/connector-viewer.html?' + params.toString();
+    return 'integrations/connector-viewer.html?' + params.toString();
+  }
+
+  function openCustomConnectorUI(uiEntryPoint, connectorName, sourceId, connectorType) {
+    openConnectorDashboardModal(
+      buildCustomConnectorUIUrl(uiEntryPoint, connectorName, sourceId, connectorType),
+      connectorName || 'Connector Dashboard'
+    );
+  }
+
+  function openConnectorDashboardModal(url, connectorName) {
+    var modal = document.getElementById('connectorDashboardModal');
+    var frame = document.getElementById('connectorDashboardFrame');
+    var title = document.getElementById('connectorDashboardTitle');
+    var urlEl = document.getElementById('connectorDashboardUrl');
+    var openNewBtn = document.getElementById('connectorDashboardOpenNewBtn');
+
+    if (!modal || !frame) return;
+
+    if (title) title.textContent = connectorName || 'Connector Dashboard';
+    if (urlEl) urlEl.textContent = url || '';
+    if (openNewBtn) {
+      openNewBtn.onclick = function () {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      };
     }
+    frame.src = url;
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeConnectorDashboardModal() {
+    var modal = document.getElementById('connectorDashboardModal');
+    var frame = document.getElementById('connectorDashboardFrame');
+
+    if (frame) frame.src = 'about:blank';
+    if (modal) modal.classList.add('hidden');
+    document.body.style.overflow = '';
   }
 
   // ── Install connector ───────────────────────────────────────────────
@@ -411,11 +711,10 @@
       if (result.success) {
         Lex.Toast.success(connectorId + ' is ready to configure.');
         var tid = setTimeout(function () {
-          if (window.LexRouter) {
-            LexRouter.navigate('integrations/integration-config.html?id=' + connectorId);
-          } else {
-            window.location.href = 'integrations/integration-config.html?id=' + connectorId;
-          }
+          openConnectorDashboardModal(
+            'integrations/integration-config.html?id=' + encodeURIComponent(connectorId) + '&chrome=embedded',
+            connectorId
+          );
         }, 1000);
         _timeouts.push(tid);
       } else {
@@ -748,68 +1047,146 @@
 
   function filterAvailableConnectors() {
     var searchInput = document.getElementById('connectorSearch');
+    var statusFilterEl = document.getElementById('statusFilter');
     var categoryFilterEl = document.getElementById('categoryFilter');
     var authTypeFilterEl = document.getElementById('authTypeFilter');
 
-    if (!searchInput || !categoryFilterEl || !authTypeFilterEl) return;
+    if (!searchInput || !statusFilterEl || !categoryFilterEl || !authTypeFilterEl) return;
 
     // lex-input and lex-select both expose .value on the element directly.
     var searchTerm = (searchInput.value || '').toLowerCase();
+    var statusVal = statusFilterEl.value || '';
     var categoryVal = categoryFilterEl.value || '';
     var authTypeVal = authTypeFilterEl.value || '';
 
     var filtered = allAvailableConnectors.filter(function (connector) {
+      var normalized = normalizeConnector(connector);
+
       if (searchTerm) {
         var matchesSearch =
-          (connector.name || '').toLowerCase().includes(searchTerm) ||
-          (connector.vendor || '').toLowerCase().includes(searchTerm) ||
-          (connector.description || '').toLowerCase().includes(searchTerm) ||
-          (connector.tags || []).some(function (tag) { return tag.toLowerCase().includes(searchTerm); });
+          (normalized.name || '').toLowerCase().includes(searchTerm) ||
+          (normalized.vendor || '').toLowerCase().includes(searchTerm) ||
+          (normalized.description || '').toLowerCase().includes(searchTerm) ||
+          (normalized.tags || []).some(function (tag) { return String(tag).toLowerCase().includes(searchTerm); });
 
         if (!matchesSearch) return false;
       }
 
-      if (categoryVal && connector.category !== categoryVal) return false;
-      if (authTypeVal && connector.auth_type !== authTypeVal) return false;
+      if (statusVal && getConnectorStatusKey(connector, currentInstalledConnectors) !== statusVal) return false;
+      if (categoryVal) {
+        var categoryMatches = normalized.category === categoryVal;
+        if (categoryVal === 'case_management') {
+          categoryMatches = categoryMatches || normalized.category === 'case';
+        }
+        if (!categoryMatches) return false;
+      }
+      if (authTypeVal && normalized.auth_type !== authTypeVal) return false;
 
       return true;
     });
 
-    renderAvailableConnectors(filtered);
+    connectorsFilteredCount = filtered.length;
+    renderAvailableConnectors(sortConnectors(filtered));
   }
 
   function renderAvailableConnectors(connectors) {
     var availableContainer = document.getElementById('availableConnectors');
     var noResultsMessage = document.getElementById('noResultsMessage');
+    var summaryEl = document.getElementById('connectorsPaginationSummary');
+    var pageLabelEl = document.getElementById('connectorsPageLabel');
+    var prevBtn = document.getElementById('connectorsPrevPage');
+    var nextBtn = document.getElementById('connectorsNextPage');
     if (!availableContainer || !noResultsMessage) return;
 
-    if (connectors.length === 0) {
-      availableContainer.innerHTML = '';
-      noResultsMessage.classList.remove('hidden');
+    var total = connectors.length;
+    var totalPages = Math.max(1, Math.ceil(total / connectorsPageSize));
+    if (connectorsCurrentPage > totalPages) connectorsCurrentPage = totalPages;
+    if (connectorsCurrentPage < 1) connectorsCurrentPage = 1;
+
+    if (total === 0) {
+      availableContainer.innerHTML = '<tr><td colspan="7" class="dc-empty">No connectors match the current filters.</td></tr>';
+      noResultsMessage.classList.add('hidden');
+      if (summaryEl) summaryEl.textContent = 'Showing 0 connectors';
+      if (pageLabelEl) pageLabelEl.textContent = 'Page 1 of 1';
+      if (prevBtn) prevBtn.disabled = true;
+      if (nextBtn) nextBtn.disabled = true;
+      updateSortIndicators();
     } else {
-      availableContainer.innerHTML = connectors
+      var start = (connectorsCurrentPage - 1) * connectorsPageSize;
+      var end = Math.min(start + connectorsPageSize, total);
+      var pageRows = connectors.slice(start, end);
+
+      availableContainer.innerHTML = pageRows
         .map(function (c) { return renderAvailableConnectorCard(c, currentInstalledConnectors); })
         .join('');
       noResultsMessage.classList.add('hidden');
+      if (summaryEl) summaryEl.textContent = 'Showing ' + (start + 1) + '-' + end + ' of ' + total + ' connectors';
+      if (pageLabelEl) pageLabelEl.textContent = 'Page ' + connectorsCurrentPage + ' of ' + totalPages;
+      if (prevBtn) prevBtn.disabled = connectorsCurrentPage <= 1;
+      if (nextBtn) nextBtn.disabled = connectorsCurrentPage >= totalPages;
+      updateSortIndicators();
     }
   }
 
   function setupSearchAndFilters() {
     var searchInput = document.getElementById('connectorSearch');
+    var statusFilterEl = document.getElementById('statusFilter');
     var categoryFilterEl = document.getElementById('categoryFilter');
     var authTypeFilterEl = document.getElementById('authTypeFilter');
+    var prevBtn = document.getElementById('connectorsPrevPage');
+    var nextBtn = document.getElementById('connectorsNextPage');
 
-    if (!searchInput || !categoryFilterEl || !authTypeFilterEl) return;
+    if (!searchInput || !statusFilterEl || !categoryFilterEl || !authTypeFilterEl) return;
+
+    function resetPageAndFilter() {
+      connectorsCurrentPage = 1;
+      filterAvailableConnectors();
+    }
 
     // lex-input fires 'lex-input' on each keystroke (equivalent to native 'input').
     searchInput.addEventListener('lex-input', function () {
       if (searchTimeout) clearTimeout(searchTimeout);
-      searchTimeout = setTimeout(filterAvailableConnectors, 300);
+      searchTimeout = setTimeout(resetPageAndFilter, 300);
     });
 
     // lex-select fires 'lex-change' when a selection is made (equivalent to native 'change').
-    categoryFilterEl.addEventListener('lex-change', filterAvailableConnectors);
-    authTypeFilterEl.addEventListener('lex-change', filterAvailableConnectors);
+    statusFilterEl.addEventListener('lex-change', resetPageAndFilter);
+    categoryFilterEl.addEventListener('lex-change', resetPageAndFilter);
+    authTypeFilterEl.addEventListener('lex-change', resetPageAndFilter);
+
+    document.querySelectorAll('[data-sort-key]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        var key = button.getAttribute('data-sort-key');
+        if (!key) return;
+
+        if (connectorsSortKey === key) {
+          connectorsSortDirection = connectorsSortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+          connectorsSortKey = key;
+          connectorsSortDirection = 'asc';
+        }
+
+        connectorsCurrentPage = 1;
+        filterAvailableConnectors();
+      });
+    });
+
+    if (prevBtn) {
+      prevBtn.addEventListener('click', function () {
+        if (connectorsCurrentPage <= 1) return;
+        connectorsCurrentPage -= 1;
+        filterAvailableConnectors();
+      });
+    }
+
+    if (nextBtn) {
+      nextBtn.addEventListener('click', function () {
+        var totalPages = Math.max(1, Math.ceil(connectorsFilteredCount / connectorsPageSize));
+        if (connectorsCurrentPage >= totalPages) return;
+        connectorsCurrentPage += 1;
+        filterAvailableConnectors();
+      });
+    }
   }
 
   // ── Page refresh ────────────────────────────────────────────────────
@@ -890,71 +1267,34 @@
 
         installedConnectors = installedConnectors.concat(additionalConnectors);
         allConnectors = installedConnectors.slice();
-
-        var installedContainer = document.getElementById('installedConnectors');
-        if (installedContainer) {
-          installedContainer.innerHTML = installedConnectors.map(renderConnectorCard).join('');
-        }
       } else {
         console.error('Failed to fetch installed connectors:', installedData.reason);
         Lex.Toast.warning('Could not load backend connectors. Showing system-level connectors only.');
 
         installedConnectors = STATIC_SYSTEM_CONNECTORS.slice();
         allConnectors = installedConnectors.slice();
-
-        var installedContainer = document.getElementById('installedConnectors');
-        if (installedContainer) {
-          installedContainer.innerHTML = installedConnectors.map(renderConnectorCard).join('');
-        }
       }
 
       // Process catalog connectors
+      var availableSection = document.getElementById('availableConnectorsSection');
       if (registryData.status === 'fulfilled') {
-        var availableConnectors = registryData.value.connectors;
+        var availableConnectors = registryData.value.connectors || [];
 
-        if (availableConnectors && availableConnectors.length > 0) {
-          availableConnectors.forEach(function (ac) {
-            if (!allConnectors.find(function (c) { return c.id === ac.id || c.connector_id === ac.id; })) {
-              allConnectors.push(ac);
-            }
-          });
-
-          var availableSection = document.getElementById('availableConnectorsSection');
-
-          var notInstalledConnectors = availableConnectors.filter(function (ac) {
-            return !ConnectorRegistry.isConnectorInstalled(ac.id, installedConnectors) && ac.status !== 'coming_soon';
-          });
-
-          allAvailableConnectors = notInstalledConnectors;
-          currentInstalledConnectors = installedConnectors;
-
-          if (notInstalledConnectors.length > 0) {
-            renderAvailableConnectors(notInstalledConnectors);
-            availableSection.classList.remove('hidden');
-          } else {
-            var availableContainer = document.getElementById('availableConnectors');
-            if (availableContainer) {
-              availableContainer.innerHTML = '<p class="text-sm text-center py-8 col-span-full" style="color:var(--lex-text-secondary)">All available connectors are already installed.</p>';
-            }
-            availableSection.classList.remove('hidden');
-          }
-        }
+        allAvailableConnectors = buildCombinedConnectorList(installedConnectors, availableConnectors);
+        currentInstalledConnectors = installedConnectors;
+        allConnectors = buildCombinedConnectorList(allConnectors, allAvailableConnectors);
+        connectorsCurrentPage = 1;
+        connectorsFilteredCount = allAvailableConnectors.length;
+        filterAvailableConnectors();
+        if (availableSection) availableSection.classList.remove('hidden');
       } else {
         console.warn('Connector catalog unavailable:', registryData.reason);
 
-        var availableSection = document.getElementById('availableConnectorsSection');
-        var availableContainer = document.getElementById('availableConnectors');
-
-        if (availableContainer) {
-          availableContainer.innerHTML =
-            '<div class="col-span-full rounded-lg p-6 text-center" style="background:var(--lex-status-warning-bg);border:1px solid var(--lex-status-warning)">' +
-              '<svg class="w-12 h-12 mx-auto mb-3" style="color:var(--lex-icon-warning)" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-                '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>' +
-              '</svg>' +
-              '<p class="text-sm font-medium mb-1" style="color:var(--lex-status-warning-text)">Connector catalog unavailable</p>' +
-              '<p class="text-xs" style="color:var(--lex-status-warning-text)">Cannot fetch available connectors from the backend catalog. You can still use the ZIP import flow.</p>' +
-            '</div>';
-        }
+        allAvailableConnectors = installedConnectors.slice();
+        currentInstalledConnectors = installedConnectors;
+        connectorsCurrentPage = 1;
+        connectorsFilteredCount = allAvailableConnectors.length;
+        filterAvailableConnectors();
         if (availableSection) availableSection.classList.remove('hidden');
       }
 
@@ -970,10 +1310,14 @@
 
   // ── Import connector ────────────────────────────────────────────────
 
-  function openImportConnectorModal() {
+  function openImportConnectorModal(opts) {
     var modal = document.getElementById('importConnectorModal');
     if (!modal) return;
+    opts = opts || {};
+    importTargetConnectorId = opts.targetConnectorId || null;
+    importTargetConnectorName = opts.targetConnectorName || null;
     clearConnectorFile();
+    applyImportConnectorModalContext();
     modal.open = true;
   }
 
@@ -981,7 +1325,36 @@
     var modal = document.getElementById('importConnectorModal');
     if (!modal) return;
     modal.open = false;
+    importTargetConnectorId = null;
+    importTargetConnectorName = null;
     clearConnectorFile();
+    applyImportConnectorModalContext();
+  }
+
+  function applyImportConnectorModalContext() {
+    var modal = document.getElementById('importConnectorModal');
+    var titleEl = document.getElementById('importConnectorContextTitle');
+    var descriptionEl = document.getElementById('importConnectorContextDescription');
+    var buttonLabelEl = document.getElementById('importConnectorBtnLabel');
+
+    if (importTargetConnectorId && importTargetConnectorName) {
+      if (modal) modal.setAttribute('heading', 'Update ' + importTargetConnectorName);
+      if (titleEl) titleEl.textContent = 'Update ' + importTargetConnectorName;
+      if (descriptionEl) {
+        descriptionEl.innerHTML =
+          'Upload a ZIP package to update <strong>' + escapeHtml(importTargetConnectorName) + '</strong>. ' +
+          'The backend will validate that the manifest matches this connector before replacing the current package.';
+      }
+      if (buttonLabelEl) buttonLabelEl.textContent = 'Upload Update';
+      return;
+    }
+
+    if (modal) modal.setAttribute('heading', 'Import Connector Configuration');
+    if (titleEl) titleEl.textContent = 'Import Custom Connector';
+    if (descriptionEl) {
+      descriptionEl.textContent = 'Upload a ZIP package containing your connector configuration (manifest.json, connector.json) and UI files (HTML/CSS/JS). The package must follow the connector schema with metadata, authentication, API endpoints, and UI assets.';
+    }
+    if (buttonLabelEl) buttonLabelEl.textContent = 'Import Connector';
   }
 
   function handleConnectorFileSelect(event) {
@@ -1112,11 +1485,16 @@
 
     var formData = new FormData();
     formData.append('connector_zip', selectedConnectorFile);
+    if (importTargetConnectorId) {
+      formData.append('target_connector_id', importTargetConnectorId);
+    }
 
     api.post('/api/v1/generic-connectors/import', formData).then(function (result) {
       if (result && result.success) {
-        var connectorName = result.connector_name || selectedConnectorFile.name;
-        Lex.Toast.success('Connector "' + connectorName + '" imported successfully!');
+        var connectorName = importTargetConnectorName || result.connector_name || selectedConnectorFile.name;
+        Lex.Toast.success(importTargetConnectorId
+          ? 'Connector "' + connectorName + '" updated successfully!'
+          : 'Connector "' + connectorName + '" imported successfully!');
 
         if (result.violations && result.violations.length > 0) {
           var tid = setTimeout(function () {
@@ -1334,11 +1712,15 @@
     var connectorName = selectedConnectorForActions
       ? ((selectedConnectorForActions.manifest && selectedConnectorForActions.manifest.name) || selectedConnectorForActions.name || 'Connector')
       : 'Connector';
+    var targetSlug = selectedConnectorForActions ? getConnectorUpdateSlug(selectedConnectorForActions) : null;
 
     Lex.Toast.info('Updating ' + connectorName + '...');
 
     var formData = new FormData();
     formData.append('connector_zip', file);
+    if (targetSlug) {
+      formData.append('target_connector_id', targetSlug);
+    }
 
     api.post('/api/v1/generic-connectors/import', formData).then(function (result) {
       if (result && result.success) {
@@ -1468,9 +1850,13 @@
     exposeGlobal('confirmImportConnector', confirmImportConnector);
     exposeGlobal('showConnectorDetails', showConnectorDetails);
     exposeGlobal('closeDetailsModal', closeDetailsModal);
+    exposeGlobal('closeConnectorDashboardModal', closeConnectorDashboardModal);
     exposeGlobal('showConnectorActionsModal', showConnectorActionsModal);
     exposeGlobal('closeConnectorActionsModal', closeConnectorActionsModal);
     exposeGlobal('navigateToConnectorDashboard', navigateToConnectorDashboard);
+    exposeGlobal('handleConnectorRowSelection', handleConnectorRowSelection);
+    exposeGlobal('toggleConnectorPin', toggleConnectorPin);
+    exposeGlobal('openConnectorUpdateModal', openConnectorUpdateModal);
     exposeGlobal('showConnectorAccountsModal', showConnectorAccountsModal);
     exposeGlobal('closeConnectorAccountsModal', closeConnectorAccountsModal);
     exposeGlobal('setConnectorDefault', setConnectorDefault);

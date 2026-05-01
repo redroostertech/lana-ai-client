@@ -13,6 +13,18 @@
   <script src="../js/components.js"></script>
   <script src="../js/menu.js"></script>
   <script src="../js/connectors.js"></script>
+  <style>
+    body.chrome-embedded aside,
+    body.chrome-embedded header {
+      display: none !important;
+    }
+    body.chrome-embedded .lg\:ml-64 {
+      margin-left: 0 !important;
+    }
+    body.chrome-embedded main {
+      min-height: 100vh;
+    }
+  </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
   <!-- Sidebar -->
@@ -173,6 +185,30 @@
     let connectorConfig = null;
     let integrationSource = null;
     let connectorId = null;
+    const isEmbeddedChrome = new URLSearchParams(window.location.search).get('chrome') === 'embedded';
+
+    if (isEmbeddedChrome) {
+      document.body.classList.add('chrome-embedded');
+    }
+
+    function timeAgo(dateString) {
+      if (window.Lex && Lex.Utils && typeof Lex.Utils.timeAgo === 'function') {
+        return Lex.Utils.timeAgo(dateString);
+      }
+
+      const date = new Date(dateString);
+      if (Number.isNaN(date.getTime())) return '';
+
+      const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+      if (seconds < 60) return 'just now';
+      const minutes = Math.floor(seconds / 60);
+      if (minutes < 60) return `${minutes}m ago`;
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `${hours}h ago`;
+      const days = Math.floor(hours / 24);
+      if (days < 30) return `${days}d ago`;
+      return date.toLocaleDateString();
+    }
 
     // Get connector ID from URL
     function getConnectorIdFromUrl() {
@@ -185,7 +221,7 @@
       connectorId = getConnectorIdFromUrl();
       if (!connectorId) {
         Toast.error('No connector ID specified');
-        window.location.href = 'connectors.html';
+        if (!isEmbeddedChrome) window.location.href = 'connectors.html';
         return;
       }
 
@@ -204,7 +240,14 @@
       } catch (error) {
         console.error('Failed to load connector config:', error);
         Toast.error('Failed to load connector configuration');
-        setTimeout(() => window.location.href = 'connectors.html', 2000);
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('notConfigured').classList.remove('hidden');
+        document.getElementById('connectTitle').textContent = 'Connector configuration unavailable';
+        document.getElementById('connectDescription').textContent = error.message || 'The connector catalog entry could not be loaded.';
+        document.getElementById('authContainer').innerHTML = '';
+        if (!isEmbeddedChrome) {
+          setTimeout(() => window.location.href = 'connectors.html', 2000);
+        }
       }
     }
 
