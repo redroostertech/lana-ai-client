@@ -609,6 +609,58 @@ textarea {
   padding: 10px 12px;
 }
 
+.voice-volume-panel {
+  display: grid;
+  gap: 7px;
+  padding: 10px 12px;
+  border: 1px solid var(--lex-border-subtle, var(--voice-line));
+  border-radius: var(--lex-radius-md, 6px);
+  background: var(--lex-bg-tertiary);
+}
+
+.voice-volume-head,
+.voice-volume-hint {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.voice-volume-head span,
+.voice-volume-hint {
+  color: var(--voice-muted);
+  font-size: var(--lex-body-xs-size, 0.75rem);
+}
+
+.voice-volume-head strong {
+  font-size: var(--lex-body-sm-size, 0.875rem);
+}
+
+.voice-volume-meter {
+  position: relative;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--lex-bg-primary);
+  border: 1px solid var(--lex-border-subtle, var(--voice-line));
+}
+
+.voice-volume-meter span {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: inherit;
+  background: var(--lex-color-success-500, #17b26a);
+  transition: width 120ms linear;
+}
+
+.voice-volume-meter i {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--lex-color-warning-600, #dc6803);
+}
+
 .voice-console-status strong {
   font-size: var(--lex-body-sm-size, 0.875rem);
 }

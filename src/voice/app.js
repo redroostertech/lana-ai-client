@@ -161,7 +161,13 @@ const state = {
     minTurnMs: 550,
     silenceMs: 900,
     rmsThreshold: 0.018,
-    bargeInGraceMs: 450
+    bargeInGraceMs: 900,
+    bargeInRmsThreshold: 0.05,
+    bargeInHoldMs: 420,
+    bargeInStartedAt: 0,
+    micLevel: 0,
+    peakMicLevel: 0,
+    lastLevelRenderAt: 0
   }
 };
 
@@ -762,6 +768,8 @@ function renderTestsTab(agent) {
   const result = agent.test?.last_result;
   const consoleState = state.voiceConsole;
   const sessionRunning = consoleState.sessionActive || consoleState.phase === 'processing' || consoleState.phase === 'speaking';
+  const micLevelPercent = Math.min(100, Math.round((consoleState.micLevel || 0) * 1000));
+  const bargeInPercent = Math.min(100, Math.round((consoleState.bargeInRmsThreshold || 0) * 1000));
   const transcriptPlaceholder = sessionRunning
     ? 'Listening. Speak naturally; a short pause will send the current turn.'
     : 'Start a session to speak with the agent.';
@@ -788,6 +796,21 @@ function renderTestsTab(agent) {
         <div class="voice-console-status ${consoleState.error ? 'error' : ''}">
           <strong>${escapeHtml(consoleState.status)}</strong>
           <span>${escapeHtml(consoleState.error || (consoleState.supported ? 'Local mic capture is available. Audio is transcribed by the LANA Whisper sidecar.' : 'This browser does not expose local microphone capture.'))}</span>
+        </div>
+
+        <div class="voice-volume-panel">
+          <div class="voice-volume-head">
+            <span>Mic volume</span>
+            <strong>${micLevelPercent}%</strong>
+          </div>
+          <div class="voice-volume-meter" aria-label="Current microphone volume">
+            <span style="width:${micLevelPercent}%"></span>
+            <i style="left:${bargeInPercent}%"></i>
+          </div>
+          <div class="voice-volume-hint">
+            <span>Barge-in threshold ${bargeInPercent}%</span>
+            <span>Current ${micLevelPercent}%</span>
+          </div>
         </div>
 
         <div class="voice-console-live">
@@ -1074,6 +1097,9 @@ function resetWebVoiceConsole() {
   state.voiceConsole.sessionActive = false;
   state.voiceConsole.listening = false;
   state.voiceConsole.openingPlayed = false;
+  state.voiceConsole.micLevel = 0;
+  state.voiceConsole.peakMicLevel = 0;
+  state.voiceConsole.lastLevelRenderAt = 0;
   renderEditor();
 }
 
@@ -1126,6 +1152,9 @@ async function startWebVoiceSession() {
     state.voiceConsole.lastVoiceAt = 0;
     state.voiceConsole.speechStarted = false;
     state.voiceConsole.openingPlayed = false;
+    state.voiceConsole.micLevel = 0;
+    state.voiceConsole.peakMicLevel = 0;
+    state.voiceConsole.lastLevelRenderAt = 0;
     renderEditor();
     playSessionOpening(agent);
   } catch (error) {
@@ -1182,10 +1211,22 @@ function handleVoiceSessionAudio(input) {
   const chunk = new Float32Array(input);
   const rms = computeRms(chunk);
   const hasVoice = rms >= consoleState.rmsThreshold;
+  consoleState.micLevel = smoothLevel(consoleState.micLevel || 0, rms);
+  consoleState.peakMicLevel = Math.max(consoleState.peakMicLevel || 0, rms);
+  if (now - (consoleState.lastLevelRenderAt || 0) >= 140) {
+    consoleState.lastLevelRenderAt = now;
+    renderEditor();
+  }
 
   if (consoleState.phase === 'speaking') {
-    if (now - consoleState.playbackStartedAt < consoleState.bargeInGraceMs) return;
-    if (hasVoice) {
+    const pastGrace = now - consoleState.playbackStartedAt >= consoleState.bargeInGraceMs;
+    const strongVoice = rms >= consoleState.bargeInRmsThreshold;
+    if (!pastGrace || !strongVoice) {
+      consoleState.bargeInStartedAt = 0;
+      return;
+    }
+    consoleState.bargeInStartedAt = consoleState.bargeInStartedAt || now;
+    if (now - consoleState.bargeInStartedAt >= consoleState.bargeInHoldMs) {
       interruptAgentPlayback();
     } else {
       return;
@@ -1226,6 +1267,11 @@ function computeRms(samples) {
   return Math.sqrt(total / samples.length);
 }
 
+function smoothLevel(previous, next) {
+  const attack = next > previous ? 0.55 : 0.18;
+  return previous + ((next - previous) * attack);
+}
+
 function finalizeCurrentVoiceTurn() {
   const consoleState = state.voiceConsole;
   if (!consoleState.speechStarted || consoleState.busy || consoleState.phase === 'processing') return;
@@ -1259,6 +1305,10 @@ function endWebVoiceSession(options = {}) {
   state.voiceConsole.openingPlayed = false;
   state.voiceConsole.startedAt = 0;
   state.voiceConsole.lastVoiceAt = 0;
+  state.voiceConsole.bargeInStartedAt = 0;
+  state.voiceConsole.micLevel = 0;
+  state.voiceConsole.peakMicLevel = 0;
+  state.voiceConsole.lastLevelRenderAt = 0;
   state.voiceConsole.interimTranscript = '';
   cleanupWebVoiceAudio();
   if (state.voiceConsole.status !== 'Idle') {
@@ -1275,6 +1325,7 @@ function interruptAgentPlayback() {
   }
   state.voiceConsole.currentAudio = null;
   state.voiceConsole.playbackStartedAt = 0;
+  state.voiceConsole.bargeInStartedAt = 0;
   state.voiceConsole.phase = 'listening';
   state.voiceConsole.listening = true;
   state.voiceConsole.busy = false;
@@ -1302,6 +1353,7 @@ async function playAgentAudio(audioPayload, options = {}) {
       if (consoleState.currentAudio === audio) {
         consoleState.currentAudio = null;
         consoleState.playbackStartedAt = 0;
+        consoleState.bargeInStartedAt = 0;
       }
       if (consoleState.sessionActive) {
         consoleState.phase = 'listening';
