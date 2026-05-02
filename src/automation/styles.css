@@ -3603,6 +3603,34 @@ details[open].ld-step-raw > summary::before {
   color: var(--text-muted, #6b7280);
   font-size: 0.78rem;
 }
+.ld-run-step-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+.ld-run-step-detail-item {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border-light, #f3f4f6);
+  border-radius: 6px;
+  background: var(--surface-muted, #f8fafc);
+}
+.ld-run-step-detail-item--wide {
+  grid-column: 1 / -1;
+}
+.ld-run-step-json {
+  max-height: 280px;
+  overflow: auto;
+  margin: 6px 0 0;
+  padding: 10px;
+  border-radius: 6px;
+  background: var(--white-200, #efefef);
+  color: var(--text, #111827);
+  font-size: 0.76rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
 .ld-run-step-note {
   margin: 10px 0 0;
   color: var(--text-muted, #6b7280);

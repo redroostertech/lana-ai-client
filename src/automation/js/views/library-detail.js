@@ -315,6 +315,20 @@ function renderReadableValue(value) {
   return String(value);
 }
 
+function isStructuredValue(value) {
+  return Boolean(value && typeof value === 'object');
+}
+
+function renderStepDetailValue(value) {
+  if (!isStructuredValue(value)) {
+    return escapeHtml(renderReadableValue(value));
+  }
+
+  return `
+    <pre class="ld-run-step-json"><code>${escapeHtml(JSON.stringify(value, null, 2))}</code></pre>
+  `;
+}
+
 function renderStepOutcomeDetails(step) {
   const metrics = step.metrics && typeof step.metrics === 'object' ? step.metrics : {};
   const resultSummary = step.result_summary && typeof step.result_summary === 'object' ? step.result_summary : {};
@@ -322,13 +336,15 @@ function renderStepOutcomeDetails(step) {
   const detailItems = [
     ...Object.entries(metrics).map(([key, value]) => ({
       label: humanizeRunToken(key),
-      value: renderReadableValue(value)
+      value: renderReadableValue(value),
+      rawValue: value
     })),
     ...Object.entries(resultSummary)
       .filter(([key]) => metrics[key] === undefined)
       .map(([key, value]) => ({
         label: humanizeRunToken(key),
-        value: renderReadableValue(value)
+        value: renderReadableValue(value),
+        rawValue: value
       }))
   ];
 
@@ -339,7 +355,16 @@ function renderStepOutcomeDetails(step) {
   return `
     <details class="ld-step-raw ld-run-step-details">
       <summary>View step details</summary>
-      ${detailItems.length ? metaGrid(detailItems, 'meta-grid ld-run-result-grid') : ''}
+      ${detailItems.length ? `
+        <div class="ld-run-step-detail-grid">
+          ${detailItems.map((item) => `
+            <div class="ld-run-step-detail-item ${isStructuredValue(item.rawValue) ? 'ld-run-step-detail-item--wide' : ''}">
+              <span class="meta-label">${escapeHtml(item.label)}</span>
+              <div class="meta-value">${renderStepDetailValue(item.rawValue)}</div>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
       ${logs.length ? `
         <div class="ld-run-step-log-list">
           ${logs.slice(0, 25).map((line) => `<div class="connector-mono">${escapeHtml(renderReadableValue(line))}</div>`).join('')}
@@ -357,7 +382,6 @@ function renderRunDetail(detail) {
   const artifacts = Array.isArray(detail.artifacts) ? detail.artifacts : [];
   const runResults = detail.run_results && typeof detail.run_results === 'object' ? detail.run_results : {};
   const connectorContext = detail.connector_context && typeof detail.connector_context === 'object' ? detail.connector_context : null;
-  const outputs = Array.isArray(runResults.outputs) ? runResults.outputs : [];
   const createdResources = Array.isArray(runResults.created_resources) ? runResults.created_resources : [];
 
   const stepsBlock = stepOutcomes.length
@@ -381,34 +405,7 @@ function renderRunDetail(detail) {
     })
     : '';
 
-  const outputBlock = outputs.length
-    ? drawerSection({
-      title: 'Run Results',
-      body: `
-        ${outputs.map((output) => {
-          const metrics = output.metrics && typeof output.metrics === 'object' ? output.metrics : {};
-          const metricItems = Object.entries(metrics).map(([key, value]) => {
-            const renderedValue = value && typeof value === 'object' ? JSON.stringify(value) : String(value);
-            return {
-              label: formatLabel(key),
-              value: renderedValue
-            };
-          });
-          return `
-            <lex-card variant="flat" class="automation-detail-item">
-              <div class="ld-run-step-row">
-                ${badge(formatLabel(output.status || 'unknown'), statusTone(output.status))}
-                <strong>${escapeHtml(humanizeRunToken(output.action_id || 'Output'))}</strong>
-                <span class="muted">${escapeHtml(humanizeRunToken(output.action_type || 'Action'))}</span>
-                ${output.execution_time_ms ? `<span class="muted">${escapeHtml(formatDuration(output.execution_time_ms))}</span>` : ''}
-              </div>
-              ${metricItems.length ? metaGrid(metricItems, 'meta-grid ld-run-result-grid') : ''}
-            </lex-card>
-          `;
-        }).join('')}
-      `
-    })
-    : '';
+  const outputBlock = '';
 
   const connectorBlock = connectorContext
     ? drawerSection({
