@@ -3582,9 +3582,31 @@ details[open].ld-step-raw > summary::before {
   border-bottom: 1px solid var(--border-light, #f3f4f6);
   font-size: 0.85rem;
 }
+.ld-run-step-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 260px;
+  flex-direction: column;
+  gap: 4px;
+}
 .ld-run-step-error {
   color: var(--error, #dc2626);
   font-size: 0.8rem;
+}
+.ld-run-step-details {
+  margin-top: 10px;
+}
+.ld-run-step-log-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  color: var(--text-muted, #6b7280);
+  font-size: 0.78rem;
+}
+.ld-run-step-note {
+  margin: 10px 0 0;
+  color: var(--text-muted, #6b7280);
+  font-size: 0.85rem;
 }
 
 /* Artifacts */

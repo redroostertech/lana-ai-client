@@ -297,6 +297,59 @@ function renderRunRow(run, isExpanded, lanaClientUrl) {
   `;
 }
 
+function humanizeRunToken(value) {
+  return String(value || '')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[._-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function renderReadableValue(value) {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'number') return String(value);
+  if (Array.isArray(value)) return `${value.length} item${value.length === 1 ? '' : 's'}`;
+  if (typeof value === 'object') return JSON.stringify(value, null, 2);
+  return String(value);
+}
+
+function renderStepOutcomeDetails(step) {
+  const metrics = step.metrics && typeof step.metrics === 'object' ? step.metrics : {};
+  const resultSummary = step.result_summary && typeof step.result_summary === 'object' ? step.result_summary : {};
+  const logs = Array.isArray(step.logs) ? step.logs : [];
+  const detailItems = [
+    ...Object.entries(metrics).map(([key, value]) => ({
+      label: humanizeRunToken(key),
+      value: renderReadableValue(value)
+    })),
+    ...Object.entries(resultSummary)
+      .filter(([key]) => metrics[key] === undefined)
+      .map(([key, value]) => ({
+        label: humanizeRunToken(key),
+        value: renderReadableValue(value)
+      }))
+  ];
+
+  if (!detailItems.length && !logs.length && !step.error_message && !step.message) {
+    return '';
+  }
+
+  return `
+    <details class="ld-step-raw ld-run-step-details">
+      <summary>View step details</summary>
+      ${detailItems.length ? metaGrid(detailItems, 'meta-grid ld-run-result-grid') : ''}
+      ${logs.length ? `
+        <div class="ld-run-step-log-list">
+          ${logs.slice(0, 25).map((line) => `<div class="connector-mono">${escapeHtml(renderReadableValue(line))}</div>`).join('')}
+        </div>
+      ` : ''}
+      ${(step.error_message || step.message) ? `<p class="ld-run-step-note">${escapeHtml(step.error_message || step.message)}</p>` : ''}
+    </details>
+  `;
+}
+
 function renderRunDetail(detail) {
   if (!detail) return `<div class="muted">No detail available.</div>`;
 
@@ -314,12 +367,14 @@ function renderRunDetail(detail) {
         ${stepOutcomes.map((s) => `
           <lex-card variant="flat" class="automation-detail-item">
             <div class="ld-run-step-row">
+              <div class="ld-run-step-copy">
+                <strong>${escapeHtml(humanizeRunToken(s.action_id || s.step_id || 'Step'))}</strong>
+                <span class="muted">${escapeHtml(humanizeRunToken(s.action_type || s.step_type || 'Action'))}${s.duration_ms ? ` · ${escapeHtml(formatDuration(s.duration_ms))}` : ''}</span>
+                ${s.error_message || s.message ? `<span class="ld-run-step-error">${escapeHtml(s.error_message || s.message)}</span>` : ''}
+              </div>
               ${badge(formatLabel(s.status || 'unknown'), statusTone(s.status))}
-              <strong>${escapeHtml(s.action_id || s.step_id || '--')}</strong>
-              <span class="muted">${escapeHtml(formatLabel(s.action_type || s.step_type || ''))}</span>
-              ${s.duration_ms ? `<span class="muted">${escapeHtml(formatDuration(s.duration_ms))}</span>` : ''}
-              ${s.error_message || s.message ? `<span class="ld-run-step-error">${escapeHtml(s.error_message || s.message)}</span>` : ''}
             </div>
+            ${renderStepOutcomeDetails(s)}
           </lex-card>
         `).join('')}
       `
@@ -343,8 +398,8 @@ function renderRunDetail(detail) {
             <lex-card variant="flat" class="automation-detail-item">
               <div class="ld-run-step-row">
                 ${badge(formatLabel(output.status || 'unknown'), statusTone(output.status))}
-                <strong>${escapeHtml(output.action_id || '--')}</strong>
-                <span class="muted">${escapeHtml(formatLabel(output.action_type || ''))}</span>
+                <strong>${escapeHtml(humanizeRunToken(output.action_id || 'Output'))}</strong>
+                <span class="muted">${escapeHtml(humanizeRunToken(output.action_type || 'Action'))}</span>
                 ${output.execution_time_ms ? `<span class="muted">${escapeHtml(formatDuration(output.execution_time_ms))}</span>` : ''}
               </div>
               ${metricItems.length ? metaGrid(metricItems, 'meta-grid ld-run-result-grid') : ''}
