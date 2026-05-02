@@ -52,7 +52,7 @@ const VOICE_TOOL_CATALOG = [
     backendName: 'capture_intake_field',
     type: 'builtin',
     description: 'Collects caller identity, contact details, reason for call, urgency, and preferred next step.',
-    details: 'Maps to the voice intake field contract. This should stay enabled for receptionist and intake agents.'
+    details: 'Maps to the voice capture field contract. This should stay enabled for agents that need to collect caller details.'
   },
   {
     id: 'create_callback_task',
@@ -79,9 +79,55 @@ const DEFAULT_AGENT = {
   status: 'draft',
   language: 'en-US',
   timezone: 'America/New_York',
-  description: 'Answers inbound calls, qualifies new matters, captures caller details, and routes urgent requests.',
-  greeting: 'Thank you for calling. This is Lana, the virtual receptionist. How can I help today?',
-  instructions: 'Be warm, concise, and professional. Confirm the caller name, phone number, reason for calling, urgency, and preferred next step before ending the call.',
+  tone: 'calm, reassuring, professional, plain-spoken',
+  description: 'Answers inbound calls for RedRooster, a personal injury law firm, screens new potential matters, captures incident details, and routes urgent requests.',
+  greeting: 'Thank you for calling RedRooster. This is Lana. How can I help today?',
+  instructions: [
+    'You are the phone receptionist for RedRooster, a personal injury law firm.',
+    'Speak naturally and listen to what the caller actually says.',
+    'Help callers with new personal injury inquiries, current-client messages, callback requests, office questions, and urgent routing.',
+    'For new potential matters, gather the caller name, best callback number, injury or incident type, incident date, incident location, whether medical treatment has been received, whether a claim or lawsuit is already open, whether the caller has signed anything with an insurer, and a brief description of what happened.',
+    'If the caller is a current client, capture their name, callback number, matter or attorney if known, and the message they want delivered.',
+    'If the caller asks whether RedRooster handles a case type, answer from the firm profile when possible and continue with useful screening.',
+    'Do not ask for information already provided. If the caller is unsure, accept that and move forward.',
+    'Do not give legal advice, evaluate the value of a claim, promise representation, or say an attorney is available unless configured in the handoff policy.',
+    'When enough details are captured, summarize briefly, confirm the best callback number, and tell the caller the RedRooster team will review the message and follow up.'
+  ].join(' '),
+  escalation: 'Escalate immediately when the caller mentions a same-day deadline, statute-of-limitations concern, court date, active hospitalization, severe injury, fatality, police at the scene, hostile caller, media inquiry, signed release, settlement offer, or request for legal advice.',
+  completion_criteria: 'New inquiry has caller identity, callback number, incident type, incident date or approximate timing, incident location, injury or treatment status, claim or lawsuit status, insurer/release status when relevant, urgency, and preferred next step captured or marked unavailable. Current-client messages have caller identity, callback number, matter or attorney if known, and message captured.',
+  additional_details: [
+    'Firm profile: RedRooster is a personal injury law firm focused on helping injured people understand whether the firm can review a potential claim.',
+    'Common inquiry types: auto accidents, trucking accidents, motorcycle accidents, pedestrian or bicycle injuries, slip and falls, premises liability, dog bites, wrongful death, workplace injury referrals, and injury-related insurance disputes.',
+    'Call goals: make the caller feel heard, capture enough detail for human review, identify urgency, avoid legal advice, and route urgent or high-risk calls for human follow-up.',
+    'Do not say RedRooster represents the caller until a human confirms representation. Do not estimate case value, deadlines, liability, settlement timing, or whether the caller has a valid claim.',
+    'For insurance adjusters, medical providers, courts, opposing parties, media, vendors, and solicitors, take a concise message and callback information unless a configured route applies.'
+  ].join('\n'),
+  intake_schema: [
+    { name: 'caller_name', label: 'Caller name', type: 'text', required: true, prompt: 'May I have your name?' },
+    { name: 'caller_phone', label: 'Best callback number', type: 'phone', required: true, prompt: 'What is the best callback number?' },
+    { name: 'caller_email', label: 'Email', type: 'email', required: false, prompt: 'Do you have an email address you would like us to include?' },
+    { name: 'incident_type', label: 'Incident type', type: 'enum', required: true, options: ['auto_accident', 'truck_accident', 'motorcycle_accident', 'pedestrian_or_bicycle', 'slip_and_fall', 'premises_liability', 'workplace_injury', 'dog_bite', 'wrongful_death', 'insurance_dispute', 'other'], prompt: 'What type of injury or incident is this about?' },
+    { name: 'incident_date', label: 'Incident date', type: 'date', required: true, prompt: 'When did the incident happen?' },
+    { name: 'incident_location', label: 'Incident location', type: 'text', required: false, prompt: 'Where did it happen?' },
+    { name: 'at_fault_party', label: 'Other party', type: 'text', required: false, prompt: 'Was another person, company, property owner, driver, or insurer involved?' },
+    { name: 'injury_summary', label: 'Injury summary', type: 'text', required: true, prompt: 'Can you briefly describe the injury or medical treatment?' },
+    { name: 'claim_status', label: 'Claim or lawsuit status', type: 'text', required: false, prompt: 'Has an insurance claim or lawsuit already been opened?' },
+    { name: 'signed_documents', label: 'Signed documents or release', type: 'boolean', required: false, prompt: 'Have you signed any release, settlement, or insurance paperwork about this incident?' },
+    { name: 'current_client_status', label: 'Current client status', type: 'boolean', required: false, prompt: 'Are you already a RedRooster client?' },
+    { name: 'attorney_or_matter', label: 'Attorney or matter', type: 'text', required: false, prompt: 'If you are a current client, do you know the attorney, case, or matter name?' },
+    { name: 'message_summary', label: 'Message summary', type: 'text', required: false, prompt: 'What message should I pass along?' },
+    { name: 'urgency', label: 'Urgency', type: 'enum', required: true, options: ['low', 'normal', 'high', 'emergency'], prompt: 'Is there anything urgent or time-sensitive?' },
+    { name: 'preferred_next_step', label: 'Preferred next step', type: 'enum', required: false, options: ['callback', 'consultation', 'message_only', 'transfer_if_available'], prompt: 'Would you prefer a callback or should I just pass along the message?' }
+  ],
+  safety: {
+    legal_advice_disclaimer: true,
+    no_attorney_client_relationship: true,
+    no_case_value_estimates: true,
+    no_representation_promises: true,
+    recording_disclosure_required: true,
+    matter_retrieval_requires_verification: true,
+    transfer_on_low_confidence: true,
+  },
   voice: {
     runtime: 'lana-voice',
     transport: 'livekit',
@@ -100,7 +146,7 @@ const DEFAULT_AGENT = {
     workspace_id: '',
     matter_enabled: false,
     matter_id: '',
-    fallback_response: 'I do not want to guess. I can take a message and have the team follow up.'
+    fallback_response: 'I do not want to guess. I can take a message and have the RedRooster team follow up.'
   },
   tools: [
     { id: 'capture_intake', enabled: true },
@@ -118,7 +164,7 @@ const DEFAULT_AGENT = {
     after_hours_mode: 'message'
   },
   test: {
-    scenario: 'New caller asks whether the firm handles an urgent employment matter.',
+    scenario: 'New caller says they were injured in a car crash last week and wants to know whether RedRooster can help.',
     last_result: null
   }
 };
@@ -142,6 +188,7 @@ const state = {
     status: 'Idle',
     transcript: '',
     interimTranscript: '',
+    streamingResponse: '',
     error: '',
     turns: [],
     telemetry: null,
@@ -151,6 +198,15 @@ const state = {
     processor: null,
     source: null,
     currentAudio: null,
+    realtimeSocket: null,
+    realtimeActive: false,
+    realtimeReady: false,
+    realtimeFallback: false,
+    realtimeCanSendAudio: false,
+    realtimePendingAudio: [],
+    realtimeAudioQueue: [],
+    realtimeAudioPlaying: false,
+    realtimeAudioReceived: false,
     playbackStartedAt: 0,
     openingPlayed: false,
     chunks: [],
@@ -206,6 +262,23 @@ function resolveUrl(path) {
   return base + (path.startsWith('/') ? path : `/${path}`);
 }
 
+function resolveWsUrl(path) {
+  const resolved = resolveUrl(path);
+  const url = new URL(resolved, window.location.href);
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  return url.toString();
+}
+
+async function createRealtimeVoiceToken() {
+  const payload = await request('/api/v1/voice/realtime-token', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+  const token = payload.data?.token || payload.token;
+  if (!token) throw new Error('Realtime token was not returned');
+  return token;
+}
+
 function normalizeVoiceStack(voice = {}) {
   return {
     ...DEFAULT_AGENT.voice,
@@ -219,6 +292,26 @@ function normalizeVoiceStack(voice = {}) {
     tts_voice: voice.tts_voice || 'af_heart',
     response_model: voice.response_model || voice.model || DEFAULT_AGENT.voice.response_model,
     speed: Number.isFinite(Number(voice.speed)) ? Number(voice.speed) : DEFAULT_AGENT.voice.speed
+  };
+}
+
+function normalizeCaptureSchema(schema) {
+  const fallback = JSON.parse(JSON.stringify(DEFAULT_AGENT.intake_schema));
+  const source = Array.isArray(schema) && schema.length ? schema : fallback;
+  return source.map((field) => ({
+    name: field.name || '',
+    label: field.label || field.name || '',
+    type: field.type || 'text',
+    required: field.required === true || field.required === 'true',
+    options: Array.isArray(field.options) ? field.options : String(field.options || '').split(',').map((item) => item.trim()).filter(Boolean),
+    prompt: field.prompt || ''
+  }));
+}
+
+function normalizeSafety(safety = {}) {
+  return {
+    ...DEFAULT_AGENT.safety,
+    ...(safety && typeof safety === 'object' ? safety : {})
   };
 }
 
@@ -270,7 +363,14 @@ function normalizeAgent(agent = {}) {
     language: agent.language || runtime.language || merged.language,
     timezone: agent.timezone || runtime.timezone || merged.timezone,
     greeting: agent.greeting || persona.greeting || merged.greeting,
+    tone: agent.tone || persona.tone || merged.tone,
     instructions: agent.instructions || instructions.system || merged.instructions,
+    escalation: agent.escalation || instructions.escalation || merged.escalation,
+    completion_criteria: agent.completion_criteria || instructions.completion_criteria || merged.completion_criteria,
+    additional_details: agent.additional_details || instructions.additional_details || metadata.additional_details || merged.additional_details,
+    intake_schema: normalizeCaptureSchema(agent.capture_schema || agent.intake_schema || config.capture_schema || config.intake_schema || merged.intake_schema),
+    capture_schema: normalizeCaptureSchema(agent.capture_schema || agent.intake_schema || config.capture_schema || config.intake_schema || merged.intake_schema),
+    safety: normalizeSafety({ ...(config.safety || {}), ...(agent.safety || {}) }),
     voice: normalizeVoiceStack({ ...(metadata.voice || {}), ...(agent.voice || {}) }),
     knowledge: {
       ...merged.knowledge,
@@ -536,11 +636,85 @@ function renderAgentTab(agent) {
       ${selectField('Agent type', 'type', agent.type, [['receptionist', 'Receptionist'], ['intake', 'Intake'], ['routing', 'Routing'], ['followup', 'Follow-up'], ['custom', 'Custom']])}
       ${field('Timezone', 'timezone', agent.timezone)}
       ${field('Language', 'language', agent.language)}
+      ${field('Tone', 'tone', agent.tone)}
       ${textArea('Description', 'description', agent.description)}
       ${textArea('Opening greeting', 'greeting', agent.greeting)}
       ${textArea('Behavior instructions', 'instructions', agent.instructions, 'rows="8"')}
+      <details class="advanced-config field-wide" open>
+        <summary>Advanced Agent Configuration</summary>
+        <div class="panel-grid advanced-config-grid">
+          ${textArea('Escalation policy', 'escalation', agent.escalation, 'rows="5"')}
+          ${textArea('Completion criteria', 'completion_criteria', agent.completion_criteria, 'rows="5"')}
+          ${textArea('Additional agent details', 'additional_details', agent.additional_details, 'rows="5"')}
+          <section class="contract-section field-wide">
+            <div class="contract-section-head">
+              <div>
+                <h3>Capture Schema</h3>
+                <p>Conversation fields this agent should collect when they are relevant to the configured use case.</p>
+              </div>
+              <lex-btn type="button" variant="ghost" size="sm" leading-icon="plus" data-action="add-intake-field">Add Field</lex-btn>
+            </div>
+            <div class="intake-field-list">
+              ${renderCaptureSchema(agent)}
+            </div>
+          </section>
+          <section class="contract-section field-wide">
+            <div class="contract-section-head">
+              <div>
+                <h3>Safety</h3>
+                <p>Boundaries the runtime includes in the agent configuration.</p>
+              </div>
+            </div>
+            <div class="safety-grid">
+              ${renderSafetySettings(agent)}
+            </div>
+          </section>
+        </div>
+      </details>
     </div>
   `;
+}
+
+function renderCaptureSchema(agent) {
+  const fields = normalizeCaptureSchema(agent.capture_schema || agent.intake_schema);
+  return fields.map((fieldItem, index) => `
+    <article class="intake-field-row">
+      <div class="intake-field-row-head">
+        <strong>${escapeHtml(fieldItem.label || fieldItem.name || `Field ${index + 1}`)}</strong>
+        <lex-btn type="button" variant="ghost" size="sm" leading-icon="trash-2" data-action="remove-intake-field" data-index="${index}">Remove</lex-btn>
+      </div>
+      <div class="panel-grid intake-field-grid">
+        ${field('Field name', `intake_schema.${index}.name`, fieldItem.name, 'placeholder="caller_name"')}
+        ${field('Label', `intake_schema.${index}.label`, fieldItem.label)}
+        ${selectField('Type', `intake_schema.${index}.type`, fieldItem.type, [['text', 'Text'], ['number', 'Number'], ['boolean', 'Boolean'], ['date', 'Date'], ['datetime', 'Date and time'], ['email', 'Email'], ['phone', 'Phone'], ['enum', 'Options'], ['json', 'JSON']])}
+        <label class="toggle-row">
+          <input type="checkbox" name="intake_schema.${index}.required" ${fieldItem.required ? 'checked' : ''}>
+          <span><strong>Required</strong><small>The agent should try to capture this before completing the intake.</small></span>
+        </label>
+        ${field('Options', `intake_schema.${index}.options`, (fieldItem.options || []).join(', '), 'placeholder="low, normal, high"')}
+        ${textArea('Prompt guidance', `intake_schema.${index}.prompt`, fieldItem.prompt, 'rows="3"')}
+      </div>
+    </article>
+  `).join('');
+}
+
+function renderSafetySettings(agent) {
+  const safety = normalizeSafety(agent.safety);
+  const settings = [
+    ['legal_advice_disclaimer', 'No legal advice', 'The agent should avoid legal advice and route those questions to the team.'],
+    ['no_attorney_client_relationship', 'No attorney-client relationship claims', 'The agent should not imply a relationship was formed during intake.'],
+    ['no_case_value_estimates', 'No case value estimates', 'The agent should not estimate claim value or settlement expectations.'],
+    ['no_representation_promises', 'No representation promises', 'The agent should not promise RedRooster will take the matter.'],
+    ['recording_disclosure_required', 'Recording disclosure required', 'The agent should respect configured recording disclosure requirements.'],
+    ['matter_retrieval_requires_verification', 'Verify before matter lookup', 'Matter-specific data requires identity and access checks.'],
+    ['transfer_on_low_confidence', 'Transfer on low confidence', 'Escalate or take a message when the agent is unsure.'],
+  ];
+  return settings.map(([key, label, description]) => `
+    <label class="toggle-row">
+      <input type="checkbox" name="safety.${key}" ${safety[key] ? 'checked' : ''}>
+      <span><strong>${escapeHtml(label)}</strong><small>${escapeHtml(description)}</small></span>
+    </label>
+  `).join('');
 }
 
 function renderVoiceTab(agent) {
@@ -930,10 +1104,13 @@ function updateSelectedFromForm() {
   for (const [name, value] of formData.entries()) {
     if (name === 'voice.speed') {
       writePath(agent, name, Number(value));
-    } else if (!name.startsWith('tools.')) {
+    } else if (!name.startsWith('tools.') && !name.startsWith('intake_schema.') && !name.startsWith('safety.')) {
       writePath(agent, name, value);
     }
   }
+
+  agent.capture_schema = readCaptureSchemaFromForm();
+  agent.intake_schema = agent.capture_schema;
 
   agent.knowledge.workspace_enabled = false;
   agent.knowledge.workspace_id = '';
@@ -959,6 +1136,13 @@ function updateSelectedFromForm() {
   agent.channels.phone = Boolean(agent.channels.twilio_phone);
   agent.channels.web = Boolean(agent.channels.web_console);
   agent.channels.sms_followup = Boolean(agent.channels.whatsapp);
+  agent.safety = normalizeSafety(agent.safety);
+  for (const key of Object.keys(normalizeSafety(agent.safety))) {
+    const control = els.form.querySelector(`[name="safety.${key}"]`);
+    if (control) {
+      agent.safety[key] = Boolean(control.checked);
+    }
+  }
   for (const [index, tool] of (agent.tools || []).entries()) {
     const control = els.form.querySelector(`[name="tools.${index}.enabled"]`);
     if (control) {
@@ -966,6 +1150,26 @@ function updateSelectedFromForm() {
     }
   }
   return agent;
+}
+
+function readCaptureSchemaFromForm() {
+  const rows = Array.from(els.form.querySelectorAll('.intake-field-row'));
+  if (!rows.length) return normalizeCaptureSchema(selectedAgent()?.capture_schema || selectedAgent()?.intake_schema || []);
+  return rows.map((row, index) => {
+    const read = (fieldName) => els.form.querySelector(`[name="intake_schema.${index}.${fieldName}"]`);
+    const options = String(read('options')?.value || '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+    return {
+      name: String(read('name')?.value || '').trim(),
+      label: String(read('label')?.value || '').trim(),
+      type: String(read('type')?.value || 'text').trim(),
+      required: Boolean(read('required')?.checked),
+      options,
+      prompt: String(read('prompt')?.value || '').trim(),
+    };
+  }).filter((fieldItem) => fieldItem.name || fieldItem.label || fieldItem.prompt);
 }
 
 async function loadAgents() {
@@ -1089,6 +1293,7 @@ function resetWebVoiceConsole() {
   state.voiceConsole.phase = 'idle';
   state.voiceConsole.transcript = '';
   state.voiceConsole.interimTranscript = '';
+  state.voiceConsole.streamingResponse = '';
   state.voiceConsole.error = '';
   state.voiceConsole.turns = [];
   state.voiceConsole.telemetry = null;
@@ -1097,6 +1302,16 @@ function resetWebVoiceConsole() {
   state.voiceConsole.sessionActive = false;
   state.voiceConsole.listening = false;
   state.voiceConsole.openingPlayed = false;
+  state.voiceConsole.streamingResponse = '';
+  state.voiceConsole.realtimeSocket = null;
+  state.voiceConsole.realtimeActive = false;
+  state.voiceConsole.realtimeReady = false;
+  state.voiceConsole.realtimeFallback = false;
+  state.voiceConsole.realtimeCanSendAudio = false;
+  state.voiceConsole.realtimePendingAudio = [];
+  state.voiceConsole.realtimeAudioQueue = [];
+  state.voiceConsole.realtimeAudioPlaying = false;
+  state.voiceConsole.realtimeAudioReceived = false;
   state.voiceConsole.micLevel = 0;
   state.voiceConsole.peakMicLevel = 0;
   state.voiceConsole.lastLevelRenderAt = 0;
@@ -1142,6 +1357,7 @@ async function startWebVoiceSession() {
     state.voiceConsole.status = 'Listening';
     state.voiceConsole.error = '';
     state.voiceConsole.interimTranscript = 'Listening. Speak naturally; pauses will send each turn.';
+    state.voiceConsole.streamingResponse = '';
     state.voiceConsole.mediaStream = stream;
     state.voiceConsole.audioContext = audioContext;
     state.voiceConsole.processor = processor;
@@ -1152,10 +1368,28 @@ async function startWebVoiceSession() {
     state.voiceConsole.lastVoiceAt = 0;
     state.voiceConsole.speechStarted = false;
     state.voiceConsole.openingPlayed = false;
+    state.voiceConsole.realtimeSocket = null;
+    state.voiceConsole.realtimeActive = false;
+    state.voiceConsole.realtimeReady = false;
+    state.voiceConsole.realtimeFallback = false;
+    state.voiceConsole.realtimeCanSendAudio = false;
+    state.voiceConsole.realtimePendingAudio = [];
+    state.voiceConsole.realtimeAudioQueue = [];
+    state.voiceConsole.realtimeAudioPlaying = false;
+    state.voiceConsole.realtimeAudioReceived = false;
     state.voiceConsole.micLevel = 0;
     state.voiceConsole.peakMicLevel = 0;
     state.voiceConsole.lastLevelRenderAt = 0;
     renderEditor();
+    connectRealtimeVoiceSession(agent, audioContext.sampleRate).catch((error) => {
+      state.voiceConsole.realtimeFallback = true;
+      state.voiceConsole.realtimeActive = false;
+      state.voiceConsole.realtimeReady = false;
+      state.voiceConsole.realtimeCanSendAudio = false;
+      state.voiceConsole.realtimePendingAudio = [];
+      state.voiceConsole.error = `Realtime voice unavailable; using upload fallback: ${error.message}`;
+      renderEditor();
+    });
     playSessionOpening(agent);
   } catch (error) {
     state.voiceConsole.error = `Unable to start local mic capture: ${error.message}`;
@@ -1203,6 +1437,197 @@ async function playSessionOpening(agent) {
   }
 }
 
+function connectRealtimeVoiceSession(agent, sampleRate) {
+  return new Promise((resolve, reject) => {
+    if (typeof WebSocket === 'undefined') {
+      reject(new Error('WebSocket is not available in this browser'));
+      return;
+    }
+    if (!agent.id) {
+      reject(new Error('Save the voice agent before starting realtime voice.'));
+      return;
+    }
+
+    const consoleState = state.voiceConsole;
+    let settled = false;
+    let activeSocket = null;
+    const timeout = window.setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        try { activeSocket?.close(); } catch (_error) {}
+        reject(new Error('connection timeout'));
+      }
+    }, 5000);
+
+    createRealtimeVoiceToken().then((voiceToken) => {
+      const url = new URL(resolveWsUrl('/api/v1/voice/realtime'));
+      url.searchParams.set('voice_token', voiceToken);
+      return url.toString();
+    }).then((url) => {
+      const socket = new WebSocket(url);
+      activeSocket = socket;
+      socket.binaryType = 'arraybuffer';
+      bindRealtimeVoiceSocket(socket, agent, sampleRate, consoleState, resolve, reject, () => settled, (value) => { settled = value; }, timeout);
+    }).catch((error) => {
+      if (!settled) {
+        settled = true;
+        window.clearTimeout(timeout);
+        reject(error);
+      }
+    });
+  });
+}
+
+function bindRealtimeVoiceSocket(socket, agent, sampleRate, consoleState, resolve, reject, getSettled, setSettled, timeout) {
+    socket.binaryType = 'arraybuffer';
+    socket.addEventListener('open', () => {
+      consoleState.realtimeSocket = socket;
+      consoleState.realtimeActive = true;
+      socket.send(JSON.stringify({
+        type: 'start',
+        call_id: consoleState.callId || `web-${Date.now()}`,
+        agent_id: agent.id || undefined,
+        agent,
+        language: (agent.language || 'en-US').split('-')[0] || 'en',
+        sample_rate: sampleRate || consoleState.sampleRate || 16000,
+        rms_threshold: consoleState.rmsThreshold,
+        min_turn_ms: consoleState.minTurnMs,
+        silence_ms: consoleState.silenceMs,
+        partial_stt: true,
+      }));
+    });
+
+    socket.addEventListener('message', (event) => {
+      let message = {};
+      try {
+        message = JSON.parse(event.data || '{}');
+      } catch (_error) {
+        return;
+      }
+      handleRealtimeVoiceEvent(message);
+      if (message.event === 'session_started' && !getSettled()) {
+        setSettled(true);
+        window.clearTimeout(timeout);
+        resolve();
+      }
+    });
+
+    socket.addEventListener('error', () => {
+      if (!getSettled()) {
+        setSettled(true);
+        window.clearTimeout(timeout);
+        reject(new Error('socket error'));
+      }
+    });
+
+    socket.addEventListener('close', () => {
+      if (consoleState.realtimeSocket === socket) {
+        consoleState.realtimeSocket = null;
+        consoleState.realtimeActive = false;
+        consoleState.realtimeReady = false;
+        consoleState.realtimeCanSendAudio = false;
+        consoleState.realtimePendingAudio = [];
+      }
+      if (!getSettled()) {
+        setSettled(true);
+        window.clearTimeout(timeout);
+        reject(new Error('socket closed'));
+      }
+    });
+}
+
+function handleRealtimeVoiceEvent(message) {
+  const consoleState = state.voiceConsole;
+  if (message.event === 'session_started') {
+    consoleState.realtimeReady = true;
+    consoleState.realtimeCanSendAudio = true;
+    consoleState.callId = message.call_id || consoleState.callId;
+    consoleState.error = '';
+    consoleState.interimTranscript = 'Realtime voice stream connected. Listening for your turn.';
+    renderEditor();
+    return;
+  }
+
+  if (message.event === 'turn_started') {
+    consoleState.speechStarted = true;
+    consoleState.status = 'Listening';
+    consoleState.phase = 'listening';
+    consoleState.interimTranscript = 'Listening to your turn...';
+    renderEditor();
+    return;
+  }
+
+  if (message.event === 'turn_processing') {
+    consoleState.busy = true;
+    consoleState.listening = false;
+    consoleState.realtimeCanSendAudio = false;
+    consoleState.phase = 'processing';
+    consoleState.status = 'Streaming audio to LANA';
+    consoleState.interimTranscript = 'Realtime stream is transcribing and sending this turn to the agent.';
+    consoleState.streamingResponse = '';
+    renderEditor();
+    return;
+  }
+
+  if (message.event === 'transcript_partial') {
+    consoleState.transcript = message.transcript || consoleState.transcript;
+    consoleState.interimTranscript = message.transcript || consoleState.interimTranscript;
+    renderEditor();
+    return;
+  }
+
+  if (message.event === 'response_delta') {
+    consoleState.streamingResponse = message.text || `${consoleState.streamingResponse || ''}${message.delta || ''}`;
+    consoleState.status = 'Agent responding';
+    consoleState.interimTranscript = consoleState.streamingResponse;
+    renderEditor();
+    return;
+  }
+
+  if (message.event === 'response_audio_delta') {
+    enqueueRealtimeResponseAudio(message);
+    return;
+  }
+
+  if (message.event === 'turn_result') {
+    if (consoleState.realtimeAudioReceived && message.data && typeof message.data === 'object') {
+      message.data.__realtime_audio_streamed = true;
+    }
+    processWebVoiceTurnResult(message.data, message.recorded_ms).catch((error) => {
+      consoleState.error = `Voice turn failed: ${error.message}`;
+      consoleState.status = 'Turn failed';
+      consoleState.busy = false;
+      consoleState.listening = consoleState.sessionActive;
+      consoleState.phase = consoleState.sessionActive ? 'listening' : 'idle';
+      renderEditor();
+    });
+    return;
+  }
+
+  if (message.event === 'listening') {
+    consoleState.realtimeCanSendAudio = true;
+    flushRealtimeAudioQueue();
+    if (consoleState.phase !== 'speaking' && consoleState.sessionActive) {
+      consoleState.busy = false;
+      consoleState.listening = true;
+      consoleState.phase = 'listening';
+      consoleState.status = 'Listening';
+      consoleState.interimTranscript = 'Listening. Speak naturally; pauses will send each turn.';
+      renderEditor();
+    }
+    return;
+  }
+
+  if (message.event === 'error') {
+    consoleState.error = message.message || 'Realtime voice stream failed.';
+    consoleState.status = 'Realtime error';
+    consoleState.busy = false;
+    consoleState.listening = consoleState.sessionActive;
+    consoleState.phase = consoleState.sessionActive ? 'listening' : 'idle';
+    renderEditor();
+  }
+}
+
 function handleVoiceSessionAudio(input) {
   const consoleState = state.voiceConsole;
   if (!consoleState.sessionActive) return;
@@ -1234,6 +1659,11 @@ function handleVoiceSessionAudio(input) {
   }
 
   if (consoleState.phase === 'processing' || consoleState.busy) return;
+
+  if (consoleState.realtimeActive && consoleState.realtimeReady) {
+    sendRealtimeAudioChunk(chunk);
+    return;
+  }
 
   if (hasVoice && !consoleState.speechStarted) {
     consoleState.speechStarted = true;
@@ -1334,6 +1764,9 @@ function interruptAgentPlayback() {
     try { audio.currentTime = 0; } catch (_error) {}
   }
   state.voiceConsole.currentAudio = null;
+  state.voiceConsole.realtimeAudioQueue = [];
+  state.voiceConsole.realtimeAudioPlaying = false;
+  state.voiceConsole.realtimePendingAudio = [];
   state.voiceConsole.playbackStartedAt = 0;
   state.voiceConsole.bargeInStartedAt = 0;
   state.voiceConsole.phase = 'listening';
@@ -1343,11 +1776,95 @@ function interruptAgentPlayback() {
   state.voiceConsole.interimTranscript = 'Interrupted agent playback. Listening to your next turn...';
 }
 
+function bufferRealtimeAudioChunk(chunk) {
+  const consoleState = state.voiceConsole;
+  const pending = consoleState.realtimePendingAudio || [];
+  pending.push(new Float32Array(chunk));
+  const maxSamples = (consoleState.sampleRate || 16000) * 3;
+  let totalSamples = pending.reduce((sum, item) => sum + item.length, 0);
+  while (pending.length > 1 && totalSamples > maxSamples) {
+    const removed = pending.shift();
+    totalSamples -= removed.length;
+  }
+  consoleState.realtimePendingAudio = pending;
+}
+
+function flushRealtimeAudioQueue() {
+  const consoleState = state.voiceConsole;
+  const pending = consoleState.realtimePendingAudio || [];
+  if (!pending.length || !consoleState.realtimeCanSendAudio) return;
+  consoleState.realtimePendingAudio = [];
+  for (const chunk of pending) {
+    sendRealtimeAudioChunk(chunk);
+  }
+}
+
+function sendRealtimeAudioChunk(chunk) {
+  const consoleState = state.voiceConsole;
+  if (!consoleState.realtimeCanSendAudio) {
+    bufferRealtimeAudioChunk(chunk);
+    return;
+  }
+  try {
+    const outbound = new Float32Array(chunk);
+    consoleState.realtimeSocket?.send(outbound.buffer);
+  } catch (error) {
+    consoleState.realtimeFallback = true;
+    consoleState.realtimeActive = false;
+    consoleState.realtimeReady = false;
+    consoleState.realtimeCanSendAudio = false;
+    consoleState.realtimePendingAudio = [];
+    consoleState.error = `Realtime stream failed; using upload fallback: ${error.message}`;
+  }
+}
+
+function enqueueRealtimeResponseAudio(message) {
+  const consoleState = state.voiceConsole;
+  if (!message?.audio?.base64) return;
+  consoleState.realtimeAudioReceived = true;
+  consoleState.realtimeAudioQueue.push({
+    audio: message.audio,
+    text: message.text || '',
+    audioId: message.audio_id || '',
+  });
+  playNextRealtimeResponseAudio();
+}
+
+function playNextRealtimeResponseAudio() {
+  const consoleState = state.voiceConsole;
+  if (consoleState.realtimeAudioPlaying || !consoleState.realtimeAudioQueue.length) return;
+  const next = consoleState.realtimeAudioQueue.shift();
+  consoleState.realtimeAudioPlaying = true;
+  playAgentAudio(next.audio, {
+    speakingStatus: 'Agent speaking',
+    noAudioStatus: consoleState.sessionActive ? 'Listening' : 'Agent replied without audio',
+    noAudioMessage: 'Listening. Speak naturally; pauses will send each turn.',
+    onFinished: () => {
+      consoleState.realtimeAudioPlaying = false;
+      if (consoleState.realtimeAudioQueue.length) {
+        playNextRealtimeResponseAudio();
+      }
+    },
+  }).catch((error) => {
+    consoleState.realtimeAudioPlaying = false;
+    consoleState.error = `Realtime audio playback failed: ${error.message}`;
+    renderEditor();
+  });
+}
+
 async function playAgentAudio(audioPayload, options = {}) {
   const consoleState = state.voiceConsole;
   const speakingStatus = options.speakingStatus || 'Agent speaking';
   const noAudioStatus = options.noAudioStatus || 'Agent replied without audio';
   const noAudioMessage = options.noAudioMessage || 'Listening. Speak naturally; pauses will send each turn.';
+  let playbackFinished = false;
+  const finishPlayback = () => {
+    if (playbackFinished) return;
+    playbackFinished = true;
+    if (typeof options.onFinished === 'function') {
+      options.onFinished();
+    }
+  };
 
   if (audioPayload?.base64) {
     const audio = new Audio(`data:${audioPayload.mime_type || 'audio/wav'};base64,${audioPayload.base64}`);
@@ -1377,6 +1894,7 @@ async function playAgentAudio(audioPayload, options = {}) {
         consoleState.interimTranscript = '';
       }
       renderEditor();
+      finishPlayback();
     }, { once: true });
     await audio.play().catch((error) => {
       consoleState.error = `Audio generated but playback was blocked: ${error.message}`;
@@ -1388,6 +1906,7 @@ async function playAgentAudio(audioPayload, options = {}) {
         : '';
       consoleState.busy = false;
       renderEditor();
+      finishPlayback();
     });
     return;
   }
@@ -1405,6 +1924,7 @@ async function playAgentAudio(audioPayload, options = {}) {
   }
   consoleState.busy = false;
   renderEditor();
+  finishPlayback();
 }
 
 function stopWebVoiceConsole(options = {}) {
@@ -1421,7 +1941,9 @@ function cleanupWebVoiceAudio() {
   const audioContext = state.voiceConsole.audioContext;
   const stream = state.voiceConsole.mediaStream;
   const audio = state.voiceConsole.currentAudio;
+  const socket = state.voiceConsole.realtimeSocket;
   try { if (audio) audio.pause(); } catch (_error) {}
+  try { if (socket) socket.close(); } catch (_error) {}
   try { if (processor) processor.disconnect(); } catch (_error) {}
   try { if (source) source.disconnect(); } catch (_error) {}
   try { if (audioContext && audioContext.state !== 'closed') audioContext.close(); } catch (_error) {}
@@ -1431,6 +1953,14 @@ function cleanupWebVoiceAudio() {
   state.voiceConsole.audioContext = null;
   state.voiceConsole.mediaStream = null;
   state.voiceConsole.currentAudio = null;
+  state.voiceConsole.realtimeSocket = null;
+  state.voiceConsole.realtimeActive = false;
+  state.voiceConsole.realtimeReady = false;
+  state.voiceConsole.realtimeCanSendAudio = false;
+  state.voiceConsole.realtimePendingAudio = [];
+  state.voiceConsole.realtimeAudioQueue = [];
+  state.voiceConsole.realtimeAudioPlaying = false;
+  state.voiceConsole.realtimeAudioReceived = false;
   state.voiceConsole.playbackStartedAt = 0;
   state.voiceConsole.chunks = [];
 }
@@ -1507,44 +2037,7 @@ async function runWebVoiceAudioTurn(wavBlob, recordedMs) {
       }),
     });
     const result = payload.data || payload;
-    const transcript = result.transcript?.text || result.transcription?.text || '';
-    if (result.ignored) {
-      state.voiceConsole.transcript = '';
-      state.voiceConsole.error = '';
-      state.voiceConsole.telemetry = {
-        ...(result.telemetry || {}),
-        recorded_ms: Number.isFinite(Number(recordedMs)) ? Math.round(recordedMs) : undefined,
-      };
-      if (state.voiceConsole.sessionActive) {
-        state.voiceConsole.phase = 'listening';
-        state.voiceConsole.status = 'Listening';
-        state.voiceConsole.listening = true;
-        state.voiceConsole.interimTranscript = 'No speech detected. Listening for your next turn.';
-      } else {
-        state.voiceConsole.phase = 'idle';
-        state.voiceConsole.status = 'Stopped';
-        state.voiceConsole.interimTranscript = '';
-      }
-      return;
-    }
-    state.voiceConsole.transcript = transcript;
-    state.voiceConsole.interimTranscript = transcript || 'No transcript returned for this turn.';
-    if (transcript) {
-      state.voiceConsole.turns.push({ role: 'user', text: transcript, at: new Date().toISOString() });
-    }
-    const reply = result.response?.text || 'The agent did not return a text response.';
-    state.voiceConsole.turns.push({ role: 'agent', text: reply, at: new Date().toISOString() });
-    state.voiceConsole.tools = Array.isArray(result.tools) ? result.tools : [];
-    state.voiceConsole.telemetry = {
-      ...(result.telemetry || {}),
-      recorded_ms: Number.isFinite(Number(recordedMs)) ? Math.round(recordedMs) : undefined,
-    };
-    state.voiceConsole.error = result.synthesis?.message && !result.audio ? result.synthesis.message : '';
-    await playAgentAudio(result.audio, {
-      speakingStatus: 'Agent speaking',
-      noAudioStatus: state.voiceConsole.sessionActive ? 'Listening' : 'Agent replied without audio',
-      noAudioMessage: 'Listening. Speak naturally; pauses will send each turn.',
-    });
+    await processWebVoiceTurnResult(result, recordedMs);
   } catch (error) {
     state.voiceConsole.error = `Voice turn failed: ${error.message}`;
     state.voiceConsole.status = 'Turn failed';
@@ -1559,6 +2052,80 @@ async function runWebVoiceAudioTurn(wavBlob, recordedMs) {
     }
     renderEditor();
   }
+}
+
+async function processWebVoiceTurnResult(result, recordedMs) {
+  if (!result) return;
+  const transcript = result.transcript?.text || result.transcription?.text || '';
+  if (result.ignored) {
+    state.voiceConsole.transcript = '';
+    state.voiceConsole.error = '';
+    state.voiceConsole.telemetry = {
+      ...(result.telemetry || {}),
+      recorded_ms: Number.isFinite(Number(recordedMs)) ? Math.round(recordedMs) : undefined,
+    };
+    if (state.voiceConsole.sessionActive) {
+      state.voiceConsole.phase = 'listening';
+      state.voiceConsole.status = 'Listening';
+      state.voiceConsole.listening = true;
+      state.voiceConsole.interimTranscript = 'No speech detected. Listening for your next turn.';
+    } else {
+      state.voiceConsole.phase = 'idle';
+      state.voiceConsole.status = 'Stopped';
+      state.voiceConsole.interimTranscript = '';
+    }
+    renderEditor();
+    return;
+  }
+  state.voiceConsole.transcript = transcript;
+  state.voiceConsole.interimTranscript = transcript || 'No transcript returned for this turn.';
+  state.voiceConsole.streamingResponse = '';
+  if (transcript) {
+    state.voiceConsole.turns.push({ role: 'user', text: transcript, at: new Date().toISOString() });
+  }
+  if (result.response?.mode === 'failed') {
+    state.voiceConsole.tools = Array.isArray(result.tools) ? result.tools : [];
+    state.voiceConsole.telemetry = {
+      ...(result.telemetry || {}),
+      recorded_ms: Number.isFinite(Number(recordedMs)) ? Math.round(recordedMs) : undefined,
+    };
+    state.voiceConsole.error = result.synthesis?.message || result.response?.metadata?.error || 'The voice agent did not return a response.';
+    state.voiceConsole.status = 'Agent response failed';
+    state.voiceConsole.phase = state.voiceConsole.sessionActive ? 'listening' : 'idle';
+    state.voiceConsole.listening = state.voiceConsole.sessionActive;
+    state.voiceConsole.interimTranscript = state.voiceConsole.sessionActive
+      ? 'The AI response failed. Listening for your next turn.'
+      : '';
+    renderEditor();
+    return;
+  }
+  const reply = result.response?.text || 'The agent did not return a text response.';
+  state.voiceConsole.turns.push({ role: 'agent', text: reply, at: new Date().toISOString() });
+  state.voiceConsole.tools = Array.isArray(result.tools) ? result.tools : [];
+  state.voiceConsole.telemetry = {
+    ...(result.telemetry || {}),
+    recorded_ms: Number.isFinite(Number(recordedMs)) ? Math.round(recordedMs) : undefined,
+  };
+  state.voiceConsole.error = result.synthesis?.message && !result.audio ? result.synthesis.message : '';
+  if (result.__realtime_audio_streamed || result.synthesis?.streamed) {
+    if (!state.voiceConsole.realtimeAudioPlaying && !state.voiceConsole.realtimeAudioQueue.length) {
+      state.voiceConsole.phase = state.voiceConsole.sessionActive ? 'listening' : 'idle';
+      state.voiceConsole.status = state.voiceConsole.sessionActive ? 'Listening' : 'Stopped';
+      state.voiceConsole.listening = state.voiceConsole.sessionActive;
+      state.voiceConsole.interimTranscript = state.voiceConsole.sessionActive
+        ? 'Listening. Speak naturally; pauses will send each turn.'
+        : '';
+      state.voiceConsole.busy = false;
+    }
+    state.voiceConsole.realtimeAudioReceived = false;
+    renderEditor();
+    return;
+  }
+  await playAgentAudio(result.audio, {
+    speakingStatus: 'Agent speaking',
+    noAudioStatus: state.voiceConsole.sessionActive ? 'Listening' : 'Agent replied without audio',
+    noAudioMessage: 'Listening. Speak naturally; pauses will send each turn.',
+  });
 }
 
 async function exportAgent() {
@@ -1693,6 +2260,8 @@ function bind() {
     const action = target?.dataset.action;
     if (!action) return;
     if (action === 'add-tool') addTool();
+    if (action === 'add-intake-field') addIntakeField();
+    if (action === 'remove-intake-field') removeIntakeField(Number(target.dataset.index));
     if (action === 'run-test') runTest();
     if (action === 'export-agent') exportAgent();
     if (action === 'import-agent') importAgent();
@@ -1731,6 +2300,32 @@ function addTool() {
     name,
     enabled: true
   });
+  setDirty(true);
+  renderEditor();
+}
+
+function addIntakeField() {
+  const agent = updateSelectedFromForm() || selectedAgent();
+  if (!agent) return;
+  agent.capture_schema = normalizeCaptureSchema(agent.capture_schema || agent.intake_schema);
+  agent.capture_schema.push({
+    name: '',
+    label: '',
+    type: 'text',
+    required: false,
+    options: [],
+    prompt: ''
+  });
+  agent.intake_schema = agent.capture_schema;
+  setDirty(true);
+  renderEditor();
+}
+
+function removeIntakeField(index) {
+  const agent = updateSelectedFromForm() || selectedAgent();
+  if (!agent || !Number.isInteger(index)) return;
+  agent.capture_schema = normalizeCaptureSchema(agent.capture_schema || agent.intake_schema).filter((_, itemIndex) => itemIndex !== index);
+  agent.intake_schema = agent.capture_schema;
   setDirty(true);
   renderEditor();
 }

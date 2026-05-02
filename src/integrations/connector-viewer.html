@@ -435,6 +435,9 @@
       pendingAuthorizationUrl: null,
       pendingAuthorizationUrlLoading: false,
       pendingAuthorizationUrlError: null,
+      oauthRedirectUri: 'lana-ai://oauth/callback',
+      oauthCallbackRegistered: false,
+      authStatusPollTimer: null,
       editingConfig: false,
       deleteConfigModalOpen: false
     };
@@ -747,6 +750,10 @@
       return `/api/v1/generic-connectors/integration-sources/${state.sourceId}${path}`;
     }
 
+    function looksLikeUuid(value) {
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
+    }
+
     function normalizeFieldOption(option) {
       if (option == null) {
         return null;
@@ -811,6 +818,12 @@
     }
 
     async function resolveConnectorContext() {
+      if (state.sourceId && !looksLikeUuid(state.sourceId)) {
+        state.connectorId = state.connectorId || state.sourceId;
+        state.connectorType = state.connectorType || state.sourceId;
+        state.sourceId = '';
+      }
+
       if (state.sourceId && state.connectorType && state.uiEntryPoint) {
         applyPageIdentity();
         return;
@@ -1560,6 +1573,11 @@
       renderConfiguration();
     }
 
+    function handleConfigDraftChange() {
+      state.formDraft = captureConfigFormDraft();
+      state.authModeDraft = getSelectedAuthModeType();
+    }
+
     async function saveConfigurationAndExitEdit() {
       try {
         await saveConfiguration();
@@ -2255,6 +2273,7 @@
       const supportsCredentialTest = supportsSharedCredentialTest();
       const isOauthConnector = isOAuthConnector();
       const oauthAuthorized = isOAuthAuthorized();
+      const configured = isConnectorConfigured();
       const setupState = getConnectorSetupState();
       const maskedFields = fields
         .filter((field) => currentConfig[field.name] && field.type === 'password')
@@ -2272,7 +2291,7 @@
           <div class="flex flex-wrap gap-2">
             ${isOauthConnector ? `
               <button type="button" id="connectOAuthBtn" onclick="connectOAuthConnector()" class="rounded-xl border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
-                ${oauthAuthorized ? 'Reconnect' : `Connect ${escapeHtml(state.connectorName)}`}
+                ${oauthAuthorized ? 'Reconnect' : configured ? 'Authorize' : 'Save & Authorize'}
               </button>
             ` : ''}
             ${supportsCredentialTest ? `
@@ -2280,26 +2299,21 @@
                 Test Connection
               </button>
             ` : ''}
-            <button type="button" id="disconnectConnectorBtn" onclick="disconnectConnector()" class="rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50">
-              Disconnect
-            </button>
+            ${configured || oauthAuthorized ? `
+              <button type="button" id="disconnectConnectorBtn" onclick="disconnectConnector()" class="rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50">
+                Disconnect
+              </button>
+            ` : ''}
           </div>
         </div>
 
-        <div class="mt-6 rounded-xl border ${isOauthConnector && !oauthAuthorized && state.sourceId ? 'border-blue-200 bg-blue-50' : 'border-gray-200'} p-4">
+        <div class="mt-6 rounded-xl border ${isOauthConnector && !oauthAuthorized && configured ? 'border-blue-200 bg-blue-50' : 'border-gray-200'} p-4">
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Status</div>
               <div class="mt-3">${getBadgeHtml(setupState.label, setupState.badge)}</div>
               <div class="mt-3 text-sm text-gray-500">${escapeHtml(setupState.message)}</div>
             </div>
-            ${isOauthConnector && !oauthAuthorized && state.sourceId ? `
-              <div class="flex flex-wrap gap-2">
-                <button type="button" onclick="copyAuthorizationUrl()" class="rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100">Copy Link</button>
-                <button type="button" onclick="openAuthorizationUrl()" class="rounded-xl bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700">Open in Browser</button>
-                <button type="button" onclick="refreshAuthorizationUrl()" class="rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100" title="Regenerate link">Refresh</button>
-              </div>
-            ` : ''}
           </div>
         </div>
 
@@ -2323,9 +2337,7 @@
 
       `;
 
-      if (isOauthConnector && !oauthAuthorized && state.sourceId) {
-        ensurePendingAuthorizationUrl();
-      } else if (oauthAuthorized) {
+      if (!configured || oauthAuthorized) {
         state.pendingAuthorizationUrl = null;
         state.pendingAuthorizationUrlError = null;
       }
@@ -2427,6 +2439,9 @@
           </div>
         `;
       }
+
+      configForm.oninput = handleConfigDraftChange;
+      configForm.onchange = handleConfigDraftChange;
 
       dynamicFields.forEach((field) => {
         if (field.type === 'array') {
@@ -3414,11 +3429,14 @@
       }
     }
 
-    async function refreshBaseData(showNotice) {
+    async function refreshBaseData(showNotice, options = {}) {
       if (!state.sourceId) {
         renderViewer();
         return;
       }
+
+      const preservedDraft = options.preserveDraft ? captureConfigFormDraft() : null;
+      const preservedAuthMode = options.preserveDraft ? (state.authModeDraft || getSelectedAuthModeType()) : '';
 
       const [summary, configResponse] = await Promise.all([
         api.get(connectorApi('/summary')),
@@ -3427,8 +3445,8 @@
 
       state.summary = summary;
       state.configResponse = configResponse;
-      state.formDraft = null;
-      state.authModeDraft = '';
+      state.formDraft = options.preserveDraft ? preservedDraft : null;
+      state.authModeDraft = options.preserveDraft ? preservedAuthMode : '';
       renderViewer();
       await loadMatterOptions();
 
@@ -3514,6 +3532,8 @@
             : {})
         });
 
+        state.pendingAuthorizationUrl = null;
+        state.pendingAuthorizationUrlError = null;
         state.formDraft = null;
         state.authModeDraft = '';
         await refreshBaseData(false);
@@ -3536,11 +3556,69 @@
         await saveConfiguration({ silentLoading: true, silentSuccess: true });
 
         const authUrl = await fetchAuthorizationUrl({ force: true });
-        window.location.href = authUrl;
+        await openOAuthAuthorizationUrl(authUrl, { sameWindow: true });
       } catch (error) {
         console.error('[Connector Viewer] Failed to start OAuth flow', error);
         showPageAlert(error.message || 'Failed to start OAuth flow.', 'error');
       }
+    }
+
+    async function openOAuthAuthorizationUrl(authUrl, { sameWindow = false } = {}) {
+      if (window.electronAPI && typeof window.electronAPI.invoke === 'function') {
+        await window.electronAPI.invoke('open-external-url', authUrl);
+        startAuthorizationStatusPolling();
+        return;
+      }
+
+      if (urlParams.get('chrome') === 'embedded' && window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: 'lex-open-external-url', url: authUrl }, '*');
+        startAuthorizationStatusPolling();
+        return;
+      }
+
+      if (sameWindow) {
+        window.location.href = authUrl;
+      } else {
+        window.open(authUrl, '_blank', 'noopener');
+        startAuthorizationStatusPolling();
+      }
+    }
+
+    function stopAuthorizationStatusPolling() {
+      if (!state.authStatusPollTimer) return;
+      clearInterval(state.authStatusPollTimer);
+      state.authStatusPollTimer = null;
+    }
+
+    function startAuthorizationStatusPolling() {
+      if (!state.sourceId || !isOAuthConnector() || isOAuthAuthorized()) return;
+
+      stopAuthorizationStatusPolling();
+
+      const startedAt = Date.now();
+      state.authStatusPollTimer = setInterval(async () => {
+        if (!state.sourceId || !isOAuthConnector() || isOAuthAuthorized()) {
+          stopAuthorizationStatusPolling();
+          return;
+        }
+
+        if (Date.now() - startedAt > 90000) {
+          stopAuthorizationStatusPolling();
+          return;
+        }
+
+        try {
+          await refreshBaseData(false, { preserveDraft: true });
+          if (isOAuthAuthorized()) {
+            state.pendingAuthorizationUrl = null;
+            state.pendingAuthorizationUrlError = null;
+            stopAuthorizationStatusPolling();
+            showPageAlert(`${state.connectorName} authorization completed.`, 'success');
+          }
+        } catch (error) {
+          console.warn('[Connector Viewer] Authorization status refresh failed', error);
+        }
+      }, 2000);
     }
 
     function buildAuthorizationReturnUrl() {
@@ -3550,6 +3628,10 @@
       returnUrl.searchParams.delete('oauth_error');
       returnUrl.searchParams.delete('connector_id');
       return returnUrl.toString();
+    }
+
+    function shouldUseElectronOAuthExchangeFlow() {
+      return Boolean(window.isElectron || window.electronAPI || window.location.protocol === 'file:');
     }
 
     async function fetchAuthorizationUrl({ force = false } = {}) {
@@ -3566,14 +3648,24 @@
       updatePendingAuthorizationUrlDisplay('Generating link...');
 
       try {
+        const params = new URLSearchParams();
+        if (shouldUseElectronOAuthExchangeFlow()) {
+          params.set('flow', 'electron');
+        } else {
+          params.set('return_to', buildAuthorizationReturnUrl());
+        }
+
         const result = await api.get(
-          `/api/v1/integrations/connectors/${encodeURIComponent(state.sourceId)}/authorize?return_to=${encodeURIComponent(buildAuthorizationReturnUrl())}`
+          `/api/v1/integrations/connectors/${encodeURIComponent(state.sourceId)}/authorize?${params.toString()}`
         );
 
         if (!result?.authorization_url) {
           throw new Error('OAuth authorization URL was not returned by the server.');
         }
 
+        if (result.redirect_uri) {
+          state.oauthRedirectUri = result.redirect_uri;
+        }
         state.pendingAuthorizationUrl = result.authorization_url;
         updatePendingAuthorizationUrlDisplay(result.authorization_url);
         return result.authorization_url;
@@ -3605,7 +3697,7 @@
 
     async function copyAuthorizationUrl() {
       try {
-        const url = state.pendingAuthorizationUrl || await fetchAuthorizationUrl();
+        const url = await fetchAuthorizationUrl({ force: true });
         await navigator.clipboard.writeText(url);
         showPageAlert('Authorization link copied to clipboard.', 'success');
       } catch (error) {
@@ -3616,8 +3708,8 @@
 
     async function openAuthorizationUrl() {
       try {
-        const url = state.pendingAuthorizationUrl || await fetchAuthorizationUrl();
-        window.open(url, '_blank', 'noopener');
+        const url = await fetchAuthorizationUrl({ force: true });
+        await openOAuthAuthorizationUrl(url);
       } catch (error) {
         console.error('[Connector Viewer] Failed to open authorization link', error);
         showPageAlert(error.message || 'Failed to open authorization link.', 'error');
@@ -3632,6 +3724,53 @@
         console.error('[Connector Viewer] Failed to refresh authorization link', error);
         showPageAlert(error.message || 'Failed to refresh authorization link.', 'error');
       }
+    }
+
+    function registerElectronOAuthCallbackHandler() {
+      if (state.oauthCallbackRegistered) return;
+      if (!window.electronAPI || typeof window.electronAPI.onOAuthCallback !== 'function') return;
+
+      window.electronAPI.onOAuthCallback(async (data) => {
+        if (!data || (!data.code && !data.error)) return;
+        if (!isOAuthConnector()) return;
+
+        if (data.error) {
+          showPageAlert(data.error_description || data.error, 'error');
+          return;
+        }
+
+        try {
+          showPageAlert(`Completing ${state.connectorName} authorization...`, 'info');
+          const connectorType = state.connectorType || state.connectorId;
+          const result = await api.post('/api/v1/integrations/oauth/exchange', {
+            code: data.code,
+            state: data.state,
+            provider: connectorType,
+            connectorId: connectorType,
+            redirectUri: state.oauthRedirectUri || 'lana-ai://oauth/callback'
+          });
+
+          if (result?.integrationSourceId) {
+            state.sourceId = result.integrationSourceId;
+            const params = new URLSearchParams(window.location.search);
+            params.set('sourceId', result.integrationSourceId);
+            params.set('connectorId', connectorType);
+            params.set('connectorType', connectorType);
+            params.set('tab', 'configuration');
+            window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+          }
+
+          state.pendingAuthorizationUrl = null;
+          state.pendingAuthorizationUrlError = null;
+          await refreshBaseData(false);
+          showPageAlert(`${state.connectorName} authorization completed.`, 'success');
+        } catch (error) {
+          console.error('[Connector Viewer] OAuth callback exchange failed', error);
+          showPageAlert(error.message || 'Failed to complete OAuth authorization.', 'error');
+        }
+      });
+
+      state.oauthCallbackRegistered = true;
     }
 
     async function copyWebhookEndpointUrl() {
@@ -4207,6 +4346,7 @@
         setLoading(true);
         applyPageIdentity();
         await resolveConnectorContext();
+        registerElectronOAuthCallbackHandler();
 
         if (!state.iframeOnlyFallback) {
           await loadCatalog();
@@ -4227,6 +4367,11 @@
     }
 
     function goBack() {
+      if (urlParams.get('chrome') === 'embedded' && window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: 'lex-embedded-back', href: '../data-connectors.html' }, '*');
+        return;
+      }
+
       window.history.back();
     }
 
@@ -4234,6 +4379,15 @@
       if (event.key === 'Escape') {
         event.preventDefault();
         goBack();
+      }
+    });
+
+    window.addEventListener('focus', async () => {
+      if (!state.sourceId || !isOAuthConnector() || isOAuthAuthorized()) return;
+      try {
+        await refreshBaseData(false, { preserveDraft: true });
+      } catch (error) {
+        console.warn('[Connector Viewer] Focus refresh failed', error);
       }
     });
 

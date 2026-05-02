@@ -402,6 +402,64 @@ textarea {
   padding: 0 14px 14px;
 }
 
+.contract-section {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid var(--lex-border-subtle);
+  padding-top: 14px;
+}
+
+.contract-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.contract-section-head h3 {
+  margin: 0;
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-md-size, 1rem);
+  font-weight: var(--lex-weight-semibold);
+}
+
+.contract-section-head p {
+  margin: 4px 0 0;
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+}
+
+.intake-field-list,
+.safety-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.intake-field-row {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--voice-line);
+  border-radius: var(--lex-radius-lg, 8px);
+  background: var(--lex-bg-primary);
+  padding: 12px;
+}
+
+.intake-field-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.intake-field-row-head strong {
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+}
+
+.intake-field-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .toggle-row,
 .tool-row,
 .voice-preview,

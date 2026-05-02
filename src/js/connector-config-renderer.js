@@ -493,13 +493,21 @@ async function initiateOAuthFlow(provider, connectorId = null, matterId = null) 
       };
     }
 
+    const isLocalOAuth =
+      Boolean(window.electronAPI) ||
+      window.location.protocol === 'file:' ||
+      ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+    const redirectUri = isLocalOAuth
+      ? 'http://localhost:8080/api/v1/integrations/oauth/callback'
+      : 'https://lanaai.io/lana-ai/oauth/callback';
+
     // Step 3: Build authorization URL with centralized redirect_uri
     // The backend will construct the full OAuth URL with provider-specific params
     const authUrl = `${backendUrl}/api/v1/integrations/oauth/authorize?` +
       `provider=${encodeURIComponent(provider)}&` +
       `state=${encodeURIComponent(state)}&` +
       `connector_id=${encodeURIComponent(connectorId || '')}&` +
-      `redirect_uri=${encodeURIComponent('https://lanaai.io/lana-ai/oauth/callback')}`;
+      `redirect_uri=${encodeURIComponent(redirectUri)}`;
 
     console.log('Opening OAuth authorization URL...');
 

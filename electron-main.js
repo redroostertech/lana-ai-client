@@ -88,15 +88,36 @@ if (process.env.NODE_ENV === 'development') {
   logInfo('[Development] Certificate bypass enabled for localhost');
 }
 
-// Register protocol for deep links (lana-ai://)
-// This must be called before app.whenReady()
-if (process.defaultApp) {
-  if (process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient('lana-ai', process.execPath, [path.resolve(process.argv[1])]);
+// Register protocol for deep links (lana-ai://).
+// In development, macOS can keep a stale LaunchServices entry that points at
+// Electron.app without our app entrypoint, which opens Electron's default
+// "path-to-app" screen. Re-register with this file explicitly on every start.
+function registerDeepLinkProtocol() {
+  const protocol = 'lana-ai';
+
+  if (process.defaultApp) {
+    const appEntry = path.resolve(__dirname, 'electron-main.js');
+    try {
+      app.removeAsDefaultProtocolClient(protocol);
+      app.removeAsDefaultProtocolClient(protocol, process.execPath, [appEntry]);
+    } catch (_error) {
+      // Best-effort cleanup only; registration below is the important step.
+    }
+
+    const registered = app.setAsDefaultProtocolClient(protocol, process.execPath, [appEntry]);
+    logInfo(`[DeepLink] Registered ${protocol}:// for development`, {
+      registered,
+      execPath: process.execPath,
+      appEntry
+    });
+    return;
   }
-} else {
-  app.setAsDefaultProtocolClient('lana-ai');
+
+  const registered = app.setAsDefaultProtocolClient(protocol);
+  logInfo(`[DeepLink] Registered ${protocol}://`, { registered });
 }
+
+registerDeepLinkProtocol();
 
 // OAuth state management for CSRF protection
 const pendingOAuthStates = new Map();
@@ -122,6 +143,10 @@ function validateOAuthState(state) {
   const timestamp = pendingOAuthStates.get(state);
   pendingOAuthStates.delete(state);
   return (Date.now() - timestamp) < OAUTH_STATE_TTL;
+}
+
+function isBackendManagedOAuthState(state) {
+  return /^[a-f0-9]{64}$/i.test(String(state || ''));
 }
 
 /**
@@ -867,7 +892,7 @@ const handleOAuthCallback = (urlObj) => {
   logInfo(`OAuth callback: provider=${provider}, hasCode=${!!code}, hasError=${!!error}`);
 
   // Validate state for CSRF protection
-  if (state && !validateOAuthState(state)) {
+  if (state && !validateOAuthState(state) && !isBackendManagedOAuthState(state)) {
     logError('OAuth state validation failed — possible CSRF');
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('oauth-callback', {
@@ -1170,4 +1195,3 @@ process.on('uncaughtException', (error) => {
   console.error('[electron-main] Uncaught exception:', error);
   dialog.showErrorBox('Application Error', error.message);
 });
-

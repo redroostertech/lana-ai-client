@@ -2338,6 +2338,51 @@ button:disabled {
   margin: 6px 0 0;
 }
 
+.run-artifact-card {
+  min-width: 0;
+}
+
+.run-artifact-card--selected .rounded-xl {
+  border-color: var(--lex-color-primary-500, #2563eb);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.run-artifact-card-header {
+  align-items: flex-start;
+}
+
+.run-artifact-card-preview {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
+}
+
+.run-artifact-preview-card {
+  margin-top: 4px;
+}
+
+.run-artifact-preview-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.run-artifact-preview-frame {
+  width: 100%;
+  min-height: min(70vh, 760px);
+  border: 1px solid var(--lex-border-subtle, var(--line));
+  border-radius: var(--lex-radius-lg, 12px);
+  background: var(--lex-bg-primary, #fff);
+}
+
+.run-artifact-preview-code {
+  max-height: min(70vh, 760px);
+}
+
 .automation-detail-code {
   max-height: 320px;
   margin: 0;

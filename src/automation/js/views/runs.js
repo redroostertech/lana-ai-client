@@ -39,6 +39,157 @@ function formatBytes(bytes) {
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function artifactId(artifact) {
+  return String(artifact?.artifact_id || artifact?.id || '').trim();
+}
+
+function artifactType(artifact) {
+  return artifact?.artifact_type || artifact?.type || 'artifact';
+}
+
+function artifactName(artifact) {
+  return artifact?.artifact_name || artifact?.name || artifactId(artifact) || 'Artifact';
+}
+
+function artifactPayload(artifact) {
+  if (!artifact) return null;
+  if (artifact.inline_data_preview !== undefined && artifact.inline_data_preview !== null) {
+    return artifact.inline_data_preview;
+  }
+  if (artifact.inline_data !== undefined && artifact.inline_data !== null) {
+    return artifact.inline_data;
+  }
+  if (artifact.preview !== undefined && artifact.preview !== null) {
+    return artifact.preview;
+  }
+  return null;
+}
+
+function artifactPreviewText(artifact) {
+  const payload = artifactPayload(artifact);
+  if (payload === null || payload === undefined) return '';
+  if (typeof payload === 'string') return payload;
+  if (typeof payload === 'number' || typeof payload === 'boolean') return String(payload);
+  try {
+    return JSON.stringify(payload, null, 2);
+  } catch (_error) {
+    return String(payload);
+  }
+}
+
+function renderArtifactPreviewBody(artifact) {
+  if (!artifact) {
+    return lexEmpty({
+      message: 'Artifact unavailable',
+      description: 'The selected artifact could not be loaded.',
+      icon: 'document'
+    });
+  }
+
+  const payload = artifactPayload(artifact);
+  const type = artifactType(artifact);
+  const hasInlineHtml = artifact.inline_data_is_html && typeof payload === 'string' && payload.trim();
+  const hasRemotePreview = type === 'document_redline'
+    && typeof artifact.download_url === 'string'
+    && artifact.download_url.trim();
+
+  if (hasInlineHtml) {
+    return `
+      <iframe
+        class="run-artifact-preview-frame"
+        srcdoc="${escapeAttribute(payload)}"
+        title="${escapeAttribute(artifactName(artifact))}"
+      ></iframe>
+    `;
+  }
+
+  if (hasRemotePreview) {
+    return `
+      <iframe
+        class="run-artifact-preview-frame"
+        src="${escapeAttribute(artifact.download_url)}"
+        title="${escapeAttribute(artifactName(artifact))}"
+      ></iframe>
+    `;
+  }
+
+  const text = artifactPreviewText(artifact);
+  if (!text) {
+    return lexEmpty({
+      message: 'No preview available',
+      description: 'This artifact did not include inline preview data.',
+      icon: 'document'
+    });
+  }
+
+  return `<pre class="automation-detail-code run-artifact-preview-code">${escapeHtml(text)}</pre>`;
+}
+
+function renderArtifactCard(artifact, context) {
+  const id = artifactId(artifact);
+  const preview = artifactPreviewText(artifact).replace(/\s+/g, ' ').trim();
+  const isSelected = id && id === context.state.selectedRunArtifactId;
+  const canView = Boolean(id);
+  const type = artifactType(artifact);
+  const meta = [
+    type,
+    artifact.storage_type || 'storage',
+    artifact.file_size_bytes ? formatBytes(artifact.file_size_bytes) : ''
+  ].filter(Boolean).join(' • ');
+
+  return `
+    <lex-card variant="flat" class="automation-detail-item run-artifact-card ${isSelected ? 'run-artifact-card--selected' : ''}">
+      <div class="row-between run-artifact-card-header">
+        <div>
+          <strong>${escapeHtml(artifactName(artifact))}</strong>
+          <p class="muted">${escapeHtml(meta)}</p>
+        </div>
+        <div class="row-actions">
+          ${canView ? `<lex-btn variant="${isSelected ? 'secondary' : 'ghost'}" size="sm" data-run-artifact-view="${escapeAttribute(id)}">View</lex-btn>` : ''}
+          ${canView ? `<lex-btn variant="ghost" size="sm" data-run-artifact-download="${escapeAttribute(id)}">Download</lex-btn>` : ''}
+        </div>
+      </div>
+      ${artifact.artifact_description ? `<p>${escapeHtml(artifact.artifact_description)}</p>` : ''}
+      ${preview ? `<p class="muted run-artifact-card-preview">${escapeHtml(preview.slice(0, 220))}${preview.length > 220 ? '...' : ''}</p>` : ''}
+    </lex-card>
+  `;
+}
+
+function renderSelectedArtifactPreview(context, artifacts) {
+  if (!context.state.selectedRunArtifactId) return '';
+
+  const fallback = artifacts.find((artifact) => artifactId(artifact) === context.state.selectedRunArtifactId);
+  const selected = context.state.selectedRunArtifactDetail || fallback || null;
+
+  return `
+    <lex-card
+      variant="outlined"
+      heading="${escapeAttribute(selected ? artifactName(selected) : 'Artifact')}"
+      subtitle="${escapeAttribute(selected ? statusLabel(artifactType(selected)) : 'Loading artifact')}"
+      class="run-artifact-preview-card"
+    >
+      <div class="run-artifact-preview-toolbar">
+        <div class="badge-row">
+          ${selected ? badge(statusLabel(artifactType(selected))) : ''}
+          ${selected?.storage_type ? badge(selected.storage_type) : ''}
+          ${selected?.file_size_bytes ? badge(formatBytes(selected.file_size_bytes)) : ''}
+        </div>
+        <div class="row-actions">
+          ${selected?.download_url ? `<a href="${escapeAttribute(selected.download_url)}" target="_blank" rel="noopener noreferrer">Open in new window</a>` : ''}
+          <lex-btn variant="ghost" size="sm" data-close-run-artifact-preview>Close</lex-btn>
+        </div>
+      </div>
+      ${context.state.selectedRunArtifactLoading
+        ? lexEmpty({
+          message: 'Loading artifact',
+          description: 'Fetching the full generated output.',
+          icon: 'loader'
+        })
+        : renderArtifactPreviewBody(selected)}
+    </lex-card>
+  `;
+}
+
 function runActionButtons(run) {
   const status = normalizeText(run.status);
   const runId = run.execution_id || '';
@@ -203,14 +354,9 @@ function renderRunDetailsPanel(context) {
         body: artifacts.length
           ? `
             <div class="run-detail-list">
-              ${artifacts.map((artifact) => `
-                <lex-card variant="flat" class="automation-detail-item">
-                  <strong>${escapeHtml(artifact.artifact_name || artifact.artifact_id || 'Artifact')}</strong>
-                  <p class="muted">${escapeHtml(artifact.artifact_type || 'artifact')} • ${escapeHtml(artifact.storage_type || 'storage')} ${artifact.file_size_bytes ? `• ${escapeHtml(formatBytes(artifact.file_size_bytes))}` : ''}</p>
-                  ${artifact.artifact_description ? `<p>${escapeHtml(artifact.artifact_description)}</p>` : ''}
-                </lex-card>
-              `).join('')}
+              ${artifacts.map((artifact) => renderArtifactCard(artifact, context)).join('')}
             </div>
+            ${renderSelectedArtifactPreview(context, artifacts)}
           `
           : lexEmpty({
             message: 'No artifacts generated',

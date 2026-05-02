@@ -379,15 +379,6 @@
       stylesheets: []
     },
 
-    'integrations/integration-config.html': {
-      title: 'Integration Configuration',
-      activeNav: 'connectors',
-      scripts: [
-        'js/connectors.js'
-      ],
-      stylesheets: []
-    },
-
     'integrations/sync-status.html': {
       title: 'Sync Status',
       activeNav: 'connectors',

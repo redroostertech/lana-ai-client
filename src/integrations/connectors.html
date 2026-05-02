@@ -952,9 +952,9 @@
         if (result.success) {
           Toast.success(`${connectorId} is ready to configure.`);
 
-          // Redirect to configuration page
+          // Redirect to the shared data-driven connector viewer.
           setTimeout(() => {
-            window.location.href = `integration-config.html?id=${connectorId}`;
+            window.location.href = `connector-viewer.html?connectorId=${encodeURIComponent(connectorId)}&connectorType=${encodeURIComponent(connectorId)}`;
           }, 1000);
         } else {
           Toast.error(`Failed to install ${connectorId}`);

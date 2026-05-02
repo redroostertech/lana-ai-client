@@ -363,17 +363,7 @@
     </main>
 
     <!-- Full-screen Connector Dashboard Modal -->
-    <div id="connectorDashboardModal" class="dc-fullscreen-modal hidden" role="dialog" aria-modal="true" aria-labelledby="connectorDashboardTitle">
-      <div class="dc-fullscreen-header">
-        <div class="min-w-0">
-          <div id="connectorDashboardTitle" class="dc-fullscreen-title">Connector Dashboard</div>
-          <div id="connectorDashboardUrl" class="dc-fullscreen-subtitle"></div>
-        </div>
-        <div class="flex items-center gap-2">
-          <lex-btn id="connectorDashboardOpenNewBtn" variant="ghost" size="sm">Open in New Window</lex-btn>
-          <lex-btn variant="secondary" size="sm" onclick="closeConnectorDashboardModal()">Close</lex-btn>
-        </div>
-      </div>
+    <div id="connectorDashboardModal" class="dc-fullscreen-modal hidden" role="dialog" aria-modal="true" aria-label="Connector dashboard">
       <iframe id="connectorDashboardFrame" class="dc-fullscreen-frame" title="Connector dashboard"></iframe>
     </div>
 

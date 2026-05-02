@@ -281,10 +281,8 @@ export function isInstalled(connector) {
  * own origin (see @automation/server.js: `app.use('/lex-framework', ...)`),
  * so the URL is same-origin and needs no separate base.
  *
- * Precedence:
- *   1. Legacy system connectors (actionstep, leadly) → their dedicated page
- *   2. Connectors with a ui_entry_point → connector-viewer wrapper
- *   3. Everything else → generic integration-config page
+ * Every connector opens in the shared, data-driven connector viewer. Connector
+ * packages can still provide ui_entry_point metadata for specialized panels.
  *
  * @param {Object} connector - Normalized connector record
  * @param {string} [baseUrl='/lex-framework'] - Optional override for the
@@ -296,29 +294,14 @@ export function buildLanaClientConnectorUrl(connector, baseUrl = '/lex-framework
   if (!connector) return null;
 
   const base = String(baseUrl || '/lex-framework').replace(/\/+$/, '');
-  const rowId = connector.id || '';
-  // `connector_id` is the catalog slug (e.g., 'actionstep', 'google-sheets', 'mysql').
-  // `connector_type` is now kept in sync with it by the backend, so match on both.
-  const connectorSlug = String(
-    connector.connector_id || connector.connector_type || connector.source_type || ''
-  ).toLowerCase();
-
-  if (connectorSlug === 'actionstep') {
-    return `${base}/integrations/actionstep.html?id=${encodeURIComponent(rowId)}`;
-  }
-
-  if (connectorSlug === 'leadly') {
-    return `${base}/integrations/leadly.html?id=${encodeURIComponent(rowId)}`;
-  }
-
-  if (connector.ui_entry_point) {
-    const params = new URLSearchParams({
-      ui: connector.ui_entry_point,
-      name: connector.name || 'Connector',
-      connectorId: rowId
-    });
-    return `${base}/integrations/connector-viewer.html?${params.toString()}`;
-  }
-
-  return `${base}/integrations/integration-config.html?id=${encodeURIComponent(rowId)}`;
+  const rowId = connector.id || connector.connector_id || connector.connector_type || '';
+  const connectorType = connector.connector_id || connector.connector_type || connector.source_type || rowId;
+  const params = new URLSearchParams({
+    ui: connector.ui_entry_point || '',
+    name: connector.name || connector.connector_name || connector.source_name || 'Connector',
+    connectorId: rowId,
+    connectorType,
+    sourceId: connector.id || ''
+  });
+  return `${base}/integrations/connector-viewer.html?${params.toString()}`;
 }

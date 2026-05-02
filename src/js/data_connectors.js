@@ -601,36 +601,16 @@
 
   function buildConnectorManageUrl(connectorId) {
     var connector = findConnectorById(connectorId);
-    // Prefer the catalog slug (connector_id) from integration_sources. Falls
-    // back to the row id when the caller passed a slug directly.
-    var connectorSlug = String(
-      (connector && (connector.connector_id || connector.connector_type)) || connectorId || ''
-    ).toLowerCase();
-
-    var connectorName = String(connector && (connector.name || connector.connector_name || connector.source_name) || '').toLowerCase();
     var catalogConnectorId = connector
       ? (connector.connector_id || connector.connector_type || connector.source_type || connector.type || connectorId)
       : connectorId;
 
-    if (connectorSlug === 'actionstep' || connectorSlug === 'case-actionstep' || connectorName.indexOf('actionstep') !== -1) {
-      return 'integrations/actionstep.html?id=' + encodeURIComponent(connectorId) + '&chrome=embedded';
-    }
-
-    if (connectorSlug === 'leadly' || connectorSlug === 'crm-leadly' || connectorName.indexOf('leadly') !== -1) {
-      return 'integrations/leadly.html?id=' + encodeURIComponent(connectorId) + '&chrome=embedded';
-    }
-
-    // Connector with custom UI — open in connector-viewer
-    if (connector && connector.ui_entry_point) {
-      return buildCustomConnectorUIUrl(
-        connector.ui_entry_point,
-        connector.name || 'Connector',
-        connector.id || '',
-        connector.connector_id || connector.connector_type || connector.id || ''
-      );
-    }
-
-    return 'integrations/integration-config.html?id=' + encodeURIComponent(catalogConnectorId) + '&chrome=embedded';
+    return buildCustomConnectorUIUrl(
+      connector && connector.ui_entry_point ? connector.ui_entry_point : '',
+      connector ? (connector.name || connector.connector_name || connector.source_name || 'Connector') : 'Connector',
+      connector && connector.id ? connector.id : '',
+      catalogConnectorId
+    );
   }
 
   function openConnectorManage(connectorId) {
@@ -712,7 +692,7 @@
         Lex.Toast.success(connectorId + ' is ready to configure.');
         var tid = setTimeout(function () {
           openConnectorDashboardModal(
-            'integrations/integration-config.html?id=' + encodeURIComponent(connectorId) + '&chrome=embedded',
+            buildCustomConnectorUIUrl('', connectorId, result.connector_id || result.id || '', connectorId),
             connectorId
           );
         }, 1000);
@@ -1846,6 +1826,23 @@
     };
     window.addEventListener('message', embeddedBackHandler);
     _documentListeners.push({ event: 'message', handler: embeddedBackHandler, target: window });
+
+    var embeddedOpenExternalHandler = function (event) {
+      var data = event && event.data;
+      if (!data || data.type !== 'lex-open-external-url' || !data.url) return;
+      var frame = document.getElementById('connectorDashboardFrame');
+      if (frame && event.source !== frame.contentWindow) return;
+
+      if (window.electronAPI && typeof window.electronAPI.invoke === 'function') {
+        window.electronAPI.invoke('open-external-url', data.url).catch(function (error) {
+          console.error('Failed to open external URL:', error);
+        });
+      } else {
+        window.open(data.url, '_blank', 'noopener');
+      }
+    };
+    window.addEventListener('message', embeddedOpenExternalHandler);
+    _documentListeners.push({ event: 'message', handler: embeddedOpenExternalHandler, target: window });
   }
 
   // ── Lifecycle hooks ─────────────────────────────────────────────────

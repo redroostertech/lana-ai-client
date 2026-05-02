@@ -85,6 +85,9 @@ const state = {
   },
   selectedRunId: null,
   selectedRunDetail: null,
+  selectedRunArtifactId: null,
+  selectedRunArtifactDetail: null,
+  selectedRunArtifactLoading: false,
   connectors: [],
   connectorHealth: [],
   installedConnectors: [],
@@ -363,6 +366,9 @@ function onAppLexClose(event) {
   if (event.target?.matches?.('[data-run-detail-drawer]')) {
     state.selectedRunId = null;
     state.selectedRunDetail = null;
+    state.selectedRunArtifactId = null;
+    state.selectedRunArtifactDetail = null;
+    state.selectedRunArtifactLoading = false;
     renderCurrentView();
   }
 
@@ -508,6 +514,13 @@ function setView(view) {
     teardownConnectorDetail();
     // GAP #10: clear lazy-loaded sources when leaving connector-detail
     state.connectorDetail.sourcesState = null;
+  }
+  if (state.currentView === 'runs' && view !== 'runs') {
+    state.selectedRunId = null;
+    state.selectedRunDetail = null;
+    state.selectedRunArtifactId = null;
+    state.selectedRunArtifactDetail = null;
+    state.selectedRunArtifactLoading = false;
   }
   // Reset edit mode when navigating away from builder so a subsequent
   // "Create Automation" does not inherit a previous edit session.
@@ -1315,6 +1328,36 @@ async function onAppClick(event) {
   if (event.target.closest('[data-close-run-detail]')) {
     state.selectedRunId = null;
     state.selectedRunDetail = null;
+    state.selectedRunArtifactId = null;
+    state.selectedRunArtifactDetail = null;
+    state.selectedRunArtifactLoading = false;
+    renderCurrentView();
+    return;
+  }
+
+  const runArtifactViewButton = event.target.closest('[data-run-artifact-view]');
+  if (runArtifactViewButton) {
+    await loadRunArtifact(runArtifactViewButton.dataset.runArtifactView);
+    return;
+  }
+
+  const runArtifactDownloadButton = event.target.closest('[data-run-artifact-download]');
+  if (runArtifactDownloadButton) {
+    const artifactId = runArtifactDownloadButton.dataset.runArtifactDownload;
+    if (artifactId) {
+      window.open(
+        getApiUrl(`/api/v1/automation/artifacts/${encodeURIComponent(artifactId)}/download`),
+        '_blank',
+        'noopener,noreferrer'
+      );
+    }
+    return;
+  }
+
+  if (event.target.closest('[data-close-run-artifact-preview]')) {
+    state.selectedRunArtifactId = null;
+    state.selectedRunArtifactDetail = null;
+    state.selectedRunArtifactLoading = false;
     renderCurrentView();
     return;
   }
@@ -1889,6 +1932,9 @@ async function loadRuns() {
     if (!stillVisible) {
       state.selectedRunId = null;
       state.selectedRunDetail = null;
+      state.selectedRunArtifactId = null;
+      state.selectedRunArtifactDetail = null;
+      state.selectedRunArtifactLoading = false;
     }
   }
 }
@@ -1996,6 +2042,31 @@ async function loadRunDetail(executionId) {
   });
   state.selectedRunId = executionId;
   state.selectedRunDetail = payload || null;
+  state.selectedRunArtifactId = null;
+  state.selectedRunArtifactDetail = null;
+  state.selectedRunArtifactLoading = false;
+}
+
+async function loadRunArtifact(artifactId) {
+  if (!artifactId) return;
+  state.selectedRunArtifactId = artifactId;
+  state.selectedRunArtifactDetail = null;
+  state.selectedRunArtifactLoading = true;
+  renderCurrentView();
+
+  try {
+    const payload = await fetchJson(`/api/v1/automation/artifacts/${encodeURIComponent(artifactId)}`, {
+      headers: authHeaders()
+    });
+    state.selectedRunArtifactDetail = payload?.data || payload || null;
+  } catch (error) {
+    state.selectedRunArtifactId = null;
+    state.selectedRunArtifactDetail = null;
+    flash(error.message || 'Failed to load artifact.', true);
+  } finally {
+    state.selectedRunArtifactLoading = false;
+    renderCurrentView();
+  }
 }
 
 async function controlRunExecution(executionId, action) {
