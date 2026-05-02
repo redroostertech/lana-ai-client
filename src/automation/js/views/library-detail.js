@@ -390,18 +390,21 @@ function renderRunDetail(detail) {
             <div class="ld-artifact-meta">
               ${badge(formatLabel(resource.type || 'output'))}
               <strong>${escapeHtml(resource.title || resource.id || 'Output')}</strong>
-              ${resource.id ? `<span class="muted connector-mono" style="font-size:0.75rem;">${escapeHtml(resource.id)}</span>` : ''}
             </div>
-            ${(resource.resource_type || resource.resource_id || resource.matter_id) ? `
+            ${(resource.resource_type || resource.matter_name) ? `
               <div class="muted">
                 ${resource.resource_type ? `Resource: ${escapeHtml(resource.resource_type)}` : ''}
-                ${resource.resource_id ? ` ${escapeHtml(resource.resource_id)}` : ''}
-                ${resource.matter_id ? ` Matter: ${escapeHtml(resource.matter_id)}` : ''}
+                ${resource.matter_name ? ` Matter: ${escapeHtml(resource.matter_name)}` : ''}
               </div>
             ` : ''}
             ${resource.url ? `
               <div class="row-actions" style="margin-top:6px;">
-                <lex-btn variant="ghost" size="sm" href="${escapeAttribute(resource.url)}">Open</lex-btn>
+                <lex-btn
+                  as="a"
+                  variant="primary"
+                  size="sm"
+                  href="${escapeAttribute(resource.url)}"
+                >${escapeHtml(resource.type === 'task' ? 'Open Task' : 'Open Output')}</lex-btn>
               </div>
             ` : ''}
           </lex-card>
