@@ -1,4 +1,4 @@
-import { badge, emptyState, metaGrid, surface } from '../shared/ui.js';
+import { badge, drawerSection, emptyState, lexEmpty, metaGrid, surface } from '../shared/ui.js';
 import { escapeAttribute, escapeHtml, formatDate, formatLabel, timeAgo } from '../shared/utils.js';
 import { describeStep, humanizeTrigger, humanizeWhen } from '../shared/step-humanizer.js';
 
@@ -256,6 +256,8 @@ function renderRunRow(run, isExpanded, lanaClientUrl) {
   const runId = run.execution_id || '';
   const status = String(run.status || 'unknown');
   const stepCount = run.total_steps || run.step_count || '--';
+  const createdOutputCount = Number(run.created_output_count || 0);
+  const rowOutputCount = Number(run.row_output_count || 0);
 
   // GAP #2: matter context badge
   const matterId = run.client_matter_id || run.matter_id || '';
@@ -282,6 +284,8 @@ function renderRunRow(run, isExpanded, lanaClientUrl) {
           <span class="muted" style="font-size:0.8rem;">${escapeHtml(timeAgo(run.triggered_at || run.started_at))}</span>
           <span class="muted" style="font-size:0.8rem;">${escapeHtml(formatDuration(run.duration_ms))}</span>
           <span class="muted" style="font-size:0.8rem;">${escapeHtml(String(stepCount))} steps</span>
+          ${rowOutputCount ? `<span class="muted" style="font-size:0.8rem;">${escapeHtml(String(rowOutputCount))} rows</span>` : ''}
+          ${createdOutputCount ? `<span class="muted" style="font-size:0.8rem;">${escapeHtml(String(createdOutputCount))} outputs</span>` : ''}
           ${auditLine}
         </div>
         <span class="ld-run-toggle-icon">${isExpanded ? '▲' : '▼'}</span>
@@ -298,37 +302,131 @@ function renderRunDetail(detail) {
 
   const stepOutcomes = Array.isArray(detail.step_outcomes) ? detail.step_outcomes : [];
   const artifacts = Array.isArray(detail.artifacts) ? detail.artifacts : [];
+  const runResults = detail.run_results && typeof detail.run_results === 'object' ? detail.run_results : {};
+  const connectorContext = detail.connector_context && typeof detail.connector_context === 'object' ? detail.connector_context : null;
+  const outputs = Array.isArray(runResults.outputs) ? runResults.outputs : [];
+  const createdResources = Array.isArray(runResults.created_resources) ? runResults.created_resources : [];
 
   const stepsBlock = stepOutcomes.length
-    ? `
-      <div class="ld-run-steps">
-        <h4>Step Outcomes</h4>
+    ? drawerSection({
+      title: 'Step Outcomes',
+      body: `
         ${stepOutcomes.map((s) => `
-          <div class="ld-run-step-row">
-            ${badge(formatLabel(s.status || 'unknown'), statusTone(s.status))}
-            <strong>${escapeHtml(s.action_id || s.step_id || '--')}</strong>
-            <span class="muted">${escapeHtml(formatLabel(s.action_type || ''))}</span>
-            ${s.error_message ? `<span class="ld-run-step-error">${escapeHtml(s.error_message)}</span>` : ''}
-          </div>
+          <lex-card variant="flat" class="automation-detail-item">
+            <div class="ld-run-step-row">
+              ${badge(formatLabel(s.status || 'unknown'), statusTone(s.status))}
+              <strong>${escapeHtml(s.action_id || s.step_id || '--')}</strong>
+              <span class="muted">${escapeHtml(formatLabel(s.action_type || s.step_type || ''))}</span>
+              ${s.duration_ms ? `<span class="muted">${escapeHtml(formatDuration(s.duration_ms))}</span>` : ''}
+              ${s.error_message || s.message ? `<span class="ld-run-step-error">${escapeHtml(s.error_message || s.message)}</span>` : ''}
+            </div>
+          </lex-card>
         `).join('')}
-      </div>
-    `
+      `
+    })
+    : '';
+
+  const outputBlock = outputs.length
+    ? drawerSection({
+      title: 'Run Results',
+      body: `
+        ${outputs.map((output) => {
+          const metrics = output.metrics && typeof output.metrics === 'object' ? output.metrics : {};
+          const metricItems = Object.entries(metrics).map(([key, value]) => {
+            const renderedValue = value && typeof value === 'object' ? JSON.stringify(value) : String(value);
+            return {
+              label: formatLabel(key),
+              value: renderedValue
+            };
+          });
+          return `
+            <lex-card variant="flat" class="automation-detail-item">
+              <div class="ld-run-step-row">
+                ${badge(formatLabel(output.status || 'unknown'), statusTone(output.status))}
+                <strong>${escapeHtml(output.action_id || '--')}</strong>
+                <span class="muted">${escapeHtml(formatLabel(output.action_type || ''))}</span>
+                ${output.execution_time_ms ? `<span class="muted">${escapeHtml(formatDuration(output.execution_time_ms))}</span>` : ''}
+              </div>
+              ${metricItems.length ? metaGrid(metricItems, 'meta-grid ld-run-result-grid') : ''}
+            </lex-card>
+          `;
+        }).join('')}
+      `
+    })
+    : '';
+
+  const connectorBlock = connectorContext
+    ? drawerSection({
+      title: 'Connector Event',
+      body: `
+        ${metaGrid([
+          connectorContext.event_type ? { label: 'Event', value: connectorContext.event_type } : null,
+          connectorContext.entity_type ? { label: 'Entity', value: connectorContext.entity_type } : null,
+          connectorContext.record_count !== null && connectorContext.record_count !== undefined ? { label: 'Rows in event', value: String(connectorContext.record_count) } : null,
+          connectorContext.records_created !== null && connectorContext.records_created !== undefined ? { label: 'Created', value: String(connectorContext.records_created) } : null,
+          connectorContext.records_updated !== null && connectorContext.records_updated !== undefined ? { label: 'Updated', value: String(connectorContext.records_updated) } : null,
+          connectorContext.records_deleted !== null && connectorContext.records_deleted !== undefined ? { label: 'Deleted', value: String(connectorContext.records_deleted) } : null,
+          connectorContext.chunk_index !== null && connectorContext.chunk_index !== undefined ? { label: 'Chunk', value: String(connectorContext.chunk_index) } : null
+        ].filter(Boolean), 'meta-grid ld-run-result-grid')}
+        ${Array.isArray(connectorContext.change_summary) && connectorContext.change_summary.length ? `
+          ${metaGrid(connectorContext.change_summary.map((row) => ({
+            label: `${formatLabel(row.entity_type)} ${formatLabel(row.change_type)}`,
+            value: String(row.count)
+          })), 'meta-grid ld-run-result-grid')}
+        ` : ''}
+        ${connectorContext.connector_records && Array.isArray(connectorContext.connector_records.sample) && connectorContext.connector_records.sample.length ? `
+          <div class="muted" style="margin-top:8px;">Sampled ${escapeHtml(String(connectorContext.connector_records.sample.length))} of ${escapeHtml(String(connectorContext.connector_records.total_ids || connectorContext.connector_records.sample.length))} connector rows used by this run.</div>
+        ` : ''}
+      `
+    })
+    : '';
+
+  const resourcesBlock = createdResources.length
+    ? drawerSection({
+      title: 'Created Outputs',
+      body: `
+        ${createdResources.slice(0, 50).map((resource) => `
+          <lex-card variant="flat" class="automation-detail-item">
+            <div class="ld-artifact-meta">
+              ${badge(formatLabel(resource.type || 'output'))}
+              <strong>${escapeHtml(resource.title || resource.id || 'Output')}</strong>
+              ${resource.id ? `<span class="muted connector-mono" style="font-size:0.75rem;">${escapeHtml(resource.id)}</span>` : ''}
+            </div>
+            ${(resource.resource_type || resource.resource_id || resource.matter_id) ? `
+              <div class="muted">
+                ${resource.resource_type ? `Resource: ${escapeHtml(resource.resource_type)}` : ''}
+                ${resource.resource_id ? ` ${escapeHtml(resource.resource_id)}` : ''}
+                ${resource.matter_id ? ` Matter: ${escapeHtml(resource.matter_id)}` : ''}
+              </div>
+            ` : ''}
+            ${resource.url ? `
+              <div class="row-actions" style="margin-top:6px;">
+                <lex-btn variant="ghost" size="sm" href="${escapeAttribute(resource.url)}">Open</lex-btn>
+              </div>
+            ` : ''}
+          </lex-card>
+        `).join('')}
+      `
+    })
     : '';
 
   const artifactsBlock = artifacts.length
-    ? `
-      <div class="ld-run-artifacts">
-        <h4>Artifacts</h4>
+    ? drawerSection({
+      title: 'Artifacts',
+      body: `
         ${artifacts.map((a) => renderArtifactRow(a)).join('')}
-      </div>
-    `
+      `
+    })
     : '';
 
   return `
     <div class="ld-run-detail-body">
+      ${connectorBlock}
       ${stepsBlock}
+      ${outputBlock}
+      ${resourcesBlock}
       ${artifactsBlock}
-      ${!stepsBlock && !artifactsBlock ? `<div class="muted">No step outcomes or artifacts recorded for this run.</div>` : ''}
+      ${!connectorBlock && !stepsBlock && !outputBlock && !resourcesBlock && !artifactsBlock ? lexEmpty({ message: 'No run results recorded', description: 'No step outcomes, outputs, or artifacts were recorded for this run.' }) : ''}
     </div>
   `;
 }
