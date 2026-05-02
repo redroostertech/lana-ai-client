@@ -1835,6 +1835,17 @@
     if (bannerImportBtn) {
       bannerImportBtn.addEventListener('click', openImportConnectorModal);
     }
+
+    // Embedded iframe back-button → dismiss the host modal
+    var embeddedBackHandler = function (event) {
+      var data = event && event.data;
+      if (!data || data.type !== 'lex-embedded-back') return;
+      var frame = document.getElementById('connectorDashboardFrame');
+      if (frame && event.source !== frame.contentWindow) return;
+      closeConnectorDashboardModal();
+    };
+    window.addEventListener('message', embeddedBackHandler);
+    _documentListeners.push({ event: 'message', handler: embeddedBackHandler, target: window });
   }
 
   // ── Lifecycle hooks ─────────────────────────────────────────────────

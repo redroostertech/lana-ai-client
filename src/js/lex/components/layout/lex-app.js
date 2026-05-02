@@ -401,6 +401,16 @@
       this.delegate('topbar-back-click', 'lex-topbar', (e) => {
         const detail = e.detail || {};
         const href = detail.href || this.backHref;
+
+        // When hosted inside a parent modal iframe, dismiss the modal instead
+        // of navigating the iframe back to the host page.
+        if (this.chrome === 'embedded' && window.parent && window.parent !== window) {
+          try {
+            window.parent.postMessage({ type: 'lex-embedded-back', href }, '*');
+            return;
+          } catch (_) { /* fall through to navigation */ }
+        }
+
         if (href && window.Lex && window.Lex.Nav) {
           window.Lex.Nav.go(href);
         } else if (href) {
