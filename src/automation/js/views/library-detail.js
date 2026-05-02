@@ -329,7 +329,7 @@ function renderStepDetailValue(value) {
   `;
 }
 
-function renderStepOutcomeDetails(step) {
+function renderStepOutcomeDetails(step, detailKey, isOpen = false) {
   const metrics = step.metrics && typeof step.metrics === 'object' ? step.metrics : {};
   const resultSummary = step.result_summary && typeof step.result_summary === 'object' ? step.result_summary : {};
   const logs = Array.isArray(step.logs) ? step.logs : [];
@@ -353,8 +353,12 @@ function renderStepOutcomeDetails(step) {
   }
 
   return `
-    <details class="ld-step-raw ld-run-step-details">
-      <summary>View step details</summary>
+    <details
+      class="ld-step-raw ld-run-step-details"
+      data-ld-step-detail="${escapeAttribute(detailKey)}"
+      ${isOpen ? 'open' : ''}
+    >
+      <summary data-ld-step-detail-summary="${escapeAttribute(detailKey)}">View step details</summary>
       ${detailItems.length ? `
         <div class="ld-run-step-detail-grid">
           ${detailItems.map((item) => `
@@ -383,12 +387,17 @@ function renderRunDetail(detail) {
   const runResults = detail.run_results && typeof detail.run_results === 'object' ? detail.run_results : {};
   const connectorContext = detail.connector_context && typeof detail.connector_context === 'object' ? detail.connector_context : null;
   const createdResources = Array.isArray(runResults.created_resources) ? runResults.created_resources : [];
+  const openStepDetails = detail.open_step_details && typeof detail.open_step_details === 'object'
+    ? detail.open_step_details
+    : {};
 
   const stepsBlock = stepOutcomes.length
     ? drawerSection({
       title: 'Step Outcomes',
       body: `
-        ${stepOutcomes.map((s) => `
+        ${stepOutcomes.map((s, index) => {
+          const detailKey = `${s.action_id || s.step_id || `step_${index + 1}`}`;
+          return `
           <lex-card variant="flat" class="automation-detail-item">
             <div class="ld-run-step-row">
               <div class="ld-run-step-copy">
@@ -398,9 +407,10 @@ function renderRunDetail(detail) {
               </div>
               ${badge(formatLabel(s.status || 'unknown'), statusTone(s.status))}
             </div>
-            ${renderStepOutcomeDetails(s)}
+            ${renderStepOutcomeDetails(s, detailKey, Boolean(openStepDetails[detailKey]))}
           </lex-card>
-        `).join('')}
+        `;
+        }).join('')}
       `
     })
     : '';
@@ -1747,9 +1757,11 @@ export async function handleLibraryDetailClick(context, event) {
     if (ld.expandedRunId === runId) {
       ld.expandedRunId = null;
       ld.expandedRunDetail = null;
+      ld.openStepDetails = {};
     } else {
       ld.expandedRunId = runId;
       ld.expandedRunDetail = null;
+      ld.openStepDetails = {};
       context.renderCurrentView();
 
       try {
@@ -1757,6 +1769,9 @@ export async function handleLibraryDetailClick(context, event) {
           headers: authHeaders()
         });
         ld.expandedRunDetail = payload || null;
+        if (ld.expandedRunDetail && typeof ld.expandedRunDetail === 'object') {
+          ld.expandedRunDetail.open_step_details = { ...ld.openStepDetails };
+        }
       } catch (err) {
         flash(err.message || 'Failed to load run detail.', true);
         ld.expandedRunId = null;
@@ -1764,6 +1779,27 @@ export async function handleLibraryDetailClick(context, event) {
     }
     context.renderCurrentView();
     return true;
+  }
+
+  const stepDetailSummaryEl = event.target.closest('[data-ld-step-detail-summary]');
+  if (stepDetailSummaryEl) {
+    const detailKey = stepDetailSummaryEl.dataset.ldStepDetailSummary;
+    const detailEl = stepDetailSummaryEl.closest('[data-ld-step-detail]');
+    if (detailKey && detailEl) {
+      ld.openStepDetails = ld.openStepDetails && typeof ld.openStepDetails === 'object'
+        ? ld.openStepDetails
+        : {};
+      const nextOpen = !detailEl.open;
+      if (nextOpen) {
+        ld.openStepDetails[detailKey] = true;
+      } else {
+        delete ld.openStepDetails[detailKey];
+      }
+      if (ld.expandedRunDetail && typeof ld.expandedRunDetail === 'object') {
+        ld.expandedRunDetail.open_step_details = { ...ld.openStepDetails };
+      }
+    }
+    return false;
   }
 
   // Runs pagination
@@ -2269,6 +2305,7 @@ export function createLibraryDetailState(automationId = null) {
     runsPagination: null,
     expandedRunId: null,
     expandedRunDetail: null,
+    openStepDetails: {},
     deleteModalOpen: false,
     artifactModalOpen: false,
     modalArtifact: null,
