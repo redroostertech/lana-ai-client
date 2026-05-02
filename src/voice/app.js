@@ -801,15 +801,15 @@ function renderTestsTab(agent) {
         <div class="voice-volume-panel">
           <div class="voice-volume-head">
             <span>Mic volume</span>
-            <strong>${micLevelPercent}%</strong>
+            <strong id="voice-volume-value">${micLevelPercent}%</strong>
           </div>
           <div class="voice-volume-meter" aria-label="Current microphone volume">
-            <span style="width:${micLevelPercent}%"></span>
-            <i style="left:${bargeInPercent}%"></i>
+            <span id="voice-volume-bar" style="width:${micLevelPercent}%"></span>
+            <i id="voice-volume-threshold" style="left:${bargeInPercent}%"></i>
           </div>
           <div class="voice-volume-hint">
             <span>Barge-in threshold ${bargeInPercent}%</span>
-            <span>Current ${micLevelPercent}%</span>
+            <span>Current <b id="voice-volume-current">${micLevelPercent}%</b></span>
           </div>
         </div>
 
@@ -1215,7 +1215,7 @@ function handleVoiceSessionAudio(input) {
   consoleState.peakMicLevel = Math.max(consoleState.peakMicLevel || 0, rms);
   if (now - (consoleState.lastLevelRenderAt || 0) >= 140) {
     consoleState.lastLevelRenderAt = now;
-    renderEditor();
+    updateVoiceVolumeMeter();
   }
 
   if (consoleState.phase === 'speaking') {
@@ -1270,6 +1270,16 @@ function computeRms(samples) {
 function smoothLevel(previous, next) {
   const attack = next > previous ? 0.55 : 0.18;
   return previous + ((next - previous) * attack);
+}
+
+function updateVoiceVolumeMeter() {
+  const level = Math.min(100, Math.round((state.voiceConsole.micLevel || 0) * 1000));
+  const value = $('voice-volume-value');
+  const current = $('voice-volume-current');
+  const bar = $('voice-volume-bar');
+  if (value) value.textContent = `${level}%`;
+  if (current) current.textContent = `${level}%`;
+  if (bar) bar.style.width = `${level}%`;
 }
 
 function finalizeCurrentVoiceTurn() {
