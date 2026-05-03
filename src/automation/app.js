@@ -48,6 +48,36 @@ import { indexConnectors, findConnectorById, normalizeConnector, buildLanaClient
 import { hasAdminRole } from './js/shared/access.js';
 import { formatFileSize } from './js/shared/utils.js';
 
+function openWorkspaceResourceUrl(resourceUrl) {
+  const href = String(resourceUrl || '').trim();
+  if (!href) return;
+
+  if (href.includes('workspace-details.html')) {
+    let params = null;
+    try {
+      params = new URL(href, window.location.href).searchParams;
+    } catch (_error) {
+      const query = href.includes('?') ? href.slice(href.indexOf('?')) : '';
+      params = new URLSearchParams(query);
+    }
+
+    const matterId = params.get('id') || '';
+    if (!matterId) return;
+
+    const nextParams = new URLSearchParams({ id: matterId });
+    for (const key of ['tab', 'task', 'task_id', 'open_file', 'artifact', 'activity']) {
+      const value = params.get(key);
+      if (value) nextParams.set(key, value);
+    }
+    if (!nextParams.get('tab')) nextParams.set('tab', 'activity');
+
+    window.location.href = new URL(`../workspace-details.html?${nextParams.toString()}`, import.meta.url).href;
+    return;
+  }
+
+  window.location.href = href;
+}
+
 function readCanonicalToken() {
   if (window.api && window.api.token) return window.api.token;
   if (typeof localStorage === 'undefined') return '';
@@ -1341,6 +1371,12 @@ async function onAppClick(event) {
     return;
   }
 
+  const runArtifactWorkspaceButton = event.target.closest('[data-run-artifact-open-workspace]');
+  if (runArtifactWorkspaceButton) {
+    openWorkspaceResourceUrl(runArtifactWorkspaceButton.dataset.runArtifactOpenWorkspace || '');
+    return;
+  }
+
   const runArtifactDownloadButton = event.target.closest('[data-run-artifact-download]');
   if (runArtifactDownloadButton) {
     const artifactId = runArtifactDownloadButton.dataset.runArtifactDownload;
@@ -1879,13 +1915,19 @@ async function loadTemplates() {
 }
 
 async function loadAutomations() {
-  const [automationsPayload, actionsPayload] = await Promise.all([
-    fetchJson('/api/automations?limit=100', { headers: authHeaders() }),
-    fetchJson('/api/automation-actions?limit=200', { headers: authHeaders() })
-  ]);
+  try {
+    const [automationsPayload, actionsPayload] = await Promise.all([
+      fetchJson('/api/automations?limit=100', { headers: authHeaders() }),
+      fetchJson('/api/automation-actions?limit=200', { headers: authHeaders() })
+    ]);
 
-  state.automations = automationsPayload.automations || [];
-  state.actionCatalog = actionsPayload.data || [];
+    state.automations = automationsPayload.automations || [];
+    state.actionCatalog = actionsPayload.data || [];
+  } catch (error) {
+    console.warn('Failed to load automations', error);
+    state.automations = [];
+    state.actionCatalog = [];
+  }
 }
 
 async function loadMatters() {

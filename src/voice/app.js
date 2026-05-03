@@ -321,7 +321,13 @@ async function request(path, options = {}) {
     ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
     ...(options.headers || {})
   };
-  const response = await fetch(resolveUrl(path), { ...options, headers });
+  let response;
+  try {
+    response = await fetch(resolveUrl(path), { ...options, headers });
+  } catch (error) {
+    error.isNetworkError = true;
+    throw error;
+  }
   const contentType = response.headers.get('content-type') || '';
   const payload = contentType.includes('application/json')
     ? await response.json().catch(() => ({}))
@@ -330,6 +336,19 @@ async function request(path, options = {}) {
     throw new Error(errorMessageFromPayload(payload, `Request failed with status ${response.status}`));
   }
   return payload;
+}
+
+function isNetworkRequestError(error) {
+  if (!error) return false;
+  if (error.isNetworkError) return true;
+  const message = String(error.message || '').toLowerCase();
+  return error.name === 'TypeError'
+    || message.includes('failed to fetch')
+    || message.includes('networkerror')
+    || message.includes('connection refused')
+    || message.includes('err_connection_refused')
+    || message.includes('socket error')
+    || message.includes('connection timeout');
 }
 
 function errorMessageFromPayload(payload, fallback) {
@@ -1382,6 +1401,14 @@ async function startWebVoiceSession() {
     state.voiceConsole.lastLevelRenderAt = 0;
     renderEditor();
     connectRealtimeVoiceSession(agent, audioContext.sampleRate).catch((error) => {
+      if (isNetworkRequestError(error)) {
+        endWebVoiceSession({ render: false });
+        state.voiceConsole.error = `Realtime voice unavailable: ${error.message}`;
+        state.voiceConsole.status = 'Voice API unavailable';
+        state.voiceConsole.interimTranscript = 'The local voice API is not reachable. Start or restart LANA API and try again.';
+        renderEditor();
+        return;
+      }
       state.voiceConsole.realtimeFallback = true;
       state.voiceConsole.realtimeActive = false;
       state.voiceConsole.realtimeReady = false;
@@ -2039,6 +2066,14 @@ async function runWebVoiceAudioTurn(wavBlob, recordedMs) {
     const result = payload.data || payload;
     await processWebVoiceTurnResult(result, recordedMs);
   } catch (error) {
+    if (isNetworkRequestError(error)) {
+      endWebVoiceSession({ render: false });
+      state.voiceConsole.error = `Voice API unavailable: ${error.message}`;
+      state.voiceConsole.status = 'Voice API unavailable';
+      state.voiceConsole.interimTranscript = 'The local voice API is not reachable. Start or restart LANA API and try again.';
+      renderEditor();
+      return;
+    }
     state.voiceConsole.error = `Voice turn failed: ${error.message}`;
     state.voiceConsole.status = 'Turn failed';
     state.voiceConsole.phase = state.voiceConsole.sessionActive ? 'listening' : 'idle';

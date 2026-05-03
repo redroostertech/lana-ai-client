@@ -3619,17 +3619,27 @@ details[open].ld-step-raw > summary::before {
 .ld-run-step-detail-item--wide {
   grid-column: 1 / -1;
 }
-.ld-run-step-json {
-  max-height: 280px;
-  overflow: auto;
-  margin: 6px 0 0;
+.ld-run-human-object,
+.ld-run-human-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+.ld-run-human-row,
+.ld-run-human-list-item {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.ld-run-human-row--nested {
   padding: 10px;
+  border: 1px solid var(--border-light, #f3f4f6);
   border-radius: 6px;
-  background: var(--white-200, #efefef);
-  color: var(--text, #111827);
-  font-size: 0.76rem;
-  line-height: 1.45;
-  white-space: pre-wrap;
+  background: rgba(255, 255, 255, 0.75);
+}
+.ld-run-human-row .meta-value,
+.ld-run-human-list-item .meta-value {
+  overflow-wrap: anywhere;
 }
 .ld-run-step-note {
   margin: 10px 0 0;

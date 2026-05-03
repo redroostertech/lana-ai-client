@@ -1,6 +1,7 @@
 import { badge, drawerSection, emptyState, lexEmpty, metaGrid, surface } from '../shared/ui.js';
 import { escapeAttribute, escapeHtml, formatDate, formatLabel, timeAgo } from '../shared/utils.js';
 import { describeStep, humanizeTrigger, humanizeWhen } from '../shared/step-humanizer.js';
+import { getApiUrl } from '../shared/api-base-url.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -240,6 +241,22 @@ function buildMatterDetailUrl(lanaClientUrl, matterId) {
   return `${baseUrl}/workspace-details.html?id=${encodeURIComponent(id)}&tab=activity`;
 }
 
+function buildWorkspaceDetailUrl(lanaClientUrl, matterId, options = {}) {
+  const id = String(matterId || '').trim();
+  if (!id) return '';
+
+  const params = new URLSearchParams({ id });
+  if (options.tab) params.set('tab', options.tab);
+  if (options.taskId) params.set('task', String(options.taskId));
+  if (options.documentId) params.set('open_file', String(options.documentId));
+  if (options.artifactId) params.set('artifact', String(options.artifactId));
+  if (options.activityId) params.set('activity', String(options.activityId));
+
+  const baseUrl = String(lanaClientUrl || '').trim().replace(/\/$/, '');
+  const path = `workspace-details.html?${params.toString()}`;
+  return baseUrl ? `${baseUrl}/${path}` : `../${path}`;
+}
+
 function renderMatterLink(lanaClientUrl, matterId, matterName, options = {}) {
   const text = `${options.prefix || ''}${String(matterName || matterId || 'Unknown matter')}`;
   const href = buildMatterDetailUrl(lanaClientUrl, matterId);
@@ -250,6 +267,104 @@ function renderMatterLink(lanaClientUrl, matterId, matterName, options = {}) {
 
 function renderMatterBadge(lanaClientUrl, matterId, matterName) {
   return `<span class="ld-run-matter-badge" style="display:inline-flex;align-items:center;border-radius:999px;padding:4px 10px;background:rgba(37,99,235,0.10);font-size:0.75rem;line-height:1;">${renderMatterLink(lanaClientUrl, matterId, matterName, { prefix: 'Matter: ' })}</span>`;
+}
+
+function resolveResourceMatterId(resource) {
+  if (!resource || typeof resource !== 'object') return '';
+  return resource.matter_number
+    || resource.matterNumber
+    || resource.external_matter_id
+    || resource.externalMatterId
+    || resource.matter_id
+    || resource.matterId
+    || resource.client_matter_id
+    || resource.clientMatterId
+    || resource.context?.matter_id
+    || resource.context?.matterId
+    || resource.matter?.matter_id
+    || resource.matter?.id
+    || '';
+}
+
+function resolveResourceTaskId(resource) {
+  if (!resource || typeof resource !== 'object') return '';
+  return resource.task_id
+    || resource.taskId
+    || resource.resource_id
+    || resource.resourceId
+    || resource.id
+    || '';
+}
+
+function getCreatedResourceUrl(resource, lanaClientUrl) {
+  if (!resource || typeof resource !== 'object') return '';
+  const type = String(resource.type || resource.resource_type || '').toLowerCase();
+  const matterId = resolveResourceMatterId(resource);
+  const resourceId = resolveResourceTaskId(resource);
+
+  if (type === 'task') {
+    const taskUrl = buildWorkspaceDetailUrl(lanaClientUrl, matterId, { tab: 'tasks', taskId: resourceId });
+    if (taskUrl) return taskUrl;
+  }
+  if (type === 'document') {
+    const documentUrl = buildWorkspaceDetailUrl(lanaClientUrl, matterId, { tab: 'documents', documentId: resourceId });
+    if (documentUrl) return documentUrl;
+  }
+  if (type === 'artifact') {
+    const artifactUrl = buildWorkspaceDetailUrl(lanaClientUrl, matterId, { tab: 'activity', artifactId: resourceId });
+    if (artifactUrl) return artifactUrl;
+  }
+  if (type === 'activity') {
+    const activityUrl = buildWorkspaceDetailUrl(lanaClientUrl, matterId, { tab: 'activity', activityId: resourceId });
+    if (activityUrl) return activityUrl;
+  }
+  if (type === 'redline') {
+    const documentId = resource.new_document_id || resource.newDocumentId || resource.document_id || resource.documentId || '';
+    const redlineUrl = buildWorkspaceDetailUrl(lanaClientUrl, matterId, documentId
+      ? { tab: 'documents', documentId }
+      : { tab: 'activity' });
+    if (redlineUrl) return redlineUrl;
+  }
+  return resource.url || '';
+}
+
+function openCreatedResourceUrl(resourceUrl) {
+  const href = String(resourceUrl || '').trim();
+  if (!href) return;
+
+  if (href.includes('workspace-details.html') || href.includes('/matters/matter.html')) {
+    const normalizedHref = href.replace(/^\.\.\//, '').replace(/^\.\//, '');
+    let params = null;
+    try {
+      params = new URL(normalizedHref, window.location.href).searchParams;
+    } catch (_err) {
+      const query = normalizedHref.includes('?') ? normalizedHref.slice(normalizedHref.indexOf('?')) : '';
+      params = new URLSearchParams(query);
+    }
+
+    const matterId = params.get('id') || '';
+    if (!matterId) return;
+
+    const nextParams = new URLSearchParams({ id: matterId });
+    const passthroughParams = ['tab', 'task', 'task_id', 'open_file', 'artifact', 'activity'];
+    for (const key of passthroughParams) {
+      const value = params.get(key);
+      if (value) nextParams.set(key, value);
+    }
+    if (!nextParams.get('tab')) nextParams.set('tab', 'activity');
+
+    // workspace-details.html is a standalone host page, not an automation SPA
+    // route. Use a full navigation to the concrete host file so Electron loads
+    // the matter detail shell regardless of the automation SPA's current URL.
+    window.location.href = new URL(`../../../workspace-details.html?${nextParams.toString()}`, import.meta.url).href;
+    return;
+  }
+
+  if (window.Lex && Lex.Nav && !/^https?:\/\//i.test(href)) {
+    Lex.Nav.go(href);
+  } else {
+    window.location.href = href;
+  }
 }
 
 function renderRunRow(run, isExpanded, lanaClientUrl) {
@@ -306,12 +421,21 @@ function humanizeRunToken(value) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function renderReadableValue(value) {
+function renderReadableValue(value, key = '') {
   if (value === null || value === undefined) return '';
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
   if (typeof value === 'number') return String(value);
   if (Array.isArray(value)) return `${value.length} item${value.length === 1 ? '' : 's'}`;
-  if (typeof value === 'object') return JSON.stringify(value, null, 2);
+  if (typeof value === 'object') return '';
+  if (typeof value === 'string') {
+    const normalizedKey = String(key || '').toLowerCase();
+    if (normalizedKey === 'model' || normalizedKey.includes('email') || /^https?:\/\//.test(value)) {
+      return value;
+    }
+    if (/[_-]/.test(value) && !/^[0-9a-f-]{24,}$/i.test(value)) {
+      return humanizeRunToken(value);
+    }
+  }
   return String(value);
 }
 
@@ -319,14 +443,60 @@ function isStructuredValue(value) {
   return Boolean(value && typeof value === 'object');
 }
 
-function renderStepDetailValue(value) {
-  if (!isStructuredValue(value)) {
+function shouldHideStepDetailKey(key, value, depth) {
+  const normalized = String(key || '').toLowerCase();
+  if (normalized.endsWith('_id')) return true;
+  if (normalized === 'id') return true;
+  if (normalized === 'organization_id') return true;
+  if (normalized === 'user_id') return true;
+  if (typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(value)) return true;
+  return value === undefined || value === null || value === '';
+}
+
+function renderHumanStepObject(value, depth = 0) {
+  if (Array.isArray(value)) {
+    if (!value.length) return '<span class="muted">None</span>';
+    return `
+      <div class="ld-run-human-list">
+        ${value.slice(0, 25).map((item, index) => `
+          <div class="ld-run-human-list-item">
+            <span class="meta-label">Item ${index + 1}</span>
+            <div class="meta-value">${renderStepDetailValue(item, depth + 1)}</div>
+          </div>
+        `).join('')}
+        ${value.length > 25 ? `<div class="muted">${escapeHtml(String(value.length - 25))} more item${value.length - 25 === 1 ? '' : 's'}</div>` : ''}
+      </div>
+    `;
+  }
+
+  if (!value || typeof value !== 'object') {
     return escapeHtml(renderReadableValue(value));
   }
 
+  const entries = Object.entries(value).filter(([key, entryValue]) => !shouldHideStepDetailKey(key, entryValue, depth));
+  if (!entries.length) return '<span class="muted">No user-facing details recorded.</span>';
+
   return `
-    <pre class="ld-run-step-json"><code>${escapeHtml(JSON.stringify(value, null, 2))}</code></pre>
+    <div class="ld-run-human-object">
+      ${entries.map(([key, entryValue]) => {
+        const structured = isStructuredValue(entryValue);
+        return `
+          <div class="ld-run-human-row ${structured ? 'ld-run-human-row--nested' : ''}">
+            <span class="meta-label">${escapeHtml(humanizeRunToken(key))}</span>
+            <div class="meta-value">${renderStepDetailValue(entryValue, depth + 1, key)}</div>
+          </div>
+        `;
+      }).join('')}
+    </div>
   `;
+}
+
+function renderStepDetailValue(value, depth = 0, key = '') {
+  if (!isStructuredValue(value)) {
+    return escapeHtml(renderReadableValue(value, key));
+  }
+
+  return renderHumanStepObject(value, depth);
 }
 
 function renderStepOutcomeDetails(step, detailKey, isOpen = false) {
@@ -379,7 +549,7 @@ function renderStepOutcomeDetails(step, detailKey, isOpen = false) {
   `;
 }
 
-function renderRunDetail(detail) {
+function renderRunDetail(detail, lanaClientUrl = '') {
   if (!detail) return `<div class="muted">No detail available.</div>`;
 
   const stepOutcomes = Array.isArray(detail.step_outcomes) ? detail.step_outcomes : [];
@@ -447,30 +617,32 @@ function renderRunDetail(detail) {
     ? drawerSection({
       title: 'Created Outputs',
       body: `
-        ${createdResources.slice(0, 50).map((resource) => `
-          <lex-card variant="flat" class="automation-detail-item">
-            <div class="ld-artifact-meta">
-              ${badge(formatLabel(resource.type || 'output'))}
-              <strong>${escapeHtml(resource.title || resource.id || 'Output')}</strong>
-            </div>
-            ${(resource.resource_type || resource.matter_name) ? `
-              <div class="muted">
-                ${resource.resource_type ? `Resource: ${escapeHtml(resource.resource_type)}` : ''}
-                ${resource.matter_name ? ` Matter: ${escapeHtml(resource.matter_name)}` : ''}
+        ${createdResources.slice(0, 50).map((resource) => {
+          const resourceUrl = getCreatedResourceUrl(resource, lanaClientUrl);
+          return `
+            <lex-card variant="flat" class="automation-detail-item">
+              <div class="ld-artifact-meta">
+                ${badge(formatLabel(resource.type || 'output'))}
+                <strong>${escapeHtml(resource.title || resource.id || 'Output')}</strong>
               </div>
-            ` : ''}
-            ${resource.url ? `
-              <div class="row-actions" style="margin-top:6px;">
-                <lex-btn
-                  as="a"
-                  variant="primary"
-                  size="sm"
-                  href="${escapeAttribute(resource.url)}"
-                >${escapeHtml(resource.type === 'task' ? 'Open Task' : 'Open Output')}</lex-btn>
-              </div>
-            ` : ''}
-          </lex-card>
-        `).join('')}
+              ${(resource.resource_type || resource.matter_name) ? `
+                <div class="muted">
+                  ${resource.resource_type ? `Resource: ${escapeHtml(resource.resource_type)}` : ''}
+                  ${resource.matter_name ? ` Matter: ${escapeHtml(resource.matter_name)}` : ''}
+                </div>
+              ` : ''}
+              ${resourceUrl ? `
+                <div class="row-actions" style="margin-top:6px;">
+                  <lex-btn
+                    variant="primary"
+                    size="sm"
+                    data-ld-open-created-resource="${escapeAttribute(resourceUrl)}"
+                  >${escapeHtml(resource.type === 'task' ? 'Open Task' : 'Open Output')}</lex-btn>
+                </div>
+              ` : ''}
+            </lex-card>
+          `;
+        }).join('')}
       `
     })
     : '';
@@ -536,12 +708,20 @@ function buildArtifactPreviewText(artifact) {
   }
 
   if (typeof artifact.inline_data_preview === 'string') {
+    const trimmed = artifact.inline_data_preview.trim();
+    if ((trimmed.startsWith('[') && trimmed.endsWith(']')) || (trimmed.startsWith('{') && trimmed.endsWith('}'))) {
+      try {
+        return buildReadableArtifactPreview(JSON.parse(trimmed));
+      } catch (_err) {
+        return artifact.inline_data_preview;
+      }
+    }
     return artifact.inline_data_preview;
   }
 
   const rawPreview = artifact.inline_data_preview ?? artifact.preview ?? null;
   if (rawPreview && typeof rawPreview === 'object') {
-    return JSON.stringify(rawPreview);
+    return buildReadableArtifactPreview(rawPreview);
   }
 
   if (typeof rawPreview === 'number' || typeof rawPreview === 'boolean') {
@@ -549,6 +729,28 @@ function buildArtifactPreviewText(artifact) {
   }
 
   return '';
+}
+
+function buildReadableArtifactPreview(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => humanizeRunToken(item))
+      .filter(Boolean)
+      .join(' · ');
+  }
+
+  if (!value || typeof value !== 'object') {
+    return renderReadableValue(value);
+  }
+
+  return Object.entries(value)
+    .filter(([key, itemValue]) => !shouldHideStepDetailKey(key, itemValue, 1))
+    .slice(0, 8)
+    .map(([key, itemValue]) => {
+      if (isStructuredValue(itemValue)) return humanizeRunToken(key);
+      return `${humanizeRunToken(key)}: ${renderReadableValue(itemValue, key)}`;
+    })
+    .join(' · ');
 }
 
 function normalizeRedlineChangeText(value) {
@@ -984,8 +1186,13 @@ function renderChangeSummaryView(changes, artifact) {
 function renderArtifactRow(artifact) {
   const id = artifact.artifact_id || artifact.id || '';
   const preview = truncate(buildArtifactPreviewText(artifact), 500);
+  const workspaceUrl = artifact.workspace_url || getCreatedResourceUrl({
+    type: 'artifact',
+    id,
+    matter_id: artifact.client_matter_id || artifact.matter_id || ''
+  }, '');
   return `
-    <div class="ld-artifact-row">
+    <lex-card variant="flat" class="automation-detail-item ld-artifact-card">
       <div class="ld-artifact-meta">
         <strong>${escapeHtml(artifact.artifact_name || artifact.name || 'Artifact')}</strong>
         ${badge(formatLabel(artifact.artifact_type || artifact.type || 'output'))}
@@ -995,11 +1202,12 @@ function renderArtifactRow(artifact) {
       ${preview ? `<div class="ld-artifact-preview muted">${escapeHtml(preview)}</div>` : ''}
       <div class="row-actions" style="margin-top:6px;">
         ${id ? `
+          <lex-btn variant="primary" size="sm" data-ld-artifact-view="${escapeAttribute(id)}">View Artifact</lex-btn>
+          ${workspaceUrl ? `<lex-btn variant="secondary" size="sm" data-ld-open-created-resource="${escapeAttribute(workspaceUrl)}">Open in Workspace</lex-btn>` : ''}
           <lex-btn variant="secondary" size="sm" data-ld-artifact-download="${escapeAttribute(id)}">Download</lex-btn>
-          <lex-btn variant="ghost" size="sm" data-ld-artifact-view="${escapeAttribute(id)}">View</lex-btn>
         ` : ''}
       </div>
-    </div>
+    </lex-card>
   `;
 }
 
@@ -1023,7 +1231,7 @@ function renderRunsTab(context) {
       if (isExpanded && expandedDetail) {
         return rowHtml.replace(
           '<div class="ld-run-loading muted">Loading run detail…</div>',
-          renderRunDetail(expandedDetail)
+          renderRunDetail(expandedDetail, lanaClientUrl)
         );
       }
       return rowHtml;
@@ -1749,6 +1957,13 @@ export async function handleLibraryDetailClick(context, event) {
     return true;
   }
 
+  const openResourceEl = event.target.closest('[data-ld-open-created-resource]');
+  if (openResourceEl) {
+    const resourceUrl = openResourceEl.dataset.ldOpenCreatedResource || '';
+    openCreatedResourceUrl(resourceUrl);
+    return true;
+  }
+
   const toggleRunEl = event.target.closest('[data-ld-toggle-run]');
   if (toggleRunEl) {
     const runId = toggleRunEl.dataset.ldToggleRun;
@@ -1949,7 +2164,7 @@ export async function handleLibraryDetailClick(context, event) {
   if (downloadEl) {
     const artifactId = downloadEl.dataset.ldArtifactDownload;
     if (artifactId) {
-      window.open(`/api/v1/automation/artifacts/${encodeURIComponent(artifactId)}/download`, '_blank', 'noopener,noreferrer');
+      window.open(getApiUrl(`/api/v1/automation/artifacts/${encodeURIComponent(artifactId)}/download`), '_blank', 'noopener,noreferrer');
     }
     return true;
   }
@@ -2229,7 +2444,7 @@ export function openRunStream(context, automationId) {
 
   const { authHeaders, state, renderCurrentView } = context;
   const token = (authHeaders()['Authorization'] || '').replace('Bearer ', '');
-  const url = `/api/v1/automations/executions/stream?automationId=${encodeURIComponent(automationId)}&token=${encodeURIComponent(token)}`;
+  const url = getApiUrl(`/api/v1/automations/executions/stream?automationId=${encodeURIComponent(automationId)}&token=${encodeURIComponent(token)}`);
 
   function startPollingFallback() {
     _runStreamPollFallback = setInterval(async () => {

@@ -1,25 +1,13 @@
 import { badge, hydrateLexDataTable, lexDataTable, sectionIntro, surface } from '../shared/ui.js';
-import { escapeAttribute } from '../shared/utils.js';
+import { escapeAttribute, formatDateTime, getOrganizationTimezone } from '../shared/utils.js';
 
 const SORT_FIELDS = {
   'created_at': (a) => new Date(a.created_at || 0).getTime(),
   'updated_at': (a) => new Date(a.updated_at || 0).getTime(),
+  'last_executed_at': (a) => new Date(a.last_executed_at || 0).getTime(),
   'automation_name': (a) => String(a.automation_name || '').toLowerCase(),
   'category': (a) => String(a.category || '').toLowerCase()
 };
-
-function formatTableDateTime(value) {
-  if (!value) return 'Unknown';
-
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) return 'Unknown';
-
-  const pad = (part) => String(part).padStart(2, '0');
-  return [
-    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
-    `${pad(date.getHours())}:${pad(date.getMinutes())}`
-  ].join(' ');
-}
 
 function normalizeScopeType(value) {
   const normalized = String(value || '').trim().toLowerCase();
@@ -179,6 +167,7 @@ export async function toggleAutomation(context, automationId, isEnabled) {
 export function renderLibrary(context) {
   const isLoading = Boolean(context.state.libraryLoading);
   const templateLibrary = context.getTemplateLibrary();
+  const timeZone = getOrganizationTimezone(context);
   const automationRows = sortAutomations(context.state.automations, { sortBy: 'updated_at', sortDir: 'desc' }).map((automation) => ({
     automation_id: automation.automation_id || '',
     automation_name: automation.automation_name || 'Unnamed automation',
@@ -188,7 +177,8 @@ export function renderLibrary(context) {
     scope: scopeLabel(automation),
     visibility: automation.visibility === 'org_wide' ? 'Org-Wide' : 'Private',
     state: automation.is_enabled ? 'active' : 'inactive',
-    updated_at: formatTableDateTime(automation.updated_at || automation.created_at),
+    last_executed_at: formatDateTime(automation.last_executed_at, { timeZone }),
+    updated_at: formatDateTime(automation.updated_at || automation.created_at, { timeZone }),
     created_at: automation.created_at || ''
   }));
 
@@ -211,7 +201,7 @@ export function renderLibrary(context) {
           <div class="template-carousel-track">
             ${templateLibrary.map((template) => `
             <lex-action-card
-              class="template-carousel-card ${template.id === context.state.builder.templateId ? 'selected' : ''}"
+              class="template-carousel-card"
               title="${escapeAttribute(template.name)}"
               description="${escapeAttribute(template.description || '')}"
               tag="${escapeAttribute(template.category || template.trigger || 'Template')}"
@@ -235,8 +225,8 @@ export function renderLibrary(context) {
           `
           : lexDataTable({
             id: 'libraryAutomationsTable',
-            columns: ['automation_name', 'category', 'automation_type', 'scope', 'visibility', 'state', 'updated_at'],
-            labels: ['Name', 'Category', 'Type', 'Scope', 'Visibility', 'State', 'Updated'],
+            columns: ['automation_name', 'category', 'automation_type', 'scope', 'visibility', 'state', 'last_executed_at', 'updated_at'],
+            labels: ['Name', 'Category', 'Type', 'Scope', 'Visibility', 'State', 'Last Run', 'Updated'],
             emptyText: 'No live automations found',
             sortBy: 'updated_at',
             sortDir: 'desc',

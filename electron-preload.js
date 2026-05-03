@@ -134,8 +134,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
    * OAuth Code Exchange (Backend-based)
    * Exchanges authorization code for tokens via backend
    */
-  exchangeOAuthCode: (code, state, provider) =>
-    ipcRenderer.invoke('exchange-oauth-code', { code, state, provider })
+  exchangeOAuthCode: (code, state, provider, connectorId, redirectUri) =>
+    ipcRenderer.invoke('exchange-oauth-code', { code, state, provider, connectorId, redirectUri })
 });
 
 /**

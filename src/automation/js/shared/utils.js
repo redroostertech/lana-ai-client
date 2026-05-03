@@ -2,9 +2,76 @@ export function normalizeText(value) {
   return String(value || '').trim().toLowerCase();
 }
 
-export function formatDate(value) {
-  if (!value) return 'Unknown';
-  return new Date(value).toLocaleString();
+function readStoredUser() {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    return JSON.parse(localStorage.getItem('user') || 'null');
+  } catch (_error) {
+    return null;
+  }
+}
+
+function validTimezone(value) {
+  if (!value || typeof value !== 'string') return '';
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value }).format(new Date());
+    return value;
+  } catch (_error) {
+    return '';
+  }
+}
+
+export function getOrganizationTimezone(contextOrOptions = {}) {
+  const state = contextOrOptions?.state || contextOrOptions || {};
+  const profile = state.userProfile || {};
+  const storedUser = readStoredUser() || {};
+  const preferences = profile.preferences || storedUser.preferences || {};
+
+  return validTimezone(
+    contextOrOptions.timeZone
+    || contextOrOptions.timezone
+    || state.organizationTimezone
+    || profile.organization_timezone
+    || profile.organizationTimezone
+    || profile.timezone
+    || storedUser.organization_timezone
+    || storedUser.organizationTimezone
+    || storedUser.timezone
+    || preferences?.general?.timezone
+    || preferences?.timezone
+  ) || 'UTC';
+}
+
+function getDateParts(value, timeZone) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return null;
+
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).formatToParts(date);
+
+  return Object.fromEntries(parts.map((part) => [part.type, part.value]));
+}
+
+export function formatDateTime(value, contextOrOptions = {}) {
+  if (!value) return 'Never';
+  const timeZone = getOrganizationTimezone(contextOrOptions);
+  const parts = getDateParts(value, timeZone);
+  if (!parts) return 'Never';
+  const hour24 = parts.hour === '24' ? 0 : Number(parts.hour);
+  const hour12 = hour24 % 12 || 12;
+  const meridiem = hour24 >= 12 ? 'PM' : 'AM';
+  return `${Number(parts.month)}/${Number(parts.day)}/${parts.year} ${hour12}:${parts.minute} ${meridiem}`;
+}
+
+export function formatDate(value, contextOrOptions = {}) {
+  return formatDateTime(value, contextOrOptions);
 }
 
 export function escapeHtml(value) {
@@ -49,7 +116,7 @@ export function timeAgo(isoString) {
   if (diffHr < 24) return `${diffHr}h ago`;
   const diffDay = Math.floor(diffHr / 24);
   if (diffDay < 30) return `${diffDay}d ago`;
-  return new Date(isoString).toLocaleDateString();
+  return formatDate(isoString);
 }
 
 export function formatLabel(value) {

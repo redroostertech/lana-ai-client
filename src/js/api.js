@@ -1098,6 +1098,7 @@ class ApiClient {
       lastName: profile.last_name,
       organizationId: profile.org_id,
       organization_name: profile.organization_name,
+      organization_timezone: profile.organization_timezone,
       department_id: profile.department_id,
       department_name: profile.department_name,
       role_id: profile.role_id,
@@ -1106,7 +1107,8 @@ class ApiClient {
       status: profile.status,
       is_active: profile.is_active,
       last_login: profile.last_login,
-      created_at: profile.created_at
+      created_at: profile.created_at,
+      preferences: profile.preferences
     };
     
     // Update localStorage with full profile

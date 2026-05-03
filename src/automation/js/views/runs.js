@@ -8,7 +8,7 @@ import {
   sectionIntro,
   surface
 } from '../shared/ui.js';
-import { escapeAttribute, escapeHtml, formatDate, normalizeText } from '../shared/utils.js';
+import { escapeAttribute, escapeHtml, formatDate, formatDateTime, getOrganizationTimezone, normalizeText } from '../shared/utils.js';
 
 function statusClass(status) {
   const normalized = normalizeText(status);
@@ -130,6 +130,7 @@ function renderArtifactCard(artifact, context) {
   const preview = artifactPreviewText(artifact).replace(/\s+/g, ' ').trim();
   const isSelected = id && id === context.state.selectedRunArtifactId;
   const canView = Boolean(id);
+  const workspaceUrl = artifact.workspace_url || '';
   const type = artifactType(artifact);
   const meta = [
     type,
@@ -146,6 +147,7 @@ function renderArtifactCard(artifact, context) {
         </div>
         <div class="row-actions">
           ${canView ? `<lex-btn variant="${isSelected ? 'secondary' : 'ghost'}" size="sm" data-run-artifact-view="${escapeAttribute(id)}">View</lex-btn>` : ''}
+          ${workspaceUrl ? `<lex-btn variant="ghost" size="sm" data-run-artifact-open-workspace="${escapeAttribute(workspaceUrl)}">Open in Workspace</lex-btn>` : ''}
           ${canView ? `<lex-btn variant="ghost" size="sm" data-run-artifact-download="${escapeAttribute(id)}">Download</lex-btn>` : ''}
         </div>
       </div>
@@ -175,6 +177,7 @@ function renderSelectedArtifactPreview(context, artifacts) {
           ${selected?.file_size_bytes ? badge(formatBytes(selected.file_size_bytes)) : ''}
         </div>
         <div class="row-actions">
+          ${selected?.workspace_url ? `<lex-btn variant="secondary" size="sm" data-run-artifact-open-workspace="${escapeAttribute(selected.workspace_url)}">Open in Workspace</lex-btn>` : ''}
           ${selected?.download_url ? `<a href="${escapeAttribute(selected.download_url)}" target="_blank" rel="noopener noreferrer">Open in new window</a>` : ''}
           <lex-btn variant="ghost" size="sm" data-close-run-artifact-preview>Close</lex-btn>
         </div>
@@ -381,6 +384,7 @@ export function renderRuns(context) {
   const visibleCount = visibleRuns.length;
   const start = visibleCount ? offset + 1 : 0;
   const end = visibleCount ? offset + visibleCount : 0;
+  const timeZone = getOrganizationTimezone(context);
 
   const runRows = visibleRuns.map((run) => {
     const scope = runScope(run);
@@ -390,7 +394,7 @@ export function renderRuns(context) {
       scope: scope.label,
       matter_name: run.matter_name || run.client_matter_id || 'Org-wide',
       trigger_event_type: run.trigger_event_type || 'manual',
-      started_at: run.created_at || run.started_at || '',
+      started_at: formatDateTime(run.started_at || run.created_at, { timeZone }),
       status: normalizeText(run.status) || 'pending',
       duration: formatDuration(run.execution_duration_ms)
     };

@@ -542,6 +542,23 @@
       return map[lower] || 'lex-bg-neutral lex-text-neutral';
     }
 
+    _formatCellValue(col, value) {
+      if (value === null || value === undefined || value === '') return '';
+      const column = String(col || '').toLowerCase();
+      const looksLikeDateColumn = /(^|_)(created|updated|started|completed|expires|last_accessed|last_run|last_sync|executed|timestamp|date|time)(_|$)/.test(column)
+        || /(_at|_on|date|time|timestamp)$/.test(column);
+      if (!looksLikeDateColumn) return value;
+
+      const raw = value instanceof Date ? value.toISOString() : String(value);
+      const parsed = new Date(raw);
+      if (!Number.isFinite(parsed.getTime())) return value;
+
+      if (window.Lex?.Utils?.formatDateTime) {
+        return window.Lex.Utils.formatDateTime(raw);
+      }
+      return parsed.toLocaleString();
+    }
+
     _renderToolbar(data) {
       const hasSearch = this.searchable;
       const hasFilter = this.filterable;
@@ -796,7 +813,7 @@
         }
 
         columns.forEach(col => {
-          const val = row[col] ?? '';
+          const val = this._formatCellValue(col, row[col]);
           if (this._isStatusValue(val)) {
             html += `<td class="${cellPad}"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${this._statusBadgeClass(val)}">${this.escapeHtml(val)}</span></td>`;
           } else {

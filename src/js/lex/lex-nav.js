@@ -55,7 +55,7 @@
     'admin/user-details.html':                { userId: 'string' },
     'admin/session-details.html':             { sessionId: 'string' },
     'admin/roles_manager.html':               { id: 'string' },
-    'workspace-details.html':                 { id: 'string', tab: 'string', upload: 'string' },
+    'workspace-details.html':                 { id: 'string', tab: 'string', task: 'string', task_id: 'string', upload: 'string', open_file: 'string', artifact: 'string', activity: 'string' },
     'matters/timeline.html':                  { id: 'string' },
     'password-reset.html':                    { token: 'string' },
     'onboarding.html':                        { token: 'string' },

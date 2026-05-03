@@ -689,7 +689,7 @@ ipcMain.handle('create-oauth-state', async (event, { provider, connectorId, matt
  * OAuth Code Exchange - Backend-based
  * Exchanges authorization code for tokens via backend
  */
-ipcMain.handle('exchange-oauth-code', async (event, { code, state, provider }) => {
+ipcMain.handle('exchange-oauth-code', async (event, { code, state, provider, connectorId, redirectUri }) => {
   try {
     const savedServer = getSavedServer();
     if (!savedServer || !savedServer.serverUrl) {
@@ -713,7 +713,9 @@ ipcMain.handle('exchange-oauth-code', async (event, { code, state, provider }) =
       body: JSON.stringify({
         code,
         state,
-        provider
+        provider,
+        connectorId: connectorId || provider,
+        redirectUri: redirectUri || `${baseUrl}/api/v1/integrations/oauth/callback`
       })
     });
 
@@ -886,6 +888,7 @@ const handleOAuthCallback = (urlObj) => {
   const provider = params.get('provider');
   const code = params.get('code');
   const state = params.get('state');
+  const connectorId = params.get('connector_id') || params.get('connectorId');
   const error = params.get('error');
   const errorDescription = params.get('error_description');
 
@@ -897,6 +900,7 @@ const handleOAuthCallback = (urlObj) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('oauth-callback', {
         provider,
+        connector_id: connectorId,
         error: 'state_mismatch',
         error_description: 'OAuth state validation failed. Please try again.'
       });
@@ -910,6 +914,7 @@ const handleOAuthCallback = (urlObj) => {
     mainWindow.focus();
     mainWindow.webContents.send('oauth-callback', {
       provider,
+      connector_id: connectorId,
       code,
       state,
       error,

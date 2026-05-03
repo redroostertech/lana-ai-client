@@ -449,10 +449,10 @@ async function openDirectoryBrowser(config) {
  *
  * Flow:
  * 1. Create state token via backend (POST /api/v1/integrations/oauth/states)
- * 2. Build auth URL with redirect_uri=https://lanaai.io/lana-ai/oauth/callback
+ * 2. Build auth URL with the generic OAuth callback URL
  * 3. Open system browser to provider auth URL
  * 4. User authenticates with provider
- * 5. Provider redirects to lanaai.io bridge
+ * 5. Provider redirects to the configured callback bridge
  * 6. Bridge redirects to lana-ai://oauth/callback (deep link)
  * 7. Electron receives deep link, validates state, sends IPC to renderer
  * 8. Renderer receives callback, exchanges code via backend (POST /api/v1/integrations/oauth/exchange)
@@ -499,7 +499,7 @@ async function initiateOAuthFlow(provider, connectorId = null, matterId = null) 
       ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
     const redirectUri = isLocalOAuth
       ? 'http://localhost:8080/api/v1/integrations/oauth/callback'
-      : 'https://lanaai.io/lana-ai/oauth/callback';
+      : 'https://lanaai.io/oauth/callback';
 
     // Step 3: Build authorization URL with centralized redirect_uri
     // The backend will construct the full OAuth URL with provider-specific params
@@ -547,7 +547,9 @@ async function initiateOAuthFlow(provider, connectorId = null, matterId = null) 
         const exchangeResult = await window.electronAPI.exchangeOAuthCode(
           data.code,
           data.state,
-          data.provider || provider
+          data.provider || provider,
+          data.connector_id || connectorId,
+          redirectUri
         );
 
         cleanup();

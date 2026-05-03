@@ -40,6 +40,7 @@
   var customFieldValues = [];
   var _tabIndicatorInitialized = false;
   var _navContext = null;              // navigation context (source, conversationId, etc.)
+  var _pendingTaskDeepLinkId = null;
 
   // Document tab pagination/search state
   var _docPage = 1;
@@ -628,6 +629,7 @@
         break;
       case 'tasks':
         renderTasksTab(m.matter, m.tasks);
+        openPendingTaskDeepLink();
         break;
       case 'notes':
         renderNotesTab(m.matter);
@@ -3267,6 +3269,25 @@
     }
 
     renderKanbanBoard(matter.matter_id, currentTasksList);
+    openPendingTaskDeepLink();
+  }
+
+  function openPendingTaskDeepLink() {
+    if (!_pendingTaskDeepLinkId || !currentTasksList.length) return;
+
+    var requestedId = String(_pendingTaskDeepLinkId);
+    var task = currentTasksList.find(function (t) {
+      return String(t.id) === requestedId || String(t.task_id || '') === requestedId;
+    });
+
+    _pendingTaskDeepLinkId = null;
+    if (task) {
+      _timeouts.push(setTimeout(function () {
+        window.openTaskQuickView(task.id || task.task_id);
+      }, 50));
+    } else if (window.Lex && Lex.Toast) {
+      Lex.Toast.error('Task not found');
+    }
   }
 
   function renderKanbanBoard(matterId, allTasks) {
@@ -8630,6 +8651,7 @@
     var params = Lex.Nav.getParams();
     var matterId = params.get('id');
     var defaultTab = params.get('tab') || 'activity';
+    var requestedTaskId = params.get('task') || params.get('task_id') || null;
     var openFileId = params.get('open_file') || null;
     var uploadTarget = params.get('upload') || null;
 
@@ -8642,6 +8664,12 @@
       matterId = ctx.matterId;
       defaultTab = ctx.tab || defaultTab;
       uploadTarget = ctx.upload || uploadTarget;
+      requestedTaskId = ctx.taskId || ctx.task_id || requestedTaskId;
+    }
+
+    if (requestedTaskId) {
+      defaultTab = 'tasks';
+      _pendingTaskDeepLinkId = requestedTaskId;
     }
 
     // Fallback 2: check sessionStorage (persists across router timing gaps)

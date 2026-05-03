@@ -55,25 +55,73 @@
 
   // ── Date formatters ───────────────────────────────────────────────────
 
-  function formatDate(dateString, options) {
-    if (!dateString) return '-';
-    var defaults = { year: 'numeric', month: 'short', day: 'numeric' };
-    var merged = Object.assign({}, defaults);
-    if (options) {
-      var keys = Object.keys(options);
-      for (var i = 0; i < keys.length; i++) {
-        merged[keys[i]] = options[keys[i]];
-      }
+  function readStoredUser() {
+    try {
+      return JSON.parse(global.localStorage && global.localStorage.getItem('user') || 'null') || {};
+    } catch (_error) {
+      return {};
     }
-    return new Date(dateString).toLocaleDateString('en-US', merged);
   }
 
-  function formatDateTime(dateString) {
-    if (!dateString) return '-';
-    return new Date(dateString).toLocaleString('en-US', {
-      year: 'numeric', month: 'short', day: 'numeric',
-      hour: '2-digit', minute: '2-digit'
-    });
+  function validTimezone(value) {
+    if (!value || typeof value !== 'string') return '';
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: value }).format(new Date());
+      return value;
+    } catch (_error) {
+      return '';
+    }
+  }
+
+  function getOrganizationTimezone(options) {
+    var user = readStoredUser();
+    var preferences = user.preferences || {};
+    options = options || {};
+    return validTimezone(
+      options.timeZone
+      || options.timezone
+      || user.organization_timezone
+      || user.organizationTimezone
+      || user.timezone
+      || (preferences.general && preferences.general.timezone)
+      || preferences.timezone
+    ) || 'UTC';
+  }
+
+  function dateParts(dateString, options) {
+    var date = new Date(dateString);
+    if (!Number.isFinite(date.getTime())) return null;
+    var formatterOptions = {
+      timeZone: getOrganizationTimezone(options),
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    };
+    if (!options || options.includeTime !== false) {
+      formatterOptions.hour = '2-digit';
+      formatterOptions.minute = '2-digit';
+      formatterOptions.hour12 = false;
+    }
+    return Object.fromEntries(new Intl.DateTimeFormat('en-US', formatterOptions).formatToParts(date).map(function (part) {
+      return [part.type, part.value];
+    }));
+  }
+
+  function formatDate(dateString, options) {
+    if (!dateString) return 'Never';
+    var parts = dateParts(dateString, Object.assign({}, options || {}, { includeTime: false }));
+    if (!parts) return 'Never';
+    return Number(parts.month) + '/' + Number(parts.day) + '/' + parts.year;
+  }
+
+  function formatDateTime(dateString, options) {
+    if (!dateString) return 'Never';
+    var parts = dateParts(dateString, Object.assign({}, options || {}, { includeTime: true }));
+    if (!parts) return 'Never';
+    var hour24 = parts.hour === '24' ? 0 : Number(parts.hour);
+    var hour12 = hour24 % 12 || 12;
+    var meridiem = hour24 >= 12 ? 'PM' : 'AM';
+    return Number(parts.month) + '/' + Number(parts.day) + '/' + parts.year + ' ' + hour12 + ':' + parts.minute + ' ' + meridiem;
   }
 
   // ── Time ago ──────────────────────────────────────────────────────────
@@ -166,7 +214,7 @@
     if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Yesterday';
     if (diffDays < 7) return diffDays + ' days ago';
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return formatDate(dateString);
   }
 
   // ── File type label ─────────────────────────────────────────────────
@@ -272,6 +320,7 @@
     escapeHtml:         escapeHtml,
     decodeHtmlEntities: decodeHtmlEntities,
     formatFileSize:     formatFileSize,
+    getOrganizationTimezone: getOrganizationTimezone,
     formatDate:         formatDate,
     formatDateTime:     formatDateTime,
     formatRelativeDate: formatRelativeDate,
@@ -293,6 +342,7 @@
   global.timeAgo            = timeAgo;
   global.debounce           = debounce;
   global.formatFileSize     = formatFileSize;
+  global.getOrganizationTimezone = getOrganizationTimezone;
   global.formatPercentage   = formatPercentage;
   global.truncateText       = truncateText;
   global.statusBadge        = statusBadge;
