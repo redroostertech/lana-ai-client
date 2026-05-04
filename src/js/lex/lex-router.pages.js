@@ -99,6 +99,73 @@
       ]
     },
 
+    // ── Agents ──
+    'agents.html': {
+      title: 'Agents',
+      activeNav: 'agents',
+      scripts: [
+        // Lex components not globally loaded
+        'js/lex/components/foundation/lex-banner.js',
+        'js/lex/components/foundation/lex-card.js',
+        'js/lex/components/foundation/lex-empty.js',
+        'js/lex/components/foundation/lex-modal.js',
+        'js/lex/components/form/lex-segmented.js',
+        'js/lex/components/form/lex-textarea.js',
+        // Page controller (MUST be last)
+        'js/pages/agents.js'
+      ],
+      stylesheets: [
+        'css/agents.css'
+      ]
+    },
+
+    'agent-detail.html': {
+      title: 'Agent Detail',
+      activeNav: 'agents',
+      scripts: [
+        // Lex components not globally loaded
+        'js/lex/components/foundation/lex-banner.js',
+        'js/lex/components/foundation/lex-card.js',
+        'js/lex/components/foundation/lex-empty.js',
+        'js/lex/components/foundation/lex-tabs.js',
+        'js/lex/components/foundation/lex-kv.js',
+        'js/lex/components/foundation/lex-modal.js',
+        'js/lex/components/foundation/lex-drawer.js',
+        'js/lex/components/form/lex-input.js',
+        'js/lex/components/form/lex-textarea.js',
+        // Page controller (MUST be last)
+        'js/pages/agent-detail.js'
+      ],
+      stylesheets: [
+        'css/agent-detail.css'
+      ]
+    },
+
+    'agent-run.html': {
+      title: 'Agent Run',
+      activeNav: 'agents',
+      scripts: [
+        // Lex components not globally loaded
+        'js/lex/components/foundation/lex-card.js',
+        'js/lex/components/foundation/lex-empty.js',
+        'js/lex/components/foundation/lex-spinner.js',
+        // SchemaRegistry + BlockRenderer must precede block files
+        'js/lex/lex.ai.js',
+        // Plan card + diff blocks (used in artifact rendering)
+        'js/lex/blocks/reasoning-steps.block.js',
+        'js/lex/blocks/redline.block.js',
+        'js/lex/blocks/compare.block.js',
+        'js/lex/chat/lex-agentic-plan-card.js',
+        // Reuse existing agentic-ui handlers when available
+        'js/agentic-ui.js',
+        // Page controller (MUST be last)
+        'js/pages/agent-run.js'
+      ],
+      stylesheets: [
+        'css/agent-run.css'
+      ]
+    },
+
     // ── Settings ──
     'settings.html': {
       title: 'Settings',

@@ -730,7 +730,16 @@
         : [
             { id: 'dashboard', label: 'Dashboard', icon: 'home', href: 'dashboard.html' },
             { id: 'search', label: 'Search Conversations', icon: 'search', href: 'search-conversations.html' },
-            { id: 'workspaces', label: 'Workspaces', icon: 'briefcase', href: 'workspaces.html' }
+            { id: 'workspaces', label: 'Workspaces', icon: 'briefcase', href: 'workspaces.html' },
+            // Agents platform — Phase 1 surfaces.
+            // NOTE: brief requested icons 'cpu' and 'activity'; those are not in
+            // Lex.Icons (see js/lex/lex.icons.js). Using the closest registered
+            // icons ('bot', 'workflow') so the nav still renders. Phase 2 should
+            // either add the requested glyphs to Lex.Icons or accept the fallback.
+            { id: 'agents', label: 'Agents', icon: 'bot', href: 'agents.html' },
+            // TODO(Phase 2): repoint this to a renamed agent-runs.html page.
+            // For now the backend keeps the agentic-tasks.html alias working.
+            { id: 'agent-runs', label: 'Activity', icon: 'workflow', href: 'agentic-tasks.html' }
           ];
 
       const sections = [
