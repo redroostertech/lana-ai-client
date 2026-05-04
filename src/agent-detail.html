@@ -1,0 +1,146 @@
+<!-- Agent Detail — agent profile with Capabilities / Runs / Stats tabs.
+     Reads ?slug=<slug> from URL. Loads GET /api/v1/agents/:slug for the
+     profile and GET /api/v1/agent-runs?agent_slug=<slug> for the run list.
+     Configure button opens a placeholder drawer (Phase 4 will wire this). -->
+
+<div id="lex-page-content">
+  <main class="agent-detail-page-container">
+
+    <!-- Banner header -->
+    <lex-banner
+      id="agentDetailBanner"
+      variant="dark"
+      corners
+      heading="Agent"
+      subtitle="Loading agent profile..."
+      icon="A"
+    >
+      <lex-btn id="agentDetailRunBtn" variant="primary" icon="play">Run</lex-btn>
+      <lex-btn id="agentDetailConfigBtn" variant="secondary" icon="settings">Configure</lex-btn>
+    </lex-banner>
+
+    <!-- Tabs -->
+    <div class="agent-detail-tabs-bar">
+      <lex-tabs
+        id="agentDetailTabs"
+        active="capabilities"
+        variant="underline"
+        tabs='[{"id":"capabilities","label":"Capabilities","icon":"layers"},{"id":"runs","label":"Runs","icon":"workflow"},{"id":"stats","label":"Stats","icon":"bar-chart-2"}]'
+      ></lex-tabs>
+    </div>
+
+    <!-- Capabilities panel -->
+    <section id="agentPanelCapabilities" class="agent-detail-panel">
+      <div id="agentPanelCapabilitiesLoading" class="agent-detail-loading">
+        <lex-spinner size="sm"></lex-spinner>
+        <span>Loading capabilities...</span>
+      </div>
+
+      <div id="agentPanelCapabilitiesContent" class="hidden">
+        <lex-card heading="About" padding="normal">
+          <p id="agentDetailDescription" class="agent-detail-description">
+            (description)
+          </p>
+        </lex-card>
+
+        <lex-card heading="Allowed Tools" padding="normal">
+          <div id="agentDetailToolsList" class="agent-detail-chip-list">
+            <span class="agent-detail-empty-text">No tools configured.</span>
+          </div>
+        </lex-card>
+
+        <lex-card heading="Delegation" padding="normal">
+          <div id="agentDetailDelegationList" class="agent-detail-chip-list">
+            <span class="agent-detail-empty-text">No sub-agents.</span>
+          </div>
+        </lex-card>
+
+        <lex-card heading="Model" padding="normal">
+          <lex-kv id="agentDetailModelKv" label="Model slot" value="-"></lex-kv>
+        </lex-card>
+
+        <lex-card heading="Approval Policy" padding="normal">
+          <p id="agentDetailApprovalPolicy" class="agent-detail-description">
+            -
+          </p>
+        </lex-card>
+      </div>
+    </section>
+
+    <!-- Runs panel -->
+    <section id="agentPanelRuns" class="agent-detail-panel hidden">
+      <lex-card padding="none">
+        <div class="agent-detail-runs-header">
+          <span class="agent-detail-runs-title">Recent Runs</span>
+          <span id="agentDetailRunsCount" class="agent-detail-runs-count"></span>
+        </div>
+        <div id="agentDetailRunsLoading" class="agent-detail-loading">
+          <lex-spinner size="sm"></lex-spinner>
+          <span>Loading runs...</span>
+        </div>
+        <div id="agentDetailRunsList"></div>
+        <div id="agentDetailRunsEmpty" class="hidden agent-detail-runs-empty">
+          <lex-empty
+            icon="workflow"
+            message="No runs yet"
+            description="Runs of this agent will appear here."
+          ></lex-empty>
+        </div>
+      </lex-card>
+    </section>
+
+    <!-- Stats panel (placeholder) -->
+    <section id="agentPanelStats" class="agent-detail-panel hidden">
+      <!-- TODO(Phase 4): populate stats from /api/v1/agents/:slug/stats once available. -->
+      <lex-card heading="Stats" subtitle="Coming in Phase 4" padding="normal">
+        <p class="agent-detail-description">
+          Run counts, success rate, average duration, and per-step timing will
+          appear here once the stats endpoint lands.
+        </p>
+      </lex-card>
+    </section>
+
+    <!-- Configure drawer (Phase-4 placeholder) -->
+    <lex-drawer
+      id="agentDetailConfigDrawer"
+      heading="Configure Agent"
+      side="right"
+      width="480px"
+      show-footer
+      confirm-text="Save"
+      cancel-text="Close"
+      data-hoist
+    >
+      <div class="agent-detail-config-body">
+        <p class="agent-detail-config-notice">
+          <strong>Coming soon.</strong>
+          A template-driven configuration form will be available here in Phase 4.
+        </p>
+        <lex-input id="agentConfigName" label="Display name" disabled placeholder="(disabled)"></lex-input>
+        <lex-textarea
+          id="agentConfigDescription"
+          label="Description"
+          rows="3"
+          disabled
+          placeholder="(disabled)"
+        ></lex-textarea>
+      </div>
+    </lex-drawer>
+
+    <!-- Run modal -->
+    <lex-modal id="agentDetailRunModal" heading="Run Agent" size="md" data-hoist>
+      <div class="agent-detail-run-modal-body">
+        <p class="agent-detail-config-notice">
+          Provide a brief input describing what the agent should do.
+        </p>
+        <lex-textarea
+          id="agentDetailRunInput"
+          label="Input"
+          rows="4"
+          placeholder="Describe the task..."
+        ></lex-textarea>
+      </div>
+    </lex-modal>
+
+  </main>
+</div>

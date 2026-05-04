@@ -1,0 +1,168 @@
+/* agents.css — Agents catalog page.
+   Scoped under .agents-page-container so other pages are not affected.
+   Uses Lex tokens exclusively (see src/css/lex-tokens.css).
+*/
+
+.agents-page-container {
+  padding: 24px 0;
+}
+
+.agents-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+/* Grid */
+.agents-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+/* Card */
+.agents-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.agents-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--lex-shadow-md, 0 4px 8px rgba(0,0,0,0.06));
+}
+
+.agents-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.agents-card-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--lex-radius-md, 8px);
+  background: var(--lex-bg-accent-soft, rgba(37, 99, 235, 0.08));
+  color: var(--lex-text-accent, #2563eb);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 600;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+.agents-card-title-block {
+  flex: 1;
+  min-width: 0;
+}
+
+.agents-card-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--lex-text-primary);
+  margin: 0;
+  word-break: break-word;
+}
+
+.agents-card-slug {
+  font-size: 0.6875rem;
+  color: var(--lex-text-tertiary);
+  font-family: var(--lex-font-mono, ui-monospace, SFMono-Regular, monospace);
+  margin-top: 2px;
+}
+
+.agents-card-kind-badge {
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: var(--lex-radius-sm, 4px);
+  background: var(--lex-bg-tertiary);
+  color: var(--lex-text-secondary);
+  flex-shrink: 0;
+}
+
+.agents-card-kind-badge--system {
+  background: var(--lex-status-info-bg, rgba(59, 130, 246, 0.1));
+  color: var(--lex-status-info-text, #2563eb);
+}
+
+.agents-card-kind-badge--custom {
+  background: var(--lex-status-success-bg, rgba(16, 185, 129, 0.1));
+  color: var(--lex-status-success-text, #16a34a);
+}
+
+.agents-card-description {
+  font-size: 0.8125rem;
+  color: var(--lex-text-secondary);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.agents-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--lex-border-subtle);
+}
+
+/* Skeleton */
+.agents-card-skeleton {
+  background: var(--lex-bg-primary);
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: var(--lex-radius-lg, 8px);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 180px;
+}
+
+.agents-skeleton-line {
+  background: var(--lex-bg-tertiary);
+  border-radius: 4px;
+  animation: agents-skeleton-shimmer 1.6s infinite linear;
+}
+
+.agents-skeleton-line--avatar { width: 40px; height: 40px; border-radius: 8px; }
+.agents-skeleton-line--title  { width: 60%; height: 16px; }
+.agents-skeleton-line--text   { width: 90%; height: 12px; }
+.agents-skeleton-line--text-short { width: 70%; height: 12px; }
+
+@keyframes agents-skeleton-shimmer {
+  0%   { opacity: 0.6; }
+  50%  { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+/* Run modal */
+.agents-run-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.agents-run-modal-text {
+  font-size: 0.8125rem;
+  color: var(--lex-text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Utility */
+.hidden {
+  display: none !important;
+}

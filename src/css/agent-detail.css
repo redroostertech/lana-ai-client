@@ -1,0 +1,179 @@
+/* agent-detail.css — Agent profile page (Capabilities / Runs / Stats).
+   Scoped under .agent-detail-page-container.
+*/
+
+.agent-detail-page-container {
+  padding: 24px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.agent-detail-tabs-bar {
+  border-bottom: 1px solid var(--lex-border-subtle);
+}
+
+.agent-detail-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.agent-detail-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 24px;
+  font-size: 0.8125rem;
+  color: var(--lex-text-tertiary);
+}
+
+.agent-detail-description {
+  font-size: 0.8125rem;
+  color: var(--lex-text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Chip list — used for tool names and delegations */
+.agent-detail-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.agent-detail-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--lex-text-secondary);
+  background: var(--lex-bg-tertiary);
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: var(--lex-radius-full, 9999px);
+  font-family: var(--lex-font-mono, ui-monospace, SFMono-Regular, monospace);
+}
+
+.agent-detail-chip--accent {
+  color: var(--lex-text-accent, #2563eb);
+  background: var(--lex-bg-accent-soft, rgba(37, 99, 235, 0.08));
+  border-color: var(--lex-bg-accent-soft, rgba(37, 99, 235, 0.16));
+}
+
+.agent-detail-empty-text {
+  font-size: 0.8125rem;
+  color: var(--lex-text-tertiary);
+  font-style: italic;
+}
+
+/* Runs table */
+.agent-detail-runs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--lex-border-subtle);
+}
+
+.agent-detail-runs-title {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--lex-text-tertiary);
+}
+
+.agent-detail-runs-count {
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+}
+
+.agent-detail-runs-empty {
+  padding: 24px;
+}
+
+.agent-detail-run-row {
+  display: grid;
+  grid-template-columns: 12px 1fr auto auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--lex-border-subtle);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.agent-detail-run-row:hover {
+  background: var(--lex-bg-secondary);
+}
+
+.agent-detail-run-row:last-child {
+  border-bottom: none;
+}
+
+.agent-detail-run-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.agent-detail-run-title {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--lex-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-detail-run-status {
+  font-size: 0.75rem;
+  color: var(--lex-text-secondary);
+}
+
+.agent-detail-run-priority {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: var(--lex-radius-sm, 4px);
+  color: #fff;
+}
+
+.agent-detail-run-priority--urgent { background: #ef4444; }
+.agent-detail-run-priority--high   { background: #f59e0b; }
+.agent-detail-run-priority--medium { background: #3b82f6; }
+.agent-detail-run-priority--low    { background: #6b7280; }
+
+.agent-detail-run-time {
+  font-size: 0.6875rem;
+  color: var(--lex-text-tertiary);
+  white-space: nowrap;
+}
+
+/* Configure drawer + run modal */
+.agent-detail-config-body,
+.agent-detail-run-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.agent-detail-config-notice {
+  font-size: 0.8125rem;
+  color: var(--lex-text-secondary);
+  line-height: 1.5;
+  background: var(--lex-status-info-bg, rgba(59, 130, 246, 0.06));
+  border: 1px solid var(--lex-status-info-border, rgba(59, 130, 246, 0.18));
+  padding: 12px;
+  border-radius: var(--lex-radius-md, 6px);
+  margin: 0;
+}
+
+.hidden {
+  display: none !important;
+}

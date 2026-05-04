@@ -1,0 +1,78 @@
+<!-- Agents Catalog — browse system + custom agent definitions.
+     Phase-1 of the agents platform UI. Loads from GET /api/v1/agents,
+     renders a filterable grid of agent cards, click-through to
+     agent-detail.html?slug=<slug>. -->
+
+<div id="lex-page-content">
+  <main class="agents-page-container">
+
+    <!-- Page banner -->
+    <lex-banner
+      id="agentsBanner"
+      variant="dark"
+      corners
+      heading="Agents"
+      subtitle="Browse and configure system and custom agents"
+      icon="A"
+    ></lex-banner>
+
+    <!-- Filter tabs -->
+    <div class="agents-filter-bar">
+      <lex-segmented
+        id="agentsFilterTabs"
+        value="all"
+        options='[{"value":"all","label":"All"},{"value":"system","label":"System"},{"value":"custom","label":"Custom"}]'
+      ></lex-segmented>
+    </div>
+
+    <!-- Loading skeleton -->
+    <div id="agentsLoading" class="agents-grid">
+      <div class="agents-card-skeleton" aria-hidden="true">
+        <div class="agents-skeleton-line agents-skeleton-line--avatar"></div>
+        <div class="agents-skeleton-line agents-skeleton-line--title"></div>
+        <div class="agents-skeleton-line agents-skeleton-line--text"></div>
+        <div class="agents-skeleton-line agents-skeleton-line--text-short"></div>
+      </div>
+      <div class="agents-card-skeleton" aria-hidden="true">
+        <div class="agents-skeleton-line agents-skeleton-line--avatar"></div>
+        <div class="agents-skeleton-line agents-skeleton-line--title"></div>
+        <div class="agents-skeleton-line agents-skeleton-line--text"></div>
+        <div class="agents-skeleton-line agents-skeleton-line--text-short"></div>
+      </div>
+      <div class="agents-card-skeleton" aria-hidden="true">
+        <div class="agents-skeleton-line agents-skeleton-line--avatar"></div>
+        <div class="agents-skeleton-line agents-skeleton-line--title"></div>
+        <div class="agents-skeleton-line agents-skeleton-line--text"></div>
+        <div class="agents-skeleton-line agents-skeleton-line--text-short"></div>
+      </div>
+    </div>
+
+    <!-- Agent grid (populated dynamically) -->
+    <div id="agentsGrid" class="agents-grid hidden"></div>
+
+    <!-- Empty state -->
+    <div id="agentsEmpty" class="hidden">
+      <lex-empty
+        icon="bot"
+        message="No agents yet"
+        description="Agent definitions will appear here once they are configured."
+      ></lex-empty>
+    </div>
+
+    <!-- Run modal placeholder (Phase 4 will replace with template-driven form) -->
+    <lex-modal id="agentsRunModal" heading="Run Agent" size="md" data-hoist>
+      <div class="agents-run-modal-body">
+        <p class="agents-run-modal-text">
+          Provide a brief input describing what the agent should do.
+        </p>
+        <lex-textarea
+          id="agentsRunInput"
+          label="Input"
+          rows="4"
+          placeholder="Describe the task you want this agent to perform..."
+        ></lex-textarea>
+      </div>
+    </lex-modal>
+
+  </main>
+</div>
