@@ -111,6 +111,9 @@
         'js/lex/components/foundation/lex-modal.js',
         'js/lex/components/form/lex-segmented.js',
         'js/lex/components/form/lex-textarea.js',
+        'js/lex/components/form/lex-select.js',
+        'js/lex/components/form/lex-checkbox.js',
+        'js/lex/components/form/lex-toggle.js',
         // Page controller (MUST be last)
         'js/pages/agents.js'
       ],
@@ -129,10 +132,14 @@
         'js/lex/components/foundation/lex-empty.js',
         'js/lex/components/foundation/lex-tabs.js',
         'js/lex/components/foundation/lex-kv.js',
+        'js/lex/components/foundation/lex-metric.js',
         'js/lex/components/foundation/lex-modal.js',
         'js/lex/components/foundation/lex-drawer.js',
         'js/lex/components/form/lex-input.js',
         'js/lex/components/form/lex-textarea.js',
+        'js/lex/components/form/lex-select.js',
+        'js/lex/components/form/lex-checkbox.js',
+        'js/lex/components/form/lex-toggle.js',
         // Page controller (MUST be last)
         'js/pages/agent-detail.js'
       ],

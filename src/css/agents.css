@@ -162,6 +162,131 @@
   line-height: 1.5;
 }
 
+/* Create-from-template modal */
+.agents-create-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 4px 8px;
+}
+
+.agents-create-modal-help {
+  font-size: 0.8125rem;
+  color: var(--lex-text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.agents-create-preview {
+  background: var(--lex-bg-secondary);
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: var(--lex-radius-md, 8px);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.agents-create-preview-row {
+  display: flex;
+  gap: 8px;
+  font-size: 0.75rem;
+}
+
+.agents-create-preview-label {
+  color: var(--lex-text-tertiary);
+  flex-shrink: 0;
+  width: 84px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+.agents-create-preview-value {
+  color: var(--lex-text-primary);
+  word-break: break-word;
+}
+
+.agents-create-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agents-create-section-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--lex-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.agents-create-section-hint {
+  display: block;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
+.agents-create-tools-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: var(--lex-radius-md, 8px);
+  padding: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--lex-bg-primary);
+}
+
+.agents-create-tool-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 0.8125rem;
+  color: var(--lex-text-primary);
+  cursor: pointer;
+  border-radius: var(--lex-radius-sm, 4px);
+}
+
+.agents-create-tool-row:hover {
+  background: var(--lex-bg-secondary);
+}
+
+.agents-create-tool-checkbox {
+  margin: 0;
+  cursor: pointer;
+}
+
+.agents-create-tool-name {
+  font-family: var(--lex-font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 0.75rem;
+  color: var(--lex-text-secondary);
+}
+
+.agents-create-empty-text {
+  font-size: 0.8125rem;
+  color: var(--lex-text-tertiary);
+  font-style: italic;
+  padding: 6px 8px;
+}
+
+.agents-create-schedule-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: var(--lex-bg-secondary);
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: var(--lex-radius-md, 8px);
+}
+
 /* Utility */
 .hidden {
   display: none !important;
