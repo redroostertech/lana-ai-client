@@ -1769,7 +1769,7 @@
           try {
             var d = new Date(out.created_at);
             if (!isNaN(d.getTime())) {
-              out.created_at = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+              out.created_at = formatDateLong(out.created_at, { month: 'short' });
             }
           } catch (e) { /* keep raw value */ }
         }
@@ -3010,8 +3010,7 @@
 
   function formatDate(dateString) {
     if (!dateString) return 'N/A';
-    var date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    return formatDateLong(dateString, { month: 'short' });
   }
 
   function escapeHtml(text) {

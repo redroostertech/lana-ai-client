@@ -237,7 +237,7 @@ const ArticleSystem = (function() {
       const months = Math.floor(diffDays / 30);
       return `${months} month${months === 1 ? '' : 's'} ago`;
     } else {
-      return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      return Lex.Utils.formatDateLong(dateString);
     }
   }
 

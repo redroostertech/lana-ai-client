@@ -84,10 +84,7 @@
     if (!dateStr) return 'N/A';
     var date = new Date(dateStr);
     if (isNaN(date.getTime())) return 'N/A';
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric', month: 'short', day: 'numeric',
-      hour: '2-digit', minute: '2-digit'
-    });
+    return formatDateTime(dateStr);
   }
 
   // NO-REGEX version of formatFieldName
@@ -1135,7 +1132,7 @@
     var groupedActivities = {};
     for (var ai = 0; ai < activities.length; ai++) {
       var activity = activities[ai];
-      var dateLabel = new Date(activity.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      var dateLabel = formatDateLong(activity.created_at);
       if (!groupedActivities[dateLabel]) {
         groupedActivities[dateLabel] = [];
       }
@@ -3241,7 +3238,7 @@
     } else if (diffDays <= 7) {
       return '<span class="text-yellow-600">Due in ' + diffDays + ' days</span>';
     } else {
-      return date.toLocaleDateString();
+      return Lex.Utils.formatDate(dateString);
     }
   }
 
@@ -4190,7 +4187,7 @@
     var linkedName = link.linked_name || 'Unknown';
     var linkedId = link.linked_entity_id;
     var linkId = link.link_id;
-    var createdAt = link.created_at ? new Date(link.created_at).toLocaleDateString() : '';
+    var createdAt = link.created_at ? Lex.Utils.formatDate(link.created_at) : '';
     var createdBy = link.created_by_name || link.created_by_email || '';
     var canDelete = !isReadOnly && linkId && linkId !== 'null' && linkId !== 'undefined';
 

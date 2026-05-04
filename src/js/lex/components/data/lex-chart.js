@@ -306,7 +306,7 @@
             var val = d[actualLabelKey];
             // Format date strings
             if (typeof val === 'string' && val.indexOf('T') !== -1) {
-              return new Date(val).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+              return new Date(val).toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: Lex.Utils.getOrganizationTimezone() });
             }
             return val;
           }),

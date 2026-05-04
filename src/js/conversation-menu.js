@@ -420,7 +420,7 @@ const ConversationMenu = {
     if (diffHours < 24) return `${diffHours}h`;
     if (diffDays < 7) return `${diffDays}d`;
 
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return formatDateLong(dateString, { month: 'short' });
   },
 
   /**

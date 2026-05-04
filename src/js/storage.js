@@ -1957,7 +1957,7 @@ function formatDate(dateString) {
   if (diffDays === 1) return 'Yesterday';
   if (diffDays < 7) return `${diffDays} days ago`;
 
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return Lex.Utils.formatDateLong(dateString, { month: 'short' });
 }
 
 function getFileIcon(filename) {
@@ -2152,7 +2152,7 @@ function renderFileCardInRecents(file) {
   const fileName = escapeHtml(file.filename || file.name);
   const fileSize = formatFileSize(file.file_size || 0);
   const fileIcon = getFileIconSVG(file.content_type);
-  const lastAccessed = file.last_accessed_at ? new Date(file.last_accessed_at).toLocaleDateString() : '';
+  const lastAccessed = file.last_accessed_at ? Lex.Utils.formatDate(file.last_accessed_at) : '';
 
   return `
     <div class="file-card bg-white rounded-lg shadow-sm border border-gray-200 p-4 cursor-pointer relative group hover:shadow-md transition-shadow"
@@ -2228,7 +2228,7 @@ function renderMatterCard(matter, isPinned = false) {
   const matterNumber = escapeHtml(matter.matter_id || '');
   const docCount = matter.document_count || 0;
   const folderCount = matter.folder_count || matter.child_folder_count || 0;
-  const lastModified = matter.updated_at ? new Date(matter.updated_at).toLocaleDateString() : '';
+  const lastModified = matter.updated_at ? Lex.Utils.formatDate(matter.updated_at) : '';
 
   // Create a unique data object for the context menu
   const folderData = {

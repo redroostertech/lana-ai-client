@@ -203,7 +203,7 @@
         _traceId: t.trace_id,
         _status: t.status,
         _chatMode: t.chat_mode,
-        timestamp: fmtDateTime ? fmtDateTime(t.request_timestamp) : new Date(t.request_timestamp).toLocaleString(),
+        timestamp: fmtDateTime ? fmtDateTime(t.request_timestamp) : formatDateTime(t.request_timestamp),
         user_message: truncate(t.user_message || 'N/A', 80),
         chat_mode: t.chat_mode || 'N/A',
         status: (t.status || 'unknown').toUpperCase(),

@@ -1,5 +1,5 @@
 import { badge, drawerSection, emptyState, lexEmpty, metaGrid, surface } from '../shared/ui.js';
-import { escapeAttribute, escapeHtml, formatDate, formatLabel, timeAgo } from '../shared/utils.js';
+import { escapeAttribute, escapeHtml, formatDate, formatLabel, getOrganizationTimezone, timeAgo } from '../shared/utils.js';
 import { describeStep, humanizeTrigger, humanizeWhen } from '../shared/step-humanizer.js';
 import { getApiUrl } from '../shared/api-base-url.js';
 
@@ -1839,6 +1839,7 @@ export function renderLibraryDetail(context) {
   const scopeMetaValue = automationScope.type === 'matter'
     ? renderMatterLink(context.state.links?.lana_client_url || '', automationScope.matterId, automationScope.matterName || automationScope.matterId, { prefix: 'Matter: ' })
     : escapeHtml(automationScope.label);
+  const timeZone = getOrganizationTimezone(context);
 
   const tabContent = activeTab === 'steps'
     ? renderStepsTab(automation)
@@ -1885,8 +1886,8 @@ export function renderLibraryDetail(context) {
 
       <div class="ld-meta-row">
         ${metaGrid([
-          { label: 'Created', value: formatDate(automation.created_at) },
-          { label: 'Updated', value: formatDate(automation.updated_at) },
+          { label: 'Created', value: formatDate(automation.created_at, { timeZone }) },
+          { label: 'Updated', value: formatDate(automation.updated_at, { timeZone }) },
           { label: 'Scope', value: scopeMetaValue, isHtml: true },
           { label: 'Created By', value: escapeHtml(automation.created_by_name || 'System') }
         ])}

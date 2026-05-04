@@ -1447,10 +1447,16 @@ class DrilldownRenderer {
         return `${parseFloat(value).toFixed(format.decimals || 1)}%`;
 
       case 'date':
-        return new Date(value).toLocaleDateString('en-US', format.dateFormat || {});
+        if (format.dateFormat) {
+          return new Date(value).toLocaleDateString('en-US', Object.assign({ timeZone: getOrganizationTimezone() }, format.dateFormat));
+        }
+        return formatDate(value);
 
       case 'datetime':
-        return new Date(value).toLocaleString('en-US', format.dateFormat || {});
+        if (format.dateFormat) {
+          return new Date(value).toLocaleString('en-US', Object.assign({ timeZone: getOrganizationTimezone() }, format.dateFormat));
+        }
+        return formatDateTime(value);
 
       default:
         return this.escapeHtml(String(value));

@@ -27,6 +27,7 @@
   var escHtml        = Lex.Utils.escapeHtml;
   var timeAgo        = Lex.Utils.timeAgo;
   var formatDate     = Lex.Utils.formatDate;
+  var formatDateTime = Lex.Utils.formatDateTime;
   var formatBytes    = Lex.Utils.formatFileSize;
   var isAdmin        = Lex.Auth.isAdmin;
   var canViewStatus  = Lex.Auth.canViewSystemStatus;
@@ -139,17 +140,12 @@
 
   /**
    * Format a Date as a friendly string.
-   * Uses toLocaleDateString — no regex.
+   * Delegates to Lex.Utils.formatDateWeekday for org-timezone correctness.
    * @param {Date} now
    * @returns {string}
    */
   function formatTodayDate(now) {
-    return now.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year:    'numeric',
-      month:   'long',
-      day:     'numeric'
-    });
+    return formatDateWeekday(now);
   }
 
   /**
@@ -1440,8 +1436,9 @@
    * @returns {string}
    */
   function renderActivityItem(activity, showUser) {
-    var ts   = activity.activity_timestamp || activity.timestamp;
-    var time = ts ? new Date(ts).toLocaleString() : '-';
+    var ts       = activity.activity_timestamp || activity.timestamp;
+    var relTime  = ts ? timeAgo(ts) : '-';
+    var fullTime = ts ? formatDateTime(ts) : '';
 
     var displayMessage;
     if (typeof EventDisplayNames !== 'undefined') {
@@ -1453,13 +1450,17 @@
       displayMessage = activity.display_message || activity.event_type || 'Activity';
     }
 
-    var meta = time;
+    var metaInner;
     if (showUser && activity.user) {
       var userName = ((activity.user.first_name || '') + ' ' + (activity.user.last_name || '')).trim();
-      if (userName) meta = escHtml(userName) + ' &bull; ' + escHtml(time);
+      metaInner = userName
+        ? escHtml(userName) + ' &bull; ' + escHtml(relTime)
+        : escHtml(relTime);
     } else {
-      meta = escHtml(time);
+      metaInner = escHtml(relTime);
     }
+
+    var titleAttr = fullTime ? ' title="' + escHtml(fullTime) + '"' : '';
 
     return (
       '<div class="py-3 hover:lex-bg-secondary transition-colors px-1" style="border-color:var(--lex-border-subtle);">' +
@@ -1471,7 +1472,7 @@
           '</div>' +
           '<div class="flex-1 min-w-0">' +
             '<p class="text-sm lex-text-primary">' + escHtml(displayMessage) + '</p>' +
-            '<p class="text-xs lex-text-tertiary mt-0.5">' + meta + '</p>' +
+            '<p class="text-xs lex-text-tertiary mt-0.5"' + titleAttr + '>' + metaInner + '</p>' +
           '</div>' +
         '</div>' +
       '</div>'

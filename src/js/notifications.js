@@ -419,7 +419,7 @@ window.NotificationPanel = (function() {
                 ${isUnread ? '<span class="w-2 h-2 bg-indigo-600 rounded-full flex-shrink-0 mt-1.5"></span>' : ''}
               </div>
               <p class="text-sm text-gray-600 mt-0.5">${escapeHtml(notification.body || notification.message || '')}</p>
-              <p class="text-xs text-gray-400 mt-1">${timeAgo(notification.created_at)}</p>
+              <p class="text-xs text-gray-400 mt-1" title="${escapeHtml(formatDateTime(notification.created_at))}">${timeAgo(notification.created_at)}</p>
             </div>
           </div>
         </div>
@@ -643,18 +643,18 @@ window.NotificationPanel = (function() {
     if (window.timeAgo) {
       return window.timeAgo(dateString);
     }
-    
+
     // Fallback implementation
     const date = new Date(dateString);
     const now = new Date();
     const seconds = Math.floor((now - date) / 1000);
-    
+
     if (seconds < 60) return 'Just now';
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
     if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
     if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
-    
-    return date.toLocaleDateString();
+
+    return formatDate(dateString);
   }
 
   /**

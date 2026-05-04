@@ -302,7 +302,7 @@
       unread ? '      <span class="notifications-item__dot"></span>' : '',
       '    </span>',
       message ? '    <span class="notifications-item__message">' + escapeHtml(message) + '</span>' : '',
-      '    <span class="notifications-item__time">' + escapeHtml(timeAgo(notification.created_at)) + '</span>',
+      '    <span class="notifications-item__time" title="' + escapeHtml(formatDateTime(notification.created_at)) + '">' + escapeHtml(timeAgo(notification.created_at)) + '</span>',
       '  </span>',
       '</button>'
     ].join('');
@@ -400,7 +400,7 @@
     if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
     if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
     if (seconds < 604800) return Math.floor(seconds / 86400) + 'd ago';
-    return date.toLocaleDateString();
+    return formatDate(dateString);
   }
 
   if (document.readyState === 'loading') {

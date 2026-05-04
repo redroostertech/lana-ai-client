@@ -484,7 +484,7 @@
     if (diffHours < 24) return diffHours + 'h ago';
     if (diffDays < 7) return diffDays + 'd ago';
 
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return formatDateLong(dateString, { month: 'short' });
   }
 
   function escapeHtml(text) {

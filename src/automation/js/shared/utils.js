@@ -59,6 +59,10 @@ function getDateParts(value, timeZone) {
   return Object.fromEntries(parts.map((part) => [part.type, part.value]));
 }
 
+function padDatePart(value) {
+  return String(value).padStart(2, '0');
+}
+
 export function formatDateTime(value, contextOrOptions = {}) {
   if (!value) return 'Never';
   const timeZone = getOrganizationTimezone(contextOrOptions);
@@ -67,7 +71,7 @@ export function formatDateTime(value, contextOrOptions = {}) {
   const hour24 = parts.hour === '24' ? 0 : Number(parts.hour);
   const hour12 = hour24 % 12 || 12;
   const meridiem = hour24 >= 12 ? 'PM' : 'AM';
-  return `${Number(parts.month)}/${Number(parts.day)}/${parts.year} ${hour12}:${parts.minute} ${meridiem}`;
+  return `${parts.month}/${parts.day}/${parts.year} ${padDatePart(hour12)}:${parts.minute} ${meridiem}`;
 }
 
 export function formatDate(value, contextOrOptions = {}) {

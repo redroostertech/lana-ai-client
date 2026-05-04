@@ -810,7 +810,7 @@
       }
       html += '</div>';
       if (v.created_at) {
-        html += '<div style="font-size: var(--lex-body-xs-size); color: var(--lex-text-tertiary); margin-top: 4px;">' + new Date(v.created_at).toLocaleString() + '</div>';
+        html += '<div style="font-size: var(--lex-body-xs-size); color: var(--lex-text-tertiary); margin-top: 4px;">' + formatDateTime(v.created_at) + '</div>';
       }
       if (v.summary) {
         html += '<div style="font-size: var(--lex-body-sm-size); color: var(--lex-text-secondary); margin-top: 8px;">' + escapeHtml(v.summary) + '</div>';

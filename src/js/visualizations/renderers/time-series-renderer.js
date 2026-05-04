@@ -164,7 +164,7 @@ export class TimeSeriesRenderer {
   _buildLabels() {
     return this.timeSeries.map(point => {
       try {
-        return new Date(point.date).toLocaleDateString();
+        return formatDate(point.date);
       } catch (e) {
         console.warn('[TimeSeriesRenderer] Invalid date format:', point.date);
         return point.date;

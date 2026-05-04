@@ -290,6 +290,7 @@ function renderRunDetailsPanel(context) {
   const artifacts = Array.isArray(detail.artifacts) ? detail.artifacts : [];
   const lanaClientUrl = context.state.links?.lana_client_url || '';
   const scope = runScope(run);
+  const timeZone = getOrganizationTimezone(context);
 
   return `
     <lex-drawer
@@ -316,8 +317,8 @@ function renderRunDetailsPanel(context) {
       ${drawerSection({
         title: 'Execution',
         body: drawerStatGrid([
-          { label: 'Started', value: formatDate(run.started_at || run.created_at) },
-          { label: 'Completed', value: formatDate(run.completed_at) },
+          { label: 'Started', value: formatDate(run.started_at || run.created_at, { timeZone }) },
+          { label: 'Completed', value: formatDate(run.completed_at, { timeZone }) },
           { label: 'Duration', value: formatDuration(run.execution_duration_ms) },
           { label: 'Scope', value: scope.label },
           {

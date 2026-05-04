@@ -27,11 +27,7 @@
     const msgDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
     // Format time portion: "4:24 PM"
-    const timeStr = date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    });
+    const timeStr = global.formatTime(iso);
 
     if (msgDay.getTime() === today.getTime()) {
       return `Today ${timeStr}`;
@@ -41,11 +37,7 @@
     }
 
     // Older: "Feb 12, 2025 3:30 AM"
-    const dateStr = date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
+    const dateStr = global.formatDateLong(iso, { month: 'short' });
     return `${dateStr} ${timeStr}`;
   }
 

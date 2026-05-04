@@ -257,7 +257,7 @@
       // Update header
       document.getElementById('viewerFileName').textContent = response.filename;
       document.getElementById('viewerFileInfo').textContent =
-        formatFileSize(response.file_size) + ' \u2022 ' + new Date(response.created_at).toLocaleDateString();
+        formatFileSize(response.file_size) + ' \u2022 ' + formatDate(response.created_at);
 
       // Update page title
       document.title = response.filename + ' - LANA AI';
@@ -429,7 +429,7 @@
 
   function loadMetadata(file) {
     document.getElementById('metaFileSize').textContent = formatFileSize(file.file_size);
-    document.getElementById('metaUploadedAt').textContent = new Date(file.created_at).toLocaleDateString();
+    document.getElementById('metaUploadedAt').textContent = formatDate(file.created_at);
     document.getElementById('metaChunkCount').textContent =
       file.chunk_count !== undefined ? file.chunk_count.toLocaleString() : '0';
 
@@ -453,7 +453,7 @@
       if (file.summary) {
         summaryView.textContent = file.summary;
         if (summaryTs && file.summary_generated_at) {
-          summaryTs.textContent = 'Generated ' + new Date(file.summary_generated_at).toLocaleDateString();
+          summaryTs.textContent = 'Generated ' + formatDate(file.summary_generated_at);
         } else if (summaryTs) {
           summaryTs.textContent = '';
         }

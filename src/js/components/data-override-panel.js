@@ -475,7 +475,7 @@ export class DataOverridePanel {
           </button>
         </div>
         <div class="text-xs text-gray-400">
-          Created: ${new Date(override.created_at).toLocaleDateString()}
+          Created: ${formatDate(override.created_at)}
         </div>
       </div>
     `;
@@ -647,10 +647,7 @@ export class DataOverridePanel {
    * @returns {string} Formatted date range
    */
   _defaultFormatDateRange(startDate, endDate) {
-    const options = { month: 'short', day: 'numeric', year: 'numeric' };
-    const start = startDate.toLocaleDateString('en-US', options);
-    const end = endDate.toLocaleDateString('en-US', options);
-    return `${start} - ${end}`;
+    return `${formatDateLong(startDate, { month: 'short' })} - ${formatDateLong(endDate, { month: 'short' })}`;
   }
 
   /**

@@ -197,7 +197,7 @@
     var lastRanStr = 'Never';
     if (run && (run.created_at || run.generated_at)) {
       var ts = run.created_at || run.generated_at;
-      lastRanStr = typeof timeAgo === 'function' ? timeAgo(ts) : new Date(ts).toLocaleString();
+      lastRanStr = typeof timeAgo === 'function' ? timeAgo(ts) : formatDateTime(ts);
     }
 
     // Build plugin status rows

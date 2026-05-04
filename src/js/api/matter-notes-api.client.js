@@ -330,38 +330,30 @@ class MatterNotesAPIClient {
 
   /**
    * Format relative date (e.g., "2 hours ago", "Yesterday")
+   * Delegates to the canonical timezone-aware Lex.Utils helpers.
+   * For sub-day granularity we use timeAgo ("2 hours ago"); for older
+   * dates we fall back to formatRelativeDate ("Yesterday" / "3 days ago" /
+   * "Jan 15, 2025") which honors the user's organization timezone.
    * @param {string} dateString - ISO date string
    * @returns {string} Relative date string
    */
   formatRelativeDate(dateString) {
     if (!dateString) return '';
 
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffSeconds = Math.floor(diffMs / 1000);
-    const diffMinutes = Math.floor(diffSeconds / 60);
-    const diffHours = Math.floor(diffMinutes / 60);
-    const diffDays = Math.floor(diffHours / 24);
+    const diffSeconds = Math.floor((new Date() - new Date(dateString)) / 1000);
 
-    if (diffSeconds < 60) {
-      return 'Just now';
-    } else if (diffMinutes < 60) {
-      return `${diffMinutes} ${diffMinutes === 1 ? 'minute' : 'minutes'} ago`;
-    } else if (diffHours < 24) {
-      return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
-    } else if (diffDays === 1) {
-      return 'Yesterday';
-    } else if (diffDays < 7) {
-      return `${diffDays} days ago`;
-    } else {
-      // Format as "Jan 15, 2025"
-      return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
-      });
+    // Sub-day: defer to timeAgo for "Just now" / "X minutes ago" / "X hours ago"
+    if (diffSeconds < 86400 && typeof window !== 'undefined' && typeof window.timeAgo === 'function') {
+      return window.timeAgo(dateString);
     }
+
+    // Day+: defer to formatRelativeDate for "Yesterday" / "3 days ago" / locale date
+    if (typeof window !== 'undefined' && typeof window.formatRelativeDate === 'function') {
+      return window.formatRelativeDate(dateString);
+    }
+
+    // Defensive fallback if Lex.Utils isn't loaded (shouldn't happen in practice)
+    return dateString;
   }
 
   /**

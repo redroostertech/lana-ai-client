@@ -111,7 +111,7 @@
     if (!dateString) return 'Never';
     var parts = dateParts(dateString, Object.assign({}, options || {}, { includeTime: false }));
     if (!parts) return 'Never';
-    return Number(parts.month) + '/' + Number(parts.day) + '/' + parts.year;
+    return parts.month + '/' + parts.day + '/' + parts.year;
   }
 
   function formatDateTime(dateString, options) {
@@ -121,7 +121,43 @@
     var hour24 = parts.hour === '24' ? 0 : Number(parts.hour);
     var hour12 = hour24 % 12 || 12;
     var meridiem = hour24 >= 12 ? 'PM' : 'AM';
-    return Number(parts.month) + '/' + Number(parts.day) + '/' + parts.year + ' ' + hour12 + ':' + parts.minute + ' ' + meridiem;
+    return parts.month + '/' + parts.day + '/' + parts.year + ' ' + String(hour12).padStart(2, '0') + ':' + parts.minute + ' ' + meridiem;
+  }
+
+  // Long format: "May 3, 2026" (or "Sun, May 3" / "Sunday, May 3, 2026" via opts).
+  // Always honors org timezone via getOrganizationTimezone().
+  function formatDateLong(dateString, options) {
+    if (!dateString) return 'Never';
+    var date = new Date(dateString);
+    if (!Number.isFinite(date.getTime())) return 'Never';
+    options = options || {};
+    var fmt = {
+      timeZone: getOrganizationTimezone(options),
+      year:  options.year  || 'numeric',
+      month: options.month || 'long',
+      day:   options.day   || 'numeric'
+    };
+    if (options.weekday) fmt.weekday = options.weekday === true ? 'long' : options.weekday;
+    return new Intl.DateTimeFormat('en-US', fmt).format(date);
+  }
+
+  // Weekday-prefixed long format: "Sunday, May 3, 2026". Convenience wrapper.
+  function formatDateWeekday(dateString, options) {
+    return formatDateLong(dateString, Object.assign({ weekday: 'long' }, options || {}));
+  }
+
+  // Time-only: "10:29 PM" (12-hour, org timezone). Pass { hour12: false } for 24-hour.
+  function formatTime(dateString, options) {
+    if (!dateString) return '';
+    var date = new Date(dateString);
+    if (!Number.isFinite(date.getTime())) return '';
+    options = options || {};
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: getOrganizationTimezone(options),
+      hour:   options.hour   || 'numeric',
+      minute: options.minute || '2-digit',
+      hour12: options.hour12 !== false
+    }).format(date);
   }
 
   // ── Time ago ──────────────────────────────────────────────────────────
@@ -323,6 +359,9 @@
     getOrganizationTimezone: getOrganizationTimezone,
     formatDate:         formatDate,
     formatDateTime:     formatDateTime,
+    formatDateLong:     formatDateLong,
+    formatDateWeekday:  formatDateWeekday,
+    formatTime:         formatTime,
     formatRelativeDate: formatRelativeDate,
     timeAgo:            timeAgo,
     debounce:           debounce,
@@ -338,6 +377,9 @@
   global.escapeHtml         = escapeHtml;
   global.formatDate         = formatDate;
   global.formatDateTime     = formatDateTime;
+  global.formatDateLong     = formatDateLong;
+  global.formatDateWeekday  = formatDateWeekday;
+  global.formatTime         = formatTime;
   global.formatRelativeDate = formatRelativeDate;
   global.timeAgo            = timeAgo;
   global.debounce           = debounce;

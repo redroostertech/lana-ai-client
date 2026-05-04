@@ -418,7 +418,7 @@ const NLQProcessor = {
 **Breakdown:**
 ${Object.entries(data).filter(([k]) => k !== 'total').map(([k, v]) => `- ${k.charAt(0).toUpperCase() + k.slice(1)}: ${v}`).join('\n')}
 
-*Data as of ${new Date().toLocaleString()}*`;
+*Data as of ${formatDateTime(new Date())}*`;
   }
 };
 

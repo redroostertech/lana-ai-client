@@ -125,12 +125,9 @@
     return colors[color] || colors.gray;
   }
 
-  // Format date range (using UTC to avoid timezone offset issues)
+  // Format date range using org timezone via canonical helper
   function formatDateRange(start, end) {
-    var startDate = new Date(start);
-    var endDate = new Date(end);
-    var options = { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' };
-    return startDate.toLocaleDateString('en-US', options) + ' - ' + endDate.toLocaleDateString('en-US', options);
+    return formatDateLong(start, { month: 'short' }) + ' - ' + formatDateLong(end, { month: 'short' });
   }
 
   // ==========================================================================
@@ -681,7 +678,7 @@
         var email = (lead.data && lead.data.email) || 'N/A';
         var phone = (lead.data && lead.data.phone) || 'N/A';
         var company = (lead.data && lead.data.company) || 'N/A';
-        var created = new Date(lead.source_created_at).toLocaleDateString();
+        var created = formatDate(lead.source_created_at);
         return '<tr class="hover:bg-gray-50">' +
           '<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">' + name + '</td>' +
           '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">' + email + '</td>' +
@@ -858,8 +855,7 @@
       if (type === 'percentage') return parseFloat(value).toFixed(1) + '%';
       if (type === 'date') {
         if (!value) return '-';
-        var date = new Date(value);
-        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        return formatDateLong(value, { month: 'short' });
       }
       return value;
     }
@@ -2571,8 +2567,7 @@
     var ctx = canvas.getContext('2d');
 
     var labels = timeSeries.map(function (ts) {
-      var date = new Date(ts.date);
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+      return new Date(ts.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: getOrganizationTimezone() });
     });
 
     var colorPalette = [
@@ -2808,7 +2803,7 @@
             '</div>' +
             '<button onclick="window._reporting.deleteOverride(\'' + override.override_id + '\')" class="text-red-600 hover:text-red-800 ml-2" title="Delete override">' +
             '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button></div>' +
-            '<div class="text-xs text-gray-400">Created: ' + new Date(override.created_at).toLocaleDateString() + '</div></div>';
+            '<div class="text-xs text-gray-400">Created: ' + formatDate(override.created_at) + '</div></div>';
         }).join('');
       } else if (existingSection) {
         existingSection.classList.add('hidden');
@@ -3785,7 +3780,7 @@
 
     try {
       var title = (snapshot.moduleName || 'Report') + ' — '
-        + new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        + new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: getOrganizationTimezone() });
 
       await panel.createThread({
         title: title,

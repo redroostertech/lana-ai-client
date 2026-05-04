@@ -50,7 +50,9 @@
       var html = '<div class="divide-y divide-gray-100 max-h-[300px] overflow-y-auto">';
 
       activities.slice(0, displayLimit).forEach(function(activity) {
-        var timeAgo = formatTimeAgo(activity.created_at || activity.timestamp);
+        var ts = activity.created_at || activity.timestamp;
+        var timeAgoLabel = ts ? timeAgo(ts) : '';
+        var timeAgoTooltip = ts ? formatDateTime(ts) : '';
         var description = activity.description || activity.event_type || 'Activity';
         var userName = activity.user_name || activity.actor || '';
         var eventType = activity.event_type || '';
@@ -80,7 +82,7 @@
           + (userName
               ? '<p class="text-xs text-gray-500 mt-0.5">' + escapeHtml(userName) + '</p>'
               : '')
-          + '<p class="text-xs text-gray-400 mt-0.5">' + escapeHtml(timeAgo) + '</p>'
+          + '<p class="text-xs text-gray-400 mt-0.5" title="' + escapeHtml(timeAgoTooltip) + '">' + escapeHtml(timeAgoLabel) + '</p>'
           + '</div>'
 
           + '</div>';
@@ -90,28 +92,6 @@
       container.innerHTML = html;
     }
   });
-
-  /**
-   * Format an ISO date string as a human-readable relative time.
-   * Returns times like "Just now", "5m ago", "3h ago", "2d ago".
-   * @param {string} dateStr - ISO 8601 date string
-   * @returns {string} Relative time string
-   */
-  function formatTimeAgo(dateStr) {
-    if (!dateStr) return '';
-    var date = new Date(dateStr);
-    var now = new Date();
-    var diffMs = now - date;
-    if (isNaN(diffMs)) return '';
-    var diffMins = Math.floor(diffMs / 60000);
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return diffMins + 'm ago';
-    var diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return diffHours + 'h ago';
-    var diffDays = Math.floor(diffHours / 24);
-    if (diffDays < 30) return diffDays + 'd ago';
-    return date.toLocaleDateString();
-  }
 
   /**
    * Escape text for safe insertion into innerHTML.

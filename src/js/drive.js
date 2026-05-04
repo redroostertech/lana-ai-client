@@ -846,7 +846,7 @@
     var fileName = escapeHtml(file.filename || file.name);
     var fileSize = formatFileSize(file.file_size || 0);
     var fileIcon = getFileIconSVG(file.content_type);
-    var lastAccessed = file.last_accessed_at ? new Date(file.last_accessed_at).toLocaleDateString() : '';
+    var lastAccessed = file.last_accessed_at ? formatDate(file.last_accessed_at) : '';
 
     return [
       '<div class="file-card rounded-lg shadow-sm border p-4 cursor-pointer relative group hover:shadow-md transition-shadow" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)"',
@@ -938,7 +938,7 @@
     var matterNumber = escapeHtml(matter.matter_id || '');
     var docCount = matter.document_count || 0;
     var folderCount = matter.folder_count || matter.child_folder_count || 0;
-    var lastModified = matter.updated_at ? new Date(matter.updated_at).toLocaleDateString() : '';
+    var lastModified = matter.updated_at ? formatDate(matter.updated_at) : '';
 
     return [
       '<div class="file-card rounded-lg shadow-sm border p-4 cursor-pointer relative group hover:shadow-md transition-shadow" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)"',

@@ -585,7 +585,8 @@
 
     var labels      = timeseries.map(function (d) {
       return new Date(d.timestamp).toLocaleTimeString([], {
-        hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric'
+        hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric',
+        timeZone: getOrganizationTimezone()
       });
     });
     var powerData   = timeseries.map(function (d) { return parseEnergyValue(d.total_watts) || 0; });

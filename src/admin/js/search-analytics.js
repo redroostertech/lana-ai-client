@@ -347,9 +347,9 @@ class SearchAnalytics {
     const labels = timeSeries.map(item => {
       const date = new Date(item.time_bucket);
       if (this.dateRange <= 1) {
-        return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: Lex.Utils.getOrganizationTimezone() });
       } else {
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: Lex.Utils.getOrganizationTimezone() });
       }
     });
 
@@ -525,14 +525,7 @@ class SearchAnalytics {
   }
 
   formatTimestamp(timestamp) {
-    const date = new Date(timestamp);
-    return date.toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit'
-    });
+    return formatDateTime(timestamp);
   }
 
   escapeHtml(text) {

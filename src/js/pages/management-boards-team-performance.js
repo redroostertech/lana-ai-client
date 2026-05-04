@@ -693,7 +693,7 @@ class TeamPerformanceBoard {
               <div class="border-l-4 border-indigo-500 bg-gray-50 p-4 rounded-r-lg">
                 <div class="flex justify-between items-start mb-2">
                   <div>
-                    <div class="font-semibold text-gray-900">${new Date(session.startedAt).toLocaleString()}</div>
+                    <div class="font-semibold text-gray-900">${formatDateTime(session.startedAt)}</div>
                     <div class="text-sm text-gray-600">Duration: ${this.formatDuration(session.duration || 0)}</div>
                   </div>
                   <span class="px-3 py-1 rounded-full text-xs font-medium ${

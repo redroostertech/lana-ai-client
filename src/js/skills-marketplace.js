@@ -1011,8 +1011,7 @@
    */
   function formatDate(dateString) {
     if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    return window.formatDateLong(dateString, { month: 'short' });
   }
 
   /**
