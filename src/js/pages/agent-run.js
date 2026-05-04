@@ -633,18 +633,21 @@
 
       function launch() {
         while (active < limit && nextIndex < items.length) {
-          var i = nextIndex++;
-          active++;
-          Promise.resolve()
-            .then(function () { return mapper(items[i], i); })
-            .then(function (value) { results[i] = { ok: true, value: value }; })
-            .catch(function (error) { results[i] = { ok: false, error: error }; })
-            .then(function () {
-              active--;
-              done++;
-              if (done === items.length) { resolve(results); return; }
-              launch();
-            });
+          // IIFE captures `i` per-launch so concurrent slots don't alias the
+          // function-scoped index. (Codex review: var-closure bug.)
+          (function (i) {
+            active++;
+            Promise.resolve()
+              .then(function () { return mapper(items[i], i); })
+              .then(function (value) { results[i] = { ok: true, value: value }; })
+              .catch(function (error) { results[i] = { ok: false, error: error }; })
+              .then(function () {
+                active--;
+                done++;
+                if (done === items.length) { resolve(results); return; }
+                launch();
+              });
+          })(nextIndex++);
         }
       }
 
@@ -706,22 +709,26 @@
   }
 
   function refreshRun() {
-    if (!_runId || !window.api || typeof window.api.get !== 'function') return Promise.resolve();
+    if (!_runId || !window.api || typeof window.api.get !== 'function') {
+      return Promise.resolve({ refreshed: false, error: null });
+    }
     return window.api.get('/api/v1/agent-runs/' + encodeURIComponent(_runId))
       .then(function (resp) {
         var run = (resp && resp.run) ? resp.run
                 : ((resp && resp.data) ? resp.data : resp);
         var steps = (resp && resp.steps) || (run && run.steps) || [];
         var artifacts = (resp && resp.artifacts) || (run && run.artifacts) || [];
-        if (!run) return;
+        if (!run) return { refreshed: false, error: null };
         // Reset local optimistic state so server state takes precedence.
         _artifactStates = {};
         renderHeader(run);
         hydrateSteps(steps);
         hydrateArtifacts(artifacts);
+        return { refreshed: true, error: null };
       })
       .catch(function (err) {
         console.warn('[agent-run] refresh after bulk op failed:', err);
+        return { refreshed: false, error: err };
       });
   }
 
@@ -779,8 +786,21 @@
         summarizeAndToast(verb, results);
         return refreshRun();
       })
-      .then(function () {
+      .then(function (refreshResult) {
         _opInFlight = false;
+        // Only re-enable bulk controls when we have a fresh server snapshot.
+        // If the post-bulk refresh failed, leave bulk buttons disabled and
+        // surface a clear message — otherwise the user could re-click "Approve
+        // all" on stale state and double-act on items the server already
+        // mutated. (Codex review: stale UI on failed refresh.)
+        if (refreshResult && refreshResult.refreshed === false) {
+          if (window.Lex && Lex.Toast) {
+            Lex.Toast.warning(verb + ' completed, but failed to refresh — reload to see latest state.');
+          }
+          // Bulk buttons stay disabled; per-artifact controls (gated by
+          // _opInFlight=false) remain interactive so the user isn't stranded.
+          return;
+        }
         setBulkButtonsDisabled(false);
       })
       .catch(function (err) {

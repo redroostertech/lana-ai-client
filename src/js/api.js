@@ -2406,19 +2406,32 @@ class ApiClient {
   }
 
   /**
-   * Mark SSE streaming as active to prevent page navigation.
-   * Call this before starting an SSE fetch and setStreamingInactive() when done.
+   * Mark SSE streaming as active to prevent page navigation. Mirrors the
+   * write to `Lex.state.isStreaming` (when available) so the LexRouter
+   * navigation guard sees a consistent value regardless of which side
+   * initiates the streaming. The Lex.state setter no-ops on identical
+   * writes so the back-mirror it performs into this method is a safe
+   * fixed point — no infinite loop. (Codex review: half-duplex mirror.)
    */
   setStreamingActive() {
     this._streamingActive = true;
+    if (typeof window !== 'undefined' && window.Lex && window.Lex.state
+        && window.Lex.state.isStreaming !== true) {
+      window.Lex.state.isStreaming = true;
+    }
   }
 
   /**
    * Mark SSE streaming as inactive. If a session expiry was deferred
-   * while streaming was active, show the modal now.
+   * while streaming was active, show the modal now. Mirrors to
+   * `Lex.state.isStreaming` for the same reason as setStreamingActive.
    */
   setStreamingInactive() {
     this._streamingActive = false;
+    if (typeof window !== 'undefined' && window.Lex && window.Lex.state
+        && window.Lex.state.isStreaming !== false) {
+      window.Lex.state.isStreaming = false;
+    }
     if (this._pendingSessionExpired) {
       this._pendingSessionExpired = false;
       this.showSessionExpiredModal();
