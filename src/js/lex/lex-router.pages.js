@@ -173,6 +173,27 @@
       ]
     },
 
+    'model-pricing.html': {
+      title: 'Model Pricing',
+      activeNav: 'admin',
+      scripts: [
+        // Lex components not globally loaded
+        'js/lex/components/foundation/lex-banner.js',
+        'js/lex/components/foundation/lex-card.js',
+        'js/lex/components/foundation/lex-empty.js',
+        'js/lex/components/foundation/lex-spinner.js',
+        'js/lex/components/foundation/lex-modal.js',
+        'js/lex/components/form/lex-input.js',
+        'js/lex/components/form/lex-textarea.js',
+        'js/lex/components/form/lex-select.js',
+        // Page controller (MUST be last)
+        'js/pages/model-pricing.js'
+      ],
+      stylesheets: [
+        'css/model-pricing.css'
+      ]
+    },
+
     // ── Settings ──
     'settings.html': {
       title: 'Settings',
