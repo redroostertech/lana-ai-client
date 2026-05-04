@@ -905,11 +905,21 @@
       var raw = results[0].value;
       if (raw.statistics || raw.total_matters !== undefined) {
         stats = raw.statistics || raw;
-        mattersCount = (stats.total_matters !== undefined)
-          ? Number(stats.total_matters).toLocaleString()
+        // Prefer `lana_matters` (matters that have been explicitly imported
+        // into client_matters via the connector viewer's Output flow) over
+        // `total_matters` (which historically UNIONed raw connector_data
+        // matter rows; the route now returns lana-only here too, but the
+        // explicit `lana_matters` field is the safer read against any
+        // future change). Falls back to `total_matters` for older API
+        // responses that don't split the count.
+        var lanaMatters = stats.lana_matters;
+        var unifiedMatters = stats.total_matters;
+        var preferredCount = (lanaMatters !== undefined) ? lanaMatters : unifiedMatters;
+        mattersCount = (preferredCount !== undefined)
+          ? Utils.formatCompactCount(preferredCount)
           : '-';
         usersCount = (stats.total_users !== undefined)
-          ? Number(stats.total_users).toLocaleString()
+          ? Utils.formatCompactCount(stats.total_users)
           : '-';
       } else if (raw.pagination) {
         // Regular user — matters list result

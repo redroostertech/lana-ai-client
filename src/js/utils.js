@@ -89,6 +89,41 @@ const Utils = {
   },
 
   /**
+   * Format an integer count for compact display in pills, badges, and metrics.
+   *
+   * Examples:
+   *   0          → "0"
+   *   42         → "42"
+   *   1000       → "1k"
+   *   1234       → "1.2k"
+   *   12345      → "12.3k"
+   *   123456     → "123k"
+   *   1500000    → "1.5m"
+   *   2000000000 → "2b"
+   *
+   * One decimal is shown only when it adds information (1.0k → "1k", not "1.0k").
+   * Returns "-" for null/undefined/non-finite/negative inputs so callers can
+   * use the result directly as a placeholder when stats haven't loaded yet.
+   *
+   * @param {number|string|null|undefined} value
+   * @returns {string}
+   */
+  formatCompactCount(value) {
+    if (value === null || value === undefined) return '-';
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < 0) return '-';
+    const format = (scaled, suffix) => {
+      const rounded = Math.round(scaled * 10) / 10;
+      const str = (rounded % 1 === 0) ? String(Math.trunc(rounded)) : rounded.toFixed(1);
+      return str + suffix;
+    };
+    if (n >= 1e9) return format(n / 1e9, 'b');
+    if (n >= 1e6) return format(n / 1e6, 'm');
+    if (n >= 1e3) return format(n / 1e3, 'k');
+    return String(Math.trunc(n));
+  },
+
+  /**
    * Validate document type against allowed types
    *
    * @param {string} docType - Document type to validate
