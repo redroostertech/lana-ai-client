@@ -1363,8 +1363,8 @@ function renderAttachMatterModal(context) {
       : '<div class="muted">No matters found.</div>';
 
   return `
-    <div class="ld-delete-modal-overlay" data-ld-attach-matter-cancel style="z-index:200;">
-      <div class="ld-delete-modal-panel" role="dialog" aria-modal="true" style="min-width:380px;max-width:560px;" onclick="event.stopPropagation()">
+    <div class="ld-delete-modal-overlay" data-ld-attach-matter-overlay style="z-index:200;">
+      <div class="ld-delete-modal-panel" role="dialog" aria-modal="true" style="min-width:380px;max-width:560px;">
         <h3>Attach to Matter</h3>
         <p class="muted">Select an active matter to attach this automation to.</p>
         <input
@@ -1398,8 +1398,8 @@ function renderEditOverridesModal(context) {
   const raw = modal.overridesJson || '{}';
 
   return `
-    <div class="ld-delete-modal-overlay" data-ld-overrides-cancel style="z-index:210;">
-      <div class="ld-delete-modal-panel" role="dialog" aria-modal="true" style="min-width:420px;" onclick="event.stopPropagation()">
+    <div class="ld-delete-modal-overlay" data-ld-overrides-overlay style="z-index:210;">
+      <div class="ld-delete-modal-panel" role="dialog" aria-modal="true" style="min-width:420px;">
         <h3>Edit Config Overrides</h3>
         <p class="muted">Override automation config for this matter attachment. Must be valid JSON.</p>
         <textarea
@@ -2317,8 +2317,9 @@ export async function handleLibraryDetailClick(context, event) {
     return true;
   }
 
-  // Cancel attach modal
-  if (event.target.closest('[data-ld-attach-matter-cancel]')) {
+  // Cancel attach modal — Cancel button or backdrop click (matches() only fires on direct overlay target)
+  if (event.target.closest('[data-ld-attach-matter-cancel]') ||
+      (event.target.matches && event.target.matches('[data-ld-attach-matter-overlay]'))) {
     ld.attachMatterModal = null;
     context.renderCurrentView();
     return true;
@@ -2376,8 +2377,9 @@ export async function handleLibraryDetailClick(context, event) {
     return true;
   }
 
-  // Cancel edit overrides
-  if (event.target.closest('[data-ld-overrides-cancel]')) {
+  // Cancel edit overrides — Cancel button or backdrop click
+  if (event.target.closest('[data-ld-overrides-cancel]') ||
+      (event.target.matches && event.target.matches('[data-ld-overrides-overlay]'))) {
     ld.editOverridesModal = null;
     context.renderCurrentView();
     return true;

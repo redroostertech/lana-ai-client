@@ -43,19 +43,27 @@ export function renderHome(context) {
 
   context.els.viewContent.innerHTML = `
     <section class="home-shell">
-      <div class="home-hero">
-        <h2>What would you like to automate, ${escapeHtml(firstName)}?</h2>
-        <div class="home-composer-wrap">
-          <lex-chat-composer
-            id="home-lex-composer"
-            placeholder="Enter an idea or connector name to get started."
-            max-height="96"
-          ></lex-chat-composer>
-        </div>
-        <div class="badge-row">
+      <section class="automation-page-banner" aria-label="Automation home">
+        <lex-banner
+          variant="light"
+          heading="What would you like to automate, ${escapeAttribute(firstName)}?"
+          subtitle="Pick a starter template below or run an existing automation."
+        ></lex-banner>
+        <div class="automation-page-banner-badges">
           ${badge(`${countReadyConnectors(context)} ready connectors`, countReadyConnectors(context) ? 'success' : '')}
           ${badge(`${context.state.automations.length} automations`)}
         </div>
+      </section>
+
+      <!-- Composer hidden for now — un-hide when the home-composer-ai flow ships
+           (see TODO at onHomeComposerSend in app.js). Kept in the DOM so the
+           configureHomeComposer + lex-composer-send wiring stays warm. -->
+      <div class="home-composer-wrap" hidden aria-hidden="true">
+        <lex-chat-composer
+          id="home-lex-composer"
+          placeholder="Enter an idea or connector name to get started."
+          max-height="96"
+        ></lex-chat-composer>
       </div>
 
       <section class="home-section">

@@ -284,6 +284,20 @@
       .lex-banner-actions slot-content {
         display: contents;
       }
+
+      /* ── Meta area (slot under subtitle) ─────────────── */
+
+      .lex-banner-meta {
+        margin-top: 8px;
+      }
+
+      .lex-banner-meta--empty {
+        display: none;
+      }
+
+      .lex-banner-meta slot-content {
+        display: contents;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -374,13 +388,34 @@
             <div class="lex-banner-text">
               ${titleRow}
               ${subtitleHtml}
+              <div class="lex-banner-meta">
+                <slot-content data-slot="meta"></slot-content>
+              </div>
             </div>
           </div>
           <div class="lex-banner-actions">
-            <slot-content></slot-content>
+            <slot-content data-slot="actions"></slot-content>
           </div>
         </div>
       `;
+    }
+
+    // Split original children into meta vs actions slots based on data-banner-meta marker
+    _restoreContent() {
+      if (!this._originalChildren) return;
+      const actionsSlot = this.querySelector('slot-content[data-slot="actions"]');
+      const metaSlot = this.querySelector('slot-content[data-slot="meta"]');
+      const metaWrap = this.querySelector('.lex-banner-meta');
+      if (actionsSlot) actionsSlot.innerHTML = '';
+      if (metaSlot) metaSlot.innerHTML = '';
+      let hasMeta = false;
+      for (const node of this._originalChildren) {
+        const isMeta = node.nodeType === 1 && node.hasAttribute && node.hasAttribute('data-banner-meta');
+        if (isMeta) hasMeta = true;
+        const target = isMeta && metaSlot ? metaSlot : actionsSlot;
+        if (target) target.appendChild(node.cloneNode(true));
+      }
+      if (metaWrap) metaWrap.classList.toggle('lex-banner-meta--empty', !hasMeta);
     }
   }
 

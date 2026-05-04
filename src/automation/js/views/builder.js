@@ -438,6 +438,7 @@ export function createBuilderState(template, matters = []) {
     overdueReminder,
     scopeType: selectedTemplate.defaults.scopeType || (selectedTemplate.id === 'connector-sync-watch' ? 'organization' : 'matter'),
     matterId: matters.length ? matterRef(matters[0]) : '',
+    matterSearch: '',
     publishMode: selectedTemplate.defaults.publishMode || 'enabled',
     publishModalOpen: false,
     selectedActionIndex: null,
@@ -1106,33 +1107,47 @@ export function renderBuilder(context) {
       ];
   const breadcrumb = `<lex-breadcrumb class="automations-builder-breadcrumb" items="${escapeAttribute(JSON.stringify(breadcrumbItems))}"></lex-breadcrumb>`;
 
+  const editIsEnabled = isEdit
+    ? Boolean(context.state.builder.editMode?.originalAutomation?.is_enabled)
+    : false;
+  const bannerHeading = isEdit
+    ? `Edit Automation: ${editAutomationName}`
+    : overdueReminderMode
+      ? 'Configure overdue invoice reminder rules'
+      : 'Create a multi-step automated automation';
+  const bannerSubtitle = isEdit
+    ? 'Edit the automation config below, then save your changes.'
+    : overdueReminderMode
+      ? 'Use explicit buckets and follow-up templates to keep billing reminders deterministic.'
+      : 'Start with your trigger, then add and tune steps.';
+  const bannerStatus = isEdit ? (editIsEnabled ? 'connected' : 'offline') : 'none';
+
   mount.innerHTML = `
     <section class="automations-builder-shell">
+      <lex-banner
+        class="automations-builder-banner"
+        variant="light"
+        size="compact"
+        heading="${escapeAttribute(bannerHeading)}"
+        subtitle="${escapeAttribute(bannerSubtitle)}"
+        status="${bannerStatus}"
+        icon="A">
+        <div class="badge-row automations-builder-banner-badges" data-banner-meta>
+          ${badge(`${actionSteps.length} step${actionSteps.length === 1 ? '' : 's'}`)}
+          ${badge(triggerMode === 'scheduled' ? 'Scheduled (pg-boss)' : 'System Event')}
+          ${overdueReminderMode ? badge('Deterministic rules', 'success') : ''}
+          ${isEdit ? badge(editIsEnabled ? 'Active' : 'Inactive', editIsEnabled ? 'success' : '') : ''}
+          ${dirty ? '<span class="builder-dirty-pill" aria-live="polite">Unsaved changes</span>' : ''}
+        </div>
+        ${isEdit ? `
+          <lex-btn variant="ghost" size="sm" data-builder-toggle-active data-edit-automation-id="${escapeAttribute(editAutomationId)}" data-current-enabled="${editIsEnabled ? 'true' : 'false'}">
+            ${editIsEnabled ? 'Deactivate' : 'Activate'}
+          </lex-btn>
+          <lex-btn variant="danger" size="sm" data-builder-delete data-edit-automation-id="${escapeAttribute(editAutomationId)}" data-edit-automation-name="${escapeAttribute(editAutomationName)}">Delete</lex-btn>
+        ` : ''}
+        <lex-btn variant="primary" size="sm" data-open-publish-modal>${isEdit ? (dirty ? 'Save Changes \u2022' : 'Save Changes') : 'Publish'}</lex-btn>
+      </lex-banner>
       ${breadcrumb}
-      <header class="automations-builder-header">
-        <div>
-          <div class="eyebrow">Automation Builder</div>
-          <h2>${isEdit
-            ? `Edit Automation: ${escapeHtml(editAutomationName)}`
-            : overdueReminderMode
-              ? 'Configure overdue invoice reminder rules'
-              : 'Create a multi-step automated automation'}</h2>
-          <p>${isEdit
-            ? 'Edit the automation config below, then save your changes.'
-            : overdueReminderMode
-              ? 'Use explicit buckets and follow-up templates to keep billing reminders deterministic.'
-              : 'Start with your trigger, then add and tune steps.'}</p>
-        </div>
-        <div class="automations-builder-header-right">
-          <div class="badge-row">
-            ${badge(`${actionSteps.length} step${actionSteps.length === 1 ? '' : 's'}`)}
-            ${badge(triggerMode === 'scheduled' ? 'Scheduled (pg-boss)' : 'System Event')}
-            ${overdueReminderMode ? badge('Deterministic rules', 'success') : ''}
-            ${dirty ? '<span class="builder-dirty-pill" aria-live="polite">Unsaved changes</span>' : ''}
-          </div>
-          <lex-btn variant="primary" size="sm" data-open-publish-modal>${isEdit ? (dirty ? 'Save Changes \u2022' : 'Save Changes') : 'Publish'}</lex-btn>
-        </div>
-      </header>
 
       <div class="automations-builder-body">
         <div class="automations-builder-main">
@@ -1472,6 +1487,69 @@ export function renderBuilder(context) {
             </div>
           </section>
 
+          ${isEdit ? `
+            <div class="automations-sidebar-section-title">Settings</div>
+            <section class="automations-settings-panel">
+              <p class="automations-settings-help">Configure scope, publish state, and visibility. Changes save with the automation.</p>
+              <label>
+                <span>Scope</span>
+                <select class="automation-builder-input" data-builder-field="scopeType">
+                  <option value="matter" ${context.state.builder.scopeType === 'matter' ? 'selected' : ''}>Specific matter</option>
+                  <option value="organization" ${context.state.builder.scopeType === 'organization' ? 'selected' : ''}>Organization-wide</option>
+                </select>
+              </label>
+              ${context.state.builder.scopeType === 'matter' ? (() => {
+                const matterQuery = (context.state.builder.matterSearch || '').toLowerCase();
+                const allMatters = context.state.matters;
+                const filteredMatters = matterQuery
+                  ? allMatters.filter((matter) =>
+                      String(matter.name || '').toLowerCase().includes(matterQuery) ||
+                      String(matterRef(matter) || '').toLowerCase().includes(matterQuery))
+                  : allMatters;
+                const selectedRef = context.state.builder.matterId;
+                const selectedMatter = allMatters.find((m) => matterRef(m) === selectedRef);
+                const optionMatters = selectedMatter && !filteredMatters.includes(selectedMatter)
+                  ? [selectedMatter, ...filteredMatters]
+                  : filteredMatters;
+                return `
+                  <label>
+                    <span>Matter</span>
+                    <input
+                      type="search"
+                      class="automation-builder-input automation-builder-matter-search"
+                      data-builder-field="matterSearch"
+                      placeholder="Search matters by name or ID${allMatters.length ? ` (${allMatters.length} total)` : ''}…"
+                      value="${escapeAttribute(context.state.builder.matterSearch || '')}"
+                      autocomplete="off">
+                    <select class="automation-builder-input" data-builder-field="matterId" size="${Math.min(Math.max(optionMatters.length, 3), 8)}">
+                      ${optionMatters.length === 0
+                        ? '<option disabled>No matters match your search</option>'
+                        : optionMatters.map((matter) => `
+                          <option value="${escapeAttribute(matterRef(matter))}" ${selectedRef === matterRef(matter) ? 'selected' : ''}>
+                            ${escapeHtml(matter.name || matterRef(matter))}
+                          </option>
+                        `).join('')}
+                    </select>
+                  </label>
+                `;
+              })() : ''}
+              <label>
+                <span>Publish state</span>
+                <select class="automation-builder-input" data-builder-field="publishMode">
+                  <option value="enabled" ${context.state.builder.publishMode === 'enabled' ? 'selected' : ''}>Active</option>
+                  <option value="disabled" ${context.state.builder.publishMode === 'disabled' ? 'selected' : ''}>Inactive</option>
+                </select>
+              </label>
+              <label>
+                <span>Visibility</span>
+                <select class="automation-builder-input" data-builder-visibility data-edit-automation-id="${escapeAttribute(editAutomationId)}">
+                  <option value="private" ${(context.state.builder.editMode?.originalAutomation?.visibility || 'private') === 'private' ? 'selected' : ''}>Private</option>
+                  <option value="org_wide" ${context.state.builder.editMode?.originalAutomation?.visibility === 'org_wide' ? 'selected' : ''}>Organization-Wide</option>
+                </select>
+              </label>
+            </section>
+          ` : ''}
+
           <div class="automations-sidebar-section-title">Reference</div>
           <section class="automations-vars-panel">
             <h3>Shared Data You Can Use</h3>
@@ -1557,6 +1635,18 @@ export function renderBuilder(context) {
               { label: 'Scope', value: context.state.builder.scopeType === 'matter' ? `Matter: ${selectedMatterName(context)}` : 'Organization-wide' },
               { label: 'Publish', value: context.state.builder.publishMode === 'enabled' ? 'Live' : 'Disabled' }
             ])}
+            ${(() => {
+              const failing = preflight.filter((item) => !item.done);
+              if (failing.length === 0) return '';
+              return `
+                <div class="builder-publish-blockers" role="alert">
+                  <strong>Resolve before ${isEdit ? 'saving' : 'publishing'}:</strong>
+                  <ul>
+                    ${failing.map((item) => `<li><strong>${escapeHtml(item.title)}</strong> — ${escapeHtml(item.description)}</li>`).join('')}
+                  </ul>
+                </div>
+              `;
+            })()}
           </div>
           <div class="builder-publish-footer">
             <lex-btn variant="secondary" size="sm" data-close-publish-modal>Cancel</lex-btn>
@@ -2347,7 +2437,7 @@ export async function loadAutomationForEdit(context, automationId) {
       ...base,
       templateId: overdueReminderConfig ? OVERDUE_INVOICE_REMINDER_TEMPLATE_ID : base.templateId,
       name: automation.automation_name || automation.name || '',
-      description: automation.description || '',
+      description: automation.automation_description || automation.description || '',
       category: automation.category || base.category,
       triggerEvent,
       triggerMode: triggerModeFromEvent(triggerEvent),

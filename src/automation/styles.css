@@ -1005,6 +1005,14 @@ button:disabled {
   color: var(--black-500);
 }
 
+.automations-builder-banner-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-right: 8px;
+}
+
 .automations-builder-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
@@ -1149,11 +1157,47 @@ button:disabled {
 .automations-diag-panel,
 .automations-palette-panel,
 .automations-vars-panel,
-.automations-json-panel {
+.automations-json-panel,
+.automations-settings-panel {
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--paper);
   padding: 12px;
+}
+
+.automations-settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.automations-settings-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: var(--black-500);
+}
+
+.automations-settings-panel label span {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.automations-settings-help {
+  margin: 0 0 4px;
+  font-size: 0.75rem;
+  color: var(--black-500);
+  line-height: 1.4;
+}
+
+.automations-settings-panel label > select[size] {
+  height: auto;
+  padding: 4px;
+}
+
+.automations-builder-matter-search {
+  margin-bottom: 4px;
 }
 
 .automations-side-title-row {
@@ -1594,6 +1638,25 @@ button:disabled {
   padding: 14px;
   display: grid;
   gap: 12px;
+}
+
+.builder-publish-blockers {
+  border: 1px solid #f0c040;
+  background: #fff8e1;
+  color: #7a4a00;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.builder-publish-blockers ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.builder-publish-blockers li + li {
+  margin-top: 4px;
 }
 
 .builder-publish-footer {

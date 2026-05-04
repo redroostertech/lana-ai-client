@@ -619,6 +619,16 @@ function onHomeComposerSend(event) {
     ? event.detail.content.trim()
     : '';
   if (!idea) return;
+  // TODO(home-composer-ai): Lana should reason about the user's idea end-to-end:
+  //   1) inspect the available trigger event catalog, action catalog, and
+  //      connectors the org has on hand
+  //   2) propose a multi-step plan back to the user (trigger → conditions →
+  //      actions, with the right scope and matter binding)
+  //   3) once confirmed, synthesize the automation JSON (config + steps) and
+  //      drop the user into the builder pre-populated, not blank
+  // Today this is a passthrough: we drop the raw idea into builder.message and
+  // open the empty builder. Replace this with an /api call that returns a draft
+  // automation config so the builder loads with a real proposed structure.
   state.builder.message = idea;
   syncBuilderJson(createContext());
   gotoBuilder();
@@ -1282,6 +1292,54 @@ async function onAppClick(event) {
     return;
   }
 
+  // Activate/Deactivate from the builder edit banner
+  const builderToggleActiveBtn = event.target.closest('[data-builder-toggle-active]');
+  if (builderToggleActiveBtn) {
+    const automationId = builderToggleActiveBtn.dataset.editAutomationId;
+    const isEnabled = builderToggleActiveBtn.dataset.currentEnabled === 'true';
+    if (!automationId) return;
+    try {
+      await fetchJson(`/api/automations/${encodeURIComponent(automationId)}/${isEnabled ? 'deactivate' : 'activate'}`, {
+        method: 'POST',
+        headers: authHeaders()
+      });
+      const editMode = state.builder.editMode;
+      if (editMode?.originalAutomation) {
+        editMode.originalAutomation.is_enabled = !isEnabled;
+      }
+      state.builder.publishMode = !isEnabled ? 'enabled' : 'disabled';
+      await loadAutomations();
+      renderCurrentView();
+      flash(`Automation ${isEnabled ? 'deactivated' : 'activated'}.`);
+    } catch (err) {
+      flash(err.message || 'Failed to toggle activation.', true);
+    }
+    return;
+  }
+
+  // Delete from the builder edit banner
+  const builderDeleteBtn = event.target.closest('[data-builder-delete]');
+  if (builderDeleteBtn) {
+    const automationId = builderDeleteBtn.dataset.editAutomationId;
+    const automationName = builderDeleteBtn.dataset.editAutomationName || 'this automation';
+    if (!automationId) return;
+    if (!window.confirm(`Delete "${automationName}"? This cannot be undone.`)) return;
+    try {
+      await fetchJson(`/api/v1/automations/${encodeURIComponent(automationId)}`, {
+        method: 'DELETE',
+        headers: authHeaders()
+      });
+      await loadAutomations();
+      state.builder.editMode = { isEdit: false, automationId: null, originalAutomation: null, loading: false };
+      flash('Automation deleted.');
+      setView('library');
+      await refreshCurrentView();
+    } catch (err) {
+      flash(err.message || 'Failed to delete automation.', true);
+    }
+    return;
+  }
+
   if (event.target.closest('[data-close-publish-modal]')) {
     state.builder.publishModalOpen = false;
     renderBuilder(createContext());
@@ -1535,6 +1593,29 @@ async function onAppInput(event) {
     return;
   }
 
+  // Inline visibility selector in the builder edit page — PATCH immediately
+  const builderVisibilityField = event.target.closest('[data-builder-visibility]');
+  if (builderVisibilityField && event.type === 'change') {
+    const automationId = builderVisibilityField.dataset.editAutomationId;
+    const nextVisibility = builderVisibilityField.value;
+    if (!automationId) return;
+    try {
+      await fetchJson(`/api/v1/automations/${encodeURIComponent(automationId)}/visibility`, {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visibility: nextVisibility })
+      });
+      const editMode = state.builder.editMode;
+      if (editMode?.originalAutomation) {
+        editMode.originalAutomation.visibility = nextVisibility;
+      }
+      flash(`Visibility changed to ${nextVisibility === 'org_wide' ? 'Organization-Wide' : 'Private'}.`);
+    } catch (err) {
+      flash(err.message || 'Failed to update visibility.', true);
+    }
+    return;
+  }
+
   const builderField = event.target.closest('[data-builder-field]');
   if (builderField) {
     const fieldName = builderField.dataset.builderField;
@@ -1565,7 +1646,7 @@ async function onAppInput(event) {
       state.builder.triggerMode = String(builderField.value).startsWith('schedule.') ? 'scheduled' : 'event';
     }
 
-    if (fieldName !== 'customJson') {
+    if (fieldName !== 'customJson' && fieldName !== 'matterSearch') {
       syncBuilderJson(createContext());
       const jsonField = document.getElementById('builder-json');
       if (jsonField && jsonField !== builderField) {
@@ -1573,7 +1654,7 @@ async function onAppInput(event) {
       }
     }
 
-    if (fieldName === 'scopeType' || fieldName === 'matterId' || event.type === 'change') {
+    if (fieldName === 'scopeType' || fieldName === 'matterId' || fieldName === 'matterSearch' || event.type === 'change') {
       renderCurrentView();
     }
 
@@ -1651,10 +1732,12 @@ function gotoBuilder(templateId, automationId) {
   if (templateId) {
     const template = getTemplateLibrary().find((entry) => entry.id === templateId);
     applyTemplate(context, template);
-    state.builderStep = 1;
   } else {
-    state.builderStep = 1;
+    // Fresh create — reset to default-template builder state so prior edit data
+    // (name, description, JSON config, scope, etc.) doesn't carry over.
+    applyTemplate(context, getTemplateLibrary()[0]);
   }
+  state.builderStep = 1;
   // Ensure editMode is clean for create flow
   state.builder.editMode = { isEdit: false, automationId: null, originalAutomation: null, loading: false };
   state.builder.publishModalOpen = false;

@@ -111,7 +111,7 @@
     if (!dateString) return 'Never';
     var parts = dateParts(dateString, Object.assign({}, options || {}, { includeTime: false }));
     if (!parts) return 'Never';
-    return parts.month + '/' + parts.day + '/' + parts.year;
+    return Number(parts.month) + '/' + Number(parts.day) + '/' + parts.year;
   }
 
   function formatDateTime(dateString, options) {
@@ -121,7 +121,7 @@
     var hour24 = parts.hour === '24' ? 0 : Number(parts.hour);
     var hour12 = hour24 % 12 || 12;
     var meridiem = hour24 >= 12 ? 'PM' : 'AM';
-    return parts.month + '/' + parts.day + '/' + parts.year + ' ' + String(hour12).padStart(2, '0') + ':' + parts.minute + ' ' + meridiem;
+    return Number(parts.month) + '/' + Number(parts.day) + '/' + parts.year + ' ' + hour12 + ':' + parts.minute + ' ' + meridiem;
   }
 
   // Long format: "May 3, 2026" (or "Sun, May 3" / "Sunday, May 3, 2026" via opts).

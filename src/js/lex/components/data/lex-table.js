@@ -526,7 +526,13 @@
       if (typeof val !== 'string') return false;
       const lower = val.toLowerCase();
       return ['active', 'inactive', 'pending', 'completed', 'failed', 'error',
-              'success', 'open', 'closed', 'draft', 'archived'].includes(lower);
+              'success', 'open', 'closed', 'draft', 'archived',
+              'in_progress', 'running', 'awaiting_approval', 'queued'].includes(lower);
+    }
+
+    _humanizeStatus(val) {
+      const s = String(val).replace(/_/g, ' ');
+      return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
     }
 
     _statusBadgeClass(val) {
@@ -537,7 +543,9 @@
         error: 'lex-bg-danger lex-text-danger', failed: 'lex-bg-danger lex-text-danger',
         inactive: 'lex-bg-neutral lex-text-neutral', closed: 'lex-bg-neutral lex-text-neutral',
         archived: 'lex-bg-neutral lex-text-neutral', draft: 'lex-bg-neutral lex-text-neutral',
-        pending: 'lex-bg-warning lex-text-warning'
+        pending: 'lex-bg-warning lex-text-warning',
+        in_progress: 'lex-bg-warning lex-text-warning', running: 'lex-bg-warning lex-text-warning',
+        awaiting_approval: 'lex-bg-warning lex-text-warning', queued: 'lex-bg-warning lex-text-warning'
       };
       return map[lower] || 'lex-bg-neutral lex-text-neutral';
     }
@@ -815,7 +823,8 @@
         columns.forEach(col => {
           const val = this._formatCellValue(col, row[col]);
           if (this._isStatusValue(val)) {
-            html += `<td class="${cellPad}"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${this._statusBadgeClass(val)}">${this.escapeHtml(val)}</span></td>`;
+            const label = this._humanizeStatus(val);
+            html += `<td class="${cellPad}"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${this._statusBadgeClass(val)}">${this.escapeHtml(label)}</span></td>`;
           } else {
             html += `<td class="${cellPad} lex-text-primary truncate max-w-xs">${this.escapeHtml(String(val))}</td>`;
           }
