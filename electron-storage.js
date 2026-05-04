@@ -121,6 +121,9 @@ function saveServerConnection(server) {
       url: server.url || `http://${server.host}:${server.port}`,
       host: server.host,
       port: server.port,
+      // Public domain (e.g. "redrooster.lanaai.io"); needed to re-call
+      // hosted discovery on logout for background refresh.
+      domain: server.domain || null,
       orgId: server.orgId,
       orgName: server.orgName,
       version: server.version,
@@ -130,6 +133,8 @@ function saveServerConnection(server) {
       burstUrl: server.burstUrl || null,
       tier: server.tier || 'standard',
       rateLimit: server.rateLimit || 100,
+      // Sub-apps available to this organization (drives the client app switcher)
+      enabledApps: Array.isArray(server.enabledApps) ? server.enabledApps : [],
       connectedAt: new Date().toISOString(),
       lastVerified: new Date().toISOString()
     };

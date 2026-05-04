@@ -423,6 +423,31 @@
     }
   }
 
+  function deleteFile() {
+    var file = state.currentFile;
+    var fileId = (file && file.id) || state.fileId;
+    if (!fileId) return;
+    var name = (file && file.filename) || 'this file';
+
+    var run = async function () {
+      try {
+        await api.deleteDocument(fileId, { hard: true });
+        notify('File deleted', 'success');
+        navigateBack();
+      } catch (error) {
+        console.error('[FileViewerPage] Delete error:', error);
+        notify((error && error.message) || 'Failed to delete file', 'error');
+      }
+    };
+
+    var msg = 'Permanently delete "' + name + '"? The file, its embeddings, and related metadata will be removed. This cannot be undone.';
+    if (typeof Lex !== 'undefined' && Lex.Modal && typeof Lex.Modal.confirm === 'function') {
+      Lex.Modal.confirm('Delete File', msg, run);
+    } else if (window.confirm(msg)) {
+      run();
+    }
+  }
+
   // =========================================================================
   // Metadata
   // =========================================================================
@@ -797,6 +822,13 @@
       }
     });
     document.getElementById('toggleSidebarBtn').addEventListener('click', toggleMetadataSidebar);
+
+    var deleteBtn = document.getElementById('viewerDeleteBtn');
+    if (deleteBtn) deleteBtn.addEventListener('click', deleteFile);
+    var errorDeleteBtn = document.getElementById('viewerErrorDelete');
+    if (errorDeleteBtn) errorDeleteBtn.addEventListener('click', deleteFile);
+    var metaDeleteBtn = document.getElementById('metaDeleteBtn');
+    if (metaDeleteBtn) metaDeleteBtn.addEventListener('click', deleteFile);
 
     // Template buttons
     _initDocxTemplateModal();

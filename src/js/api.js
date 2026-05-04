@@ -772,6 +772,108 @@ class ApiClient {
       };
     }
 
+    // -------------------- TASK PLANS --------------------
+    if (path === '/api/v1/task-plans' && method === 'GET') {
+      const plans = mock.taskPlans || [
+        {
+          id: 'tp-demo-1',
+          title: 'Client Intake Checklist',
+          description: 'Draft shell for onboarding a new client and creating native tasks at publish time.',
+          status: 'draft',
+          source_type: 'manual',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          items: [
+            { title: 'Confirm client identity and contact details' },
+            { title: 'Open matter workspace' },
+            { title: 'Prepare engagement letter' }
+          ]
+        }
+      ];
+      return { task_plans: plans, total: plans.length };
+    }
+
+    if (path.match(/\/api\/v1\/task-plans\/[^/]+$/) && method === 'GET') {
+      const planId = path.split('/').pop();
+      const plans = mock.taskPlans || [];
+      const plan = plans.find(p => p.id === planId) || {
+        id: planId,
+        title: 'Task Plan',
+        description: 'Demo task plan detail.',
+        status: 'draft',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        items: []
+      };
+      return { task_plan: plan };
+    }
+
+    if (path === '/api/v1/task-plans' && method === 'POST') {
+      const newPlan = {
+        id: mock.generateId?.('tp') || 'tp-new',
+        ...data,
+        status: 'draft',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        items: []
+      };
+      return { task_plan: newPlan, message: 'Task plan created (demo mode)' };
+    }
+
+    if (path.match(/\/api\/v1\/task-plans\/[^/]+$/) && method === 'PATCH') {
+      const planId = path.split('/').pop();
+      return {
+        task_plan: {
+          id: planId,
+          title: data?.title || 'Updated Task Plan',
+          description: data?.description || 'Updated demo task plan.',
+          status: data?.status || 'draft',
+          source_type: data?.source_type || 'manual',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          items: data?.items || []
+        },
+        message: 'Task plan updated (demo mode)'
+      };
+    }
+
+    if (path === '/api/v1/task-plans/generate-draft' && method === 'POST') {
+      const newPlan = {
+        id: mock.generateId?.('tp') || 'tp-lana-draft',
+        title: data?.title || 'Lana Draft Plan',
+        description: data?.description || 'Generated demo task plan draft.',
+        status: 'draft',
+        source_type: 'lana_draft',
+        metadata: {
+          ...(data?.metadata || {}),
+          draft_instructions: data?.draft_instructions || null
+        },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        items: [
+          { title: 'Review draft recommendations', priority: 'medium' },
+          { title: 'Confirm matter and assignee details', priority: 'medium' }
+        ]
+      };
+      return { task_plan: newPlan, message: 'Lana draft generated (demo mode)' };
+    }
+
+    if (path.match(/\/api\/v1\/task-plans\/[^/]+\/publish$/) && method === 'POST') {
+      const planId = path.split('/')[4];
+      return {
+        task_plan: {
+          id: planId,
+          title: data?.title || 'Published Task Plan',
+          description: 'Published demo task plan.',
+          status: 'published',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          items: []
+        },
+        message: 'Task plan published (demo mode)'
+      };
+    }
+
     // -------------------- AUDIT --------------------
     if (path === '/api/v1/audit/logs' && method === 'GET') {
       return { logs: mock.auditLogs || [], total: (mock.auditLogs || []).length };
@@ -1243,6 +1345,35 @@ class ApiClient {
   }
 
   // ============================================================
+  // Task Plans
+  // ============================================================
+  async getTaskPlans(filters = {}) {
+    const params = new URLSearchParams(filters);
+    const query = params.toString();
+    return this.get(`/api/v1/task-plans${query ? `?${query}` : ''}`);
+  }
+
+  async getTaskPlan(planId) {
+    return this.get(`/api/v1/task-plans/${planId}`);
+  }
+
+  async createTaskPlan(planData) {
+    return this.post('/api/v1/task-plans', planData);
+  }
+
+  async generateTaskPlanDraft(planData) {
+    return this.post('/api/v1/task-plans/generate-draft', planData);
+  }
+
+  async updateTaskPlan(planId, planData) {
+    return this.patch(`/api/v1/task-plans/${planId}`, planData);
+  }
+
+  async publishTaskPlan(planId, options = {}) {
+    return this.post(`/api/v1/task-plans/${planId}/publish`, options);
+  }
+
+  // ============================================================
   // Matters
   // ============================================================
   async getMatters(page = 1, pageSize = 20, filters = {}) {
@@ -1522,6 +1653,12 @@ class ApiClient {
    */
   async getMatterTasks(matterId) {
     return this.get(`/api/v1/matters/${matterId}/tasks`);
+  }
+
+  async getMyTasks(filters = {}) {
+    const params = new URLSearchParams(filters);
+    const query = params.toString();
+    return this.get(`/api/v1/tasks/my${query ? `?${query}` : ''}`);
   }
 
   /**
@@ -1884,8 +2021,10 @@ class ApiClient {
    * @param {string} documentId - The document ID
    * @returns {Promise<Object>} Deletion result
    */
-  async deleteDocument(documentId) {
-    return this.delete(`/api/v1/storage/${documentId}`);
+  async deleteDocument(documentId, options) {
+    const hard = !!(options && options.hard);
+    const path = `/api/v1/storage/${documentId}` + (hard ? '?hard=true' : '');
+    return this.delete(path);
   }
 
   /**

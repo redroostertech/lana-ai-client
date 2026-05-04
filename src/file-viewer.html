@@ -61,6 +61,11 @@
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
           Generate
         </lex-btn>
+        <!-- Delete file -->
+        <lex-btn id="viewerDeleteBtn" variant="ghost" title="Delete file">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a2 2 0 012-2h2a2 2 0 012 2v3"></path></svg>
+          Delete
+        </lex-btn>
         <!-- Toggle Metadata Sidebar -->
         <lex-btn id="toggleSidebarBtn" variant="ghost" icon="true" title="Toggle metadata sidebar">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -102,6 +107,10 @@
               <lex-btn id="viewerErrorDownload" variant="primary">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                 Download Instead
+              </lex-btn>
+              <lex-btn id="viewerErrorDelete" variant="danger">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a2 2 0 012-2h2a2 2 0 012 2v3"></path></svg>
+                Delete File
               </lex-btn>
             </div>
           </div>
@@ -219,9 +228,15 @@
         </div>
 
         <!-- Metadata Actions Footer (Edit Mode Only) -->
-        <div id="metaActionsFooter" class="hidden px-4 py-3 border-t flex items-center justify-end gap-2" style="border-color: var(--lex-border-default); background-color: var(--lex-bg-secondary)">
-          <lex-btn id="metaCancelBtn" variant="secondary">Cancel</lex-btn>
-          <lex-btn id="metaSaveBtn" variant="primary">Save Changes</lex-btn>
+        <div id="metaActionsFooter" class="hidden px-4 py-3 border-t flex items-center justify-between gap-2" style="border-color: var(--lex-border-default); background-color: var(--lex-bg-secondary)">
+          <lex-btn id="metaDeleteBtn" variant="danger">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a2 2 0 012-2h2a2 2 0 012 2v3"></path></svg>
+            Delete
+          </lex-btn>
+          <div class="flex items-center gap-2">
+            <lex-btn id="metaCancelBtn" variant="secondary">Cancel</lex-btn>
+            <lex-btn id="metaSaveBtn" variant="primary">Save Changes</lex-btn>
+          </div>
         </div>
       </div>
 

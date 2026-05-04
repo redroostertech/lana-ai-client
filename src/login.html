@@ -355,6 +355,9 @@
           api.baseUrl = savedServer.url;
           // Show Step 2 directly
           showStep2(savedServer);
+          // Fire-and-forget: refresh org metadata so admin-side changes
+          // (enabled_apps, tier, etc.) propagate between sessions.
+          refreshOrgFromDiscovery(savedServer);
         }
       } catch (e) {
         console.warn('[Login] Failed to parse saved server:', e);
@@ -455,6 +458,57 @@
           throw new Error('Unable to reach discovery service. Please check your internet connection.');
         }
         throw error;
+      }
+    }
+
+    /**
+     * Background refresh of org metadata when auto-resuming a saved session.
+     * Re-calls hosted discovery so admin-side changes (enabled_apps, tier,
+     * burst keys, etc.) propagate without forcing the user to re-enter org
+     * details. Network details (url/host/port) are left alone — those were
+     * established and verified during the original Step 1 flow.
+     */
+    async function refreshOrgFromDiscovery(savedServer) {
+      if (!savedServer || !savedServer.orgId || !savedServer.domain) {
+        return;
+      }
+      try {
+        const response = await fetch(HOSTED_DISCOVERY_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            org_id: savedServer.orgId,
+            domain: savedServer.domain
+          }),
+          signal: AbortSignal.timeout(5000)
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (data.status !== 'healthy' || !data.server) return;
+
+        const merged = {
+          ...savedServer,
+          orgName: data.server.org_name || savedServer.orgName,
+          version: data.server.version || savedServer.version,
+          apiVersion: data.server.api_version || savedServer.apiVersion,
+          tier: data.tier || 'standard',
+          rateLimit: data.rate_limit || 100,
+          burstApiKey: data.burst_api_key || null,
+          burstUrl: data.burst_url || null,
+          enabledApps: Array.isArray(data.enabled_apps) ? data.enabled_apps : []
+        };
+
+        localStorage.setItem('lana_saved_server', JSON.stringify(merged));
+        if (window.electronAPI) {
+          await window.electronAPI.saveSettings(merged);
+        }
+        if (typeof connectedOrgName !== 'undefined' && connectedOrgName) {
+          connectedOrgName.textContent = merged.orgName || merged.orgId;
+        }
+        resolvedServerInfo = merged;
+        console.log('[Login] Org metadata refreshed from discovery');
+      } catch (err) {
+        console.warn('[Login] Background discovery refresh failed:', err && err.message);
       }
     }
 

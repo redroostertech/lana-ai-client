@@ -1014,11 +1014,11 @@
     }
 
     _getDefaultAppItems() {
+      // Safe fallback when discovery hasn't supplied enabled_apps yet
+      // (e.g. first launch, missing field, parse error). LanaWorks is the
+      // baseline app every org has; other sub-apps must be explicitly enabled.
       return [
-        { id: 'lana-works', label: 'LanaWorks', description: 'Manage matters, workspaces and client operations', route: 'dashboard.html', colors: ['#82d8ff', '#4267df', '#126f62', '#111827'] },
-        { id: 'lana-automations', label: 'LanaAutomate', description: 'Build, deploy and monitor automated workflows', route: 'automation/index.html', colors: ['#ffd16f', '#f97316', '#7c3aed', '#4c1d95'] },
-        { id: 'lana-insights', label: 'LanaInsights', description: 'Analyze performance, trends and business intelligence', route: 'admin/analytics.html', colors: ['#9debd0', '#10b981', '#0f766e', '#111827'] },
-        { id: 'lana-voice', label: 'LanaVoice', description: 'Capture, transcribe and route voice intake', route: 'voice/index.html', colors: ['#f3f4f6', '#9ca3af', '#6b7280', '#111827'] }
+        { id: 'lana-works', label: 'LanaWorks', description: 'Manage matters, workspaces and client operations', route: 'dashboard.html', colors: ['#82d8ff', '#4267df', '#126f62', '#111827'] }
       ];
     }
 

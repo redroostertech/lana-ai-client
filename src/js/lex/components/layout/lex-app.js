@@ -730,6 +730,7 @@
         : [
             { id: 'dashboard', label: 'Dashboard', icon: 'home', href: 'dashboard.html' },
             { id: 'search', label: 'Search Conversations', icon: 'search', href: 'search-conversations.html' },
+            { id: 'my-tasks', label: 'My Tasks', icon: 'clipboard-check', href: 'my-tasks.html' },
             { id: 'workspaces', label: 'Workspaces', icon: 'briefcase', href: 'workspaces.html' }
           ];
 

@@ -29,14 +29,79 @@
 
 .cc-action-row {
   display: grid;
-  grid-template-columns: 1fr; /* Full width — Zone D (Lana Tasks) hidden */
+  grid-template-columns: 1fr;
   gap: 1.25rem;
   margin-bottom: 1.25rem;
   align-items: start;
 }
-/* Restore two-column when Zone D is re-enabled:
-   grid-template-columns: 3fr 2fr;
-*/
+
+#ccZoneD,
+#ccZoneD lex-card {
+  width: 100%;
+}
+
+#ccZoneDContent {
+  max-height: 28rem;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.cc-task-section {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.cc-task-section + .cc-task-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--lex-border-subtle, rgba(0,0,0,0.06));
+}
+
+.cc-task-section__heading {
+  font-size: var(--lex-body-xs-size);
+  font-weight: var(--lex-weight-semibold);
+  color: var(--lex-text-secondary);
+  text-transform: uppercase;
+}
+
+.cc-task-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--lex-border-subtle, rgba(0,0,0,0.06));
+  border-radius: var(--lex-radius-md, 0.5rem);
+  background: var(--lex-bg-primary);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.cc-task-row:hover {
+  background: var(--lex-bg-secondary);
+  border-color: var(--lex-border-default);
+}
+
+.cc-task-row__title {
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-sm-size);
+  font-weight: var(--lex-weight-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cc-task-row__meta {
+  color: var(--lex-text-tertiary);
+  font-size: var(--lex-body-xs-size);
+  margin-top: 0.125rem;
+}
+
+.cc-task-empty {
+  color: var(--lex-text-tertiary);
+  font-size: var(--lex-body-sm-size);
+  padding: 0.75rem;
+}
 
 
 /* ==========================================================================
@@ -470,4 +535,3 @@
   background: var(--lex-color-info-500);
   transition: width 0.4s ease;
 }
-

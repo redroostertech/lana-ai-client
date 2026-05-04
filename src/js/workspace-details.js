@@ -3257,10 +3257,16 @@
           '</svg>' +
           '<h4 class="text-lg font-semibold text-gray-900 mb-2">No tasks yet</h4>' +
           '<p class="text-gray-500 mb-4">Create a task or connect ActionStep to import tasks</p>' +
-          '<button onclick="openCreateTaskModal(\'' + matter.matter_id + '\')" class="inline-flex items-center gap-2 px-4 py-2 lex-bg-accent hover:lex-bg-accent text-white text-sm rounded-lg font-medium transition-colors">' +
-            '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>' +
-            'Create Task' +
-          '</button>' +
+          '<div class="flex flex-wrap justify-center gap-2">' +
+            '<button onclick="openCreateTaskModal(\'' + matter.matter_id + '\')" class="inline-flex items-center gap-2 px-4 py-2 lex-bg-accent hover:lex-bg-accent text-white text-sm rounded-lg font-medium transition-colors">' +
+              '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>' +
+              'Create Task' +
+            '</button>' +
+            '<button onclick="openTaskPlansForMatter(\'' + matter.matter_id + '\')" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 text-sm rounded-lg font-medium hover:bg-gray-50 transition-colors">' +
+              '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 11l3 3L22 4"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path></svg>' +
+              'Create Task Plan' +
+            '</button>' +
+          '</div>' +
         '</div>';
       return;
     }
@@ -3309,10 +3315,16 @@
             '<h3 class="text-lg font-semibold text-gray-900">Task Board</h3>' +
             '<p class="text-sm text-gray-500">' + lanaCount + ' LANA tasks, ' + externalCount + ' external tasks</p>' +
           '</div>' +
-          '<button onclick="openCreateTaskModal(\'' + matterId + '\')" class="px-4 py-2 lex-bg-accent text-white rounded-lg hover:lex-bg-accent transition-colors text-sm font-medium flex items-center gap-2">' +
-            '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>' +
-            'Create Task' +
-          '</button>' +
+          '<div class="flex flex-wrap gap-2">' +
+            '<button onclick="openTaskPlansForMatter(\'' + matterId + '\')" class="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium flex items-center gap-2">' +
+              '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 11l3 3L22 4"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path></svg>' +
+              'Task Plan' +
+            '</button>' +
+            '<button onclick="openCreateTaskModal(\'' + matterId + '\')" class="px-4 py-2 lex-bg-accent text-white rounded-lg hover:lex-bg-accent transition-colors text-sm font-medium flex items-center gap-2">' +
+              '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>' +
+              'Create Task' +
+            '</button>' +
+          '</div>' +
         '</div>' +
         '<div class="overflow-x-auto -mx-6 px-6">' +
           '<div class="inline-flex gap-4 min-w-full pb-4">' +
@@ -5003,19 +5015,25 @@
     currentEditingTask = null;
   }
 
+  function openTaskPlansForMatter(matterId) {
+    if (!matterId) return;
+    window.location.href = 'admin/task-plans.html?matter_id=' + encodeURIComponent(matterId);
+  }
+
   // =========================================================================
   // Window globals for task modal handlers
   // =========================================================================
 
   window.populateTaskAssignees = populateTaskAssignees;
   window.openCreateTaskModal = openCreateTaskModal;
+  window.openTaskPlansForMatter = openTaskPlansForMatter;
   window.editTask = editTask;
   window.quickCompleteTask = quickCompleteTask;
   window.deleteTask = deleteTask;
   window.saveTask = saveTask;
   window.closeTaskModal = closeTaskModal;
 
-  ['populateTaskAssignees', 'openCreateTaskModal', 'editTask',
+  ['populateTaskAssignees', 'openCreateTaskModal', 'openTaskPlansForMatter', 'editTask',
    'quickCompleteTask', 'deleteTask', 'saveTask', 'closeTaskModal'].forEach(_trackGlobal);
 
   // =========================================================================

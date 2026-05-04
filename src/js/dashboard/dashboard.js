@@ -203,36 +203,32 @@
    * Update Zone A matters button once stats are loaded.
    * When matters > 0: shows "X active matters" → navigates to matters page.
    * When matters = 0: shows "Create a new matter" → navigates to create flow.
-   * @param {number|string} matterCount - Visible matters count
+   * @param {number|string} matterCount - Visible matters count (compact-formatted string or number)
    */
   function updateZoneAPills(matterCount) {
-    var mattersBtn     = el('ccZoneAMatters');
-    var mattersCountEl = el('ccZoneAMattersCount');
+    var mattersBtn = el('ccZoneAMatters');
     if (!mattersBtn) return;
 
     var count = parseInt(String(matterCount), 10);
     var hasMatters = !isNaN(count) && count > 0;
 
-    if (hasMatters) {
-      mattersBtn.variant = 'secondary';
-      if (mattersCountEl) {
-        mattersCountEl.textContent = String(matterCount);
-        mattersCountEl.style.display = '';
+    // Set variant first; this may queue a re-render via lex-btn's
+    // _scheduleUpdate (microtask). lex-btn restores _originalChildren on
+    // every re-render, so any synchronous mutation of slot children
+    // (textContent, display:none) gets clobbered. Defer the content swap
+    // with Promise.resolve().then() so it lands AFTER the variant re-render.
+    mattersBtn.variant = hasMatters ? 'secondary' : 'primary';
+
+    Promise.resolve().then(function () {
+      var slot = mattersBtn.querySelector('slot-content') || mattersBtn;
+      if (hasMatters) {
+        slot.innerHTML = '<span id="ccZoneAMattersCount">' +
+          Utils.escapeHtml(String(matterCount)) +
+          '</span> active matters';
+      } else {
+        slot.innerHTML = 'Create a new matter';
       }
-      // Replace text nodes after the span
-      var lastText = mattersBtn.lastChild;
-      if (lastText && lastText.nodeType === 3) {
-        lastText.textContent = ' active matters';
-      }
-    } else {
-      mattersBtn.variant = 'primary';
-      if (mattersCountEl) mattersCountEl.style.display = 'none';
-      // Replace text to "Create a new matter"
-      var lastText2 = mattersBtn.lastChild;
-      if (lastText2 && lastText2.nodeType === 3) {
-        lastText2.textContent = 'Create a new matter';
-      }
-    }
+    });
   }
 
   // =========================================================================
@@ -757,47 +753,48 @@
   }
 
   // =========================================================================
-  // Zone D — Lana Tasks (live status)
+  // Zone D — My Tasks
   // =========================================================================
 
-  /**
-   * Status dot color for a Lana task status.
-   * @param {string} status
-   * @returns {string} CSS color value
-   */
-  function lanaTaskStatusColor(status) {
-    if (status === 'running' || status === 'compiling_context') return '#3b82f6';
-    if (status === 'awaiting_input')    return '#f59e0b';
-    if (status === 'awaiting_approval') return '#f59e0b';
-    if (status === 'completed')         return '#10b981';
-    if (status === 'failed')            return '#ef4444';
-    if (status === 'rejected')          return '#ef4444';
-    if (status === 'cancelled')         return '#6b7280';
-    return '#9ca3af';
+  function dashboardTaskPriorityColor(priority) {
+    if (priority === 'high') return 'red';
+    if (priority === 'medium' || priority === 'normal') return 'yellow';
+    return 'gray';
   }
 
-  /**
-   * Human-readable label for a Lana task status.
-   * @param {string} status
-   * @returns {string}
-   */
-  function lanaTaskStatusLabel(status) {
-    if (!status) return 'Pending';
-    if (status === 'compiling_context') return 'Compiling...';
-    if (status === 'running')           return 'Running';
-    if (status === 'awaiting_input')    return 'Needs Input';
-    if (status === 'awaiting_approval') return 'Pending Approval';
-    if (status === 'completed')         return 'Completed';
-    if (status === 'failed')            return 'Failed';
-    if (status === 'rejected')          return 'Rejected';
-    if (status === 'cancelled')         return 'Cancelled';
-    return status;
+  function dashboardTaskScope(task) {
+    return task && task.matter_id ? 'Matter' : 'Org';
   }
 
-  /**
-   * Render Lana Tasks zone — shows up to 5 active/recent Lana tasks.
-   * @returns {Promise<void>}
-   */
+  function dashboardTaskPlanLabel(task) {
+    if (!task) return '';
+    return task.task_plan_title || (task.task_plan_id ? 'Task group' : '');
+  }
+
+  function isTaskDueToday(task) {
+    if (!task || !task.due_date) return false;
+    var due = new Date(task.due_date);
+    var today = new Date();
+    return due.getFullYear() === today.getFullYear() &&
+      due.getMonth() === today.getMonth() &&
+      due.getDate() === today.getDate();
+  }
+
+  function renderDashboardTaskRow(title, meta, priority, countLabel) {
+    return [
+      '<div class="cc-task-row" data-nav="my-tasks">',
+      '  <div style="min-width:0;">',
+      '    <div class="cc-task-row__title">' + escHtml(title || 'Untitled task') + '</div>',
+      meta ? '    <div class="cc-task-row__meta">' + escHtml(meta) + '</div>' : '',
+      '  </div>',
+      '  <div style="display:flex;align-items:center;gap:0.375rem;">',
+      countLabel ? '    <lex-badge label="' + escHtml(countLabel) + '" color="gray"></lex-badge>' : '',
+      priority ? '    <lex-badge label="' + escHtml(priority) + '" color="' + escHtml(dashboardTaskPriorityColor(priority)) + '"></lex-badge>' : '',
+      '  </div>',
+      '</div>'
+    ].join('');
+  }
+
   async function renderZoneD() {
     var loadingEl = el('ccZoneDLoading');
     var contentEl = el('ccZoneDContent');
@@ -806,59 +803,93 @@
     var tasks = [];
 
     try {
-      var result = await api.get('/api/v1/agentic-tasks?limit=5&sort_by=created_at&sort_order=desc');
-      tasks = (result && result.data) || [];
+      var result = await api.getMyTasks({
+        limit: 50,
+        offset: 0,
+        statuses: 'pending,in_progress,in_review',
+        sort_by: 'updated_at',
+        sort_dir: 'DESC'
+      });
+      tasks = (result && result.data && result.data.tasks) || (result && result.tasks) || [];
     } catch (err) {
-      console.warn('[Dashboard Zone D] Could not load Lana tasks:', err && err.message);
+      console.warn('[Dashboard Zone D] Could not load my tasks:', err && err.message);
     }
 
     if (loadingEl) hide(loadingEl);
 
     if (tasks.length === 0) {
       contentEl.innerHTML =
-        '<lex-empty icon="zap" message="No Lana tasks yet" description="Assign actions to Lana from the action queue"></lex-empty>';
+        '<lex-empty icon="tasks" message="No outstanding tasks" description="Assigned tasks will appear here."></lex-empty>';
       show(contentEl);
       return;
     }
 
-    var html = '';
+    var todayTasks = tasks.filter(isTaskDueToday).slice(0, 4);
+    var grouped = {};
+    var ungrouped = [];
+
     for (var i = 0; i < tasks.length; i++) {
       var task = tasks[i];
-      var status = task.execution_status || 'pending';
-      var dotColor = lanaTaskStatusColor(status);
-      var statusText = escHtml(lanaTaskStatusLabel(status));
-      var title = escHtml(task.name || 'Untitled task');
-      var ts = task.created_at ? escHtml(timeAgo(task.created_at)) : '';
-
-      html +=
-        '<div class="cc-lana-task-row" data-task-id="' + escHtml(task.id) + '" ' +
-          'style="padding:10px 12px;cursor:pointer;transition:background 0.15s ease;' +
-          'border-bottom:1px solid var(--lex-border-subtle, rgba(0,0,0,0.06));" ' +
-          'onmouseenter="this.style.background=\'var(--lex-bg-secondary)\'" onmouseleave="this.style.background=\'transparent\'">' +
-          '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">' +
-            '<div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1;">' +
-              '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + dotColor + ';flex-shrink:0;' +
-                ((status === 'running' || status === 'compiling_context') ? 'animation:cc-pulse 1.5s ease-in-out infinite;' : '') +
-              '"></span>' +
-              '<span style="font-size:0.8125rem;color:var(--lex-text-primary);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + title + '</span>' +
-            '</div>' +
-            '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">' +
-              '<span style="font-size:0.6875rem;color:var(--lex-text-tertiary);">' + statusText + '</span>' +
-              (ts ? '<span style="font-size:0.6875rem;color:var(--lex-text-tertiary);">' + ts + '</span>' : '') +
-            '</div>' +
-          '</div>' +
-        '</div>';
+      if (task.task_plan_id) {
+        if (!grouped[task.task_plan_id]) {
+          grouped[task.task_plan_id] = {
+            title: dashboardTaskPlanLabel(task),
+            count: 0,
+            priority: task.priority || 'normal'
+          };
+        }
+        grouped[task.task_plan_id].count++;
+      } else {
+        ungrouped.push(task);
+      }
     }
 
-    contentEl.innerHTML = html;
+    var groupRows = Object.keys(grouped).slice(0, 4).map(function (id) {
+      var group = grouped[id];
+      return renderDashboardTaskRow(
+        group.title,
+        'Task group',
+        group.priority,
+        group.count + ' task' + (group.count === 1 ? '' : 's')
+      );
+    }).join('');
+
+    var outstandingRows = groupRows;
+    var remainingSlots = Math.max(0, 5 - Object.keys(grouped).slice(0, 4).length);
+    outstandingRows += ungrouped.slice(0, remainingSlots).map(function (task) {
+      return renderDashboardTaskRow(
+        task.title,
+        dashboardTaskScope(task),
+        task.priority || 'normal',
+        ''
+      );
+    }).join('');
+
+    var todayRows = todayTasks.map(function (task) {
+      return renderDashboardTaskRow(
+        task.title,
+        dashboardTaskScope(task),
+        task.priority || 'normal',
+        ''
+      );
+    }).join('');
+
+    contentEl.innerHTML = [
+      '<div class="cc-task-section">',
+      '  <div class="cc-task-section__heading">Today</div>',
+      todayRows || '  <div class="cc-task-empty">No tasks due today</div>',
+      '</div>',
+      '<div class="cc-task-section">',
+      '  <div class="cc-task-section__heading">Outstanding</div>',
+      outstandingRows || '  <div class="cc-task-empty">No outstanding task groups</div>',
+      '</div>'
+    ].join('');
     show(contentEl);
 
-    // Wire click → navigate to task detail
-    var rows = contentEl.querySelectorAll('.cc-lana-task-row');
+    var rows = contentEl.querySelectorAll('[data-nav="my-tasks"]');
     for (var j = 0; j < rows.length; j++) {
       rows[j].addEventListener('click', function () {
-        var taskId = this.getAttribute('data-task-id');
-        if (taskId) Lex.Nav.go('agentic-task-detail.html', { params: { id: taskId } });
+        Lex.Nav.go('my-tasks.html');
       });
     }
   }
@@ -2395,15 +2426,15 @@
       });
     }
 
-    // Zone D — View all Lana tasks
+    // Zone D — View all my tasks
     var zoneDViewAll = el('ccZoneDViewAll');
     if (zoneDViewAll) {
       zoneDViewAll.addEventListener('click', function () {
-        Lex.Nav.go('agentic-tasks.html');
+        Lex.Nav.go('my-tasks.html');
       });
     }
 
-    // Zone D — silent polling every 30s (tasks may change status frequently)
+    // Zone D — silent polling every 30s
     _intervals.push(setInterval(function () {
       if (document.hidden) return;
       renderZoneD();
