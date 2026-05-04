@@ -368,6 +368,91 @@
   gap: 12px;
 }
 
+/* Sparkline — small inline SVG above the KPI cards. Visual polish only;
+   the cards remain the source of truth for the numbers. */
+.agent-detail-stats-sparkline-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--lex-bg-secondary);
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: var(--lex-radius-md, 8px);
+}
+
+.agent-detail-stats-sparkline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+}
+
+.agent-detail-stats-sparkline-title {
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.agent-detail-stats-sparkline-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.agent-detail-stats-sparkline-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.6875rem;
+  color: var(--lex-text-secondary);
+}
+
+.agent-detail-stats-sparkline-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 2px;
+  border-radius: 1px;
+}
+
+.agent-detail-stats-sparkline-swatch--total {
+  background: var(--lex-text-tertiary);
+}
+
+.agent-detail-stats-sparkline-swatch--completed {
+  background: var(--lex-status-success, var(--lex-text-accent, #2563eb));
+}
+
+.agent-detail-stats-sparkline {
+  display: block;
+  width: 100%;
+  max-width: 200px;
+  height: 40px;
+  overflow: visible;
+}
+
+.agent-detail-stats-sparkline-line {
+  stroke-width: 1.25;
+  vector-effect: non-scaling-stroke;
+}
+
+.agent-detail-stats-sparkline-line--total {
+  stroke: var(--lex-text-tertiary);
+}
+
+.agent-detail-stats-sparkline-line--completed {
+  stroke: var(--lex-status-success, var(--lex-text-accent, #2563eb));
+}
+
+.agent-detail-stats-sparkline-dot--completed {
+  fill: var(--lex-status-success, var(--lex-text-accent, #2563eb));
+}
+
+.agent-detail-stats-sparkline-hit {
+  cursor: default;
+}
+
 .agent-detail-stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

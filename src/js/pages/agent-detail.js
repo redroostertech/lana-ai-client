@@ -1014,6 +1014,11 @@
             + '?since=' + encodeURIComponent(w.since)
             + '&until=' + encodeURIComponent(w.until);
 
+    // Fire the trends fetch in parallel — the sparkline is independent of
+    // the KPI cards and we don't want to block on it. Failures hide the
+    // sparkline area cleanly without affecting the rest of the tab.
+    loadStatsTrends(w);
+
     window.api.get(url)
       .then(function (resp) {
         _statsLoaded = true;
@@ -1144,6 +1149,172 @@
       return;
     }
     node.innerHTML = html;
+  }
+
+  // -------------------------------------------------------------------------
+  // Sparkline — total vs completed runs over the selected window.
+  // -------------------------------------------------------------------------
+
+  // Pick a sensible bucket size for the picked window. The brief asks for
+  // 'day' as the default; we keep 'day' regardless of range so the
+  // sparkline density scales naturally.
+  function loadStatsTrends(w) {
+    var wrap = el('agentDetailStatsSparklineWrap');
+    if (!wrap) return;
+    // Hide on every (re)load — we either re-show with fresh data, or
+    // leave it hidden if the endpoint isn't available.
+    hide(wrap);
+
+    if (!_slug) return;
+    if (!window.api || typeof window.api.get !== 'function') return;
+
+    var url = '/api/v1/agents/' + encodeURIComponent(_slug) + '/stats/trends'
+            + '?since=' + encodeURIComponent(w.since)
+            + '&until=' + encodeURIComponent(w.until)
+            + '&bucket=day';
+
+    window.api.get(url)
+      .then(function (resp) {
+        // Backend returns { agent, bucket, window, series: [...] }.
+        // Tolerate { data: ... } and bare-array shapes.
+        var payload = (resp && resp.data) ? resp.data : resp;
+        var series = (payload && Array.isArray(payload.series)) ? payload.series
+                   : (Array.isArray(payload) ? payload : []);
+        if (!series || series.length === 0) {
+          hide(wrap);
+          return;
+        }
+        renderSparkline(series);
+        show(wrap);
+      })
+      .catch(function (err) {
+        var status = err && (err.status || (err.response && err.response.status));
+        if (status === 404 || status === 501) {
+          // Endpoint not yet shipped — hide cleanly.
+          hide(wrap);
+          return;
+        }
+        // Any other error — also hide. The KPI cards still load and
+        // surface their own errors; we don't want a sparkline failure
+        // to clutter the tab.
+        console.warn('[agent-detail] Trends fetch failed:', err);
+        hide(wrap);
+      });
+  }
+
+  // Hand-rolled SVG sparkline. Two polylines (total + completed) sharing
+  // the same y-axis scale (max of both series). 200x40 viewBox, normalized
+  // so the polyline fills the box. No charting library; no regex.
+  function renderSparkline(series) {
+    var svg = el('agentDetailStatsSparkline');
+    if (!svg) return;
+
+    // Normalize the series — drop bad rows, coerce numbers.
+    var points = [];
+    for (var i = 0; i < series.length; i++) {
+      var p = series[i];
+      if (!p || typeof p !== 'object') continue;
+      var ts = p.ts || p.bucket || p.timestamp || '';
+      var total = Number(p.total != null ? p.total : 0);
+      var completed = Number(p.completed != null ? p.completed : 0);
+      if (isNaN(total)) total = 0;
+      if (isNaN(completed)) completed = 0;
+      points.push({ ts: ts, total: total, completed: completed });
+    }
+
+    if (points.length === 0) {
+      svg.innerHTML = '';
+      return;
+    }
+
+    // Compute y-axis max from both series so they share the same scale.
+    var maxV = 0;
+    for (var j = 0; j < points.length; j++) {
+      if (points[j].total > maxV) maxV = points[j].total;
+      if (points[j].completed > maxV) maxV = points[j].completed;
+    }
+    if (maxV <= 0) maxV = 1;
+
+    // Map indices to x coords across [0, 200] and values to y across
+    // [38, 2] (top of viewBox is 0; flipped so taller bars sit higher).
+    // When there's a single point, keep it centered to avoid NaN x.
+    var W = 200;
+    var H = 40;
+    var pad = 2;
+    var xStep = points.length > 1 ? (W / (points.length - 1)) : 0;
+
+    function xFor(idx) {
+      if (points.length === 1) return W / 2;
+      return idx * xStep;
+    }
+    function yFor(v) {
+      var ratio = v / maxV;
+      // 0..1 → (H - pad) downward → (pad) upward
+      return (H - pad) - ratio * (H - pad * 2);
+    }
+
+    function buildPath(field) {
+      // SVG points string: "x1,y1 x2,y2 ..."
+      var parts = [];
+      for (var k = 0; k < points.length; k++) {
+        parts.push(xFor(k).toFixed(2) + ',' + yFor(points[k][field]).toFixed(2));
+      }
+      return parts.join(' ');
+    }
+
+    var totalPts = buildPath('total');
+    var completedPts = buildPath('completed');
+
+    // Build per-point hover targets so the user gets a tooltip on the
+    // closest bucket. The tooltip text is rendered via the native title
+    // element (no lex-tooltip primitive yet).
+    var hoverHtml = '';
+    for (var m = 0; m < points.length; m++) {
+      var hx = xFor(m).toFixed(2);
+      var titleText = formatBucketTooltip(points[m]);
+      // Wider invisible bands centered on the data point so the tooltip
+      // is easy to hit. Each band gets its own <title>.
+      var bandW = (xStep > 0 ? Math.max(xStep, 6) : 24);
+      var bandX = (Number(hx) - bandW / 2).toFixed(2);
+      hoverHtml += ''
+        + '<rect class="agent-detail-stats-sparkline-hit" '
+        + 'x="' + bandX + '" y="0" '
+        + 'width="' + bandW.toFixed(2) + '" height="' + H + '" '
+        + 'fill="transparent">'
+        + '<title>' + escHtml(titleText) + '</title>'
+        + '</rect>';
+      // Also a small dot at each data point on the completed series so
+      // the user can read individual buckets.
+      hoverHtml += ''
+        + '<circle class="agent-detail-stats-sparkline-dot agent-detail-stats-sparkline-dot--completed" '
+        + 'cx="' + hx + '" cy="' + yFor(points[m].completed).toFixed(2) + '" r="1.5" />';
+    }
+
+    svg.innerHTML = ''
+      + '<polyline class="agent-detail-stats-sparkline-line agent-detail-stats-sparkline-line--total" '
+      +   'points="' + totalPts + '" fill="none" />'
+      + '<polyline class="agent-detail-stats-sparkline-line agent-detail-stats-sparkline-line--completed" '
+      +   'points="' + completedPts + '" fill="none" />'
+      + hoverHtml;
+  }
+
+  function formatBucketTooltip(p) {
+    if (!p) return '';
+    var date = '';
+    if (p.ts) {
+      // Use Lex.Utils.formatDate when available, fall back to a slice
+      // of the ISO string. Avoid regex per project rules.
+      if (window.Lex && Lex.Utils && Lex.Utils.formatDate) {
+        date = Lex.Utils.formatDate(p.ts);
+      } else {
+        var s = String(p.ts);
+        date = s.length >= 10 ? s.substring(0, 10) : s;
+      }
+    }
+    var line1 = date ? date : 'Bucket';
+    return line1
+      + ' — Total: ' + (p.total != null ? p.total : 0)
+      + ', Completed: ' + (p.completed != null ? p.completed : 0);
   }
 
   // Render snake_case keys as Title Case for display.

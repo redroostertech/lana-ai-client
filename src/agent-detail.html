@@ -140,6 +140,32 @@
 
       <!-- Stats content -->
       <div id="agentDetailStatsContent" class="hidden">
+        <!-- Sparkline — total vs completed runs over the picked window.
+             Hidden cleanly when the trends endpoint isn't available. -->
+        <div id="agentDetailStatsSparklineWrap" class="agent-detail-stats-sparkline-wrap hidden">
+          <div class="agent-detail-stats-sparkline-header">
+            <span class="agent-detail-stats-sparkline-title">Runs over time</span>
+            <span class="agent-detail-stats-sparkline-legend">
+              <span class="agent-detail-stats-sparkline-legend-item">
+                <span class="agent-detail-stats-sparkline-swatch agent-detail-stats-sparkline-swatch--total"></span>
+                Total
+              </span>
+              <span class="agent-detail-stats-sparkline-legend-item">
+                <span class="agent-detail-stats-sparkline-swatch agent-detail-stats-sparkline-swatch--completed"></span>
+                Completed
+              </span>
+            </span>
+          </div>
+          <svg
+            id="agentDetailStatsSparkline"
+            class="agent-detail-stats-sparkline"
+            viewBox="0 0 200 40"
+            preserveAspectRatio="none"
+            role="img"
+            aria-label="Runs over time"
+          ></svg>
+        </div>
+
         <!-- KPI row -->
         <div id="agentDetailStatsCards" class="agent-detail-stats-cards">
           <lex-metric id="agentDetailStatTotalRuns"     label="Total runs"        value="0" size="md"></lex-metric>
