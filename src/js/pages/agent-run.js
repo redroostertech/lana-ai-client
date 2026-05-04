@@ -265,7 +265,7 @@
       +   '</summary>'
       +   '<div class="agent-run-tool-detail">'
       +     (inputStr ? '<span class="agent-run-tool-section-label">Input</span>' + escHtml(inputStr) : '')
-      +     (outputStr ? '<span class="agent-run-tool-section-label" style="margin-top:8px;">Output</span>' + escHtml(outputStr) : '')
+      +     (outputStr ? '<span class="agent-run-tool-section-label agent-run-tool-section-label--spaced">Output</span>' + escHtml(outputStr) : '')
       +   '</div>'
       + '</details>';
     appendEventRow(html);
@@ -616,6 +616,28 @@
 
   function dispatchEvent(eventName, data) {
     // Map SSE event types to handlers
+    if (eventName === 'snapshot') {
+      // Initial replay burst: { run, steps, artifacts }. Hydrate local state
+      // so a viewer joining mid-execution sees prior history immediately.
+      var snapRun = (data && data.run) ? data.run : data;
+      if (snapRun) {
+        renderHeader(snapRun);
+      }
+      hydrateSteps((data && data.steps) || (snapRun && snapRun.steps) || []);
+      hydrateArtifacts((data && data.artifacts) || (snapRun && snapRun.artifacts) || []);
+      return;
+    }
+    if (eventName === 'end') {
+      // Clean stream close. If the server didn't already emit a status_change,
+      // make sure the header is no longer "running".
+      if (_run && !isTerminal(_run.status)) {
+        handleStatusChange({ status: 'completed' });
+      }
+      var streamStatus = el('agentRunStreamStatus');
+      if (streamStatus) streamStatus.textContent = 'Closed';
+      stopStream();
+      return;
+    }
     if (eventName === 'agent_step_start')        return handleStepStart(data);
     if (eventName === 'agent_step_complete')     return handleStepComplete(data);
     if (eventName === 'agent_step_error')        return handleStepError(data);
@@ -652,9 +674,7 @@
     var streamStatus = el('agentRunStreamStatus');
     if (streamStatus) streamStatus.textContent = 'Streaming';
 
-    if (window.api && typeof window.api.setStreamingActive === 'function') {
-      window.api.setStreamingActive();
-    }
+    setStreamingFlag(true);
 
     var url = baseUrl + '/api/v1/agent-runs/' + encodeURIComponent(_runId) + '/stream';
     var token = _getToken();
@@ -696,7 +716,18 @@
                 var raw = line.slice(5).trim();
                 if (!raw) continue;
                 var parsed;
-                try { parsed = JSON.parse(raw); } catch (e) { continue; }
+                try {
+                  parsed = JSON.parse(raw);
+                } catch (e) {
+                  // Surface malformed payloads instead of silently dropping
+                  // them — this used to make stream bugs invisible.
+                  console.error('[agent-run] malformed SSE JSON:', e, raw);
+                  if (window.Lex && Lex.Toast) {
+                    Lex.Toast.error('Stream message could not be parsed');
+                  }
+                  if (streamStatus) streamStatus.textContent = 'Stream parse error';
+                  continue;
+                }
                 dispatchEvent(currentEvent || 'message', parsed);
                 currentEvent = null;
               }
@@ -716,10 +747,27 @@
       })
       .then(function () {
         _streamConnected = false;
-        if (window.api && typeof window.api.setStreamingInactive === 'function') {
-          window.api.setStreamingInactive();
-        }
+        setStreamingFlag(false);
       });
+  }
+
+  // LexRouter blocks navigation while a stream is active. It prefers
+  // Lex.state.isStreaming and falls back to window.api._streamingActive,
+  // so write to BOTH so navigation is correctly guarded regardless of which
+  // path the router takes.
+  function setStreamingFlag(active) {
+    try {
+      if (window.Lex && window.Lex.state) {
+        window.Lex.state.isStreaming = !!active;
+      }
+    } catch (e) { /* state is a class instance but accepts ad-hoc props */ }
+    if (window.api) {
+      if (active && typeof window.api.setStreamingActive === 'function') {
+        window.api.setStreamingActive();
+      } else if (!active && typeof window.api.setStreamingInactive === 'function') {
+        window.api.setStreamingInactive();
+      }
+    }
   }
 
   function stopStream() {
@@ -728,6 +776,7 @@
       _abortCtrl = null;
     }
     _streamConnected = false;
+    setStreamingFlag(false);
   }
 
   // =========================================================================
@@ -743,31 +792,16 @@
 
     window.api.get('/api/v1/agent-runs/' + encodeURIComponent(_runId))
       .then(function (resp) {
-        var run = (resp && resp.data) ? resp.data : resp;
+        // Backend returns { run, steps, artifacts } — normalize so the
+        // UI doesn't treat the envelope as the run.
+        var run = (resp && resp.run) ? resp.run
+                : ((resp && resp.data) ? resp.data : resp);
+        var steps = (resp && resp.steps) || (run && run.steps) || [];
+        var artifacts = (resp && resp.artifacts) || (run && run.artifacts) || [];
         if (!run) return;
         renderHeader(run);
-
-        // Pre-populate steps
-        if (Array.isArray(run.steps)) {
-          _steps = [];
-          for (var i = 0; i < run.steps.length; i++) {
-            var s = run.steps[i];
-            _steps.push({
-              number: s.step_number || s.number || (i + 1),
-              title: s.title || s.description || ('Step ' + (i + 1)),
-              status: s.status === 'complete' || s.status === 'completed' ? 'complete'
-                    : (s.status === 'error' || s.status === 'failed' ? 'error'
-                    : (s.status === 'active' || s.status === 'running' ? 'active' : 'pending'))
-            });
-          }
-          renderStepsBlock();
-        }
-
-        // Pre-populate artifacts
-        if (Array.isArray(run.artifacts)) {
-          _artifacts = run.artifacts.slice();
-          renderArtifacts();
-        }
+        hydrateSteps(steps);
+        hydrateArtifacts(artifacts);
 
         // Open the SSE stream unless terminal
         if (!isTerminal(run.status)) {
@@ -779,9 +813,50 @@
       })
       .catch(function (err) {
         console.error('[agent-run] failed to load run:', err);
-        var streamStatus = el('agentRunStreamStatus');
-        if (streamStatus) streamStatus.textContent = 'Unable to load run';
+        showLoadError(err);
       });
+  }
+
+  // Map an array of step records into the local _steps shape and re-render.
+  function hydrateSteps(steps) {
+    if (!Array.isArray(steps)) return;
+    _steps = [];
+    for (var i = 0; i < steps.length; i++) {
+      var s = steps[i] || {};
+      _steps.push({
+        number: s.step_number || s.number || (i + 1),
+        title: s.title || s.description || ('Step ' + (i + 1)),
+        status: s.status === 'complete' || s.status === 'completed' ? 'complete'
+              : (s.status === 'error' || s.status === 'failed' ? 'error'
+              : (s.status === 'active' || s.status === 'running' ? 'active' : 'pending'))
+      });
+    }
+    renderStepsBlock();
+  }
+
+  function hydrateArtifacts(artifacts) {
+    if (!Array.isArray(artifacts)) return;
+    _artifacts = artifacts.slice();
+    renderArtifacts();
+  }
+
+  // Differentiated error message for run load failures.
+  function showLoadError(err) {
+    var streamStatus = el('agentRunStreamStatus');
+    var status = err && (err.status || (err.response && err.response.status));
+    var msg = 'Unable to load run';
+    if (status === 401) {
+      msg = 'Your session expired. Please sign in again.';
+      if (window.Lex && Lex.Toast) Lex.Toast.error(msg);
+      if (window.Lex && Lex.Nav) Lex.Nav.go('login.html');
+    } else if (status === 404) {
+      msg = 'This run no longer exists.';
+    } else {
+      msg = 'Something went wrong loading this run.';
+    }
+    if (streamStatus) streamStatus.textContent = msg;
+    var titleEl = el('agentRunTitle');
+    if (titleEl) titleEl.textContent = msg;
   }
 
   // =========================================================================

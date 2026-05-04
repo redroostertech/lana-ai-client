@@ -273,6 +273,11 @@
   margin-bottom: 4px;
 }
 
+/* Spacing modifier for the second tool-output label (formerly an inline style). */
+.agent-run-tool-section-label--spaced {
+  margin-top: 8px;
+}
+
 /* Sub-agent delegation */
 .agent-run-subagent {
   border: 1px solid var(--lex-border-accent, var(--lex-border-subtle));
