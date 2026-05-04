@@ -446,7 +446,9 @@
           burstApiKey: data.burst_api_key || null,
           burstUrl: data.burst_url || null,
           tier: data.tier || 'standard',
-          rateLimit: data.rate_limit || 100
+          rateLimit: data.rate_limit || 100,
+          // Sub-apps available to this organization (drives the client app switcher)
+          enabledApps: Array.isArray(data.enabled_apps) ? data.enabled_apps : []
         };
       } catch (error) {
         if (error.message === 'Failed to fetch') {
@@ -588,7 +590,8 @@
             burstApiKey: serverInfo.burstApiKey,
             burstUrl: serverInfo.burstUrl,
             tier: serverInfo.tier,
-            rateLimit: serverInfo.rateLimit
+            rateLimit: serverInfo.rateLimit,
+            enabledApps: serverInfo.enabledApps
           });
         }
 

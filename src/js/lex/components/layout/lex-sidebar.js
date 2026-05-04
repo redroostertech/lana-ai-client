@@ -1013,53 +1013,53 @@
       return nestedDirs.some((dir) => path.indexOf(dir) !== -1) ? '../' : '';
     }
 
+    _getDefaultAppItems() {
+      return [
+        { id: 'lana-works', label: 'LanaWorks', description: 'Manage matters, workspaces and client operations', route: 'dashboard.html', colors: ['#82d8ff', '#4267df', '#126f62', '#111827'] },
+        { id: 'lana-automations', label: 'LanaAutomate', description: 'Build, deploy and monitor automated workflows', route: 'automation/index.html', colors: ['#ffd16f', '#f97316', '#7c3aed', '#4c1d95'] },
+        { id: 'lana-insights', label: 'LanaInsights', description: 'Analyze performance, trends and business intelligence', route: 'admin/analytics.html', colors: ['#9debd0', '#10b981', '#0f766e', '#111827'] },
+        { id: 'lana-voice', label: 'LanaVoice', description: 'Capture, transcribe and route voice intake', route: 'voice/index.html', colors: ['#f3f4f6', '#9ca3af', '#6b7280', '#111827'] }
+      ];
+    }
+
     _getAppItems() {
       const prefix = this._getAppPrefix();
-      return [
-        {
-          id: 'lana-works',
-          label: 'LanaWorks',
-          description: 'Manage matters, workspaces and client operations',
-          href: prefix + 'dashboard.html',
-          colors: ['#82d8ff', '#4267df', '#126f62', '#111827']
-        },
-        {
-          id: 'lana-automations',
-          label: 'LanaAutomate',
-          description: 'Build, deploy and monitor automated workflows',
-          href: prefix + 'automation/index.html',
-          colors: ['#ffd16f', '#f97316', '#7c3aed', '#4c1d95']
-        },
-        {
-          id: 'lana-insights',
-          label: 'LanaInsights',
-          description: 'Analyze performance, trends and business intelligence',
-          href: prefix + 'admin/analytics.html',
-          colors: ['#9debd0', '#10b981', '#0f766e', '#111827']
-        },
-        {
-          id: 'lana-voice',
-          label: 'LanaVoice',
-          description: 'Capture, transcribe and route voice intake',
-          href: prefix + 'voice/index.html',
-          colors: ['#f3f4f6', '#9ca3af', '#6b7280', '#111827']
+      // Source of truth is the discovery payload persisted at login.
+      // Fall back to defaults so sessions cached before enabled_apps shipped still render.
+      let items = null;
+      try {
+        const raw = localStorage.getItem('lana_saved_server');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed && parsed.enabledApps) && parsed.enabledApps.length) {
+            items = parsed.enabledApps;
+          }
         }
-      ];
+      } catch (_) { /* fall through to defaults */ }
+      if (!items) items = this._getDefaultAppItems();
+      return items.map((item) => ({
+        id: item.id,
+        label: item.label,
+        description: item.description,
+        href: prefix + (item.route || ''),
+        colors: Array.isArray(item.colors) ? item.colors : []
+      }));
     }
 
     _getCurrentApp() {
       const path = window.location.pathname || '';
       const items = this._getAppItems();
-      if (path.indexOf('/automation/') !== -1) return items[1];
+      const byId = (id) => items.find((it) => it.id === id);
+      if (path.indexOf('/automation/') !== -1) return byId('lana-automations') || items[0];
       if (
         path.indexOf('/admin/analytics.html') !== -1 ||
         path.indexOf('/admin/reporting.html') !== -1 ||
         path.indexOf('/admin/billable-hours.html') !== -1 ||
         path.indexOf('/admin/data-visualization.html') !== -1 ||
         path.indexOf('/insights/') !== -1
-      ) return items[2];
-      if (path.indexOf('/voice/') !== -1) return items[3];
-      return items[0];
+      ) return byId('lana-insights') || items[0];
+      if (path.indexOf('/voice/') !== -1) return byId('lana-voice') || items[0];
+      return byId('lana-works') || items[0];
     }
 
     _renderAppMark(item) {
