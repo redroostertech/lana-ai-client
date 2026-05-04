@@ -483,11 +483,14 @@
 
   function syncEnabledToggle() {
     var toggle = el('agentDetailEnabledToggle');
+    var status = el('agentDetailEnabledStatus');
     var block = el('agentDetailEnabledBlock');
-    if (!toggle || !block) return;
+    if (!block) return;
 
     if (!_agent) {
       hide(block);
+      if (toggle) hide(toggle);
+      if (status) hide(status);
       return;
     }
 
@@ -495,12 +498,24 @@
     // is_active defaults to true if absent; explicit false disables.
     var active = (_agent.is_active !== false);
 
-    toggle.checked = active;
-    toggle.disabled = system;
     if (system) {
-      toggle.title = "System agents can't be disabled per-org from this UI; use the org kill switch in admin.";
+      // System agents render as a read-only status pill — never as an
+      // interactive toggle — so a click cannot register a state flip and
+      // there is no flicker to revert.
+      if (toggle) {
+        hide(toggle);
+        toggle.checked = active;
+        toggle.disabled = true;
+      }
+      if (status) show(status);
     } else {
-      toggle.title = '';
+      if (status) hide(status);
+      if (toggle) {
+        toggle.checked = active;
+        toggle.disabled = false;
+        toggle.title = '';
+        show(toggle);
+      }
     }
     show(block);
   }
@@ -508,7 +523,9 @@
   function onEnabledToggleChange(evt) {
     if (!_agent || !_slug) return;
     if (isSystemAgent(_agent)) {
-      // Re-sync (revert) and tell the user.
+      // Defense in depth — system agents render the read-only status pill
+      // instead of the toggle, so this listener should not be reachable.
+      // Re-sync just in case to keep the UI consistent and surface a hint.
       syncEnabledToggle();
       if (window.Lex && Lex.Toast) {
         Lex.Toast.info("System agents can't be disabled per-org from this UI; use the org kill switch in admin.");

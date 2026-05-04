@@ -17,12 +17,23 @@
       icon="A"
     >
       <div id="agentDetailEnabledBlock" class="agent-detail-enabled-block hidden">
+        <!-- Org-defined agents: live enable/disable toggle. -->
         <lex-toggle
           id="agentDetailEnabledToggle"
+          class="hidden"
           label="Enabled"
           label-side="right"
           size="sm"
         ></lex-toggle>
+        <!-- System agents: read-only status indicator (no toggle, no flicker). -->
+        <span
+          id="agentDetailEnabledStatus"
+          class="agent-detail-enabled-status hidden"
+          role="status"
+          aria-disabled="true"
+          tabindex="-1"
+          title="System agents can't be disabled per-org from this UI. Use the org kill switch in admin."
+        >System (always on)</span>
       </div>
       <lex-btn id="agentDetailRunBtn" variant="primary" icon="play">Run</lex-btn>
       <lex-btn id="agentDetailConfigBtn" variant="secondary" icon="settings">Configure</lex-btn>

@@ -196,6 +196,23 @@
   color: var(--lex-text-on-accent, #fff);
 }
 
+/* Read-only badge shown for system agents in place of the live toggle.
+   Renders as a non-interactive label so no click event can fire a state
+   flip — eliminates the toggle-revert flicker for system agents. The
+   element has no click listener, so we keep pointer-events enabled to
+   let the native title tooltip surface on hover. */
+.agent-detail-enabled-status {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--lex-text-on-accent, #fff);
+  opacity: 0.85;
+  cursor: not-allowed;
+  user-select: none;
+}
+
 /* ── Configure drawer (edit form) ────────────────────────────────── */
 
 .agent-detail-drawer-body {
