@@ -549,7 +549,8 @@ async function initiateOAuthFlow(provider, connectorId = null, matterId = null) 
           data.state,
           data.provider || provider,
           data.connector_id || connectorId,
-          redirectUri
+          redirectUri,
+          data.realmId || data.realm_id || null
         );
 
         cleanup();

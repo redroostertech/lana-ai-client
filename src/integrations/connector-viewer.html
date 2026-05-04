@@ -44,6 +44,143 @@
       color: #111827;
     }
 
+    lex-topbar,
+    .lex-topbar-root,
+    .lex-topbar-center {
+      overflow: visible;
+    }
+
+    lex-topbar {
+      z-index: 1000;
+    }
+
+    .connector-switcher {
+      display: inline-flex;
+      align-items: center;
+      max-width: min(360px, 52vw);
+      min-width: 220px;
+    }
+
+    .connector-switcher-trigger {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.375rem 0.625rem;
+      border: none;
+      border-radius: 0.5rem;
+      background: transparent;
+      color: var(--lex-topbar-text, #111827);
+      font-family: inherit;
+      font-size: var(--lex-h5-size, 1.125rem);
+      font-weight: 600;
+      cursor: pointer;
+      max-width: 100%;
+      transition: background 0.15s ease;
+    }
+
+    .connector-switcher-trigger:hover,
+    .connector-switcher-trigger[aria-expanded="true"] {
+      background: var(--lex-bg-tertiary, #f3f4f6);
+    }
+
+    .connector-switcher-trigger-label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
+    }
+
+    .connector-switcher-chevron {
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+      color: var(--lex-text-tertiary, #6b7280);
+      transition: transform 0.2s ease;
+    }
+
+    .connector-switcher-trigger[aria-expanded="true"] .connector-switcher-chevron {
+      transform: rotate(180deg);
+    }
+
+    .connector-switcher-panel {
+      position: fixed;
+      z-index: 10000;
+      min-width: 280px;
+      max-width: 360px;
+      max-height: 60vh;
+      overflow-y: auto;
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 0.75rem;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15);
+      padding: 0.375rem;
+      display: none;
+    }
+
+    .connector-switcher-panel[data-open="true"] {
+      display: block;
+    }
+
+    .connector-switcher-search {
+      position: sticky;
+      top: 0;
+      background: #ffffff;
+      padding: 0.25rem 0.25rem 0.5rem;
+      border-bottom: 1px solid #f1f5f9;
+      margin-bottom: 0.25rem;
+    }
+
+    .connector-switcher-search input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 0.4rem 0.625rem;
+      font-size: 0.8125rem;
+      border: 1px solid #e5e7eb;
+      border-radius: 0.5rem;
+      outline: none;
+      background: #f9fafb;
+    }
+
+    .connector-switcher-search input:focus {
+      border-color: #2563eb;
+      background: #fff;
+    }
+
+    .connector-switcher-option {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      width: 100%;
+      padding: 0.5rem 0.625rem;
+      border: none;
+      background: transparent;
+      border-radius: 0.5rem;
+      font-family: inherit;
+      font-size: 0.875rem;
+      text-align: left;
+      color: #111827;
+      cursor: pointer;
+    }
+
+    .connector-switcher-option:hover,
+    .connector-switcher-option:focus {
+      background: #f3f4f6;
+      outline: none;
+    }
+
+    .connector-switcher-option[aria-current="true"] {
+      background: #eff6ff;
+      color: #1d4ed8;
+      font-weight: 600;
+    }
+
+    .connector-switcher-empty {
+      padding: 0.75rem;
+      text-align: center;
+      font-size: 0.8125rem;
+      color: #6b7280;
+    }
+
     .connector-mono {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     }
@@ -75,6 +212,11 @@
     .badge-yellow {
       background: #fef3c7;
       color: #92400e;
+    }
+
+    .badge-amber {
+      background: #fed7aa;
+      color: #9a3412;
     }
 
     .badge-red {
@@ -300,30 +442,41 @@
                   </div>
 
                   <div class="rounded-2xl border border-gray-200 bg-gray-50 p-5">
-                    <div class="connector-label">Bulk Actions</div>
-                    <div class="mt-2 text-sm text-gray-500">Assign filtered or selected data to a matter, or shortlist records for correction without mutating the source snapshot.</div>
+                    <div class="connector-label">Assign To Matter</div>
+                    <div class="mt-2 text-sm text-gray-500">Route the current selection to a matter. Leave the picker on <span class="font-medium text-gray-700">Unassigned</span> to create a new matter when you assign.</div>
 
                     <div class="mt-5 space-y-5">
                       <label class="block">
-                        <div class="mb-2 text-sm font-medium text-gray-900">Assign To Matter</div>
-                        <select id="dataMatterSelect" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
-                          <option value="">Unassigned</option>
+                        <div class="mb-2 text-sm font-medium text-gray-900">Target Matter</div>
+                        <select id="dataMatterSelect" onchange="onMatterDropdownChange()" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                          <option value="">Unassigned (create new matter)</option>
                         </select>
+                        <div id="matterDropdownHint" class="mt-2 text-xs text-blue-700"></div>
                       </label>
 
-                      <div class="space-y-3">
-                        <button type="button" onclick="assignSelectedToMatter()" class="w-full rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-white">
-                          Assign Selected
-                        </button>
-                        <button type="button" onclick="assignFilteredToMatter()" class="w-full rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-white">
-                          Assign Filtered Results
-                        </button>
-                        <button type="button" onclick="shortlistSelectedForEdit()" class="w-full rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600">
-                          Shortlist Selected For Edit
-                        </button>
-                      </div>
+                      <div id="cascadePanel" class="hidden space-y-3"></div>
+
+                      <button type="button" id="assignSelectedButton" onclick="assignSelectedToMatter()" disabled class="w-full rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
+                        Assign Selected
+                      </button>
+
+                      <button type="button" id="unassignSelectedButton" onclick="unassignSelectedFromMatter()" disabled class="w-full rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60">
+                        Unassign Selected
+                      </button>
 
                       <div id="bulkActionSummary" class="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-600"></div>
+                    </div>
+                  </div>
+
+                  <div class="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+                    <div class="connector-label">Flag For Later Review</div>
+                    <div class="mt-2 text-sm text-gray-600">Tag selected rows for someone to revisit. Flags don't change matter assignments or modify source data — a dedicated review queue page is coming, and these flags will populate it.</div>
+
+                    <div class="mt-5 space-y-3">
+                      <button type="button" id="shortlistSelectedButton" onclick="shortlistSelectedForEdit()" class="w-full rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60">
+                        Flag Selected For Review
+                      </button>
+                      <div id="shortlistHint" class="text-xs text-amber-800"></div>
                     </div>
                   </div>
 
@@ -337,18 +490,21 @@
                       <div id="dataPreviewMeta" class="mt-2 text-sm text-gray-500"></div>
                     </div>
                     <div class="flex flex-wrap items-center gap-3">
+                      <div id="selectionToolbar" class="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs"></div>
                       <button type="button" onclick="refreshDataPreview()" class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
                         Refresh Data
                       </button>
-                      <div id="selectedDataSummary" class="text-sm text-gray-500"></div>
                     </div>
                   </div>
 
                   <div id="dataPreviewTable" class="overflow-x-auto rounded-2xl border border-gray-200"></div>
+
+                  <div id="dataPreviewPagination" class="hidden flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 p-4"></div>
                 </div>
               </div>
               <div id="recordDetailBackdrop" class="hidden fixed inset-0 z-30 bg-slate-900/20 backdrop-blur-[1px]" onclick="closeRecordDetail()"></div>
               <div id="recordDetailPanel" class="hidden fixed inset-y-0 right-0 z-40 w-full max-w-2xl overflow-y-auto border-l border-gray-200 bg-white shadow-2xl"></div>
+              <div id="assignMatterModal" class="hidden"></div>
             </section>
 
             <section id="tab-logs" class="connector-tabpane space-y-6">
@@ -360,6 +516,9 @@
 
               <div id="logsMeta" class="text-sm text-gray-500"></div>
               <div id="logsTable" class="overflow-x-auto rounded-2xl border border-gray-200"></div>
+
+              <div id="logDetailBackdrop" class="hidden fixed inset-0 z-30 bg-slate-900/20 backdrop-blur-[1px]" onclick="closeLogDetail()"></div>
+              <div id="logDetailPanel" class="hidden fixed inset-y-0 right-0 z-40 w-full max-w-2xl overflow-y-auto border-l border-gray-200 bg-white shadow-2xl"></div>
             </section>
 
             <section id="tab-docs" class="connector-tabpane space-y-6">
@@ -381,6 +540,7 @@
   <script src="../js/version.js"></script>
   <script src="../js/menu.js"></script>
   <script src="../js/navigation-helpers.js"></script>
+  <script src="../js/connectors.js"></script>
 
   <script src="../js/lex/lex.core.js"></script>
   <script src="../js/lex/lex.icons.js"></script>
@@ -396,6 +556,7 @@
   <script src="../js/lex/components/foundation/lex-spinner.js"></script>
   <script src="../js/lex/components/foundation/lex-btn.js"></script>
   <script src="../js/lex/components/foundation/lex-empty.js"></script>
+  <script src="../js/lex/components/form/lex-select.js"></script>
   <script src="../js/lex/components/layout/lex-sidebar.js"></script>
   <script src="../js/lex/components/layout/lex-topbar.js"></script>
   <script src="../js/lex/components/layout/lex-conversation-item.js"></script>
@@ -416,11 +577,16 @@
       summary: null,
       configResponse: null,
       dataPreview: null,
+      dataPreviewOffset: 0,
+      dataPreviewLimit: 25,
       dataGroups: null,
       logs: null,
       matterOptions: [],
       dataRules: [],
+      connectorOptions: [],
       selectedDataIds: [],
+      selectedRowsById: {},
+      selectionMode: 'manual',
       selectedRecordId: '',
       selectedRecord: null,
       recordAnnotations: [],
@@ -439,7 +605,20 @@
       oauthCallbackRegistered: false,
       authStatusPollTimer: null,
       editingConfig: false,
-      deleteConfigModalOpen: false
+      deleteConfigModalOpen: false,
+      selectedLogId: '',
+      logDetailPollTimer: null,
+      cascadeIndex: {},
+      cascadeIndexLoading: {},
+      cascadeIndexErrors: {},
+      cascadeEnabled: false,
+      cascadeDisabledRels: {},
+      cascadeLinkedPanel: null,
+      cascadePanelPreview: null,
+      cascadePanelLoading: false,
+      cascadePanelDebounce: null,
+      assignDialog: null,
+      deleteAnnotationModal: null
     };
 
     function escapeHtml(value) {
@@ -733,6 +912,7 @@
       if (lexApp) {
         lexApp.setAttribute('page-title', state.connectorName);
       }
+      renderConnectorHeaderSelector();
 
       const breadcrumb = document.getElementById('connectorBreadcrumb');
       if (breadcrumb) {
@@ -824,14 +1004,13 @@
         state.sourceId = '';
       }
 
-      if (state.sourceId && state.connectorType && state.uiEntryPoint) {
-        applyPageIdentity();
-        return;
-      }
-
-      const result = await api.get('/api/v1/integrations/connectors');
-      const connectors = Array.isArray(result.connectors) ? result.connectors : [];
-      const match = connectors.find((connector) => {
+      const merged = await Connectors.getMergedList().catch(() => ({ connectors: [] }));
+      const allConnectors = merged.connectors || [];
+      state.connectorOptions = allConnectors.filter(isVisibleConnectorOption);
+      // Match only against installed records — state.sourceId must resolve to
+      // a real integration source UUID, not a catalog slug.
+      const installedConnectors = allConnectors.filter((connector) => looksLikeUuid(connector.id));
+      const match = installedConnectors.find((connector) => {
         if (state.sourceId && connector.id === state.sourceId) {
           return true;
         }
@@ -855,6 +1034,36 @@
         state.connectorType = state.connectorType || match.connector_id || match.connector_type || '';
         state.connectorName = match.name || state.connectorName;
         state.uiEntryPoint = state.uiEntryPoint || match.ui_entry_point || '';
+      }
+
+      if (!state.sourceId && (state.connectorType || state.connectorId)) {
+        const connectorType = state.connectorType || state.connectorId;
+        try {
+          const catalogResult = await api.get(`/api/v1/integrations/connectors/catalog/${encodeURIComponent(connectorType)}`);
+          const catalogConnector = catalogResult.connector || {};
+          const displayName =
+            catalogConnector.metadata?.name ||
+            catalogConnector.name ||
+            state.connectorName ||
+            connectorType;
+
+          const createResult = await api.post('/api/v1/integrations/connectors/configure', {
+            connector_type: connectorType,
+            config: {}
+          });
+
+          if (createResult?.connector_id) {
+            state.sourceId = createResult.connector_id;
+            state.connectorType = connectorType;
+            state.connectorName = displayName;
+            state.iframeOnlyFallback = false;
+          }
+        } catch (error) {
+          console.warn('[Connector Viewer] Could not create integration source for catalog connector', {
+            connectorType,
+            error: error.message
+          });
+        }
       }
 
       applyPageIdentity();
@@ -1022,6 +1231,263 @@
       return getWebhookFields().filter((field) => field.name !== 'webhook_endpoint_url');
     }
 
+    const VISIBLE_CONNECTOR_TERMS = [
+      'quickbooks',
+      'actionstep',
+      'leadly',
+      'google',
+      'gmail',
+      'microsoft',
+      'office',
+      'outlook',
+      'onedrive',
+      'sharepoint',
+      'teams',
+      'excel'
+    ];
+
+    function normalizeConnectorIdentifier(value) {
+      return String(value || '').trim().toLowerCase().replace(/[_\s]+/g, '-');
+    }
+
+    function getConnectorDisplayName(connector) {
+      const manifest = connector?.manifest || {};
+      const metadata = connector?.metadata || manifest.metadata || {};
+      return manifest.name
+        || metadata.name
+        || connector?.name
+        || connector?.connector_name
+        || connector?.source_name
+        || 'Connector';
+    }
+
+    function getConnectorSlug(connector) {
+      return connector?.connector_id
+        || connector?.connector_type
+        || connector?.source_type
+        || connector?.type
+        || connector?.id
+        || '';
+    }
+
+    function getConnectorUiEntryPoint(connector) {
+      return connector?.ui_entry_point || '';
+    }
+
+    function isVisibleConnectorOption(connector) {
+      const name = normalizeConnectorIdentifier(getConnectorDisplayName(connector));
+      const identity = normalizeConnectorIdentifier(getConnectorSlug(connector));
+      const authType = String(connector?.auth_type || connector?.authType || connector?.auth?.type || '').toLowerCase();
+
+      if (identity === 'actionstep' || (name === 'actionstep' && authType === 'none')) {
+        return false;
+      }
+
+      if (identity === 'google-drive' || name === 'google-drive') {
+        return true;
+      }
+
+      const haystack = [
+        connector?.id,
+        connector?.connector_id,
+        connector?.connector_type,
+        connector?.source_type,
+        connector?.type,
+        connector?.auth_type,
+        connector?.authType,
+        getConnectorDisplayName(connector),
+        connector?.category,
+        connector?.vendor,
+        connector?.metadata?.created_by
+      ].map((value) => String(value || '').toLowerCase()).join(' ');
+
+      return VISIBLE_CONNECTOR_TERMS.some((term) => haystack.includes(term));
+    }
+
+    function getConnectorOptionKey(connector) {
+      const sourceId = looksLikeUuid(connector?.id) ? connector.id : '';
+      return sourceId || getConnectorSlug(connector) || getConnectorDisplayName(connector);
+    }
+
+    function buildConnectorViewerUrl(connector) {
+      const connectorType = getConnectorSlug(connector);
+      const sourceId = looksLikeUuid(connector?.id) ? connector.id : '';
+      const params = new URLSearchParams({
+        ui: getConnectorUiEntryPoint(connector),
+        name: getConnectorDisplayName(connector),
+        connectorId: connectorType || sourceId,
+        connectorType: connectorType || '',
+        sourceId,
+        chrome: 'embedded'
+      });
+
+      return `connector-viewer.html?${params.toString()}`;
+    }
+
+    function getCurrentConnectorOptionValue() {
+      return state.sourceId || state.connectorType || state.connectorId || '';
+    }
+
+    const CONNECTOR_SWITCHER_CHEVRON = '<svg class="connector-switcher-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>';
+
+    function renderConnectorHeaderSelector() {
+      const topbar = document.querySelector('lex-topbar');
+      const center = topbar ? topbar.querySelector('.lex-topbar-center') : null;
+      if (!center || !state.connectorOptions.length) {
+        return;
+      }
+
+      const currentValue = getCurrentConnectorOptionValue();
+      const selected = state.connectorOptions.find((connector) => {
+        const value = getConnectorOptionKey(connector);
+        const connectorType = getConnectorSlug(connector);
+        return value === currentValue || connectorType === state.connectorType || connectorType === state.connectorId;
+      });
+      const triggerLabel = (selected && getConnectorDisplayName(selected)) || state.connectorName || 'Select connector';
+      const selectedKey = selected ? getConnectorOptionKey(selected) : currentValue;
+
+      center.innerHTML = `
+        <div class="connector-switcher">
+          <button
+            type="button"
+            id="connectorSwitcherTrigger"
+            class="connector-switcher-trigger"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            aria-label="Select connector"
+          >
+            <span class="connector-switcher-trigger-label">${escapeHtml(triggerLabel)}</span>
+            ${CONNECTOR_SWITCHER_CHEVRON}
+          </button>
+        </div>
+      `;
+
+      // Render the panel as a body-level portal so it isn't clipped or
+      // wiped by the topbar's reactive lifecycle. Recreate on each render
+      // to drop stale listeners that closed over a previous trigger.
+      const existingPanel = document.getElementById('connectorSwitcherPanel');
+      if (existingPanel) existingPanel.remove();
+      const panel = document.createElement('div');
+      panel.id = 'connectorSwitcherPanel';
+      panel.className = 'connector-switcher-panel';
+      panel.setAttribute('role', 'listbox');
+      panel.setAttribute('aria-label', 'Available connectors');
+      panel.dataset.open = 'false';
+      document.body.appendChild(panel);
+
+      const trigger = document.getElementById('connectorSwitcherTrigger');
+      if (!trigger) return;
+
+      const showSearch = state.connectorOptions.length > 8;
+      let searchTerm = '';
+
+      const renderPanelContents = () => {
+        const term = searchTerm.trim().toLowerCase();
+        const filtered = state.connectorOptions.filter((connector) => {
+          if (!term) return true;
+          return getConnectorDisplayName(connector).toLowerCase().includes(term);
+        });
+
+        const searchHtml = showSearch
+          ? `<div class="connector-switcher-search"><input type="text" placeholder="Search connectors..." value="${escapeHtml(searchTerm)}" autocomplete="off" /></div>`
+          : '';
+
+        const optionsHtml = filtered.length === 0
+          ? '<div class="connector-switcher-empty">No connectors found</div>'
+          : filtered.map((connector) => {
+              const key = getConnectorOptionKey(connector);
+              const label = getConnectorDisplayName(connector);
+              const isCurrent = key === selectedKey;
+              return `
+                <button type="button" class="connector-switcher-option" role="option" data-key="${escapeHtml(key)}" aria-current="${isCurrent ? 'true' : 'false'}">
+                  ${escapeHtml(label)}
+                </button>
+              `;
+            }).join('');
+
+        panel.innerHTML = searchHtml + optionsHtml;
+
+        if (showSearch) {
+          const input = panel.querySelector('.connector-switcher-search input');
+          if (input) {
+            input.addEventListener('input', (e) => {
+              searchTerm = e.target.value;
+              renderPanelContents();
+              const refocus = panel.querySelector('.connector-switcher-search input');
+              if (refocus) {
+                refocus.focus();
+                refocus.setSelectionRange(searchTerm.length, searchTerm.length);
+              }
+            });
+          }
+        }
+
+        panel.querySelectorAll('.connector-switcher-option').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const key = btn.dataset.key;
+            const connector = state.connectorOptions.find((option) => getConnectorOptionKey(option) === key);
+            closePanel();
+            if (connector) {
+              window.location.href = buildConnectorViewerUrl(connector);
+            }
+          });
+        });
+      };
+
+      const positionPanel = () => {
+        const rect = trigger.getBoundingClientRect();
+        panel.style.top = `${Math.round(rect.bottom + 6)}px`;
+        panel.style.left = `${Math.round(rect.left)}px`;
+        panel.style.minWidth = `${Math.max(rect.width, 280)}px`;
+      };
+
+      const openPanel = () => {
+        searchTerm = '';
+        renderPanelContents();
+        positionPanel();
+        panel.dataset.open = 'true';
+        trigger.setAttribute('aria-expanded', 'true');
+        document.addEventListener('mousedown', onOutsideMouseDown, true);
+        document.addEventListener('keydown', onKeyDown, true);
+        window.addEventListener('resize', positionPanel);
+        window.addEventListener('scroll', positionPanel, true);
+        if (showSearch) {
+          const input = panel.querySelector('.connector-switcher-search input');
+          if (input) input.focus();
+        }
+      };
+
+      const closePanel = () => {
+        panel.dataset.open = 'false';
+        trigger.setAttribute('aria-expanded', 'false');
+        document.removeEventListener('mousedown', onOutsideMouseDown, true);
+        document.removeEventListener('keydown', onKeyDown, true);
+        window.removeEventListener('resize', positionPanel);
+        window.removeEventListener('scroll', positionPanel, true);
+      };
+
+      const onOutsideMouseDown = (e) => {
+        if (!panel.contains(e.target) && !trigger.contains(e.target)) {
+          closePanel();
+        }
+      };
+
+      const onKeyDown = (e) => {
+        if (e.key === 'Escape') {
+          closePanel();
+          trigger.focus();
+        }
+      };
+
+      trigger.addEventListener('click', () => {
+        if (panel.dataset.open === 'true') {
+          closePanel();
+        } else {
+          openPanel();
+        }
+      });
+    }
+
     function isApiConnector() {
       return Boolean(state.catalog && state.catalog.api && state.catalog.api.base_url);
     }
@@ -1029,6 +1495,10 @@
     function getDocumentationLink() {
       return state.catalog?.documentation?.api_reference_url
         || state.catalog?.documentation?.docs_url
+        || state.catalog?.documentation?.documentation_url
+        || state.catalog?.documentation?.vendor_docs_url
+        || state.catalog?.documentation_url
+        || state.catalog?.docs_url
         || state.catalog?.metadata?.documentation_url
         || state.catalog?.metadata?.docs_url
         || state.catalog?.metadata?.website
@@ -1074,11 +1544,52 @@
     }
 
     function isConnectorConfigured() {
-      return Boolean(state.summary && state.summary.configured);
+      if (connectorRequiresSavedCredentialsOrConfig() && !hasStoredConnectorCredentials() && !hasMeaningfulSavedConnectorConfig()) {
+        return false;
+      }
+
+      return Boolean(
+        state.summary?.configured ||
+        state.configResponse?.configured ||
+        hasStoredConnectorCredentials()
+      );
     }
 
     function isOAuthConnector() {
       return getSelectedAuthModeType() === 'oauth2';
+    }
+
+    function connectorRequiresSavedCredentialsOrConfig() {
+      const authType = getSelectedAuthModeType();
+      return authType === 'oauth2' || authType === 'oauth2_or_api_key' || authType === 'api_key';
+    }
+
+    function hasStoredConnectorCredentials() {
+      const config = state.configResponse?.config || {};
+      return Object.keys(config).some((key) => key.endsWith('_configured') && config[key]);
+    }
+
+    function hasMeaningfulSavedConnectorConfig() {
+      const config = state.configResponse?.config || {};
+      const operationalKeys = new Set([
+        'sync_frequency',
+        'scheduled_sync_time',
+        'sync_interval_minutes',
+        'last_sync'
+      ]);
+
+      return Object.keys(config).some((key) => {
+        if (!key || key.endsWith('_configured') || operationalKeys.has(key)) {
+          return false;
+        }
+
+        const value = config[key];
+        if (value == null) return false;
+        if (typeof value === 'string') return value.trim() !== '';
+        if (Array.isArray(value)) return value.length > 0;
+        if (typeof value === 'object') return Object.keys(value).length > 0;
+        return true;
+      });
     }
 
     function isOAuthAuthorized() {
@@ -1124,6 +1635,20 @@
         badge: 'badge-green',
         message: 'Integration is configured in LANA.'
       };
+    }
+
+    function getAuthenticationStatusDisplay() {
+      if (isOAuthConnector()) {
+        if (isOAuthAuthorized()) {
+          return 'Connected';
+        }
+
+        return isConnectorConfigured() ? 'Authorization Required' : 'Needs Setup';
+      }
+
+      return isConnectorConfigured()
+        ? humanizeStatus(state.configResponse?.auth_status || 'configured')
+        : 'Needs Setup';
     }
 
     function getGeneratedConnectSteps() {
@@ -1305,8 +1830,19 @@
     function getComputedUiValue(key) {
       const config = state.configResponse?.config || {};
       const lastSyncDisplay = getLastSyncHeadline();
+      const normalizedKey = String(key || '');
 
-      switch (String(key || '')) {
+      if (normalizedKey.startsWith('entity_count:')) {
+        const entityType = normalizedKey.slice('entity_count:'.length);
+        const entities = (state.summary && state.summary.stats && state.summary.stats.entities) || {};
+        if (!entityType) {
+          return undefined;
+        }
+
+        return Number(entities[entityType] || 0);
+      }
+
+      switch (normalizedKey) {
         case 'configured_bases':
           return Array.isArray(config.bases) ? config.bases.length : 0;
         case 'sync_frequency':
@@ -1887,8 +2423,10 @@
       const documentation = catalog.documentation || {};
       const guide = documentation.setup_guide || null;
 
-      const title = documentation.title || `${state.connectorName || 'Connector'} Setup Guide`;
-      const description = documentation.description || '';
+      const baseTitle = state.connectorName || documentation.title || catalog.name || 'Connector';
+      const title = guide?.title
+        || (/setup guide/i.test(String(documentation.title || '')) ? documentation.title : `${baseTitle} Setup Guide`);
+      const description = guide?.description || documentation.description || '';
 
       // Normalize to the rich structure. Legacy packages emit only
       // connect_steps + getting_started — we'll render those as a bare list.
@@ -1931,12 +2469,7 @@
         <ol class="mt-8 space-y-6">
           ${steps.map((step, index) => renderDocStep(step, index + 1)).join('')}
         </ol>
-      ` : `
-        <div class="mt-8 rounded-xl border border-dashed border-gray-300 p-6 text-sm text-gray-500">
-          No step-by-step guide has been authored for this connector yet.
-          Vendor-provided documentation is available${docsUrl ? ` <a class="text-blue-700 underline" href="${escapeHtml(docsUrl)}" target="_blank" rel="noreferrer">here</a>` : ''}.
-        </div>
-      `;
+      ` : '';
 
       const gettingStartedHtml = gettingStarted.length ? `
         <div class="mt-10">
@@ -2067,7 +2600,7 @@
 
     function renderOverview() {
       const summary = state.summary || {};
-      const configured = Boolean(summary.configured);
+      const configured = isConnectorConfigured();
       const entities = (summary.stats && summary.stats.entities) || {};
       const entityEntries = Object.entries(entities);
       const lastSync = getLastSuccessfulSync();
@@ -2086,7 +2619,7 @@
       setupNode.innerHTML = getBadgeHtml(setupState.label, setupState.badge);
       setupMessage.textContent = summary.message || setupState.message;
 
-      document.getElementById('authStatus').textContent = humanizeStatus(authStatus);
+      document.getElementById('authStatus').textContent = getAuthenticationStatusDisplay();
       document.getElementById('authType').textContent = state.catalog && state.catalog.auth
         ? `Auth type: ${getAuthTypeDisplayLabel()}`
         : 'Auth type unavailable';
@@ -2321,7 +2854,7 @@
           <div class="rounded-xl border border-gray-200 p-4">
             <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Auth Type</div>
             <div class="mt-3 text-lg font-semibold text-gray-900">${escapeHtml(authTypeLabel)}</div>
-            <div class="mt-2 text-sm text-gray-500">${escapeHtml(humanizeStatus(state.configResponse ? state.configResponse.auth_status : 'unknown'))}</div>
+            <div class="mt-2 text-sm text-gray-500">${escapeHtml(getAuthenticationStatusDisplay())}</div>
           </div>
           <div class="rounded-xl border border-gray-200 p-4">
             <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Last Sync</div>
@@ -2792,6 +3325,34 @@
       `;
     }
 
+    const DATA_RULE_FIELDS = [
+      { value: 'external_id', label: 'External ID (LANA-prefixed, e.g. AS-244)' },
+      { value: 'entity_type', label: 'Entity Type' },
+      { value: 'matter_id', label: 'Assigned Matter (LANA)' },
+      { value: 'synced_at', label: 'Synced At' },
+      { value: 'source_created_at', label: 'Source Created At' },
+      { value: 'source_updated_at', label: 'Source Updated At' },
+      { value: 'annotation_count', label: 'Annotation Count' },
+      { value: 'has_corrections', label: 'Has Corrections' },
+      { value: '__data_path__', label: 'Source data field…' }
+    ];
+
+    const DATA_RULE_OPERATORS = [
+      { value: 'contains', label: 'contains', valueless: false },
+      { value: 'not_contains', label: 'does not contain', valueless: false },
+      { value: 'equals', label: 'equals', valueless: false },
+      { value: 'not_equals', label: 'does not equal', valueless: false },
+      { value: 'starts_with', label: 'starts with', valueless: false },
+      { value: 'ends_with', label: 'ends with', valueless: false },
+      { value: 'exists', label: 'is set', valueless: true },
+      { value: 'not_exists', label: 'is empty', valueless: true }
+    ];
+
+    function isValuelessOperator(op) {
+      const entry = DATA_RULE_OPERATORS.find((o) => o.value === op);
+      return Boolean(entry && entry.valueless);
+    }
+
     function renderDataRuleBuilder() {
       const container = document.getElementById('dataRulesContainer');
       if (!container) return;
@@ -2799,33 +3360,110 @@
       if (!state.dataRules.length) {
         container.innerHTML = `
           <div class="rounded-xl border border-dashed border-gray-300 p-4 text-sm text-gray-500">
-            No rules yet. Add rules for field-level matching such as email contains, status equals, or source field exists.
+            No rules yet. Add rules to filter on Entity Type, Matter ID, Health, and other indexed fields.
           </div>
         `;
         return;
       }
 
-      container.innerHTML = state.dataRules.map((rule, index) => `
-        <div class="data-rule-row grid gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 lg:grid-cols-[minmax(0,1.3fr)_180px_minmax(0,1fr)_56px]" data-index="${index}">
-          <input data-role="field" type="text" value="${escapeHtml(rule.field || '')}" placeholder="Field key or external_id" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
-          <select data-role="operator" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
-            ${['contains', 'not_contains', 'equals', 'not_equals', 'starts_with', 'ends_with', 'exists', 'not_exists'].map((operator) => `
-              <option value="${operator}" ${rule.operator === operator ? 'selected' : ''}>${operator}</option>
-            `).join('')}
-          </select>
-          <input data-role="value" type="text" value="${escapeHtml(rule.value || '')}" placeholder="Filter value" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
-          <button type="button" onclick="removeDataRule(${index})" class="rounded-xl border border-red-200 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50">X</button>
-        </div>
-      `).join('');
+      const indexedFieldValues = DATA_RULE_FIELDS
+        .filter((f) => f.value !== '__data_path__')
+        .map((f) => f.value);
+
+      const fieldOptions = (selectedField, isDataPathMode) => DATA_RULE_FIELDS
+        .map((f) => {
+          const isSelected = (f.value === '__data_path__' && isDataPathMode)
+            || (f.value === selectedField && !isDataPathMode);
+          return `<option value="${f.value}" ${isSelected ? 'selected' : ''}>${f.label}</option>`;
+        })
+        .join('');
+
+      const operatorOptions = (selected) => DATA_RULE_OPERATORS
+        .map((o) => `<option value="${o.value}" ${selected === o.value ? 'selected' : ''}>${o.label}</option>`)
+        .join('');
+
+      container.innerHTML = state.dataRules.map((rule, index) => {
+        const valueless = isValuelessOperator(rule.operator);
+        const fieldRaw = rule.field || '';
+        const isDataPathMode = fieldRaw.startsWith('data.');
+        const isKnownField = indexedFieldValues.includes(fieldRaw);
+        // Treat any non-empty, non-indexed, non-data.* field as a data-path entry too,
+        // so a rule with field="custom_key" still survives a re-render.
+        const treatAsDataPath = isDataPathMode || (fieldRaw && !isKnownField);
+        const dataPathValue = isDataPathMode ? fieldRaw.slice('data.'.length) : (treatAsDataPath ? fieldRaw : '');
+        const fieldSelectValue = treatAsDataPath ? '__data_path__' : fieldRaw;
+        return `
+          <div class="data-rule-row space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-3" data-index="${index}" data-mode="${treatAsDataPath ? 'data' : 'indexed'}">
+            <div class="flex items-start gap-2">
+              <select data-role="field" onchange="onDataRuleFieldChange(${index}, this.value)" class="flex-1 min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                <option value="" ${!fieldRaw ? 'selected' : ''}>Pick a field…</option>
+                ${fieldOptions(fieldSelectValue, treatAsDataPath)}
+              </select>
+              <button type="button" onclick="removeDataRule(${index})" aria-label="Remove rule" class="shrink-0 rounded-lg border border-gray-200 bg-white p-2 text-gray-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
+                  <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+                </svg>
+              </button>
+            </div>
+            <div class="${treatAsDataPath ? '' : 'hidden'} flex items-center gap-2">
+              <span class="text-xs font-semibold text-gray-500">data.</span>
+              <input data-role="data-path" type="text" value="${escapeHtml(dataPathValue)}" placeholder="e.g. matter_id" class="flex-1 min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+            </div>
+            <div class="flex items-start gap-2">
+              <select data-role="operator" onchange="onDataRuleOperatorChange(${index}, this.value)" class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" style="flex: 0 0 auto; max-width: 50%;">
+                ${operatorOptions(rule.operator || 'contains')}
+              </select>
+              <input data-role="value" type="text" value="${escapeHtml(rule.value || '')}" placeholder="Value" class="flex-1 min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 ${valueless ? 'hidden' : ''}">
+            </div>
+          </div>
+        `;
+      }).join('');
     }
 
     function syncDataRulesFromDom() {
       const rows = document.querySelectorAll('.data-rule-row');
-      state.dataRules = Array.from(rows).map((row) => ({
-        field: row.querySelector('[data-role="field"]').value.trim(),
-        operator: row.querySelector('[data-role="operator"]').value,
-        value: row.querySelector('[data-role="value"]').value
-      })).filter((rule) => rule.field);
+      state.dataRules = Array.from(rows).map((row) => {
+        const fieldEl = row.querySelector('[data-role="field"]');
+        const operatorEl = row.querySelector('[data-role="operator"]');
+        const valueEl = row.querySelector('[data-role="value"]');
+        const dataPathEl = row.querySelector('[data-role="data-path"]');
+        const operator = operatorEl ? operatorEl.value : 'contains';
+        const fieldSelectValue = fieldEl ? fieldEl.value.trim() : '';
+        let field = fieldSelectValue;
+        if (fieldSelectValue === '__data_path__') {
+          const path = dataPathEl ? dataPathEl.value.trim() : '';
+          field = path ? `data.${path}` : '__data_path__';
+        }
+        return {
+          field,
+          operator,
+          value: valueEl && !isValuelessOperator(operator) ? valueEl.value : ''
+        };
+      });
+    }
+
+    function onDataRuleFieldChange(index, newField) {
+      syncDataRulesFromDom();
+      if (state.dataRules[index]) {
+        // Picker changed: clear the field so the renderer treats it correctly,
+        // letting the next sync (or render) re-establish based on the select choice.
+        if (newField === '__data_path__') {
+          // Keep current value so user can edit the path; renderer reads from DOM
+        } else if (newField === '') {
+          state.dataRules[index].field = '';
+        } else {
+          state.dataRules[index].field = newField;
+        }
+      }
+      renderDataRuleBuilder();
+    }
+
+    function onDataRuleOperatorChange(index, newOperator) {
+      syncDataRulesFromDom();
+      if (state.dataRules[index]) {
+        state.dataRules[index].operator = newOperator;
+      }
+      renderDataRuleBuilder();
     }
 
     function addDataRule() {
@@ -2842,12 +3480,17 @@
 
     function getCurrentDataFilters() {
       syncDataRulesFromDom();
+      const submittable = state.dataRules.filter((rule) => {
+        if (!rule.field || rule.field === '__data_path__') return false;
+        if (isValuelessOperator(rule.operator)) return true;
+        return String(rule.value || '') !== '';
+      });
       return {
         q: document.getElementById('dataSearchInput')?.value.trim() || '',
         entity_type: document.getElementById('entityTypeFilter')?.value || '',
         sort_by: document.getElementById('dataSortBy')?.value || 'synced_at',
         sort_dir: document.getElementById('dataSortDir')?.value || 'desc',
-        filters: state.dataRules
+        filters: submittable
       };
     }
 
@@ -2990,25 +3633,1296 @@
 
     function renderBulkActionSummary() {
       const node = document.getElementById('bulkActionSummary');
+      const rows = state.dataPreview && Array.isArray(state.dataPreview.data) ? state.dataPreview.data : [];
+      const filteredTotal = state.dataPreview?.pagination?.total || 0;
+      const allFiltered = state.selectionMode === 'all-filtered';
+      const targetLabel = allFiltered
+        ? `${formatNumber(filteredTotal)} filtered row${filteredTotal === 1 ? '' : 's'}`
+        : `${state.selectedDataIds.length} row${state.selectedDataIds.length === 1 ? '' : 's'}`;
+
+      if (node) {
+        node.innerHTML = `
+          <div class="space-y-2">
+            <div class="flex items-center justify-between gap-4">
+              <span>Will assign</span>
+              <span class="font-semibold text-gray-900">${targetLabel}</span>
+            </div>
+            <div class="flex items-center justify-between gap-4">
+              <span>Visible rows</span>
+              <span class="font-semibold text-gray-900">${rows.length}</span>
+            </div>
+            <div class="flex items-center justify-between gap-4">
+              <span>Filtered total</span>
+              <span class="font-semibold text-gray-900">${formatNumber(filteredTotal)}</span>
+            </div>
+          </div>
+        `;
+      }
+
+      updateAssignSelectedButton();
+      updateUnassignSelectedButton();
+      updateShortlistSelectedButton();
+      renderMatterDropdownHint();
+    }
+
+    function getCurrentSelectionCount() {
+      if (state.selectionMode === 'all-filtered') {
+        return state.dataPreview?.pagination?.total || 0;
+      }
+      return state.selectedDataIds.length;
+    }
+
+    function renderSelectionToolbar() {
+      const node = document.getElementById('selectionToolbar');
       if (!node) return;
 
       const rows = state.dataPreview && Array.isArray(state.dataPreview.data) ? state.dataPreview.data : [];
+      const filteredTotal = state.dataPreview?.pagination?.total || 0;
+      const pageCount = rows.length;
+      const allFiltered = state.selectionMode === 'all-filtered';
+      const manualCount = state.selectedDataIds.length;
+
+      let label;
+      if (allFiltered) {
+        label = `<span class="font-semibold text-blue-700">All ${formatNumber(filteredTotal)} filtered selected</span>`;
+      } else if (manualCount === 0) {
+        label = `<span class="text-gray-500">No rows selected</span>`;
+      } else {
+        label = `<span class="font-semibold text-gray-900">${formatNumber(manualCount)} selected</span>`;
+      }
+
+      const hasSelection = allFiltered || manualCount > 0;
+      const canSelectAllFiltered = filteredTotal > 0 && filteredTotal !== pageCount;
+
+      const buttons = [];
+      if (pageCount > 0) {
+        buttons.push(`<button type="button" onclick="selectPageRows()" class="rounded-lg border border-gray-300 bg-white px-2 py-1 font-semibold text-gray-700 hover:bg-gray-50">Select page (${formatNumber(pageCount)})</button>`);
+      }
+      if (canSelectAllFiltered) {
+        buttons.push(`<button type="button" onclick="selectAllFiltered()" class="rounded-lg border border-blue-300 bg-blue-50 px-2 py-1 font-semibold text-blue-700 hover:bg-blue-100">Select all filtered (${formatNumber(filteredTotal)})</button>`);
+      }
+      if (hasSelection) {
+        buttons.push(`<button type="button" onclick="clearAssignSelection()" class="rounded-lg border border-gray-300 bg-white px-2 py-1 font-semibold text-gray-700 hover:bg-gray-50">Clear</button>`);
+      }
+
       node.innerHTML = `
-        <div class="space-y-2">
-          <div class="flex items-center justify-between gap-4">
-            <span>Selected rows</span>
-            <span class="font-semibold text-gray-900">${state.selectedDataIds.length}</span>
+        <span class="text-gray-500">Selection:</span>
+        ${label}
+        <span class="mx-1 h-4 w-px bg-gray-300"></span>
+        ${buttons.join('')}
+      `;
+    }
+
+    function selectPageRows() {
+      const rows = state.dataPreview && Array.isArray(state.dataPreview.data) ? state.dataPreview.data : [];
+      state.selectionMode = 'manual';
+      for (const row of rows) {
+        if (row && row.id) {
+          if (!state.selectedDataIds.includes(row.id)) {
+            state.selectedDataIds.push(row.id);
+          }
+          state.selectedRowsById[row.id] = row;
+        }
+      }
+      renderDataPreview();
+      scheduleCascadePanelRefresh();
+    }
+
+    function selectAllFiltered() {
+      const filteredTotal = state.dataPreview?.pagination?.total || 0;
+      if (!filteredTotal) {
+        showPageAlert('No filtered rows to select.', 'info');
+        return;
+      }
+      state.selectionMode = 'all-filtered';
+      state.selectedDataIds = [];
+      state.selectedRowsById = {};
+      renderDataPreview();
+      scheduleCascadePanelRefresh();
+    }
+
+    function clearAssignSelection() {
+      state.selectionMode = 'manual';
+      state.selectedDataIds = [];
+      state.selectedRowsById = {};
+      renderDataPreview();
+      scheduleCascadePanelRefresh();
+    }
+
+    function updateAssignSelectedButton() {
+      const button = document.getElementById('assignSelectedButton');
+      if (!button) return;
+      const count = getCurrentSelectionCount();
+      const matterId = document.getElementById('dataMatterSelect')?.value || '';
+      const matterName = matterId
+        ? (state.matterOptions.find((m) => m.id === matterId)?.name || 'Selected matter')
+        : '';
+      const allFiltered = state.selectionMode === 'all-filtered';
+      const cascadeChildren = state.cascadeEnabled
+        && state.cascadePanelPreview
+        && Number(state.cascadePanelPreview.totalChildren || 0) > 0
+        ? Number(state.cascadePanelPreview.totalChildren)
+        : 0;
+
+      const linkedSuffix = cascadeChildren > 0 ? ` + ${formatNumber(cascadeChildren)} linked` : '';
+      const target = matterName || 'new matter';
+
+      let label;
+      if (count === 0) {
+        label = 'Assign Selected';
+      } else if (allFiltered) {
+        label = matterName
+          ? `Assign ${formatNumber(count)} filtered → ${matterName}`
+          : `Assign ${formatNumber(count)} filtered to new matter`;
+      } else {
+        label = `Assign ${formatNumber(count)}${linkedSuffix} → ${target}`;
+      }
+      button.textContent = label;
+      button.disabled = count === 0;
+      button.classList.toggle('opacity-60', count === 0);
+      button.classList.toggle('cursor-not-allowed', count === 0);
+    }
+
+    function updateUnassignSelectedButton() {
+      const button = document.getElementById('unassignSelectedButton');
+      if (!button) return;
+      const count = getCurrentSelectionCount();
+      const allFiltered = state.selectionMode === 'all-filtered';
+      button.disabled = count === 0;
+      if (count === 0) {
+        button.textContent = 'Unassign Selected';
+      } else if (allFiltered) {
+        button.textContent = `Unassign ${formatNumber(count)} filtered from matter`;
+      } else {
+        button.textContent = `Unassign ${formatNumber(count)} from matter`;
+      }
+    }
+
+    function updateShortlistSelectedButton() {
+      const button = document.getElementById('shortlistSelectedButton');
+      const hint = document.getElementById('shortlistHint');
+      if (!button) return;
+      const allFiltered = state.selectionMode === 'all-filtered';
+      const manualCount = state.selectedDataIds.length;
+      const disabled = allFiltered || manualCount === 0;
+      button.disabled = disabled;
+      if (manualCount === 0 && !allFiltered) {
+        button.textContent = 'Flag Selected For Review';
+      } else if (allFiltered) {
+        button.textContent = 'Flag Selected For Review';
+      } else {
+        button.textContent = `Flag ${formatNumber(manualCount)} For Review`;
+      }
+      if (hint) {
+        if (allFiltered) {
+          hint.textContent = 'Flagging requires individual row selection. Pick rows manually or use "Select page" to flag a single page at a time.';
+        } else if (manualCount === 0) {
+          hint.textContent = 'Pick one or more rows to flag for review.';
+        } else {
+          hint.textContent = '';
+        }
+      }
+    }
+
+    function renderMatterDropdownHint() {
+      const hint = document.getElementById('matterDropdownHint');
+      if (!hint) return;
+      const matterId = document.getElementById('dataMatterSelect')?.value || '';
+      hint.textContent = matterId
+        ? ''
+        : 'A new matter will be created when you assign — you\'ll name it in the next step.';
+    }
+
+    function onMatterDropdownChange() {
+      renderMatterDropdownHint();
+      updateAssignSelectedButton();
+    }
+
+    function getDependentEntitiesMap() {
+      const declared = state.catalog && state.catalog.relationships;
+      if (!declared || typeof declared !== 'object' || Array.isArray(declared)) return {};
+      const map = {};
+      for (const [parent, rels] of Object.entries(declared)) {
+        if (!Array.isArray(rels)) continue;
+        const cleaned = rels
+          .filter((rel) => rel && typeof rel === 'object' && rel.entity_type && rel.via)
+          .map((rel) => ({
+            entity_type: String(rel.entity_type),
+            label: rel.label ? String(rel.label) : titleCase(String(rel.entity_type)),
+            via: String(rel.via),
+            match: rel.match ? String(rel.match) : 'external_id',
+            transitive: Array.isArray(rel.transitive)
+              ? rel.transitive
+                  .filter((t) => t && t.entity_type && t.via)
+                  .map((t) => ({
+                    entity_type: String(t.entity_type),
+                    label: t.label ? String(t.label) : titleCase(String(t.entity_type)),
+                    via: String(t.via),
+                    match: t.match ? String(t.match) : 'external_id'
+                  }))
+              : []
+          }));
+        if (cleaned.length) map[parent] = cleaned;
+      }
+      return map;
+    }
+
+    function hasAnyDependentEntities() {
+      const map = getDependentEntitiesMap();
+      return Object.keys(map).length > 0;
+    }
+
+    function getRelationshipsForEntity(entityType) {
+      if (!entityType) return [];
+      const map = getDependentEntitiesMap();
+      return Array.isArray(map[entityType]) ? map[entityType] : [];
+    }
+
+    function readPathValue(row, path) {
+      if (!row || !path) return null;
+      const segments = String(path).split('.').filter(Boolean);
+      let cursor = row;
+      for (const segment of segments) {
+        if (cursor == null || typeof cursor !== 'object') return null;
+        cursor = cursor[segment];
+      }
+      if (cursor == null) return null;
+      return String(cursor);
+    }
+
+    async function loadCascadeIndexForEntity(entityType) {
+      if (!entityType || !state.sourceId) return [];
+      if (Array.isArray(state.cascadeIndex[entityType])) {
+        return state.cascadeIndex[entityType];
+      }
+      if (state.cascadeIndexLoading[entityType]) {
+        return state.cascadeIndexLoading[entityType];
+      }
+      const promise = (async () => {
+        const collected = [];
+        const pageSize = 500;
+        let offset = 0;
+        let total = Infinity;
+        while (offset < total) {
+          const params = new URLSearchParams({
+            limit: String(pageSize),
+            offset: String(offset),
+            entity_type: entityType
+          });
+          const response = await api.get(`${connectorApi('/data')}?${params.toString()}`);
+          const rows = Array.isArray(response.data) ? response.data : [];
+          collected.push(...rows);
+          const pagination = response.pagination || {};
+          total = typeof pagination.total === 'number' ? pagination.total : collected.length;
+          if (!rows.length) break;
+          offset += rows.length;
+          if (offset >= total) break;
+          if (collected.length >= 5000) break;
+        }
+        state.cascadeIndex[entityType] = collected;
+        return collected;
+      })().catch((error) => {
+        state.cascadeIndexErrors[entityType] = error.message || 'Failed to load linked records';
+        state.cascadeIndex[entityType] = [];
+        return [];
+      }).finally(() => {
+        delete state.cascadeIndexLoading[entityType];
+      });
+      state.cascadeIndexLoading[entityType] = promise;
+      return promise;
+    }
+
+    function getMatchValuesForRows(rows, matchPath) {
+      const path = String(matchPath || 'external_id');
+      const values = new Set();
+      for (const row of rows || []) {
+        let value = null;
+        if (path === 'external_id') value = row && row.external_id != null ? String(row.external_id) : null;
+        else if (path === 'id') value = row && row.id != null ? String(row.id) : null;
+        else value = readPathValue(row, path);
+        if (value != null && value !== '') values.add(value);
+      }
+      return values;
+    }
+
+    function findChildRowsForParents(childRows, viaPath, parentMatchValues) {
+      const matches = [];
+      for (const child of childRows || []) {
+        const fkValue = readPathValue(child, viaPath);
+        if (fkValue != null && parentMatchValues.has(fkValue)) {
+          matches.push(child);
+        }
+      }
+      return matches;
+    }
+
+    async function computeCascadeForRows(parentRows) {
+      const result = {
+        parents: Array.isArray(parentRows) ? parentRows.length : 0,
+        breakdown: [],
+        idsByEntity: {},
+        allChildIds: new Set(),
+        warnings: []
+      };
+      if (!parentRows || !parentRows.length) return result;
+
+      const groupedByEntity = new Map();
+      for (const row of parentRows) {
+        const entityType = row && row.entity_type;
+        if (!entityType) continue;
+        if (!groupedByEntity.has(entityType)) groupedByEntity.set(entityType, []);
+        groupedByEntity.get(entityType).push(row);
+      }
+
+      for (const [parentEntityType, parentsOfType] of groupedByEntity.entries()) {
+        const rels = getRelationshipsForEntity(parentEntityType);
+        if (!rels.length) continue;
+
+        for (const rel of rels) {
+          if (state.cascadeDisabledRels[`${parentEntityType}::${rel.entity_type}`]) continue;
+          const parentValues = getMatchValuesForRows(parentsOfType, rel.match);
+          if (!parentValues.size) continue;
+
+          let childRows;
+          try {
+            childRows = await loadCascadeIndexForEntity(rel.entity_type);
+          } catch (error) {
+            result.warnings.push(`Failed to load ${rel.label}: ${error.message || error}`);
+            continue;
+          }
+
+          const matchedChildren = findChildRowsForParents(childRows, rel.via, parentValues);
+          if (!matchedChildren.length) {
+            result.breakdown.push({
+              parent_entity_type: parentEntityType,
+              entity_type: rel.entity_type,
+              label: rel.label,
+              count: 0,
+              ids: []
+            });
+            continue;
+          }
+
+          const childIds = matchedChildren.map((row) => row.id).filter(Boolean);
+          for (const id of childIds) result.allChildIds.add(id);
+          if (!result.idsByEntity[rel.entity_type]) result.idsByEntity[rel.entity_type] = new Set();
+          for (const id of childIds) result.idsByEntity[rel.entity_type].add(id);
+
+          result.breakdown.push({
+            parent_entity_type: parentEntityType,
+            entity_type: rel.entity_type,
+            label: rel.label,
+            count: childIds.length,
+            ids: childIds
+          });
+
+          if (Array.isArray(rel.transitive) && rel.transitive.length) {
+            for (const trans of rel.transitive) {
+              if (state.cascadeDisabledRels[`${parentEntityType}::${rel.entity_type}::${trans.entity_type}`]) continue;
+              const transParentValues = getMatchValuesForRows(matchedChildren, trans.match);
+              if (!transParentValues.size) continue;
+
+              let transRows;
+              try {
+                transRows = await loadCascadeIndexForEntity(trans.entity_type);
+              } catch (error) {
+                result.warnings.push(`Failed to load ${trans.label}: ${error.message || error}`);
+                continue;
+              }
+
+              const matchedTrans = findChildRowsForParents(transRows, trans.via, transParentValues);
+              const transIds = matchedTrans.map((row) => row.id).filter(Boolean);
+              for (const id of transIds) result.allChildIds.add(id);
+              if (!result.idsByEntity[trans.entity_type]) result.idsByEntity[trans.entity_type] = new Set();
+              for (const id of transIds) result.idsByEntity[trans.entity_type].add(id);
+
+              result.breakdown.push({
+                parent_entity_type: rel.entity_type,
+                entity_type: trans.entity_type,
+                label: trans.label,
+                count: transIds.length,
+                ids: transIds,
+                transitive: true
+              });
+            }
+          }
+        }
+      }
+      return result;
+    }
+
+    function getCascadeRelKey(parentEntity, childEntity, transChild) {
+      return transChild
+        ? `${parentEntity}::${childEntity}::${transChild}`
+        : `${parentEntity}::${childEntity}`;
+    }
+
+    function toggleCascadeRel(parentEntity, childEntity, transChild, isDisabled) {
+      const key = getCascadeRelKey(parentEntity, childEntity, transChild);
+      if (isDisabled) {
+        state.cascadeDisabledRels[key] = true;
+      } else {
+        delete state.cascadeDisabledRels[key];
+      }
+      renderCascadePanel();
+      scheduleCascadePanelRefresh();
+    }
+
+    function setCascadeEnabled(value) {
+      state.cascadeEnabled = Boolean(value);
+      renderCascadePanel();
+      scheduleCascadePanelRefresh();
+    }
+
+    function getCascadeMatchCount(entityType, transitiveEntityType) {
+      const preview = state.cascadePanelPreview;
+      if (!preview || !Array.isArray(preview.breakdown)) return null;
+      const target = transitiveEntityType || entityType;
+      const isTransitive = Boolean(transitiveEntityType);
+      let total = 0;
+      let found = false;
+      for (const row of preview.breakdown) {
+        if (row.entity_type !== target) continue;
+        if (Boolean(row.transitive) !== isTransitive) continue;
+        total += Number(row.count || 0);
+        found = true;
+      }
+      return found ? total : 0;
+    }
+
+    function renderCascadeMatchLabel(rel, entityType, transitiveEntityType) {
+      const poolSize = Array.isArray(state.cascadeIndex[entityType])
+        ? state.cascadeIndex[entityType].length
+        : null;
+      const loading = Boolean(state.cascadeIndexLoading[entityType]);
+      if (loading) return 'Loading pool…';
+
+      const parentCount = state.cascadePanelPreview ? state.cascadePanelPreview.parents : 0;
+      if (parentCount === 0) {
+        return poolSize == null
+          ? 'Pool not loaded'
+          : `${formatNumber(poolSize)} candidate${poolSize === 1 ? '' : 's'} (select rows to compute matches)`;
+      }
+
+      if (state.cascadePanelLoading) return 'Computing matches…';
+
+      const matched = getCascadeMatchCount(transitiveEntityType ? entityType : null, transitiveEntityType || rel);
+      const matchedSafe = matched == null ? 0 : matched;
+      if (poolSize == null) {
+        return `${formatNumber(matchedSafe)} matched`;
+      }
+      return `${formatNumber(matchedSafe)} matched of ${formatNumber(poolSize)}`;
+    }
+
+    function renderCascadePanel() {
+      const node = document.getElementById('cascadePanel');
+      if (!node) return;
+      if (!hasAnyDependentEntities()) {
+        node.innerHTML = '';
+        node.classList.add('hidden');
+        return;
+      }
+      node.classList.remove('hidden');
+
+      const map = getDependentEntitiesMap();
+      const parentEntities = Object.keys(map);
+
+      const checkboxId = 'cascadeEnabledToggle';
+      const lines = [];
+      lines.push(`
+        <label class="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-3">
+          <input id="${checkboxId}" type="checkbox" ${state.cascadeEnabled ? 'checked' : ''} onchange="setCascadeEnabled(this.checked)" class="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+          <div>
+            <div class="text-sm font-medium text-gray-900">Also assign linked records</div>
+            <div class="mt-1 text-xs text-gray-500">When on, assigning rows to a matter also assigns their linked records (${parentEntities.map(titleCase).join(', ')} relationships). Match counts below reflect the current selection.</div>
           </div>
-          <div class="flex items-center justify-between gap-4">
-            <span>Visible rows</span>
-            <span class="font-semibold text-gray-900">${rows.length}</span>
+        </label>
+      `);
+
+      if (state.cascadeEnabled) {
+        const rows = [];
+        for (const parent of parentEntities) {
+          for (const rel of map[parent]) {
+            const key = getCascadeRelKey(parent, rel.entity_type);
+            const disabled = Boolean(state.cascadeDisabledRels[key]);
+            const label = renderCascadeMatchLabel(rel.entity_type, rel.entity_type, null);
+            rows.push(`
+              <label class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
+                <div class="flex items-start gap-3">
+                  <input type="checkbox" ${disabled ? '' : 'checked'} onchange="toggleCascadeRel('${escapeHtml(parent)}','${escapeHtml(rel.entity_type)}','', !this.checked)" class="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                  <div>
+                    <div class="text-sm text-gray-900">${escapeHtml(rel.label)}</div>
+                    <div class="text-xs text-gray-500">${escapeHtml(titleCase(parent))} &rarr; ${escapeHtml(rel.entity_type)} via <code>${escapeHtml(rel.via)}</code></div>
+                  </div>
+                </div>
+                <div class="text-xs text-gray-500 text-right">${label}</div>
+              </label>
+            `);
+            if (Array.isArray(rel.transitive)) {
+              for (const trans of rel.transitive) {
+                const tkey = getCascadeRelKey(parent, rel.entity_type, trans.entity_type);
+                const tdisabled = Boolean(state.cascadeDisabledRels[tkey]);
+                const tlabel = renderCascadeMatchLabel(trans.entity_type, trans.entity_type, trans.entity_type);
+                rows.push(`
+                  <label class="ml-6 flex items-center justify-between gap-3 rounded-lg border border-dashed border-gray-200 bg-white px-3 py-2">
+                    <div class="flex items-start gap-3">
+                      <input type="checkbox" ${tdisabled ? '' : 'checked'} onchange="toggleCascadeRel('${escapeHtml(parent)}','${escapeHtml(rel.entity_type)}','${escapeHtml(trans.entity_type)}', !this.checked)" class="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                      <div>
+                        <div class="text-sm text-gray-900">${escapeHtml(trans.label)}</div>
+                        <div class="text-xs text-gray-500">${escapeHtml(rel.entity_type)} &rarr; ${escapeHtml(trans.entity_type)} via <code>${escapeHtml(trans.via)}</code></div>
+                      </div>
+                    </div>
+                    <div class="text-xs text-gray-500 text-right">${tlabel}</div>
+                  </label>
+                `);
+              }
+            }
+          }
+        }
+        lines.push(`<div class="mt-3 space-y-2">${rows.join('')}</div>`);
+        const errorKeys = Object.keys(state.cascadeIndexErrors || {});
+        if (errorKeys.length) {
+          lines.push(`<div class="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">${errorKeys.map((k) => escapeHtml(`${k}: ${state.cascadeIndexErrors[k]}`)).join('<br>')}</div>`);
+        }
+      }
+
+      node.innerHTML = lines.join('');
+    }
+
+    function getParentRowsForCurrentSelection() {
+      if (state.selectionMode === 'all-filtered') return null;
+      const rows = state.dataPreview && Array.isArray(state.dataPreview.data) ? state.dataPreview.data : [];
+      return rows.filter((row) => state.selectedDataIds.includes(row.id));
+    }
+
+    function scheduleCascadePanelRefresh() {
+      if (state.cascadePanelDebounce) clearTimeout(state.cascadePanelDebounce);
+      state.cascadePanelDebounce = setTimeout(() => {
+        state.cascadePanelDebounce = null;
+        refreshCascadePanelMatchCounts();
+      }, 150);
+    }
+
+    async function refreshCascadePanelMatchCounts() {
+      if (!state.cascadeEnabled || !hasAnyDependentEntities()) {
+        state.cascadePanelPreview = null;
+        renderCascadePanel();
+        updateAssignSelectedButton();
+        return;
+      }
+      const parentRows = getParentRowsForCurrentSelection();
+      if (parentRows == null) {
+        // all-filtered: too expensive to recompute live; fall back to pool counts
+        state.cascadePanelPreview = null;
+        renderCascadePanel();
+        updateAssignSelectedButton();
+        return;
+      }
+      if (!parentRows.length) {
+        state.cascadePanelPreview = { parents: 0, breakdown: [], totalChildren: 0, warnings: [] };
+        renderCascadePanel();
+        updateAssignSelectedButton();
+        return;
+      }
+      state.cascadePanelLoading = true;
+      renderCascadePanel();
+      try {
+        const preview = await previewCascadeForSelection(parentRows);
+        state.cascadePanelPreview = preview;
+      } catch (error) {
+        state.cascadePanelPreview = { parents: parentRows.length, breakdown: [], totalChildren: 0, warnings: [error.message || String(error)] };
+      } finally {
+        state.cascadePanelLoading = false;
+        renderCascadePanel();
+        updateAssignSelectedButton();
+      }
+    }
+
+    async function previewCascadeForSelection(parentRows, options = {}) {
+      const result = await computeCascadeForRows(parentRows);
+      const totalChildren = result.allChildIds.size;
+      const totalRows = (result.parents || 0) + totalChildren;
+      return {
+        parents: result.parents,
+        breakdown: result.breakdown,
+        warnings: result.warnings,
+        idsByEntity: result.idsByEntity,
+        allChildIds: result.allChildIds,
+        totalChildren,
+        totalRows,
+        threshold: options.threshold == null ? 100 : options.threshold
+      };
+    }
+
+    function buildAssignTargetBody(target) {
+      if (!target || !target.mode) {
+        throw new Error('Assign target is required');
+      }
+      if (target.mode === 'existing') {
+        if (!target.matterId) throw new Error('Select a matter before assigning');
+        return { matter_id: target.matterId };
+      }
+      if (target.mode === 'create') {
+        const form = target.createForm || {};
+        const create_matter = {};
+        for (const key of ['name', 'client_name', 'description', 'status', 'matter_type', 'case_number', 'visibility']) {
+          const value = (form[key] == null ? '' : String(form[key])).trim();
+          if (value) create_matter[key] = value;
+        }
+        if (!create_matter.name) throw new Error('Matter name is required');
+        if (!create_matter.matter_type) create_matter.matter_type = 'workspace';
+        if (!create_matter.status) create_matter.status = 'active';
+        return { create_matter };
+      }
+      throw new Error('Unsupported assign mode');
+    }
+
+    function summarizeAssignResponse(response, fallbackCount, label) {
+      const assigned = Number.isFinite(response?.rows_assigned)
+        ? response.rows_assigned
+        : (Number.isFinite(response?.rows_updated) ? response.rows_updated : fallbackCount);
+      const skipped = Number.isFinite(response?.rows_skipped) ? response.rows_skipped : 0;
+      const parts = [`${label} (${formatNumber(assigned)} rows assigned`];
+      if (skipped > 0) parts.push(`, ${formatNumber(skipped)} skipped`);
+      parts.push(').');
+      return parts.join('');
+    }
+
+    async function performAssign(target, payloadExtras, label, fallbackCount) {
+      const body = Object.assign({}, payloadExtras || {}, buildAssignTargetBody(target));
+      if (typeof body.skip_already_assigned !== 'boolean') {
+        body.skip_already_assigned = true;
+      }
+      const response = await api.post(connectorApi('/data/assign-matter'), body);
+      showPageAlert(summarizeAssignResponse(response, fallbackCount, label), 'success');
+      state.cascadeIndex = {};
+      state.cascadeIndexErrors = {};
+      await Promise.all([refreshDataPreview(), refreshBaseData(false)]);
+      if (response && response.created_matter && response.created_matter.id) {
+        await loadMatterOptions();
+        const select = document.getElementById('dataMatterSelect');
+        if (select) select.value = response.created_matter.id;
+        renderMatterDropdownHint();
+        updateAssignSelectedButton();
+      }
+      return response;
+    }
+
+    async function performAssignWithIds(matterId, dataIds, label) {
+      if (!Array.isArray(dataIds) || !dataIds.length) {
+        throw new Error('No rows to assign');
+      }
+      return performAssign(
+        { mode: 'existing', matterId },
+        { data_ids: dataIds },
+        label,
+        dataIds.length
+      );
+    }
+
+    function getMatterNameById(matterId) {
+      if (!matterId) return '';
+      const matter = state.matterOptions.find((m) => m.id === matterId);
+      if (!matter) return '';
+      return matter.name || matter.matter_id || matter.client_name || 'Matter';
+    }
+
+    function deriveDefaultMatterName(parentRows) {
+      if (!Array.isArray(parentRows) || !parentRows.length) return '';
+      const first = parentRows[0];
+      const data = first && typeof first.data === 'object' ? first.data : {};
+      const candidates = [data.name, data.title, data.matter_name, data.case_name, first.external_id];
+      for (const candidate of candidates) {
+        const value = candidate == null ? '' : String(candidate).trim();
+        if (value) return value;
+      }
+      return '';
+    }
+
+    function summarizeAlreadyImported(parentRows) {
+      const examples = [];
+      const seen = new Set();
+      let totalAssigned = 0;
+      const seedRows = Array.isArray(parentRows) ? parentRows.slice() : [];
+      for (const set of Object.values(state.cascadeIndex || {})) {
+        if (!Array.isArray(set)) continue;
+        for (const row of set) {
+          if (!row || !row.id || seen.has(row.id)) continue;
+          seen.add(row.id);
+          if (row.matter_id) seedRows.push(row);
+        }
+      }
+      const liveRows = state.dataPreview && Array.isArray(state.dataPreview.data) ? state.dataPreview.data : [];
+      for (const row of liveRows) {
+        if (!row || !row.id || seen.has(row.id)) continue;
+        seen.add(row.id);
+        if (row.matter_id) seedRows.push(row);
+      }
+      const scannedIds = new Set();
+      for (const row of seedRows) {
+        if (!row || !row.id || scannedIds.has(row.id)) continue;
+        scannedIds.add(row.id);
+        if (!row.matter_id) continue;
+        totalAssigned += 1;
+        if (examples.length < 5) {
+          examples.push({
+            id: row.id,
+            external_id: row.external_id || '',
+            matter_id: row.matter_id,
+            matter_name: row.matter_name || getMatterNameById(row.matter_id) || ''
+          });
+        }
+      }
+      return { count: totalAssigned, examples };
+    }
+
+    function openAssignDialog(context) {
+      const parentRows = Array.isArray(context.parentRows) ? context.parentRows : [];
+      const cascadeAvailable = Boolean(state.cascadeEnabled && hasAnyDependentEntities() && context.cascadeAllowed !== false);
+      const defaultName = deriveDefaultMatterName(parentRows);
+      const presetMatterId = document.getElementById('dataMatterSelect')?.value || '';
+      const alreadyImported = summarizeAlreadyImported(parentRows);
+      state.assignDialog = {
+        open: true,
+        mode: presetMatterId ? 'existing' : 'create',
+        context,
+        targetMatterId: presetMatterId,
+        createForm: {
+          name: defaultName,
+          client_name: '',
+          description: '',
+          status: 'active',
+          matter_type: 'workspace',
+          case_number: '',
+          visibility: 'private'
+        },
+        oneMatterPerRow: false,
+        alreadyImported,
+        cascadePreview: null,
+        cascadeAvailable,
+        cascadeLoading: cascadeAvailable,
+        cascadeError: null,
+        inFlight: false
+      };
+      renderAssignDialog();
+      if (cascadeAvailable) {
+        previewCascadeForSelection(parentRows)
+          .then((preview) => {
+            if (!state.assignDialog) return;
+            state.assignDialog.cascadePreview = preview;
+            state.assignDialog.cascadeLoading = false;
+            renderAssignDialog();
+          })
+          .catch((error) => {
+            if (!state.assignDialog) return;
+            state.assignDialog.cascadeLoading = false;
+            state.assignDialog.cascadeError = error.message || String(error);
+            renderAssignDialog();
+          });
+      }
+    }
+
+    function closeAssignDialog() {
+      state.assignDialog = null;
+      renderAssignDialog();
+    }
+
+    function setAssignDialogMode(mode) {
+      if (!state.assignDialog) return;
+      state.assignDialog.mode = mode === 'create' ? 'create' : 'existing';
+      renderAssignDialog();
+    }
+
+    function setAssignDialogMatter(matterId) {
+      if (!state.assignDialog) return;
+      state.assignDialog.targetMatterId = matterId || '';
+      renderAssignDialog();
+    }
+
+    function updateAssignDialogField(field, value) {
+      if (!state.assignDialog) return;
+      if (!state.assignDialog.createForm) state.assignDialog.createForm = {};
+      state.assignDialog.createForm[field] = value;
+    }
+
+    function setAssignDialogOneMatterPerRow(value) {
+      if (!state.assignDialog) return;
+      state.assignDialog.oneMatterPerRow = Boolean(value);
+      renderAssignDialog();
+    }
+
+    function deriveMatterNameForRow(parentRow) {
+      if (!parentRow) return '(unnamed row)';
+      const name = deriveDefaultMatterName([parentRow]);
+      if (name) return name;
+      const externalId = parentRow.external_id == null ? '' : String(parentRow.external_id).trim();
+      if (externalId) return externalId;
+      return '(unnamed row)';
+    }
+
+    function getAssignDialogTotals() {
+      const dialog = state.assignDialog;
+      if (!dialog) return { rowCount: 0, cascadeChildren: 0, totalRows: 0 };
+      const ctx = dialog.context || {};
+      const parents = Array.isArray(ctx.parentRows) ? ctx.parentRows.length : 0;
+      const baseCount = Number.isFinite(ctx.rowCount) ? ctx.rowCount : parents;
+      const willCascade = dialog.cascadeAvailable && dialog.cascadePreview && dialog.cascadePreview.totalChildren > 0;
+      const cascadeChildren = willCascade ? dialog.cascadePreview.totalChildren : 0;
+      return {
+        rowCount: baseCount,
+        cascadeChildren,
+        totalRows: baseCount + cascadeChildren
+      };
+    }
+
+    function renderAssignDialog() {
+      const node = document.getElementById('assignMatterModal');
+      if (!node) return;
+      const dialog = state.assignDialog;
+      if (!dialog || !dialog.open) {
+        node.classList.add('hidden');
+        node.innerHTML = '';
+        return;
+      }
+      const ctx = dialog.context || {};
+      const totals = getAssignDialogTotals();
+      const targetLabel = dialog.mode === 'create'
+        ? (dialog.createForm?.name?.trim() || 'newly-created matter')
+        : (getMatterNameById(dialog.targetMatterId) || 'Unassigned');
+      const skippedCount = dialog.alreadyImported.count || 0;
+      const examplesHtml = dialog.alreadyImported.examples.length
+        ? `<ul class="mt-2 space-y-1 text-xs text-gray-600">${dialog.alreadyImported.examples.map((ex) => {
+            const left = ex.external_id ? escapeHtml(ex.external_id) : escapeHtml(ex.id);
+            const right = ex.matter_name ? escapeHtml(ex.matter_name) : 'Matter';
+            return `<li>${left} &rarr; ${right}</li>`;
+          }).join('')}</ul>`
+        : '';
+      const skippedHtml = skippedCount > 0
+        ? `
+          <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            <div class="font-medium">${formatNumber(skippedCount)} row${skippedCount === 1 ? '' : 's'} already assigned to a matter — these will be skipped.</div>
+            ${examplesHtml}
+            <div class="mt-2 text-xs text-amber-700">Edit individually via Inspect &rarr; Assign if you need to reassign.</div>
+          </div>`
+        : '<div class="rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-500">No rows in the current selection are already assigned to a matter.</div>';
+
+      const matterOptionsHtml = ['<option value="">Select a matter…</option>']
+        .concat(state.matterOptions.map((matter) => {
+          const label = matter.name || matter.matter_id || matter.client_name || 'Matter';
+          const selected = matter.id === dialog.targetMatterId ? ' selected' : '';
+          return `<option value="${escapeHtml(matter.id)}"${selected}>${escapeHtml(label)}</option>`;
+        }))
+        .join('');
+
+      const existingPanelHtml = dialog.mode === 'existing' ? `
+        <div class="mt-3 space-y-2">
+          <label class="block text-xs font-medium text-gray-700">Matter</label>
+          <select id="assignDialogMatterSelect" onchange="setAssignDialogMatter(this.value)" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">${matterOptionsHtml}</select>
+        </div>` : '';
+
+      const form = dialog.createForm || {};
+      const ctxParentRows = Array.isArray(ctx.parentRows) ? ctx.parentRows : [];
+      const oneMatterPerRow = Boolean(dialog.oneMatterPerRow);
+      const perRowNamePreview = oneMatterPerRow
+        ? ctxParentRows.slice(0, 5).map((row) => deriveMatterNameForRow(row))
+        : [];
+      const perRowExtraCount = oneMatterPerRow && ctxParentRows.length > 5 ? ctxParentRows.length - 5 : 0;
+      const perRowToggleHtml = dialog.mode === 'create' ? `
+        <div class="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
+          <div class="text-xs font-medium text-gray-700">Creation strategy</div>
+          <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-6">
+            <label class="flex items-start gap-2 text-sm text-gray-700">
+              <input type="radio" name="assignDialogPerRow" value="single" ${oneMatterPerRow ? '' : 'checked'} onchange="setAssignDialogOneMatterPerRow(false)" class="mt-1" />
+              <span>
+                <span class="font-medium">Single new matter</span>
+                <span class="block text-xs text-gray-500">All selected rows and linked records go into one matter.</span>
+              </span>
+            </label>
+            <label class="flex items-start gap-2 text-sm text-gray-700">
+              <input type="radio" name="assignDialogPerRow" value="perRow" ${oneMatterPerRow ? 'checked' : ''} onchange="setAssignDialogOneMatterPerRow(true)" ${ctxParentRows.length > 0 ? '' : 'disabled'} />
+              <span>
+                <span class="font-medium">One matter per selected row</span>
+                <span class="block text-xs text-gray-500">Each selected row becomes its own matter; linked records are partitioned per parent.</span>
+              </span>
+            </label>
           </div>
-          <div class="flex items-center justify-between gap-4">
-            <span>Filtered total</span>
-            <span class="font-semibold text-gray-900">${formatNumber(state.dataPreview?.pagination?.total || 0)}</span>
+        </div>` : '';
+
+      const perRowPreviewHtml = oneMatterPerRow ? `
+        <div class="mt-3 rounded-xl border border-gray-200 bg-white p-3">
+          <div class="text-xs font-medium text-gray-700">Preview (${formatNumber(ctxParentRows.length)} matter${ctxParentRows.length === 1 ? '' : 's'} will be created)</div>
+          ${perRowNamePreview.length
+            ? `<ul class="mt-2 space-y-1 text-xs text-gray-600">${perRowNamePreview.map((name) => `<li>&bull; ${escapeHtml(name)}</li>`).join('')}</ul>`
+            : '<div class="mt-2 text-xs text-gray-500">No selected rows to preview.</div>'}
+          ${perRowExtraCount > 0 ? `<div class="mt-2 text-xs text-gray-500">…and ${formatNumber(perRowExtraCount)} more</div>` : ''}
+        </div>` : '';
+
+      const singleCreateFieldsHtml = !oneMatterPerRow ? `
+        <label class="block sm:col-span-2">
+          <div class="text-xs font-medium text-gray-700">Name<span class="text-red-500">*</span></div>
+          <input type="text" value="${escapeHtml(form.name || '')}" oninput="updateAssignDialogField('name', this.value); refreshAssignDialogTotals();" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" />
+        </label>
+        <label class="block">
+          <div class="text-xs font-medium text-gray-700">Client Name</div>
+          <input type="text" value="${escapeHtml(form.client_name || '')}" oninput="updateAssignDialogField('client_name', this.value)" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" />
+        </label>
+        <label class="block">
+          <div class="text-xs font-medium text-gray-700">Case Number</div>
+          <input type="text" value="${escapeHtml(form.case_number || '')}" oninput="updateAssignDialogField('case_number', this.value)" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" />
+        </label>
+        <label class="block sm:col-span-2">
+          <div class="text-xs font-medium text-gray-700">Description</div>
+          <textarea rows="2" oninput="updateAssignDialogField('description', this.value)" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">${escapeHtml(form.description || '')}</textarea>
+        </label>` : '';
+
+      const createPanelHtml = dialog.mode === 'create' ? `
+        ${perRowToggleHtml}
+        ${perRowPreviewHtml}
+        <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          ${singleCreateFieldsHtml}
+          <label class="block">
+            <div class="text-xs font-medium text-gray-700">Status</div>
+            <select onchange="updateAssignDialogField('status', this.value)" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+              ${['active', 'pending', 'archived', 'closed'].map((s) => `<option value="${s}"${(form.status || 'active') === s ? ' selected' : ''}>${escapeHtml(s)}</option>`).join('')}
+            </select>
+          </label>
+          <label class="block">
+            <div class="text-xs font-medium text-gray-700">Matter Type</div>
+            <select onchange="updateAssignDialogField('matter_type', this.value)" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+              ${['workspace', 'matter'].map((s) => `<option value="${s}"${(form.matter_type || 'workspace') === s ? ' selected' : ''}>${escapeHtml(s)}</option>`).join('')}
+            </select>
+          </label>
+        </div>` : '';
+
+      const cascadeHtml = dialog.cascadeAvailable
+        ? (dialog.cascadeLoading
+          ? '<div class="rounded-xl border border-gray-200 bg-white p-3 text-sm text-gray-500">Computing linked records…</div>'
+          : (dialog.cascadeError
+            ? `<div class="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">${escapeHtml(dialog.cascadeError)}</div>`
+            : (dialog.cascadePreview && dialog.cascadePreview.breakdown.length
+              ? `<div class="space-y-2">${dialog.cascadePreview.breakdown.map((row) => `
+                  <div class="flex items-center justify-between gap-4 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+                    <div>
+                      <div class="font-medium text-gray-900">${escapeHtml(row.label)}${row.transitive ? ' <span class="text-xs text-gray-500">(transitive)</span>' : ''}</div>
+                      <div class="text-xs text-gray-500">${escapeHtml(row.parent_entity_type)} &rarr; ${escapeHtml(row.entity_type)}</div>
+                    </div>
+                    <div class="text-sm font-semibold text-gray-900">${formatNumber(row.count)}</div>
+                  </div>`).join('')}</div>`
+              : '<div class="rounded-xl border border-gray-200 bg-white p-3 text-xs text-gray-500">No linked records were found for this selection.</div>')))
+        : '';
+
+      const cascadeWarningsHtml = dialog.cascadePreview && dialog.cascadePreview.warnings && dialog.cascadePreview.warnings.length
+        ? `<div class="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">${dialog.cascadePreview.warnings.map(escapeHtml).join('<br>')}</div>`
+        : '';
+
+      const canConfirm = !dialog.inFlight
+        && (
+          dialog.mode === 'existing'
+            ? Boolean(dialog.targetMatterId)
+            : (oneMatterPerRow ? ctxParentRows.length > 0 : Boolean((form.name || '').trim()))
+        )
+        && totals.rowCount > 0;
+
+      const confirmLabel = dialog.inFlight
+        ? (oneMatterPerRow && dialog.mode === 'create' ? 'Creating…' : 'Assigning…')
+        : (oneMatterPerRow && dialog.mode === 'create'
+          ? `Create ${formatNumber(ctxParentRows.length)} matter${ctxParentRows.length === 1 ? '' : 's'}`
+          : 'Confirm');
+
+      const description = ctx.parentDescription || `${formatNumber(totals.rowCount)} row${totals.rowCount === 1 ? '' : 's'}`;
+
+      node.classList.remove('hidden');
+      node.innerHTML = `
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div class="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <div class="connector-label">Assign to matter</div>
+                <div class="mt-1 text-sm text-gray-600">${escapeHtml(description)} from this connector.</div>
+              </div>
+              <button type="button" onclick="closeAssignDialog()" class="rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-500 hover:bg-gray-50">Close</button>
+            </div>
+
+            <div class="mt-4">${skippedHtml}</div>
+
+            <div class="mt-4 rounded-xl border border-gray-200 p-4">
+              <div class="text-sm font-semibold text-gray-900">Target</div>
+              <div class="mt-2 flex flex-wrap gap-4">
+                <label class="flex items-center gap-2 text-sm text-gray-700">
+                  <input type="radio" name="assignDialogMode" value="existing" ${dialog.mode === 'existing' ? 'checked' : ''} onchange="setAssignDialogMode('existing')" />
+                  Existing matter
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-700">
+                  <input type="radio" name="assignDialogMode" value="create" ${dialog.mode === 'create' ? 'checked' : ''} onchange="setAssignDialogMode('create')" />
+                  Create new matter
+                </label>
+              </div>
+              ${existingPanelHtml}
+              ${createPanelHtml}
+            </div>
+
+            ${cascadeHtml ? `<div class="mt-4 rounded-xl border border-gray-200 p-4"><div class="text-sm font-semibold text-gray-900">Linked records</div><div class="mt-2">${cascadeHtml}</div>${cascadeWarningsHtml}</div>` : ''}
+
+            <div class="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+              <span id="assignDialogTotalsText">${renderAssignDialogTotalsText(totals, targetLabel, skippedCount, { oneMatterPerRow: oneMatterPerRow && dialog.mode === 'create', matterCount: ctxParentRows.length })}</span>
+            </div>
+
+            <div class="mt-6 flex justify-end gap-3">
+              <button type="button" onclick="closeAssignDialog()" class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
+              <button type="button" onclick="confirmAssignDialog()" ${canConfirm ? '' : 'disabled'} class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 ${canConfirm ? '' : 'opacity-60 cursor-not-allowed'}">${escapeHtml(confirmLabel)}</button>
+            </div>
           </div>
         </div>
       `;
+    }
+
+    function renderAssignDialogTotalsText(totals, targetLabel, skippedCount, options) {
+      const opts = options || {};
+      const skippedNote = skippedCount > 0 ? ` Skipping ${formatNumber(skippedCount)} already-assigned row${skippedCount === 1 ? '' : 's'}.` : '';
+      if (opts.oneMatterPerRow) {
+        const matterCount = Number.isFinite(opts.matterCount) ? opts.matterCount : 0;
+        return `Will create ${formatNumber(matterCount)} new matter${matterCount === 1 ? '' : 's'} from the selection (linked records partitioned per parent).${skippedNote}`;
+      }
+      const cascadeNote = totals.cascadeChildren > 0
+        ? ` (plus ${formatNumber(totals.cascadeChildren)} linked record${totals.cascadeChildren === 1 ? '' : 's'})`
+        : '';
+      return `Will assign ${formatNumber(totals.rowCount)} row${totals.rowCount === 1 ? '' : 's'}${cascadeNote} to ${escapeHtml(targetLabel)}.${skippedNote}`;
+    }
+
+    function refreshAssignDialogTotals() {
+      const dialog = state.assignDialog;
+      if (!dialog) return;
+      const totals = getAssignDialogTotals();
+      const targetLabel = dialog.mode === 'create'
+        ? (dialog.createForm?.name?.trim() || 'newly-created matter')
+        : (getMatterNameById(dialog.targetMatterId) || 'Unassigned');
+      const skippedCount = dialog.alreadyImported.count || 0;
+      const ctxParentRows = Array.isArray(dialog.context?.parentRows) ? dialog.context.parentRows : [];
+      const oneMatterPerRow = Boolean(dialog.oneMatterPerRow) && dialog.mode === 'create';
+      const text = renderAssignDialogTotalsText(totals, targetLabel, skippedCount, {
+        oneMatterPerRow,
+        matterCount: ctxParentRows.length
+      });
+      const node = document.getElementById('assignDialogTotalsText');
+      if (node) node.innerHTML = text;
+    }
+
+    async function confirmAssignDialog() {
+      const dialog = state.assignDialog;
+      if (!dialog || dialog.inFlight) return;
+      const ctx = dialog.context || {};
+
+      const isPerRowCreate = dialog.mode === 'create' && Boolean(dialog.oneMatterPerRow);
+
+      let target;
+      if (!isPerRowCreate) {
+        try {
+          target = dialog.mode === 'existing'
+            ? { mode: 'existing', matterId: dialog.targetMatterId }
+            : { mode: 'create', createForm: dialog.createForm };
+          buildAssignTargetBody(target);
+        } catch (error) {
+          showPageAlert(error.message || 'Invalid assignment target.', 'error');
+          return;
+        }
+      }
+
+      dialog.inFlight = true;
+      renderAssignDialog();
+
+      if (isPerRowCreate) {
+        const parentRows = Array.isArray(ctx.parentRows) ? ctx.parentRows : [];
+        if (!parentRows.length) {
+          showPageAlert('No selected rows available to create matters from.', 'error');
+          dialog.inFlight = false;
+          renderAssignDialog();
+          return;
+        }
+        const form = dialog.createForm || {};
+        const status = (form.status || 'active').trim() || 'active';
+        const matterType = (form.matter_type || 'workspace').trim() || 'workspace';
+        const cascadeAvailable = Boolean(dialog.cascadeAvailable);
+        const successes = [];
+        const failures = [];
+
+        for (const parent of parentRows) {
+          if (!parent || !parent.id) {
+            failures.push({ parent, error: 'Missing parent row id' });
+            continue;
+          }
+          const derivedName = deriveMatterNameForRow(parent);
+          try {
+            let childIds = [];
+            if (cascadeAvailable) {
+              try {
+                const preview = await previewCascadeForSelection([parent]);
+                if (preview && preview.allChildIds) {
+                  childIds = Array.from(preview.allChildIds);
+                }
+              } catch (cascadeError) {
+                console.warn('[Connector Viewer] Per-row cascade preview failed; proceeding with parent only', { parentId: parent.id, error: cascadeError });
+              }
+            }
+            const dataIds = Array.from(new Set([parent.id, ...childIds]));
+            const body = {
+              data_ids: dataIds,
+              skip_already_assigned: true,
+              create_matter: {
+                name: derivedName,
+                status,
+                matter_type: matterType
+              }
+            };
+            const response = await api.post(connectorApi('/data/assign-matter'), body);
+            successes.push({ parent, derivedName, response });
+          } catch (error) {
+            console.error('[Connector Viewer] Per-row matter create failed', { parentId: parent.id, derivedName, error });
+            failures.push({ parent, derivedName, error: error?.message || String(error) });
+          }
+        }
+
+        const total = parentRows.length;
+        const successCount = successes.length;
+        const failureCount = failures.length;
+        if (failureCount === 0) {
+          showPageAlert(`Created ${formatNumber(successCount)} matter${successCount === 1 ? '' : 's'}.`, 'success');
+        } else if (successCount === 0) {
+          showPageAlert(`Failed to create ${formatNumber(failureCount)} matter${failureCount === 1 ? '' : 's'} — check the console for details.`, 'error');
+          console.error('[Connector Viewer] Per-row matter create failures', failures);
+        } else {
+          showPageAlert(`Created ${formatNumber(successCount)} of ${formatNumber(total)} matters. ${formatNumber(failureCount)} failed — check the console for details.`, 'warning');
+          console.error('[Connector Viewer] Per-row matter create partial failures', failures);
+        }
+
+        if (successCount > 0) {
+          state.cascadeIndex = {};
+          state.cascadeIndexErrors = {};
+          try {
+            await Promise.all([loadMatterOptions(), refreshDataPreview(), refreshBaseData(false)]);
+          } catch (refreshError) {
+            console.warn('[Connector Viewer] Post-create refresh failed', refreshError);
+          }
+        }
+
+        state.assignDialog = null;
+        renderAssignDialog();
+        return;
+      }
+
+      try {
+        const willCascade = dialog.cascadeAvailable && dialog.cascadePreview && dialog.cascadePreview.totalChildren > 0;
+        const parentRows = Array.isArray(ctx.parentRows) ? ctx.parentRows : [];
+        const parentIds = Array.isArray(ctx.parentIds) && ctx.parentIds.length
+          ? ctx.parentIds.slice()
+          : parentRows.map((row) => row.id).filter(Boolean);
+        let payloadExtras;
+        let label = ctx.label || 'Assignment complete';
+        let fallbackCount = ctx.rowCount || parentRows.length;
+
+        if (willCascade && parentIds.length) {
+          const allIds = Array.from(new Set([...parentIds, ...dialog.cascadePreview.allChildIds]));
+          payloadExtras = { data_ids: allIds };
+          fallbackCount = allIds.length;
+          label = ctx.cascadeLabel || 'Cascade assign complete';
+        } else if (ctx.bodyMode === 'ids') {
+          payloadExtras = { data_ids: parentIds };
+          fallbackCount = parentIds.length;
+        } else if (ctx.bodyMode === 'filtered') {
+          payloadExtras = {
+            q: ctx.filtered?.q || null,
+            entity_type: ctx.filtered?.entity_type || null,
+            filters: ctx.filtered?.filters || []
+          };
+        } else if (ctx.bodyMode === 'group') {
+          payloadExtras = { group: ctx.group };
+        } else {
+          payloadExtras = { data_ids: parentIds };
+        }
+
+        await performAssign(target, payloadExtras, label, fallbackCount);
+        state.assignDialog = null;
+        renderAssignDialog();
+      } catch (error) {
+        console.error('[Connector Viewer] Assign dialog confirm failed', error);
+        showPageAlert(error.message || 'Failed to assign rows.', 'error');
+        if (state.assignDialog) {
+          state.assignDialog.inFlight = false;
+          renderAssignDialog();
+        }
+      }
+    }
+
+    async function assignSingleRecordWithCascade(recordId) {
+      if (!state.sourceId) return;
+      try {
+        const rows = state.dataPreview && Array.isArray(state.dataPreview.data) ? state.dataPreview.data : [];
+        const record = rows.find((row) => row.id === recordId) || state.selectedRecord;
+        if (!record) {
+          throw new Error('Record not found in current view');
+        }
+        openAssignDialog({
+          parentRows: [record],
+          rowCount: 1,
+          parentDescription: `1 ${titleCase(record.entity_type || 'record')}`,
+          bodyMode: 'ids',
+          label: 'Record assigned',
+          cascadeLabel: 'Record and linked rows assigned'
+        });
+      } catch (error) {
+        console.error('[Connector Viewer] Single-record assign failed', error);
+        showPageAlert(error.message || 'Failed to assign record.', 'error');
+      }
+    }
+
+    async function refreshLinkedRecordsForOpenRecord() {
+      if (!state.selectedRecord) {
+        state.cascadeLinkedPanel = null;
+        renderRecordDetail();
+        return;
+      }
+      const rels = getRelationshipsForEntity(state.selectedRecord.entity_type);
+      if (!rels.length) {
+        state.cascadeLinkedPanel = null;
+        renderRecordDetail();
+        return;
+      }
+      state.cascadeLinkedPanel = { loading: true, breakdown: [], warnings: [], totalChildren: 0 };
+      renderRecordDetail();
+      try {
+        const preview = await previewCascadeForSelection([state.selectedRecord], { threshold: 100 });
+        state.cascadeLinkedPanel = {
+          loading: false,
+          breakdown: preview.breakdown,
+          warnings: preview.warnings,
+          totalChildren: preview.totalChildren
+        };
+      } catch (error) {
+        state.cascadeLinkedPanel = { loading: false, breakdown: [], warnings: [error.message || String(error)], totalChildren: 0 };
+      }
+      renderRecordDetail();
+    }
+
+    function filterToLinkedRecords(parentRecordId, childEntityType) {
+      const rows = state.dataPreview && Array.isArray(state.dataPreview.data) ? state.dataPreview.data : [];
+      const parent = rows.find((row) => row.id === parentRecordId) || state.selectedRecord;
+      if (!parent || !childEntityType) return;
+      const rels = getRelationshipsForEntity(parent.entity_type);
+      const rel = rels.find((r) => r.entity_type === childEntityType);
+      if (!rel) return;
+      const matchValue = rel.match === 'external_id'
+        ? (parent.external_id != null ? String(parent.external_id) : '')
+        : (readPathValue(parent, rel.match) || '');
+      if (!matchValue) {
+        showPageAlert('Could not derive a filter key for this relationship.', 'error');
+        return;
+      }
+      const entitySelect = document.getElementById('entityTypeFilter');
+      if (entitySelect) entitySelect.value = childEntityType;
+      const searchInput = document.getElementById('dataSearchInput');
+      if (searchInput) searchInput.value = matchValue;
+      closeRecordDetail();
+      applyDataFilters();
+      showPageAlert(`Filtered to ${rel.label} for ${parent.external_id || parent.entity_type}. Refine the search if unrelated rows appear.`, 'info');
     }
 
     function renderDataGroups() {
@@ -3065,6 +4979,253 @@
       `;
     }
 
+    function getValueByPath(obj, path) {
+      if (obj == null || !path) return undefined;
+      const segments = String(path).split('.').filter((s) => s.length > 0);
+      let cursor = obj;
+      for (const seg of segments) {
+        if (cursor == null) return undefined;
+        if (Array.isArray(cursor)) {
+          const idx = Number(seg);
+          if (!Number.isInteger(idx)) return undefined;
+          cursor = cursor[idx];
+        } else if (typeof cursor === 'object') {
+          cursor = cursor[seg];
+        } else {
+          return undefined;
+        }
+      }
+      return cursor;
+    }
+
+    function formatPayloadValue(value) {
+      if (value === null) return 'null';
+      if (value === undefined) return 'undefined';
+      if (typeof value === 'string') return JSON.stringify(value);
+      if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+      try { return JSON.stringify(value); } catch (e) { return String(value); }
+    }
+
+    function isLeafValue(value) {
+      if (value === null || value === undefined) return true;
+      const t = typeof value;
+      if (t === 'string' || t === 'number' || t === 'boolean') return true;
+      return false;
+    }
+
+    function collectFieldPaths(obj, prefix, out) {
+      if (obj == null || typeof obj !== 'object') return;
+      const entries = Array.isArray(obj) ? obj.map((v, i) => [String(i), v]) : Object.entries(obj);
+      for (const [key, value] of entries) {
+        const path = prefix ? `${prefix}.${key}` : key;
+        if (isLeafValue(value)) {
+          out.push(path);
+        } else if (typeof value === 'object') {
+          collectFieldPaths(value, path, out);
+        }
+      }
+    }
+
+    function renderCorrectionFieldOptions(record) {
+      const data = record && typeof record.data === 'object' && record.data !== null ? record.data : {};
+      const paths = [];
+      collectFieldPaths(data, '', paths);
+      paths.sort();
+      const options = ['<option value="">Select a field…</option>']
+        .concat(paths.map((p) => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`))
+        .concat(['<option value="__custom__">Custom path…</option>']);
+      return options.join('');
+    }
+
+    function renderInteractivePayload(record) {
+      const data = record && typeof record.data === 'object' && record.data !== null ? record.data : {};
+      const lines = [];
+
+      function walk(value, prefix, indent, leadingKey) {
+        const padStyle = `padding-left:${indent * 12}px`;
+        if (isLeafValue(value)) {
+          const path = prefix;
+          const display = formatPayloadValue(value);
+          const keyLabel = leadingKey == null
+            ? ''
+            : `<span class="text-teal-100">${escapeHtml(JSON.stringify(leadingKey))}</span><span class="text-gray-300">: </span>`;
+          lines.push(`<button type="button" onclick="prefillCorrectionFromPath('${escapeHtml(path)}')" class="block w-full text-left rounded px-2 py-0.5 text-gray-100 hover:bg-gray-800" style="${padStyle}">${keyLabel}<span class="text-emerald-100">${escapeHtml(display)}</span></button>`);
+          return;
+        }
+        if (Array.isArray(value)) {
+          const header = leadingKey == null
+            ? '<span class="text-gray-300">[</span>'
+            : `<span class="text-teal-100">${escapeHtml(JSON.stringify(leadingKey))}</span><span class="text-gray-300">: [</span>`;
+          lines.push(`<div class="px-2 py-0.5" style="${padStyle}">${header}</div>`);
+          value.forEach((item, idx) => {
+            const childPath = prefix ? `${prefix}.${idx}` : String(idx);
+            walk(item, childPath, indent + 1, idx);
+          });
+          lines.push(`<div class="px-2 py-0.5 text-gray-300" style="${padStyle}">]</div>`);
+          return;
+        }
+        if (typeof value === 'object') {
+          const header = leadingKey == null
+            ? '<span class="text-gray-300">{</span>'
+            : `<span class="text-teal-100">${escapeHtml(JSON.stringify(leadingKey))}</span><span class="text-gray-300">: {</span>`;
+          lines.push(`<div class="px-2 py-0.5" style="${padStyle}">${header}</div>`);
+          for (const [k, v] of Object.entries(value)) {
+            const childPath = prefix ? `${prefix}.${k}` : k;
+            walk(v, childPath, indent + 1, k);
+          }
+          lines.push(`<div class="px-2 py-0.5 text-gray-300" style="${padStyle}">}</div>`);
+          return;
+        }
+      }
+
+      if (Object.keys(data).length === 0) {
+        return '<div class="px-2 py-2 text-gray-400">{}  (empty payload)</div>';
+      }
+      walk(data, '', 0, null);
+      return `<div class="connector-mono leading-relaxed">${lines.join('')}</div>`;
+    }
+
+    function getActiveCorrectionFieldKey() {
+      const select = document.getElementById('recordCorrectionFieldSelect');
+      if (!select) return '';
+      if (select.value === '__custom__') {
+        const custom = document.getElementById('recordCorrectionFieldCustom');
+        return custom ? custom.value.trim() : '';
+      }
+      return select.value || '';
+    }
+
+    function updateCurrentValueDisplay() {
+      const wrap = document.getElementById('recordCorrectionCurrentValueWrap');
+      const target = document.getElementById('recordCorrectionCurrentValue');
+      if (!wrap || !target) return;
+      const path = getActiveCorrectionFieldKey();
+      if (!path || !state.selectedRecord || !state.selectedRecord.data) {
+        wrap.classList.add('hidden');
+        target.textContent = '';
+        return;
+      }
+      const value = getValueByPath(state.selectedRecord.data, path);
+      if (value === undefined) {
+        wrap.classList.remove('hidden');
+        target.innerHTML = '<span class="italic text-gray-500">(field not present in current payload)</span>';
+        return;
+      }
+      wrap.classList.remove('hidden');
+      target.textContent = formatPayloadValue(value);
+    }
+
+    function onCorrectionFieldSelectChange() {
+      const select = document.getElementById('recordCorrectionFieldSelect');
+      const custom = document.getElementById('recordCorrectionFieldCustom');
+      if (!select || !custom) return;
+      if (select.value === '__custom__') {
+        custom.classList.remove('hidden');
+        custom.focus();
+      } else {
+        custom.classList.add('hidden');
+      }
+      updateCurrentValueDisplay();
+    }
+
+    function prefillCorrectionFromPath(path) {
+      if (!path || !state.selectedRecord) return;
+      const select = document.getElementById('recordCorrectionFieldSelect');
+      const custom = document.getElementById('recordCorrectionFieldCustom');
+      const proposedInput = document.getElementById('recordCorrectionValue');
+      if (!select) return;
+
+      const hasOption = [...select.options].some((opt) => opt.value === path);
+      if (hasOption) {
+        select.value = path;
+        if (custom) custom.classList.add('hidden');
+      } else if (custom) {
+        select.value = '__custom__';
+        custom.classList.remove('hidden');
+        custom.value = path;
+      }
+
+      if (proposedInput) {
+        const value = getValueByPath(state.selectedRecord.data, path);
+        proposedInput.value = formatPayloadValue(value);
+        proposedInput.focus();
+        proposedInput.select();
+      }
+
+      updateCurrentValueDisplay();
+
+      const form = document.getElementById('correctionForm');
+      if (form && typeof form.scrollIntoView === 'function') {
+        form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+
+    function renderProposedCorrectionsSection(annotations) {
+      const corrections = (Array.isArray(annotations) ? annotations : [])
+        .filter((a) => a && a.annotation_type === 'correction');
+
+      const intro = `
+        <div class="text-sm font-semibold text-gray-900">Proposed Corrections</div>
+        <div class="mt-1 text-xs text-gray-500">Suggested edits collaborators have proposed for this record. The synced source data is unchanged until a correction is applied.</div>
+      `;
+
+      if (!corrections.length) {
+        return `
+          <div class="rounded-xl border border-gray-200 bg-white p-4">
+            ${intro}
+            <div class="mt-3 text-sm text-gray-500">No proposed corrections yet. Click a field in the Source Payload above to start one.</div>
+          </div>
+        `;
+      }
+
+      const items = corrections.map((c) => {
+        const value = c.value && typeof c.value === 'object' && !Array.isArray(c.value) ? c.value : {};
+        const fieldKey = c.field_key || (typeof value.field_key === 'string' ? value.field_key : '') || 'record';
+        const original = value.original_value === undefined ? null : value.original_value;
+        const proposed = value.proposed_value === undefined ? null : value.proposed_value;
+        const notes = typeof value.notes === 'string' ? value.notes : '';
+        const status = typeof value.status === 'string' ? value.status : 'shortlisted';
+
+        return `
+          <div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <div class="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <div class="text-xs font-semibold uppercase tracking-wide text-amber-700">${escapeHtml(status)}</div>
+                <div class="mt-1 text-sm font-semibold text-gray-900 connector-mono">${escapeHtml(fieldKey)}</div>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="text-xs text-gray-500">${escapeHtml(formatDateTime(c.created_at))}</span>
+                <button type="button" onclick="deleteRecordAnnotation('${escapeHtml(c.id)}')" class="rounded-md border border-red-200 bg-white px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50" title="Withdraw correction">
+                  Withdraw
+                </button>
+              </div>
+            </div>
+            <div class="mt-3 grid gap-2 sm:grid-cols-2">
+              <div class="rounded-lg border border-red-200 bg-red-50 p-2">
+                <div class="text-xs font-semibold uppercase tracking-wide text-red-700">Current</div>
+                <div class="mt-1 break-words connector-mono text-xs text-red-900">${escapeHtml(formatPayloadValue(original))}</div>
+              </div>
+              <div class="rounded-lg border border-green-200 bg-green-50 p-2">
+                <div class="text-xs font-semibold uppercase tracking-wide text-green-700">Proposed</div>
+                <div class="mt-1 break-words connector-mono text-xs text-green-900">${escapeHtml(formatPayloadValue(proposed))}</div>
+              </div>
+            </div>
+            ${notes ? `<div class="mt-3 rounded-lg border border-gray-200 bg-white p-2 text-xs text-gray-700"><span class="font-semibold text-gray-500">Notes:</span> ${escapeHtml(notes)}</div>` : ''}
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="rounded-xl border border-amber-300 bg-white p-4">
+          <div class="flex items-center justify-between gap-3">
+            <div>${intro}</div>
+            <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">${formatNumber(corrections.length)}</span>
+          </div>
+          <div class="mt-3 space-y-3">${items}</div>
+        </div>
+      `;
+    }
+
     function renderRecordDetail() {
       const node = document.getElementById('recordDetailPanel');
       const backdrop = document.getElementById('recordDetailBackdrop');
@@ -3111,21 +5272,35 @@
             </div>
 
             <div class="rounded-xl border border-gray-200 bg-white p-4">
-              <div class="text-sm font-semibold text-gray-900">Source Payload</div>
-              <pre class="mt-4 max-h-[420px] overflow-auto rounded-xl bg-gray-950 p-4 text-xs text-gray-100">${escapeHtml(JSON.stringify(record.data || {}, null, 2))}</pre>
+              <div class="flex items-center justify-between gap-3">
+                <div class="text-sm font-semibold text-gray-900">Source Payload</div>
+                <div class="text-xs text-gray-500">Click a field below to start a correction.</div>
+              </div>
+              <div class="mt-4 max-h-[420px] overflow-auto rounded-xl bg-gray-950 p-3 text-xs">${renderInteractivePayload(record)}</div>
             </div>
 
-            <div class="rounded-xl border border-gray-200 bg-white p-4">
-              <div class="text-sm font-semibold text-gray-900">Shortlist A Correction</div>
-              <div class="mt-2 text-sm text-gray-500">Propose an edit without overwriting the source record. LANA stores the suggested change as a correction annotation.</div>
+            ${renderLinkedRecordsSection(record)}
+
+            ${renderRecordAssignSection(record)}
+
+            <div id="correctionForm" class="rounded-xl border border-gray-200 bg-white p-4">
+              <div class="text-sm font-semibold text-gray-900">Propose A Correction</div>
+              <div class="mt-2 text-sm text-gray-500">Suggest an edit without overwriting the source record. LANA stores the suggestion as a correction annotation.</div>
               <div class="mt-4 space-y-3">
                 <label class="block">
-                  <div class="mb-2 text-sm font-medium text-gray-900">Field Key</div>
-                  <input id="recordCorrectionField" type="text" placeholder="email, status, title..." class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                  <div class="mb-2 text-sm font-medium text-gray-900">Field</div>
+                  <select id="recordCorrectionFieldSelect" onchange="onCorrectionFieldSelectChange()" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                    ${renderCorrectionFieldOptions(record)}
+                  </select>
+                  <input id="recordCorrectionFieldCustom" type="text" placeholder="Custom path, e.g. address.city" oninput="updateCurrentValueDisplay()" class="mt-2 hidden w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
                 </label>
+                <div id="recordCorrectionCurrentValueWrap" class="hidden rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Current Value</div>
+                  <div id="recordCorrectionCurrentValue" class="mt-2 break-words connector-mono text-xs text-gray-800"></div>
+                </div>
                 <label class="block">
                   <div class="mb-2 text-sm font-medium text-gray-900">Proposed Value</div>
-                  <textarea id="recordCorrectionValue" rows="4" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"></textarea>
+                  <textarea id="recordCorrectionValue" rows="4" placeholder="What the value should be" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"></textarea>
                 </label>
                 <label class="block">
                   <div class="mb-2 text-sm font-medium text-gray-900">Notes</div>
@@ -3137,21 +5312,95 @@
               </div>
             </div>
 
+            ${renderProposedCorrectionsSection(annotations)}
+
             <div class="rounded-xl border border-gray-200 bg-white p-4">
-              <div class="text-sm font-semibold text-gray-900">Annotations</div>
+              <div class="text-sm font-semibold text-gray-900">Other Annotations</div>
+              <div class="mt-1 text-xs text-gray-500">Flags, notes, tags, and status entries on this record.</div>
               <div class="mt-3 space-y-3">
-                ${annotations.length ? annotations.map((annotation) => `
-                  <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                    <div class="flex items-center justify-between gap-3">
-                      <span>${renderLogStatus(annotation.annotation_type || 'note')}</span>
-                      <span class="text-xs text-gray-500">${escapeHtml(formatDateTime(annotation.created_at))}</span>
+                ${(annotations.filter((a) => a && a.annotation_type !== 'correction')).length
+                  ? annotations.filter((a) => a && a.annotation_type !== 'correction').map((annotation) => `
+                    <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                      <div class="flex items-center justify-between gap-3">
+                        <span>${renderLogStatus(annotation.annotation_type || 'note')}</span>
+                        <div class="flex items-center gap-3">
+                          <span class="text-xs text-gray-500">${escapeHtml(formatDateTime(annotation.created_at))}</span>
+                          <button type="button" onclick="deleteRecordAnnotation('${escapeHtml(annotation.id)}')" class="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50" title="Delete annotation">
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                      <div class="mt-2 text-xs font-semibold uppercase tracking-wide text-gray-500">${escapeHtml(annotation.field_key || 'record')}</div>
+                      <pre class="mt-2 overflow-x-auto whitespace-pre-wrap rounded-lg bg-white p-3 text-xs text-gray-700">${escapeHtml(JSON.stringify(annotation.value || {}, null, 2))}</pre>
                     </div>
-                    <div class="mt-2 text-xs font-semibold uppercase tracking-wide text-gray-500">${escapeHtml(annotation.field_key || 'record')}</div>
-                    <pre class="mt-2 overflow-x-auto whitespace-pre-wrap rounded-lg bg-white p-3 text-xs text-gray-700">${escapeHtml(JSON.stringify(annotation.value || {}, null, 2))}</pre>
-                  </div>
-                `).join('') : '<div class="text-sm text-gray-500">No annotations on this record yet.</div>'}
+                  `).join('')
+                  : '<div class="text-sm text-gray-500">No other annotations on this record yet.</div>'}
               </div>
             </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderLinkedRecordsSection(record) {
+      const rels = getRelationshipsForEntity(record && record.entity_type);
+      if (!rels.length) return '';
+      const panel = state.cascadeLinkedPanel;
+      let bodyHtml;
+      if (!panel) {
+        bodyHtml = `
+          <div class="mt-3 text-sm text-gray-500">Discover related rows for this record.</div>
+          <div class="mt-3"><button type="button" onclick="refreshLinkedRecordsForOpenRecord()" class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Load Linked Records</button></div>
+        `;
+      } else if (panel.loading) {
+        bodyHtml = '<div class="mt-3 text-sm text-gray-500">Loading linked records…</div>';
+      } else if (!panel.breakdown.length || panel.totalChildren === 0) {
+        bodyHtml = '<div class="mt-3 text-sm text-gray-500">No linked records found for this row.</div>';
+      } else {
+        const rows = panel.breakdown
+          .filter((row) => row.count > 0)
+          .map((row) => `
+            <div class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+              <div>
+                <div class="font-medium text-gray-900">${escapeHtml(row.label)}${row.transitive ? ' <span class="text-xs text-gray-500">(transitive)</span>' : ''}</div>
+                <div class="text-xs text-gray-500">${escapeHtml(row.parent_entity_type)} &rarr; ${escapeHtml(row.entity_type)}</div>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="text-sm font-semibold text-gray-900">${formatNumber(row.count)}</span>
+                <button type="button" onclick="filterToLinkedRecords('${escapeHtml(record.id)}','${escapeHtml(row.entity_type)}')" class="rounded-lg border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50">View</button>
+              </div>
+            </div>
+          `).join('');
+        const warningsHtml = panel.warnings && panel.warnings.length
+          ? `<div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">${panel.warnings.map(escapeHtml).join('<br>')}</div>`
+          : '';
+        bodyHtml = `<div class="mt-3 space-y-2">${rows || '<div class="text-sm text-gray-500">No linked records.</div>'}</div>${warningsHtml}`;
+      }
+      return `
+        <div class="rounded-xl border border-gray-200 bg-white p-4">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <div class="text-sm font-semibold text-gray-900">Linked Records</div>
+              <div class="mt-1 text-xs text-gray-500">Rows in other entity types that reference this record.</div>
+            </div>
+            <button type="button" onclick="refreshLinkedRecordsForOpenRecord()" class="rounded-lg border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50">Refresh</button>
+          </div>
+          ${bodyHtml}
+        </div>
+      `;
+    }
+
+    function renderRecordAssignSection(record) {
+      const hasRels = getRelationshipsForEntity(record && record.entity_type).length > 0;
+      const cascadeLabel = hasRels
+        ? 'Toggle "Also assign linked records" in Bulk Actions to include linked rows.'
+        : 'This entity has no declared relationships; only this record will be assigned.';
+      return `
+        <div class="rounded-xl border border-gray-200 bg-white p-4">
+          <div class="text-sm font-semibold text-gray-900">Assign To Matter</div>
+          <div class="mt-1 text-xs text-gray-500">Uses the matter selected in the Bulk Actions panel. ${escapeHtml(cascadeLabel)}</div>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <button type="button" onclick="assignSingleRecordWithCascade('${escapeHtml(record.id)}')" class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Assign Record</button>
           </div>
         </div>
       `;
@@ -3161,24 +5410,61 @@
       state.selectedRecordId = '';
       state.selectedRecord = null;
       state.recordAnnotations = [];
+      state.cascadeLinkedPanel = null;
       renderDataPreview();
+    }
+
+    function renderDataPreviewPagination(node, info) {
+      if (!node) return;
+      const { limit, offset, total, hasMore } = info;
+      if (!total || total <= limit) {
+        node.classList.add('hidden');
+        node.classList.remove('flex');
+        node.innerHTML = '';
+        return;
+      }
+      const totalPages = Math.max(1, Math.ceil(total / limit));
+      const currentPage = Math.floor(offset / limit) + 1;
+      const isFirst = offset <= 0;
+      const isLast = !hasMore;
+      const btnBase = 'rounded-lg border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50';
+      const btnDisabled = 'rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-300 cursor-not-allowed';
+
+      node.classList.remove('hidden');
+      node.classList.add('flex');
+      node.innerHTML = `
+        <div class="text-sm text-gray-600">Page <span class="font-semibold text-gray-900">${formatNumber(currentPage)}</span> of <span class="font-semibold text-gray-900">${formatNumber(totalPages)}</span></div>
+        <div class="flex flex-wrap items-center gap-2">
+          <button type="button" onclick="goToDataPage('first')" ${isFirst ? 'disabled' : ''} class="${isFirst ? btnDisabled : btnBase}">First</button>
+          <button type="button" onclick="goToDataPage('prev')" ${isFirst ? 'disabled' : ''} class="${isFirst ? btnDisabled : btnBase}">Previous</button>
+          <button type="button" onclick="goToDataPage('next')" ${isLast ? 'disabled' : ''} class="${isLast ? btnDisabled : btnBase}">Next</button>
+          <button type="button" onclick="goToDataPage('last')" ${isLast ? 'disabled' : ''} class="${isLast ? btnDisabled : btnBase}">Last</button>
+        </div>
+      `;
     }
 
     function renderDataPreview() {
       const meta = document.getElementById('dataPreviewMeta');
       const container = document.getElementById('dataPreviewTable');
-      const selectedSummary = document.getElementById('selectedDataSummary');
+      const paginationNode = document.getElementById('dataPreviewPagination');
       const response = state.dataPreview;
       const rows = response && Array.isArray(response.data) ? response.data : [];
       const pagination = response && response.pagination ? response.pagination : null;
 
       if (!rows.length) {
         state.selectedDataIds = [];
-        selectedSummary.textContent = 'No rows selected';
+        state.selectedRowsById = {};
+        state.selectionMode = 'manual';
         renderBulkActionSummary();
+        renderSelectionToolbar();
         renderRecordDetail();
         meta.textContent = 'No connector data found for this filter.';
         container.innerHTML = '<div class="p-8 text-center text-sm text-gray-500">No records to preview.</div>';
+        if (paginationNode) {
+          paginationNode.classList.add('hidden');
+          paginationNode.classList.remove('flex');
+          paginationNode.innerHTML = '';
+        }
         return;
       }
 
@@ -3186,17 +5472,32 @@
         state.selectedRecord = rows.find((row) => row.id === state.selectedRecordId) || state.selectedRecord;
       }
 
-      meta.textContent = pagination
-        ? `Showing ${rows.length} of ${formatNumber(pagination.total)} records`
-        : `Showing ${rows.length} records`;
-      selectedSummary.textContent = `${state.selectedDataIds.length} selected`;
+      if (pagination) {
+        const limit = pagination.limit || state.dataPreviewLimit || rows.length;
+        const offset = pagination.offset || 0;
+        const total = pagination.total || 0;
+        const start = total === 0 ? 0 : offset + 1;
+        const end = offset + rows.length;
+        meta.textContent = `Showing ${formatNumber(start)}–${formatNumber(end)} of ${formatNumber(total)} records`;
+        renderDataPreviewPagination(paginationNode, { limit, offset, total, hasMore: Boolean(pagination.has_more) });
+      } else {
+        meta.textContent = `Showing ${rows.length} records`;
+        if (paginationNode) {
+          paginationNode.classList.add('hidden');
+          paginationNode.classList.remove('flex');
+          paginationNode.innerHTML = '';
+        }
+      }
+
+      const allFiltered = state.selectionMode === 'all-filtered';
+      const headerChecked = allFiltered || (state.selectedDataIds.length > 0 && state.selectedDataIds.length === rows.length);
 
       container.innerHTML = `
         <table class="min-w-full divide-y divide-gray-200 text-sm">
           <thead class="bg-gray-50">
             <tr>
               <th class="px-4 py-3 text-left font-semibold text-gray-600">
-                <input type="checkbox" ${state.selectedDataIds.length && state.selectedDataIds.length === rows.length ? 'checked' : ''} onchange="toggleAllDataSelection(this.checked)">
+                <input type="checkbox" ${headerChecked ? 'checked' : ''} onchange="toggleAllDataSelection(this.checked)">
               </th>
               <th class="px-4 py-3 text-left font-semibold text-gray-600">Entity</th>
               <th class="px-4 py-3 text-left font-semibold text-gray-600">External ID</th>
@@ -3210,7 +5511,7 @@
             ${rows.map((row) => `
               <tr class="${state.selectedRecordId === row.id ? 'bg-blue-50' : ''}">
                 <td class="px-4 py-3 align-top">
-                  <input type="checkbox" ${state.selectedDataIds.includes(row.id) ? 'checked' : ''} onchange="toggleDataSelection('${escapeHtml(row.id)}', this.checked)">
+                  <input type="checkbox" ${(allFiltered || state.selectedDataIds.includes(row.id)) ? 'checked' : ''} onchange="toggleDataSelection('${escapeHtml(row.id)}', this.checked)">
                 </td>
                 <td class="px-4 py-3 align-top">
                   <div class="font-semibold text-gray-900">${escapeHtml(titleCase(row.entity_type || 'record'))}</div>
@@ -3219,15 +5520,17 @@
                 <td class="px-4 py-3 align-top text-gray-700">${escapeHtml(row.matter_name || 'Unassigned')}</td>
                 <td class="px-4 py-3 align-top">
                   <div class="flex flex-wrap gap-2">
-                    ${row.has_corrections ? getBadgeHtml('Corrections', 'badge-yellow') : getBadgeHtml('Clean', 'badge-green')}
-                    ${row.annotation_count ? getBadgeHtml(`${row.annotation_count} annotations`, 'badge-slate') : ''}
+                    ${row.has_corrections ? getBadgeHtml('Corrections', 'badge-yellow') : ''}
+                    ${row.has_flags ? getBadgeHtml(row.flag_count > 1 ? `Flagged ×${row.flag_count}` : 'Flagged', 'badge-amber') : ''}
+                    ${(!row.has_corrections && !row.has_flags) ? getBadgeHtml('Clean', 'badge-green') : ''}
+                    ${row.annotation_count ? getBadgeHtml(`${row.annotation_count} note${row.annotation_count === 1 ? '' : 's'}`, 'badge-slate') : ''}
                   </div>
                 </td>
                 <td class="px-4 py-3 align-top text-gray-600">${escapeHtml(formatDateTime(row.synced_at))}</td>
                 <td class="px-4 py-3 align-top">
                   <div class="flex flex-wrap gap-2">
                     <button type="button" onclick="openRecordDetail('${escapeHtml(row.id)}')" class="rounded-lg border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50">Inspect</button>
-                    <button type="button" onclick="shortlistSingleRecord('${escapeHtml(row.id)}')" class="rounded-lg border border-amber-200 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50">Shortlist</button>
+                    <button type="button" onclick="shortlistSingleRecord('${escapeHtml(row.id)}')" class="rounded-lg border border-amber-200 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50">Flag</button>
                   </div>
                 </td>
               </tr>
@@ -3237,7 +5540,9 @@
       `;
 
       renderBulkActionSummary();
+      renderSelectionToolbar();
       renderRecordDetail();
+      scheduleCascadePanelRefresh();
     }
 
     function renderLogs() {
@@ -3250,6 +5555,7 @@
       if (!rows.length) {
         meta.textContent = 'No sync logs recorded yet.';
         container.innerHTML = '<div class="p-8 text-center text-sm text-gray-500">No execution logs yet.</div>';
+        renderLogDetail();
         return;
       }
 
@@ -3269,7 +5575,7 @@
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
             ${rows.map((row) => `
-              <tr>
+              <tr class="cursor-pointer hover:bg-gray-50 ${state.selectedLogId === row.id ? 'bg-blue-50' : ''}" onclick="openLogDetail('${escapeHtml(row.id)}')">
                 <td class="px-4 py-3 align-top text-gray-700">${escapeHtml(formatDateTime(row.started_at))}</td>
                 <td class="px-4 py-3 align-top">${renderLogStatus(row.status)}</td>
                 <td class="px-4 py-3 align-top text-gray-700">
@@ -3282,6 +5588,8 @@
           </tbody>
         </table>
       `;
+
+      renderLogDetail();
     }
 
     function renderLogStatus(status) {
@@ -3290,6 +5598,203 @@
       if (normalized === 'failed') return getBadgeHtml('Failed', 'badge-red');
       if (normalized === 'running' || normalized === 'queued' || normalized === 'processing') return getBadgeHtml(normalized, 'badge-yellow');
       return getBadgeHtml(normalized, 'badge-slate');
+    }
+
+    function isLogInFlight(status) {
+      const normalized = String(status || '').toLowerCase();
+      return normalized === 'running' || normalized === 'queued' || normalized === 'processing' || normalized === 'started';
+    }
+
+    function findSelectedLog() {
+      const rows = state.logs && Array.isArray(state.logs.logs) ? state.logs.logs : [];
+      return rows.find((row) => row.id === state.selectedLogId) || null;
+    }
+
+    function openLogDetail(logId) {
+      state.selectedLogId = logId;
+      renderLogs();
+
+      const log = findSelectedLog();
+      if (state.logDetailPollTimer) {
+        clearInterval(state.logDetailPollTimer);
+        state.logDetailPollTimer = null;
+      }
+      if (log && isLogInFlight(log.status)) {
+        state.logDetailPollTimer = setInterval(async () => {
+          try {
+            await refreshLogs();
+            const current = findSelectedLog();
+            if (!current || !isLogInFlight(current.status)) {
+              if (state.logDetailPollTimer) {
+                clearInterval(state.logDetailPollTimer);
+                state.logDetailPollTimer = null;
+              }
+            }
+          } catch (error) {
+            console.error('[Connector Viewer] Failed to poll log detail', error);
+          }
+        }, 2000);
+      }
+    }
+
+    function closeLogDetail() {
+      state.selectedLogId = '';
+      if (state.logDetailPollTimer) {
+        clearInterval(state.logDetailPollTimer);
+        state.logDetailPollTimer = null;
+      }
+      const panel = document.getElementById('logDetailPanel');
+      const backdrop = document.getElementById('logDetailBackdrop');
+      if (panel) {
+        panel.classList.add('hidden');
+        panel.innerHTML = '';
+      }
+      if (backdrop) {
+        backdrop.classList.add('hidden');
+      }
+      renderLogs();
+    }
+
+    function renderLogDetail() {
+      const panel = document.getElementById('logDetailPanel');
+      const backdrop = document.getElementById('logDetailBackdrop');
+      if (!panel) return;
+
+      const log = findSelectedLog();
+      if (!log) {
+        panel.classList.add('hidden');
+        panel.innerHTML = '';
+        if (backdrop) backdrop.classList.add('hidden');
+        return;
+      }
+
+      panel.classList.remove('hidden');
+      if (backdrop) backdrop.classList.remove('hidden');
+
+      const records = log.records || {};
+      const changes = log.changes || {};
+      const metadata = log.metadata && typeof log.metadata === 'object' ? log.metadata : null;
+      const hasMetadata = metadata && Object.keys(metadata).length > 0;
+      const inFlight = isLogInFlight(log.status);
+      const completedDisplay = log.completed_at
+        ? escapeHtml(formatDateTime(log.completed_at))
+        : (inFlight ? '<span class="text-amber-600">Still running…</span>' : '<span class="text-gray-400">—</span>');
+      const durationDisplay = (log.duration_seconds === null || log.duration_seconds === undefined)
+        ? '<span class="text-gray-400">—</span>'
+        : `${escapeHtml(String(log.duration_seconds))}s`;
+      const triggeredBy = log.triggered_by || (log.triggered_by_user_id ? 'user' : 'system');
+      const triggeredByUser = log.triggered_by_user_id ? ` (${escapeHtml(String(log.triggered_by_user_id))})` : '';
+      const errorDetailsJson = log.error_details
+        ? (typeof log.error_details === 'string' ? log.error_details : JSON.stringify(log.error_details, null, 2))
+        : '';
+
+      panel.innerHTML = `
+        <div class="min-h-full bg-white">
+          <div class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-gray-200 bg-white px-6 py-5">
+            <div>
+              <div class="flex items-center gap-3">
+                ${renderLogStatus(log.status)}
+                <div class="connector-label">Sync Log Detail</div>
+              </div>
+              <div class="mt-2 connector-mono text-xs text-gray-500">${escapeHtml(log.id || '')}</div>
+            </div>
+            <button type="button" onclick="closeLogDetail()" class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+              Close
+            </button>
+          </div>
+
+          <div class="space-y-6 p-6">
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div class="rounded-xl border border-gray-200 bg-white p-4">
+                <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Started At</div>
+                <div class="mt-2 text-sm font-semibold text-gray-900">${escapeHtml(formatDateTime(log.started_at))}</div>
+              </div>
+              <div class="rounded-xl border border-gray-200 bg-white p-4">
+                <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Completed At</div>
+                <div class="mt-2 text-sm font-semibold text-gray-900">${completedDisplay}</div>
+              </div>
+              <div class="rounded-xl border border-gray-200 bg-white p-4">
+                <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Duration</div>
+                <div class="mt-2 text-sm font-semibold text-gray-900">${durationDisplay}</div>
+              </div>
+              <div class="rounded-xl border border-gray-200 bg-white p-4">
+                <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Triggered By</div>
+                <div class="mt-2 text-sm font-semibold text-gray-900">${escapeHtml(String(triggeredBy))}${triggeredByUser}</div>
+              </div>
+              <div class="rounded-xl border border-gray-200 bg-white p-4">
+                <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Connector ID</div>
+                <div class="mt-2 connector-mono text-xs font-semibold text-gray-900 break-all">${escapeHtml(log.connector_id || '')}</div>
+              </div>
+              <div class="rounded-xl border border-gray-200 bg-white p-4">
+                <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Sync Type</div>
+                <div class="mt-2 text-sm font-semibold text-gray-900">${escapeHtml(log.sync_type || '—')}</div>
+              </div>
+            </div>
+
+            <div class="rounded-xl border border-gray-200 bg-white p-4">
+              <div class="text-sm font-semibold text-gray-900">Records</div>
+              <div class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
+                <div class="rounded-lg bg-gray-50 p-3">
+                  <div class="text-xs uppercase tracking-wide text-gray-500">Processed</div>
+                  <div class="mt-1 text-lg font-semibold text-gray-900">${formatNumber(records.processed)}</div>
+                </div>
+                <div class="rounded-lg bg-emerald-50 p-3">
+                  <div class="text-xs uppercase tracking-wide text-emerald-700">Created</div>
+                  <div class="mt-1 text-lg font-semibold text-emerald-900">${formatNumber(records.created)}</div>
+                </div>
+                <div class="rounded-lg bg-blue-50 p-3">
+                  <div class="text-xs uppercase tracking-wide text-blue-700">Updated</div>
+                  <div class="mt-1 text-lg font-semibold text-blue-900">${formatNumber(records.updated)}</div>
+                </div>
+                <div class="rounded-lg bg-red-50 p-3">
+                  <div class="text-xs uppercase tracking-wide text-red-700">Failed</div>
+                  <div class="mt-1 text-lg font-semibold text-red-900">${formatNumber(records.failed)}</div>
+                </div>
+                <div class="rounded-lg bg-gray-50 p-3">
+                  <div class="text-xs uppercase tracking-wide text-gray-500">Unchanged</div>
+                  <div class="mt-1 text-lg font-semibold text-gray-900">${formatNumber(records.unchanged)}</div>
+                </div>
+              </div>
+
+              <div class="mt-5 text-sm font-semibold text-gray-900">Changes</div>
+              <div class="mt-3 grid grid-cols-3 gap-3">
+                <div class="rounded-lg bg-emerald-50 p-3">
+                  <div class="text-xs uppercase tracking-wide text-emerald-700">Created</div>
+                  <div class="mt-1 text-lg font-semibold text-emerald-900">${formatNumber(changes.created)}</div>
+                </div>
+                <div class="rounded-lg bg-blue-50 p-3">
+                  <div class="text-xs uppercase tracking-wide text-blue-700">Updated</div>
+                  <div class="mt-1 text-lg font-semibold text-blue-900">${formatNumber(changes.updated)}</div>
+                </div>
+                <div class="rounded-lg bg-red-50 p-3">
+                  <div class="text-xs uppercase tracking-wide text-red-700">Deleted</div>
+                  <div class="mt-1 text-lg font-semibold text-red-900">${formatNumber(changes.deleted)}</div>
+                </div>
+              </div>
+            </div>
+
+            ${(log.error_message || errorDetailsJson) ? `
+              <div class="rounded-xl border border-red-200 bg-red-50 p-4">
+                <div class="text-sm font-semibold text-red-900">Error</div>
+                ${log.error_message ? `<div class="mt-2 text-sm text-red-800">${escapeHtml(log.error_message)}</div>` : ''}
+                ${errorDetailsJson ? `<pre class="mt-3 max-h-[320px] overflow-auto rounded-lg bg-red-100 p-3 text-xs text-red-900">${escapeHtml(errorDetailsJson)}</pre>` : ''}
+              </div>
+            ` : ''}
+
+            ${hasMetadata ? `
+              <div class="rounded-xl border border-gray-200 bg-white p-4">
+                <div class="text-sm font-semibold text-gray-900">Metadata</div>
+                <pre class="mt-3 max-h-[320px] overflow-auto rounded-xl bg-gray-950 p-4 text-xs text-gray-100 connector-mono">${escapeHtml(JSON.stringify(metadata, null, 2))}</pre>
+              </div>
+            ` : ''}
+
+            <details class="rounded-xl border border-gray-200 bg-white p-4">
+              <summary class="cursor-pointer text-sm font-semibold text-gray-900">Raw JSON</summary>
+              <pre class="mt-3 max-h-[420px] overflow-auto rounded-xl bg-gray-950 p-4 text-xs text-gray-100 connector-mono">${escapeHtml(JSON.stringify(log, null, 2))}</pre>
+            </details>
+          </div>
+        </div>
+      `;
     }
 
     function renderEntityFilterOptions() {
@@ -3463,7 +5968,7 @@
       const select = document.getElementById('dataMatterSelect');
       if (select) {
         const currentValue = select.value;
-        select.innerHTML = ['<option value="">Unassigned</option>']
+        select.innerHTML = ['<option value="">Unassigned (create new matter)</option>']
           .concat(state.matterOptions.map((matter) => (
             `<option value="${escapeHtml(matter.id)}">${escapeHtml(matter.name || matter.matter_id || matter.client_name || 'Matter')}</option>`
           )))
@@ -3473,6 +5978,8 @@
           select.value = currentValue;
         }
       }
+      renderMatterDropdownHint();
+      updateAssignSelectedButton();
     }
 
     async function refreshDataGroups() {
@@ -3490,7 +5997,9 @@
       if (!state.sourceId) return;
 
       const filters = getCurrentDataFilters();
-      const query = new URLSearchParams({ limit: '25' });
+      const limit = state.dataPreviewLimit || 25;
+      const offset = Math.max(0, state.dataPreviewOffset || 0);
+      const query = new URLSearchParams({ limit: String(limit), offset: String(offset) });
       if (filters.entity_type) query.set('entity_type', filters.entity_type);
       if (filters.q) query.set('q', filters.q);
       if (filters.sort_by) query.set('sort_by', filters.sort_by);
@@ -3747,7 +6256,8 @@
             state: data.state,
             provider: connectorType,
             connectorId: connectorType,
-            redirectUri: state.oauthRedirectUri || 'lana-ai://oauth/callback'
+            redirectUri: state.oauthRedirectUri || 'lana-ai://oauth/callback',
+            realmId: data.realmId || data.realm_id
           });
 
           if (result?.integrationSourceId) {
@@ -3796,6 +6306,8 @@
         showPageAlert('Clearing connector configuration...', 'info');
         await api.delete(connectorApi('/config'));
         state.selectedDataIds = [];
+        state.selectedRowsById = {};
+        state.selectionMode = 'manual';
         state.selectedRecordId = '';
         state.selectedRecord = null;
         state.recordAnnotations = [];
@@ -3960,9 +6472,41 @@
     }
 
     function applyDataFilters() {
+      state.dataPreviewOffset = 0;
+      state.selectedDataIds = [];
+      state.selectedRowsById = {};
+      state.selectionMode = 'manual';
       refreshDataPreview().catch((error) => {
         console.error('[Connector Viewer] Failed to apply data filters', error);
         showPageAlert(error.message || 'Failed to apply filters.', 'error');
+      });
+    }
+
+    function goToDataPage(direction) {
+      const pagination = state.dataPreview && state.dataPreview.pagination;
+      if (!pagination) return;
+      const limit = pagination.limit || state.dataPreviewLimit || 25;
+      const total = pagination.total || 0;
+      const current = state.dataPreviewOffset || 0;
+      let next = current;
+
+      if (direction === 'next') {
+        next = current + limit;
+      } else if (direction === 'prev') {
+        next = current - limit;
+      } else if (direction === 'first') {
+        next = 0;
+      } else if (direction === 'last') {
+        next = Math.max(0, Math.floor(Math.max(0, total - 1) / limit) * limit);
+      }
+
+      next = Math.max(0, Math.min(next, Math.max(0, total - 1)));
+      if (next === current) return;
+
+      state.dataPreviewOffset = next;
+      refreshDataPreview().catch((error) => {
+        console.error('[Connector Viewer] Failed to change data page', error);
+        showPageAlert(error.message || 'Failed to load page.', 'error');
       });
     }
 
@@ -3981,26 +6525,58 @@
     }
 
     function toggleDataSelection(recordId, isChecked) {
+      const rows = state.dataPreview && Array.isArray(state.dataPreview.data) ? state.dataPreview.data : [];
+      if (state.selectionMode === 'all-filtered') {
+        state.selectionMode = 'manual';
+        state.selectedDataIds = rows.map((row) => row.id);
+        state.selectedRowsById = {};
+        for (const row of rows) {
+          if (row && row.id) state.selectedRowsById[row.id] = row;
+        }
+      }
       if (isChecked) {
         if (!state.selectedDataIds.includes(recordId)) {
           state.selectedDataIds.push(recordId);
         }
+        const row = rows.find((r) => r.id === recordId);
+        if (row) state.selectedRowsById[recordId] = row;
       } else {
         state.selectedDataIds = state.selectedDataIds.filter((id) => id !== recordId);
+        delete state.selectedRowsById[recordId];
       }
       renderDataPreview();
+      scheduleCascadePanelRefresh();
     }
 
     function toggleAllDataSelection(isChecked) {
       const rows = state.dataPreview && Array.isArray(state.dataPreview.data) ? state.dataPreview.data : [];
-      state.selectedDataIds = isChecked ? rows.map((row) => row.id) : [];
+      state.selectionMode = 'manual';
+      if (isChecked) {
+        for (const row of rows) {
+          if (row && row.id) {
+            if (!state.selectedDataIds.includes(row.id)) {
+              state.selectedDataIds.push(row.id);
+            }
+            state.selectedRowsById[row.id] = row;
+          }
+        }
+      } else {
+        const visible = new Set(rows.map((row) => row.id));
+        state.selectedDataIds = state.selectedDataIds.filter((id) => !visible.has(id));
+        for (const id of visible) delete state.selectedRowsById[id];
+      }
       renderDataPreview();
+      scheduleCascadePanelRefresh();
     }
 
     async function openRecordDetail(recordId) {
       const rows = state.dataPreview && Array.isArray(state.dataPreview.data) ? state.dataPreview.data : [];
+      const previousRecordId = state.selectedRecordId;
       state.selectedRecordId = recordId;
       state.selectedRecord = rows.find((row) => row.id === recordId) || null;
+      if (previousRecordId !== recordId) {
+        state.cascadeLinkedPanel = null;
+      }
 
       try {
         const response = await api.get(`${connectorApi(`/data-records/${recordId}/annotations`)}?limit=25`);
@@ -4011,18 +6587,29 @@
       }
 
       renderDataPreview();
+
+      if (state.selectedRecord && getRelationshipsForEntity(state.selectedRecord.entity_type).length) {
+        refreshLinkedRecordsForOpenRecord();
+      }
     }
 
     async function submitRecordCorrection() {
       if (!state.selectedRecordId || !state.selectedRecord) return;
 
       try {
-        const fieldKey = document.getElementById('recordCorrectionField')?.value.trim() || '';
+        const fieldKey = getActiveCorrectionFieldKey();
         const proposedValue = document.getElementById('recordCorrectionValue')?.value || '';
         const notes = document.getElementById('recordCorrectionNotes')?.value.trim() || '';
-        if (!fieldKey || !proposedValue) {
-          throw new Error('Field key and proposed value are required');
+        if (!fieldKey) {
+          throw new Error('Pick a field to correct');
         }
+        if (!proposedValue) {
+          throw new Error('Proposed value is required');
+        }
+
+        const originalValue = state.selectedRecord.data
+          ? getValueByPath(state.selectedRecord.data, fieldKey)
+          : null;
 
         await api.post(connectorApi(`/data-records/${state.selectedRecordId}/annotations`), {
           annotation_type: 'correction',
@@ -4030,7 +6617,7 @@
           value: {
             proposed_value: proposedValue,
             notes,
-            original_value: state.selectedRecord.data ? state.selectedRecord.data[fieldKey] : null,
+            original_value: originalValue === undefined ? null : originalValue,
             status: 'shortlisted'
           }
         });
@@ -4044,6 +6631,7 @@
     }
 
     async function shortlistSingleRecord(recordId) {
+      state.selectionMode = 'manual';
       state.selectedDataIds = [recordId];
       renderDataPreview();
       await shortlistSelectedForEdit();
@@ -4053,6 +6641,9 @@
       if (!state.sourceId) return;
 
       try {
+        if (state.selectionMode === 'all-filtered') {
+          throw new Error('Flagging requires individual row selection. Use "Select page" or pick rows manually.');
+        }
         if (!state.selectedDataIds.length) {
           throw new Error('Select one or more rows first');
         }
@@ -4066,32 +6657,233 @@
           data_ids: state.selectedDataIds
         });
 
-        showPageAlert('Selected rows were shortlisted for edit.', 'success');
+        showPageAlert('Selected rows flagged for review.', 'success');
         await refreshDataPreview();
       } catch (error) {
-        console.error('[Connector Viewer] Failed to shortlist rows', error);
-        showPageAlert(error.message || 'Failed to shortlist rows.', 'error');
+        console.error('[Connector Viewer] Failed to flag rows for review', error);
+        showPageAlert(error.message || 'Failed to flag rows for review.', 'error');
       }
+    }
+
+    function getSelectedMatterMeta() {
+      const matterId = document.getElementById('dataMatterSelect')?.value || '';
+      const matterName = matterId
+        ? (state.matterOptions.find((m) => m.id === matterId)?.name || 'Selected matter')
+        : 'Unassigned';
+      return { matterId, matterName };
     }
 
     async function assignSelectedToMatter() {
       if (!state.sourceId) return;
 
       try {
+        if (state.selectionMode === 'all-filtered') {
+          await assignFilteredToMatter();
+          return;
+        }
         if (!state.selectedDataIds.length) {
           throw new Error('Select one or more rows first');
         }
+        const visibleRows = state.dataPreview && Array.isArray(state.dataPreview.data) ? state.dataPreview.data : [];
+        for (const row of visibleRows) {
+          if (row && row.id && state.selectedDataIds.includes(row.id) && !state.selectedRowsById[row.id]) {
+            state.selectedRowsById[row.id] = row;
+          }
+        }
+        const parentRows = state.selectedDataIds
+          .map((id) => state.selectedRowsById[id])
+          .filter(Boolean);
 
-        await api.post(connectorApi('/data/assign-matter'), {
-          matter_id: document.getElementById('dataMatterSelect')?.value || null,
-          data_ids: state.selectedDataIds
+        openAssignDialog({
+          parentRows,
+          parentIds: state.selectedDataIds.slice(),
+          rowCount: state.selectedDataIds.length,
+          parentDescription: `${formatNumber(state.selectedDataIds.length)} selected row${state.selectedDataIds.length === 1 ? '' : 's'}`,
+          bodyMode: 'ids',
+          label: 'Selected rows assigned',
+          cascadeLabel: 'Cascade assign complete'
         });
-
-        showPageAlert('Selected rows were assigned.', 'success');
-        await Promise.all([refreshDataPreview(), refreshBaseData(false)]);
       } catch (error) {
         console.error('[Connector Viewer] Failed to assign selected rows', error);
         showPageAlert(error.message || 'Failed to assign selected rows.', 'error');
+      }
+    }
+
+    const MAX_CASCADE_PARENTS = 10000;
+
+    async function fetchAllMatchingParents(baseParams) {
+      const PAGE_SIZE = 1000;
+      const out = [];
+      let offset = 0;
+      while (true) {
+        const q = new URLSearchParams();
+        for (const [k, v] of Object.entries(baseParams)) {
+          if (v !== undefined && v !== null && v !== '') q.set(k, v);
+        }
+        q.set('limit', String(PAGE_SIZE));
+        q.set('offset', String(offset));
+        const page = await api.get(`${connectorApi('/data')}?${q.toString()}`);
+        const rows = Array.isArray(page.data) ? page.data : [];
+        const total = page.pagination?.total ?? (offset + rows.length);
+        out.push(...rows);
+        if (out.length < total && out.length >= MAX_CASCADE_PARENTS) {
+          throw new Error(`Cascade is limited to ${MAX_CASCADE_PARENTS.toLocaleString()} parent rows (filter matched ${total.toLocaleString()}). Narrow filters and try again, or assign without cascade.`);
+        }
+        if (rows.length < PAGE_SIZE || out.length >= total) break;
+        offset += rows.length;
+      }
+      return out;
+    }
+
+    async function unassignSelectedFromMatter() {
+      if (!state.sourceId) return;
+
+      try {
+        const allFiltered = state.selectionMode === 'all-filtered';
+        const filters = getCurrentDataFilters();
+        const filteredTotal = state.dataPreview?.pagination?.total || 0;
+
+        if (!allFiltered && !state.selectedDataIds.length) {
+          throw new Error('Select one or more rows first');
+        }
+
+        const count = allFiltered ? filteredTotal : state.selectedDataIds.length;
+        const target = allFiltered
+          ? `${formatNumber(count)} filtered row${count === 1 ? '' : 's'}`
+          : `${formatNumber(count)} selected row${count === 1 ? '' : 's'}`;
+
+        if (!window.confirm(`Unassign ${target} from their current matters? Source data is not modified.`)) {
+          return;
+        }
+
+        const body = { unassign: true };
+        if (allFiltered) {
+          body.q = filters.q;
+          body.entity_type = filters.entity_type || null;
+          body.filters = filters.filters;
+        } else {
+          body.data_ids = state.selectedDataIds.slice();
+        }
+
+        const response = await api.post(connectorApi('/data/assign-matter'), body);
+        const assigned = Number.isFinite(response?.rows_assigned) ? response.rows_assigned : 0;
+        const skipped = Number.isFinite(response?.rows_skipped) ? response.rows_skipped : 0;
+        const parts = [`Unassigned ${formatNumber(assigned)} row${assigned === 1 ? '' : 's'}`];
+        if (skipped > 0) parts.push(`${formatNumber(skipped)} already unassigned`);
+        showPageAlert(`${parts.join(' — ')}.`, 'success');
+        state.cascadeIndex = {};
+        state.cascadeIndexErrors = {};
+        await Promise.all([refreshDataPreview(), refreshBaseData(false)]);
+      } catch (error) {
+        console.error('[Connector Viewer] Failed to unassign rows', error);
+        showPageAlert(error.message || 'Failed to unassign rows.', 'error');
+      }
+    }
+
+    function deleteRecordAnnotation(annotationId) {
+      if (!state.sourceId || !state.selectedRecordId || !annotationId) return;
+      const annotation = (state.recordAnnotations || []).find((a) => a && a.id === annotationId);
+      if (!annotation) return;
+      openDeleteAnnotationModal(annotation);
+    }
+
+    function openDeleteAnnotationModal(annotation) {
+      const value = annotation && typeof annotation.value === 'object' ? annotation.value : {};
+      const flag = value && typeof value === 'object' && !Array.isArray(value) ? value.flag : null;
+      let summary = '';
+      if (flag) summary = String(flag);
+      else if (value && typeof value === 'object' && value.proposed_value != null) summary = `correction → ${String(value.proposed_value)}`;
+      else if (annotation && annotation.field_key) summary = `field: ${annotation.field_key}`;
+
+      state.deleteAnnotationModal = {
+        annotationId: annotation.id,
+        annotationType: annotation.annotation_type || 'note',
+        fieldKey: annotation.field_key || '',
+        summary,
+        createdAt: annotation.created_at || ''
+      };
+      renderDeleteAnnotationModal();
+    }
+
+    function closeDeleteAnnotationModal() {
+      state.deleteAnnotationModal = null;
+      renderDeleteAnnotationModal();
+    }
+
+    function renderDeleteAnnotationModal() {
+      const existing = document.getElementById('deleteAnnotationModal');
+      if (!state.deleteAnnotationModal) {
+        if (existing) existing.remove();
+        return;
+      }
+      if (existing) return;
+
+      const dialog = state.deleteAnnotationModal;
+      const modal = document.createElement('div');
+      modal.id = 'deleteAnnotationModal';
+      modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 p-4';
+      modal.innerHTML = `
+        <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+          <div class="flex items-start gap-3">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5">
+                <path d="M12 9v4" />
+                <path d="M12 17h.01" />
+                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+              </svg>
+            </div>
+            <div class="flex-1">
+              <h3 class="text-base font-semibold text-gray-900">Delete annotation?</h3>
+              <p class="mt-2 text-sm text-gray-600">
+                This will permanently remove the
+                <span class="font-semibold">${escapeHtml(dialog.annotationType)}</span>
+                annotation${dialog.summary ? ` (<span class="font-semibold">${escapeHtml(dialog.summary)}</span>)` : ''}
+                from this record. The synced source data is not modified.
+              </p>
+              ${dialog.createdAt ? `<p class="mt-2 text-xs text-gray-500">Created ${escapeHtml(formatDateTime(dialog.createdAt))}</p>` : ''}
+              <p class="mt-2 text-sm text-gray-600">This action cannot be undone.</p>
+            </div>
+          </div>
+          <div class="mt-6 flex flex-wrap justify-end gap-3">
+            <button type="button" onclick="closeDeleteAnnotationModal()" class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+              Cancel
+            </button>
+            <button type="button" id="confirmDeleteAnnotationBtn" onclick="confirmDeleteAnnotation()" class="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">
+              Delete Annotation
+            </button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+
+      modal.addEventListener('click', function (event) {
+        if (event.target === modal) {
+          closeDeleteAnnotationModal();
+        }
+      });
+    }
+
+    async function confirmDeleteAnnotation() {
+      const dialog = state.deleteAnnotationModal;
+      if (!dialog || !state.sourceId || !state.selectedRecordId) return;
+      const button = document.getElementById('confirmDeleteAnnotationBtn');
+      const originalLabel = button ? button.textContent : '';
+      try {
+        if (button) {
+          button.disabled = true;
+          button.textContent = 'Deleting...';
+        }
+        await api.delete(connectorApi(`/data-records/${state.selectedRecordId}/annotations/${dialog.annotationId}`));
+        showPageAlert('Annotation deleted.', 'success');
+        closeDeleteAnnotationModal();
+        await Promise.all([openRecordDetail(state.selectedRecordId), refreshDataPreview()]);
+      } catch (error) {
+        console.error('[Connector Viewer] Failed to delete annotation', error);
+        showPageAlert(error.message || 'Failed to delete annotation.', 'error');
+        if (button) {
+          button.disabled = false;
+          button.textContent = originalLabel || 'Delete Annotation';
+        }
       }
     }
 
@@ -4100,15 +6892,26 @@
 
       try {
         const filters = getCurrentDataFilters();
-        await api.post(connectorApi('/data/assign-matter'), {
-          matter_id: document.getElementById('dataMatterSelect')?.value || null,
-          q: filters.q,
-          entity_type: filters.entity_type || null,
-          filters: filters.filters
-        });
+        const filteredTotal = state.dataPreview?.pagination?.total || 0;
 
-        showPageAlert('Filtered result set was assigned.', 'success');
-        await Promise.all([refreshDataPreview(), refreshBaseData(false)]);
+        let parentRows = state.dataPreview && Array.isArray(state.dataPreview.data) ? state.dataPreview.data.slice() : [];
+        if (state.cascadeEnabled && hasAnyDependentEntities()) {
+          parentRows = await fetchAllMatchingParents({
+            entity_type: filters.entity_type,
+            q: filters.q,
+            filters: filters.filters && filters.filters.length ? JSON.stringify(filters.filters) : null
+          });
+        }
+
+        openAssignDialog({
+          parentRows,
+          rowCount: filteredTotal || parentRows.length,
+          parentDescription: `${formatNumber(filteredTotal || parentRows.length)} filtered row${(filteredTotal || parentRows.length) === 1 ? '' : 's'}`,
+          bodyMode: 'filtered',
+          filtered: { q: filters.q, entity_type: filters.entity_type, filters: filters.filters },
+          label: 'Filtered result set assigned',
+          cascadeLabel: 'Cascade assign complete'
+        });
       } catch (error) {
         console.error('[Connector Viewer] Failed to assign filtered rows', error);
         showPageAlert(error.message || 'Failed to assign filtered rows.', 'error');
@@ -4123,22 +6926,42 @@
         const decodedSpreadsheetId = decodeURIComponent(spreadsheetId || '');
         const decodedSheetName = decodeURIComponent(sheetName || '');
         const decodedEntityType = decodeURIComponent(entityType || '');
-        await api.post(connectorApi('/data/assign-matter'), {
-          matter_id: document.getElementById('dataMatterSelect')?.value || null,
-          group: decodedGroupType === 'source_collection'
-            ? {
-                group_type: 'source_collection',
-                spreadsheet_id: decodedSpreadsheetId,
-                sheet_name: decodedSheetName
-              }
-            : {
-                group_type: 'entity_type',
-                entity_type: decodedEntityType
-              }
-        });
 
-        showPageAlert('Group assignment updated.', 'success');
-        await Promise.all([refreshDataPreview(), refreshBaseData(false)]);
+        const groupPayload = decodedGroupType === 'source_collection'
+          ? {
+              group_type: 'source_collection',
+              spreadsheet_id: decodedSpreadsheetId,
+              sheet_name: decodedSheetName
+            }
+          : {
+              group_type: 'entity_type',
+              entity_type: decodedEntityType
+            };
+
+        let parentRows = [];
+        const cascadeAllowed = state.cascadeEnabled
+          && hasAnyDependentEntities()
+          && groupPayload.group_type === 'entity_type';
+        if (cascadeAllowed) {
+          parentRows = await fetchAllMatchingParents({ entity_type: decodedEntityType });
+        }
+
+        const groupLabel = decodedGroupType === 'source_collection'
+          ? `${decodedSheetName || 'sheet'} group`
+          : `${titleCase(decodedEntityType)} group`;
+
+        openAssignDialog({
+          parentRows,
+          rowCount: parentRows.length || 0,
+          parentDescription: parentRows.length
+            ? `${formatNumber(parentRows.length)} ${titleCase(decodedEntityType || 'group')} row${parentRows.length === 1 ? '' : 's'}`
+            : `${groupLabel}`,
+          bodyMode: 'group',
+          group: groupPayload,
+          cascadeAllowed,
+          label: 'Group assignment updated',
+          cascadeLabel: 'Cascade assign complete'
+        });
       } catch (error) {
         console.error('[Connector Viewer] Failed to assign group', error);
         showPageAlert(error.message || 'Failed to assign group.', 'error');
@@ -4171,7 +6994,9 @@
       renderDataGroups();
       renderDataPreview();
       renderBulkActionSummary();
+      renderCascadePanel();
       renderRecordDetail();
+      renderAssignDialog();
       renderLogs();
       updateTabVisibility();
       switchTab(state.activeTab);
@@ -4416,21 +7241,49 @@
     window.removeArrayFieldItem = removeArrayFieldItem;
     window.addDataRule = addDataRule;
     window.removeDataRule = removeDataRule;
+    window.onDataRuleOperatorChange = onDataRuleOperatorChange;
+    window.onDataRuleFieldChange = onDataRuleFieldChange;
     window.applyDataFilters = applyDataFilters;
     window.clearDataFilters = clearDataFilters;
+    window.goToDataPage = goToDataPage;
     window.toggleDataSelection = toggleDataSelection;
     window.toggleAllDataSelection = toggleAllDataSelection;
+    window.selectPageRows = selectPageRows;
+    window.selectAllFiltered = selectAllFiltered;
+    window.clearAssignSelection = clearAssignSelection;
+    window.onMatterDropdownChange = onMatterDropdownChange;
     window.openRecordDetail = openRecordDetail;
     window.submitRecordCorrection = submitRecordCorrection;
+    window.onCorrectionFieldSelectChange = onCorrectionFieldSelectChange;
+    window.updateCurrentValueDisplay = updateCurrentValueDisplay;
+    window.prefillCorrectionFromPath = prefillCorrectionFromPath;
     window.shortlistSingleRecord = shortlistSingleRecord;
     window.shortlistSelectedForEdit = shortlistSelectedForEdit;
     window.assignSelectedToMatter = assignSelectedToMatter;
     window.assignFilteredToMatter = assignFilteredToMatter;
+    window.unassignSelectedFromMatter = unassignSelectedFromMatter;
+    window.deleteRecordAnnotation = deleteRecordAnnotation;
+    window.closeDeleteAnnotationModal = closeDeleteAnnotationModal;
+    window.confirmDeleteAnnotation = confirmDeleteAnnotation;
     window.assignGroupToMatter = assignGroupToMatter;
+    window.assignSingleRecordWithCascade = assignSingleRecordWithCascade;
+    window.setCascadeEnabled = setCascadeEnabled;
+    window.toggleCascadeRel = toggleCascadeRel;
+    window.refreshLinkedRecordsForOpenRecord = refreshLinkedRecordsForOpenRecord;
+    window.filterToLinkedRecords = filterToLinkedRecords;
+    window.closeAssignDialog = closeAssignDialog;
+    window.setAssignDialogMode = setAssignDialogMode;
+    window.setAssignDialogMatter = setAssignDialogMatter;
+    window.updateAssignDialogField = updateAssignDialogField;
+    window.setAssignDialogOneMatterPerRow = setAssignDialogOneMatterPerRow;
+    window.refreshAssignDialogTotals = refreshAssignDialogTotals;
+    window.confirmAssignDialog = confirmAssignDialog;
     window.refreshBaseData = refreshBaseData;
     window.refreshDataPreview = refreshDataPreview;
     window.refreshLogs = refreshLogs;
     window.closeRecordDetail = closeRecordDetail;
+    window.openLogDetail = openLogDetail;
+    window.closeLogDetail = closeLogDetail;
     window.switchTab = switchTab;
     window.discoverDynamicFieldOptions = discoverDynamicFieldOptions;
 

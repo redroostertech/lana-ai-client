@@ -270,6 +270,76 @@ const ConnectorsMockData = {
   }
 };
 
+// Shared identity helpers — used by getMergedList() and exposed for callers
+// that need to key connectors by stable identity (e.g. dropdown selection).
+function looksLikeUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
+}
+
+function normalizeConnectorIdentifier(value) {
+  return String(value || '').trim().toLowerCase().replace(/[_\s]+/g, '-');
+}
+
+function getConnectorDisplayName(connector) {
+  const manifest = (connector && connector.manifest) || {};
+  const metadata = (connector && connector.metadata) || manifest.metadata || {};
+  return manifest.name
+    || metadata.name
+    || (connector && connector.name)
+    || (connector && connector.connector_name)
+    || (connector && connector.source_name)
+    || 'Connector';
+}
+
+function getConnectorSlug(connector) {
+  return (connector && (
+    connector.connector_id
+    || connector.connector_type
+    || connector.source_type
+    || connector.type
+    || connector.id
+  )) || '';
+}
+
+function getConnectorIdentityKeys(connector) {
+  const keys = new Set();
+  const slug = normalizeConnectorIdentifier(getConnectorSlug(connector));
+  const name = normalizeConnectorIdentifier(getConnectorDisplayName(connector));
+  if (slug) keys.add(slug);
+  if (name) keys.add(name);
+  return keys;
+}
+
+function dedupeConnectors(connectors) {
+  const seen = new Set();
+  const result = [];
+  (connectors || []).forEach((connector) => {
+    const keys = getConnectorIdentityKeys(connector);
+    if (keys.size === 0) return;
+    const dupIndex = result.findIndex((existing) => {
+      const existingKeys = getConnectorIdentityKeys(existing);
+      return Array.from(existingKeys).some((k) => keys.has(k));
+    });
+    if (dupIndex !== -1) {
+      // Prefer the installed record (UUID id) so the resulting option
+      // resolves to a real integration source rather than a catalog entry.
+      if (looksLikeUuid(connector.id) && !looksLikeUuid(result[dupIndex].id)) {
+        result[dupIndex] = connector;
+      }
+      return;
+    }
+    keys.forEach((key) => seen.add(key));
+    result.push(connector);
+  });
+  return result;
+}
+
+function sortConnectorsByDisplayName(connectors) {
+  return (connectors || []).slice().sort((a, b) => (
+    getConnectorDisplayName(a).toLowerCase().localeCompare(getConnectorDisplayName(b).toLowerCase())
+  ));
+}
+
 // Connectors API
 const Connectors = {
   /**
@@ -281,6 +351,25 @@ const Connectors = {
       return { connectors: ConnectorsMockData.connectors };
     }
     return api.get('/api/v1/integrations/connectors');
+  },
+
+  /**
+   * Fetch installed + catalog connectors and return a deduplicated, merged list.
+   * The installed record (UUID id) is preferred over its catalog twin so the
+   * caller can address a real integration source.
+   */
+  async getMergedList() {
+    const results = await Promise.allSettled([
+      this.getAll(),
+      ConnectorRegistry.getCatalog()
+    ]);
+    const installed = results[0].status === 'fulfilled' && Array.isArray(results[0].value.connectors)
+      ? results[0].value.connectors
+      : [];
+    const catalog = results[1].status === 'fulfilled' && Array.isArray(results[1].value.connectors)
+      ? results[1].value.connectors
+      : [];
+    return { connectors: sortConnectorsByDisplayName(dedupeConnectors(installed.concat(catalog))) };
   },
 
   /**
@@ -592,6 +681,16 @@ const ConnectorRegistry = {
       return false;
     });
   }
+};
+
+Connectors.helpers = {
+  looksLikeUuid,
+  normalizeConnectorIdentifier,
+  getConnectorDisplayName,
+  getConnectorSlug,
+  getConnectorIdentityKeys,
+  dedupeConnectors,
+  sortConnectorsByDisplayName
 };
 
 // Export for use in other modules (legacy pages)

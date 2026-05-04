@@ -1819,8 +1819,11 @@ class ApiClient {
   async getNotifications(options = {}) {
     const params = new URLSearchParams();
     if (options.read !== undefined) params.append('read', options.read);
+    if (options.unread_only !== undefined) params.append('unread_only', options.unread_only);
     if (options.limit) params.append('limit', options.limit);
+    if (options.offset) params.append('offset', options.offset);
     if (options.sort) params.append('sort', options.sort);
+    if (options.type) params.append('type', options.type);
 
     const queryString = params.toString();
     const endpoint = `/api/v1/notifications${queryString ? '?' + queryString : ''}`;
@@ -1842,7 +1845,11 @@ class ApiClient {
    * @returns {Promise<Object>} Update result
    */
   async markNotificationRead(notificationId) {
-    return this.put(`/api/v1/notifications/${notificationId}/read`);
+    return this.post(`/api/v1/notifications/${notificationId}/read`);
+  }
+
+  async getNotificationTypes() {
+    return this.get('/api/v1/notifications/types');
   }
 
   /**
@@ -2262,16 +2269,21 @@ class ApiClient {
   // ============================================================
   // Notifications
   // ============================================================
-  async getNotifications(unreadOnly = false, limit = 20, offset = 0) {
+  async getNotifications(unreadOnly = false, limit = 20, offset = 0, type = '') {
     const params = new URLSearchParams();
     if (unreadOnly) params.append('unread_only', 'true');
+    if (type) params.append('type', type);
     params.append('limit', limit);
     params.append('offset', offset);
     return this.get(`/api/v1/notifications?${params.toString()}`);
   }
 
   async markNotificationRead(notificationId) {
-    return this.put(`/api/v1/notifications/${notificationId}/read`);
+    return this.post(`/api/v1/notifications/${notificationId}/read`);
+  }
+
+  async getNotificationTypes() {
+    return this.get('/api/v1/notifications/types');
   }
 
   async markAllNotificationsRead() {

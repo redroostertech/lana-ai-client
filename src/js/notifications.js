@@ -46,6 +46,7 @@ window.NotificationPanel = (function() {
       panel: document.getElementById('notificationPanel'),
       overlay: document.getElementById('notificationOverlay'),
       closeBtn: document.getElementById('closeNotificationPanel'),
+      viewAllBtn: document.getElementById('viewAllNotificationsBtn'),
       list: document.getElementById('notificationList'),
       loading: document.getElementById('notificationLoading'),
       loadingMore: document.getElementById('notificationLoadingMore'),
@@ -91,6 +92,7 @@ window.NotificationPanel = (function() {
       <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
         <h2 class="text-lg font-semibold text-gray-900">Notifications</h2>
         <div class="flex items-center gap-3">
+          <button id="viewAllNotificationsBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">View all</button>
           <button id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium hidden">Mark all read</button>
           <button id="refreshNotificationsBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -181,6 +183,17 @@ window.NotificationPanel = (function() {
         loadNotifications(true).finally(() => {
           setTimeout(() => elements.refreshBtn.classList.remove('animate-spin'), 300);
         });
+      });
+    }
+
+    if (elements.viewAllBtn) {
+      elements.viewAllBtn.addEventListener('click', () => {
+        close();
+        if (window.Lex && window.Lex.Nav) {
+          window.Lex.Nav.go('notifications.html');
+        } else {
+          window.location.href = 'notifications.html';
+        }
       });
     }
 
@@ -685,4 +698,3 @@ window.NotificationPanel = (function() {
     getUnreadCount: () => state.unreadCount
   };
 })();
-

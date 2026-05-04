@@ -106,6 +106,10 @@
       '  gap: 4px;',
       '}',
 
+      '.notif-view-all {',
+      '  margin-right: 4px;',
+      '}',
+
       /* Filter bar */
       '.notif-filter-bar {',
       '  padding: 12px 20px;',
@@ -464,6 +468,7 @@
         '<div class="notif-header">',
         '  <h2 class="notif-header-title">Notifications</h2>',
         '  <div class="notif-header-actions">',
+        '    <lex-btn class="notif-view-all" variant="ghost" size="sm" data-action="view-all">View all</lex-btn>',
         '    <lex-btn variant="ghost" size="sm" data-action="mark-all" hidden>Mark all read</lex-btn>',
         '    <lex-btn variant="ghost" size="sm" icon="true" data-action="refresh" title="Refresh">' + REFRESH_SVG + '</lex-btn>',
         '    <lex-btn variant="ghost" size="sm" icon="true" data-action="close" title="Close">' + CLOSE_SVG + '</lex-btn>',
@@ -566,6 +571,18 @@
           self._loadNotifications(true).finally(function () {
             setTimeout(function () { refreshBtn.loading = false; }, 300);
           });
+        });
+      }
+
+      var viewAllBtn = this._panel.querySelector('[data-action="view-all"]');
+      if (viewAllBtn) {
+        viewAllBtn.addEventListener('click', function () {
+          self.close();
+          if (window.Lex && window.Lex.Nav) {
+            window.Lex.Nav.go('notifications.html');
+          } else {
+            window.location.href = 'notifications.html';
+          }
         });
       }
 

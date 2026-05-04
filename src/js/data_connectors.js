@@ -75,46 +75,6 @@
     connectorsFilteredCount = 0;
   }
 
-  // ── Static data ─────────────────────────────────────────────────────
-
-  var STATIC_SYSTEM_CONNECTORS = [
-    {
-      id: 'case-actionstep',
-      connector_type: 'case-actionstep',
-      name: 'ActionStep Integration',
-      description: 'Integrate with ActionStep legal practice management software to sync matters, contacts, documents, and billing information. Streamline your legal workflow with automated data synchronization.',
-      category: 'case_management',
-      vendor: 'ActionStep',
-      auth_type: 'api_key',
-      capabilities: ['matter_sync', 'contact_sync', 'document_sync', 'billing_integration', 'task_management'],
-      tags: ['legal', 'practice management', 'case management', 'billing'],
-      documentation_url: 'https://www.actionstep.com/api-documentation',
-      status: 'disconnected',
-      records: 0,
-      lastSync: null
-    },
-    {
-      id: 'crm-leadly',
-      connector_type: 'crm-leadly',
-      name: 'Leadly CRM',
-      description: 'Connect with Leadly CRM to sync leads, contacts, and opportunities. Automate your sales pipeline and maintain up-to-date customer information across platforms.',
-      category: 'crm',
-      vendor: 'Leadly',
-      auth_type: 'api_key',
-      capabilities: ['lead_sync', 'contact_sync', 'opportunity_tracking', 'pipeline_management'],
-      tags: ['crm', 'sales', 'lead management'],
-      documentation_url: null,
-      status: 'disconnected',
-      records: 0,
-      lastSync: null
-    }
-  ];
-
-  var SYSTEM_INTEGRATION_DEFAULTS = {
-    'case-actionstep': STATIC_SYSTEM_CONNECTORS[0],
-    'crm-leadly': STATIC_SYSTEM_CONNECTORS[1]
-  };
-
   // ── Helpers ──────────────────────────────────────────────────────────
 
   function loadPinnedConnectors() {
@@ -150,41 +110,6 @@
     });
   }
 
-  function getConnectorWithDefaults(connector) {
-    var possibleIds = [
-      connector.connector_type,
-      connector.connector_id,
-      connector.id,
-      connector.name ? connector.name.toLowerCase().split(' ').join('-') : null
-    ].filter(Boolean);
-
-    var defaults = null;
-    for (var i = 0; i < possibleIds.length; i++) {
-      if (SYSTEM_INTEGRATION_DEFAULTS[possibleIds[i]]) {
-        defaults = SYSTEM_INTEGRATION_DEFAULTS[possibleIds[i]];
-        break;
-      }
-    }
-
-    if (defaults) {
-      return Object.assign({}, defaults, connector, {
-        id: connector.id,
-        connector_type: connector.connector_type || Object.keys(SYSTEM_INTEGRATION_DEFAULTS).find(function (k) {
-          return SYSTEM_INTEGRATION_DEFAULTS[k] === defaults;
-        }),
-        description: connector.description || connector.connector_description || defaults.description,
-        category: (connector.category && connector.category !== 'unknown') ? connector.category : defaults.category,
-        vendor: connector.vendor || defaults.vendor,
-        auth_type: (connector.auth_type && connector.auth_type !== 'unknown') ? connector.auth_type : defaults.auth_type,
-        capabilities: (connector.capabilities && connector.capabilities.length > 0) ? connector.capabilities : defaults.capabilities,
-        tags: (connector.tags && connector.tags.length > 0) ? connector.tags : defaults.tags,
-        documentation_url: connector.documentation_url || defaults.documentation_url
-      });
-    }
-
-    return connector;
-  }
-
   function formatText(text) {
     if (!text) return '';
     return text
@@ -207,6 +132,7 @@
   function formatAuthType(authType) {
     var authTypeMap = {
       'oauth2': 'OAuth 2.0',
+      'oauth2_or_api_key': 'OAuth 2.0 or API Key',
       'api_key': 'API Key',
       'basic': 'Basic Auth'
     };
@@ -222,6 +148,59 @@
       connector.name ||
       ''
     ).toLowerCase();
+  }
+
+  var VISIBLE_CONNECTOR_TERMS = [
+    'quickbooks',
+    'actionstep',
+    'leadly',
+    'google',
+    'gmail',
+    'microsoft',
+    'office',
+    'outlook',
+    'onedrive',
+    'sharepoint',
+    'teams',
+    'excel'
+  ];
+
+  function isVisibleConnector(connector) {
+    var normalized = normalizeConnector(connector);
+    var raw = normalized.raw || {};
+    var identity = normalized.identity || connectorIdentity(raw);
+    var name = String(normalized.name || '').trim().toLowerCase();
+    var normalizedIdentity = String(identity || '').replace(/[_\s]+/g, '-').toLowerCase();
+    var normalizedName = name.replace(/[_\s]+/g, '-');
+
+    if (
+      identity === 'actionstep' ||
+      (name === 'actionstep' && normalized.auth_type === 'none')
+    ) {
+      return false;
+    }
+
+    if (normalizedIdentity === 'google-drive' || normalizedName === 'google-drive') {
+      return true;
+    }
+
+    var haystack = [
+      normalized.id,
+      identity,
+      normalized.name,
+      normalized.vendor,
+      normalized.category,
+      raw.connector_id,
+      raw.connector_type,
+      raw.source_type,
+      raw.type,
+      raw.auth_type,
+      raw.authType
+    ].join(' ').toLowerCase();
+
+    return VISIBLE_CONNECTOR_TERMS.some(function (term) {
+      return haystack.indexOf(term) !== -1;
+    });
   }
 
   function getConnectorPinKey(connector) {
@@ -255,21 +234,23 @@
   }
 
   function normalizeConnector(connector) {
-    connector = getConnectorWithDefaults(connector || {});
+    connector = connector || {};
 
     var manifest = connector.manifest || {};
+    var metadata = connector.metadata || manifest.metadata || {};
+    var auth = connector.auth || {};
     var id = connector.id || connector.connector_id || connector.connector_type || 'unknown';
 
     return {
       raw: connector,
       id: id,
       identity: connectorIdentity(connector),
-      name: manifest.name || connector.name || connector.connector_name || 'Unknown Connector',
-      description: manifest.description || connector.description || connector.connector_description || '',
+      name: manifest.name || metadata.name || connector.name || connector.connector_name || 'Unknown Connector',
+      description: manifest.description || metadata.description || connector.description || connector.connector_description || '',
       status: String(connector.status || connector.auth_status || '').toLowerCase(),
-      category: manifest.category || connector.category || connector.connector_category || 'unknown',
-      vendor: manifest.vendor || connector.vendor || '',
-      auth_type: connector.auth_type || connector.authType || 'unknown',
+      category: manifest.category || metadata.category || connector.category || connector.connector_category || 'unknown',
+      vendor: manifest.vendor || metadata.vendor || metadata.created_by || connector.vendor || '',
+      auth_type: connector.auth_type || connector.authType || auth.type || 'unknown',
       version: connector.version || manifest.version || '1.0.0',
       logo_url: manifest.icon || connector.logo_url || connector.logo || connector.icon || null,
       tags: connector.tags || [],
@@ -279,46 +260,76 @@
     };
   }
 
+  function connectorHasMeaningfulConfig(connector) {
+    var config = connector && connector.config && typeof connector.config === 'object'
+      ? connector.config
+      : {};
+    var operationalKeys = {
+      sync_frequency: true,
+      scheduled_sync_time: true,
+      sync_interval_minutes: true,
+      last_sync: true
+    };
+
+    return Object.keys(config).some(function (key) {
+      if (!key || key.slice(-11) === '_configured' || operationalKeys[key]) {
+        return false;
+      }
+
+      var value = config[key];
+      if (value == null) return false;
+      if (typeof value === 'string') return value.trim() !== '';
+      if (Array.isArray(value)) return value.length > 0;
+      if (typeof value === 'object') return Object.keys(value).length > 0;
+      return true;
+    });
+  }
+
+  function connectorRequiresSavedCredentialOrConfig(connector) {
+    var normalized = normalizeConnector(connector);
+    var authType = String(normalized.auth_type || '').toLowerCase();
+    return authType === 'oauth2' || authType === 'oauth2_or_api_key' || authType === 'api_key';
+  }
+
+  function connectorHasConnectionEvidence(connector) {
+    return Boolean(connectorHasMeaningfulConfig(connector));
+  }
+
   function getConnectorStatusKey(connector, installedConnectors) {
     var normalized = normalizeConnector(connector);
     var rawStatus = normalized.status;
 
-    if (rawStatus === 'connected' || rawStatus === 'active') return 'connected';
-    if (rawStatus === 'syncing') return 'syncing';
-    if (rawStatus === 'error') return 'error';
     if (rawStatus === 'coming_soon') return 'coming_soon';
-    if (rawStatus === 'installed') return 'installed';
+    if (rawStatus === 'connected') return 'connected';
+    if (rawStatus === 'disconnected') return 'disconnected';
+    if (connectorHasConnectionEvidence(normalized.raw)) return 'connected';
 
     var installed = installedConnectors || currentInstalledConnectors;
-    if (ConnectorRegistry.isConnectorInstalled(normalized.id, installed) && rawStatus !== 'disconnected') {
-      return 'installed';
+    if (ConnectorRegistry.isConnectorInstalled(normalized.id, installed)) {
+      return 'not_connected';
     }
 
-    return 'available';
+    return 'not_connected';
   }
 
   function getConnectorStatusBadge(connector, installedConnectors) {
     var status = getConnectorStatusKey(connector, installedConnectors);
     var statusBadgeMap = {
       connected:   { color: 'green',  label: 'Connected' },
-      installed:   { color: 'blue',   label: 'Installed' },
-      available:   { color: 'gray',   label: 'Available' },
-      syncing:     { color: 'blue',   label: 'Syncing' },
-      error:       { color: 'red',    label: 'Error' },
+      not_connected: { color: 'gray', label: 'Not Connected' },
+      disconnected: { color: 'red', label: 'Disconnected' },
       coming_soon: { color: 'yellow', label: 'Coming Soon' }
     };
-    return statusBadgeMap[status] || statusBadgeMap.available;
+    return statusBadgeMap[status] || statusBadgeMap.not_connected;
   }
 
   function getConnectorSortValue(connector, key) {
     var normalized = normalizeConnector(connector);
     var statusRank = {
       connected: 0,
-      installed: 1,
-      available: 2,
-      syncing: 3,
-      error: 4,
-      coming_soon: 5
+      not_connected: 1,
+      disconnected: 2,
+      coming_soon: 3
     };
 
     if (key === 'status') {
@@ -365,18 +376,71 @@
   function buildCombinedConnectorList(installedConnectors, catalogConnectors) {
     var combined = [];
     var seen = new Set();
+    var catalogByKey = new Map();
+
+    (catalogConnectors || []).forEach(function (connector) {
+      var key = connectorIdentity(connector);
+      if (key) {
+        catalogByKey.set(key, connector);
+      }
+    });
+
+    function isMissingDisplayValue(value) {
+      if (value == null) return true;
+      var normalized = String(value).trim().toLowerCase();
+      return !normalized || normalized === 'unknown' || normalized === 'other';
+    }
+
+    function enrichInstalledConnector(connector) {
+      var catalog = catalogByKey.get(connectorIdentity(connector));
+      if (!catalog) return connector;
+
+      var catalogNormalized = normalizeConnector(catalog);
+      var connectorNormalized = normalizeConnector(connector);
+      var mergedManifest = Object.assign(
+        {},
+        catalog.manifest || {},
+        connector.manifest || {}
+      );
+      var mergedMetadata = Object.assign(
+        {},
+        catalog.metadata || (catalog.manifest && catalog.manifest.metadata) || {},
+        connector.metadata || (connector.manifest && connector.manifest.metadata) || {}
+      );
+
+      return Object.assign({}, catalog, connector, {
+        manifest: mergedManifest,
+        metadata: mergedMetadata,
+        category: isMissingDisplayValue(connectorNormalized.category)
+          || connectorNormalized.category === connector.connector_type
+          || connectorNormalized.category === connector.connector_id
+          ? catalogNormalized.category
+          : connectorNormalized.category,
+        auth_type: isMissingDisplayValue(connectorNormalized.auth_type)
+          ? catalogNormalized.auth_type
+          : connectorNormalized.auth_type,
+        authType: isMissingDisplayValue(connector.authType)
+          ? catalogNormalized.auth_type
+          : connector.authType,
+        vendor: connectorNormalized.vendor || catalogNormalized.vendor,
+        version: connector.version || catalog.version || catalogNormalized.version,
+        description: connector.description || catalog.description || catalogNormalized.description,
+        documentation_url: connector.documentation_url || catalog.documentation_url || catalogNormalized.raw.documentation_url,
+        source: connector.source || 'installed'
+      });
+    }
 
     function addConnector(connector) {
       if (!connector) return;
       var key = connectorIdentity(connector);
       if (!key || seen.has(key)) return;
       seen.add(key);
-      combined.push(connector);
+      combined.push(enrichInstalledConnector(connector));
     }
 
     installedConnectors.forEach(addConnector);
     (catalogConnectors || []).forEach(addConnector);
-    return combined;
+    return combined.filter(isVisibleConnector);
   }
 
   function escapeHtml(value) {
@@ -391,7 +455,7 @@
     var status = getConnectorStatusKey(connector, installedConnectors);
 
     if (status === 'coming_soon') return 'details';
-    if (status === 'available') return 'install';
+    if (status === 'not_connected') return 'install';
     return 'open';
   }
 
@@ -433,8 +497,6 @@
   // ── Card rendering ──────────────────────────────────────────────────
 
   function renderConnectorCard(connector) {
-    connector = getConnectorWithDefaults(connector);
-
     var hasCustomUI = !!(connector.ui_entry_point && connector.manifest);
     var manifest = connector.manifest || {};
 
@@ -463,8 +525,9 @@
     var statusBadgeMap = {
       connected:    { color: 'green',  label: 'Connected' },
       active:       { color: 'green',  label: 'Active' },
-      installed:    { color: 'blue',   label: 'Installed' },
-      disconnected: { color: 'gray',   label: 'Disconnected' },
+      installed:    { color: 'gray',   label: 'Not Connected' },
+      not_connected:{ color: 'gray',   label: 'Not Connected' },
+      disconnected: { color: 'red',    label: 'Disconnected' },
       error:        { color: 'red',    label: 'Error' },
       syncing:      { color: 'blue',   label: 'Syncing' },
       coming_soon:  { color: 'yellow', label: 'Coming Soon' }
@@ -474,7 +537,7 @@
     var badgeConfig = statusBadgeMap[displayStatus] || statusBadgeMap.disconnected;
     var isComingSoon = displayStatus === 'coming_soon';
     var isActive = displayStatus === 'connected' || displayStatus === 'active';
-    var isInstalled = displayStatus === 'installed';
+    var isInstalled = displayStatus === 'installed' || displayStatus === 'not_connected';
 
     var logoHtml = normalizedConnector.logo_url
       ? '<img src="' + normalizedConnector.logo_url + '" alt="' + normalizedConnector.name + '" class="w-10 h-10 object-contain" onerror="this.parentElement.innerHTML=\'<span class=\\\'text-lg font-bold\\\' style=\\\'color:var(--lex-text-disabled)\\\'>' + normalizedConnector.name.charAt(0) + '</span>\'">'
@@ -599,32 +662,139 @@
 
   // ── Navigation ──────────────────────────────────────────────────────
 
-  function buildConnectorManageUrl(connectorId) {
+  function isUuid(value) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(String(value || ''));
+  }
+
+  function getCatalogConnectorSlug(connector, fallbackId) {
+    if (!connector) return fallbackId || '';
+    return connector.connector_id ||
+      connector.connector_type ||
+      connector.source_type ||
+      connector.type ||
+      connector.id ||
+      fallbackId ||
+      '';
+  }
+
+  function findInstalledSourceForSlug(slug) {
+    if (!slug) return null;
+    var normalizedSlug = String(slug).toLowerCase();
+    return currentInstalledConnectors.find(function (connector) {
+      if (!connector || !isUuid(connector.id)) return false;
+      return [
+        connector.connector_id,
+        connector.connector_type,
+        connector.source_type,
+        connector.type
+      ].some(function (value) {
+        return value && String(value).toLowerCase() === normalizedSlug;
+      });
+    }) || null;
+  }
+
+  async function ensureConnectorIntegrationSource(connectorId) {
     var connector = findConnectorById(connectorId);
-    var catalogConnectorId = connector
-      ? (connector.connector_id || connector.connector_type || connector.source_type || connector.type || connectorId)
+    if (!connector) {
+      throw new Error('Connector not found');
+    }
+
+    var sourceId = isUuid(connector.id) ? connector.id : '';
+    var catalogConnectorId = getCatalogConnectorSlug(connector, connectorId);
+    var existingSource = findInstalledSourceForSlug(catalogConnectorId);
+
+    if (!sourceId && existingSource) {
+      sourceId = existingSource.id;
+      connector = Object.assign({}, connector, existingSource, {
+        connector_id: existingSource.connector_id || catalogConnectorId,
+        connector_type: existingSource.connector_type || existingSource.connector_id || catalogConnectorId
+      });
+    }
+
+    if (sourceId) {
+      return {
+        connector: connector,
+        sourceId: sourceId,
+        connectorType: catalogConnectorId || getCatalogConnectorSlug(connector, connectorId)
+      };
+    }
+
+    var connectorName = (connector.manifest && connector.manifest.name) ||
+      connector.name ||
+      connector.connector_name ||
+      formatText(catalogConnectorId);
+
+    var result = await api.post('/api/v1/integrations/connectors/configure', {
+      connector_type: catalogConnectorId,
+      config: {}
+    });
+
+    sourceId = result && result.connector_id;
+    if (!sourceId) {
+      throw new Error('Connector source was not created');
+    }
+
+    var sourceConnector = Object.assign({}, connector, {
+      id: sourceId,
+      name: connectorName,
+      connector_id: catalogConnectorId,
+      connector_type: catalogConnectorId,
+      status: 'configured',
+      auth_status: 'configured'
+    });
+
+    currentInstalledConnectors = currentInstalledConnectors.concat(sourceConnector);
+    allConnectors = buildCombinedConnectorList(allConnectors.concat([sourceConnector]), allAvailableConnectors);
+
+    return {
+      connector: sourceConnector,
+      sourceId: sourceId,
+      connectorType: catalogConnectorId
+    };
+  }
+
+  function buildConnectorManageUrl(connectorId, resolvedContext) {
+    var connector = findConnectorById(connectorId);
+    var context = resolvedContext || null;
+    var contextConnector = context && context.connector ? context.connector : connector;
+    var catalogConnectorId = context
+      ? context.connectorType
+      : connector
+        ? getCatalogConnectorSlug(connector, connectorId)
       : connectorId;
+    var sourceId = context
+      ? context.sourceId
+      : connector && isUuid(connector.id)
+        ? connector.id
+        : '';
 
     return buildCustomConnectorUIUrl(
-      connector && connector.ui_entry_point ? connector.ui_entry_point : '',
-      connector ? (connector.name || connector.connector_name || connector.source_name || 'Connector') : 'Connector',
-      connector && connector.id ? connector.id : '',
+      contextConnector && contextConnector.ui_entry_point ? contextConnector.ui_entry_point : '',
+      contextConnector ? (contextConnector.name || contextConnector.connector_name || contextConnector.source_name || 'Connector') : 'Connector',
+      sourceId,
       catalogConnectorId
     );
   }
 
-  function openConnectorManage(connectorId) {
-    var connector = findConnectorById(connectorId);
-    var url = buildConnectorManageUrl(connectorId);
-    var connectorName = connector
-      ? ((connector.manifest && connector.manifest.name) || connector.name || connector.connector_name || 'Connector Dashboard')
-      : 'Connector Dashboard';
+  async function openConnectorManage(connectorId) {
+    try {
+      var context = await ensureConnectorIntegrationSource(connectorId);
+      var connector = context.connector;
+      var url = buildConnectorManageUrl(connectorId, context);
+      var connectorName = connector
+        ? ((connector.manifest && connector.manifest.name) || connector.name || connector.connector_name || 'Connector Dashboard')
+        : 'Connector Dashboard';
 
-    if (!url) return;
-    openConnectorDashboardModal(url, connectorName);
+      if (!url) return;
+      openConnectorDashboardModal(url, connectorName);
+    } catch (error) {
+      console.error('Failed to open connector dashboard:', error);
+      Lex.Toast.error('Failed to open connector: ' + (error.message || 'Unknown error'));
+    }
   }
 
   function openConnector(connectorId, category) {
+    void category;
     openConnectorManage(connectorId);
   }
 
@@ -691,10 +861,7 @@
       if (result.success) {
         Lex.Toast.success(connectorId + ' is ready to configure.');
         var tid = setTimeout(function () {
-          openConnectorDashboardModal(
-            buildCustomConnectorUIUrl('', connectorId, result.connector_id || result.id || '', connectorId),
-            connectorId
-          );
+          openConnectorManage(connectorId);
         }, 1000);
         _timeouts.push(tid);
       } else {
@@ -729,8 +896,6 @@
       console.error('Connector not found:', connectorId);
       return;
     }
-
-    connector = getConnectorWithDefaults(connector);
 
     var nc = {
       id: connector.id || connector.connector_id || 'unknown',
@@ -862,12 +1027,8 @@
       modalTitle.textContent = connectorName;
     }
 
-    var systemConnectors = ['case-actionstep', 'crm-leadly'];
-    var connectorType = connector.connector_type || connector.connector_id || connectorId;
-    var isSystemConnector = systemConnectors.indexOf(connectorType) !== -1;
-
     var deleteButton = document.getElementById('actionDelete');
-    deleteButton.style.display = isSystemConnector ? 'none' : 'flex';
+    deleteButton.style.display = 'flex';
 
     if (modal) {
       modal.open = true;
@@ -1203,56 +1364,11 @@
       var installedConnectors = [];
 
       if (installedData.status === 'fulfilled') {
-        var backendConnectors = installedData.value.connectors || [];
-
-        var isSystemConnector = function (backendConnector, staticConnector) {
-          if (backendConnector.connector_type === staticConnector.connector_type) return true;
-          if (backendConnector.connector_id === staticConnector.id) return true;
-          if (backendConnector.id === staticConnector.id) return true;
-
-          var backendName = (backendConnector.name || '').toLowerCase().trim();
-          var staticName = (staticConnector.name || '').toLowerCase().trim();
-
-          if (backendName === staticName) return true;
-          if (backendName.includes('actionstep') && staticName.includes('actionstep')) return true;
-          if (backendName.includes('leadly') && staticName.includes('leadly')) return true;
-          if (backendName.includes('gohighlevel') && staticName.includes('gohighlevel')) return true;
-
-          return false;
-        };
-
-        var matchedBackendIds = new Set();
-        installedConnectors = STATIC_SYSTEM_CONNECTORS.map(function (staticConnector) {
-          var backendMatch = backendConnectors.find(function (bc) { return isSystemConnector(bc, staticConnector); });
-
-          if (backendMatch) {
-            matchedBackendIds.add(backendMatch.id);
-            return Object.assign({}, staticConnector, {
-              status: backendMatch.status || backendMatch.auth_status || staticConnector.status,
-              records: backendMatch.records || backendMatch.total_records || staticConnector.records,
-              lastSync: backendMatch.lastSync || backendMatch.last_sync || backendMatch.last_sync_at || staticConnector.lastSync,
-              backend_id: backendMatch.id,
-              id: staticConnector.id,
-              connector_type: staticConnector.connector_type
-            });
-          }
-
-          return staticConnector;
-        });
-
-        var additionalConnectors = backendConnectors.filter(function (bc) {
-          if (matchedBackendIds.has(bc.id)) return false;
-          return !STATIC_SYSTEM_CONNECTORS.some(function (sc) { return isSystemConnector(bc, sc); });
-        });
-
-        installedConnectors = installedConnectors.concat(additionalConnectors);
+        installedConnectors = installedData.value.connectors || [];
         allConnectors = installedConnectors.slice();
       } else {
         console.error('Failed to fetch installed connectors:', installedData.reason);
-        Lex.Toast.warning('Could not load backend connectors. Showing system-level connectors only.');
-
-        installedConnectors = STATIC_SYSTEM_CONNECTORS.slice();
-        allConnectors = installedConnectors.slice();
+        Lex.Toast.warning('Could not load installed connectors. Showing catalog connectors only.');
       }
 
       // Process catalog connectors

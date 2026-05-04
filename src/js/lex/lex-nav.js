@@ -66,6 +66,9 @@
     'matter-skills.html':                     { matterSkillId: 'string', tab: 'string' },
     'skills.html':                            { category: 'string', id: 'string' },
     'action-queue.html':                      { action_type: 'string', severity: 'string' },
+    'notifications.html':                     { filter: 'string', type: 'string' },
+    'alerts.html':                            {},
+    'admin/alerts.html':                      {},
     'file-viewer.html':                       { id: 'string' }
   };
 

@@ -24,6 +24,30 @@ const { checkForUpdates, downloadAndInstallUpdate, showOptionalUpdateDialog, sho
 const { logInfo, logError, exportLogs, getLogFilePath } = require('./electron-logger');
 const SessionTracker = require('./js/session/session-tracker');
 
+function isBrokenPipeError(error) {
+  return error && (error.code === 'EPIPE' || /write EPIPE/i.test(String(error.message || '')));
+}
+
+function attachBrokenPipeGuard(stream, streamName) {
+  if (!stream || typeof stream.on !== 'function') return;
+
+  stream.on('error', (error) => {
+    if (isBrokenPipeError(error)) {
+      try {
+        logError(`[electron-main] Ignoring broken ${streamName} pipe`, error);
+      } catch (_logError) {
+        // The logging destination may be the closed pipe; avoid a recursive crash.
+      }
+      return;
+    }
+
+    throw error;
+  });
+}
+
+attachBrokenPipeGuard(process.stdout, 'stdout');
+attachBrokenPipeGuard(process.stderr, 'stderr');
+
 /**
  * Get app version from centralized version system
  * @returns {string} Formatted version like "v3.0.0b1"
@@ -689,7 +713,7 @@ ipcMain.handle('create-oauth-state', async (event, { provider, connectorId, matt
  * OAuth Code Exchange - Backend-based
  * Exchanges authorization code for tokens via backend
  */
-ipcMain.handle('exchange-oauth-code', async (event, { code, state, provider, connectorId, redirectUri }) => {
+ipcMain.handle('exchange-oauth-code', async (event, { code, state, provider, connectorId, redirectUri, realmId }) => {
   try {
     const savedServer = getSavedServer();
     if (!savedServer || !savedServer.serverUrl) {
@@ -715,7 +739,8 @@ ipcMain.handle('exchange-oauth-code', async (event, { code, state, provider, con
         state,
         provider,
         connectorId: connectorId || provider,
-        redirectUri: redirectUri || `${baseUrl}/api/v1/integrations/oauth/callback`
+        redirectUri: redirectUri || `${baseUrl}/api/v1/integrations/oauth/callback`,
+        realmId: realmId || null
       })
     });
 
@@ -889,6 +914,7 @@ const handleOAuthCallback = (urlObj) => {
   const code = params.get('code');
   const state = params.get('state');
   const connectorId = params.get('connector_id') || params.get('connectorId');
+  const realmId = params.get('realmId') || params.get('realm_id');
   const error = params.get('error');
   const errorDescription = params.get('error_description');
 
@@ -917,6 +943,7 @@ const handleOAuthCallback = (urlObj) => {
       connector_id: connectorId,
       code,
       state,
+      realmId,
       error,
       error_description: errorDescription
     });
@@ -1197,6 +1224,15 @@ app.on('web-contents-created', (event, contents) => {
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
+  if (isBrokenPipeError(error)) {
+    try {
+      logError('[electron-main] Ignoring broken process pipe', error);
+    } catch (_logError) {
+      // Avoid surfacing a dev pipe shutdown as a user-facing application error.
+    }
+    return;
+  }
+
   console.error('[electron-main] Uncaught exception:', error);
   dialog.showErrorBox('Application Error', error.message);
 });
