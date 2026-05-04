@@ -250,6 +250,64 @@
           </div>
         </div>
 
+        <!-- Budget — per-agent execution caps. All optional; fields left
+             empty are dropped from the PUT body so admins can revert to
+             org-level defaults. max_duration_ms is shown as seconds in the
+             UI and converted on save. -->
+        <div class="agent-detail-drawer-section">
+          <div class="agent-detail-drawer-section-label">
+            Budget
+            <span class="agent-detail-drawer-section-hint">
+              Optional caps for each run. Leave a field blank to use the
+              org-level default. Positive integers only.
+            </span>
+          </div>
+          <div class="agent-detail-drawer-budget-grid">
+            <lex-input
+              id="agentDetailEditBudgetSteps"
+              label="Max total steps"
+              type="number"
+              placeholder="e.g. 50"
+              title="Hard cap on the number of agent steps (tool calls + reasoning + sub-agent turns) per run."
+            ></lex-input>
+            <lex-input
+              id="agentDetailEditBudgetSubagents"
+              label="Max sub-agents"
+              type="number"
+              placeholder="e.g. 3"
+              title="Maximum number of sub-agents the orchestrator may spawn during a run."
+            ></lex-input>
+            <lex-input
+              id="agentDetailEditBudgetDurationSec"
+              label="Max duration (seconds)"
+              type="number"
+              placeholder="e.g. 600"
+              title="Wall-clock cap on a single run, in seconds. Stored as max_duration_ms server-side."
+            ></lex-input>
+            <lex-input
+              id="agentDetailEditBudgetInputTokens"
+              label="Max input tokens"
+              type="number"
+              placeholder="e.g. 200000"
+              title="Cumulative input-token cap across all model calls in a single run."
+            ></lex-input>
+            <lex-input
+              id="agentDetailEditBudgetOutputTokens"
+              label="Max output tokens"
+              type="number"
+              placeholder="e.g. 50000"
+              title="Cumulative output-token cap across all model calls in a single run."
+            ></lex-input>
+            <lex-input
+              id="agentDetailEditBudgetToolCalls"
+              label="Max tool calls"
+              type="number"
+              placeholder="e.g. 25"
+              title="Maximum number of tool invocations during a single run."
+            ></lex-input>
+          </div>
+        </div>
+
         <div class="agent-detail-drawer-danger-zone">
           <div class="agent-detail-drawer-section-label agent-detail-drawer-danger-label">
             Danger zone

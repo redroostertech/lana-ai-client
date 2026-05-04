@@ -170,6 +170,105 @@
     return '$' + dollars.toFixed(0);
   }
 
+  // -------------------------------------------------------------------------
+  // Budget form helpers
+  // -------------------------------------------------------------------------
+
+  // Each entry maps a UI field id to:
+  //   key      — the budget JSONB key the server expects
+  //   units    — 'count' (raw integer) or 'ms_from_seconds' (UI shows
+  //              seconds; we convert to ms on save).
+  var _BUDGET_FIELDS = [
+    { id: 'agentDetailEditBudgetSteps',         key: 'max_total_steps',   units: 'count' },
+    { id: 'agentDetailEditBudgetSubagents',     key: 'max_subagents',     units: 'count' },
+    { id: 'agentDetailEditBudgetDurationSec',   key: 'max_duration_ms',   units: 'ms_from_seconds' },
+    { id: 'agentDetailEditBudgetInputTokens',   key: 'max_input_tokens',  units: 'count' },
+    { id: 'agentDetailEditBudgetOutputTokens', key: 'max_output_tokens',  units: 'count' },
+    { id: 'agentDetailEditBudgetToolCalls',     key: 'max_tool_calls',    units: 'count' }
+  ];
+
+  // Convert a stored budget value into the string we want to render in
+  // the UI input. Returns '' for null/undefined so the field is empty.
+  function budgetValueToInput(field, raw) {
+    if (raw == null || raw === '') return '';
+    var n = Number(raw);
+    if (isNaN(n)) return '';
+    if (field.units === 'ms_from_seconds') {
+      // Convert ms → seconds for display. Keep one decimal place only when
+      // the original wasn't a whole number of seconds (avoids "600.0" noise).
+      var sec = n / 1000;
+      if (sec === Math.floor(sec)) return String(Math.round(sec));
+      return String(sec);
+    }
+    return String(Math.round(n));
+  }
+
+  // Convert a UI input string into the value to store in the budget object.
+  // Returns null when the input is empty (caller should drop the key).
+  // Returns the special token { _invalid: <message> } for invalid values
+  // so submitEdit() can surface a single error message.
+  function budgetInputToValue(field, raw) {
+    if (raw == null) return null;
+    var trimmed = String(raw).trim();
+    if (trimmed === '') return null;
+    var n = Number(trimmed);
+    if (isNaN(n)) return { _invalid: 'Budget values must be numbers.' };
+    if (n < 0) return { _invalid: 'Budget values must be zero or positive.' };
+    if (field.units === 'ms_from_seconds') {
+      // Round to ms so submillisecond noise doesn't sneak in.
+      return Math.round(n * 1000);
+    }
+    // Counts are integers — fractional input is rejected.
+    if (n !== Math.floor(n)) {
+      return { _invalid: 'Budget counts must be whole numbers.' };
+    }
+    return Math.round(n);
+  }
+
+  // Read the current budget form into a plain { key: value } object.
+  // Values are normalized via budgetInputToValue. Empty fields are dropped.
+  // If any field is invalid, returns { _invalid: <message> } instead.
+  function readBudgetFromForm() {
+    var out = {};
+    for (var i = 0; i < _BUDGET_FIELDS.length; i++) {
+      var f = _BUDGET_FIELDS[i];
+      var node = el(f.id);
+      var raw = node && typeof node.value !== 'undefined' ? node.value : '';
+      var v = budgetInputToValue(f, raw);
+      if (v == null) continue;
+      if (v && typeof v === 'object' && v._invalid) {
+        return { _invalid: v._invalid };
+      }
+      out[f.key] = v;
+    }
+    return out;
+  }
+
+  // Given the agent's stored budget, push values into the form fields.
+  // Missing keys clear the field (so reverting works).
+  function populateBudgetForm(budget) {
+    var src = (budget && typeof budget === 'object') ? budget : {};
+    for (var i = 0; i < _BUDGET_FIELDS.length; i++) {
+      var f = _BUDGET_FIELDS[i];
+      var value = budgetValueToInput(f, src[f.key]);
+      setVal(f.id, value);
+    }
+  }
+
+  // Compare two budget objects for shallow equality across the keys we
+  // care about. Used to decide whether to send a `budget` patch on PUT.
+  function budgetsEqual(a, b) {
+    var ka = a ? Object.keys(a) : [];
+    var kb = b ? Object.keys(b) : [];
+    if (ka.length !== kb.length) return false;
+    for (var i = 0; i < ka.length; i++) {
+      var k = ka[i];
+      if (!Object.prototype.hasOwnProperty.call(b, k)) return false;
+      if (Number(a[k]) !== Number(b[k])) return false;
+    }
+    return true;
+  }
+
   // =========================================================================
   // Tab management
   // =========================================================================
@@ -592,6 +691,13 @@
   // Read the current edit form into a plain object. Single source of truth
   // for both the snapshot (drawer-open baseline) and the diff (on submit).
   function captureEditFormState() {
+    // readBudgetFromForm() may return a { _invalid } sentinel for parse
+    // errors. The snapshot doesn't care about validity (it's just a
+    // baseline); coerce to an empty object on invalid input so diffs
+    // against later valid edits still work.
+    var budget = readBudgetFromForm();
+    if (budget && budget._invalid) budget = {};
+
     return {
       name: ((el('agentDetailEditName') && el('agentDetailEditName').value) || '').trim(),
       description: ((el('agentDetailEditDescription') && el('agentDetailEditDescription').value) || '').trim(),
@@ -603,6 +709,7 @@
       schedule_enabled: !!(el('agentDetailEditScheduleEnabled') && el('agentDetailEditScheduleEnabled').checked),
       schedule_cron: ((el('agentDetailEditScheduleCron') && el('agentDetailEditScheduleCron').value) || '').trim(),
       schedule_timezone: (el('agentDetailEditScheduleTimezone') && el('agentDetailEditScheduleTimezone').value) || 'UTC',
+      budget: budget,
     };
   }
 
@@ -654,6 +761,10 @@
     if (schedFields) {
       if (scheduleEnabled) show(schedFields); else hide(schedFields);
     }
+
+    // Budget — pull from agent.budget (JSONB). Empty fields revert to
+    // org-level defaults on save.
+    populateBudgetForm(a.budget || {});
 
     // System notice + readonly hints. Disable form fields for system agents.
     var notice = el('agentDetailDrawerSystemNotice');
@@ -728,6 +839,16 @@
       };
     }
 
+    // Budget: any field added/changed/cleared → send the full budget
+    // object. Cleared fields drop their key, so the server reverts that
+    // dimension to org-level defaults. Empty objects are still sent so
+    // an admin can wipe all overrides in one save.
+    var curBudget = (cur.budget && !cur.budget._invalid) ? cur.budget : {};
+    var snapBudget = (snap.budget && !snap.budget._invalid) ? snap.budget : {};
+    if (!budgetsEqual(curBudget, snapBudget)) {
+      body.budget = curBudget;
+    }
+
     return body;
   }
 
@@ -758,6 +879,13 @@
     }
     if (curState.schedule_enabled && !curState.schedule_cron) {
       if (window.Lex && Lex.Toast) Lex.Toast.error('Schedule is enabled but no cron expression was provided.');
+      return;
+    }
+    // Budget — surface the parse error from readBudgetFromForm before we
+    // hit the server with a malformed value.
+    var rawBudget = readBudgetFromForm();
+    if (rawBudget && rawBudget._invalid) {
+      if (window.Lex && Lex.Toast) Lex.Toast.error(rawBudget._invalid);
       return;
     }
     if (Object.keys(body).length === 0) {

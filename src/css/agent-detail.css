@@ -305,6 +305,24 @@
   border-radius: var(--lex-radius-md, 8px);
 }
 
+/* Budget — two-column grid of small numeric inputs. Tooltip lives on
+   each lex-input via its title attribute (no lex-tooltip primitive yet). */
+.agent-detail-drawer-budget-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 12px;
+  background: var(--lex-bg-secondary);
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: var(--lex-radius-md, 8px);
+}
+
+@media (max-width: 540px) {
+  .agent-detail-drawer-budget-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .agent-detail-drawer-danger-zone {
   margin-top: 8px;
   padding: 12px;
