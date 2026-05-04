@@ -1,7 +1,8 @@
 <!-- Agent Detail — agent profile with Capabilities / Runs / Stats tabs.
      Reads ?slug=<slug> from URL. Loads GET /api/v1/agents/:slug for the
      profile and GET /api/v1/agent-runs?agent_slug=<slug> for the run list.
-     Configure button opens a placeholder drawer (Phase 4 will wire this). -->
+     The Configure button opens an edit drawer (Phase 4) and the banner
+     hosts an enable/disable toggle wired to the per-agent endpoints. -->
 
 <div id="lex-page-content">
   <main class="agent-detail-page-container">
@@ -15,6 +16,14 @@
       subtitle="Loading agent profile..."
       icon="A"
     >
+      <div id="agentDetailEnabledBlock" class="agent-detail-enabled-block hidden">
+        <lex-toggle
+          id="agentDetailEnabledToggle"
+          label="Enabled"
+          label-side="right"
+          size="sm"
+        ></lex-toggle>
+      </div>
       <lex-btn id="agentDetailRunBtn" variant="primary" icon="play">Run</lex-btn>
       <lex-btn id="agentDetailConfigBtn" variant="secondary" icon="settings">Configure</lex-btn>
     </lex-banner>
@@ -89,41 +98,162 @@
       </lex-card>
     </section>
 
-    <!-- Stats panel (placeholder) -->
+    <!-- Stats panel — populated from GET /api/v1/agents/:slug/stats. -->
     <section id="agentPanelStats" class="agent-detail-panel hidden">
-      <!-- TODO(Phase 4): populate stats from /api/v1/agents/:slug/stats once available. -->
-      <lex-card heading="Stats" subtitle="Coming in Phase 4" padding="normal">
-        <p class="agent-detail-description">
-          Run counts, success rate, average duration, and per-step timing will
-          appear here once the stats endpoint lands.
-        </p>
-      </lex-card>
+      <!-- Date-range selector -->
+      <div class="agent-detail-stats-toolbar">
+        <span class="agent-detail-stats-toolbar-label">Range</span>
+        <lex-segmented
+          id="agentDetailStatsRange"
+          value="30d"
+          options='[{"value":"7d","label":"Last 7 days"},{"value":"30d","label":"Last 30 days"},{"value":"90d","label":"Last 90 days"}]'
+        ></lex-segmented>
+      </div>
+
+      <!-- Loading state -->
+      <div id="agentDetailStatsLoading" class="agent-detail-loading hidden">
+        <lex-spinner size="sm"></lex-spinner>
+        <span>Loading stats...</span>
+      </div>
+
+      <!-- Stats not yet available (404/501) -->
+      <div id="agentDetailStatsUnavailable" class="hidden">
+        <lex-card padding="normal">
+          <lex-empty
+            icon="bar-chart-2"
+            message="Stats not yet available"
+            description="The stats service is not available on this server."
+          ></lex-empty>
+        </lex-card>
+      </div>
+
+      <!-- Stats content -->
+      <div id="agentDetailStatsContent" class="hidden">
+        <!-- KPI row -->
+        <div id="agentDetailStatsCards" class="agent-detail-stats-cards">
+          <lex-metric id="agentDetailStatTotalRuns"     label="Total runs"        value="0" size="md"></lex-metric>
+          <lex-metric id="agentDetailStatSuccessRate"   label="Success rate"      value="0%" size="md"></lex-metric>
+          <lex-metric id="agentDetailStatMedianDuration" label="Median duration"  value="0s" size="md"></lex-metric>
+          <lex-metric id="agentDetailStatTotalTokens"   label="Total tokens"      value="0" size="md"></lex-metric>
+          <lex-metric id="agentDetailStatEstCost"       label="Est. cost"         value="-" size="md"></lex-metric>
+        </div>
+
+        <!-- Breakdown tables -->
+        <div class="agent-detail-stats-grid">
+          <lex-card heading="Runs by status" padding="compact">
+            <div id="agentDetailStatsByStatus" class="agent-detail-stats-list">
+              <span class="agent-detail-empty-text">No runs yet.</span>
+            </div>
+          </lex-card>
+
+          <lex-card heading="Runs by trigger" padding="compact">
+            <div id="agentDetailStatsByTrigger" class="agent-detail-stats-list">
+              <span class="agent-detail-empty-text">No runs yet.</span>
+            </div>
+          </lex-card>
+
+          <lex-card heading="Artifacts" padding="compact">
+            <div id="agentDetailStatsArtifacts" class="agent-detail-stats-list">
+              <span class="agent-detail-empty-text">No artifacts yet.</span>
+            </div>
+          </lex-card>
+        </div>
+      </div>
     </section>
 
-    <!-- Configure drawer (Phase-4 placeholder) -->
+    <!-- Configure drawer — edit form for the loaded agent.
+         system_prompt is intentionally absent (templates only).
+         allowed_tools may only be a subset of the template's set. -->
     <lex-drawer
       id="agentDetailConfigDrawer"
       heading="Configure Agent"
       side="right"
-      width="480px"
+      width="lg"
       show-footer
       confirm-text="Save"
-      cancel-text="Close"
+      cancel-text="Cancel"
       data-hoist
     >
-      <div class="agent-detail-config-body">
-        <p class="agent-detail-config-notice">
-          <strong>Coming soon.</strong>
-          A template-driven configuration form will be available here in Phase 4.
+      <div class="agent-detail-drawer-body">
+        <p id="agentDetailDrawerSystemNotice" class="agent-detail-drawer-system-notice hidden">
+          This is a system agent. Some fields are managed centrally and
+          cannot be edited per-organization here.
         </p>
-        <lex-input id="agentConfigName" label="Display name" disabled placeholder="(disabled)"></lex-input>
+
+        <lex-input
+          id="agentDetailEditName"
+          label="Display name"
+          required
+        ></lex-input>
+
         <lex-textarea
-          id="agentConfigDescription"
+          id="agentDetailEditDescription"
           label="Description"
           rows="3"
-          disabled
-          placeholder="(disabled)"
         ></lex-textarea>
+
+        <div class="agent-detail-drawer-section">
+          <div class="agent-detail-drawer-section-label">
+            Allowed tools
+            <span class="agent-detail-drawer-section-hint">
+              Uncheck tools you want this agent to skip. The template
+              defines the maximum set — adding new tools is not supported.
+            </span>
+          </div>
+          <div id="agentDetailEditToolsList" class="agent-detail-drawer-tools-list">
+            <span class="agent-detail-empty-text">No tools configured.</span>
+          </div>
+        </div>
+
+        <lex-select
+          id="agentDetailEditModelSlot"
+          label="Model slot"
+          placeholder="Choose a model slot..."
+        ></lex-select>
+
+        <lex-select
+          id="agentDetailEditApprovalPolicy"
+          label="Approval policy"
+          options='[{"value":"none","label":"No approval required"},{"value":"sensitive","label":"Required for sensitive actions"},{"value":"all","label":"Required for every action"}]'
+        ></lex-select>
+
+        <div class="agent-detail-drawer-section">
+          <div class="agent-detail-drawer-section-label">Schedule</div>
+          <lex-toggle
+            id="agentDetailEditScheduleEnabled"
+            label="Run on a schedule"
+            label-side="right"
+          ></lex-toggle>
+          <div id="agentDetailEditScheduleFields" class="agent-detail-drawer-schedule-fields hidden">
+            <lex-input
+              id="agentDetailEditScheduleCron"
+              label="Cron expression"
+              placeholder="0 9 * * 1-5"
+              help="Standard 5-field cron"
+            ></lex-input>
+            <lex-select
+              id="agentDetailEditScheduleTimezone"
+              label="Timezone"
+              placeholder="UTC"
+            ></lex-select>
+          </div>
+        </div>
+
+        <div class="agent-detail-drawer-danger-zone">
+          <div class="agent-detail-drawer-section-label agent-detail-drawer-danger-label">
+            Danger zone
+          </div>
+          <p class="agent-detail-drawer-danger-text">
+            Deleting an agent soft-disables it for your organization. Past
+            runs are kept for audit but the agent will no longer accept
+            new runs.
+          </p>
+          <lex-btn
+            id="agentDetailEditDeleteBtn"
+            variant="danger"
+            icon="trash-2"
+          >Delete agent</lex-btn>
+        </div>
       </div>
     </lex-drawer>
 
