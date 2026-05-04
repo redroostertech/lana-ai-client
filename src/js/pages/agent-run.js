@@ -33,6 +33,15 @@
   var _steps           = []; // for reasoning_steps block
   var _artifacts       = []; // current artifact list
   var _artifactStates  = {}; // id -> 'pending' | 'approved' | 'rejected' | 'applied'
+  var _opInFlight      = false; // single-gate to prevent racing bulk + per-artifact ops
+
+  // Bulk op concurrency. Three keeps the UI responsive without hammering
+  // the backend (tested values: 1 too slow on 20+ artifacts, 5 caused
+  // perceptible jank in the activity pane).
+  var BULK_CONCURRENCY = 3;
+  // Emit a progress toast every N completed items so users get feedback
+  // on long bulk runs without a flood of notifications.
+  var BULK_PROGRESS_EVERY = 3;
 
   // =========================================================================
   // Helpers
@@ -382,6 +391,7 @@
     // Show approval bar
     show(el('agentRunApprovalBar'));
     updateApprovalSummary();
+    updateBulkButtonVisibility();
   }
 
   function updateApprovalSummary() {
@@ -558,13 +568,256 @@
     container.addEventListener('click', function (evt) {
       var btn = evt.target.closest('[data-art-action]');
       if (!btn) return;
+      // Gate: don't allow per-artifact ops while a bulk op is running.
+      if (_opInFlight) return;
       var action = btn.getAttribute('data-art-action');
       var id = btn.getAttribute('data-artifact-id');
       if (!action || !id) return;
-      if (action === 'approve') approveArtifact(id);
-      else if (action === 'reject') rejectArtifact(id);
-      else if (action === 'apply') applyArtifact(id);
+
+      _opInFlight = true;
+      setBulkButtonsDisabled(true);
+      var p;
+      if (action === 'approve') p = approveArtifact(id);
+      else if (action === 'reject') p = rejectArtifact(id);
+      else if (action === 'apply') p = applyArtifact(id);
+      else p = Promise.resolve();
+
+      Promise.resolve(p).then(function () {
+        _opInFlight = false;
+        setBulkButtonsDisabled(false);
+        // Re-render so the bulk-button visibility reflects the new state.
+        renderArtifacts();
+      });
     });
+  }
+
+  // =========================================================================
+  // Bulk approve / reject / apply
+  // =========================================================================
+
+  // Treat any of these server-side states as "needs review" for bulk
+  // approve/reject. The backend has surfaced both 'awaiting_approval' and
+  // 'proposed' depending on artifact kind; the client also mints a local
+  // 'pending' state when nothing is set yet.
+  function isPending(artifact) {
+    var s = getArtifactState(artifact);
+    return s === 'pending' || s === 'awaiting_approval' || s === 'proposed';
+  }
+
+  function isApproved(artifact) {
+    return getArtifactState(artifact) === 'approved';
+  }
+
+  function pendingArtifacts() {
+    return _artifacts.filter(isPending);
+  }
+
+  function approvedArtifacts() {
+    return _artifacts.filter(isApproved);
+  }
+
+  /**
+   * Bounded-concurrency map. Resolves once every item has been mapped,
+   * preserving input order in the result array. Errors are caught per item
+   * and surfaced as { ok: false, error }; success is { ok: true, value }.
+   */
+  function pMap(items, mapper, concurrency) {
+    var limit = Math.max(1, concurrency || 1);
+    var results = new Array(items.length);
+    var nextIndex = 0;
+    var active = 0;
+    var done = 0;
+
+    return new Promise(function (resolve) {
+      if (items.length === 0) { resolve(results); return; }
+
+      function launch() {
+        while (active < limit && nextIndex < items.length) {
+          var i = nextIndex++;
+          active++;
+          Promise.resolve()
+            .then(function () { return mapper(items[i], i); })
+            .then(function (value) { results[i] = { ok: true, value: value }; })
+            .catch(function (error) { results[i] = { ok: false, error: error }; })
+            .then(function () {
+              active--;
+              done++;
+              if (done === items.length) { resolve(results); return; }
+              launch();
+            });
+        }
+      }
+
+      launch();
+    });
+  }
+
+  function setBulkButtonsDisabled(disabled) {
+    var ids = ['agentRunApproveAllBtn', 'agentRunRejectAllBtn', 'agentRunApplyApprovedBtn'];
+    for (var i = 0; i < ids.length; i++) {
+      var b = el(ids[i]);
+      if (b) b.disabled = !!disabled;
+    }
+    // Also disable per-artifact buttons so users can't race a per-item op
+    // into the middle of a bulk loop.
+    var perItem = document.querySelectorAll('[data-art-action]');
+    for (var j = 0; j < perItem.length; j++) {
+      perItem[j].disabled = !!disabled;
+    }
+  }
+
+  // Returns the api-call promise WITHOUT updating local artifact state on
+  // success. State updates are applied after the bulk loop completes via a
+  // single refreshRun() so the UI sees the canonical server view.
+  function bulkApproveOne(id) {
+    return callArtifactEndpoint(id, 'approve');
+  }
+  function bulkRejectOne(id) {
+    return callArtifactEndpoint(id, 'reject');
+  }
+  function bulkApplyOne(id) {
+    return callArtifactEndpoint(id, 'apply');
+  }
+
+  function summarizeAndToast(verb, results) {
+    var ok = 0, fail = 0;
+    var failedIds = [];
+    for (var i = 0; i < results.length; i++) {
+      if (results[i] && results[i].ok) {
+        ok++;
+      } else {
+        fail++;
+        if (results[i] && results[i]._artifactId) {
+          failedIds.push({ id: results[i]._artifactId, error: results[i].error });
+        }
+      }
+    }
+    if (failedIds.length) {
+      console.error('[agent-run] bulk ' + verb + ' failures:', failedIds);
+    }
+    if (!(window.Lex && Lex.Toast)) return;
+    if (fail === 0) {
+      Lex.Toast.success(verb + ' ' + ok + ' of ' + results.length);
+    } else if (ok === 0) {
+      Lex.Toast.error(verb + ' failed for all ' + fail + ' items');
+    } else {
+      Lex.Toast.warning(verb + ' ' + ok + ' of ' + results.length + '; ' + fail + ' failed');
+    }
+  }
+
+  function refreshRun() {
+    if (!_runId || !window.api || typeof window.api.get !== 'function') return Promise.resolve();
+    return window.api.get('/api/v1/agent-runs/' + encodeURIComponent(_runId))
+      .then(function (resp) {
+        var run = (resp && resp.run) ? resp.run
+                : ((resp && resp.data) ? resp.data : resp);
+        var steps = (resp && resp.steps) || (run && run.steps) || [];
+        var artifacts = (resp && resp.artifacts) || (run && run.artifacts) || [];
+        if (!run) return;
+        // Reset local optimistic state so server state takes precedence.
+        _artifactStates = {};
+        renderHeader(run);
+        hydrateSteps(steps);
+        hydrateArtifacts(artifacts);
+      })
+      .catch(function (err) {
+        console.warn('[agent-run] refresh after bulk op failed:', err);
+      });
+  }
+
+  function runBulk(action, targets, mapper, verb) {
+    if (_opInFlight) return Promise.resolve();
+    if (!targets || targets.length === 0) return Promise.resolve();
+
+    _opInFlight = true;
+    setBulkButtonsDisabled(true);
+    var total = targets.length;
+    var completed = 0;
+
+    if (window.Lex && Lex.Toast) {
+      Lex.Toast.info(verb + ' ' + total + ' artifact' + (total === 1 ? '' : 's') + '...');
+    }
+
+    var wrappedMapper = function (artifact) {
+      var aid = artifact && artifact.id;
+      return Promise.resolve()
+        .then(function () { return mapper(aid); })
+        .then(function (value) {
+          completed++;
+          if (window.Lex && Lex.Toast
+              && completed % BULK_PROGRESS_EVERY === 0
+              && completed < total) {
+            Lex.Toast.info(verb + ' ' + completed + ' of ' + total + '...');
+          }
+          return value;
+        })
+        .catch(function (err) {
+          completed++;
+          // Tag the failure with the artifact id so summarizeAndToast can
+          // log a useful diagnostic in the dev console. Some rejections are
+          // plain strings or frozen objects, so wrap defensively.
+          var tagged;
+          if (err && typeof err === 'object') {
+            try { err._artifactId = aid; tagged = err; }
+            catch (assignErr) { tagged = { _artifactId: aid, original: err }; }
+          } else {
+            tagged = { _artifactId: aid, original: err };
+          }
+          throw tagged;
+        });
+    };
+
+    return pMap(targets, wrappedMapper, BULK_CONCURRENCY)
+      .then(function (results) {
+        // Annotate failures with the artifact id (pMap stores the rejection
+        // verbatim; the wrapper above attached _artifactId to the error).
+        for (var i = 0; i < results.length; i++) {
+          if (!results[i].ok && results[i].error) {
+            results[i]._artifactId = results[i].error._artifactId;
+          }
+        }
+        summarizeAndToast(verb, results);
+        return refreshRun();
+      })
+      .then(function () {
+        _opInFlight = false;
+        setBulkButtonsDisabled(false);
+      })
+      .catch(function (err) {
+        // Defensive: pMap shouldn't reject (it captures per-item errors),
+        // but if anything else above throws, restore button state.
+        console.error('[agent-run] bulk ' + action + ' fatal:', err);
+        _opInFlight = false;
+        setBulkButtonsDisabled(false);
+      });
+  }
+
+  function bulkApprove() {
+    return runBulk('approve', pendingArtifacts(), bulkApproveOne, 'Approved');
+  }
+  function bulkReject() {
+    return runBulk('reject', pendingArtifacts(), bulkRejectOne, 'Rejected');
+  }
+  function bulkApply() {
+    // Some kinds (e.g. matter_plan) return 501 from the apply endpoint —
+    // those count as failures and the summary toast will reflect that.
+    return runBulk('apply', approvedArtifacts(), bulkApplyOne, 'Applied');
+  }
+
+  // Recompute bulk-button visibility based on current artifact states.
+  // Hidden (not just disabled) when a target set is empty so the bar
+  // doesn't show no-op buttons.
+  function updateBulkButtonVisibility() {
+    var pending = pendingArtifacts().length;
+    var approved = approvedArtifacts().length;
+
+    var approveBtn = el('agentRunApproveAllBtn');
+    var rejectBtn = el('agentRunRejectAllBtn');
+    var applyBtn = el('agentRunApplyApprovedBtn');
+
+    if (approveBtn) approveBtn.classList.toggle('hidden', pending === 0);
+    if (rejectBtn) rejectBtn.classList.toggle('hidden', pending === 0);
+    if (applyBtn) applyBtn.classList.toggle('hidden', approved === 0);
   }
 
   function wireApprovalBar() {
@@ -572,24 +825,14 @@
     if (!bar || bar._wired) return;
     bar._wired = true;
 
-    var approveAll = el('agentRunApproveAllBtn');
-    var rejectAll = el('agentRunRejectAllBtn');
-    var applyApproved = el('agentRunApplyApprovedBtn');
-
-    if (approveAll) approveAll.addEventListener('click', function () {
-      for (var i = 0; i < _artifacts.length; i++) {
-        if (getArtifactState(_artifacts[i]) === 'pending') approveArtifact(_artifacts[i].id);
-      }
-    });
-    if (rejectAll) rejectAll.addEventListener('click', function () {
-      for (var i = 0; i < _artifacts.length; i++) {
-        if (getArtifactState(_artifacts[i]) === 'pending') rejectArtifact(_artifacts[i].id);
-      }
-    });
-    if (applyApproved) applyApproved.addEventListener('click', function () {
-      for (var i = 0; i < _artifacts.length; i++) {
-        if (getArtifactState(_artifacts[i]) === 'approved') applyArtifact(_artifacts[i].id);
-      }
+    bar.addEventListener('click', function (evt) {
+      var btn = evt.target.closest('[data-action]');
+      if (!btn) return;
+      if (_opInFlight) return;
+      var action = btn.getAttribute('data-action');
+      if (action === 'bulk-approve') bulkApprove();
+      else if (action === 'bulk-reject') bulkReject();
+      else if (action === 'bulk-apply') bulkApply();
     });
   }
 
@@ -751,16 +994,18 @@
       });
   }
 
-  // LexRouter blocks navigation while a stream is active. It prefers
-  // Lex.state.isStreaming and falls back to window.api._streamingActive,
-  // so write to BOTH so navigation is correctly guarded regardless of which
-  // path the router takes.
+  // LexRouter reads Lex.state.isStreaming to gate navigation. The setter
+  // on lex.state.js mirrors to window.api._streamingActive (and calls
+  // setStreamingActive()/setStreamingInactive() so api.js can run its
+  // session-expiry follow-up), so writing here is enough.
   function setStreamingFlag(active) {
     try {
       if (window.Lex && window.Lex.state) {
         window.Lex.state.isStreaming = !!active;
+        return;
       }
-    } catch (e) { /* state is a class instance but accepts ad-hoc props */ }
+    } catch (e) { /* fall through to legacy api fallback below */ }
+    // Fallback for tests / pages that boot before lex.state.js loads.
     if (window.api) {
       if (active && typeof window.api.setStreamingActive === 'function') {
         window.api.setStreamingActive();

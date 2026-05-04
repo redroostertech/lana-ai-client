@@ -61,13 +61,33 @@
 
     </div>
 
-    <!-- Sticky approval bar (visible only when artifacts exist) -->
+    <!-- Sticky approval bar (visible only when artifacts exist).
+         Each bulk button is hidden by default; agent-run.js shows it only
+         when at least one artifact is in the action's target state. -->
     <div id="agentRunApprovalBar" class="agent-run-approval-bar hidden">
       <span class="agent-run-approval-summary" id="agentRunApprovalSummary"></span>
       <div class="agent-run-approval-actions">
-        <lex-btn id="agentRunRejectAllBtn" variant="ghost" size="sm">Reject all</lex-btn>
-        <lex-btn id="agentRunApproveAllBtn" variant="secondary" size="sm">Approve all</lex-btn>
-        <lex-btn id="agentRunApplyApprovedBtn" variant="primary" size="sm">Apply approved</lex-btn>
+        <lex-btn
+          id="agentRunRejectAllBtn"
+          class="agent-run-bulk-btn hidden"
+          data-action="bulk-reject"
+          variant="ghost"
+          size="sm"
+        >Reject all</lex-btn>
+        <lex-btn
+          id="agentRunApproveAllBtn"
+          class="agent-run-bulk-btn hidden"
+          data-action="bulk-approve"
+          variant="secondary"
+          size="sm"
+        >Approve all</lex-btn>
+        <lex-btn
+          id="agentRunApplyApprovedBtn"
+          class="agent-run-bulk-btn hidden"
+          data-action="bulk-apply"
+          variant="primary"
+          size="sm"
+        >Apply approved</lex-btn>
       </div>
     </div>
 

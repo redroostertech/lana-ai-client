@@ -403,6 +403,21 @@
 .agent-run-approval-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Bulk-action buttons in the approval bar. Each is hidden until at least
+   one artifact targets the action; agent-run.js toggles .hidden via
+   updateBulkButtonVisibility(). The class also keeps disabled-state
+   visuals aligned with the rest of the lex-btn family. */
+.agent-run-bulk-btn {
+  white-space: nowrap;
+}
+
+.agent-run-bulk-btn[disabled],
+.agent-run-bulk-btn[aria-disabled="true"] {
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 .hidden {
