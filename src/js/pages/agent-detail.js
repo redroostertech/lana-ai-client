@@ -33,6 +33,10 @@
   // Tools the user has unchecked relative to the agent's existing
   // allowed_tools. Final allowed_tools = current set - this set.
   var _editDisabledTools = {};
+  // Snapshot of form values captured when the edit drawer opens. Used by
+  // buildEditBody() to send only changed fields to PUT /api/v1/agents/:slug
+  // so default churn doesn't masquerade as user edits.
+  var _editSnapshot = null;
 
   var _MODEL_SLOTS = [
     { value: 'agentic', label: 'Agentic (planning + tool use)' },
@@ -545,12 +549,17 @@
           _agent = agent;
           syncEnabledToggle();
         } else {
-          // Trust the toggle reflects the new state.
+          // No agent in the response — trust the toggle optimistically until
+          // the canonical refresh below confirms.
           if (_agent) _agent.is_active = desired;
         }
         if (window.Lex && Lex.Toast) {
           Lex.Toast.success(desired ? 'Agent enabled' : 'Agent disabled');
         }
+        // Always re-fetch from the server so derived UI (stats counters,
+        // schedule indicator, etc.) reflects the canonical state. Failures
+        // here are non-fatal — loadAgent surfaces its own errors.
+        if (typeof loadAgent === 'function') loadAgent();
       })
       .catch(function (err) {
         console.error('[agent-detail] Toggle failed:', err);
@@ -573,7 +582,28 @@
     var drawer = el('agentDetailConfigDrawer');
     if (!drawer) return;
     populateEditForm();
+    // Snapshot the populated form so submitEdit can diff against it and
+    // send only changed fields. Capture happens AFTER populateEditForm so
+    // the snapshot reflects the on-screen baseline, not stale agent state.
+    _editSnapshot = captureEditFormState();
     drawer.open = true;
+  }
+
+  // Read the current edit form into a plain object. Single source of truth
+  // for both the snapshot (drawer-open baseline) and the diff (on submit).
+  function captureEditFormState() {
+    return {
+      name: ((el('agentDetailEditName') && el('agentDetailEditName').value) || '').trim(),
+      description: ((el('agentDetailEditDescription') && el('agentDetailEditDescription').value) || '').trim(),
+      model_slot: (el('agentDetailEditModelSlot') && el('agentDetailEditModelSlot').value) || '',
+      approval_policy: (el('agentDetailEditApprovalPolicy') && el('agentDetailEditApprovalPolicy').value) || 'none',
+      // Shallow clone so later mutations to _editDisabledTools don't bleed
+      // into the snapshot.
+      disabled_tools: Object.assign({}, _editDisabledTools || {}),
+      schedule_enabled: !!(el('agentDetailEditScheduleEnabled') && el('agentDetailEditScheduleEnabled').checked),
+      schedule_cron: ((el('agentDetailEditScheduleCron') && el('agentDetailEditScheduleCron').value) || '').trim(),
+      schedule_timezone: (el('agentDetailEditScheduleTimezone') && el('agentDetailEditScheduleTimezone').value) || 'UTC',
+    };
   }
 
   function populateEditForm() {
@@ -656,34 +686,47 @@
     toolsList.innerHTML = html;
   }
 
-  // Assemble the PUT body. We send the full editable surface — the
-  // backend will diff against the stored agent. system_prompt is
-  // intentionally absent (templates only).
+  // Assemble the PUT body containing ONLY fields that changed since the
+  // drawer opened. system_prompt is intentionally absent (templates only).
+  // If no fields changed, returns an empty object — the caller short-circuits
+  // before issuing a PUT in that case.
   function buildEditBody() {
-    var name = (el('agentDetailEditName') && el('agentDetailEditName').value) || '';
-    var description = (el('agentDetailEditDescription') && el('agentDetailEditDescription').value) || '';
-    var modelSlot = (el('agentDetailEditModelSlot') && el('agentDetailEditModelSlot').value) || '';
-    var approvalPolicy = (el('agentDetailEditApprovalPolicy') && el('agentDetailEditApprovalPolicy').value) || 'none';
+    var cur = captureEditFormState();
+    var snap = _editSnapshot || {};
+    var body = {};
 
-    var currentTools = ((_agent && _agent.allowed_tools) || []).map(toolName).filter(Boolean);
-    var allowedTools = currentTools.filter(function (t) { return !_editDisabledTools[t]; });
+    if (cur.name !== (snap.name || '')) body.name = cur.name;
+    if (cur.description !== (snap.description || '')) body.description = cur.description;
+    if (cur.model_slot && cur.model_slot !== (snap.model_slot || '')) body.model_slot = cur.model_slot;
+    if (cur.approval_policy !== (snap.approval_policy || 'none')) body.approval_policy = cur.approval_policy;
 
-    var body = {
-      name: String(name).trim(),
-      description: String(description).trim(),
-      allowed_tools: allowedTools,
-      approval_policy: approvalPolicy
-    };
-    if (modelSlot) body.model_slot = modelSlot;
+    // Tools changed iff the disabled-set diff is non-empty. When changed,
+    // resolve the final allowed_tools list from the agent's current tools.
+    var snapDisabled = snap.disabled_tools || {};
+    var curDisabled = cur.disabled_tools || {};
+    var toolsChanged = false;
+    var seenKeys = {};
+    var k;
+    for (k in snapDisabled) { if (Object.prototype.hasOwnProperty.call(snapDisabled, k)) seenKeys[k] = true; }
+    for (k in curDisabled) { if (Object.prototype.hasOwnProperty.call(curDisabled, k)) seenKeys[k] = true; }
+    for (k in seenKeys) {
+      if (!!snapDisabled[k] !== !!curDisabled[k]) { toolsChanged = true; break; }
+    }
+    if (toolsChanged) {
+      var currentTools = ((_agent && _agent.allowed_tools) || []).map(toolName).filter(Boolean);
+      body.allowed_tools = currentTools.filter(function (t) { return !curDisabled[t]; });
+    }
 
-    var schedOn = !!(el('agentDetailEditScheduleEnabled') && el('agentDetailEditScheduleEnabled').checked);
-    var cron = (el('agentDetailEditScheduleCron') && el('agentDetailEditScheduleCron').value) || '';
-    var tz = (el('agentDetailEditScheduleTimezone') && el('agentDetailEditScheduleTimezone').value) || 'UTC';
-    body.schedule = {
-      enabled: schedOn,
-      cron: String(cron).trim(),
-      timezone: tz
-    };
+    // Schedule: any of three fields changed → send the full schedule object.
+    if (cur.schedule_enabled !== !!snap.schedule_enabled
+        || cur.schedule_cron !== (snap.schedule_cron || '')
+        || cur.schedule_timezone !== (snap.schedule_timezone || 'UTC')) {
+      body.schedule = {
+        enabled: cur.schedule_enabled,
+        cron: cur.schedule_cron,
+        timezone: cur.schedule_timezone,
+      };
+    }
 
     return body;
   }
@@ -703,12 +746,23 @@
     }
 
     var body = buildEditBody();
-    if (!body.name) {
+
+    // No-op short-circuit: if nothing changed, close the drawer and toast
+    // rather than firing an empty PUT. Validating "name required" against
+    // the current form value (not the diff) keeps the user's intent visible
+    // even if they cleared a field that previously had content.
+    var curState = captureEditFormState();
+    if (!curState.name) {
       if (window.Lex && Lex.Toast) Lex.Toast.error('Display name is required.');
       return;
     }
-    if (body.schedule && body.schedule.enabled && !body.schedule.cron) {
+    if (curState.schedule_enabled && !curState.schedule_cron) {
       if (window.Lex && Lex.Toast) Lex.Toast.error('Schedule is enabled but no cron expression was provided.');
+      return;
+    }
+    if (Object.keys(body).length === 0) {
+      if (drawer) drawer.open = false;
+      if (window.Lex && Lex.Toast) Lex.Toast.info('No changes to save.');
       return;
     }
 

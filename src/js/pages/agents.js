@@ -575,6 +575,11 @@
         else if (status === 404) msg = 'Agent creation is not available on this server.';
         else if (status === 409) msg = 'An agent with that name already exists.';
         if (window.Lex && Lex.Toast) Lex.Toast.error(msg);
+        // Mirror the load-time 401 path: route to login so the user can
+        // re-auth instead of being stranded with a vague error.
+        if (status === 401 && window.Lex && Lex.Nav) {
+          Lex.Nav.go('login.html');
+        }
       });
   }
 

@@ -575,7 +575,7 @@
       if (!action || !id) return;
 
       _opInFlight = true;
-      setBulkButtonsDisabled(true);
+      setAllArtifactControlsDisabled(true);
       var p;
       if (action === 'approve') p = approveArtifact(id);
       else if (action === 'reject') p = rejectArtifact(id);
@@ -584,7 +584,9 @@
 
       Promise.resolve(p).then(function () {
         _opInFlight = false;
-        setBulkButtonsDisabled(false);
+        // Re-enable both groups — the per-artifact buttons were disabled
+        // alongside the bulk buttons at op-start.
+        setAllArtifactControlsDisabled(false);
         // Re-render so the bulk-button visibility reflects the new state.
         renderArtifacts();
       });
@@ -661,12 +663,22 @@
       var b = el(ids[i]);
       if (b) b.disabled = !!disabled;
     }
-    // Also disable per-artifact buttons so users can't race a per-item op
-    // into the middle of a bulk loop.
+  }
+
+  function setPerArtifactButtonsDisabled(disabled) {
     var perItem = document.querySelectorAll('[data-art-action]');
     for (var j = 0; j < perItem.length; j++) {
       perItem[j].disabled = !!disabled;
     }
+  }
+
+  // Disable both groups together — used at op-start so users can't race a
+  // per-item op into the middle of a bulk loop. The recovery paths in
+  // runBulk decide which group(s) to re-enable based on whether the
+  // post-bulk refresh succeeded.
+  function setAllArtifactControlsDisabled(disabled) {
+    setBulkButtonsDisabled(disabled);
+    setPerArtifactButtonsDisabled(disabled);
   }
 
   // Returns the api-call promise WITHOUT updating local artifact state on
@@ -737,7 +749,10 @@
     if (!targets || targets.length === 0) return Promise.resolve();
 
     _opInFlight = true;
-    setBulkButtonsDisabled(true);
+    // Disable both groups so per-artifact clicks can't race the bulk loop.
+    // The success/refresh-failed/catch paths each decide which group(s)
+    // to re-enable.
+    setAllArtifactControlsDisabled(true);
     var total = targets.length;
     var completed = 0;
 
@@ -797,18 +812,20 @@
           if (window.Lex && Lex.Toast) {
             Lex.Toast.warning(verb + ' completed, but failed to refresh — reload to see latest state.');
           }
-          // Bulk buttons stay disabled; per-artifact controls (gated by
-          // _opInFlight=false) remain interactive so the user isn't stranded.
+          // Bulk buttons stay disabled (re-clicking would act on stale
+          // state); per-artifact controls are explicitly re-enabled so the
+          // user can still act on individual items while the run reloads.
+          setPerArtifactButtonsDisabled(false);
           return;
         }
-        setBulkButtonsDisabled(false);
+        setAllArtifactControlsDisabled(false);
       })
       .catch(function (err) {
         // Defensive: pMap shouldn't reject (it captures per-item errors),
         // but if anything else above throws, restore button state.
         console.error('[agent-run] bulk ' + action + ' fatal:', err);
         _opInFlight = false;
-        setBulkButtonsDisabled(false);
+        setAllArtifactControlsDisabled(false);
       });
   }
 
