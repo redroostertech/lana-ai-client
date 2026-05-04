@@ -140,8 +140,38 @@
       .catch(function (err) {
         console.error('[agents] Failed to load agents:', err);
         _allAgents = [];
-        renderGrid();
+        showLoadError(err);
       });
+  }
+
+  // Render a banner-style error in the empty container so the user can
+  // distinguish "no agents" from "load failed".
+  function showLoadError(err) {
+    var grid = el('agentsGrid');
+    var loadingEl = el('agentsLoading');
+    var emptyEl = el('agentsEmpty');
+    hide(loadingEl);
+    hide(grid);
+    if (!emptyEl) return;
+
+    var status = err && (err.status || (err.response && err.response.status));
+    var icon = 'alert-circle';
+    var title = 'Unable to load agents';
+    var description = 'Something went wrong. Try again.';
+
+    if (status === 401) {
+      title = 'Session expired';
+      description = 'Your session expired. Please sign in again.';
+      if (window.Lex && Lex.Nav) Lex.Nav.go('login.html');
+    } else if (status === 404) {
+      title = 'Agents unavailable';
+      description = 'The agents service is not available on this server.';
+    }
+
+    emptyEl.innerHTML = '<lex-empty icon="' + escHtml(icon)
+      + '" message="' + escHtml(title)
+      + '" description="' + escHtml(description) + '"></lex-empty>';
+    show(emptyEl);
   }
 
   // =========================================================================
@@ -181,17 +211,30 @@
       input: String(value).trim()
     })
       .then(function (resp) {
-        var runId = resp && (resp.id || (resp.data && resp.data.id) || resp.run_id);
+        // Backend returns 202 { run, queue }; tolerate { data } or bare object.
+        var runId = (resp && resp.run && resp.run.id)
+                 || (resp && resp.data && resp.data.id)
+                 || (resp && resp.id)
+                 || (resp && resp.run_id);
         var modal = el('agentsRunModal');
         if (modal) modal.open = false;
         if (window.Lex && Lex.Toast) Lex.Toast.success('Run started');
         if (runId && window.Lex && Lex.Nav) {
           Lex.Nav.go('agent-run.html', { params: { id: runId } });
+        } else {
+          console.warn('[agents] Run started but no id in response:', resp);
+          if (window.Lex && Lex.Toast) {
+            Lex.Toast.info('Run started, but we could not open the live view.');
+          }
         }
       })
       .catch(function (err) {
         console.error('[agents] Run start failed:', err);
-        if (window.Lex && Lex.Toast) Lex.Toast.error('Unable to start run');
+        var status = err && (err.status || (err.response && err.response.status));
+        var msg = 'Unable to start run';
+        if (status === 401) msg = 'Your session expired. Please sign in again.';
+        else if (status === 404) msg = 'This agent no longer exists.';
+        if (window.Lex && Lex.Toast) Lex.Toast.error(msg);
       });
   }
 

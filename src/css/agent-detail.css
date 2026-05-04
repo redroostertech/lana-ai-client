@@ -117,7 +117,16 @@
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
+  background: var(--lex-text-tertiary);
 }
+
+/* Status dot color modifiers — driven from Lex status tokens. */
+.agent-detail-run-status-dot--running   { background: var(--lex-status-info); }
+.agent-detail-run-status-dot--awaiting  { background: var(--lex-status-warning); }
+.agent-detail-run-status-dot--complete  { background: var(--lex-status-success); }
+.agent-detail-run-status-dot--failed    { background: var(--lex-status-danger); }
+.agent-detail-run-status-dot--cancelled { background: var(--lex-text-tertiary); }
+.agent-detail-run-status-dot--pending   { background: var(--lex-text-tertiary); }
 
 .agent-detail-run-title {
   font-size: 0.8125rem;

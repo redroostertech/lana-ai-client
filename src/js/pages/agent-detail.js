@@ -51,15 +51,13 @@
     return status;
   }
 
-  function statusColor(status) {
-    if (status === 'running' || status === 'compiling_context' || status === 'queued') return '#3b82f6';
-    if (status === 'awaiting_input')    return '#f59e0b';
-    if (status === 'awaiting_approval') return '#f59e0b';
-    if (status === 'completed' || status === 'approved') return '#10b981';
-    if (status === 'failed')   return '#ef4444';
-    if (status === 'rejected') return '#ef4444';
-    if (status === 'cancelled')return '#6b7280';
-    return '#9ca3af';
+  function statusDotModifier(status) {
+    if (status === 'running' || status === 'compiling_context' || status === 'queued') return 'agent-detail-run-status-dot--running';
+    if (status === 'awaiting_input' || status === 'awaiting_approval') return 'agent-detail-run-status-dot--awaiting';
+    if (status === 'completed' || status === 'approved') return 'agent-detail-run-status-dot--complete';
+    if (status === 'failed' || status === 'rejected')   return 'agent-detail-run-status-dot--failed';
+    if (status === 'cancelled') return 'agent-detail-run-status-dot--cancelled';
+    return 'agent-detail-run-status-dot--pending';
   }
 
   function priorityClass(priority) {
@@ -87,6 +85,15 @@
         else hide(panels[k]);
       }
     });
+    if (_activeTab === 'runs') loadRuns();
+  }
+
+  // After the agent profile is loaded, refresh runs if that tab is active.
+  // Recent Runs needs `agent_definition_id` (the loaded agent's id) — which we
+  // only learn after `loadAgent()` resolves. Reset cache so the request fires
+  // with the correct filter when the user lands on the Runs tab.
+  function onAgentLoaded() {
+    _runsLoaded = false;
     if (_activeTab === 'runs') loadRuns();
   }
 
@@ -187,14 +194,14 @@
   function renderRunRow(run) {
     var status = run.status || 'queued';
     var priority = run.priority || 'medium';
-    var color = statusColor(status);
+    var dotMod = statusDotModifier(status);
     var pCls = priorityClass(priority);
     var label = statusLabel(status);
     var title = run.title || ('Run ' + (run.id || '').slice(0, 8));
 
     return ''
       + '<div class="agent-detail-run-row" data-run-id="' + escHtml(run.id || '') + '">'
-      +   '<span class="agent-detail-run-status-dot" style="background:' + color + ';"></span>'
+      +   '<span class="agent-detail-run-status-dot ' + dotMod + '"></span>'
       +   '<span class="agent-detail-run-title">' + escHtml(title) + '</span>'
       +   '<span class="agent-detail-run-status">' + escHtml(label) + '</span>'
       +   '<span class="agent-detail-run-priority ' + pCls + '">' + escHtml(priority) + '</span>'
@@ -205,20 +212,32 @@
   var _runsLoaded = false;
   function loadRuns() {
     if (_runsLoaded) return;
-    if (!_slug) return;
     if (!window.api || typeof window.api.get !== 'function') return;
-
-    _runsLoaded = true;
 
     var loadingEl = el('agentDetailRunsLoading');
     var listEl = el('agentDetailRunsList');
     var emptyEl = el('agentDetailRunsEmpty');
     var countEl = el('agentDetailRunsCount');
+
+    // Backend list endpoint filters by `agent_definition_id`, NOT `agent_slug`.
+    // We can only build the correct query once the agent profile has loaded.
+    // Until then, hold off (the list will rerun via onAgentLoaded()).
+    var agentDefinitionId = _agent && _agent.id;
+    if (!agentDefinitionId) {
+      // Show loading until agent resolves.
+      show(loadingEl);
+      if (listEl) listEl.innerHTML = '';
+      hide(emptyEl);
+      return;
+    }
+
+    _runsLoaded = true;
+
     show(loadingEl);
     if (listEl) listEl.innerHTML = '';
     hide(emptyEl);
 
-    var url = '/api/v1/agent-runs?agent_slug=' + encodeURIComponent(_slug)
+    var url = '/api/v1/agent-runs?agent_definition_id=' + encodeURIComponent(agentDefinitionId)
             + '&limit=20&sort_by=created_at&sort_order=desc';
 
     window.api.get(url)
@@ -244,6 +263,13 @@
         hide(loadingEl);
         console.error('[agent-detail] Failed to load runs:', err);
         if (countEl) countEl.textContent = '';
+        var status = err && (err.status || (err.response && err.response.status));
+        if (emptyEl) {
+          var msg = 'Unable to load runs.';
+          if (status === 401) msg = 'Your session expired. Please sign in again.';
+          else if (status === 404) msg = 'This agent no longer exists.';
+          emptyEl.innerHTML = '<lex-empty icon="alert-circle" message="Unable to load runs" description="' + escHtml(msg) + '"></lex-empty>';
+        }
         show(emptyEl);
       });
   }
@@ -320,17 +346,30 @@
       input: String(value).trim()
     })
       .then(function (resp) {
-        var runId = resp && (resp.id || (resp.data && resp.data.id) || resp.run_id);
+        // Backend returns 202 { run, queue }; tolerate { data } or bare object.
+        var runId = (resp && resp.run && resp.run.id)
+                 || (resp && resp.data && resp.data.id)
+                 || (resp && resp.id)
+                 || (resp && resp.run_id);
         var modal = el('agentDetailRunModal');
         if (modal) modal.open = false;
         if (window.Lex && Lex.Toast) Lex.Toast.success('Run started');
         if (runId && window.Lex && Lex.Nav) {
           Lex.Nav.go('agent-run.html', { params: { id: runId } });
+        } else {
+          console.warn('[agent-detail] Run started but no id in response:', resp);
+          if (window.Lex && Lex.Toast) {
+            Lex.Toast.info('Run started, but we could not open the live view. Check the Runs tab.');
+          }
         }
       })
       .catch(function (err) {
         console.error('[agent-detail] Run start failed:', err);
-        if (window.Lex && Lex.Toast) Lex.Toast.error('Unable to start run');
+        var status = err && (err.status || (err.response && err.response.status));
+        var msg = 'Unable to start run';
+        if (status === 401) msg = 'Your session expired. Please sign in again.';
+        else if (status === 404) msg = 'This agent no longer exists.';
+        if (window.Lex && Lex.Toast) Lex.Toast.error(msg);
       });
   }
 
@@ -347,17 +386,48 @@
 
     window.api.get('/api/v1/agents/' + encodeURIComponent(_slug))
       .then(function (resp) {
-        var agent = (resp && resp.data) ? resp.data : resp;
+        // Backend returns { agent: {...} }; tolerate { data } / bare object
+        var agent = (resp && resp.agent) ? resp.agent
+                  : ((resp && resp.data) ? resp.data : resp);
         if (!agent) {
           renderProfile({ slug: _slug, name: _slug, description: 'Agent not found.' });
           return;
         }
         renderProfile(agent);
+        onAgentLoaded();
       })
       .catch(function (err) {
         console.error('[agent-detail] Failed to load agent:', err);
-        renderProfile({ slug: _slug, name: _slug, description: 'Unable to load agent.' });
+        showLoadError(err);
       });
+  }
+
+  // Differentiated error message for load failures.
+  function showLoadError(err) {
+    var status = err && (err.status || (err.response && err.response.status));
+    var descEl = el('agentDetailDescription');
+    var loading = el('agentPanelCapabilitiesLoading');
+    var content = el('agentPanelCapabilitiesContent');
+    hide(loading);
+    show(content);
+
+    var message;
+    if (status === 401) {
+      message = 'Your session expired. Please sign in again.';
+      if (window.Lex && Lex.Toast) Lex.Toast.error(message);
+      if (window.Lex && Lex.Nav) Lex.Nav.go('login.html');
+    } else if (status === 404) {
+      message = 'This agent no longer exists.';
+    } else {
+      message = 'Something went wrong loading this agent. Try again.';
+    }
+    if (descEl) descEl.textContent = message;
+
+    var banner = el('agentDetailBanner');
+    if (banner) {
+      banner.heading = _slug || 'Agent';
+      banner.subtitle = message;
+    }
   }
 
   // =========================================================================
