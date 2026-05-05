@@ -1,0 +1,19 @@
+{
+  "name": "lana-client-cli",
+  "version": "1.0.0",
+  "description": "Lana AI Client CLI — run, release, and build the Electron client",
+  "bin": {
+    "lana-client": "./lana-client.js"
+  },
+  "main": "lana-client.js",
+  "scripts": {
+    "start": "node lana-client.js"
+  },
+  "dependencies": {
+    "commander": "^12.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "private": true
+}
