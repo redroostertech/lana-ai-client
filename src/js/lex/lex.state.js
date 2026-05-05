@@ -7,11 +7,25 @@
      1. Auth        — token, user, isAuthenticated, isTokenExpired
      2. Connection   — baseUrl, serverInfo, isReachable
      3. Context      — activeMatterId, activeConversationId
+     4. Streaming    — isStreaming (mirrors window.api._streamingActive)
 
    Usage:
      Lex.state.on('auth:changed', (e) => console.log(e.detail))
      Lex.state.isAuthenticated  // true/false
      Lex.state.setActiveMatter('abc-123')
+     Lex.state.isStreaming = true  // when SSE starts; false when finished
+
+   Events emitted:
+     - 'auth:changed'        { token, user, isAuthenticated }
+     - 'connection:changed'  { isReachable, baseUrl, serverInfo? }
+     - 'context:changed'     { property, value }
+     - 'streaming:changed'   { active }   // fires when isStreaming flips
+
+   Note on streaming:
+     `isStreaming` is the canonical flag used by LexRouter to gate navigation
+     while an SSE stream is active. The setter mirrors the value to
+     `window.api._streamingActive` for backwards compatibility with chat code
+     that still writes to that property directly.
    ========================================================================== */
 
 (function (global) {
@@ -39,6 +53,13 @@
       // -- Context slice --
       this._activeMatterId = null;
       this._activeConversationId = null;
+
+      // -- Streaming slice --
+      // Tracks whether an SSE stream (chat or agent run) is in flight.
+      // LexRouter reads this to block navigation that would tear down the
+      // active fetch reader. Mirrors window.api._streamingActive so legacy
+      // call sites that write to the api flag continue to work.
+      this._isStreaming = false;
 
       // Saved property descriptors for cleanup
       this._interceptedProps = new Map();
@@ -83,6 +104,34 @@
 
     get activeMatterId() { return this._activeMatterId; }
     get activeConversationId() { return this._activeConversationId; }
+
+    // -----------------------------------------------------------------------
+    // Streaming getter / setter
+    // -----------------------------------------------------------------------
+
+    get isStreaming() { return this._isStreaming; }
+
+    set isStreaming(value) {
+      var next = !!value;
+      if (this._isStreaming === next) return;
+      this._isStreaming = next;
+
+      // Mirror to window.api._streamingActive so anything reading either
+      // property sees a consistent value. Use the dedicated setter when
+      // available so api.js can run its session-expired follow-up logic.
+      if (typeof window.api !== 'undefined' && window.api) {
+        if (next && typeof window.api.setStreamingActive === 'function') {
+          window.api.setStreamingActive();
+        } else if (!next && typeof window.api.setStreamingInactive === 'function') {
+          window.api.setStreamingInactive();
+        } else {
+          // Fallback for older api shims that don't expose the helpers.
+          window.api._streamingActive = next;
+        }
+      }
+
+      this._emit('streaming:changed', { active: next });
+    }
 
     // -----------------------------------------------------------------------
     // Auth setters

@@ -3,6 +3,16 @@
  *
  * With hosted discovery at lanaai.io, we no longer need Bonjour/mDNS.
  * This module now only contains server verification functionality.
+ *
+ * NOTE (Phase 1, agents platform):
+ *   The hosted discovery payload is consumed in `src/login.html`
+ *   (function `resolveOrganization`), not here. That function persists
+ *   the new `forge_api_key` / `forge_url` / `forge_sovereign` fields via
+ *   `window.electronAPI.saveSettings(...)` → `electron-storage.js`
+ *   `saveServerConnection()` (mirrors the existing burst pattern).
+ *
+ *   `verifyServer()` below only re-verifies the resolved server's health
+ *   endpoint and does not need to forward those fields.
  */
 
 const axios = require('axios');

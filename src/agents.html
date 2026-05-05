@@ -1,0 +1,178 @@
+<!-- Agents Catalog — browse system + custom agent definitions.
+     Phase-1 of the agents platform UI. Loads from GET /api/v1/agents,
+     renders a filterable grid of agent cards, click-through to
+     agent-detail.html?slug=<slug>. Phase-4 adds the Create-from-template
+     modal which clones a system template into an org-owned definition. -->
+
+<div id="lex-page-content">
+  <main class="agents-page-container">
+
+    <!-- Page banner -->
+    <lex-banner
+      id="agentsBanner"
+      variant="dark"
+      corners
+      heading="Agents"
+      subtitle="Browse and configure system and custom agents"
+      icon="A"
+    >
+      <lex-btn id="agentsCreateBtn" variant="primary" icon="plus">Create agent</lex-btn>
+    </lex-banner>
+
+    <!-- Filter tabs -->
+    <div class="agents-filter-bar">
+      <lex-segmented
+        id="agentsFilterTabs"
+        value="all"
+        options='[{"value":"all","label":"All"},{"value":"system","label":"System"},{"value":"custom","label":"Custom"}]'
+      ></lex-segmented>
+    </div>
+
+    <!-- Loading skeleton -->
+    <div id="agentsLoading" class="agents-grid">
+      <div class="agents-card-skeleton" aria-hidden="true">
+        <div class="agents-skeleton-line agents-skeleton-line--avatar"></div>
+        <div class="agents-skeleton-line agents-skeleton-line--title"></div>
+        <div class="agents-skeleton-line agents-skeleton-line--text"></div>
+        <div class="agents-skeleton-line agents-skeleton-line--text-short"></div>
+      </div>
+      <div class="agents-card-skeleton" aria-hidden="true">
+        <div class="agents-skeleton-line agents-skeleton-line--avatar"></div>
+        <div class="agents-skeleton-line agents-skeleton-line--title"></div>
+        <div class="agents-skeleton-line agents-skeleton-line--text"></div>
+        <div class="agents-skeleton-line agents-skeleton-line--text-short"></div>
+      </div>
+      <div class="agents-card-skeleton" aria-hidden="true">
+        <div class="agents-skeleton-line agents-skeleton-line--avatar"></div>
+        <div class="agents-skeleton-line agents-skeleton-line--title"></div>
+        <div class="agents-skeleton-line agents-skeleton-line--text"></div>
+        <div class="agents-skeleton-line agents-skeleton-line--text-short"></div>
+      </div>
+    </div>
+
+    <!-- Agent grid (populated dynamically) -->
+    <div id="agentsGrid" class="agents-grid hidden"></div>
+
+    <!-- Empty state -->
+    <div id="agentsEmpty" class="hidden">
+      <lex-empty
+        icon="bot"
+        message="No agents yet"
+        description="Agent definitions will appear here once they are configured."
+      ></lex-empty>
+    </div>
+
+    <!-- Run modal placeholder (Phase 4 will replace with template-driven form) -->
+    <lex-modal id="agentsRunModal" heading="Run Agent" size="md" data-hoist>
+      <div class="agents-run-modal-body">
+        <p class="agents-run-modal-text">
+          Provide a brief input describing what the agent should do.
+        </p>
+        <lex-textarea
+          id="agentsRunInput"
+          label="Input"
+          rows="4"
+          placeholder="Describe the task you want this agent to perform..."
+        ></lex-textarea>
+      </div>
+    </lex-modal>
+
+    <!-- Create-from-template modal (Phase 4).
+         Clones a system template into a new org-owned agent. The
+         system_prompt is intentionally NOT in this form — that lives
+         on the template only. allowed_tools may only be a subset of
+         the template's allowed_tools (no escalation client-side). -->
+    <lex-modal
+      id="agentsCreateModal"
+      heading="Create agent from template"
+      size="lg"
+      confirm-text="Create"
+      cancel-text="Cancel"
+      data-hoist
+    >
+      <div class="agents-create-modal-body">
+        <p class="agents-create-modal-help">
+          Pick a template, adjust the name, description, and which tools the
+          agent may call. Templates own the underlying prompt — those rules
+          stay locked on the template.
+        </p>
+
+        <lex-select
+          id="agentsCreateTemplate"
+          label="Template"
+          placeholder="Choose a template..."
+          required
+          searchable
+        ></lex-select>
+
+        <!-- Template preview (shown once a template is selected) -->
+        <div id="agentsCreateTemplatePreview" class="agents-create-preview hidden">
+          <div class="agents-create-preview-row">
+            <span class="agents-create-preview-label">Template</span>
+            <span id="agentsCreateTemplateSlug" class="agents-create-preview-value"></span>
+          </div>
+          <div class="agents-create-preview-row">
+            <span class="agents-create-preview-label">Description</span>
+            <span id="agentsCreateTemplateDescription" class="agents-create-preview-value"></span>
+          </div>
+        </div>
+
+        <lex-input
+          id="agentsCreateName"
+          label="Display name"
+          placeholder="e.g. Contract Reviewer"
+          required
+        ></lex-input>
+
+        <lex-textarea
+          id="agentsCreateDescription"
+          label="Description"
+          rows="3"
+          placeholder="What this agent will do for your team..."
+        ></lex-textarea>
+
+        <div class="agents-create-section">
+          <div class="agents-create-section-label">
+            Allowed tools
+            <span class="agents-create-section-hint">
+              Uncheck tools you don't want this agent to use. The template
+              defines the maximum set — adding new tools is not supported here.
+            </span>
+          </div>
+          <div id="agentsCreateToolsList" class="agents-create-tools-list">
+            <span class="agents-create-empty-text">Pick a template to see its tools.</span>
+          </div>
+        </div>
+
+        <lex-select
+          id="agentsCreateModelSlot"
+          label="Model slot"
+          placeholder="Choose a model slot..."
+        ></lex-select>
+
+        <div class="agents-create-section">
+          <div class="agents-create-section-label">Schedule</div>
+          <lex-toggle
+            id="agentsCreateScheduleEnabled"
+            label="Run this agent on a schedule"
+            label-side="right"
+          ></lex-toggle>
+          <div id="agentsCreateScheduleFields" class="agents-create-schedule-fields hidden">
+            <lex-input
+              id="agentsCreateScheduleCron"
+              label="Cron expression"
+              placeholder="0 9 * * 1-5"
+              help="Standard 5-field cron (minute hour dom month dow)"
+            ></lex-input>
+            <lex-select
+              id="agentsCreateScheduleTimezone"
+              label="Timezone"
+              placeholder="UTC"
+            ></lex-select>
+          </div>
+        </div>
+      </div>
+    </lex-modal>
+
+  </main>
+</div>

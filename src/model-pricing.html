@@ -1,0 +1,164 @@
+<!-- Model Pricing — admin page for managing per-model token costs.
+     Drives estimated_cost_microdollars in agent stats. Loads from
+     GET /api/v1/admin/model-pricing, supports POST/PUT/DELETE.
+
+     Permission: admin:pricing (server enforces; client surfaces 403).
+
+     Page fragment — injected into the lex-app shell by the SPA router.
+     See lex-router.pages.js for the descriptor (activeNav: 'admin'). -->
+
+<div id="lex-page-content">
+  <main class="model-pricing-page-container">
+
+    <!-- Page banner -->
+    <lex-banner
+      id="modelPricingBanner"
+      variant="dark"
+      corners
+      heading="Model pricing"
+      subtitle="Per-token costs that drive estimated_cost_microdollars in agent stats."
+      icon="$"
+    >
+      <lex-btn id="modelPricingAddBtn" variant="primary" icon="plus">Add pricing</lex-btn>
+    </lex-banner>
+
+    <!-- Loading skeleton -->
+    <div id="modelPricingLoading" class="model-pricing-loading">
+      <lex-spinner size="sm"></lex-spinner>
+      <span>Loading pricing rows...</span>
+    </div>
+
+    <!-- Pricing table -->
+    <lex-card id="modelPricingTableCard" class="hidden" padding="none">
+      <div class="model-pricing-table-wrap">
+        <table class="model-pricing-table" aria-describedby="modelPricingTableCaption">
+          <caption id="modelPricingTableCaption" class="model-pricing-table-caption">
+            Pricing rows
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Model</th>
+              <th scope="col">Provider</th>
+              <th scope="col" class="model-pricing-th-num">Input cost</th>
+              <th scope="col" class="model-pricing-th-num">Output cost</th>
+              <th scope="col">Currency</th>
+              <th scope="col">Notes</th>
+              <th scope="col">Created</th>
+              <th scope="col" class="model-pricing-th-actions" aria-label="Actions"></th>
+            </tr>
+          </thead>
+          <tbody id="modelPricingTbody"></tbody>
+        </table>
+      </div>
+    </lex-card>
+
+    <!-- Empty state -->
+    <div id="modelPricingEmpty" class="hidden">
+      <lex-empty
+        icon="dollar-sign"
+        message="No pricing configured"
+        description="Add a pricing row so cost estimates show up on agent stats."
+      ></lex-empty>
+    </div>
+
+    <!-- Unavailable state — endpoint not yet shipped -->
+    <div id="modelPricingUnavailable" class="hidden">
+      <lex-empty
+        icon="alert-circle"
+        message="Model pricing API not yet available"
+        description="The pricing service is not available on this server."
+      ></lex-empty>
+    </div>
+
+    <!-- Permission denied state -->
+    <div id="modelPricingForbidden" class="hidden">
+      <lex-empty
+        icon="lock"
+        message="You do not have permission"
+        description="Managing model pricing requires the admin:pricing permission."
+      ></lex-empty>
+    </div>
+
+    <!-- Add / Edit modal -->
+    <lex-modal
+      id="modelPricingFormModal"
+      heading="Add pricing"
+      size="md"
+      confirm-text="Save"
+      cancel-text="Cancel"
+      data-hoist
+    >
+      <div class="model-pricing-form-body">
+        <p class="model-pricing-form-help">
+          Costs are stored as <strong>microdollars per token</strong> server-side
+          (1,000,000 microdollars = $1). Enter prices below as
+          <strong>USD per 1M tokens</strong> — the most common vendor unit — and
+          we'll convert on save.
+        </p>
+
+        <lex-input
+          id="modelPricingFormName"
+          label="Model name"
+          placeholder="e.g. claude-opus-4"
+          required
+        ></lex-input>
+
+        <lex-input
+          id="modelPricingFormProvider"
+          label="Provider (optional)"
+          placeholder="e.g. anthropic, openai"
+        ></lex-input>
+
+        <div class="model-pricing-form-grid">
+          <lex-input
+            id="modelPricingFormInputCost"
+            label="Input cost (USD / 1M tokens)"
+            type="number"
+            placeholder="e.g. 15"
+            help="Cost per 1,000,000 input tokens. Decimals allowed."
+          ></lex-input>
+
+          <lex-input
+            id="modelPricingFormOutputCost"
+            label="Output cost (USD / 1M tokens)"
+            type="number"
+            placeholder="e.g. 75"
+            help="Cost per 1,000,000 output tokens. Decimals allowed."
+          ></lex-input>
+        </div>
+
+        <lex-select
+          id="modelPricingFormCurrency"
+          label="Currency"
+          options='[{"value":"USD","label":"USD"},{"value":"EUR","label":"EUR"},{"value":"GBP","label":"GBP"}]'
+        ></lex-select>
+
+        <lex-textarea
+          id="modelPricingFormNotes"
+          label="Notes (optional)"
+          rows="3"
+          placeholder="Internal notes about this pricing row..."
+        ></lex-textarea>
+      </div>
+    </lex-modal>
+
+    <!-- Delete confirm modal -->
+    <lex-modal
+      id="modelPricingDeleteModal"
+      heading="Delete pricing row?"
+      size="sm"
+      variant="danger"
+      confirm-text="Delete"
+      cancel-text="Cancel"
+      data-hoist
+    >
+      <div class="model-pricing-delete-body">
+        <p>
+          Delete pricing for <strong id="modelPricingDeleteTarget"></strong>?
+          Cost estimates that referenced this row will fall back to defaults.
+        </p>
+      </div>
+    </lex-modal>
+
+  </main>
+</div>

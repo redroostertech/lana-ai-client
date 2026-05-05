@@ -1,0 +1,495 @@
+/* agent-detail.css — Agent profile page (Capabilities / Runs / Stats).
+   Scoped under .agent-detail-page-container.
+*/
+
+.agent-detail-page-container {
+  padding: 24px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.agent-detail-tabs-bar {
+  border-bottom: 1px solid var(--lex-border-subtle);
+}
+
+.agent-detail-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.agent-detail-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 24px;
+  font-size: 0.8125rem;
+  color: var(--lex-text-tertiary);
+}
+
+.agent-detail-description {
+  font-size: 0.8125rem;
+  color: var(--lex-text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Chip list — used for tool names and delegations */
+.agent-detail-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.agent-detail-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--lex-text-secondary);
+  background: var(--lex-bg-tertiary);
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: var(--lex-radius-full, 9999px);
+  font-family: var(--lex-font-mono, ui-monospace, SFMono-Regular, monospace);
+}
+
+.agent-detail-chip--accent {
+  color: var(--lex-text-accent, #2563eb);
+  background: var(--lex-bg-accent-soft, rgba(37, 99, 235, 0.08));
+  border-color: var(--lex-bg-accent-soft, rgba(37, 99, 235, 0.16));
+}
+
+.agent-detail-empty-text {
+  font-size: 0.8125rem;
+  color: var(--lex-text-tertiary);
+  font-style: italic;
+}
+
+/* Runs table */
+.agent-detail-runs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--lex-border-subtle);
+}
+
+.agent-detail-runs-title {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--lex-text-tertiary);
+}
+
+.agent-detail-runs-count {
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+}
+
+.agent-detail-runs-empty {
+  padding: 24px;
+}
+
+.agent-detail-run-row {
+  display: grid;
+  grid-template-columns: 12px 1fr auto auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--lex-border-subtle);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.agent-detail-run-row:hover {
+  background: var(--lex-bg-secondary);
+}
+
+.agent-detail-run-row:last-child {
+  border-bottom: none;
+}
+
+.agent-detail-run-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--lex-text-tertiary);
+}
+
+/* Status dot color modifiers — driven from Lex status tokens. */
+.agent-detail-run-status-dot--running   { background: var(--lex-status-info); }
+.agent-detail-run-status-dot--awaiting  { background: var(--lex-status-warning); }
+.agent-detail-run-status-dot--complete  { background: var(--lex-status-success); }
+.agent-detail-run-status-dot--failed    { background: var(--lex-status-danger); }
+.agent-detail-run-status-dot--cancelled { background: var(--lex-text-tertiary); }
+.agent-detail-run-status-dot--pending   { background: var(--lex-text-tertiary); }
+
+.agent-detail-run-title {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--lex-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-detail-run-status {
+  font-size: 0.75rem;
+  color: var(--lex-text-secondary);
+}
+
+.agent-detail-run-priority {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: var(--lex-radius-sm, 4px);
+  color: #fff;
+}
+
+.agent-detail-run-priority--urgent { background: #ef4444; }
+.agent-detail-run-priority--high   { background: #f59e0b; }
+.agent-detail-run-priority--medium { background: #3b82f6; }
+.agent-detail-run-priority--low    { background: #6b7280; }
+
+.agent-detail-run-time {
+  font-size: 0.6875rem;
+  color: var(--lex-text-tertiary);
+  white-space: nowrap;
+}
+
+/* Run modal body (kept compact for the existing run-modal markup) */
+.agent-detail-run-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.agent-detail-config-notice {
+  font-size: 0.8125rem;
+  color: var(--lex-text-secondary);
+  line-height: 1.5;
+  background: var(--lex-status-info-bg, rgba(59, 130, 246, 0.06));
+  border: 1px solid var(--lex-status-info-border, rgba(59, 130, 246, 0.18));
+  padding: 12px;
+  border-radius: var(--lex-radius-md, 6px);
+  margin: 0;
+}
+
+/* ── Banner enable toggle ────────────────────────────────────────── */
+
+.agent-detail-enabled-block {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--lex-radius-full, 9999px);
+  padding: 4px 12px 4px 12px;
+  margin-right: 8px;
+  color: var(--lex-text-on-accent, #fff);
+}
+
+/* Read-only badge shown for system agents in place of the live toggle.
+   Renders as a non-interactive label so no click event can fire a state
+   flip — eliminates the toggle-revert flicker for system agents. The
+   element has no click listener, so we keep pointer-events enabled to
+   let the native title tooltip surface on hover. */
+.agent-detail-enabled-status {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--lex-text-on-accent, #fff);
+  opacity: 0.85;
+  cursor: not-allowed;
+  user-select: none;
+}
+
+/* ── Configure drawer (edit form) ────────────────────────────────── */
+
+.agent-detail-drawer-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.agent-detail-drawer-system-notice {
+  font-size: 0.8125rem;
+  color: var(--lex-text-secondary);
+  line-height: 1.5;
+  background: var(--lex-status-warning-bg, rgba(245, 158, 11, 0.08));
+  border: 1px solid var(--lex-status-warning-border, rgba(245, 158, 11, 0.2));
+  padding: 10px 12px;
+  border-radius: var(--lex-radius-md, 6px);
+  margin: 0;
+}
+
+.agent-detail-drawer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agent-detail-drawer-section-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--lex-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.agent-detail-drawer-section-hint {
+  display: block;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
+.agent-detail-drawer-tools-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: var(--lex-radius-md, 8px);
+  padding: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--lex-bg-primary);
+}
+
+.agent-detail-edit-tool-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 0.8125rem;
+  color: var(--lex-text-primary);
+  cursor: pointer;
+  border-radius: var(--lex-radius-sm, 4px);
+}
+
+.agent-detail-edit-tool-row:hover {
+  background: var(--lex-bg-secondary);
+}
+
+.agent-detail-edit-tool-checkbox {
+  margin: 0;
+  cursor: pointer;
+}
+
+.agent-detail-edit-tool-name {
+  font-family: var(--lex-font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 0.75rem;
+  color: var(--lex-text-secondary);
+}
+
+.agent-detail-drawer-schedule-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: var(--lex-bg-secondary);
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: var(--lex-radius-md, 8px);
+}
+
+/* Budget — two-column grid of small numeric inputs. Tooltip lives on
+   each lex-input via its title attribute (no lex-tooltip primitive yet). */
+.agent-detail-drawer-budget-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 12px;
+  background: var(--lex-bg-secondary);
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: var(--lex-radius-md, 8px);
+}
+
+@media (max-width: 540px) {
+  .agent-detail-drawer-budget-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.agent-detail-drawer-danger-zone {
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid var(--lex-status-danger-border, rgba(239, 68, 68, 0.25));
+  border-radius: var(--lex-radius-md, 8px);
+  background: var(--lex-status-danger-bg, rgba(239, 68, 68, 0.04));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agent-detail-drawer-danger-label {
+  color: var(--lex-status-danger-text, #b91c1c);
+}
+
+.agent-detail-drawer-danger-text {
+  font-size: 0.8125rem;
+  color: var(--lex-text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ── Stats tab ───────────────────────────────────────────────────── */
+
+.agent-detail-stats-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.agent-detail-stats-toolbar-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--lex-text-tertiary);
+}
+
+.agent-detail-stats-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+/* Sparkline — small inline SVG above the KPI cards. Visual polish only;
+   the cards remain the source of truth for the numbers. */
+.agent-detail-stats-sparkline-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--lex-bg-secondary);
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: var(--lex-radius-md, 8px);
+}
+
+.agent-detail-stats-sparkline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+}
+
+.agent-detail-stats-sparkline-title {
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.agent-detail-stats-sparkline-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.agent-detail-stats-sparkline-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.6875rem;
+  color: var(--lex-text-secondary);
+}
+
+.agent-detail-stats-sparkline-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 2px;
+  border-radius: 1px;
+}
+
+.agent-detail-stats-sparkline-swatch--total {
+  background: var(--lex-text-tertiary);
+}
+
+.agent-detail-stats-sparkline-swatch--completed {
+  background: var(--lex-status-success, var(--lex-text-accent, #2563eb));
+}
+
+.agent-detail-stats-sparkline {
+  display: block;
+  width: 100%;
+  max-width: 200px;
+  height: 40px;
+  overflow: visible;
+}
+
+.agent-detail-stats-sparkline-line {
+  stroke-width: 1.25;
+  vector-effect: non-scaling-stroke;
+}
+
+.agent-detail-stats-sparkline-line--total {
+  stroke: var(--lex-text-tertiary);
+}
+
+.agent-detail-stats-sparkline-line--completed {
+  stroke: var(--lex-status-success, var(--lex-text-accent, #2563eb));
+}
+
+.agent-detail-stats-sparkline-dot--completed {
+  fill: var(--lex-status-success, var(--lex-text-accent, #2563eb));
+}
+
+.agent-detail-stats-sparkline-hit {
+  cursor: default;
+}
+
+.agent-detail-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.agent-detail-stats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.agent-detail-stats-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--lex-border-subtle);
+}
+
+.agent-detail-stats-row:last-child {
+  border-bottom: none;
+}
+
+.agent-detail-stats-row-label {
+  color: var(--lex-text-secondary);
+}
+
+.agent-detail-stats-row-value {
+  font-weight: 600;
+  color: var(--lex-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.hidden {
+  display: none !important;
+}
