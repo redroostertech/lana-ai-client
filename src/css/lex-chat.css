@@ -167,16 +167,20 @@
    4. KEYFRAME ANIMATIONS
    ========================================================================== */
 
-/* Breathing logo — top-left corner (gentle inward pulse) */
+/* Breathing logo — top-left corner (gentle inward pulse).
+   translate3d keeps the animation on the GPU compositor instead of the
+   main thread. Pairing translate with scale gives sub-pixel-continuous
+   motion — a 1px-only translate visibly snapped because the browser
+   rounded to whole pixels at every frame. */
 @keyframes lex-chat-breathe-tl {
-  0%, 100% { transform: translate(0, 0); opacity: 0.4; }
-  50%      { transform: translate(-1px, -1px); opacity: 1; }
+  0%, 100% { transform: translate3d(0, 0, 0) scale(0.88); opacity: 0.4; }
+  50%      { transform: translate3d(-2px, -2px, 0) scale(1); opacity: 1; }
 }
 
 /* Breathing logo — bottom-right corner (gentle inward pulse) */
 @keyframes lex-chat-breathe-br {
-  0%, 100% { transform: translate(0, 0); opacity: 0.4; }
-  50%      { transform: translate(1px, 1px); opacity: 1; }
+  0%, 100% { transform: translate3d(0, 0, 0) scale(0.88); opacity: 0.4; }
+  50%      { transform: translate3d(2px, 2px, 0) scale(1); opacity: 1; }
 }
 
 /* Block entry fade-in + slide up */
@@ -287,12 +291,14 @@
   top: 7px;
   left: 7px;
   animation: lex-chat-breathe-tl 3s ease-in-out infinite;
+  will-change: transform, opacity;
 }
 
 .lex-chat-indicator-corner--br {
   bottom: 7px;
   right: 7px;
   animation: lex-chat-breathe-br 3s ease-in-out infinite;
+  will-change: transform, opacity;
 }
 
 /* Static variant (non-animated, for completed messages) */
