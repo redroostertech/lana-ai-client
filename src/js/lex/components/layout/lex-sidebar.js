@@ -1256,6 +1256,29 @@
         this.appMenuOpen = !this.appMenuOpen;
       });
 
+      // Outside-click + Escape dismiss for the app-switcher menu. Bound once
+      // per instance via an idempotency flag because updated() fires on every
+      // render. mousedown (capture) fires before any click handler, so an
+      // outside mousedown closes the menu before a stray click can re-trigger.
+      if (!this._appMenuDismissBound) {
+        this._appMenuDismissBound = true;
+        this._onAppMenuOutside = (e) => {
+          if (!this.appMenuOpen) return;
+          if (e.target.closest && (
+            e.target.closest('[data-action="app-menu"]') ||
+            e.target.closest('.lex-sidebar-app-menu')
+          )) return;
+          this.appMenuOpen = false;
+        };
+        this._onAppMenuKey = (e) => {
+          if (e.key === 'Escape' && this.appMenuOpen) {
+            this.appMenuOpen = false;
+          }
+        };
+        document.addEventListener('mousedown', this._onAppMenuOutside, true);
+        document.addEventListener('keydown', this._onAppMenuKey);
+      }
+
       this.delegate('click', '[data-app-switch]', (e, target) => {
         e.preventDefault();
         const href = target.dataset.href || '';
