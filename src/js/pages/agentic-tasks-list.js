@@ -156,6 +156,9 @@
           cards[j].addEventListener('click', function () {
             var taskId = this.getAttribute('data-task-id');
             if (taskId) {
+              // The agentic-tasks page lives at src/agents/agentic-tasks.html
+              // and the detail page is its sibling, so a same-folder relative
+              // URL is correct here.
               window.location.href = 'agentic-task-detail.html?id=' + taskId;
             }
           });
@@ -181,10 +184,45 @@
   }
 
   // =========================================================================
+  // Sidebar wiring
+  // =========================================================================
+
+  // Push the LanaAgents app sidebar nav into the shared <lex-app> shell so the
+  // Activity item is highlighted while the user is on this page. Runs after
+  // lex-app-ready so setSections is available; falls back to a sidebar.sections
+  // assignment if the shell helper is missing.
+  function wireAgentsSidebar() {
+    var agentsApp = window.LanaAgentsApp;
+    if (!agentsApp || typeof agentsApp.getAgentsAppSections !== 'function') return;
+    var shell = document.getElementById('agents-shell') || document.querySelector('lex-app');
+    if (!shell) return;
+    var apply = function () {
+      var sections = agentsApp.getAgentsAppSections({ activeId: 'activity' });
+      if (typeof shell.setSections === 'function') {
+        shell.setSections(sections);
+      } else {
+        var sidebar = shell.querySelector('lex-sidebar') || document.querySelector('lex-sidebar');
+        if (sidebar) sidebar.sections = sections;
+      }
+      if ('activeNavId' in shell) shell.activeNavId = 'activity';
+    };
+    if (shell._shellRendered) {
+      apply();
+    } else {
+      shell.addEventListener('lex-app-ready', apply, { once: true });
+      // Defensive fallback in case the event already fired before this handler
+      // attached or never fires.
+      window.setTimeout(apply, 500);
+    }
+  }
+
+  // =========================================================================
   // Event listeners
   // =========================================================================
 
   function init() {
+    wireAgentsSidebar();
+
     // Status filter
     var statusFilterEl = el('atStatusFilter');
     if (statusFilterEl) {

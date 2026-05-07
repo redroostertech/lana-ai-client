@@ -227,7 +227,7 @@
   function navigateToDetail(slug) {
     if (!slug) return;
     if (window.Lex && Lex.Nav && typeof Lex.Nav.go === 'function') {
-      Lex.Nav.go('agent-detail.html', { params: { slug: slug } });
+      Lex.Nav.go('agents/agent-detail.html', { params: { slug: slug } });
     }
   }
 
@@ -266,7 +266,7 @@
         if (modal) modal.open = false;
         if (window.Lex && Lex.Toast) Lex.Toast.success('Run started');
         if (runId && window.Lex && Lex.Nav) {
-          Lex.Nav.go('agent-run.html', { params: { id: runId } });
+          Lex.Nav.go('agents/agent-run.html', { params: { id: runId } });
         } else {
           console.warn('[agents] Run started but no id in response:', resp);
           if (window.Lex && Lex.Toast) {
@@ -562,7 +562,7 @@
         loadAgents();
 
         if (slug && window.Lex && Lex.Nav) {
-          Lex.Nav.go('agent-detail.html', { params: { slug: slug } });
+          Lex.Nav.go('agents/agent-detail.html', { params: { slug: slug } });
         }
       })
       .catch(function (err) {
@@ -616,10 +616,34 @@
   }
 
   // =========================================================================
+  // Sidebar wiring
+  // =========================================================================
+
+  // Push the LanaAgents app sidebar nav into the shared <lex-app> shell so
+  // every agents page renders the same sidebar (Catalog / Activity). The
+  // catalog, detail, and run pages all share `activeId: 'catalog'` because
+  // detail and run are sub-routes of the catalog.
+  function wireAgentsSidebar() {
+    var agentsApp = window.LanaAgentsApp;
+    if (!agentsApp || typeof agentsApp.getAgentsAppSections !== 'function') return;
+    var shell = document.querySelector('lex-app');
+    if (!shell) return;
+    var sections = agentsApp.getAgentsAppSections({ activeId: 'catalog' });
+    if (typeof shell.setSections === 'function') {
+      shell.setSections(sections);
+    } else {
+      var sidebar = shell.querySelector('lex-sidebar') || document.querySelector('lex-sidebar');
+      if (sidebar) sidebar.sections = sections;
+    }
+    if ('activeNavId' in shell) shell.activeNavId = 'catalog';
+  }
+
+  // =========================================================================
   // Init
   // =========================================================================
 
   function init() {
+    wireAgentsSidebar();
     wireFilters();
     wireGridDelegation();
     wireRunModal();
@@ -628,7 +652,7 @@
   }
 
   if (window.LexRouter) {
-    LexRouter.registerPageInit('agents.html', init);
+    LexRouter.registerPageInit('agents/index.html', init);
   }
   init();
 })();

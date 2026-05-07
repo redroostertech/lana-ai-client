@@ -488,7 +488,7 @@
       if (!row) return;
       var runId = row.getAttribute('data-run-id');
       if (runId && window.Lex && Lex.Nav) {
-        Lex.Nav.go('agent-run.html', { params: { id: runId } });
+        Lex.Nav.go('agents/agent-run.html', { params: { id: runId } });
       }
     });
   }
@@ -969,7 +969,7 @@
         if (drawer) drawer.open = false;
         if (window.Lex && Lex.Toast) Lex.Toast.success('Agent deleted');
         // Drop the user back to the catalog so they can pick another.
-        if (window.Lex && Lex.Nav) Lex.Nav.go('agents.html');
+        if (window.Lex && Lex.Nav) Lex.Nav.go('agents/index.html');
       })
       .catch(function (err) {
         console.error('[agent-detail] Delete failed:', err);
@@ -1352,7 +1352,7 @@
         if (modal) modal.open = false;
         if (window.Lex && Lex.Toast) Lex.Toast.success('Run started');
         if (runId && window.Lex && Lex.Nav) {
-          Lex.Nav.go('agent-run.html', { params: { id: runId } });
+          Lex.Nav.go('agents/agent-run.html', { params: { id: runId } });
         } else {
           console.warn('[agent-detail] Run started but no id in response:', resp);
           if (window.Lex && Lex.Toast) {
@@ -1428,6 +1428,26 @@
   }
 
   // =========================================================================
+  // Sidebar wiring
+  // =========================================================================
+
+  // Detail is a sub-route of the catalog, so the Catalog item stays active.
+  function wireAgentsSidebar() {
+    var agentsApp = window.LanaAgentsApp;
+    if (!agentsApp || typeof agentsApp.getAgentsAppSections !== 'function') return;
+    var shell = document.querySelector('lex-app');
+    if (!shell) return;
+    var sections = agentsApp.getAgentsAppSections({ activeId: 'catalog' });
+    if (typeof shell.setSections === 'function') {
+      shell.setSections(sections);
+    } else {
+      var sidebar = shell.querySelector('lex-sidebar') || document.querySelector('lex-sidebar');
+      if (sidebar) sidebar.sections = sections;
+    }
+    if ('activeNavId' in shell) shell.activeNavId = 'catalog';
+  }
+
+  // =========================================================================
   // Init
   // =========================================================================
 
@@ -1440,6 +1460,7 @@
     _runsLoaded = false;
     _activeTab = 'capabilities';
 
+    wireAgentsSidebar();
     wireTabs();
     wireRunsList();
     wireBannerButtons();
@@ -1448,7 +1469,7 @@
   }
 
   if (window.LexRouter) {
-    LexRouter.registerPageInit('agent-detail.html', init);
+    LexRouter.registerPageInit('agents/agent-detail.html', init);
   }
   init();
 })();

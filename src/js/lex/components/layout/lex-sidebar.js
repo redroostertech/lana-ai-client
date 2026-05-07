@@ -1018,7 +1018,8 @@
       // (e.g. first launch, missing field, parse error). LanaWorks is the
       // baseline app every org has; other sub-apps must be explicitly enabled.
       return [
-        { id: 'lana-works', label: 'LanaWorks', description: 'Manage matters, workspaces and client operations', route: 'dashboard.html', colors: ['#82d8ff', '#4267df', '#126f62', '#111827'] }
+        { id: 'lana-works',  label: 'LanaWorks',  description: 'Manage matters, workspaces and client operations', route: 'dashboard.html',    colors: ['#82d8ff', '#4267df', '#126f62', '#111827'] },
+        { id: 'lana-agents', label: 'LanaAgents', description: 'Browse and run AI agents',                          route: 'agents/index.html', colors: ['#a78bfa', '#7c3aed', '#5b21b6', '#1e1b4b'] }
       ];
     }
 
@@ -1059,6 +1060,7 @@
         path.indexOf('/insights/') !== -1
       ) return byId('lana-insights') || items[0];
       if (path.indexOf('/voice/') !== -1) return byId('lana-voice') || items[0];
+      if (path.indexOf('/agents/') !== -1) return byId('lana-agents') || items[0];
       return byId('lana-works') || items[0];
     }
 

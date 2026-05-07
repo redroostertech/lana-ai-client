@@ -291,7 +291,7 @@
       +     '<span class="agent-run-event-icon agent-run-event-icon--running"></span>'
       +     '<span>Delegated to <strong>' + escHtml(childAgent) + '</strong></span>'
       +     '<span class="agent-run-event-meta">' + escHtml(statusLabel(childStatus)) + '</span>'
-      +     (childRunId ? '<a href="agent-run.html?id=' + escHtml(childRunId) + '" class="agent-run-subagent-link" data-child-run="' + escHtml(childRunId) + '">View</a>' : '')
+      +     (childRunId ? '<a href="agents/agent-run.html?id=' + escHtml(childRunId) + '" class="agent-run-subagent-link" data-child-run="' + escHtml(childRunId) + '">View</a>' : '')
       +   '</summary>'
       +   '<div class="agent-run-tool-detail">'
       +     '<span class="agent-run-tool-section-label">Child run</span>'
@@ -1167,7 +1167,7 @@
       back._wired = true;
       back.addEventListener('click', function (e) {
         e.preventDefault();
-        if (window.Lex && Lex.Nav) Lex.Nav.go('agents.html');
+        if (window.Lex && Lex.Nav) Lex.Nav.go('agents/index.html');
       });
     }
 
@@ -1181,7 +1181,7 @@
         evt.preventDefault();
         var childId = link.getAttribute('data-child-run');
         if (childId && window.Lex && Lex.Nav) {
-          Lex.Nav.go('agent-run.html', { params: { id: childId } });
+          Lex.Nav.go('agents/agent-run.html', { params: { id: childId } });
         }
       });
     }
@@ -1212,6 +1212,7 @@
     _streamConnected = false;
     _startTimeMs = null;
 
+    wireAgentsSidebar();
     wireHeaderButtons();
     wireArtifactActions();
     wireApprovalBar();
@@ -1225,8 +1226,24 @@
     loadRun();
   }
 
+  // Run is a sub-route of the catalog, so the Catalog item stays active.
+  function wireAgentsSidebar() {
+    var agentsApp = window.LanaAgentsApp;
+    if (!agentsApp || typeof agentsApp.getAgentsAppSections !== 'function') return;
+    var shell = document.querySelector('lex-app');
+    if (!shell) return;
+    var sections = agentsApp.getAgentsAppSections({ activeId: 'catalog' });
+    if (typeof shell.setSections === 'function') {
+      shell.setSections(sections);
+    } else {
+      var sidebar = shell.querySelector('lex-sidebar') || document.querySelector('lex-sidebar');
+      if (sidebar) sidebar.sections = sections;
+    }
+    if ('activeNavId' in shell) shell.activeNavId = 'catalog';
+  }
+
   if (window.LexRouter) {
-    LexRouter.registerPageInit('agent-run.html', function () {
+    LexRouter.registerPageInit('agents/agent-run.html', function () {
       LexRouter.registerView({ onLeave: onLeave });
       init();
     });

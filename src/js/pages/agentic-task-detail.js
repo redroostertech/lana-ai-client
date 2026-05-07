@@ -492,10 +492,40 @@
   }
 
   // =========================================================================
+  // Sidebar wiring
+  // =========================================================================
+
+  // Detail is a sub-route of activity, so the Activity item stays active.
+  function wireAgentsSidebar() {
+    var agentsApp = window.LanaAgentsApp;
+    if (!agentsApp || typeof agentsApp.getAgentsAppSections !== 'function') return;
+    var shell = document.getElementById('agents-shell') || document.querySelector('lex-app');
+    if (!shell) return;
+    var apply = function () {
+      var sections = agentsApp.getAgentsAppSections({ activeId: 'activity' });
+      if (typeof shell.setSections === 'function') {
+        shell.setSections(sections);
+      } else {
+        var sidebar = shell.querySelector('lex-sidebar') || document.querySelector('lex-sidebar');
+        if (sidebar) sidebar.sections = sections;
+      }
+      if ('activeNavId' in shell) shell.activeNavId = 'activity';
+    };
+    if (shell._shellRendered) {
+      apply();
+    } else {
+      shell.addEventListener('lex-app-ready', apply, { once: true });
+      window.setTimeout(apply, 500);
+    }
+  }
+
+  // =========================================================================
   // Initialization
   // =========================================================================
 
   function init() {
+    wireAgentsSidebar();
+
     // Extract taskId from URL query params
     var search = window.location.search || '';
     var params = search.slice(1).split('&');

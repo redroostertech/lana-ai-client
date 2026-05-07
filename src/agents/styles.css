@@ -1,0 +1,20 @@
+/* src/agents/styles.css
+ *
+ * App-shell styles for the LanaAgents app.
+ *
+ * Per-page styles live in src/css/ and are loaded directly by each
+ * page's HTML file:
+ *   - src/css/agents.css       (catalog: agents.html)
+ *   - src/css/agent-detail.css (detail: agent-detail.html)
+ *   - src/css/agent-run.css    (run: agent-run.html)
+ *
+ * Activity pages (agentic-tasks.html, agentic-task-detail.html) use
+ * existing shared shell + Lex component styles and do not require
+ * dedicated CSS at this time.
+ *
+ * Keep this file for shell-level concerns only (cross-page wrappers,
+ * layout containers shared by every agents page). Do NOT duplicate
+ * styles from the per-page files above.
+ */
+
+/* Reserved for future app-shell rules. */

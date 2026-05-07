@@ -99,10 +99,15 @@
       ]
     },
 
-    // ── Agents ──
-    'agents.html': {
+    // ── Agents (LanaAgents app) ──
+    // SPA-routed pages under src/agents/. Scripts and stylesheets here are
+    // resolved against _appBaseUrl (the host page, e.g. dashboard.html under
+    // src/), so they keep paths relative to src/ and do NOT need a ../ prefix.
+    // The agents/sidebar-config.js script publishes window.LanaAgentsApp, which
+    // each page controller calls to wire the agents-app sidebar nav.
+    'agents/index.html': {
       title: 'Agents',
-      activeNav: 'agents',
+      activeNav: 'catalog',
       scripts: [
         // Lex components not globally loaded
         'js/lex/components/foundation/lex-banner.js',
@@ -114,6 +119,8 @@
         'js/lex/components/form/lex-select.js',
         'js/lex/components/form/lex-checkbox.js',
         'js/lex/components/form/lex-toggle.js',
+        // LanaAgents app shell config (provides window.LanaAgentsApp)
+        'agents/sidebar-config.js',
         // Page controller (MUST be last)
         'js/pages/agents.js'
       ],
@@ -122,9 +129,9 @@
       ]
     },
 
-    'agent-detail.html': {
+    'agents/agent-detail.html': {
       title: 'Agent Detail',
-      activeNav: 'agents',
+      activeNav: 'catalog',
       scripts: [
         // Lex components not globally loaded
         'js/lex/components/foundation/lex-banner.js',
@@ -140,6 +147,8 @@
         'js/lex/components/form/lex-select.js',
         'js/lex/components/form/lex-checkbox.js',
         'js/lex/components/form/lex-toggle.js',
+        // LanaAgents app shell config (provides window.LanaAgentsApp)
+        'agents/sidebar-config.js',
         // Page controller (MUST be last)
         'js/pages/agent-detail.js'
       ],
@@ -148,9 +157,9 @@
       ]
     },
 
-    'agent-run.html': {
+    'agents/agent-run.html': {
       title: 'Agent Run',
-      activeNav: 'agents',
+      activeNav: 'catalog',
       scripts: [
         // Lex components not globally loaded
         'js/lex/components/foundation/lex-card.js',
@@ -165,6 +174,8 @@
         'js/lex/chat/lex-agentic-plan-card.js',
         // Reuse existing agentic-ui handlers when available
         'js/agentic-ui.js',
+        // LanaAgents app shell config (provides window.LanaAgentsApp)
+        'agents/sidebar-config.js',
         // Page controller (MUST be last)
         'js/pages/agent-run.js'
       ],
