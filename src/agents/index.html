@@ -3,71 +3,65 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Agents - LANA AI</title>
-
-  <!-- CSS -->
-  <link rel="stylesheet" href="../css/lex-tokens.css">
-  <link rel="stylesheet" href="../css/components.css">
+  <title>LANA Agents</title>
+  <!-- Lex UI framework from lana-client -->
   <link rel="stylesheet" href="../css/tailwind-output.css">
+  <script src="../js/tailwind-loader.js"></script>
+  <link rel="stylesheet" href="../css/lex-tokens.css">
   <link rel="stylesheet" href="../css/agents.css">
   <link rel="stylesheet" href="../css/agent-detail.css">
   <link rel="stylesheet" href="../css/agent-run.css">
   <link rel="stylesheet" href="../css/activity-detail.css">
   <link rel="stylesheet" href="./styles.css">
-  <script src="../js/tailwind-loader.js"></script>
-
 </head>
 <body>
-
-  <lex-loader theme="light"></lex-loader>
-
-  <!-- LanaAgents SPA host shell. Mirrors src/automation/index.html: a
-       single <lex-app> + script loads, with no embedded <template>.
-       Active sidebar nav is managed dynamically by app.js based on
-       state.currentView (catalog | agentDetail | agentRun | activity |
-       activityDetail). -->
   <lex-app
     id="agents-shell"
     logo-src="../img/logo-light.png"
     logo-alt="LANA AI"
     logo-href="../dashboard.html"
+    active-nav-id="catalog"
     page-title="Agents"
   ></lex-app>
+
+  <!-- Canonical lana-ai-client API + auth -->
+  <script src="../js/config.js"></script>
+  <script src="../js/version.js"></script>
+  <script src="../js/api.js"></script>
 
   <!-- Lex UI core -->
   <script src="../js/lex/lex.core.js"></script>
   <script src="../js/lex/lex.icons.js"></script>
+  <script src="../js/lex/lex.utils.js"></script>
   <script src="../js/lex/lex.data.js"></script>
   <script src="../js/lex/lex.forms.js"></script>
   <script src="../js/lex/lex.state.js"></script>
-  <script src="../js/lex/lex.utils.js"></script>
-  <script src="../js/lex/lex.auth.js"></script>
   <script src="../js/lex/lex-nav.js"></script>
-
-  <!-- Lex UI layout -->
-  <script src="../js/lex/components/foundation/lex-loader.js"></script>
-  <script src="../js/lex/components/foundation/lex-toast.js"></script>
-  <script src="../js/lex/components/foundation/lex-spinner.js"></script>
   <script src="../js/lex/components/foundation/lex-btn.js"></script>
+  <script src="../js/lex/components/foundation/lex-card.js"></script>
+  <script src="../js/lex/components/foundation/lex-action-card.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
   <script src="../js/lex/components/foundation/lex-empty.js"></script>
   <script src="../js/lex/components/foundation/lex-banner.js"></script>
-  <script src="../js/lex/components/foundation/lex-card.js"></script>
+  <script src="../js/lex/components/foundation/lex-drawer.js"></script>
   <script src="../js/lex/components/foundation/lex-modal.js"></script>
   <script src="../js/lex/components/foundation/lex-tabs.js"></script>
   <script src="../js/lex/components/foundation/lex-kv.js"></script>
   <script src="../js/lex/components/foundation/lex-metric.js"></script>
-  <script src="../js/lex/components/foundation/lex-drawer.js"></script>
   <script src="../js/lex/components/form/lex-segmented.js"></script>
   <script src="../js/lex/components/form/lex-select.js"></script>
   <script src="../js/lex/components/form/lex-input.js"></script>
   <script src="../js/lex/components/form/lex-textarea.js"></script>
   <script src="../js/lex/components/form/lex-toggle.js"></script>
   <script src="../js/lex/components/form/lex-checkbox.js"></script>
+  <script src="../js/lex/components/data/lex-pagination.js"></script>
   <script src="../js/lex/components/layout/lex-sidebar.js"></script>
   <script src="../js/lex/components/layout/lex-topbar.js"></script>
-  <script src="../js/lex/components/layout/lex-conversation-item.js"></script>
   <script src="../js/lex/components/layout/lex-notification-panel.js"></script>
   <script src="../js/lex/components/layout/lex-app.js"></script>
+  <script src="../js/lex/index.js"></script>
+  <script src="../js/sidebar-footer-hydrate.js"></script>
+  <script src="../js/auth-guard.js"></script>
 
   <!-- View modules: each registers on window.LanaAgentsApp.Views.<name>.
        Loaded BEFORE app.js so the controller's initial route dispatch
@@ -80,8 +74,5 @@
 
   <!-- LanaAgents SPA controller (owns state, routing, sidebar config) -->
   <script src="./app.js"></script>
-
-  <!-- Auth guard + loader dismiss (MUST be last) -->
-  <script src="../js/auth-guard.js"></script>
 </body>
 </html>
