@@ -37,8 +37,11 @@ var require_package = __commonJS({
         lint: "eslint src/",
         migrate: "node scripts/migrate.js",
         "migrate:phase2": "node scripts/migrate-phase2.js",
+        preelectron: "npm run build:tiptap && npm run css:dev",
         electron: "electron electron-main.js --disable-gpu-driver-bug-workarounds",
-        "electron:dev": "NODE_ENV=development electron electron-main.js --disable-gpu-driver-bug-workarounds",
+        "preelectron:dev": "npm run build:tiptap && npm run css:dev",
+        "electron:dev": "NODE_ENV=development npx electron electron-main.js --disable-gpu-driver-bug-workarounds",
+        "electron:dev:watch": 'nodemon --watch electron-main.js --watch electron-preload.js --watch electron-storage.js --watch electron-discovery.js --watch electron-logger.js --watch electron-updater-custom.js --watch js --watch public_html --watch src/js/tiptap-bundle.js --watch src/css --ext js,html,css,json --exec "npm run build:tiptap && npm run css:dev && NODE_ENV=development electron electron-main.js --disable-gpu-driver-bug-workarounds"',
         "electron:rebuild": "electron-rebuild -f -w bcrypt",
         "postinstall:electron": "npm run electron:rebuild",
         "build:client": "electron-builder -c electron-builder.client.json",
@@ -47,7 +50,12 @@ var require_package = __commonJS({
         "build:mac-x64": "electron-builder --mac --x64 -c electron-builder.client.json",
         "build:win": "electron-builder --win -c electron-builder.client.json",
         "build:linux": "electron-builder --linux -c electron-builder.client.json",
-        "build:all": "electron-builder --mac --x64 --arm64 --win --linux -c electron-builder.client.json"
+        "build:all": "electron-builder --mac --x64 --arm64 --win --linux -c electron-builder.client.json",
+        "generate:icons": "node scripts/generate-icons.js",
+        "generate:icons-all": "node scripts/generate-icons.js --all",
+        "css:build": "postcss src/css/tailwind-input.css -o src/css/tailwind-output.css --env production",
+        "css:watch": "postcss src/css/tailwind-input.css -o src/css/tailwind-output.css --watch",
+        "css:dev": "postcss src/css/tailwind-input.css -o src/css/tailwind-output.css"
       },
       keywords: [
         "ai",
@@ -88,6 +96,7 @@ var require_package = __commonJS({
         multer: "^2.0.2",
         "node-cache": "^5.1.2",
         "p-limit": "^3.1.0",
+        "pdfjs-dist": "^3.11.174",
         pg: "^8.16.3",
         "pg-boss": "^9.0.3",
         pgvector: "^0.2.1",
@@ -104,13 +113,19 @@ var require_package = __commonJS({
         "@electron/rebuild": "^4.0.1",
         "@jest/globals": "^29.7.0",
         "babel-jest": "^29.7.0",
+        cssnano: "^7.1.2",
         electron: "^32.0.0",
         "electron-builder": "^25.0.0",
         "electron-updater": "^6.3.9",
         esbuild: "^0.27.1",
         jest: "^29.7.0",
         "jest-junit": "^16.0.0",
-        nodemon: "^3.0.0"
+        "lucide-static": "^0.574.0",
+        nodemon: "^3.0.0",
+        postcss: "^8.5.6",
+        "postcss-cli": "^11.0.1",
+        "postcss-import": "^16.1.1",
+        tailwindcss: "^3.4.19"
       }
     };
   }
@@ -15425,12 +15440,12 @@ var require_electron_storage = __commonJS({
           const configPath = path2.join(configDir, "server-config.json");
           if (fs.existsSync(configPath)) {
             fs.unlinkSync(configPath);
-            logInfo2(`Deleted corrupted config file: ${configPath}`);
+            logInfo2(`[electron-storage] Deleted corrupted config file: ${configPath}`);
           }
           store = new Store2(storeOptions);
-          logInfo2("Successfully initialized fresh config store");
+          logInfo2("[electron-storage] Successfully initialized fresh config store");
         } catch (retryError) {
-          logError2("Failed to recover from corrupted config", retryError);
+          logError2("[electron-storage] Failed to recover from corrupted config", retryError);
           store = {
             _data: storeOptions.defaults,
             get: function(key, defaultValue) {
@@ -15449,7 +15464,7 @@ var require_electron_storage = __commonJS({
               return this._data;
             }
           };
-          logInfo2("Using in-memory fallback store");
+          logInfo2("[electron-storage] Using in-memory fallback store");
         }
       }
     }
@@ -15460,6 +15475,9 @@ var require_electron_storage = __commonJS({
           url: server.url || `http://${server.host}:${server.port}`,
           host: server.host,
           port: server.port,
+          // Public domain (e.g. "redrooster.lanaai.io"); needed to re-call
+          // hosted discovery on logout for background refresh.
+          domain: server.domain || null,
           orgId: server.orgId,
           orgName: server.orgName,
           version: server.version,
@@ -15469,15 +15487,17 @@ var require_electron_storage = __commonJS({
           burstUrl: server.burstUrl || null,
           tier: server.tier || "standard",
           rateLimit: server.rateLimit || 100,
+          // Sub-apps available to this organization (drives the client app switcher)
+          enabledApps: Array.isArray(server.enabledApps) ? server.enabledApps : [],
           connectedAt: (/* @__PURE__ */ new Date()).toISOString(),
           lastVerified: (/* @__PURE__ */ new Date()).toISOString()
         };
         store.set("server", connectionData);
         store.set("lastConnected", (/* @__PURE__ */ new Date()).toISOString());
-        logInfo2(`Server connection saved: ${server.orgName} (${server.orgId})`);
+        logInfo2(`[electron-storage] Server connection saved: ${server.orgName} (${server.orgId})`);
         return true;
       } catch (error) {
-        logError2("Failed to save server connection", error);
+        logError2("[electron-storage] Failed to save server connection", error);
         return false;
       }
     }
@@ -15485,13 +15505,13 @@ var require_electron_storage = __commonJS({
       try {
         const server = store.get("server");
         if (!server) {
-          logInfo2("No saved server found");
+          logInfo2("[electron-storage] No saved server found");
           return null;
         }
-        logInfo2(`Retrieved saved server: ${server.orgName} (${server.orgId})`);
+        logInfo2(`[electron-storage] Retrieved saved server: ${server.orgName} (${server.orgId})`);
         return server;
       } catch (error) {
-        logError2("Failed to get saved server", error);
+        logError2("[electron-storage] Failed to get saved server", error);
         return null;
       }
     }
@@ -15505,7 +15525,7 @@ var require_electron_storage = __commonJS({
         store.set("server", server);
         return true;
       } catch (error) {
-        logError2("Failed to update last verified timestamp", error);
+        logError2("[electron-storage] Failed to update last verified timestamp", error);
         return false;
       }
     }
@@ -15513,12 +15533,12 @@ var require_electron_storage = __commonJS({
       try {
         const server = store.get("server");
         if (server) {
-          logInfo2(`Clearing saved server: ${server.orgName}`);
+          logInfo2(`[electron-storage] Clearing saved server: ${server.orgName}`);
         }
         store.delete("server");
         return true;
       } catch (error) {
-        logError2("Failed to clear saved server", error);
+        logError2("[electron-storage] Failed to clear saved server", error);
         return false;
       }
     }
@@ -15529,7 +15549,7 @@ var require_electron_storage = __commonJS({
           rememberServer: true
         });
       } catch (error) {
-        logError2("Failed to get preferences", error);
+        logError2("[electron-storage] Failed to get preferences", error);
         return {
           autoConnect: true,
           rememberServer: true
@@ -15541,10 +15561,10 @@ var require_electron_storage = __commonJS({
         const current = getPreferences();
         const updated = { ...current, ...preferences };
         store.set("preferences", updated);
-        logInfo2("Preferences updated");
+        logInfo2("[electron-storage] Preferences updated");
         return true;
       } catch (error) {
-        logError2("Failed to update preferences", error);
+        logError2("[electron-storage] Failed to update preferences", error);
         return false;
       }
     }
@@ -15552,17 +15572,17 @@ var require_electron_storage = __commonJS({
       try {
         return store.store;
       } catch (error) {
-        logError2("Failed to get all data", error);
+        logError2("[electron-storage] Failed to get all data", error);
         return {};
       }
     }
     function clearAllData() {
       try {
         store.clear();
-        logInfo2("All stored data cleared");
+        logInfo2("[electron-storage] All stored data cleared");
         return true;
       } catch (error) {
-        logError2("Failed to clear all data", error);
+        logError2("[electron-storage] Failed to clear all data", error);
         return false;
       }
     }
@@ -15581,7 +15601,7 @@ var require_electron_storage = __commonJS({
         store.set("connectionHistory", trimmed);
         return true;
       } catch (error) {
-        logError2("Failed to add to connection history", error);
+        logError2("[electron-storage] Failed to add to connection history", error);
         return false;
       }
     }
@@ -15589,7 +15609,7 @@ var require_electron_storage = __commonJS({
       try {
         return store.get("connectionHistory", []);
       } catch (error) {
-        logError2("Failed to get connection history", error);
+        logError2("[electron-storage] Failed to get connection history", error);
         return [];
       }
     }
@@ -30356,6 +30376,24 @@ var { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified
 var { checkForUpdates, downloadAndInstallUpdate, showOptionalUpdateDialog, showForceUpdateDialog, shouldCheckForUpdates, configureAutoUpdater } = require_electron_updater_custom();
 var { logInfo, logError, exportLogs, getLogFilePath } = require_electron_logger();
 var SessionTracker = require_session_tracker();
+function isBrokenPipeError(error) {
+  return error && (error.code === "EPIPE" || /write EPIPE/i.test(String(error.message || "")));
+}
+function attachBrokenPipeGuard(stream, streamName) {
+  if (!stream || typeof stream.on !== "function") return;
+  stream.on("error", (error) => {
+    if (isBrokenPipeError(error)) {
+      try {
+        logError(`[electron-main] Ignoring broken ${streamName} pipe`, error);
+      } catch (_logError) {
+      }
+      return;
+    }
+    throw error;
+  });
+}
+attachBrokenPipeGuard(process.stdout, "stdout");
+attachBrokenPipeGuard(process.stderr, "stderr");
 function getAppVersion() {
   try {
     const versionModule = require_version();
@@ -30397,13 +30435,27 @@ if (process.env.NODE_ENV === "development") {
   });
   logInfo("[Development] Certificate bypass enabled for localhost");
 }
-if (process.defaultApp) {
-  if (process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient("lana-ai", process.execPath, [path.resolve(process.argv[1])]);
+function registerDeepLinkProtocol() {
+  const protocol = "lana-ai";
+  if (process.defaultApp) {
+    const appEntry = path.resolve(__dirname, "electron-main.js");
+    try {
+      app.removeAsDefaultProtocolClient(protocol);
+      app.removeAsDefaultProtocolClient(protocol, process.execPath, [appEntry]);
+    } catch (_error) {
+    }
+    const registered2 = app.setAsDefaultProtocolClient(protocol, process.execPath, [appEntry]);
+    logInfo(`[DeepLink] Registered ${protocol}:// for development`, {
+      registered: registered2,
+      execPath: process.execPath,
+      appEntry
+    });
+    return;
   }
-} else {
-  app.setAsDefaultProtocolClient("lana-ai");
+  const registered = app.setAsDefaultProtocolClient(protocol);
+  logInfo(`[DeepLink] Registered ${protocol}://`, { registered });
 }
+registerDeepLinkProtocol();
 var pendingOAuthStates = /* @__PURE__ */ new Map();
 var OAUTH_STATE_TTL = 10 * 60 * 1e3;
 function generateOAuthState() {
@@ -30424,6 +30476,9 @@ function validateOAuthState(state) {
   const timestamp = pendingOAuthStates.get(state);
   pendingOAuthStates.delete(state);
   return Date.now() - timestamp < OAUTH_STATE_TTL;
+}
+function isBackendManagedOAuthState(state) {
+  return /^[a-f0-9]{64}$/i.test(String(state || ""));
 }
 function createWindow(serverUrl = null) {
   logInfo(`Creating main window with server: ${serverUrl || "none"}`);
@@ -30451,7 +30506,7 @@ function createWindow(serverUrl = null) {
     show: false
     // Don't show until ready (prevents flash of white screen)
   });
-  const startUrl = createFileUrl(path.join(__dirname, "public_html/index.html"));
+  const startUrl = createFileUrl(path.join(__dirname, "public_html/dashboard.html"));
   mainWindow.loadURL(startUrl);
   if (process.platform === "win32") {
     const { screen } = require("electron");
@@ -30810,6 +30865,79 @@ ipcMain.handle("open-external-url", async (event, url2) => {
 ipcMain.handle("generate-oauth-state", async () => {
   return generateOAuthState();
 });
+ipcMain.handle("create-oauth-state", async (event, { provider, connectorId, matterId }) => {
+  try {
+    const savedServer = getSavedServer();
+    if (!savedServer || !savedServer.serverUrl) {
+      throw new Error("No server connection found");
+    }
+    const baseUrl = savedServer.serverUrl;
+    const authToken = savedServer.authToken;
+    if (!authToken) {
+      throw new Error("No authentication token found");
+    }
+    const response = await fetch(`${baseUrl}/api/v1/integrations/oauth/states`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${authToken}`
+      },
+      body: JSON.stringify({
+        provider,
+        connector_id: connectorId,
+        matter_id: matterId
+      })
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+      throw new Error(errorData.error || `HTTP ${response.status}`);
+    }
+    const data = await response.json();
+    logInfo(`OAuth state created for provider: ${provider}, state: ${data.state.substring(0, 8)}...`);
+    return { success: true, state: data.state };
+  } catch (error) {
+    logError("Failed to create OAuth state", error);
+    return { success: false, error: error.message };
+  }
+});
+ipcMain.handle("exchange-oauth-code", async (event, { code, state, provider, connectorId, redirectUri, realmId }) => {
+  try {
+    const savedServer = getSavedServer();
+    if (!savedServer || !savedServer.serverUrl) {
+      throw new Error("No server connection found");
+    }
+    const baseUrl = savedServer.serverUrl;
+    const authToken = savedServer.authToken;
+    if (!authToken) {
+      throw new Error("No authentication token found");
+    }
+    const response = await fetch(`${baseUrl}/api/v1/integrations/oauth/exchange`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${authToken}`
+      },
+      body: JSON.stringify({
+        code,
+        state,
+        provider,
+        connectorId: connectorId || provider,
+        redirectUri: redirectUri || `${baseUrl}/api/v1/integrations/oauth/callback`,
+        realmId: realmId || null
+      })
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+      throw new Error(errorData.error || `HTTP ${response.status}`);
+    }
+    const data = await response.json();
+    logInfo(`OAuth code exchanged successfully for provider: ${provider}`);
+    return { success: true, data };
+  } catch (error) {
+    logError("Failed to exchange OAuth code", error);
+    return { success: false, error: error.message };
+  }
+});
 ipcMain.handle("check-updates", async (event, serverUrl) => {
   try {
     const savedServer = getSavedServer();
@@ -30919,14 +31047,17 @@ var handleOAuthCallback = (urlObj) => {
   const provider = params.get("provider");
   const code = params.get("code");
   const state = params.get("state");
+  const connectorId = params.get("connector_id") || params.get("connectorId");
+  const realmId = params.get("realmId") || params.get("realm_id");
   const error = params.get("error");
   const errorDescription = params.get("error_description");
   logInfo(`OAuth callback: provider=${provider}, hasCode=${!!code}, hasError=${!!error}`);
-  if (state && !validateOAuthState(state)) {
+  if (state && !validateOAuthState(state) && !isBackendManagedOAuthState(state)) {
     logError("OAuth state validation failed \u2014 possible CSRF");
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send("oauth-callback", {
         provider,
+        connector_id: connectorId,
         error: "state_mismatch",
         error_description: "OAuth state validation failed. Please try again."
       });
@@ -30938,8 +31069,10 @@ var handleOAuthCallback = (urlObj) => {
     mainWindow.focus();
     mainWindow.webContents.send("oauth-callback", {
       provider,
+      connector_id: connectorId,
       code,
       state,
+      realmId,
       error,
       error_description: errorDescription
     });
@@ -31034,16 +31167,16 @@ app.whenReady().then(async () => {
     logInfo(`Found saved server: ${savedServer.orgName || savedServer.orgId}`);
     const isReachable = await verifyServer(savedServer.url);
     if (isReachable) {
-      logInfo("Saved server is reachable, loading main app...");
+      logInfo("[electron-main] Saved server is reachable, loading main app...");
       updateLastVerified();
       createWindow(savedServer.url);
       return;
     } else {
-      logInfo("Saved server is not reachable, clearing saved server and showing login...");
+      logInfo("[electron-main] Saved server is not reachable, clearing saved server and showing login...");
       clearSavedServer();
     }
   } else {
-    logInfo("No saved server found, showing login...");
+    logInfo("[electron-main] No saved server found, showing login...");
   }
   createLoginWindow();
   app.on("activate", () => {
@@ -31063,10 +31196,10 @@ app.on("window-all-closed", () => {
   }
 });
 app.on("before-quit", async () => {
-  console.log("Application is quitting...");
+  console.log("[electron-main] Application is quitting...");
   if (sessionTracker) {
     await sessionTracker.shutdown();
-    logInfo("Session tracker shut down");
+    logInfo("[electron-main] Session tracker shut down");
   }
 });
 app.on("web-contents-created", (event, contents) => {
@@ -31074,8 +31207,8 @@ app.on("web-contents-created", (event, contents) => {
     const parsedUrl = new URL(navigationUrl);
     if (parsedUrl.protocol === "file:") {
       let pathname = decodeURIComponent(parsedUrl.pathname);
-      logInfo(`[Navigation] Original URL: ${navigationUrl}`);
-      logInfo(`[Navigation] Decoded pathname: ${pathname}`);
+      logInfo(`[electron-main] [Navigation] Original URL: ${navigationUrl}`);
+      logInfo(`[electron-main] [Navigation] Decoded pathname: ${pathname}`);
       const hasPublicHtml = pathname.includes("public_html");
       const hasDriveLetterAfterPublicHtml = /public_html\/[A-Za-z]:/.test(pathname);
       const isAlreadyCorrect = hasPublicHtml && !hasDriveLetterAfterPublicHtml;
@@ -31085,13 +31218,13 @@ app.on("web-contents-created", (event, contents) => {
           const driveMatch = pathname.match(/public_html\/[A-Za-z]:(\/[^?#]*)/);
           if (driveMatch) {
             pagePath = driveMatch[1];
-            logInfo(`[Navigation] Extracted page from malformed path: ${pagePath}`);
+            logInfo(`[electron-main] [Navigation] Extracted page from malformed path: ${pagePath}`);
           }
         } else {
           const windowsDriveMatch = pathname.match(/^\/?[A-Za-z]:(\/[^?#]*)/);
           if (windowsDriveMatch) {
             pagePath = windowsDriveMatch[1];
-            logInfo(`[Navigation] Windows drive letter stripped: ${pathname} -> ${pagePath}`);
+            logInfo(`[electron-main] [Navigation] Windows drive letter stripped: ${pathname} -> ${pagePath}`);
           }
         }
         if (!pagePath.startsWith("/")) {
@@ -31104,29 +31237,36 @@ app.on("web-contents-created", (event, contents) => {
         const publicHtmlPath = path.join(__dirname, "public_html");
         const fullPath = path.join(publicHtmlPath, pagePath);
         let correctPath = createFileUrl(fullPath);
-        logInfo(`[Navigation] parsedUrl.search: ${parsedUrl.search}`);
-        logInfo(`[Navigation] parsedUrl.hash: ${parsedUrl.hash}`);
+        logInfo(`[electron-main] [Navigation] parsedUrl.search: ${parsedUrl.search}`);
+        logInfo(`[electron-main] [Navigation] parsedUrl.hash: ${parsedUrl.hash}`);
         if (parsedUrl.search) {
           correctPath += parsedUrl.search;
-          logInfo(`[Navigation] Added search: ${correctPath}`);
+          logInfo(`[electron-main] [Navigation] Added search: ${correctPath}`);
         }
         if (parsedUrl.hash) {
           correctPath += parsedUrl.hash;
-          logInfo(`[Navigation] Added hash: ${correctPath}`);
+          logInfo(`[electron-main] [Navigation] Added hash: ${correctPath}`);
         }
-        logInfo(`[Navigation] Final path: ${navigationUrl} -> ${correctPath}`);
+        logInfo(`[electron-main] [Navigation] Final path: ${navigationUrl} -> ${correctPath}`);
         navigationEvent.preventDefault();
         contents.loadURL(correctPath);
         return;
       }
-      logInfo(`[Navigation] Path OK, allowing: ${pathname}`);
+      logInfo(`[electron-main] [Navigation] Path OK, allowing: ${pathname}`);
       return;
     }
     navigationEvent.preventDefault();
   });
 });
 process.on("uncaughtException", (error) => {
-  console.error("Uncaught exception:", error);
+  if (isBrokenPipeError(error)) {
+    try {
+      logError("[electron-main] Ignoring broken process pipe", error);
+    } catch (_logError) {
+    }
+    return;
+  }
+  console.error("[electron-main] Uncaught exception:", error);
   dialog.showErrorBox("Application Error", error.message);
 });
 /*! Bundled license information:

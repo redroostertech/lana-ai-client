@@ -88,9 +88,19 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("oauth-callback", (event, data) => callback(data));
   },
   /**
-   * Generate a CSRF-safe OAuth state parameter
+   * Generate a CSRF-safe OAuth state parameter (local, deprecated)
    */
-  generateOAuthState: () => ipcRenderer.invoke("generate-oauth-state")
+  generateOAuthState: () => ipcRenderer.invoke("generate-oauth-state"),
+  /**
+   * OAuth State Management (Backend-based)
+   * Creates a state token in the backend database for CSRF protection
+   */
+  createOAuthState: (provider, connectorId, matterId) => ipcRenderer.invoke("create-oauth-state", { provider, connectorId, matterId }),
+  /**
+   * OAuth Code Exchange (Backend-based)
+   * Exchanges authorization code for tokens via backend
+   */
+  exchangeOAuthCode: (code, state, provider, connectorId, redirectUri, realmId) => ipcRenderer.invoke("exchange-oauth-code", { code, state, provider, connectorId, redirectUri, realmId })
 });
 contextBridge.exposeInMainWorld("isElectron", true);
 contextBridge.exposeInMainWorld("processInfo", {

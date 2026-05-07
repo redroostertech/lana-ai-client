@@ -173,13 +173,6 @@
     var normalizedIdentity = String(identity || '').replace(/[_\s]+/g, '-').toLowerCase();
     var normalizedName = name.replace(/[_\s]+/g, '-');
 
-    if (
-      identity === 'actionstep' ||
-      (name === 'actionstep' && normalized.auth_type === 'none')
-    ) {
-      return false;
-    }
-
     if (normalizedIdentity === 'google-drive' || normalizedName === 'google-drive') {
       return true;
     }

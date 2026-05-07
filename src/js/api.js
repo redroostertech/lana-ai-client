@@ -57,30 +57,33 @@ class ApiClient {
     this._ready = false;
     this._streamingActive = false; // Guard: prevents page navigation during SSE streaming
 
-    // Check if running in Electron and get server URL from saved connection
-    // This overrides config.js API_BASE_URL for auto-discovery mode
-    if (window.electronAPI) {
-      // Synchronously check localStorage first so baseUrl is available immediately
-      // This prevents race conditions where async IPC hasn't resolved yet
-      try {
-        const savedServer = localStorage.getItem('lana_saved_server');
-        if (savedServer) {
-          const serverInfo = JSON.parse(savedServer);
-          if (serverInfo.url) {
-            this.baseUrl = serverInfo.url;
-            console.log('[LanaAPI] Pre-loaded server URL from localStorage:', this.baseUrl);
-          }
+    // Override baseUrl with the user's saved server from localStorage. This
+    // runs unconditionally (not gated on window.electronAPI) because iframes
+    // in this app don't get the preload-exposed electronAPI but DO share
+    // localStorage with the parent. Without this override an iframe's
+    // api.js stays on the config default (e.g. http://localhost:8080) while
+    // the parent uses the real backend, and every iframe request 401s with
+    // a token signed by a different server.
+    try {
+      const savedServer = localStorage.getItem('lana_saved_server');
+      if (savedServer) {
+        const serverInfo = JSON.parse(savedServer);
+        if (serverInfo && serverInfo.url) {
+          this.baseUrl = serverInfo.url;
+          console.log('[LanaAPI] Pre-loaded server URL from localStorage:', this.baseUrl);
         }
-      } catch (err) {
-        console.error('[LanaAPI] Failed to pre-load server URL from localStorage:', err);
       }
+    } catch (err) {
+      console.error('[LanaAPI] Failed to pre-load server URL from localStorage:', err);
+    }
 
-      // Then async confirm/update from Electron storage (source of truth)
+    if (window.electronAPI) {
+      // Async confirm/update from Electron storage (source of truth in the parent)
       this._readyPromise = window.electronAPI.getSavedServer().then(result => {
         if (result && result.success && result.server && result.server.url) {
           this.baseUrl = result.server.url;
           console.log('[LanaAPI] Confirmed server URL from Electron:', this.baseUrl);
-          // Keep localStorage in sync
+          // Keep localStorage in sync so iframes (which lack electronAPI) can read it
           try {
             localStorage.setItem('lana_saved_server', JSON.stringify(result.server));
           } catch (e) { /* ignore */ }
@@ -91,13 +94,14 @@ class ApiClient {
         return this.baseUrl;
       }).catch((err) => {
         console.error('[LanaAPI] Failed to get saved server from Electron:', err);
-        // baseUrl already set from localStorage sync check above
+        // baseUrl already set from localStorage check above
         this._ready = true;
         return this.baseUrl;
       });
     } else {
-      // Running in browser - if empty, use current origin
-      // But only if we're not on a file:// protocol (which would be Electron without electronAPI)
+      // No electronAPI: either we're in a plain browser, or we're an iframe in
+      // Electron (preload-exposed APIs aren't propagated to subframes by default).
+      // For browsers, fall back to current origin when no other URL is set.
       const origin = window.location.origin;
       if (!this.baseUrl && window.location.protocol !== 'file:' && origin && origin !== 'null') {
         this.baseUrl = origin;
@@ -359,6 +363,15 @@ class ApiClient {
   }
 
   showSessionExpiredModal() {
+    // A 401 inside an iframe must not tear down the parent's session.
+    // The parent owns auth state; iframes share localStorage but are guests.
+    // Without this guard, iframe-side polling 401s would clear the parent's
+    // token and redirect the whole window to login.
+    if (typeof window !== 'undefined' && window.top && window !== window.top) {
+      console.warn('[LanaAPI] 401 inside iframe — not clearing parent session');
+      return;
+    }
+
     // If SSE streaming is active, defer the redirect to avoid aborting the stream.
     // The stream's own error handling will detect the expired token on next request.
     if (this._streamingActive) {
