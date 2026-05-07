@@ -1970,8 +1970,13 @@
           // Get selected workspace from dropdown
           const selectedWorkspaceId = document.getElementById('workspaceSelector')?.value;
 
-          // Auto-link to workspace if selected from dropdown OR if created from workspace modal
-          const workspaceToLinkTo = selectedWorkspaceId || createMatterForWorkspaceId;
+          // Auto-link to workspace if selected from dropdown OR if created from workspace modal.
+          // createMatterForWorkspaceId is declared (with `let`) in matters.html only; on the
+          // Workspaces page this code runs without that scope, so guard with typeof to avoid
+          // a ReferenceError on the standalone-matter path (where selectedWorkspaceId is empty
+          // and the || falls through to the right side).
+          const fallbackWorkspaceId = (typeof createMatterForWorkspaceId !== 'undefined') ? createMatterForWorkspaceId : null;
+          const workspaceToLinkTo = selectedWorkspaceId || fallbackWorkspaceId;
 
           if (workspaceToLinkTo && result.matter?.matter_id) {
             try {
@@ -2000,8 +2005,10 @@
               console.error('[Matter Creation] Error auto-linking to workspace:', error);
               Lex.Toast.error('Failed to link to workspace');
             } finally {
-              // Clear the workspace ID
-              createMatterForWorkspaceId = null;
+              // Clear the workspace ID — only if the matters.html scope owns it.
+              if (typeof createMatterForWorkspaceId !== 'undefined') {
+                createMatterForWorkspaceId = null;
+              }
             }
           }
         }
@@ -2032,12 +2039,13 @@
           }
         }
 
-        modal.open = false;;
+        modal.open = false;
         resetShareForm();
         if (conflictDetection) {
           conflictDetection.reset();
         }
         loadMatters();
+        loadWorkspaces();
 
         // If the drawer was open when editing started, re-open it with refreshed data
         // This ensures the drawer shows the updated matter name and refreshed conversation list
@@ -2243,6 +2251,7 @@
           workspaceConflictDetection.reset();
         }
         loadMatters();
+        loadWorkspaces();
 
         // Refresh linked matters section if viewing the workspace
         // Linked matters are displayed in the Details tab, not as a separate tab
