@@ -1,50 +1,307 @@
-/* agent-detail.js — Agent profile page (Capabilities | Runs | Stats).
-   Reads ?slug=<slug>, fetches agent profile + filtered run list. Phase 4
-   adds the Configure edit drawer, the populated Stats tab, and the
-   header enable/disable toggle.
+/* agent-detail.js — Agent profile SPA view (Capabilities | Runs | Stats).
+   Migrated from src/js/pages/agent-detail.js. Reads ctx.slug, fetches agent
+   profile + filtered run list. Includes the Configure edit drawer, Stats
+   tab, and the header enable/disable toggle.
 
    Rules:
      - IIFE, no top-level const/class
-     - Lex.Nav.go() for navigation, NEVER window.location.href
+     - Internal navigation goes through ctx.app.setView
      - All HTML escaping via Lex.Utils.escapeHtml()
      - NO regex
 */
 
-(function () {
-  'use strict';
+'use strict';
 
-  var escHtml = (window.Lex && Lex.Utils && Lex.Utils.escapeHtml)
-    ? Lex.Utils.escapeHtml
+(function (global) {
+  global.LanaAgentsApp = global.LanaAgentsApp || {};
+  global.LanaAgentsApp.Views = global.LanaAgentsApp.Views || {};
+
+  // Markup template — extracted from src/agents/agent-detail.html (the
+  // <main class="agent-detail-page-container"> body, dropping the outer
+  // <div id="lex-page-content"> wrapper). Cloned into rootEl on render.
+  var TEMPLATE = ''
+    + '<main class="agent-detail-page-container">'
+
+    + '<lex-banner'
+    +   ' id="agentDetailBanner"'
+    +   ' variant="dark"'
+    +   ' corners'
+    +   ' heading="Agent"'
+    +   ' subtitle="Loading agent profile..."'
+    +   ' icon="A"'
+    + '>'
+    +   '<div id="agentDetailEnabledBlock" class="agent-detail-enabled-block hidden">'
+    +     '<lex-toggle'
+    +       ' id="agentDetailEnabledToggle"'
+    +       ' class="hidden"'
+    +       ' label="Enabled"'
+    +       ' label-side="right"'
+    +       ' size="sm"'
+    +     '></lex-toggle>'
+    +     '<span'
+    +       ' id="agentDetailEnabledStatus"'
+    +       ' class="agent-detail-enabled-status hidden"'
+    +       ' role="status"'
+    +       ' aria-disabled="true"'
+    +       ' tabindex="-1"'
+    +       " title=\"System agents can't be disabled per-org from this UI. Use the org kill switch in admin.\""
+    +     '>System (always on)</span>'
+    +   '</div>'
+    +   '<lex-btn id="agentDetailRunBtn" variant="primary" icon="play">Run</lex-btn>'
+    +   '<lex-btn id="agentDetailConfigBtn" variant="secondary" icon="settings">Configure</lex-btn>'
+    + '</lex-banner>'
+
+    + '<div class="agent-detail-tabs-bar">'
+    +   '<lex-tabs'
+    +     ' id="agentDetailTabs"'
+    +     ' active="capabilities"'
+    +     ' variant="underline"'
+    +     ' tabs=\'[{"id":"capabilities","label":"Capabilities","icon":"layers"},{"id":"runs","label":"Runs","icon":"workflow"},{"id":"stats","label":"Stats","icon":"bar-chart-2"}]\''
+    +   '></lex-tabs>'
+    + '</div>'
+
+    + '<section id="agentPanelCapabilities" class="agent-detail-panel">'
+    +   '<div id="agentPanelCapabilitiesLoading" class="agent-detail-loading">'
+    +     '<lex-spinner size="sm"></lex-spinner>'
+    +     '<span>Loading capabilities...</span>'
+    +   '</div>'
+    +   '<div id="agentPanelCapabilitiesContent" class="hidden">'
+    +     '<lex-card heading="About" padding="normal">'
+    +       '<p id="agentDetailDescription" class="agent-detail-description">(description)</p>'
+    +     '</lex-card>'
+    +     '<lex-card heading="Allowed Tools" padding="normal">'
+    +       '<div id="agentDetailToolsList" class="agent-detail-chip-list">'
+    +         '<span class="agent-detail-empty-text">No tools configured.</span>'
+    +       '</div>'
+    +     '</lex-card>'
+    +     '<lex-card heading="Delegation" padding="normal">'
+    +       '<div id="agentDetailDelegationList" class="agent-detail-chip-list">'
+    +         '<span class="agent-detail-empty-text">No sub-agents.</span>'
+    +       '</div>'
+    +     '</lex-card>'
+    +     '<lex-card heading="Model" padding="normal">'
+    +       '<lex-kv id="agentDetailModelKv" label="Model slot" value="-"></lex-kv>'
+    +     '</lex-card>'
+    +     '<lex-card heading="Approval Policy" padding="normal">'
+    +       '<p id="agentDetailApprovalPolicy" class="agent-detail-description">-</p>'
+    +     '</lex-card>'
+    +   '</div>'
+    + '</section>'
+
+    + '<section id="agentPanelRuns" class="agent-detail-panel hidden">'
+    +   '<lex-card padding="none">'
+    +     '<div class="agent-detail-runs-header">'
+    +       '<span class="agent-detail-runs-title">Recent Runs</span>'
+    +       '<span id="agentDetailRunsCount" class="agent-detail-runs-count"></span>'
+    +     '</div>'
+    +     '<div id="agentDetailRunsLoading" class="agent-detail-loading">'
+    +       '<lex-spinner size="sm"></lex-spinner>'
+    +       '<span>Loading runs...</span>'
+    +     '</div>'
+    +     '<div id="agentDetailRunsList"></div>'
+    +     '<div id="agentDetailRunsEmpty" class="hidden agent-detail-runs-empty">'
+    +       '<lex-empty'
+    +         ' icon="workflow"'
+    +         ' message="No runs yet"'
+    +         ' description="Runs of this agent will appear here."'
+    +       '></lex-empty>'
+    +     '</div>'
+    +   '</lex-card>'
+    + '</section>'
+
+    + '<section id="agentPanelStats" class="agent-detail-panel hidden">'
+    +   '<div class="agent-detail-stats-toolbar">'
+    +     '<span class="agent-detail-stats-toolbar-label">Range</span>'
+    +     '<lex-segmented'
+    +       ' id="agentDetailStatsRange"'
+    +       ' value="30d"'
+    +       ' options=\'[{"value":"7d","label":"Last 7 days"},{"value":"30d","label":"Last 30 days"},{"value":"90d","label":"Last 90 days"}]\''
+    +     '></lex-segmented>'
+    +   '</div>'
+    +   '<div id="agentDetailStatsLoading" class="agent-detail-loading hidden">'
+    +     '<lex-spinner size="sm"></lex-spinner>'
+    +     '<span>Loading stats...</span>'
+    +   '</div>'
+    +   '<div id="agentDetailStatsUnavailable" class="hidden">'
+    +     '<lex-card padding="normal">'
+    +       '<lex-empty'
+    +         ' icon="bar-chart-2"'
+    +         ' message="Stats not yet available"'
+    +         ' description="The stats service is not available on this server."'
+    +       '></lex-empty>'
+    +     '</lex-card>'
+    +   '</div>'
+    +   '<div id="agentDetailStatsContent" class="hidden">'
+    +     '<div id="agentDetailStatsSparklineWrap" class="agent-detail-stats-sparkline-wrap hidden">'
+    +       '<div class="agent-detail-stats-sparkline-header">'
+    +         '<span class="agent-detail-stats-sparkline-title">Runs over time</span>'
+    +         '<span class="agent-detail-stats-sparkline-legend">'
+    +           '<span class="agent-detail-stats-sparkline-legend-item">'
+    +             '<span class="agent-detail-stats-sparkline-swatch agent-detail-stats-sparkline-swatch--total"></span>'
+    +             'Total'
+    +           '</span>'
+    +           '<span class="agent-detail-stats-sparkline-legend-item">'
+    +             '<span class="agent-detail-stats-sparkline-swatch agent-detail-stats-sparkline-swatch--completed"></span>'
+    +             'Completed'
+    +           '</span>'
+    +         '</span>'
+    +       '</div>'
+    +       '<svg'
+    +         ' id="agentDetailStatsSparkline"'
+    +         ' class="agent-detail-stats-sparkline"'
+    +         ' viewBox="0 0 200 40"'
+    +         ' preserveAspectRatio="none"'
+    +         ' role="img"'
+    +         ' aria-label="Runs over time"'
+    +       '></svg>'
+    +     '</div>'
+    +     '<div id="agentDetailStatsCards" class="agent-detail-stats-cards">'
+    +       '<lex-metric id="agentDetailStatTotalRuns"     label="Total runs"        value="0" size="md"></lex-metric>'
+    +       '<lex-metric id="agentDetailStatSuccessRate"   label="Success rate"      value="0%" size="md"></lex-metric>'
+    +       '<lex-metric id="agentDetailStatMedianDuration" label="Median duration"  value="0s" size="md"></lex-metric>'
+    +       '<lex-metric id="agentDetailStatTotalTokens"   label="Total tokens"      value="0" size="md"></lex-metric>'
+    +       '<lex-metric id="agentDetailStatEstCost"       label="Est. cost"         value="-" size="md"></lex-metric>'
+    +     '</div>'
+    +     '<div class="agent-detail-stats-grid">'
+    +       '<lex-card heading="Runs by status" padding="compact">'
+    +         '<div id="agentDetailStatsByStatus" class="agent-detail-stats-list">'
+    +           '<span class="agent-detail-empty-text">No runs yet.</span>'
+    +         '</div>'
+    +       '</lex-card>'
+    +       '<lex-card heading="Runs by trigger" padding="compact">'
+    +         '<div id="agentDetailStatsByTrigger" class="agent-detail-stats-list">'
+    +           '<span class="agent-detail-empty-text">No runs yet.</span>'
+    +         '</div>'
+    +       '</lex-card>'
+    +       '<lex-card heading="Artifacts" padding="compact">'
+    +         '<div id="agentDetailStatsArtifacts" class="agent-detail-stats-list">'
+    +           '<span class="agent-detail-empty-text">No artifacts yet.</span>'
+    +         '</div>'
+    +       '</lex-card>'
+    +     '</div>'
+    +   '</div>'
+    + '</section>'
+
+    + '<lex-drawer'
+    +   ' id="agentDetailConfigDrawer"'
+    +   ' heading="Configure Agent"'
+    +   ' side="right"'
+    +   ' width="lg"'
+    +   ' show-footer'
+    +   ' confirm-text="Save"'
+    +   ' cancel-text="Cancel"'
+    +   ' data-hoist'
+    + '>'
+    +   '<div class="agent-detail-drawer-body">'
+    +     '<p id="agentDetailDrawerSystemNotice" class="agent-detail-drawer-system-notice hidden">'
+    +       'This is a system agent. Some fields are managed centrally and '
+    +       'cannot be edited per-organization here.'
+    +     '</p>'
+    +     '<lex-input id="agentDetailEditName" label="Display name" required></lex-input>'
+    +     '<lex-textarea id="agentDetailEditDescription" label="Description" rows="3"></lex-textarea>'
+    +     '<div class="agent-detail-drawer-section">'
+    +       '<div class="agent-detail-drawer-section-label">'
+    +         'Allowed tools'
+    +         '<span class="agent-detail-drawer-section-hint">'
+    +           'Uncheck tools you want this agent to skip. The template '
+    +           'defines the maximum set — adding new tools is not supported.'
+    +         '</span>'
+    +       '</div>'
+    +       '<div id="agentDetailEditToolsList" class="agent-detail-drawer-tools-list">'
+    +         '<span class="agent-detail-empty-text">No tools configured.</span>'
+    +       '</div>'
+    +     '</div>'
+    +     '<lex-select'
+    +       ' id="agentDetailEditModelSlot"'
+    +       ' label="Model slot"'
+    +       ' placeholder="Choose a model slot..."'
+    +     '></lex-select>'
+    +     '<lex-select'
+    +       ' id="agentDetailEditApprovalPolicy"'
+    +       ' label="Approval policy"'
+    +       ' options=\'[{"value":"none","label":"No approval required"},{"value":"sensitive","label":"Required for sensitive actions"},{"value":"all","label":"Required for every action"}]\''
+    +     '></lex-select>'
+    +     '<div class="agent-detail-drawer-section">'
+    +       '<div class="agent-detail-drawer-section-label">Schedule</div>'
+    +       '<lex-toggle'
+    +         ' id="agentDetailEditScheduleEnabled"'
+    +         ' label="Run on a schedule"'
+    +         ' label-side="right"'
+    +       '></lex-toggle>'
+    +       '<div id="agentDetailEditScheduleFields" class="agent-detail-drawer-schedule-fields hidden">'
+    +         '<lex-input'
+    +           ' id="agentDetailEditScheduleCron"'
+    +           ' label="Cron expression"'
+    +           ' placeholder="0 9 * * 1-5"'
+    +           ' help="Standard 5-field cron"'
+    +         '></lex-input>'
+    +         '<lex-select'
+    +           ' id="agentDetailEditScheduleTimezone"'
+    +           ' label="Timezone"'
+    +           ' placeholder="UTC"'
+    +         '></lex-select>'
+    +       '</div>'
+    +     '</div>'
+    +     '<div class="agent-detail-drawer-section">'
+    +       '<div class="agent-detail-drawer-section-label">'
+    +         'Budget'
+    +         '<span class="agent-detail-drawer-section-hint">'
+    +           'Optional caps for each run. Leave a field blank to use the '
+    +           'org-level default. Positive integers only.'
+    +         '</span>'
+    +       '</div>'
+    +       '<div class="agent-detail-drawer-budget-grid">'
+    +         '<lex-input id="agentDetailEditBudgetSteps" label="Max total steps" type="number" placeholder="e.g. 50" title="Hard cap on the number of agent steps (tool calls + reasoning + sub-agent turns) per run."></lex-input>'
+    +         '<lex-input id="agentDetailEditBudgetSubagents" label="Max sub-agents" type="number" placeholder="e.g. 3" title="Maximum number of sub-agents the orchestrator may spawn during a run."></lex-input>'
+    +         '<lex-input id="agentDetailEditBudgetDurationSec" label="Max duration (seconds)" type="number" placeholder="e.g. 600" title="Wall-clock cap on a single run, in seconds. Stored as max_duration_ms server-side."></lex-input>'
+    +         '<lex-input id="agentDetailEditBudgetInputTokens" label="Max input tokens" type="number" placeholder="e.g. 200000" title="Cumulative input-token cap across all model calls in a single run."></lex-input>'
+    +         '<lex-input id="agentDetailEditBudgetOutputTokens" label="Max output tokens" type="number" placeholder="e.g. 50000" title="Cumulative output-token cap across all model calls in a single run."></lex-input>'
+    +         '<lex-input id="agentDetailEditBudgetToolCalls" label="Max tool calls" type="number" placeholder="e.g. 25" title="Maximum number of tool invocations during a single run."></lex-input>'
+    +       '</div>'
+    +     '</div>'
+    +     '<div class="agent-detail-drawer-danger-zone">'
+    +       '<div class="agent-detail-drawer-section-label agent-detail-drawer-danger-label">Danger zone</div>'
+    +       '<p class="agent-detail-drawer-danger-text">'
+    +         'Deleting an agent soft-disables it for your organization. Past '
+    +         'runs are kept for audit but the agent will no longer accept '
+    +         'new runs.'
+    +       '</p>'
+    +       '<lex-btn id="agentDetailEditDeleteBtn" variant="danger" icon="trash-2">Delete agent</lex-btn>'
+    +     '</div>'
+    +   '</div>'
+    + '</lex-drawer>'
+
+    + '<lex-modal id="agentDetailRunModal" heading="Run Agent" size="md" data-hoist>'
+    +   '<div class="agent-detail-run-modal-body">'
+    +     '<p class="agent-detail-config-notice">'
+    +       'Provide a brief input describing what the agent should do.'
+    +     '</p>'
+    +     '<lex-textarea'
+    +       ' id="agentDetailRunInput"'
+    +       ' label="Input"'
+    +       ' rows="4"'
+    +       ' placeholder="Describe the task..."'
+    +     '></lex-textarea>'
+    +   '</div>'
+    + '</lex-modal>'
+
+    + '</main>';
+
+  var escHtml = (typeof window !== 'undefined' && window.Lex && window.Lex.Utils && window.Lex.Utils.escapeHtml)
+    ? window.Lex.Utils.escapeHtml
     : function (s) { var d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; };
 
-  var timeAgo = (window.Lex && Lex.Utils && Lex.Utils.timeAgo)
-    ? Lex.Utils.timeAgo
+  var timeAgo = (typeof window !== 'undefined' && window.Lex && window.Lex.Utils && window.Lex.Utils.timeAgo)
+    ? window.Lex.Utils.timeAgo
     : function (s) { return s ? String(s) : ''; };
 
-  // =========================================================================
-  // State
-  // =========================================================================
-
-  var _slug          = null;
-  var _agent         = null;
-  var _activeTab     = 'capabilities';
-  var _statsRange    = '30d';
-  var _statsLoaded   = false;
-  // Tools the user has unchecked relative to the agent's existing
-  // allowed_tools. Final allowed_tools = current set - this set.
-  var _editDisabledTools = {};
-  // Snapshot of form values captured when the edit drawer opens. Used by
-  // buildEditBody() to send only changed fields to PUT /api/v1/agents/:slug
-  // so default churn doesn't masquerade as user edits.
-  var _editSnapshot = null;
-
-  var _MODEL_SLOTS = [
+  var MODEL_SLOTS = [
     { value: 'agentic', label: 'Agentic (planning + tool use)' },
     { value: 'rag',     label: 'RAG (retrieval-augmented chat)' },
     { value: 'main',    label: 'Main (general-purpose chat)' }
   ];
 
-  var _COMMON_TZS = [
+  var COMMON_TZS = [
     { value: 'UTC',                 label: 'UTC' },
     { value: 'America/New_York',    label: 'America/New York (Eastern)' },
     { value: 'America/Chicago',     label: 'America/Chicago (Central)' },
@@ -55,6 +312,15 @@
     { value: 'Asia/Singapore',      label: 'Asia/Singapore' },
     { value: 'Asia/Tokyo',          label: 'Asia/Tokyo' },
     { value: 'Australia/Sydney',    label: 'Australia/Sydney' }
+  ];
+
+  var BUDGET_FIELDS = [
+    { id: 'agentDetailEditBudgetSteps',         key: 'max_total_steps',   units: 'count' },
+    { id: 'agentDetailEditBudgetSubagents',     key: 'max_subagents',     units: 'count' },
+    { id: 'agentDetailEditBudgetDurationSec',   key: 'max_duration_ms',   units: 'ms_from_seconds' },
+    { id: 'agentDetailEditBudgetInputTokens',   key: 'max_input_tokens',  units: 'count' },
+    { id: 'agentDetailEditBudgetOutputTokens',  key: 'max_output_tokens', units: 'count' },
+    { id: 'agentDetailEditBudgetToolCalls',     key: 'max_tool_calls',    units: 'count' }
   ];
 
   // =========================================================================
@@ -103,8 +369,6 @@
     return t.name || t.slug || '';
   }
 
-  // System agents are owned by no organization. Disabling/editing them
-  // here is read-only — admins must use the org kill switch.
   function isSystemAgent(agent) {
     if (!agent) return false;
     if (agent.is_system === true) return true;
@@ -123,11 +387,6 @@
     if (n) n.checked = !!checked;
   }
 
-  // Format a millisecond duration into a human-readable string.
-  // < 1s   → "245ms"
-  // < 60s  → "1.2s"
-  // < 1h   → "12m 03s"
-  // else   → "1h 02m"
   function formatDurationMs(ms) {
     if (ms == null || isNaN(ms)) return '-';
     var n = Number(ms);
@@ -143,8 +402,6 @@
     return h + 'h ' + (rm < 10 ? '0' : '') + rm + 'm';
   }
 
-  // Format an integer with thousand separators. Avoids regex per
-  // project rules — uses a simple loop to insert commas.
   function formatInt(n) {
     if (n == null || isNaN(n)) return '-';
     var s = String(Math.round(Number(n)));
@@ -160,7 +417,6 @@
     return (negative ? '-' : '') + out;
   }
 
-  // microdollars → human dollars. 1_000_000 microdollars = $1.
   function formatMicroDollars(micro) {
     if (micro == null || isNaN(micro)) return null;
     var dollars = Number(micro) / 1e6;
@@ -170,32 +426,11 @@
     return '$' + dollars.toFixed(0);
   }
 
-  // -------------------------------------------------------------------------
-  // Budget form helpers
-  // -------------------------------------------------------------------------
-
-  // Each entry maps a UI field id to:
-  //   key      — the budget JSONB key the server expects
-  //   units    — 'count' (raw integer) or 'ms_from_seconds' (UI shows
-  //              seconds; we convert to ms on save).
-  var _BUDGET_FIELDS = [
-    { id: 'agentDetailEditBudgetSteps',         key: 'max_total_steps',   units: 'count' },
-    { id: 'agentDetailEditBudgetSubagents',     key: 'max_subagents',     units: 'count' },
-    { id: 'agentDetailEditBudgetDurationSec',   key: 'max_duration_ms',   units: 'ms_from_seconds' },
-    { id: 'agentDetailEditBudgetInputTokens',   key: 'max_input_tokens',  units: 'count' },
-    { id: 'agentDetailEditBudgetOutputTokens', key: 'max_output_tokens',  units: 'count' },
-    { id: 'agentDetailEditBudgetToolCalls',     key: 'max_tool_calls',    units: 'count' }
-  ];
-
-  // Convert a stored budget value into the string we want to render in
-  // the UI input. Returns '' for null/undefined so the field is empty.
   function budgetValueToInput(field, raw) {
     if (raw == null || raw === '') return '';
     var n = Number(raw);
     if (isNaN(n)) return '';
     if (field.units === 'ms_from_seconds') {
-      // Convert ms → seconds for display. Keep one decimal place only when
-      // the original wasn't a whole number of seconds (avoids "600.0" noise).
       var sec = n / 1000;
       if (sec === Math.floor(sec)) return String(Math.round(sec));
       return String(sec);
@@ -203,10 +438,6 @@
     return String(Math.round(n));
   }
 
-  // Convert a UI input string into the value to store in the budget object.
-  // Returns null when the input is empty (caller should drop the key).
-  // Returns the special token { _invalid: <message> } for invalid values
-  // so submitEdit() can surface a single error message.
   function budgetInputToValue(field, raw) {
     if (raw == null) return null;
     var trimmed = String(raw).trim();
@@ -215,23 +446,18 @@
     if (isNaN(n)) return { _invalid: 'Budget values must be numbers.' };
     if (n < 0) return { _invalid: 'Budget values must be zero or positive.' };
     if (field.units === 'ms_from_seconds') {
-      // Round to ms so submillisecond noise doesn't sneak in.
       return Math.round(n * 1000);
     }
-    // Counts are integers — fractional input is rejected.
     if (n !== Math.floor(n)) {
       return { _invalid: 'Budget counts must be whole numbers.' };
     }
     return Math.round(n);
   }
 
-  // Read the current budget form into a plain { key: value } object.
-  // Values are normalized via budgetInputToValue. Empty fields are dropped.
-  // If any field is invalid, returns { _invalid: <message> } instead.
   function readBudgetFromForm() {
     var out = {};
-    for (var i = 0; i < _BUDGET_FIELDS.length; i++) {
-      var f = _BUDGET_FIELDS[i];
+    for (var i = 0; i < BUDGET_FIELDS.length; i++) {
+      var f = BUDGET_FIELDS[i];
       var node = el(f.id);
       var raw = node && typeof node.value !== 'undefined' ? node.value : '';
       var v = budgetInputToValue(f, raw);
@@ -244,19 +470,15 @@
     return out;
   }
 
-  // Given the agent's stored budget, push values into the form fields.
-  // Missing keys clear the field (so reverting works).
   function populateBudgetForm(budget) {
     var src = (budget && typeof budget === 'object') ? budget : {};
-    for (var i = 0; i < _BUDGET_FIELDS.length; i++) {
-      var f = _BUDGET_FIELDS[i];
+    for (var i = 0; i < BUDGET_FIELDS.length; i++) {
+      var f = BUDGET_FIELDS[i];
       var value = budgetValueToInput(f, src[f.key]);
       setVal(f.id, value);
     }
   }
 
-  // Compare two budget objects for shallow equality across the keys we
-  // care about. Used to decide whether to send a `budget` patch on PUT.
   function budgetsEqual(a, b) {
     var ka = a ? Object.keys(a) : [];
     var kb = b ? Object.keys(b) : [];
@@ -269,12 +491,53 @@
     return true;
   }
 
+  function prettyKey(k) {
+    if (!k) return '';
+    var parts = String(k).split('_');
+    var out = [];
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i];
+      if (!p) continue;
+      out.push(p.charAt(0).toUpperCase() + p.substring(1));
+    }
+    return out.join(' ');
+  }
+
+  function statsRangeToWindow(range) {
+    var days = 30;
+    if (range === '7d')  days = 7;
+    if (range === '30d') days = 30;
+    if (range === '90d') days = 90;
+    var until = new Date();
+    var since = new Date(until.getTime() - days * 24 * 3600 * 1000);
+    return { since: since.toISOString(), until: until.toISOString() };
+  }
+
+  // =========================================================================
+  // Per-render state
+  // =========================================================================
+
+  function createState(slug) {
+    return {
+      slug: slug || null,
+      agent: null,
+      activeTab: 'capabilities',
+      statsRange: '30d',
+      statsLoaded: false,
+      runsLoaded: false,
+      editDisabledTools: {},
+      editSnapshot: null,
+      destroyed: false,
+      _unbindFns: []
+    };
+  }
+
   // =========================================================================
   // Tab management
   // =========================================================================
 
-  function switchTab(id) {
-    _activeTab = id || 'capabilities';
+  function switchTab(state, id) {
+    state.activeTab = id || 'capabilities';
     var panels = {
       capabilities: el('agentPanelCapabilities'),
       runs:         el('agentPanelRuns'),
@@ -282,42 +545,39 @@
     };
     Object.keys(panels).forEach(function (k) {
       if (panels[k]) {
-        if (k === _activeTab) show(panels[k]);
+        if (k === state.activeTab) show(panels[k]);
         else hide(panels[k]);
       }
     });
-    if (_activeTab === 'runs')  loadRuns();
-    if (_activeTab === 'stats') loadStats();
+    if (state.activeTab === 'runs')  loadRuns(state);
+    if (state.activeTab === 'stats') loadStats(state);
   }
 
-  // After the agent profile is loaded, refresh dependent panels.
-  // Recent Runs needs `agent_definition_id` (the loaded agent's id) — which
-  // we only learn after `loadAgent()` resolves. Stats also needs the slug
-  // (already known) but should be re-fetched if the user hits this tab.
-  function onAgentLoaded() {
-    _runsLoaded = false;
-    _statsLoaded = false;
-    syncEnabledToggle();
-    if (_activeTab === 'runs')  loadRuns();
-    if (_activeTab === 'stats') loadStats();
+  function onAgentLoaded(state) {
+    state.runsLoaded = false;
+    state.statsLoaded = false;
+    syncEnabledToggle(state);
+    if (state.activeTab === 'runs')  loadRuns(state);
+    if (state.activeTab === 'stats') loadStats(state);
   }
 
-  function wireTabs() {
+  function wireTabs(state) {
     var tabsEl = el('agentDetailTabs');
-    if (!tabsEl || tabsEl._agentWired) return;
-    tabsEl._agentWired = true;
-    tabsEl.addEventListener('tab-change', function (e) {
+    if (!tabsEl) return;
+    var handler = function (e) {
       var id = e.detail && e.detail.id;
-      if (id) switchTab(id);
-    });
+      if (id) switchTab(state, id);
+    };
+    tabsEl.addEventListener('tab-change', handler);
+    state._unbindFns.push(function () { tabsEl.removeEventListener('tab-change', handler); });
   }
 
   // =========================================================================
   // Profile rendering
   // =========================================================================
 
-  function renderProfile(agent) {
-    _agent = agent || {};
+  function renderProfile(state, agent) {
+    state.agent = agent || {};
 
     var banner = el('agentDetailBanner');
     if (banner) {
@@ -337,7 +597,6 @@
     var descEl = el('agentDetailDescription');
     if (descEl) descEl.textContent = agent.description || agent.summary || 'No description provided.';
 
-    // Tools
     var toolsEl = el('agentDetailToolsList');
     if (toolsEl) {
       var tools = Array.isArray(agent.allowed_tools) ? agent.allowed_tools : [];
@@ -353,7 +612,6 @@
       }
     }
 
-    // Delegation
     var delegEl = el('agentDetailDelegationList');
     if (delegEl) {
       var deleg = Array.isArray(agent.delegatable_to) ? agent.delegatable_to : [];
@@ -370,13 +628,11 @@
       }
     }
 
-    // Model slot
     var modelKv = el('agentDetailModelKv');
     if (modelKv) {
       modelKv.value = agent.model_slot || agent.model || 'default';
     }
 
-    // Approval policy
     var policyEl = el('agentDetailApprovalPolicy');
     if (policyEl) {
       var policy = agent.approval_policy;
@@ -414,9 +670,8 @@
       + '</div>';
   }
 
-  var _runsLoaded = false;
-  function loadRuns() {
-    if (_runsLoaded) return;
+  function loadRuns(state) {
+    if (state.runsLoaded) return;
     if (!window.api || typeof window.api.get !== 'function') return;
 
     var loadingEl = el('agentDetailRunsLoading');
@@ -424,19 +679,15 @@
     var emptyEl = el('agentDetailRunsEmpty');
     var countEl = el('agentDetailRunsCount');
 
-    // Backend list endpoint filters by `agent_definition_id`, NOT `agent_slug`.
-    // We can only build the correct query once the agent profile has loaded.
-    // Until then, hold off (the list will rerun via onAgentLoaded()).
-    var agentDefinitionId = _agent && _agent.id;
+    var agentDefinitionId = state.agent && state.agent.id;
     if (!agentDefinitionId) {
-      // Show loading until agent resolves.
       show(loadingEl);
       if (listEl) listEl.innerHTML = '';
       hide(emptyEl);
       return;
     }
 
-    _runsLoaded = true;
+    state.runsLoaded = true;
 
     show(loadingEl);
     if (listEl) listEl.innerHTML = '';
@@ -447,6 +698,7 @@
 
     window.api.get(url)
       .then(function (resp) {
+        if (state.destroyed) return;
         hide(loadingEl);
         var runs = [];
         if (Array.isArray(resp)) runs = resp;
@@ -465,6 +717,7 @@
         if (listEl) listEl.innerHTML = html;
       })
       .catch(function (err) {
+        if (state.destroyed) return;
         hide(loadingEl);
         console.error('[agent-detail] Failed to load runs:', err);
         if (countEl) countEl.textContent = '';
@@ -479,104 +732,113 @@
       });
   }
 
-  function wireRunsList() {
+  function wireRunsList(ctx, state) {
     var listEl = el('agentDetailRunsList');
-    if (!listEl || listEl._agentWired) return;
-    listEl._agentWired = true;
-    listEl.addEventListener('click', function (evt) {
+    if (!listEl) return;
+    var handler = function (evt) {
       var row = evt.target.closest('.agent-detail-run-row');
       if (!row) return;
       var runId = row.getAttribute('data-run-id');
-      if (runId && window.Lex && Lex.Nav) {
-        Lex.Nav.go('agents/agent-run.html', { params: { id: runId } });
+      if (runId) {
+        ctx.app.setView('agentRun', { runId: runId });
       }
-    });
+    };
+    listEl.addEventListener('click', handler);
+    state._unbindFns.push(function () { listEl.removeEventListener('click', handler); });
   }
 
   // =========================================================================
-  // Buttons + drawer + enable toggle
+  // Banner buttons + drawer + enable toggle
   // =========================================================================
 
-  function wireBannerButtons() {
+  function wireBannerButtons(ctx, state) {
     var runBtn = el('agentDetailRunBtn');
-    if (runBtn && !runBtn._agentWired) {
-      runBtn._agentWired = true;
-      runBtn.addEventListener('click', function () {
+    if (runBtn) {
+      var runHandler = function () {
         var modal = el('agentDetailRunModal');
         var input = el('agentDetailRunInput');
         if (input && typeof input.value !== 'undefined') input.value = '';
         if (modal) {
-          modal.heading = 'Run: ' + (_agent && (_agent.name || _agent.slug) || _slug || '');
+          modal.heading = 'Run: ' + (state.agent && (state.agent.name || state.agent.slug) || state.slug || '');
           modal.open = true;
         }
-      });
+      };
+      runBtn.addEventListener('click', runHandler);
+      state._unbindFns.push(function () { runBtn.removeEventListener('click', runHandler); });
     }
 
     var configBtn = el('agentDetailConfigBtn');
-    if (configBtn && !configBtn._agentWired) {
-      configBtn._agentWired = true;
-      configBtn.addEventListener('click', openEditDrawer);
+    if (configBtn) {
+      var openHandler = function () { openEditDrawer(state); };
+      configBtn.addEventListener('click', openHandler);
+      state._unbindFns.push(function () { configBtn.removeEventListener('click', openHandler); });
     }
 
     var drawer = el('agentDetailConfigDrawer');
-    if (drawer && !drawer._agentWired) {
-      drawer._agentWired = true;
-      drawer.addEventListener('lex-confirm', submitEdit);
-      // Drawer cancel just closes — no API call. Default behavior.
+    if (drawer) {
+      var saveHandler = function () { submitEdit(state); };
+      drawer.addEventListener('lex-confirm', saveHandler);
+      state._unbindFns.push(function () { drawer.removeEventListener('lex-confirm', saveHandler); });
     }
 
     var deleteBtn = el('agentDetailEditDeleteBtn');
-    if (deleteBtn && !deleteBtn._agentWired) {
-      deleteBtn._agentWired = true;
-      deleteBtn.addEventListener('click', confirmDelete);
+    if (deleteBtn) {
+      var deleteHandler = function () { confirmDelete(ctx, state); };
+      deleteBtn.addEventListener('click', deleteHandler);
+      state._unbindFns.push(function () { deleteBtn.removeEventListener('click', deleteHandler); });
     }
 
     var schedToggle = el('agentDetailEditScheduleEnabled');
-    if (schedToggle && !schedToggle._agentWired) {
-      schedToggle._agentWired = true;
-      schedToggle.addEventListener('lex-change', function (evt) {
+    if (schedToggle) {
+      var schedHandler = function (evt) {
         var checked = !!(evt && evt.detail && evt.detail.value);
         var fields = el('agentDetailEditScheduleFields');
         if (!fields) return;
         if (checked) show(fields); else hide(fields);
-      });
+      };
+      schedToggle.addEventListener('lex-change', schedHandler);
+      state._unbindFns.push(function () { schedToggle.removeEventListener('lex-change', schedHandler); });
     }
 
     var toolsList = el('agentDetailEditToolsList');
-    if (toolsList && !toolsList._agentWired) {
-      toolsList._agentWired = true;
-      toolsList.addEventListener('change', function (evt) {
+    if (toolsList) {
+      var toolHandler = function (evt) {
         var input = evt.target.closest('.agent-detail-edit-tool-checkbox');
         if (!input) return;
         var name = input.getAttribute('data-tool');
         if (!name) return;
-        if (input.checked) delete _editDisabledTools[name];
-        else _editDisabledTools[name] = true;
-      });
+        if (input.checked) delete state.editDisabledTools[name];
+        else state.editDisabledTools[name] = true;
+      };
+      toolsList.addEventListener('change', toolHandler);
+      state._unbindFns.push(function () { toolsList.removeEventListener('change', toolHandler); });
     }
 
     var enabledToggle = el('agentDetailEnabledToggle');
-    if (enabledToggle && !enabledToggle._agentWired) {
-      enabledToggle._agentWired = true;
-      enabledToggle.addEventListener('lex-change', onEnabledToggleChange);
+    if (enabledToggle) {
+      var enabledHandler = function (evt) { onEnabledToggleChange(state, evt); };
+      enabledToggle.addEventListener('lex-change', enabledHandler);
+      state._unbindFns.push(function () { enabledToggle.removeEventListener('lex-change', enabledHandler); });
     }
 
     var modal = el('agentDetailRunModal');
-    if (modal && !modal._agentWired) {
-      modal._agentWired = true;
-      modal.addEventListener('lex-confirm', submitRun);
+    if (modal) {
+      var modalHandler = function () { submitRun(ctx, state); };
+      modal.addEventListener('lex-confirm', modalHandler);
+      state._unbindFns.push(function () { modal.removeEventListener('lex-confirm', modalHandler); });
     }
 
     var statsRange = el('agentDetailStatsRange');
-    if (statsRange && !statsRange._agentWired) {
-      statsRange._agentWired = true;
-      statsRange.addEventListener('lex-change', function (evt) {
+    if (statsRange) {
+      var rangeHandler = function (evt) {
         var v = (evt && evt.detail && evt.detail.value) || (statsRange.value) || '30d';
-        if (v === _statsRange) return;
-        _statsRange = v;
-        _statsLoaded = false;
-        if (_activeTab === 'stats') loadStats();
-      });
+        if (v === state.statsRange) return;
+        state.statsRange = v;
+        state.statsLoaded = false;
+        if (state.activeTab === 'stats') loadStats(state);
+      };
+      statsRange.addEventListener('lex-change', rangeHandler);
+      state._unbindFns.push(function () { statsRange.removeEventListener('lex-change', rangeHandler); });
     }
   }
 
@@ -584,27 +846,23 @@
   // Enable / disable toggle
   // -------------------------------------------------------------------------
 
-  function syncEnabledToggle() {
+  function syncEnabledToggle(state) {
     var toggle = el('agentDetailEnabledToggle');
     var status = el('agentDetailEnabledStatus');
     var block = el('agentDetailEnabledBlock');
     if (!block) return;
 
-    if (!_agent) {
+    if (!state.agent) {
       hide(block);
       if (toggle) hide(toggle);
       if (status) hide(status);
       return;
     }
 
-    var system = isSystemAgent(_agent);
-    // is_active defaults to true if absent; explicit false disables.
-    var active = (_agent.is_active !== false);
+    var system = isSystemAgent(state.agent);
+    var active = (state.agent.is_active !== false);
 
     if (system) {
-      // System agents render as a read-only status pill — never as an
-      // interactive toggle — so a click cannot register a state flip and
-      // there is no flicker to revert.
       if (toggle) {
         hide(toggle);
         toggle.checked = active;
@@ -623,15 +881,12 @@
     show(block);
   }
 
-  function onEnabledToggleChange(evt) {
-    if (!_agent || !_slug) return;
-    if (isSystemAgent(_agent)) {
-      // Defense in depth — system agents render the read-only status pill
-      // instead of the toggle, so this listener should not be reachable.
-      // Re-sync just in case to keep the UI consistent and surface a hint.
-      syncEnabledToggle();
-      if (window.Lex && Lex.Toast) {
-        Lex.Toast.info("System agents can't be disabled per-org from this UI; use the org kill switch in admin.");
+  function onEnabledToggleChange(state, evt) {
+    if (!state.agent || !state.slug) return;
+    if (isSystemAgent(state.agent)) {
+      syncEnabledToggle(state);
+      if (window.Lex && window.Lex.Toast) {
+        window.Lex.Toast.info("System agents can't be disabled per-org from this UI; use the org kill switch in admin.");
       }
       return;
     }
@@ -640,36 +895,32 @@
     var path = desired ? 'enable' : 'disable';
     if (!window.api || typeof window.api.put !== 'function') return;
 
-    window.api.put('/api/v1/agents/' + encodeURIComponent(_slug) + '/' + path, {})
+    window.api.put('/api/v1/agents/' + encodeURIComponent(state.slug) + '/' + path, {})
       .then(function (resp) {
+        if (state.destroyed) return;
         var agent = (resp && resp.agent) ? resp.agent
                   : ((resp && resp.data) ? resp.data : resp);
         if (agent) {
-          _agent = agent;
-          syncEnabledToggle();
+          state.agent = agent;
+          syncEnabledToggle(state);
         } else {
-          // No agent in the response — trust the toggle optimistically until
-          // the canonical refresh below confirms.
-          if (_agent) _agent.is_active = desired;
+          if (state.agent) state.agent.is_active = desired;
         }
-        if (window.Lex && Lex.Toast) {
-          Lex.Toast.success(desired ? 'Agent enabled' : 'Agent disabled');
+        if (window.Lex && window.Lex.Toast) {
+          window.Lex.Toast.success(desired ? 'Agent enabled' : 'Agent disabled');
         }
-        // Always re-fetch from the server so derived UI (stats counters,
-        // schedule indicator, etc.) reflects the canonical state. Failures
-        // here are non-fatal — loadAgent surfaces its own errors.
-        if (typeof loadAgent === 'function') loadAgent();
+        loadAgent(state);
       })
       .catch(function (err) {
+        if (state.destroyed) return;
         console.error('[agent-detail] Toggle failed:', err);
-        // Revert toggle to last known state.
-        syncEnabledToggle();
+        syncEnabledToggle(state);
         var status = err && (err.status || (err.response && err.response.status));
         var msg = desired ? 'Unable to enable agent' : 'Unable to disable agent';
         if (status === 401) msg = 'Your session expired. Please sign in again.';
         else if (status === 403) msg = 'You do not have permission to change this.';
         else if (status === 404) msg = 'This agent no longer exists.';
-        if (window.Lex && Lex.Toast) Lex.Toast.error(msg);
+        if (window.Lex && window.Lex.Toast) window.Lex.Toast.error(msg);
       });
   }
 
@@ -677,24 +928,15 @@
   // Edit drawer
   // -------------------------------------------------------------------------
 
-  function openEditDrawer() {
+  function openEditDrawer(state) {
     var drawer = el('agentDetailConfigDrawer');
     if (!drawer) return;
-    populateEditForm();
-    // Snapshot the populated form so submitEdit can diff against it and
-    // send only changed fields. Capture happens AFTER populateEditForm so
-    // the snapshot reflects the on-screen baseline, not stale agent state.
-    _editSnapshot = captureEditFormState();
+    populateEditForm(state);
+    state.editSnapshot = captureEditFormState(state);
     drawer.open = true;
   }
 
-  // Read the current edit form into a plain object. Single source of truth
-  // for both the snapshot (drawer-open baseline) and the diff (on submit).
-  function captureEditFormState() {
-    // readBudgetFromForm() may return a { _invalid } sentinel for parse
-    // errors. The snapshot doesn't care about validity (it's just a
-    // baseline); coerce to an empty object on invalid input so diffs
-    // against later valid edits still work.
+  function captureEditFormState(state) {
     var budget = readBudgetFromForm();
     if (budget && budget._invalid) budget = {};
 
@@ -703,32 +945,28 @@
       description: ((el('agentDetailEditDescription') && el('agentDetailEditDescription').value) || '').trim(),
       model_slot: (el('agentDetailEditModelSlot') && el('agentDetailEditModelSlot').value) || '',
       approval_policy: (el('agentDetailEditApprovalPolicy') && el('agentDetailEditApprovalPolicy').value) || 'none',
-      // Shallow clone so later mutations to _editDisabledTools don't bleed
-      // into the snapshot.
-      disabled_tools: Object.assign({}, _editDisabledTools || {}),
+      disabled_tools: Object.assign({}, state.editDisabledTools || {}),
       schedule_enabled: !!(el('agentDetailEditScheduleEnabled') && el('agentDetailEditScheduleEnabled').checked),
       schedule_cron: ((el('agentDetailEditScheduleCron') && el('agentDetailEditScheduleCron').value) || '').trim(),
       schedule_timezone: (el('agentDetailEditScheduleTimezone') && el('agentDetailEditScheduleTimezone').value) || 'UTC',
-      budget: budget,
+      budget: budget
     };
   }
 
-  function populateEditForm() {
-    _editDisabledTools = {};
-    var a = _agent || {};
+  function populateEditForm(state) {
+    state.editDisabledTools = {};
+    var a = state.agent || {};
     var system = isSystemAgent(a);
 
     setVal('agentDetailEditName', a.name || '');
     setVal('agentDetailEditDescription', a.description || '');
 
-    // Model slot select
     var slotEl = el('agentDetailEditModelSlot');
     if (slotEl) {
-      slotEl.options = _MODEL_SLOTS.slice();
+      slotEl.options = MODEL_SLOTS.slice();
       slotEl.value = a.model_slot || 'agentic';
     }
 
-    // Approval policy select — server may emit string or object.
     var policyEl = el('agentDetailEditApprovalPolicy');
     if (policyEl) {
       var policyValue = 'none';
@@ -742,10 +980,8 @@
       policyEl.value = policyValue;
     }
 
-    // Tools list — render checkboxes. Existing allowed_tools are checked.
     renderEditToolsCheckboxes(a.allowed_tools || []);
 
-    // Schedule fields
     var schedule = a.schedule || {};
     var scheduleEnabled = !!schedule.enabled;
     setChecked('agentDetailEditScheduleEnabled', scheduleEnabled);
@@ -753,7 +989,7 @@
 
     var tzEl = el('agentDetailEditScheduleTimezone');
     if (tzEl) {
-      tzEl.options = _COMMON_TZS.slice();
+      tzEl.options = COMMON_TZS.slice();
       tzEl.value = schedule.timezone || 'UTC';
     }
 
@@ -762,11 +998,8 @@
       if (scheduleEnabled) show(schedFields); else hide(schedFields);
     }
 
-    // Budget — pull from agent.budget (JSONB). Empty fields revert to
-    // org-level defaults on save.
     populateBudgetForm(a.budget || {});
 
-    // System notice + readonly hints. Disable form fields for system agents.
     var notice = el('agentDetailDrawerSystemNotice');
     if (notice) {
       if (system) show(notice); else hide(notice);
@@ -797,13 +1030,9 @@
     toolsList.innerHTML = html;
   }
 
-  // Assemble the PUT body containing ONLY fields that changed since the
-  // drawer opened. system_prompt is intentionally absent (templates only).
-  // If no fields changed, returns an empty object — the caller short-circuits
-  // before issuing a PUT in that case.
-  function buildEditBody() {
-    var cur = captureEditFormState();
-    var snap = _editSnapshot || {};
+  function buildEditBody(state) {
+    var cur = captureEditFormState(state);
+    var snap = state.editSnapshot || {};
     var body = {};
 
     if (cur.name !== (snap.name || '')) body.name = cur.name;
@@ -811,8 +1040,6 @@
     if (cur.model_slot && cur.model_slot !== (snap.model_slot || '')) body.model_slot = cur.model_slot;
     if (cur.approval_policy !== (snap.approval_policy || 'none')) body.approval_policy = cur.approval_policy;
 
-    // Tools changed iff the disabled-set diff is non-empty. When changed,
-    // resolve the final allowed_tools list from the agent's current tools.
     var snapDisabled = snap.disabled_tools || {};
     var curDisabled = cur.disabled_tools || {};
     var toolsChanged = false;
@@ -824,25 +1051,20 @@
       if (!!snapDisabled[k] !== !!curDisabled[k]) { toolsChanged = true; break; }
     }
     if (toolsChanged) {
-      var currentTools = ((_agent && _agent.allowed_tools) || []).map(toolName).filter(Boolean);
+      var currentTools = ((state.agent && state.agent.allowed_tools) || []).map(toolName).filter(Boolean);
       body.allowed_tools = currentTools.filter(function (t) { return !curDisabled[t]; });
     }
 
-    // Schedule: any of three fields changed → send the full schedule object.
     if (cur.schedule_enabled !== !!snap.schedule_enabled
         || cur.schedule_cron !== (snap.schedule_cron || '')
         || cur.schedule_timezone !== (snap.schedule_timezone || 'UTC')) {
       body.schedule = {
         enabled: cur.schedule_enabled,
         cron: cur.schedule_cron,
-        timezone: cur.schedule_timezone,
+        timezone: cur.schedule_timezone
       };
     }
 
-    // Budget: any field added/changed/cleared → send the full budget
-    // object. Cleared fields drop their key, so the server reverts that
-    // dimension to org-level defaults. Empty objects are still sent so
-    // an admin can wipe all overrides in one save.
     var curBudget = (cur.budget && !cur.budget._invalid) ? cur.budget : {};
     var snapBudget = (snap.budget && !snap.budget._invalid) ? snap.budget : {};
     if (!budgetsEqual(curBudget, snapBudget)) {
@@ -852,66 +1074,61 @@
     return body;
   }
 
-  function submitEdit() {
+  function submitEdit(state) {
     var drawer = el('agentDetailConfigDrawer');
-    if (!_slug || !_agent) {
+    if (!state.slug || !state.agent) {
       if (drawer) drawer.open = false;
       return;
     }
-    if (isSystemAgent(_agent)) {
-      if (window.Lex && Lex.Toast) {
-        Lex.Toast.info('System agents are managed centrally and cannot be edited here.');
+    if (isSystemAgent(state.agent)) {
+      if (window.Lex && window.Lex.Toast) {
+        window.Lex.Toast.info('System agents are managed centrally and cannot be edited here.');
       }
       if (drawer) drawer.open = false;
       return;
     }
 
-    var body = buildEditBody();
+    var body = buildEditBody(state);
 
-    // No-op short-circuit: if nothing changed, close the drawer and toast
-    // rather than firing an empty PUT. Validating "name required" against
-    // the current form value (not the diff) keeps the user's intent visible
-    // even if they cleared a field that previously had content.
-    var curState = captureEditFormState();
+    var curState = captureEditFormState(state);
     if (!curState.name) {
-      if (window.Lex && Lex.Toast) Lex.Toast.error('Display name is required.');
+      if (window.Lex && window.Lex.Toast) window.Lex.Toast.error('Display name is required.');
       return;
     }
     if (curState.schedule_enabled && !curState.schedule_cron) {
-      if (window.Lex && Lex.Toast) Lex.Toast.error('Schedule is enabled but no cron expression was provided.');
+      if (window.Lex && window.Lex.Toast) window.Lex.Toast.error('Schedule is enabled but no cron expression was provided.');
       return;
     }
-    // Budget — surface the parse error from readBudgetFromForm before we
-    // hit the server with a malformed value.
     var rawBudget = readBudgetFromForm();
     if (rawBudget && rawBudget._invalid) {
-      if (window.Lex && Lex.Toast) Lex.Toast.error(rawBudget._invalid);
+      if (window.Lex && window.Lex.Toast) window.Lex.Toast.error(rawBudget._invalid);
       return;
     }
     if (Object.keys(body).length === 0) {
       if (drawer) drawer.open = false;
-      if (window.Lex && Lex.Toast) Lex.Toast.info('No changes to save.');
+      if (window.Lex && window.Lex.Toast) window.Lex.Toast.info('No changes to save.');
       return;
     }
 
     if (!window.api || typeof window.api.put !== 'function') return;
 
-    window.api.put('/api/v1/agents/' + encodeURIComponent(_slug), body)
+    window.api.put('/api/v1/agents/' + encodeURIComponent(state.slug), body)
       .then(function (resp) {
+        if (state.destroyed) return;
         var agent = (resp && resp.agent) ? resp.agent
                   : ((resp && resp.data) ? resp.data : resp);
         if (agent) {
-          renderProfile(agent);
+          renderProfile(state, agent);
         }
         if (drawer) drawer.open = false;
-        if (window.Lex && Lex.Toast) Lex.Toast.success('Agent updated');
+        if (window.Lex && window.Lex.Toast) window.Lex.Toast.success('Agent updated');
       })
       .catch(function (err) {
+        if (state.destroyed) return;
         console.error('[agent-detail] Save failed:', err);
         var status = err && (err.status || (err.response && err.response.status));
         var msg = 'Unable to save changes';
         if (status === 400) {
-          // 400 also covers the "system_prompt rejected" case from the contract.
           msg = 'Some fields look invalid. Check name, tools, and schedule.';
         } else if (status === 401) {
           msg = 'Your session expired. Please sign in again.';
@@ -920,7 +1137,7 @@
         } else if (status === 404) {
           msg = 'This agent no longer exists.';
         }
-        if (window.Lex && Lex.Toast) Lex.Toast.error(msg);
+        if (window.Lex && window.Lex.Toast) window.Lex.Toast.error(msg);
       });
   }
 
@@ -928,57 +1145,56 @@
   // Delete confirm
   // -------------------------------------------------------------------------
 
-  function confirmDelete() {
-    if (!_agent || !_slug) return;
-    if (isSystemAgent(_agent)) {
-      if (window.Lex && Lex.Toast) {
-        Lex.Toast.info('System agents cannot be deleted from this UI.');
+  function confirmDelete(ctx, state) {
+    if (!state.agent || !state.slug) return;
+    if (isSystemAgent(state.agent)) {
+      if (window.Lex && window.Lex.Toast) {
+        window.Lex.Toast.info('System agents cannot be deleted from this UI.');
       }
       return;
     }
-    if (!window.Lex || !Lex.Modal || typeof Lex.Modal.confirm !== 'function') {
-      // Fallback to native confirm so the action still works without
-      // the static Lex.Modal helper.
+    if (!window.Lex || !window.Lex.Modal || typeof window.Lex.Modal.confirm !== 'function') {
       if (window.confirm('Delete this agent? This soft-disables it for your org.')) {
-        performDelete();
+        performDelete(ctx, state);
       }
       return;
     }
 
-    Lex.Modal.confirm(
+    window.Lex.Modal.confirm(
       'Delete agent?',
-      'This soft-disables "' + (_agent.name || _slug) + '" for your organization. Past runs are kept for audit but the agent will no longer accept new runs.',
-      performDelete,
+      'This soft-disables "' + (state.agent.name || state.slug) + '" for your organization. Past runs are kept for audit but the agent will no longer accept new runs.',
+      function () { performDelete(ctx, state); },
       { variant: 'danger', confirmText: 'Delete', cancelText: 'Cancel' }
     );
   }
 
-  function performDelete() {
-    if (!_slug) return;
+  function performDelete(ctx, state) {
+    if (!state.slug) return;
     if (!window.api || typeof window.api.delete !== 'function') return;
 
-    window.api.delete('/api/v1/agents/' + encodeURIComponent(_slug))
+    window.api.delete('/api/v1/agents/' + encodeURIComponent(state.slug))
       .then(function (resp) {
+        if (state.destroyed) return;
         var agent = (resp && resp.agent) ? resp.agent
                   : ((resp && resp.data) ? resp.data : resp);
         if (agent) {
-          _agent = agent;
-          syncEnabledToggle();
+          state.agent = agent;
+          syncEnabledToggle(state);
         }
         var drawer = el('agentDetailConfigDrawer');
         if (drawer) drawer.open = false;
-        if (window.Lex && Lex.Toast) Lex.Toast.success('Agent deleted');
-        // Drop the user back to the catalog so they can pick another.
-        if (window.Lex && Lex.Nav) Lex.Nav.go('agents/index.html');
+        if (window.Lex && window.Lex.Toast) window.Lex.Toast.success('Agent deleted');
+        ctx.app.setView('catalog');
       })
       .catch(function (err) {
+        if (state.destroyed) return;
         console.error('[agent-detail] Delete failed:', err);
         var status = err && (err.status || (err.response && err.response.status));
         var msg = 'Unable to delete agent';
         if (status === 401) msg = 'Your session expired. Please sign in again.';
         else if (status === 403) msg = 'You do not have permission to delete this agent.';
         else if (status === 404) msg = 'This agent no longer exists.';
-        if (window.Lex && Lex.Toast) Lex.Toast.error(msg);
+        if (window.Lex && window.Lex.Toast) window.Lex.Toast.error(msg);
       });
   }
 
@@ -986,19 +1202,9 @@
   // Stats tab
   // -------------------------------------------------------------------------
 
-  function statsRangeToWindow(range) {
-    var days = 30;
-    if (range === '7d')  days = 7;
-    if (range === '30d') days = 30;
-    if (range === '90d') days = 90;
-    var until = new Date();
-    var since = new Date(until.getTime() - days * 24 * 3600 * 1000);
-    return { since: since.toISOString(), until: until.toISOString() };
-  }
-
-  function loadStats() {
-    if (_statsLoaded) return;
-    if (!_slug) return;
+  function loadStats(state) {
+    if (state.statsLoaded) return;
+    if (!state.slug) return;
     if (!window.api || typeof window.api.get !== 'function') return;
 
     var loading      = el('agentDetailStatsLoading');
@@ -1009,21 +1215,18 @@
     hide(content);
     hide(unavailable);
 
-    var w = statsRangeToWindow(_statsRange);
-    var url = '/api/v1/agents/' + encodeURIComponent(_slug) + '/stats'
+    var w = statsRangeToWindow(state.statsRange);
+    var url = '/api/v1/agents/' + encodeURIComponent(state.slug) + '/stats'
             + '?since=' + encodeURIComponent(w.since)
             + '&until=' + encodeURIComponent(w.until);
 
-    // Fire the trends fetch in parallel — the sparkline is independent of
-    // the KPI cards and we don't want to block on it. Failures hide the
-    // sparkline area cleanly without affecting the rest of the tab.
-    loadStatsTrends(w);
+    loadStatsTrends(state, w);
 
     window.api.get(url)
       .then(function (resp) {
-        _statsLoaded = true;
+        if (state.destroyed) return;
+        state.statsLoaded = true;
         hide(loading);
-        // Backend returns the stats object directly; tolerate { data } too.
         var stats = (resp && resp.data) ? resp.data : resp;
         if (!stats || typeof stats !== 'object') {
           show(unavailable);
@@ -1033,15 +1236,14 @@
         show(content);
       })
       .catch(function (err) {
+        if (state.destroyed) return;
         hide(loading);
         var status = err && (err.status || (err.response && err.response.status));
         if (status === 404 || status === 501) {
-          // Endpoint not yet shipped — show the gentle placeholder.
           show(unavailable);
           return;
         }
         console.error('[agent-detail] Stats fetch failed:', err);
-        // For other errors, also degrade to placeholder rather than crash.
         var msg = 'Stats are temporarily unavailable.';
         if (status === 401) msg = 'Your session expired. Please sign in again.';
         var card = unavailable && unavailable.querySelector('lex-empty');
@@ -1059,30 +1261,25 @@
     var duration = (stats && stats.duration) || {};
     var artifacts = (stats && stats.artifacts) || {};
 
-    // Total runs
     var totalRuns = Number(runs.total || 0);
     var totalRunsEl = el('agentDetailStatTotalRuns');
     if (totalRunsEl) totalRunsEl.value = formatInt(totalRuns);
 
-    // Success rate (completed / total)
     var byStatus = runs.by_status || {};
     var completed = Number(byStatus.completed || byStatus.approved || 0);
     var rate = totalRuns > 0 ? (completed / totalRuns * 100) : 0;
     var successEl = el('agentDetailStatSuccessRate');
     if (successEl) successEl.value = (totalRuns === 0 ? '-' : rate.toFixed(0) + '%');
 
-    // Median duration
     var medEl = el('agentDetailStatMedianDuration');
     if (medEl) medEl.value = formatDurationMs(duration.median_ms);
 
-    // Total tokens
     var inTokens  = Number(cost.input_tokens || 0);
     var outTokens = Number(cost.output_tokens || 0);
     var totalTokens = Number(cost.total_tokens != null ? cost.total_tokens : (inTokens + outTokens));
     var tokensEl = el('agentDetailStatTotalTokens');
     if (tokensEl) tokensEl.value = formatInt(totalTokens);
 
-    // Estimated cost — hide card if unavailable
     var costEl = el('agentDetailStatEstCost');
     var costFormatted = formatMicroDollars(cost.estimated_cost_microdollars);
     if (costEl) {
@@ -1120,8 +1317,6 @@
     node.innerHTML = html;
   }
 
-  // The artifact breakdown follows a known sequence so we render
-  // it in lifecycle order rather than alphabetical.
   function renderArtifactBreakdown(targetId, artifacts) {
     var node = el(targetId);
     if (!node) return;
@@ -1151,32 +1346,22 @@
     node.innerHTML = html;
   }
 
-  // -------------------------------------------------------------------------
-  // Sparkline — total vs completed runs over the selected window.
-  // -------------------------------------------------------------------------
-
-  // Pick a sensible bucket size for the picked window. The brief asks for
-  // 'day' as the default; we keep 'day' regardless of range so the
-  // sparkline density scales naturally.
-  function loadStatsTrends(w) {
+  function loadStatsTrends(state, w) {
     var wrap = el('agentDetailStatsSparklineWrap');
     if (!wrap) return;
-    // Hide on every (re)load — we either re-show with fresh data, or
-    // leave it hidden if the endpoint isn't available.
     hide(wrap);
 
-    if (!_slug) return;
+    if (!state.slug) return;
     if (!window.api || typeof window.api.get !== 'function') return;
 
-    var url = '/api/v1/agents/' + encodeURIComponent(_slug) + '/stats/trends'
+    var url = '/api/v1/agents/' + encodeURIComponent(state.slug) + '/stats/trends'
             + '?since=' + encodeURIComponent(w.since)
             + '&until=' + encodeURIComponent(w.until)
             + '&bucket=day';
 
     window.api.get(url)
       .then(function (resp) {
-        // Backend returns { agent, bucket, window, series: [...] }.
-        // Tolerate { data: ... } and bare-array shapes.
+        if (state.destroyed) return;
         var payload = (resp && resp.data) ? resp.data : resp;
         var series = (payload && Array.isArray(payload.series)) ? payload.series
                    : (Array.isArray(payload) ? payload : []);
@@ -1188,28 +1373,21 @@
         show(wrap);
       })
       .catch(function (err) {
+        if (state.destroyed) return;
         var status = err && (err.status || (err.response && err.response.status));
         if (status === 404 || status === 501) {
-          // Endpoint not yet shipped — hide cleanly.
           hide(wrap);
           return;
         }
-        // Any other error — also hide. The KPI cards still load and
-        // surface their own errors; we don't want a sparkline failure
-        // to clutter the tab.
         console.warn('[agent-detail] Trends fetch failed:', err);
         hide(wrap);
       });
   }
 
-  // Hand-rolled SVG sparkline. Two polylines (total + completed) sharing
-  // the same y-axis scale (max of both series). 200x40 viewBox, normalized
-  // so the polyline fills the box. No charting library; no regex.
   function renderSparkline(series) {
     var svg = el('agentDetailStatsSparkline');
     if (!svg) return;
 
-    // Normalize the series — drop bad rows, coerce numbers.
     var points = [];
     for (var i = 0; i < series.length; i++) {
       var p = series[i];
@@ -1227,7 +1405,6 @@
       return;
     }
 
-    // Compute y-axis max from both series so they share the same scale.
     var maxV = 0;
     for (var j = 0; j < points.length; j++) {
       if (points[j].total > maxV) maxV = points[j].total;
@@ -1235,9 +1412,6 @@
     }
     if (maxV <= 0) maxV = 1;
 
-    // Map indices to x coords across [0, 200] and values to y across
-    // [38, 2] (top of viewBox is 0; flipped so taller bars sit higher).
-    // When there's a single point, keep it centered to avoid NaN x.
     var W = 200;
     var H = 40;
     var pad = 2;
@@ -1249,12 +1423,10 @@
     }
     function yFor(v) {
       var ratio = v / maxV;
-      // 0..1 → (H - pad) downward → (pad) upward
       return (H - pad) - ratio * (H - pad * 2);
     }
 
     function buildPath(field) {
-      // SVG points string: "x1,y1 x2,y2 ..."
       var parts = [];
       for (var k = 0; k < points.length; k++) {
         parts.push(xFor(k).toFixed(2) + ',' + yFor(points[k][field]).toFixed(2));
@@ -1265,15 +1437,10 @@
     var totalPts = buildPath('total');
     var completedPts = buildPath('completed');
 
-    // Build per-point hover targets so the user gets a tooltip on the
-    // closest bucket. The tooltip text is rendered via the native title
-    // element (no lex-tooltip primitive yet).
     var hoverHtml = '';
     for (var m = 0; m < points.length; m++) {
       var hx = xFor(m).toFixed(2);
       var titleText = formatBucketTooltip(points[m]);
-      // Wider invisible bands centered on the data point so the tooltip
-      // is easy to hit. Each band gets its own <title>.
       var bandW = (xStep > 0 ? Math.max(xStep, 6) : 24);
       var bandX = (Number(hx) - bandW / 2).toFixed(2);
       hoverHtml += ''
@@ -1283,8 +1450,6 @@
         + 'fill="transparent">'
         + '<title>' + escHtml(titleText) + '</title>'
         + '</rect>';
-      // Also a small dot at each data point on the completed series so
-      // the user can read individual buckets.
       hoverHtml += ''
         + '<circle class="agent-detail-stats-sparkline-dot agent-detail-stats-sparkline-dot--completed" '
         + 'cx="' + hx + '" cy="' + yFor(points[m].completed).toFixed(2) + '" r="1.5" />';
@@ -1302,10 +1467,8 @@
     if (!p) return '';
     var date = '';
     if (p.ts) {
-      // Use Lex.Utils.formatDate when available, fall back to a slice
-      // of the ISO string. Avoid regex per project rules.
-      if (window.Lex && Lex.Utils && Lex.Utils.formatDate) {
-        date = Lex.Utils.formatDate(p.ts);
+      if (window.Lex && window.Lex.Utils && window.Lex.Utils.formatDate) {
+        date = window.Lex.Utils.formatDate(p.ts);
       } else {
         var s = String(p.ts);
         date = s.length >= 10 ? s.substring(0, 10) : s;
@@ -1317,56 +1480,44 @@
       + ', Completed: ' + (p.completed != null ? p.completed : 0);
   }
 
-  // Render snake_case keys as Title Case for display.
-  function prettyKey(k) {
-    if (!k) return '';
-    var parts = String(k).split('_');
-    var out = [];
-    for (var i = 0; i < parts.length; i++) {
-      var p = parts[i];
-      if (!p) continue;
-      out.push(p.charAt(0).toUpperCase() + p.substring(1));
-    }
-    return out.join(' ');
-  }
-
-  function submitRun() {
+  function submitRun(ctx, state) {
     var input = el('agentDetailRunInput');
     var value = input && typeof input.value !== 'undefined' ? input.value : '';
     if (!value || !String(value).trim()) {
-      if (window.Lex && Lex.Toast) Lex.Toast.error('Please describe what the agent should do.');
+      if (window.Lex && window.Lex.Toast) window.Lex.Toast.error('Please describe what the agent should do.');
       return;
     }
-    if (!window.api || typeof window.api.post !== 'function' || !_slug) return;
+    if (!window.api || typeof window.api.post !== 'function' || !state.slug) return;
 
-    window.api.post('/api/v1/agents/' + encodeURIComponent(_slug) + '/runs', {
+    window.api.post('/api/v1/agents/' + encodeURIComponent(state.slug) + '/runs', {
       input: String(value).trim()
     })
       .then(function (resp) {
-        // Backend returns 202 { run, queue }; tolerate { data } or bare object.
+        if (state.destroyed) return;
         var runId = (resp && resp.run && resp.run.id)
                  || (resp && resp.data && resp.data.id)
                  || (resp && resp.id)
                  || (resp && resp.run_id);
         var modal = el('agentDetailRunModal');
         if (modal) modal.open = false;
-        if (window.Lex && Lex.Toast) Lex.Toast.success('Run started');
-        if (runId && window.Lex && Lex.Nav) {
-          Lex.Nav.go('agents/agent-run.html', { params: { id: runId } });
+        if (window.Lex && window.Lex.Toast) window.Lex.Toast.success('Run started');
+        if (runId) {
+          ctx.app.setView('agentRun', { runId: runId });
         } else {
           console.warn('[agent-detail] Run started but no id in response:', resp);
-          if (window.Lex && Lex.Toast) {
-            Lex.Toast.info('Run started, but we could not open the live view. Check the Runs tab.');
+          if (window.Lex && window.Lex.Toast) {
+            window.Lex.Toast.info('Run started, but we could not open the live view. Check the Runs tab.');
           }
         }
       })
       .catch(function (err) {
+        if (state.destroyed) return;
         console.error('[agent-detail] Run start failed:', err);
         var status = err && (err.status || (err.response && err.response.status));
         var msg = 'Unable to start run';
         if (status === 401) msg = 'Your session expired. Please sign in again.';
         else if (status === 404) msg = 'This agent no longer exists.';
-        if (window.Lex && Lex.Toast) Lex.Toast.error(msg);
+        if (window.Lex && window.Lex.Toast) window.Lex.Toast.error(msg);
       });
   }
 
@@ -1374,33 +1525,35 @@
   // Data
   // =========================================================================
 
-  function loadAgent() {
-    if (!_slug) return;
+  function loadAgent(state) {
+    if (!state.slug) return;
     if (!window.api || typeof window.api.get !== 'function') {
-      document.addEventListener('lex-ready', loadAgent, { once: true });
+      var onReady = function () { loadAgent(state); };
+      state._lexReadyHandler = onReady;
+      document.addEventListener('lex-ready', onReady, { once: true });
       return;
     }
 
-    window.api.get('/api/v1/agents/' + encodeURIComponent(_slug))
+    window.api.get('/api/v1/agents/' + encodeURIComponent(state.slug))
       .then(function (resp) {
-        // Backend returns { agent: {...} }; tolerate { data } / bare object
+        if (state.destroyed) return;
         var agent = (resp && resp.agent) ? resp.agent
                   : ((resp && resp.data) ? resp.data : resp);
         if (!agent) {
-          renderProfile({ slug: _slug, name: _slug, description: 'Agent not found.' });
+          renderProfile(state, { slug: state.slug, name: state.slug, description: 'Agent not found.' });
           return;
         }
-        renderProfile(agent);
-        onAgentLoaded();
+        renderProfile(state, agent);
+        onAgentLoaded(state);
       })
       .catch(function (err) {
+        if (state.destroyed) return;
         console.error('[agent-detail] Failed to load agent:', err);
-        showLoadError(err);
+        showLoadError(state, err);
       });
   }
 
-  // Differentiated error message for load failures.
-  function showLoadError(err) {
+  function showLoadError(state, err) {
     var status = err && (err.status || (err.response && err.response.status));
     var descEl = el('agentDetailDescription');
     var loading = el('agentPanelCapabilitiesLoading');
@@ -1411,8 +1564,8 @@
     var message;
     if (status === 401) {
       message = 'Your session expired. Please sign in again.';
-      if (window.Lex && Lex.Toast) Lex.Toast.error(message);
-      if (window.Lex && Lex.Nav) Lex.Nav.go('login.html');
+      if (window.Lex && window.Lex.Toast) window.Lex.Toast.error(message);
+      if (window.Lex && window.Lex.Nav) window.Lex.Nav.go('login.html');
     } else if (status === 404) {
       message = 'This agent no longer exists.';
     } else {
@@ -1422,54 +1575,45 @@
 
     var banner = el('agentDetailBanner');
     if (banner) {
-      banner.heading = _slug || 'Agent';
+      banner.heading = state.slug || 'Agent';
       banner.subtitle = message;
     }
   }
 
   // =========================================================================
-  // Sidebar wiring
+  // Lifecycle
   // =========================================================================
 
-  // Detail is a sub-route of the catalog, so the Catalog item stays active.
-  function wireAgentsSidebar() {
-    var agentsApp = window.LanaAgentsApp;
-    if (!agentsApp || typeof agentsApp.getAgentsAppSections !== 'function') return;
-    var shell = document.querySelector('lex-app');
-    if (!shell) return;
-    var sections = agentsApp.getAgentsAppSections({ activeId: 'catalog' });
-    if (typeof shell.setSections === 'function') {
-      shell.setSections(sections);
-    } else {
-      var sidebar = shell.querySelector('lex-sidebar') || document.querySelector('lex-sidebar');
-      if (sidebar) sidebar.sections = sections;
+  function render(rootEl, ctx) {
+    rootEl.innerHTML = TEMPLATE;
+
+    var slug = ctx && ctx.slug;
+    var state = createState(slug);
+    rootEl._agentDetailState = state;
+
+    wireTabs(state);
+    wireRunsList(ctx, state);
+    wireBannerButtons(ctx, state);
+    switchTab(state, state.activeTab);
+    loadAgent(state);
+  }
+
+  function destroy(rootEl) {
+    var state = rootEl && rootEl._agentDetailState;
+    if (!state) return;
+    state.destroyed = true;
+    if (state._lexReadyHandler) {
+      document.removeEventListener('lex-ready', state._lexReadyHandler);
+      state._lexReadyHandler = null;
     }
-    if ('activeNavId' in shell) shell.activeNavId = 'catalog';
+    if (Array.isArray(state._unbindFns)) {
+      for (var i = 0; i < state._unbindFns.length; i++) {
+        try { state._unbindFns[i](); } catch (e) { /* ignore */ }
+      }
+    }
+    state._unbindFns = [];
+    rootEl._agentDetailState = null;
   }
 
-  // =========================================================================
-  // Init
-  // =========================================================================
-
-  function init() {
-    var params = (window.Lex && Lex.Nav && typeof Lex.Nav.getParams === 'function')
-      ? Lex.Nav.getParams()
-      : new URLSearchParams(window.location.search);
-    _slug = params && (params.get ? params.get('slug') : params.slug);
-    _agent = null;
-    _runsLoaded = false;
-    _activeTab = 'capabilities';
-
-    wireAgentsSidebar();
-    wireTabs();
-    wireRunsList();
-    wireBannerButtons();
-    switchTab(_activeTab);
-    loadAgent();
-  }
-
-  if (window.LexRouter) {
-    LexRouter.registerPageInit('agents/agent-detail.html', init);
-  }
-  init();
-})();
+  global.LanaAgentsApp.Views.agentDetail = { render: render, destroy: destroy };
+})(typeof window !== 'undefined' ? window : globalThis);

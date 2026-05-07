@@ -100,89 +100,12 @@
     },
 
     // ── Agents (LanaAgents app) ──
-    // SPA-routed pages under src/agents/. Scripts and stylesheets here are
-    // resolved against _appBaseUrl (the host page, e.g. dashboard.html under
-    // src/), so they keep paths relative to src/ and do NOT need a ../ prefix.
-    // The agents/sidebar-config.js script publishes window.LanaAgentsApp, which
-    // each page controller calls to wire the agents-app sidebar nav.
-    'agents/index.html': {
-      title: 'Agents',
-      activeNav: 'catalog',
-      scripts: [
-        // Lex components not globally loaded
-        'js/lex/components/foundation/lex-banner.js',
-        'js/lex/components/foundation/lex-card.js',
-        'js/lex/components/foundation/lex-empty.js',
-        'js/lex/components/foundation/lex-modal.js',
-        'js/lex/components/form/lex-segmented.js',
-        'js/lex/components/form/lex-textarea.js',
-        'js/lex/components/form/lex-select.js',
-        'js/lex/components/form/lex-checkbox.js',
-        'js/lex/components/form/lex-toggle.js',
-        // LanaAgents app shell config (provides window.LanaAgentsApp)
-        'agents/sidebar-config.js',
-        // Page controller (MUST be last)
-        'js/pages/agents.js'
-      ],
-      stylesheets: [
-        'css/agents.css'
-      ]
-    },
-
-    'agents/agent-detail.html': {
-      title: 'Agent Detail',
-      activeNav: 'catalog',
-      scripts: [
-        // Lex components not globally loaded
-        'js/lex/components/foundation/lex-banner.js',
-        'js/lex/components/foundation/lex-card.js',
-        'js/lex/components/foundation/lex-empty.js',
-        'js/lex/components/foundation/lex-tabs.js',
-        'js/lex/components/foundation/lex-kv.js',
-        'js/lex/components/foundation/lex-metric.js',
-        'js/lex/components/foundation/lex-modal.js',
-        'js/lex/components/foundation/lex-drawer.js',
-        'js/lex/components/form/lex-input.js',
-        'js/lex/components/form/lex-textarea.js',
-        'js/lex/components/form/lex-select.js',
-        'js/lex/components/form/lex-checkbox.js',
-        'js/lex/components/form/lex-toggle.js',
-        // LanaAgents app shell config (provides window.LanaAgentsApp)
-        'agents/sidebar-config.js',
-        // Page controller (MUST be last)
-        'js/pages/agent-detail.js'
-      ],
-      stylesheets: [
-        'css/agent-detail.css'
-      ]
-    },
-
-    'agents/agent-run.html': {
-      title: 'Agent Run',
-      activeNav: 'catalog',
-      scripts: [
-        // Lex components not globally loaded
-        'js/lex/components/foundation/lex-card.js',
-        'js/lex/components/foundation/lex-empty.js',
-        'js/lex/components/foundation/lex-spinner.js',
-        // SchemaRegistry + BlockRenderer must precede block files
-        'js/lex/lex.ai.js',
-        // Plan card + diff blocks (used in artifact rendering)
-        'js/lex/blocks/reasoning-steps.block.js',
-        'js/lex/blocks/redline.block.js',
-        'js/lex/blocks/compare.block.js',
-        'js/lex/chat/lex-agentic-plan-card.js',
-        // Reuse existing agentic-ui handlers when available
-        'js/agentic-ui.js',
-        // LanaAgents app shell config (provides window.LanaAgentsApp)
-        'agents/sidebar-config.js',
-        // Page controller (MUST be last)
-        'js/pages/agent-run.js'
-      ],
-      stylesheets: [
-        'css/agent-run.css'
-      ]
-    },
+    // The LanaAgents app is now a true SPA with its own host shell and
+    // hash-based routing under src/agents/index.html. It is NOT registered
+    // with lex-router — navigation INTO the app is a full page load
+    // (window.location.href = 'agents/index.html#<view>') and navigation
+    // WITHIN the app goes through window.LanaAgentsApp.setView(). See
+    // src/agents/README.md for details.
 
     'model-pricing.html': {
       title: 'Model Pricing',

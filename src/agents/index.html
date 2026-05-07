@@ -10,6 +10,9 @@
   <link rel="stylesheet" href="../css/components.css">
   <link rel="stylesheet" href="../css/tailwind-output.css">
   <link rel="stylesheet" href="../css/agents.css">
+  <link rel="stylesheet" href="../css/agent-detail.css">
+  <link rel="stylesheet" href="../css/agent-run.css">
+  <link rel="stylesheet" href="../css/activity-detail.css">
   <link rel="stylesheet" href="./styles.css">
   <script src="../js/tailwind-loader.js"></script>
 
@@ -18,193 +21,18 @@
 
   <lex-loader theme="light"></lex-loader>
 
-  <!-- Agents app shell — sibling of LanaWorks' dashboard.html.
-       active-nav-id matches the 'catalog' entry in sidebar-config.js
-       so the LanaAgents sidebar highlights Catalog by default. -->
+  <!-- LanaAgents SPA host shell. Mirrors src/automation/index.html: a
+       single <lex-app> + script loads, with no embedded <template>.
+       Active sidebar nav is managed dynamically by app.js based on
+       state.currentView (catalog | agentDetail | agentRun | activity |
+       activityDetail). -->
   <lex-app
     id="agents-shell"
     logo-src="../img/logo-light.png"
     logo-alt="LANA AI"
     logo-href="../dashboard.html"
-    active-nav-id="catalog"
     page-title="Agents"
   ></lex-app>
-
-  <!-- Page content as inert <template> — cloned into the live DOM by
-       lex-page-init.js after the shell renders. Same pattern as
-       dashboard.html and agentic-tasks.html. -->
-  <template id="page-content">
-    <main class="agents-page-container">
-
-      <!-- Page banner -->
-      <lex-banner
-        id="agentsBanner"
-        variant="dark"
-        corners
-        heading="Agents"
-        subtitle="Browse and configure system and custom agents"
-        icon="A"
-      >
-        <lex-btn id="agentsCreateBtn" variant="primary" icon="plus">Create agent</lex-btn>
-      </lex-banner>
-
-      <!-- Filter tabs -->
-      <div class="agents-filter-bar">
-        <lex-segmented
-          id="agentsFilterTabs"
-          value="all"
-          options='[{"value":"all","label":"All"},{"value":"system","label":"System"},{"value":"custom","label":"Custom"}]'
-        ></lex-segmented>
-      </div>
-
-      <!-- Loading skeleton -->
-      <div id="agentsLoading" class="agents-grid">
-        <div class="agents-card-skeleton" aria-hidden="true">
-          <div class="agents-skeleton-line agents-skeleton-line--avatar"></div>
-          <div class="agents-skeleton-line agents-skeleton-line--title"></div>
-          <div class="agents-skeleton-line agents-skeleton-line--text"></div>
-          <div class="agents-skeleton-line agents-skeleton-line--text-short"></div>
-        </div>
-        <div class="agents-card-skeleton" aria-hidden="true">
-          <div class="agents-skeleton-line agents-skeleton-line--avatar"></div>
-          <div class="agents-skeleton-line agents-skeleton-line--title"></div>
-          <div class="agents-skeleton-line agents-skeleton-line--text"></div>
-          <div class="agents-skeleton-line agents-skeleton-line--text-short"></div>
-        </div>
-        <div class="agents-card-skeleton" aria-hidden="true">
-          <div class="agents-skeleton-line agents-skeleton-line--avatar"></div>
-          <div class="agents-skeleton-line agents-skeleton-line--title"></div>
-          <div class="agents-skeleton-line agents-skeleton-line--text"></div>
-          <div class="agents-skeleton-line agents-skeleton-line--text-short"></div>
-        </div>
-      </div>
-
-      <!-- Agent grid (populated dynamically) -->
-      <div id="agentsGrid" class="agents-grid hidden"></div>
-
-      <!-- Empty state -->
-      <div id="agentsEmpty" class="hidden">
-        <lex-empty
-          icon="bot"
-          message="No agents yet"
-          description="Agent definitions will appear here once they are configured."
-        ></lex-empty>
-      </div>
-
-      <!-- Run modal placeholder (Phase 4 will replace with template-driven form) -->
-      <lex-modal id="agentsRunModal" heading="Run Agent" size="md" data-hoist>
-        <div class="agents-run-modal-body">
-          <p class="agents-run-modal-text">
-            Provide a brief input describing what the agent should do.
-          </p>
-          <lex-textarea
-            id="agentsRunInput"
-            label="Input"
-            rows="4"
-            placeholder="Describe the task you want this agent to perform..."
-          ></lex-textarea>
-        </div>
-      </lex-modal>
-
-      <!-- Create-from-template modal (Phase 4).
-           Clones a system template into a new org-owned agent. The
-           system_prompt is intentionally NOT in this form — that lives
-           on the template only. allowed_tools may only be a subset of
-           the template's allowed_tools (no escalation client-side). -->
-      <lex-modal
-        id="agentsCreateModal"
-        heading="Create agent from template"
-        size="lg"
-        confirm-text="Create"
-        cancel-text="Cancel"
-        data-hoist
-      >
-        <div class="agents-create-modal-body">
-          <p class="agents-create-modal-help">
-            Pick a template, adjust the name, description, and which tools the
-            agent may call. Templates own the underlying prompt — those rules
-            stay locked on the template.
-          </p>
-
-          <lex-select
-            id="agentsCreateTemplate"
-            label="Template"
-            placeholder="Choose a template..."
-            required
-            searchable
-          ></lex-select>
-
-          <!-- Template preview (shown once a template is selected) -->
-          <div id="agentsCreateTemplatePreview" class="agents-create-preview hidden">
-            <div class="agents-create-preview-row">
-              <span class="agents-create-preview-label">Template</span>
-              <span id="agentsCreateTemplateSlug" class="agents-create-preview-value"></span>
-            </div>
-            <div class="agents-create-preview-row">
-              <span class="agents-create-preview-label">Description</span>
-              <span id="agentsCreateTemplateDescription" class="agents-create-preview-value"></span>
-            </div>
-          </div>
-
-          <lex-input
-            id="agentsCreateName"
-            label="Display name"
-            placeholder="e.g. Contract Reviewer"
-            required
-          ></lex-input>
-
-          <lex-textarea
-            id="agentsCreateDescription"
-            label="Description"
-            rows="3"
-            placeholder="What this agent will do for your team..."
-          ></lex-textarea>
-
-          <div class="agents-create-section">
-            <div class="agents-create-section-label">
-              Allowed tools
-              <span class="agents-create-section-hint">
-                Uncheck tools you don't want this agent to use. The template
-                defines the maximum set — adding new tools is not supported here.
-              </span>
-            </div>
-            <div id="agentsCreateToolsList" class="agents-create-tools-list">
-              <span class="agents-create-empty-text">Pick a template to see its tools.</span>
-            </div>
-          </div>
-
-          <lex-select
-            id="agentsCreateModelSlot"
-            label="Model slot"
-            placeholder="Choose a model slot..."
-          ></lex-select>
-
-          <div class="agents-create-section">
-            <div class="agents-create-section-label">Schedule</div>
-            <lex-toggle
-              id="agentsCreateScheduleEnabled"
-              label="Run this agent on a schedule"
-              label-side="right"
-            ></lex-toggle>
-            <div id="agentsCreateScheduleFields" class="agents-create-schedule-fields hidden">
-              <lex-input
-                id="agentsCreateScheduleCron"
-                label="Cron expression"
-                placeholder="0 9 * * 1-5"
-                help="Standard 5-field cron (minute hour dom month dow)"
-              ></lex-input>
-              <lex-select
-                id="agentsCreateScheduleTimezone"
-                label="Timezone"
-                placeholder="UTC"
-              ></lex-select>
-            </div>
-          </div>
-        </div>
-      </lex-modal>
-
-    </main>
-  </template>
 
   <!-- Lex UI core -->
   <script src="../js/lex/lex.core.js"></script>
@@ -225,6 +53,10 @@
   <script src="../js/lex/components/foundation/lex-banner.js"></script>
   <script src="../js/lex/components/foundation/lex-card.js"></script>
   <script src="../js/lex/components/foundation/lex-modal.js"></script>
+  <script src="../js/lex/components/foundation/lex-tabs.js"></script>
+  <script src="../js/lex/components/foundation/lex-kv.js"></script>
+  <script src="../js/lex/components/foundation/lex-metric.js"></script>
+  <script src="../js/lex/components/foundation/lex-drawer.js"></script>
   <script src="../js/lex/components/form/lex-segmented.js"></script>
   <script src="../js/lex/components/form/lex-select.js"></script>
   <script src="../js/lex/components/form/lex-input.js"></script>
@@ -237,16 +69,19 @@
   <script src="../js/lex/components/layout/lex-notification-panel.js"></script>
   <script src="../js/lex/components/layout/lex-app.js"></script>
 
-  <!-- Page init: clones <template id="page-content"> into the live DOM. -->
-  <script src="../js/lex/lex-page-init.js"></script>
+  <!-- View modules: each registers on window.LanaAgentsApp.Views.<name>.
+       Loaded BEFORE app.js so the controller's initial route dispatch
+       finds all view renderers already registered. -->
+  <script src="./js/views/catalog.js"></script>
+  <script src="./js/views/agent-detail.js"></script>
+  <script src="./js/views/agent-run.js"></script>
+  <script src="./js/views/activity.js"></script>
+  <script src="./js/views/activity-detail.js"></script>
 
-  <!-- LanaAgents app shell config (provides window.LanaAgentsApp) -->
-  <script src="./sidebar-config.js"></script>
+  <!-- LanaAgents SPA controller (owns state, routing, sidebar config) -->
+  <script src="./app.js"></script>
 
-  <!-- Page controller (MUST be last before auth-guard) -->
-  <script src="../js/pages/agents.js"></script>
-
-  <!-- Auth guard + loader dismiss -->
+  <!-- Auth guard + loader dismiss (MUST be last) -->
   <script src="../js/auth-guard.js"></script>
 </body>
 </html>

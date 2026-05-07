@@ -5,55 +5,53 @@
 LanaAgents is the Electron client surface for browsing, running, and
 auditing Lana's agent platform. Users pick an agent from the catalog,
 configure and launch a run, and review past runs ("activity"). It is a
-sibling of LanaWorks in the top-level app dropdown switcher: the host
-shell hands the user off to the agents pages here, and `sidebar-config.js`
-owns the per-app left-nav while inside the LanaAgents experience.
-
-## Pages
-
-| Page | File | Purpose | Entry point |
-|------|------|---------|-------------|
-| Catalog | `src/agents.html` | Browse and search available agents. Default landing page. | App dropdown -> "LanaAgents", or sidebar "Catalog" |
-| Agent detail | `src/agent-detail.html` | View an agent's description, tools, and inputs; start a run. | Click an agent in the catalog |
-| Agent run | `src/agent-run.html` | Live view of a run: streamed steps, tool calls, output. | "Run" action from agent detail, or click an in-progress run from activity |
-| Activity (runs list) | `src/agentic-tasks.html` | History of all agent runs across agents. | Sidebar "Activity" |
-| Activity detail | `src/agentic-task-detail.html` | Full record of a single completed run: inputs, transcript, artifacts. | Click a row in activity |
-
-## Sidebar nav
-
-`sidebar-config.js` is the single source of truth for the LanaAgents
-app's sidebar. Each page, once `<lex-app>` is ready, calls:
-
-```js
-const sections = window.LanaAgentsApp.getAgentsAppSections({ activeId: 'catalog' });
-els.shell.setSections(sections);
-```
-
-The shared host footer (user chip, settings, etc.) is hydrated by the
-existing `LanaSidebarFooter` helper, same as LanaAutomations — no
-duplication here.
+sibling of LanaWorks in the top-level app dropdown switcher.
 
 ## Pattern alignment
 
-LanaAgents follows the **multi-page-with-shared-sidebar-config** pattern
-(similar to LanaWorks' top-level pages) rather than the
-**single-page-app** pattern used by `src/automation/` and `src/voice/`.
+LanaAgents is a **single-page application**, matching the pattern used
+by `src/automation/` and `src/voice/`. There is one host (`index.html`),
+one controller (`app.js`), and a set of view modules under `js/views/`
+that each register a renderer on `window.LanaAgentsApp.Views.<name>`.
 
-Rationale: the existing agents pages were built as separate HTML files
-routed via `lex-router`. Preserving that structure keeps the migration
-to a first-class app scoped to (a) a per-app sidebar config, (b) a
-dropdown entry, and (c) light page wiring — without rewriting page
-flow into a SPA.
+Internal navigation is **hash-based** via
+`window.LanaAgentsApp.setView(view, params)` — NOT `Lex.Nav.go(...)`,
+which would trigger a full page load and tear down SPA state. Only
+navigation that crosses out of (or back into) the LanaAgents app uses
+full-page navigation, e.g. `window.location.href = 'agents/index.html#catalog'`.
 
-## How to add a new page
+## Views
 
-1. Create `src/<new-page>.html`, `src/js/pages/<new-page>.js`, and
-   `src/css/<new-page>.css` (HTML/JS/CSS triplet — see
-   `lana-ai-client/CLAUDE.md` page hygiene rule).
-2. After `<lex-app>` is ready in the page's JS, call
-   `window.LanaAgentsApp.getAgentsAppSections({ activeId: '<id>' })`
-   and pass the result to `els.shell.setSections(sections)`. If the
-   page should appear in the sidebar, add an entry to
-   `SIDEBAR_NAV_ITEMS` in `sidebar-config.js`.
-3. If the page is reachable directly (deep link), register it with the
-   Lex router in `src/js/lex/lex-router.pages.js`.
+| View name | URL hash | Purpose |
+|-----------|----------|---------|
+| `catalog` | `#catalog` (default) | Browse and search available agents. |
+| `agentDetail` | `#agent/:slug` | View an agent's description, tools, inputs; start a run. |
+| `agentRun` | `#run/:id` | Live view of a running or completed run: streamed steps, tool calls, output. |
+| `activity` | `#activity` | History of all agent runs across agents. |
+| `activityDetail` | `#activity/:id` | Full record of a single run: inputs, transcript, artifacts. |
+
+## Files
+
+- `index.html` — SPA host shell. Loads Lex, view modules, then `app.js`.
+- `app.js` — SPA controller. Owns state, hash routing, sidebar config,
+  and dispatches view rendering via `setView()`.
+- `js/views/*.js` — One module per view. Each registers a renderer on
+  `window.LanaAgentsApp.Views.<viewName>`.
+- `styles.css` — App-local styles. Page-specific styles live in
+  `src/css/agents.css`, `src/css/agent-detail.css`, `src/css/agent-run.css`.
+
+## How to add a new view
+
+1. Create `js/views/<view-name>.js`. Inside, build the markup and
+   wire-up logic, exporting a render function (and optional teardown).
+2. At the end of the module, register it:
+   `window.LanaAgentsApp.Views.<viewName> = { render, teardown };`
+   Add the `<script src="./js/views/<view-name>.js">` tag to
+   `index.html` BEFORE `app.js`.
+3. In `app.js`, add a case to `setView()`'s switch and (if the view has
+   its own URL) map between hash and `{ view, params }` in the
+   hash-parse / hash-write helpers.
+
+If the view should appear in the LanaAgents sidebar, also add an entry
+to the sidebar items array inside `app.js` (subsumed from the former
+`sidebar-config.js`).

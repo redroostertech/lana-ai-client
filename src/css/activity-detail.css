@@ -1,0 +1,39 @@
+/* src/css/activity-detail.css
+ *
+ * Styles for the LanaAgents `activityDetail` view (rendered by
+ * src/agents/js/views/activity-detail.js). Migrated from the inline
+ * <style> block of the now-deleted src/agents/agentic-task-detail.html.
+ * Loaded by src/agents/index.html so the SPA host has these styles
+ * available regardless of which view is active.
+ *
+ * Class naming: `.atd-*` (legacy from "agentic-task-detail"); kept
+ * verbatim so the view module's existing markup doesn't need to be
+ * re-classed.
+ */
+
+.atd-header { padding: 24px 0 16px; }
+.atd-header-back { font-size: 0.75rem; color: var(--lex-text-tertiary); text-decoration: none; display: inline-flex; align-items: center; gap: 4px; margin-bottom: 8px; }
+.atd-header-back:hover { color: var(--lex-text-secondary); }
+.atd-title { font-size: 1.125rem; font-weight: 600; color: var(--lex-text-primary); }
+.atd-meta { display: flex; align-items: center; gap: 16px; margin-top: 6px; font-size: 0.75rem; color: var(--lex-text-tertiary); }
+.atd-meta-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+
+.atd-log { max-height: 500px; overflow-y: auto; padding: 16px; }
+.atd-log-entry { padding: 8px 0; font-size: 0.8125rem; line-height: 1.5; }
+.atd-log-entry + .atd-log-entry { border-top: 1px solid var(--lex-border-subtle); }
+.atd-log-agent { color: var(--lex-text-primary); }
+.atd-log-user { color: var(--lex-color-primary-600, #2563eb); }
+.atd-log-progress { color: var(--lex-text-secondary); font-size: 0.75rem; }
+.atd-log-error { color: var(--lex-color-danger-500, #ef4444); }
+
+.atd-approval { padding: 16px; margin-top: 16px; border-radius: 8px; border: 1px solid var(--lex-border-default); background: var(--lex-bg-secondary); }
+.atd-approval-title { font-size: 0.875rem; font-weight: 500; color: var(--lex-text-primary); margin-bottom: 12px; }
+.atd-approval-toggle { font-size: 0.75rem; color: var(--lex-color-primary-600); cursor: pointer; margin-bottom: 12px; }
+.atd-approval-diff { font-size: 0.75rem; color: var(--lex-text-secondary); font-family: monospace; background: var(--lex-bg-tertiary); padding: 12px; border-radius: 6px; overflow-x: auto; }
+.atd-approval-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px; }
+
+.atd-input-area { display: flex; align-items: flex-end; gap: 8px; padding: 16px; border-top: 1px solid var(--lex-border-subtle); }
+.atd-input-area textarea { flex: 1; min-height: 44px; max-height: 120px; border: 1px solid var(--lex-border-default); border-radius: 8px; padding: 10px 12px; font-size: 0.8125rem; resize: vertical; font-family: inherit; background: var(--lex-bg-primary); color: var(--lex-text-primary); }
+.atd-input-area textarea:focus { outline: none; border-color: var(--lex-color-primary-500); }
+
+.atd-priority-badge { display: inline-block; font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.08em; padding: 2px 6px; border-radius: 3px; color: #fff; font-weight: 600; }
