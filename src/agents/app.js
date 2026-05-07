@@ -131,6 +131,11 @@
 
     var sections = [
       {
+        id: 'main-actions',
+        isStaticTop: true,
+        items: [{ id: 'create', label: 'Create', icon: 'plus', isButton: true, onClick: 'openAgentCreateModal' }]
+      },
+      {
         id: 'navigation',
         items: SIDEBAR_NAV_ITEMS.map(function (item) {
           return Object.assign({}, item, { href: '#' + item.id });
@@ -475,6 +480,20 @@
   global.LanaAgentsApp.setView = setView;
   // Alias kept stable for view modules — same function reference as setView.
   global.LanaAgentsApp.navigate = setView;
+
+  // Wired to the sidebar's static Create button (see applySidebarSections).
+  // The create modal element lives inside the catalog view's TEMPLATE, so
+  // navigate there first; then dispatch a click on the in-view button whose
+  // existing handler (catalog.js wireCreateModal) opens the modal.
+  global.openAgentCreateModal = function () {
+    if (state.currentView !== 'catalog') {
+      setView('catalog');
+    }
+    requestAnimationFrame(function () {
+      var btn = document.getElementById('agentsCreateBtn');
+      if (btn) btn.click();
+    });
+  };
 
   // -------------------------------------------------------------------------
   // Entry

@@ -24,11 +24,9 @@
 
     + '<lex-banner'
     +   ' id="agentDetailBanner"'
-    +   ' variant="dark"'
-    +   ' corners'
+    +   ' variant="light"'
     +   ' heading="Agent"'
     +   ' subtitle="Loading agent profile..."'
-    +   ' icon="A"'
     + '>'
     +   '<div id="agentDetailEnabledBlock" class="agent-detail-enabled-block hidden">'
     +     '<lex-toggle'

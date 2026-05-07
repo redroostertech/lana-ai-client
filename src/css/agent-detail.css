@@ -3,10 +3,17 @@
 */
 
 .agent-detail-page-container {
-  padding: 24px 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
+  min-height: 100%;
+  padding: 32px;
+}
+
+@media (max-width: 768px) {
+  .agent-detail-page-container {
+    padding: 20px;
+  }
 }
 
 .agent-detail-tabs-bar {

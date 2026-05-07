@@ -4,14 +4,43 @@
 */
 
 .agents-page-container {
-  padding: 24px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-height: 100%;
+  padding: 32px;
+}
+
+@media (max-width: 768px) {
+  .agents-page-container {
+    padding: 20px;
+  }
+}
+
+/* Mirror automate's sidebar Create button styling (automation/styles.css:700)
+   so the LanaAgents Create CTA reads as the same component across apps. */
+.lex-sidebar-root .lex-sidebar-nav-item[data-id="create"] {
+  background: linear-gradient(135deg, #6e6557 0%, #595246 100%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+  font-weight: 700;
+}
+
+.lex-sidebar-root .lex-sidebar-nav-item[data-id="create"]:hover {
+  background: linear-gradient(135deg, #7d7465 0%, #655d50 100%);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.lex-sidebar-root .lex-sidebar-nav-item[data-id="create"] svg {
+  opacity: 0.95;
 }
 
 .agents-filter-bar {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 16px 0;
 }
 
 /* Grid */
@@ -19,7 +48,6 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 16px;
-  margin-top: 16px;
 }
 
 /* Card */

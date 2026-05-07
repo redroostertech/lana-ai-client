@@ -24,11 +24,9 @@
 
     + '<lex-banner'
     +   ' id="agentsBanner"'
-    +   ' variant="dark"'
-    +   ' corners'
+    +   ' variant="light"'
     +   ' heading="Agents"'
-    +   ' subtitle="Browse and configure system and custom agents"'
-    +   ' icon="A"'
+    +   ' subtitle="Browse and configure system and custom agents."'
     + '>'
     +   '<lex-btn id="agentsCreateBtn" variant="primary" icon="plus">Create agent</lex-btn>'
     + '</lex-banner>'
