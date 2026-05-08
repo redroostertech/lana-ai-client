@@ -578,7 +578,11 @@
     var tabsEl = el('agentDetailTabs');
     if (!tabsEl) return;
     var handler = function (e) {
-      var id = e.detail && e.detail.id;
+      // lex-tabs emits { tab, previous } on tab-change (see
+      // src/js/lex/components/foundation/lex-tabs.js:266). Earlier wiring
+      // read e.detail.id, which is undefined — so switchTab never fired
+      // and the panel never swapped.
+      var id = e.detail && (e.detail.tab || e.detail.id);
       if (id) switchTab(state, id);
     };
     tabsEl.addEventListener('tab-change', handler);
@@ -765,9 +769,16 @@
   // =========================================================================
 
   function wireBannerButtons(ctx, state) {
-    var runBtn = el('agentDetailRunBtn');
-    if (runBtn) {
-      var runHandler = function () {
+    // lex-banner and lex-btn both clone their children during render (see
+    // lex.core.js _captureContent + _restoreContent), so any listener
+    // attached directly to el('agentDetailRunBtn') runs against a node
+    // that's been replaced by a clone before the user can click it. Use
+    // root-level click delegation against the stable view container so we
+    // catch the click on whichever clone is live in the DOM.
+    var rootForBanner = state._rootEl || document;
+    var bannerClickHandler = function (e) {
+      if (!e || !e.target || typeof e.target.closest !== 'function') return;
+      if (e.target.closest('#agentDetailRunBtn')) {
         var modal = el('agentDetailRunModal');
         var input = el('agentDetailRunInput');
         if (input && typeof input.value !== 'undefined') input.value = '';
@@ -775,17 +786,15 @@
           modal.heading = 'Run: ' + (state.agent && (state.agent.name || state.agent.slug) || state.slug || '');
           modal.open = true;
         }
-      };
-      runBtn.addEventListener('click', runHandler);
-      state._unbindFns.push(function () { runBtn.removeEventListener('click', runHandler); });
-    }
-
-    var configBtn = el('agentDetailConfigBtn');
-    if (configBtn) {
-      var openHandler = function () { openEditDrawer(state); };
-      configBtn.addEventListener('click', openHandler);
-      state._unbindFns.push(function () { configBtn.removeEventListener('click', openHandler); });
-    }
+        return;
+      }
+      if (e.target.closest('#agentDetailConfigBtn')) {
+        openEditDrawer(state);
+        return;
+      }
+    };
+    rootForBanner.addEventListener('click', bannerClickHandler);
+    state._unbindFns.push(function () { rootForBanner.removeEventListener('click', bannerClickHandler); });
 
     var drawer = el('agentDetailConfigDrawer');
     if (drawer) {
@@ -1691,6 +1700,7 @@
 
     var slug = ctx && ctx.slug;
     var state = createState(slug);
+    state._rootEl = rootEl;
     rootEl._agentDetailState = state;
 
     wireTabs(state);
