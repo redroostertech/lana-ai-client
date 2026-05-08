@@ -113,11 +113,33 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // Register protocol for deep links (lana-ai://).
-// In development, macOS can keep a stale LaunchServices entry that points at
-// Electron.app without our app entrypoint, which opens Electron's default
-// "path-to-app" screen. Re-register with this file explicitly on every start.
+//
+// Behavior by platform:
+//   - macOS dev (process.defaultApp + darwin):
+//       SKIP registration entirely. Calling setAsDefaultProtocolClient here
+//       (and especially the removeAsDefaultProtocolClient calls that precede
+//       it) wipes the LanaAIDevHelper.app entry installed by install.sh,
+//       handing routing back to the bare Electron.app which spawns a
+//       welcome-screen window. The helper owns lana-ai:// in dev.
+//   - Windows / Linux dev:
+//       setAsDefaultProtocolClient(protocol, execPath, [appEntry]) writes
+//       registry entries (Windows) or a .desktop record that include the
+//       app entry path, so cold-start launches load electron-main.js. The
+//       args parameter is honored on these platforms (unlike macOS).
+//   - Packaged builds (process.defaultApp = false):
+//       The protocol is declared in Info.plist (mac) / NSIS install (win) /
+//       .desktop file (linux) by electron-builder. The runtime call here is
+//       a defensive no-op that confirms the registration.
 function registerDeepLinkProtocol() {
   const protocol = 'lana-ai';
+
+  if (process.platform === 'darwin' && process.defaultApp) {
+    logInfo(
+      `[DeepLink] Skipping ${protocol}:// registration on macOS dev — ` +
+        'routing is owned by LanaAIDevHelper.app (installed by install.sh)'
+    );
+    return;
+  }
 
   if (process.defaultApp) {
     const appEntry = path.resolve(__dirname, 'electron-main.js');

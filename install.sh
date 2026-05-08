@@ -122,6 +122,127 @@ install_cli() {
     cd "${SCRIPT_DIR}"
 }
 
+# ============================================================================
+# Dev-mode lana-ai:// protocol handler
+#
+# When running `npm run electron:dev` (i.e. lana-client run dev), macOS
+# LaunchServices won't reliably route lana-ai:// to the running Electron —
+# it tends to launch a fresh stock Electron with the welcome screen instead.
+#
+# Fix: install a tiny .app bundle whose only job is to forward lana-ai://
+# URLs to the already-running Electron via an Apple Event ("open location"),
+# which fires app.on('open-url', ...) in electron-main.js. No new windows.
+#
+# Skipped on non-macOS. Idempotent.
+# ============================================================================
+install_dev_url_handler() {
+    if [ "$(uname -s)" != "Darwin" ]; then
+        return 0
+    fi
+
+    local handler_dir="${HOME}/.lana-client"
+    local handler_app="${handler_dir}/LanaAIDevHelper.app"
+    local applescript_src="${handler_dir}/_lana-ai-helper.applescript"
+    local plist="${handler_app}/Contents/Info.plist"
+
+    # Sanity-check that osacompile, PlistBuddy, and lsregister exist
+    if ! command -v osacompile >/dev/null 2>&1; then
+        print_warn "osacompile not found; skipping dev URL handler install"
+        return 0
+    fi
+    if [ ! -x "/usr/libexec/PlistBuddy" ]; then
+        print_warn "PlistBuddy not found; skipping dev URL handler install"
+        return 0
+    fi
+    local lsregister="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+    if [ ! -x "${lsregister}" ]; then
+        print_warn "lsregister not found; skipping dev URL handler install"
+        return 0
+    fi
+
+    print_step "Installing lana-ai:// URL handler for dev mode…"
+
+    # Write the AppleScript handler. When macOS opens a lana-ai:// URL, it
+    # delivers a "GetURL" Apple Event to the registered .app — this script
+    # catches it and re-emits the same event to the running Electron.
+    cat > "${applescript_src}" <<'APPLESCRIPT'
+on open location URL_arg
+    tell application "System Events"
+        set isRunning to (exists (processes where name is "Electron"))
+    end tell
+    if isRunning then
+        tell application id "com.github.Electron"
+            open location URL_arg
+        end tell
+    else
+        display alert "Lana AI dev app is not running" message "Start it with: lana-client run dev" buttons {"OK"} default button 1
+    end if
+end open location
+APPLESCRIPT
+
+    # Compile the AppleScript into a .app bundle
+    rm -rf "${handler_app}"
+    if ! osacompile -o "${handler_app}" "${applescript_src}" >/dev/null 2>&1; then
+        print_warn "osacompile failed; skipping dev URL handler install"
+        rm -f "${applescript_src}"
+        return 0
+    fi
+
+    # Stable bundle identifier — required so we can set this app as the
+    # *default* handler (not just one of many registered handlers) for
+    # lana-ai:// via LSSetDefaultHandlerForURLScheme below.
+    local helper_bundle_id="com.redroostertech.lana-ai.dev-helper"
+    /usr/libexec/PlistBuddy -c "Delete :CFBundleIdentifier" "${plist}" 2>/dev/null || true
+    /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string ${helper_bundle_id}" "${plist}"
+
+    # Add CFBundleURLTypes so macOS knows this app handles lana-ai:// URLs.
+    # Drop any pre-existing entry first so re-runs are idempotent.
+    /usr/libexec/PlistBuddy -c "Delete :CFBundleURLTypes" "${plist}" 2>/dev/null || true
+    /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" "${plist}"
+    /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0 dict" "${plist}"
+    /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLName string Lana AI Dev" "${plist}"
+    /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" "${plist}"
+    /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string lana-ai" "${plist}"
+
+    # Hide from the dock when triggered
+    /usr/libexec/PlistBuddy -c "Delete :LSUIElement" "${plist}" 2>/dev/null || true
+    /usr/libexec/PlistBuddy -c "Add :LSUIElement bool true" "${plist}"
+
+    # The .app was code-signed by osacompile against the *original* plist.
+    # Re-sign now that we've changed CFBundleIdentifier / CFBundleURLTypes,
+    # otherwise lsregister may refuse to register it (Gatekeeper kVErrorMisc).
+    if command -v codesign >/dev/null 2>&1; then
+        codesign --force --deep --sign - "${handler_app}" >/dev/null 2>&1 || true
+    fi
+
+    # Re-register with LaunchServices so macOS picks up the new bundle ID
+    # and CFBundleURLTypes.
+    "${lsregister}" -f "${handler_app}" >/dev/null 2>&1 || true
+
+    # Set the helper as the *default* handler for lana-ai://. lsregister only
+    # lists it as a candidate; LSSetDefaultHandlerForURLScheme is what makes
+    # macOS actually route the URL to it instead of the stale npx Electron.
+    if command -v swift >/dev/null 2>&1; then
+        swift - <<SWIFT >/dev/null 2>&1 || true
+import Foundation
+import CoreServices
+let result = LSSetDefaultHandlerForURLScheme("lana-ai" as CFString, "${helper_bundle_id}" as CFString)
+exit(result == 0 ? 0 : 1)
+SWIFT
+        if [ $? -eq 0 ]; then
+            print_step "lana-ai:// is now routed through the dev helper"
+        else
+            print_warn "Could not set dev helper as default lana-ai:// handler. Run: ./install.sh again, or set manually."
+        fi
+    else
+        print_warn "swift CLI not available — cannot programmatically set lana-ai:// default handler."
+        print_warn "Install Xcode Command Line Tools: xcode-select --install"
+    fi
+
+    rm -f "${applescript_src}"
+    print_step "Dev URL handler installed: ${handler_app}"
+}
+
 verify_install() {
     if command -v lana-client >/dev/null 2>&1; then
         print_step "Installed: lana-client $(lana-client --version)"
@@ -152,6 +273,7 @@ main() {
     check_gh
     ensure_credentials
     install_cli
+    install_dev_url_handler
     verify_install
     print_next_steps
 }

@@ -616,34 +616,94 @@ function renderRunDetail(detail, lanaClientUrl = '') {
   const resourcesBlock = createdResources.length
     ? drawerSection({
       title: 'Created Outputs',
-      body: `
-        ${createdResources.slice(0, 50).map((resource) => {
+      body: (() => {
+        const itemActionLabel = (type) => {
+          const t = String(type || '').toLowerCase();
+          if (t === 'task') return 'Open Task';
+          if (t === 'document') return 'Open Document';
+          if (t === 'redline') return 'Open Redline';
+          if (t === 'activity') return 'Open Activity';
+          if (t === 'artifact') return 'Open Artifact';
+          return 'Open Output';
+        };
+
+        // Split into per-item resources vs. roll-up summary entries so the
+        // summaries don't pose as clickable items. The backend currently
+        // emits a single "summary" row that totals the rest of the run
+        // (e.g. "+225 additional item results"); render it inline as context
+        // rather than another full card.
+        const items = createdResources.filter((r) =>
+          String(r?.type || r?.resource_type || '').toLowerCase() !== 'summary' && r?.is_summary !== true
+        );
+        const summaries = createdResources.filter((r) =>
+          String(r?.type || r?.resource_type || '').toLowerCase() === 'summary' || r?.is_summary === true
+        );
+
+        const itemsHtml = items.slice(0, 50).map((resource) => {
+          const type = String(resource.type || resource.resource_type || 'output').toLowerCase();
           const resourceUrl = getCreatedResourceUrl(resource, lanaClientUrl);
+          const matterId = resolveResourceMatterId(resource);
+          const matterName = resource.matter_name || resource.matterName || matterId;
+          const matterUrl = buildMatterDetailUrl(lanaClientUrl, matterId);
+          const title = resource.title || resource.id || itemActionLabel(type);
+          const resourceTypeLabel = resource.resource_type ? formatLabel(resource.resource_type) : '';
+
           return `
             <lex-card variant="flat" class="automation-detail-item">
               <div class="ld-artifact-meta">
-                ${badge(formatLabel(resource.type || 'output'))}
-                <strong>${escapeHtml(resource.title || resource.id || 'Output')}</strong>
+                ${badge(formatLabel(type || 'output'))}
+                <strong>${escapeHtml(title)}</strong>
+                ${resourceTypeLabel && resourceTypeLabel.toLowerCase() !== type
+                  ? `<span class="muted" style="font-size:0.8rem;">${escapeHtml(resourceTypeLabel)}</span>`
+                  : ''}
               </div>
-              ${(resource.resource_type || resource.matter_name) ? `
-                <div class="muted">
-                  ${resource.resource_type ? `Resource: ${escapeHtml(resource.resource_type)}` : ''}
-                  ${resource.matter_name ? ` Matter: ${escapeHtml(resource.matter_name)}` : ''}
+              ${matterId ? `
+                <div style="margin-top:6px;">
+                  ${renderMatterBadge(lanaClientUrl, matterId, matterName)}
                 </div>
               ` : ''}
-              ${resourceUrl ? `
-                <div class="row-actions" style="margin-top:6px;">
+              <div class="row-actions" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">
+                ${resourceUrl ? `
                   <lex-btn
                     variant="primary"
                     size="sm"
                     data-ld-open-created-resource="${escapeAttribute(resourceUrl)}"
-                  >${escapeHtml(resource.type === 'task' ? 'Open Task' : 'Open Output')}</lex-btn>
-                </div>
-              ` : ''}
+                  >${escapeHtml(itemActionLabel(type))}</lex-btn>
+                ` : ''}
+                ${matterUrl && resourceUrl !== matterUrl ? `
+                  <lex-btn
+                    variant="secondary"
+                    size="sm"
+                    data-ld-open-created-resource="${escapeAttribute(matterUrl)}"
+                  >View Matter</lex-btn>
+                ` : ''}
+              </div>
             </lex-card>
           `;
-        }).join('')}
-      `
+        }).join('');
+
+        const overflowCount = items.length > 50 ? items.length - 50 : 0;
+
+        // Summary chips: count-only rolled-up entries from the backend, plus
+        // a synthesized chip for any items beyond the first 50 we listed.
+        const summaryChips = [
+          ...summaries.map((s) => {
+            const label = s.title || s.id || (s.count ? `+${s.count} additional items` : 'Additional items');
+            return `<span class="ld-run-matter-badge" style="display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 10px;background:rgba(0,0,0,0.04);font-size:0.75rem;line-height:1;">${badge(formatLabel('summary'))} ${escapeHtml(String(label))}</span>`;
+          }),
+          overflowCount > 0
+            ? `<span class="ld-run-matter-badge" style="display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 10px;background:rgba(0,0,0,0.04);font-size:0.75rem;line-height:1;">${badge(formatLabel('summary'))} +${overflowCount} more not shown</span>`
+            : ''
+        ].filter(Boolean).join(' ');
+
+        return `
+          <p class="muted" style="margin:0 0 10px;font-size:0.85rem;">
+            Items created during this run. Items linked to a matter open the matter detail in the Lana AI client.
+          </p>
+          ${itemsHtml}
+          ${summaryChips ? `<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;">${summaryChips}</div>` : ''}
+        `;
+      })()
     })
     : '';
 
