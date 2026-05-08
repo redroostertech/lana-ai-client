@@ -563,7 +563,7 @@
     var tabsEl = el('agentDetailTabs');
     if (!tabsEl) return;
     var handler = function (e) {
-      var id = e.detail && e.detail.id;
+      var id = e.detail && (e.detail.tab || e.detail.id);
       if (id) switchTab(state, id);
     };
     tabsEl.addEventListener('tab-change', handler);
@@ -750,9 +750,10 @@
   // =========================================================================
 
   function wireBannerButtons(ctx, state) {
-    var runBtn = el('agentDetailRunBtn');
-    if (runBtn) {
-      var runHandler = function () {
+    var rootForBanner = state._rootEl || document;
+    var bannerClickHandler = function (e) {
+      if (!e || !e.target || typeof e.target.closest !== 'function') return;
+      if (e.target.closest('#agentDetailRunBtn')) {
         var modal = el('agentDetailRunModal');
         var input = el('agentDetailRunInput');
         if (input && typeof input.value !== 'undefined') input.value = '';
@@ -760,17 +761,15 @@
           modal.heading = 'Run: ' + (state.agent && (state.agent.name || state.agent.slug) || state.slug || '');
           modal.open = true;
         }
-      };
-      runBtn.addEventListener('click', runHandler);
-      state._unbindFns.push(function () { runBtn.removeEventListener('click', runHandler); });
-    }
-
-    var configBtn = el('agentDetailConfigBtn');
-    if (configBtn) {
-      var openHandler = function () { openEditDrawer(state); };
-      configBtn.addEventListener('click', openHandler);
-      state._unbindFns.push(function () { configBtn.removeEventListener('click', openHandler); });
-    }
+        return;
+      }
+      if (e.target.closest('#agentDetailConfigBtn')) {
+        openEditDrawer(state);
+        return;
+      }
+    };
+    rootForBanner.addEventListener('click', bannerClickHandler);
+    state._unbindFns.push(function () { rootForBanner.removeEventListener('click', bannerClickHandler); });
 
     var drawer = el('agentDetailConfigDrawer');
     if (drawer) {
@@ -1587,6 +1586,7 @@
 
     var slug = ctx && ctx.slug;
     var state = createState(slug);
+    state._rootEl = rootEl;
     rootEl._agentDetailState = state;
 
     wireTabs(state);

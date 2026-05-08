@@ -91,7 +91,9 @@ const DEFAULT_AGENT = {
     'If the caller asks whether RedRooster handles a case type, answer from the firm profile when possible and continue with useful screening.',
     'Do not ask for information already provided. If the caller is unsure, accept that and move forward.',
     'Do not give legal advice, evaluate the value of a claim, promise representation, or say an attorney is available unless configured in the handoff policy.',
-    'When enough details are captured, summarize briefly, confirm the best callback number, and tell the caller the RedRooster team will review the message and follow up.'
+    'When enough details are captured, summarize briefly, confirm the best callback number, and tell the caller you will forward the information to an attorney or legal team for review.',
+    'For routine new inquiries, tell the caller they should hear back today or the next business day.',
+    'If the caller offers photos, incident numbers, medical records, or other follow-up materials, acknowledge that they can send those along and explain the attorney-review callback next step.'
   ].join(' '),
   escalation: 'Escalate immediately when the caller mentions a same-day deadline, statute-of-limitations concern, court date, active hospitalization, severe injury, fatality, police at the scene, hostile caller, media inquiry, signed release, settlement offer, or request for legal advice.',
   completion_criteria: 'New inquiry has caller identity, callback number, incident type, incident date or approximate timing, incident location, injury or treatment status, claim or lawsuit status, insurer/release status when relevant, urgency, and preferred next step captured or marked unavailable. Current-client messages have caller identity, callback number, matter or attorney if known, and message captured.',
@@ -198,6 +200,7 @@ const state = {
     processor: null,
     source: null,
     currentAudio: null,
+    currentAudioId: '',
     realtimeSocket: null,
     realtimeActive: false,
     realtimeReady: false,
@@ -787,33 +790,22 @@ async function showVoicePreview() {
   const voice = normalizeVoiceStack(agent.voice || {});
   const previewText = agent.greeting || DEFAULT_AGENT.greeting;
   let previewResult = null;
-  let playbackMessage = 'Requesting audio preview from the LANA voice runtime.';
+  let playbackMessage = '';
 
   try {
-    const response = await fetch(resolveUrl('/api/v1/voice/preview'), {
-      method: 'POST',
-      headers: {
-        ...authHeaders(),
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify({
-        text: previewText,
-        voice: voice.tts_voice,
-        speed: voice.speed,
-        format: 'wav',
-      }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    previewResult = payload.data || payload;
-    if (response.ok && previewResult?.audio?.base64) {
-      const audio = new Audio(`data:${previewResult.audio.mime_type || 'audio/wav'};base64,${previewResult.audio.base64}`);
-      audio.play().catch((error) => {
-        showFlash(`Audio preview was generated but playback was blocked: ${error.message}`, 'warn');
-      });
-      playbackMessage = 'Audio preview generated and playback started.';
-    } else {
+    previewResult = await synthesizeAgentSpeech(previewText, voice);
+    if (!previewResult?.audio?.base64) {
       playbackMessage = previewResult?.message || 'Audio playback is not available from the current LANA voice runtime.';
+    } else {
+      const audio = new Audio(`data:${previewResult.audio.mime_type || 'audio/wav'};base64,${previewResult.audio.base64}`);
+      if (state.voiceConsole.currentPreviewAudio) {
+        try { state.voiceConsole.currentPreviewAudio.pause(); } catch (_error) {}
+        try { state.voiceConsole.currentPreviewAudio.currentTime = 0; } catch (_error) {}
+      }
+      state.voiceConsole.currentPreviewAudio = audio;
+      await audio.play();
+      showFlash(`Playing ${voice.tts_voice} preview.`, 'success');
+      return;
     }
   } catch (error) {
     playbackMessage = `Audio preview failed: ${error.message}`;
@@ -1338,7 +1330,15 @@ function resetWebVoiceConsole() {
 }
 
 async function startWebVoiceSession() {
-  const agent = updateSelectedFromForm() || selectedAgent();
+  if (state.dirty) {
+    state.voiceConsole.status = 'Save required';
+    state.voiceConsole.error = 'Save this agent before starting a voice session so the runtime uses the same configuration shown here.';
+    showFlash('Save changes before starting a voice session.', 'warn');
+    renderEditor();
+    return;
+  }
+
+  const agent = selectedAgent();
   if (!agent) return;
   if (!navigator.mediaDevices?.getUserMedia) {
     state.voiceConsole.supported = false;
@@ -1387,6 +1387,7 @@ async function startWebVoiceSession() {
     state.voiceConsole.lastVoiceAt = 0;
     state.voiceConsole.speechStarted = false;
     state.voiceConsole.openingPlayed = false;
+    state.voiceConsole.currentAudioId = '';
     state.voiceConsole.realtimeSocket = null;
     state.voiceConsole.realtimeActive = false;
     state.voiceConsole.realtimeReady = false;
@@ -1787,10 +1788,17 @@ function endWebVoiceSession(options = {}) {
 function interruptAgentPlayback() {
   const audio = state.voiceConsole.currentAudio;
   if (audio) {
+    sendRealtimePlaybackEvent('interrupted', {
+      audioId: state.voiceConsole.currentAudioId || '',
+      reason: 'barge_in',
+      currentTimeMs: Math.round((audio.currentTime || 0) * 1000),
+      durationMs: Number.isFinite(audio.duration) ? Math.round(audio.duration * 1000) : null,
+    });
     try { audio.pause(); } catch (_error) {}
     try { audio.currentTime = 0; } catch (_error) {}
   }
   state.voiceConsole.currentAudio = null;
+  state.voiceConsole.currentAudioId = '';
   state.voiceConsole.realtimeAudioQueue = [];
   state.voiceConsole.realtimeAudioPlaying = false;
   state.voiceConsole.realtimePendingAudio = [];
@@ -1863,6 +1871,8 @@ function playNextRealtimeResponseAudio() {
   const next = consoleState.realtimeAudioQueue.shift();
   consoleState.realtimeAudioPlaying = true;
   playAgentAudio(next.audio, {
+    audioId: next.audioId,
+    textLength: next.text.length,
     speakingStatus: 'Agent speaking',
     noAudioStatus: consoleState.sessionActive ? 'Listening' : 'Agent replied without audio',
     noAudioMessage: 'Listening. Speak naturally; pauses will send each turn.',
@@ -1884,6 +1894,8 @@ async function playAgentAudio(audioPayload, options = {}) {
   const speakingStatus = options.speakingStatus || 'Agent speaking';
   const noAudioStatus = options.noAudioStatus || 'Agent replied without audio';
   const noAudioMessage = options.noAudioMessage || 'Listening. Speak naturally; pauses will send each turn.';
+  const audioId = options.audioId || audioPayload?.audio_id || '';
+  const textLength = Number.isFinite(Number(options.textLength)) ? Number(options.textLength) : null;
   let playbackFinished = false;
   const finishPlayback = () => {
     if (playbackFinished) return;
@@ -1896,6 +1908,7 @@ async function playAgentAudio(audioPayload, options = {}) {
   if (audioPayload?.base64) {
     const audio = new Audio(`data:${audioPayload.mime_type || 'audio/wav'};base64,${audioPayload.base64}`);
     consoleState.currentAudio = audio;
+    consoleState.currentAudioId = audioId;
     consoleState.playbackStartedAt = performance.now();
     consoleState.phase = 'speaking';
     consoleState.status = speakingStatus;
@@ -1903,12 +1916,25 @@ async function playAgentAudio(audioPayload, options = {}) {
     consoleState.listening = true;
     consoleState.interimTranscript = 'Agent speaking. Start talking to interrupt.';
     renderEditor();
+    sendRealtimePlaybackEvent('started', {
+      audioId,
+      textLength,
+      durationMs: null,
+      currentTimeMs: 0,
+    });
     audio.addEventListener('ended', () => {
       if (consoleState.currentAudio === audio) {
         consoleState.currentAudio = null;
+        consoleState.currentAudioId = '';
         consoleState.playbackStartedAt = 0;
         consoleState.bargeInStartedAt = 0;
       }
+      sendRealtimePlaybackEvent('ended', {
+        audioId,
+        textLength,
+        durationMs: Number.isFinite(audio.duration) ? Math.round(audio.duration * 1000) : null,
+        currentTimeMs: Math.round((audio.currentTime || 0) * 1000),
+      });
       if (consoleState.sessionActive) {
         consoleState.phase = 'listening';
         consoleState.status = 'Listening';
@@ -1924,6 +1950,17 @@ async function playAgentAudio(audioPayload, options = {}) {
       finishPlayback();
     }, { once: true });
     await audio.play().catch((error) => {
+      sendRealtimePlaybackEvent('blocked', {
+        audioId,
+        textLength,
+        reason: error.message,
+        durationMs: Number.isFinite(audio.duration) ? Math.round(audio.duration * 1000) : null,
+        currentTimeMs: Math.round((audio.currentTime || 0) * 1000),
+      });
+      if (consoleState.currentAudio === audio) {
+        consoleState.currentAudio = null;
+        consoleState.currentAudioId = '';
+      }
       consoleState.error = `Audio generated but playback was blocked: ${error.message}`;
       consoleState.phase = consoleState.sessionActive ? 'listening' : 'idle';
       consoleState.status = consoleState.sessionActive ? 'Listening' : 'Stopped';
@@ -1938,6 +1975,11 @@ async function playAgentAudio(audioPayload, options = {}) {
     return;
   }
 
+  sendRealtimePlaybackEvent('missing_audio', {
+    audioId,
+    textLength,
+    reason: 'no_audio_payload',
+  });
   if (consoleState.sessionActive) {
     consoleState.phase = 'listening';
     consoleState.status = noAudioStatus;
@@ -1952,6 +1994,23 @@ async function playAgentAudio(audioPayload, options = {}) {
   consoleState.busy = false;
   renderEditor();
   finishPlayback();
+}
+
+function sendRealtimePlaybackEvent(status, details = {}) {
+  const socket = state.voiceConsole.realtimeSocket;
+  if (!socket || socket.readyState !== WebSocket.OPEN) return;
+  try {
+    socket.send(JSON.stringify({
+      type: 'audio_playback',
+      status,
+      audio_id: details.audioId || '',
+      reason: details.reason || null,
+      duration_ms: Number.isFinite(Number(details.durationMs)) ? Number(details.durationMs) : null,
+      current_time_ms: Number.isFinite(Number(details.currentTimeMs)) ? Number(details.currentTimeMs) : null,
+      text_length: Number.isFinite(Number(details.textLength)) ? Number(details.textLength) : null,
+      timestamp: new Date().toISOString(),
+    }));
+  } catch (_error) {}
 }
 
 function stopWebVoiceConsole(options = {}) {
@@ -1980,6 +2039,7 @@ function cleanupWebVoiceAudio() {
   state.voiceConsole.audioContext = null;
   state.voiceConsole.mediaStream = null;
   state.voiceConsole.currentAudio = null;
+  state.voiceConsole.currentAudioId = '';
   state.voiceConsole.realtimeSocket = null;
   state.voiceConsole.realtimeActive = false;
   state.voiceConsole.realtimeReady = false;
@@ -2294,7 +2354,6 @@ function bind() {
     const target = actionTarget(event);
     const action = target?.dataset.action;
     if (!action) return;
-    if (action === 'add-tool') addTool();
     if (action === 'add-intake-field') addIntakeField();
     if (action === 'remove-intake-field') removeIntakeField(Number(target.dataset.index));
     if (action === 'run-test') runTest();
@@ -2324,21 +2383,6 @@ function bind() {
   }
 }
 
-function addTool() {
-  const input = $('new-tool-name');
-  const name = input?.value.trim();
-  const agent = selectedAgent();
-  if (!name || !agent) return;
-  agent.tools = agent.tools || [];
-  agent.tools.push({
-    id: name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''),
-    name,
-    enabled: true
-  });
-  setDirty(true);
-  renderEditor();
-}
-
 function addIntakeField() {
   const agent = updateSelectedFromForm() || selectedAgent();
   if (!agent) return;
@@ -2366,6 +2410,9 @@ function removeIntakeField(index) {
 }
 
 function onSidebarUserAction(event) {
+  if (event && typeof event.stopPropagation === 'function') {
+    event.stopPropagation();
+  }
   const detail = event && event.detail;
   if (!detail) return;
   if (detail.action === 'signout') {
@@ -2383,7 +2430,11 @@ function onSidebarUserAction(event) {
     return;
   }
   if (detail.href) {
-    window.location.href = detail.href;
+    const targetUrl = new URL(detail.href, window.location.href);
+    if (targetUrl.pathname === window.location.pathname) {
+      return;
+    }
+    window.location.href = targetUrl.href;
   }
 }
 
