@@ -575,7 +575,7 @@
   }
 
   function switchMatterTab(tab) {
-    var tabs = ['activity', 'notes', 'tasks', 'comments', 'documents', 'conversations', 'billableHours', 'docGeneration', 'analytics'];
+    var tabs = ['activity', 'notes', 'tasks', 'comments', 'documents', 'conversations', 'billableHours', 'summary', 'docGeneration', 'analytics'];
     var activeBtn = null;
 
     tabs.forEach(function (t) {
@@ -684,9 +684,20 @@
 
     var html = '<div class="flex flex-col gap-4">';
 
-    // Information card (read-only — edit via header menu)
+    // Information card (read-only — edit via header menu).
+    // Description used to live in its own card at the top of the page; we
+    // render it as a stacked block at the bottom of this card so the meta
+    // rows above stay aligned in the label/value columns.
+    var descriptionText = (matter && matter.description) ? String(matter.description).trim() : '';
+    var descriptionBlock = descriptionText
+      ? '<div class="pb-2.5 mb-2.5 border-b border-gray-100">' +
+          '<p class="text-gray-900" style="white-space:pre-wrap;line-height:1.5;margin:0;">' + escapeHtml(descriptionText) + '</p>' +
+        '</div>'
+      : '';
+
     html += '<lex-card id="infoCard" heading="Information" variant="flat" padding="compact">' +
       '<div class="space-y-2.5 text-sm">' +
+        descriptionBlock +
         '<div class="flex justify-between"><span class="text-gray-500">Client</span><span class="text-gray-900 font-medium">' + escapeHtml(matter.client_name || 'N/A') + '</span></div>' +
         '<div class="flex justify-between"><span class="text-gray-500">Type</span><span class="text-gray-900">' + (matter.matter_type === 'workspace' ? 'Workspace' : 'Matter') + '</span></div>' +
         '<div class="flex justify-between"><span class="text-gray-500">Status</span><span class="text-gray-900">' + (matter.status ? matter.status.charAt(0).toUpperCase() + matter.status.substring(1) : 'Active') + '</span></div>' +
@@ -3262,7 +3273,7 @@
               '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>' +
               'Create Task' +
             '</button>' +
-            '<button onclick="openTaskPlansForMatter(\'' + matter.matter_id + '\')" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 text-sm rounded-lg font-medium hover:bg-gray-50 transition-colors">' +
+            '<button onclick="openCreateTaskPlanModal(\'' + matter.matter_id + '\')" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 text-sm rounded-lg font-medium hover:bg-gray-50 transition-colors">' +
               '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 11l3 3L22 4"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path></svg>' +
               'Create Task Plan' +
             '</button>' +
@@ -3316,7 +3327,7 @@
             '<p class="text-sm text-gray-500">' + lanaCount + ' LANA tasks, ' + externalCount + ' external tasks</p>' +
           '</div>' +
           '<div class="flex flex-wrap gap-2">' +
-            '<button onclick="openTaskPlansForMatter(\'' + matterId + '\')" class="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium flex items-center gap-2">' +
+            '<button onclick="openCreateTaskPlanModal(\'' + matterId + '\')" class="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium flex items-center gap-2">' +
               '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 11l3 3L22 4"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path></svg>' +
               'Task Plan' +
             '</button>' +
@@ -4755,6 +4766,24 @@
   // Task Modal
   // =========================================================================
 
+  // Build a human label for a user object.
+  // Fallback chain (most specific → least):
+  //   1. "First Last"  — when both name fields are present
+  //   2. "First"       — when only first_name is present
+  //   3. email         — when no name is present
+  //   4. raw id        — absolute last resort
+  // Without this, users with no first/last (e.g. system accounts) render as
+  // an empty label and lex-select falls back to displaying the raw UUID.
+  function userDisplayLabel(u) {
+    if (!u) return '';
+    var first = (u.first_name || u.firstName || '').trim();
+    var last  = (u.last_name  || u.lastName  || '').trim();
+    if (first && last) return first + ' ' + last;
+    if (first) return first;
+    if (u.email) return u.email;
+    return String(u.id || '');
+  }
+
   // Populate assignee dropdown with organisation users
   async function populateTaskAssignees(selectedUserId) {
     selectedUserId = selectedUserId || null;
@@ -4766,28 +4795,44 @@
 
       var optionsList = [{ value: '', label: 'Unassigned' }];
 
-      // Add "Me" option for current user first
+      // Add "Me" option for current user first. Always include this when we
+      // have a current user, even if the directory endpoint doesn't return
+      // them (e.g. system/admin accounts that are excluded from /admin/users).
+      // Without this fallback the dropdown's value (currentUserId) wouldn't
+      // match any option and lex-select would render the raw UUID.
       if (currentUserId) {
         var currentUser = null;
         for (var ci = 0; ci < users.length; ci++) {
           if (users[ci].id === currentUserId) { currentUser = users[ci]; break; }
         }
-        if (currentUser) {
-          optionsList.push({
-            value: currentUserId,
-            label: 'Me (' + (currentUser.first_name || currentUser.firstName || '') + ' ' + (currentUser.last_name || currentUser.lastName || '') + ')'
-          });
-        }
+        var meSource = currentUser || api.user || { id: currentUserId };
+        optionsList.push({
+          value: currentUserId,
+          label: 'Me (' + userDisplayLabel(meSource) + ')'
+        });
       }
 
-      // Add remaining users
+      // Add remaining users from the directory.
       for (var ui = 0; ui < users.length; ui++) {
         var u = users[ui];
         if (u.id === currentUserId) continue;
         optionsList.push({
           value: u.id,
-          label: (u.first_name || u.firstName || '') + ' ' + (u.last_name || u.lastName || '')
+          label: userDisplayLabel(u)
         });
+      }
+
+      // If the pre-selected user isn't the current user and isn't in the
+      // directory list either, synthesize an option so lex-select can render
+      // a label instead of the raw UUID.
+      if (selectedUserId && selectedUserId !== currentUserId) {
+        var alreadyHas = false;
+        for (var oi = 0; oi < optionsList.length; oi++) {
+          if (optionsList[oi].value === selectedUserId) { alreadyHas = true; break; }
+        }
+        if (!alreadyHas) {
+          optionsList.push({ value: selectedUserId, label: selectedUserId });
+        }
       }
 
       if (dropdown) {
@@ -5020,6 +5065,190 @@
     window.location.href = 'admin/task-plans.html?matter_id=' + encodeURIComponent(matterId);
   }
 
+  // ===========================================================================
+  // Create Task Plan Modal
+  // ===========================================================================
+
+  var currentTaskPlanMatterId = null;
+  // Local state mirrors the rendered <lex-input> rows so re-renders (after
+  // add/remove) preserve typed values.
+  var taskPlanItemsState = [];
+
+  async function openCreateTaskPlanModal(matterId) {
+    currentTaskPlanMatterId = matterId || null;
+    taskPlanItemsState = [{ title: '' }]; // start with one empty row
+
+    var modal = document.getElementById('taskPlanModal');
+    if (!modal) return;
+
+    var title = document.getElementById('taskPlanTitle');
+    var description = document.getElementById('taskPlanDescription');
+    if (title) title.value = '';
+    if (description) description.value = '';
+
+    renderTaskPlanItems();
+    modal.open = true;
+  }
+
+  function closeTaskPlanModal() {
+    var modal = document.getElementById('taskPlanModal');
+    if (modal) modal.open = false;
+    currentTaskPlanMatterId = null;
+    taskPlanItemsState = [];
+  }
+
+  function syncTaskPlanItemsFromInputs() {
+    var list = document.getElementById('taskPlanItemsList');
+    if (!list) return;
+    var inputs = list.querySelectorAll('[data-task-plan-item]');
+    for (var i = 0; i < inputs.length; i++) {
+      var idx = parseInt(inputs[i].getAttribute('data-task-plan-item'), 10);
+      if (taskPlanItemsState[idx]) {
+        taskPlanItemsState[idx].title = inputs[i].value || '';
+      }
+    }
+  }
+
+  function addTaskPlanItem() {
+    syncTaskPlanItemsFromInputs();
+    taskPlanItemsState.push({ title: '' });
+    renderTaskPlanItems();
+  }
+
+  function removeTaskPlanItem(index) {
+    syncTaskPlanItemsFromInputs();
+    if (index >= 0 && index < taskPlanItemsState.length) {
+      taskPlanItemsState.splice(index, 1);
+    }
+    if (taskPlanItemsState.length === 0) {
+      taskPlanItemsState.push({ title: '' });
+    }
+    renderTaskPlanItems();
+  }
+
+  function escapeAttr(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function renderTaskPlanItems() {
+    var list = document.getElementById('taskPlanItemsList');
+    if (!list) return;
+
+    list.innerHTML = taskPlanItemsState.map(function (item, idx) {
+      return '' +
+        '<div class="flex items-center gap-2">' +
+          '<lex-input ' +
+            'data-task-plan-item="' + idx + '" ' +
+            'placeholder="Item ' + (idx + 1) + '" ' +
+            'value="' + escapeAttr(item.title || '') + '" ' +
+            'style="flex:1;">' +
+          '</lex-input>' +
+          '<button type="button" onclick="removeTaskPlanItem(' + idx + ')" ' +
+            'class="p-2 text-gray-400 hover:text-red-600 transition-colors" title="Remove item">' +
+            '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+              '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>' +
+            '</svg>' +
+          '</button>' +
+        '</div>';
+    }).join('');
+  }
+
+  async function saveTaskPlan(event) {
+    if (event) event.preventDefault();
+
+    var titleEl = document.getElementById('taskPlanTitle');
+    var descriptionEl = document.getElementById('taskPlanDescription');
+    var title = titleEl ? String(titleEl.value || '').trim() : '';
+    var description = descriptionEl ? String(descriptionEl.value || '').trim() : '';
+
+    if (!title) {
+      Lex.Toast.error('Please enter a plan name');
+      return;
+    }
+
+    syncTaskPlanItemsFromInputs();
+    var items = taskPlanItemsState
+      .filter(function (it) { return it && it.title && it.title.trim(); })
+      .map(function (it, idx) {
+        return {
+          title: it.title.trim(),
+          description: '',
+          position: idx,
+          checklist_items: []
+        };
+      });
+
+    var saveBtn = document.querySelector('#taskPlanForm lex-btn[type="submit"]');
+    if (saveBtn) saveBtn.loading = true;
+
+    try {
+      var response = await api.createTaskPlan({
+        title: title,
+        description: description,
+        matter_id: currentTaskPlanMatterId,
+        plan_type: 'manual',
+        source_type: 'manual',
+        target_type: 'unassigned',
+        metadata: {
+          source_matter_id: currentTaskPlanMatterId,
+          target: { type: 'unassigned' }
+        }
+      });
+
+      var plan = (response && response.task_plan) || (response && response.data) || response;
+      var planId = plan && (plan.id || plan.task_plan_id || plan.plan_id);
+
+      // Persist items as a second call — createTaskPlan doesn't accept an
+      // items array, so we patch the freshly-created plan with the list.
+      if (planId && items.length > 0) {
+        await api.updateTaskPlan(planId, { items: items });
+      }
+
+      // Publish the plan so its items become real tasks attached to the
+      // matter. Without this step the plan stays in draft and the matter's
+      // Tasks tab continues to show "No tasks yet".
+      if (planId && items.length > 0) {
+        try {
+          await api.publishTaskPlan(planId);
+        } catch (publishErr) {
+          console.warn('[Workspace Details] Plan saved but publish failed:', publishErr);
+          Lex.Toast.error('Plan saved, but publishing failed: ' + (publishErr && publishErr.message || 'unknown error'));
+          // Fall through — close modal anyway so the user can fix later.
+        }
+      }
+
+      closeTaskPlanModal();
+      Lex.Toast.success(items.length > 0 ? 'Task plan published' : 'Task plan created');
+
+      // Reload the matter tasks so the new tasks appear in the Tasks tab.
+      try {
+        var matterIdToRefresh = currentMatterData
+          && (currentMatterData.matter_id
+              || (currentMatterData.matter && currentMatterData.matter.matter_id));
+        if (matterIdToRefresh) {
+          var refreshResponse = await api.getMatterTasks(matterIdToRefresh);
+          var refreshed = (refreshResponse && refreshResponse.tasks) || [];
+          if (currentMatterData) {
+            currentMatterData.tasks = refreshed;
+            renderTasksTab(currentMatterData.matter, refreshed);
+          }
+        }
+      } catch (refreshErr) {
+        console.warn('[Workspace Details] Could not refresh tasks after publish:', refreshErr);
+      }
+    } catch (err) {
+      console.error('[Workspace Details] Failed to create task plan:', err);
+      Lex.Toast.error(err && err.message || 'Failed to create task plan');
+    } finally {
+      if (saveBtn) saveBtn.loading = false;
+    }
+  }
+
   // =========================================================================
   // Window globals for task modal handlers
   // =========================================================================
@@ -5027,6 +5256,11 @@
   window.populateTaskAssignees = populateTaskAssignees;
   window.openCreateTaskModal = openCreateTaskModal;
   window.openTaskPlansForMatter = openTaskPlansForMatter;
+  window.openCreateTaskPlanModal = openCreateTaskPlanModal;
+  window.closeTaskPlanModal = closeTaskPlanModal;
+  window.addTaskPlanItem = addTaskPlanItem;
+  window.removeTaskPlanItem = removeTaskPlanItem;
+  window.saveTaskPlan = saveTaskPlan;
   window.editTask = editTask;
   window.quickCompleteTask = quickCompleteTask;
   window.deleteTask = deleteTask;
@@ -6455,6 +6689,13 @@
     var container = document.getElementById('matterProfileSection');
     var notificationContainer = document.getElementById('matterProfileNotification');
     if (!container) return;
+
+    // Matter Intelligence is intentionally hidden in the Context tab — clear
+    // any previously rendered content (and skip the lazy-init network call)
+    // so the panel doesn't spend cycles or surface the empty-state card.
+    container.innerHTML = '';
+    if (notificationContainer) notificationContainer.innerHTML = '';
+    return;
 
     try {
       var profile = null;

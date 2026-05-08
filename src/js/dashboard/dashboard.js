@@ -780,16 +780,101 @@
       due.getDate() === today.getDate();
   }
 
-  function renderDashboardTaskRow(title, meta, priority, countLabel) {
+  // ---- Task status / date helpers (used by row + drawer) ------------------
+
+  var TASK_STATUSES = ['pending', 'in_progress', 'in_review', 'complete', 'cancelled'];
+
+  function taskStatusLabel(status) {
+    if (status === 'pending') return 'Pending';
+    if (status === 'in_progress') return 'In Progress';
+    if (status === 'in_review') return 'In Review';
+    if (status === 'complete' || status === 'completed') return 'Complete';
+    if (status === 'cancelled') return 'Cancelled';
+    return (status || 'Unknown').toString();
+  }
+
+  function taskStatusColor(status) {
+    if (status === 'complete' || status === 'completed') return 'green';
+    if (status === 'in_review') return 'yellow';
+    if (status === 'in_progress') return 'blue';
+    if (status === 'cancelled') return 'red';
+    return 'gray';
+  }
+
+  function formatDashboardTaskDate(dateStr) {
+    if (!dateStr) return '';
+    var d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function getTaskId(task) {
+    return (task && (task.id || task.task_id)) || '';
+  }
+
+  function renderTaskStatusPill(task, opts) {
+    opts = opts || {};
+    var size = opts.size || 'sm';
+    var status = task.status || 'pending';
+    var label = taskStatusLabel(status);
+    var color = taskStatusColor(status);
+    var taskId = getTaskId(task);
+
+    return [
+      '<button type="button"',
+      '  class="cc-task-status-pill"',
+      '  data-task-status-pill="1"',
+      '  data-task-id="' + escHtml(taskId) + '"',
+      '  data-current-status="' + escHtml(status) + '"',
+      '  aria-haspopup="listbox"',
+      '  aria-expanded="false"',
+      '  title="Change status"',
+      '  style="display:inline-flex;align-items:center;gap:4px;border:none;background:transparent;padding:0;cursor:pointer;font:inherit;color:inherit;">',
+      '  <lex-badge label="' + escHtml(label) + '" color="' + color + '"' + (size === 'lg' ? '' : '') + '></lex-badge>',
+      '  <span aria-hidden="true" style="font-size:0.65em;line-height:1;color:var(--lex-color-text-muted,#6b7280);">▾</span>',
+      '</button>'
+    ].join('');
+  }
+
+  function renderDashboardTaskRow(task) {
+    var taskId = getTaskId(task);
+    var title = task.title || 'Untitled task';
+    var scopeLabel = dashboardTaskScope(task);
+    var createdLabel = formatDashboardTaskDate(task.created_at);
+    var dueLabel = formatDashboardTaskDate(task.due_date);
+    var metaParts = [scopeLabel];
+    if (createdLabel) metaParts.push('Created ' + createdLabel);
+    if (dueLabel) metaParts.push('Due ' + dueLabel);
+    var meta = metaParts.filter(Boolean).join(' · ');
+
+    return [
+      '<div class="cc-task-row" data-task-row="1" data-task-id="' + escHtml(taskId) + '">',
+      '  <button type="button"',
+      '    class="cc-task-row__main"',
+      '    data-task-open="1"',
+      '    data-task-id="' + escHtml(taskId) + '"',
+      '    style="flex:1;min-width:0;text-align:left;border:none;background:transparent;padding:0;cursor:pointer;font:inherit;color:inherit;">',
+      '    <div class="cc-task-row__title">' + escHtml(title) + '</div>',
+      meta ? '    <div class="cc-task-row__meta">' + escHtml(meta) + '</div>' : '',
+      '  </button>',
+      '  <div style="display:flex;align-items:center;gap:0.375rem;flex-shrink:0;">',
+      '    ' + renderTaskStatusPill(task),
+      '  </div>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderDashboardTaskGroupRow(group) {
+    var count = group.count || 0;
     return [
       '<div class="cc-task-row" data-nav="my-tasks">',
-      '  <div style="min-width:0;">',
-      '    <div class="cc-task-row__title">' + escHtml(title || 'Untitled task') + '</div>',
-      meta ? '    <div class="cc-task-row__meta">' + escHtml(meta) + '</div>' : '',
+      '  <div style="min-width:0;flex:1;">',
+      '    <div class="cc-task-row__title">' + escHtml(group.title || 'Task group') + '</div>',
+      '    <div class="cc-task-row__meta">' + escHtml(count + ' task' + (count === 1 ? '' : 's') + ' in this plan') + '</div>',
       '  </div>',
-      '  <div style="display:flex;align-items:center;gap:0.375rem;">',
-      countLabel ? '    <lex-badge label="' + escHtml(countLabel) + '" color="gray"></lex-badge>' : '',
-      priority ? '    <lex-badge label="' + escHtml(priority) + '" color="' + escHtml(dashboardTaskPriorityColor(priority)) + '"></lex-badge>' : '',
+      '  <div style="display:flex;align-items:center;gap:0.375rem;flex-shrink:0;">',
+      '    <lex-badge label="' + escHtml(count + ' task' + (count === 1 ? '' : 's')) + '" color="gray"></lex-badge>',
+      group.priority ? '    <lex-badge label="' + escHtml(group.priority) + '" color="' + escHtml(dashboardTaskPriorityColor(group.priority)) + '"></lex-badge>' : '',
       '  </div>',
       '</div>'
     ].join('');
@@ -845,34 +930,15 @@
     }
 
     var groupRows = Object.keys(grouped).slice(0, 4).map(function (id) {
-      var group = grouped[id];
-      return renderDashboardTaskRow(
-        group.title,
-        'Task group',
-        group.priority,
-        group.count + ' task' + (group.count === 1 ? '' : 's')
-      );
+      return renderDashboardTaskGroupRow(grouped[id]);
     }).join('');
 
     var outstandingRows = groupRows;
     var remainingSlots = Math.max(0, 5 - Object.keys(grouped).slice(0, 4).length);
-    outstandingRows += ungrouped.slice(0, remainingSlots).map(function (task) {
-      return renderDashboardTaskRow(
-        task.title,
-        dashboardTaskScope(task),
-        task.priority || 'normal',
-        ''
-      );
-    }).join('');
+    var outstandingTasks = ungrouped.slice(0, remainingSlots);
+    outstandingRows += outstandingTasks.map(renderDashboardTaskRow).join('');
 
-    var todayRows = todayTasks.map(function (task) {
-      return renderDashboardTaskRow(
-        task.title,
-        dashboardTaskScope(task),
-        task.priority || 'normal',
-        ''
-      );
-    }).join('');
+    var todayRows = todayTasks.map(renderDashboardTaskRow).join('');
 
     contentEl.innerHTML = [
       '<div class="cc-task-section">',
@@ -886,10 +952,462 @@
     ].join('');
     show(contentEl);
 
-    var rows = contentEl.querySelectorAll('[data-nav="my-tasks"]');
-    for (var j = 0; j < rows.length; j++) {
-      rows[j].addEventListener('click', function () {
+    // Build a quick lookup so click handlers can pass the full task object to
+    // the drawer without re-fetching.
+    var taskLookup = {};
+    var allRowTasks = todayTasks.concat(outstandingTasks);
+    for (var t = 0; t < allRowTasks.length; t++) {
+      var tid = getTaskId(allRowTasks[t]);
+      if (tid) taskLookup[tid] = allRowTasks[t];
+    }
+
+    attachZoneDTaskHandlers(contentEl, taskLookup);
+  }
+
+  // ---- Zone D event wiring (status menu + detail drawer + actions) -------
+
+  // One-time state used to dismiss the floating status menu when the user
+  // clicks elsewhere. We attach the listener lazily.
+  var _zoneDStatusMenuListenerAttached = false;
+  function ensureZoneDStatusMenuDismissListener() {
+    if (_zoneDStatusMenuListenerAttached) return;
+    _zoneDStatusMenuListenerAttached = true;
+    document.addEventListener('click', function (event) {
+      var menu = document.getElementById('ccTaskStatusMenu');
+      if (!menu) return;
+      if (menu.contains(event.target)) return;
+      // Don't close immediately if the click is on a status pill — that path
+      // toggles the menu via its own handler.
+      if (event.target.closest && event.target.closest('[data-task-status-pill]')) return;
+      menu.remove();
+    }, true);
+  }
+
+  function attachZoneDTaskHandlers(contentEl, taskLookup) {
+    ensureZoneDStatusMenuDismissListener();
+
+    // Group rows still navigate to the my-tasks page (no per-task drawer for
+    // a roll-up entry).
+    var groupRows = contentEl.querySelectorAll('[data-nav="my-tasks"]');
+    for (var i = 0; i < groupRows.length; i++) {
+      groupRows[i].addEventListener('click', function () {
         Lex.Nav.go('my-tasks.html');
+      });
+    }
+
+    // Per-task open: clicking the title area opens the detail drawer.
+    var openButtons = contentEl.querySelectorAll('[data-task-open="1"]');
+    for (var j = 0; j < openButtons.length; j++) {
+      openButtons[j].addEventListener('click', function (event) {
+        event.stopPropagation();
+        var taskId = this.getAttribute('data-task-id');
+        var task = taskLookup[taskId];
+        if (task) openTaskDetailDrawer(task);
+      });
+    }
+
+    // Status pill: clicking opens a small floating menu of valid statuses.
+    var pills = contentEl.querySelectorAll('[data-task-status-pill]');
+    for (var k = 0; k < pills.length; k++) {
+      pills[k].addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        var taskId = this.getAttribute('data-task-id');
+        var current = this.getAttribute('data-current-status') || 'pending';
+        showTaskStatusMenu(this, taskId, current);
+      });
+    }
+  }
+
+  function showTaskStatusMenu(anchorEl, taskId, currentStatus) {
+    // Toggle if already open against the same anchor.
+    var existing = document.getElementById('ccTaskStatusMenu');
+    if (existing) {
+      existing.remove();
+      if (existing.getAttribute('data-anchor-id') === taskId) return;
+    }
+
+    var menu = document.createElement('div');
+    menu.id = 'ccTaskStatusMenu';
+    menu.setAttribute('data-anchor-id', taskId || '');
+    menu.setAttribute('role', 'listbox');
+    menu.style.cssText = [
+      'position:absolute',
+      'z-index:1000',
+      'min-width:160px',
+      'background:var(--lex-color-bg-elevated,#fff)',
+      'border:1px solid var(--lex-color-border,#e5e7eb)',
+      'border-radius:8px',
+      'box-shadow:0 8px 24px rgba(15,23,42,0.12)',
+      'padding:4px',
+      'display:flex',
+      'flex-direction:column'
+    ].join(';');
+
+    var rect = anchorEl.getBoundingClientRect();
+    menu.style.top = (window.scrollY + rect.bottom + 4) + 'px';
+    menu.style.left = (window.scrollX + Math.max(0, rect.right - 160)) + 'px';
+
+    TASK_STATUSES.forEach(function (status) {
+      var item = document.createElement('button');
+      item.type = 'button';
+      item.setAttribute('role', 'option');
+      item.style.cssText = [
+        'display:flex',
+        'align-items:center',
+        'gap:8px',
+        'padding:6px 10px',
+        'background:transparent',
+        'border:none',
+        'border-radius:6px',
+        'cursor:pointer',
+        'font:inherit',
+        'color:inherit',
+        'text-align:left',
+        'width:100%'
+      ].join(';');
+      item.innerHTML =
+        '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + statusDotColor(status) + ';"></span>' +
+        '<span>' + escHtml(taskStatusLabel(status)) + '</span>' +
+        (status === currentStatus ? '<span aria-hidden="true" style="margin-left:auto;color:var(--lex-color-primary-600,#2563eb);">✓</span>' : '');
+      item.addEventListener('mouseenter', function () { item.style.background = 'rgba(0,0,0,0.04)'; });
+      item.addEventListener('mouseleave', function () { item.style.background = 'transparent'; });
+      item.addEventListener('click', function (event) {
+        event.stopPropagation();
+        menu.remove();
+        if (status !== currentStatus) {
+          updateTaskStatusFromZoneD(taskId, status);
+        }
+      });
+      menu.appendChild(item);
+    });
+
+    document.body.appendChild(menu);
+  }
+
+  function statusDotColor(status) {
+    var color = taskStatusColor(status);
+    if (color === 'green')  return '#10b981';
+    if (color === 'yellow') return '#f59e0b';
+    if (color === 'blue')   return '#3b82f6';
+    if (color === 'red')    return '#ef4444';
+    return '#9ca3af';
+  }
+
+  async function updateTaskStatusFromZoneD(taskId, newStatus) {
+    if (!taskId || !newStatus) return;
+    try {
+      await api.updateTask(taskId, { status: newStatus });
+      // Easiest correctness: re-render Zone D so the row, drawer (if open),
+      // and the today/outstanding split all reflect the new state.
+      var openDrawer = document.querySelector('[data-task-detail-drawer]');
+      if (openDrawer) openDrawer.remove();
+      await renderZoneD();
+    } catch (err) {
+      console.error('[Dashboard Zone D] Failed to update task status:', err);
+      if (window.Lex && Lex.Toast && Lex.Toast.error) {
+        Lex.Toast.error('Could not update task status: ' + (err && err.message || 'unknown error'));
+      }
+    }
+  }
+
+  // ---- Task detail drawer -------------------------------------------------
+
+  // Build a human label for a user object.
+  // Fallback chain (most specific → least):
+  //   1. "First Last"  — if both first_name and last_name are present
+  //   2. "First"       — if only first_name is present
+  //   3. email         — if neither name field is present
+  //   4. raw id        — absolute last resort
+  function userPickerLabel(u) {
+    if (!u) return '';
+    var first = (u.first_name || u.firstName || '').trim();
+    var last  = (u.last_name  || u.lastName  || '').trim();
+    if (first && last) return first + ' ' + last;
+    if (first) return first;
+    if (u.email) return u.email;
+    return String(u.id || '');
+  }
+
+  // Org users cached for the assignee picker; populated lazily on first
+  // edit-mode entry so we don't fetch the directory on every dashboard load.
+  var _orgUsersCache = null;
+  async function loadOrgUsersForPicker() {
+    if (_orgUsersCache) return _orgUsersCache;
+    try {
+      var result = await api.getUsers(1, 200);
+      var users = (result && result.data && result.data.users)
+        || (result && result.users)
+        || [];
+      _orgUsersCache = users.map(function (u) {
+        return { value: u.id, label: userPickerLabel(u) };
+      });
+    } catch (err) {
+      console.warn('[Dashboard Zone D] Could not load users for assignee picker:', err);
+      _orgUsersCache = [];
+    }
+    return _orgUsersCache;
+  }
+
+  function priorityOptions() {
+    return [
+      { value: '',       label: 'No priority' },
+      { value: 'low',    label: 'Low' },
+      { value: 'normal', label: 'Normal' },
+      { value: 'medium', label: 'Medium' },
+      { value: 'high',   label: 'High' }
+    ];
+  }
+
+  function dueDateInputValue(dateStr) {
+    if (!dateStr) return '';
+    var d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    // YYYY-MM-DD for <input type="date">
+    var yyyy = d.getFullYear();
+    var mm = String(d.getMonth() + 1).padStart(2, '0');
+    var dd = String(d.getDate()).padStart(2, '0');
+    return yyyy + '-' + mm + '-' + dd;
+  }
+
+  function renderTaskViewBody(task) {
+    var taskId = getTaskId(task);
+    var title = task.title || 'Untitled task';
+    var description = task.description || task.notes || '';
+    var matterName = task.matter_name || (task.matter_id ? task.matter_id : '');
+    var assignee = task.assigned_to_name || task.assigned_to_email || '';
+    var createdLabel = formatDashboardTaskDate(task.created_at) || '—';
+    var dueLabel = formatDashboardTaskDate(task.due_date) || '—';
+    var priority = task.priority || '';
+    var scopeLabel = dashboardTaskScope(task);
+
+    var metaKvs = [
+      '<lex-kv label="Scope" value="' + escHtml(scopeLabel) + '"></lex-kv>',
+      matterName ? '<lex-kv label="Matter" value="' + escHtml(matterName) + '"></lex-kv>' : '',
+      '<lex-kv label="Created" value="' + escHtml(createdLabel) + '"></lex-kv>',
+      '<lex-kv label="Due" value="' + escHtml(dueLabel) + '"></lex-kv>',
+      priority ? '<lex-kv label="Priority" value="' + escHtml(priority) + '"></lex-kv>' : '',
+      assignee ? '<lex-kv label="Assignee" value="' + escHtml(assignee) + '"></lex-kv>' : ''
+    ].filter(Boolean).join('');
+
+    return [
+      '<lex-stack direction="vertical" gap="4" style="padding:16px;" data-task-body="view">',
+      '  <h2 style="margin:0;font-size:1.125rem;font-weight:600;line-height:1.4;">' + escHtml(title) + '</h2>',
+      description
+        ? '  <p style="margin:0;color:var(--lex-text-secondary,#4b5563);line-height:1.5;white-space:pre-wrap;">' + escHtml(description) + '</p>'
+        : '',
+      '  <div>' + renderTaskStatusPill(task, { size: 'lg' }) + '</div>',
+      '  <lex-divider></lex-divider>',
+      '  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">',
+      '    ' + metaKvs,
+      '  </div>',
+      '  <lex-divider></lex-divider>',
+      '  <div style="display:flex;gap:8px;flex-wrap:wrap;">',
+      '    <lex-btn variant="primary" size="sm" data-task-action="complete" data-task-id="' + escHtml(taskId) + '">Mark Complete</lex-btn>',
+      '    <lex-btn variant="secondary" size="sm" data-task-action="edit" data-task-id="' + escHtml(taskId) + '">Edit</lex-btn>',
+      '    <lex-btn variant="secondary" size="sm" data-task-action="open-page" data-task-id="' + escHtml(taskId) + '">Open in My Tasks</lex-btn>',
+      '  </div>',
+      '</lex-stack>'
+    ].join('');
+  }
+
+  function renderTaskEditBody(task, users) {
+    var taskId = getTaskId(task);
+    var title = task.title || '';
+    var description = task.description || task.notes || '';
+    var dueValue = dueDateInputValue(task.due_date);
+    var priority = task.priority || '';
+    var assigneeId = task.assigned_to_user_id
+      || task.assigned_to_id
+      || task.assigneeId
+      || '';
+    var matterName = task.matter_name || (task.matter_id ? task.matter_id : '');
+    var createdLabel = formatDashboardTaskDate(task.created_at) || '—';
+    var scopeLabel = dashboardTaskScope(task);
+
+    // Make sure the currently-assigned user always has a labeled option, even
+    // if they aren't in the loaded users list (e.g. an inactive user, or a
+    // system user the admin endpoint doesn't return). Without this fallback,
+    // lex-select would render the raw UUID since it can't find a match.
+    var optionUsers = (users || []).slice();
+    if (assigneeId && !optionUsers.some(function (u) { return u.value === assigneeId; })) {
+      optionUsers.unshift({
+        value: assigneeId,
+        label: task.assigned_to_name
+          || task.assignee_name
+          || task.assigned_to_email
+          || assigneeId
+      });
+    }
+    var assigneeOptions = [{ value: '', label: 'Unassigned' }].concat(optionUsers);
+
+    return [
+      '<lex-stack direction="vertical" gap="4" style="padding:16px;" data-task-body="edit">',
+      '  <lex-input label="Title" data-task-field="title" value="' + escHtml(title) + '"></lex-input>',
+      '  <lex-textarea label="Description" rows="4" data-task-field="description" value="' + escHtml(description) + '"></lex-textarea>',
+      '  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">',
+      '    <lex-input label="Due date" type="date" data-task-field="due_date" value="' + escHtml(dueValue) + '"></lex-input>',
+      "    <lex-select label='Priority' data-task-field='priority' value='" + escAttr(priority) + "' options='" + escAttr(JSON.stringify(priorityOptions())) + "'></lex-select>",
+      '  </div>',
+      "  <lex-select label='Assignee' data-task-field='assigned_to_user_id' value='" + escAttr(assigneeId) + "' options='" + escAttr(JSON.stringify(assigneeOptions)) + "'></lex-select>",
+      '  <lex-divider></lex-divider>',
+      '  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">',
+      '    <lex-kv label="Scope" value="' + escHtml(scopeLabel) + '"></lex-kv>',
+      matterName ? '    <lex-kv label="Matter" value="' + escHtml(matterName) + '"></lex-kv>' : '',
+      '    <lex-kv label="Created" value="' + escHtml(createdLabel) + '"></lex-kv>',
+      '  </div>',
+      '  <lex-divider></lex-divider>',
+      '  <div style="display:flex;gap:8px;flex-wrap:wrap;">',
+      '    <lex-btn variant="primary" size="sm" data-task-action="save" data-task-id="' + escHtml(taskId) + '">Save changes</lex-btn>',
+      '    <lex-btn variant="secondary" size="sm" data-task-action="cancel-edit" data-task-id="' + escHtml(taskId) + '">Revert changes</lex-btn>',
+      '  </div>',
+      '</lex-stack>'
+    ].join('');
+  }
+
+  // Lightweight attribute-safe escape for embedding JSON in HTML attributes.
+  function escAttr(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/'/g, '&#39;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function openTaskDetailDrawer(task) {
+    // Replace any existing drawer so reopening doesn't stack them.
+    var existing = document.querySelector('[data-task-detail-drawer]');
+    if (existing) existing.remove();
+
+    var taskId = getTaskId(task);
+    var title = task.title || 'Untitled task';
+
+    var drawer = document.createElement('div');
+    drawer.innerHTML = [
+      '<lex-drawer heading="Task" side="right" width="md" open data-task-detail-drawer="1" data-task-id="' + escHtml(taskId) + '">',
+      renderTaskViewBody(task),
+      '</lex-drawer>'
+    ].join('');
+
+    var drawerEl = drawer.firstElementChild;
+    drawerEl._task = task; // attach for handlers
+    document.body.appendChild(drawerEl);
+    wireTaskDrawerHandlers(drawerEl);
+  }
+
+  function wireTaskDrawerHandlers(drawerEl) {
+    var task = drawerEl._task || {};
+    var taskId = getTaskId(task);
+
+    // Status pill — same in both view and edit modes.
+    var pill = drawerEl.querySelector('[data-task-status-pill]');
+    if (pill) {
+      pill.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        var current = pill.getAttribute('data-current-status') || 'pending';
+        showTaskStatusMenu(pill, taskId, current);
+      });
+    }
+
+    // Mark Complete (view mode).
+    var completeBtn = drawerEl.querySelector('[data-task-action="complete"]');
+    if (completeBtn) {
+      completeBtn.addEventListener('click', async function () {
+        try {
+          if (typeof api.completeTask === 'function') {
+            await api.completeTask(taskId);
+          } else {
+            await api.updateTask(taskId, { status: 'complete' });
+          }
+          drawerEl.remove();
+          await renderZoneD();
+        } catch (err) {
+          console.error('[Dashboard Zone D] Failed to complete task:', err);
+          if (window.Lex && Lex.Toast && Lex.Toast.error) {
+            Lex.Toast.error('Could not complete task: ' + (err && err.message || 'unknown error'));
+          }
+        }
+      });
+    }
+
+    // Open in My Tasks (view mode).
+    var openPageBtn = drawerEl.querySelector('[data-task-action="open-page"]');
+    if (openPageBtn) {
+      openPageBtn.addEventListener('click', function () {
+        Lex.Nav.go('my-tasks.html');
+      });
+    }
+
+    // Edit (view mode → edit mode). Lazy-load org users for the assignee
+    // picker, then swap the drawer body and re-wire handlers.
+    var editBtn = drawerEl.querySelector('[data-task-action="edit"]');
+    if (editBtn) {
+      editBtn.addEventListener('click', async function () {
+        editBtn.setAttribute('disabled', 'true');
+        var users = await loadOrgUsersForPicker();
+        var bodyEl = drawerEl.querySelector('[data-task-body]');
+        if (bodyEl) {
+          bodyEl.outerHTML = renderTaskEditBody(drawerEl._task || task, users);
+        }
+        wireTaskDrawerHandlers(drawerEl);
+      });
+    }
+
+    // Cancel (edit mode → view mode).
+    var cancelBtn = drawerEl.querySelector('[data-task-action="cancel-edit"]');
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', function () {
+        var bodyEl = drawerEl.querySelector('[data-task-body]');
+        if (bodyEl) {
+          bodyEl.outerHTML = renderTaskViewBody(drawerEl._task || task);
+        }
+        wireTaskDrawerHandlers(drawerEl);
+      });
+    }
+
+    // Save (edit mode). Read values from the lex form components by their
+    // `value` properties — set when the user types/selects.
+    var saveBtn = drawerEl.querySelector('[data-task-action="save"]');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', async function () {
+        saveBtn.setAttribute('disabled', 'true');
+        try {
+          var fields = {};
+          drawerEl.querySelectorAll('[data-task-field]').forEach(function (el) {
+            var key = el.getAttribute('data-task-field');
+            // .value reads through lex form components' property accessor;
+            // for native fallbacks, the property is also defined.
+            var raw = el.value != null ? el.value : '';
+            if (key === 'due_date') {
+              fields[key] = raw ? raw : null;
+            } else if (key === 'priority' || key === 'assigned_to_user_id') {
+              fields[key] = raw === '' ? null : raw;
+            } else {
+              fields[key] = raw;
+            }
+          });
+
+          var updated = await api.updateTask(taskId, fields);
+          // Merge the response (or our local fields) back onto the drawer's
+          // task so a subsequent re-edit sees fresh values.
+          var nextTask = (updated && updated.data) || updated || {};
+          drawerEl._task = Object.assign({}, drawerEl._task || task, nextTask, fields);
+
+          if (window.Lex && Lex.Toast && Lex.Toast.success) {
+            Lex.Toast.success('Task updated');
+          }
+
+          drawerEl.remove();
+          await renderZoneD();
+        } catch (err) {
+          console.error('[Dashboard Zone D] Failed to save task:', err);
+          saveBtn.removeAttribute('disabled');
+          if (window.Lex && Lex.Toast && Lex.Toast.error) {
+            Lex.Toast.error('Could not save task: ' + (err && err.message || 'unknown error'));
+          }
+        }
       });
     }
   }

@@ -479,10 +479,6 @@ async function initiateOAuthFlow(provider, connectorId = null, matterId = null) 
     const state = stateResult.state;
     console.log('OAuth state created:', state.substring(0, 8) + '...');
 
-    // Step 2: Get connector configuration to build auth URL
-    const config = window.config || {};
-    const backendUrl = config.apiBaseUrl || 'http://localhost:8080';
-
     // For demo mode, return fake tokens
     if (window.api && window.api.isDemoMode && window.api.isDemoMode()) {
       console.log('Demo mode: Returning fake OAuth tokens');
@@ -493,13 +489,40 @@ async function initiateOAuthFlow(provider, connectorId = null, matterId = null) 
       };
     }
 
-    const isLocalOAuth =
-      Boolean(window.electronAPI) ||
-      window.location.protocol === 'file:' ||
-      ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
-    const redirectUri = isLocalOAuth
-      ? 'http://localhost:8080/api/v1/integrations/oauth/callback'
-      : 'https://lanaai.io/oauth/callback';
+    // Derive the backend URL (where we send the OAuth init/exchange) from the
+    // actual saved server. window.api.baseUrl is populated from
+    // localStorage.lana_saved_server during ApiClient init, so it holds the
+    // user's real backend (e.g. 100.64.0.26:8080, a cloud URL, etc.) — not
+    // "localhost:8080" from config.js's dev default.
+    let backendUrl = (window.api && window.api.baseUrl) || '';
+    if (!backendUrl) {
+      try {
+        const saved = localStorage.getItem('lana_saved_server');
+        if (saved) {
+          const info = JSON.parse(saved);
+          if (info && info.url) backendUrl = info.url;
+        }
+      } catch (_) { /* ignore */ }
+    }
+    if (!backendUrl) {
+      const cfg = window.LanaConfig || window.config || {};
+      backendUrl = cfg.API_BASE_URL || cfg.apiBaseUrl || '';
+    }
+    if (!backendUrl) {
+      const msg = 'OAuth flow cannot start: no backend URL is configured. Sign in again to set the saved server.';
+      console.error(msg);
+      alert(msg);
+      return null;
+    }
+
+    // OAuth providers (Google/Microsoft/etc) require a pre-registered, publicly
+    // resolvable redirect_uri. They can't reach localhost, Tailscale IPs, or
+    // LAN IPs from their servers, and only the lanaai.io URL is registered in
+    // their developer consoles. The bridge (RedRoosterTech-Web → routes/
+    // lana-ai-oauth.js) handles the provider redirect and converts it into a
+    // lana-ai:// deep link that Electron catches and routes back into the app.
+    // Use it unconditionally so dev / Tailscale / cloud all behave the same.
+    const redirectUri = 'https://lanaai.io/oauth/callback';
 
     // Step 3: Build authorization URL with centralized redirect_uri
     // The backend will construct the full OAuth URL with provider-specific params

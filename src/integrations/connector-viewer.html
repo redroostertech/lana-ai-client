@@ -6356,9 +6356,16 @@
 
     function registerElectronOAuthCallbackHandler() {
       if (state.oauthCallbackRegistered) return;
-      if (!window.electronAPI || typeof window.electronAPI.onOAuthCallback !== 'function') return;
 
-      window.electronAPI.onOAuthCallback(async (data) => {
+      // The preload script doesn't run inside iframes (nodeIntegrationInSubFrames
+      // is false), so window.electronAPI is undefined here. The parent window
+      // does have it because it's same-origin (file://, webSecurity:false), so
+      // fall back to that. Without this, oauth-callback IPC arrives at the
+      // parent renderer with no listener and the OAuth exchange never runs.
+      const electronAPI = window.electronAPI || (window.parent && window.parent.electronAPI);
+      if (!electronAPI || typeof electronAPI.onOAuthCallback !== 'function') return;
+
+      electronAPI.onOAuthCallback(async (data) => {
         if (!data || (!data.code && !data.error)) return;
         if (!isOAuthConnector()) return;
 

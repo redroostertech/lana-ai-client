@@ -100,45 +100,30 @@ class NoteListComponent {
   render() {
     this.container.innerHTML = `
       <div class="flex flex-col h-full">
-        <!-- Note Composer - Fixed at top -->
-        <div class="flex-shrink-0 bg-white rounded-lg border border-gray-200 overflow-hidden mb-4">
-          <!-- Header with Focus Mode Toggle -->
-          <div class="px-4 pt-4 pb-3 border-b border-gray-100 flex items-center justify-between">
-            <h3 class="text-sm font-medium text-gray-700">New Note</h3>
-            <div class="flex items-center gap-2">
-              <span class="text-xs text-gray-500">Focus Mode</span>
-              <button
-                id="notesFocusModeToggle"
-                class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 bg-gray-200"
-                role="switch"
-                aria-checked="false"
-              >
-                <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform translate-x-1"></span>
-              </button>
-            </div>
-          </div>
+        <!--
+          Hidden composer plumbing.
+          The save/clear/focus-mode flow throughout this file reads + writes
+          to these elements (see saveNote, toggleFocusMode, closeFocusMode).
+          We hide the inline composer card per UX direction — notes are
+          authored exclusively in the focus-mode modal — but keep these DOM
+          nodes around so the existing handlers continue to work without a
+          full refactor of the save pipeline.
+        -->
+        <div class="hidden" aria-hidden="true">
+          <input type="text" id="notesTitleInput" placeholder="Note title..." />
+          <div id="notesEditorContainer" contenteditable="true" data-placeholder="Start writing your note..."></div>
+          <button id="notesSaveBtn">Save Note</button>
+          <button id="notesClearBtn">Clear</button>
+          <button id="notesFocusModeToggle" role="switch" aria-checked="false"><span></span></button>
+        </div>
 
-          <!-- Editor Content -->
-          <div class="p-4">
-            <input
-              type="text"
-              id="notesTitleInput"
-              class="w-full px-0 py-2 border-0 border-b border-gray-200 focus:ring-0 focus:border-indigo-500 text-base outline-none mb-3 font-semibold placeholder-gray-400"
-              placeholder="Note title..."
-            />
-            <div
-              id="notesEditorContainer"
-              contenteditable="true"
-              class="w-full px-0 py-2 border-0 focus:ring-0 min-h-[120px] text-sm outline-none text-gray-700 placeholder-gray-400"
-              data-placeholder="Start writing your note..."
-            ></div>
-          </div>
-
-          <!-- Footer with Actions -->
-          <div class="px-4 pb-4 flex justify-end gap-2">
-            <button id="notesClearBtn" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 font-medium">Clear</button>
-            <button id="notesSaveBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium shadow-sm">Save Note</button>
-          </div>
+        <!--
+          Header — title only. Per design, the create CTA lives in the
+          empty state (and we'll surface a smaller create affordance once
+          there are notes, see render-list logic).
+        -->
+        <div class="flex-shrink-0 mb-4">
+          <h3 class="text-lg font-semibold text-gray-900">Notes</h3>
         </div>
 
         <!-- Notes List - Scrollable -->
@@ -188,7 +173,7 @@ class NoteListComponent {
           <!-- Modal Footer - Fixed CTAs -->
           <div class="flex-shrink-0 border-t border-gray-200 px-8 py-4 flex justify-end gap-3">
             <button id="notesFocusClearBtn" class="px-5 py-2.5 text-sm text-gray-600 hover:text-gray-800 font-medium">Clear</button>
-            <button id="notesFocusSaveBtn" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">Save Note</button>
+            <button id="notesFocusSaveBtn" class="px-5 py-2.5 lex-bg-accent hover:lex-bg-accent text-white rounded-lg text-sm font-medium transition-colors">Save Note</button>
           </div>
         </div>
       </div>
@@ -259,7 +244,7 @@ class NoteListComponent {
       clearBtn.addEventListener('click', () => this.handleClearNote());
     }
 
-    // Focus Mode Toggle
+    // Focus Mode Toggle (hidden plumbing — kept for backwards-compat)
     const focusToggle = document.getElementById('notesFocusModeToggle');
     if (focusToggle) {
       focusToggle.addEventListener('click', () => this.toggleFocusMode());
@@ -388,7 +373,9 @@ class NoteListComponent {
     const notesList = document.getElementById('notesList');
     if (!notesList) return;
 
-    // Empty state
+    // Empty state — render a single CTA that takes the user straight into
+    // the focus-mode editor. Wires to the same toggleFocusMode() handler as
+    // the header button.
     if (this.filteredNotes.length === 0) {
       notesList.innerHTML = `
         <div class="text-center py-12">
@@ -396,9 +383,22 @@ class NoteListComponent {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
           </svg>
           <h4 class="text-lg font-semibold text-gray-900 mb-2">No notes yet</h4>
-          <p class="text-gray-500">Start writing your first note using the editor above</p>
+          <p class="text-gray-500 mb-5">Capture your first note for this matter.</p>
+          <button
+            id="notesEmptyCreateBtn"
+            class="inline-flex items-center gap-2 px-4 py-2 lex-bg-accent hover:lex-bg-accent text-white text-sm rounded-lg font-medium transition-colors"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            Create Note
+          </button>
         </div>
       `;
+      const emptyCreateBtn = document.getElementById('notesEmptyCreateBtn');
+      if (emptyCreateBtn) {
+        emptyCreateBtn.addEventListener('click', () => this.toggleFocusMode());
+      }
       return;
     }
 
