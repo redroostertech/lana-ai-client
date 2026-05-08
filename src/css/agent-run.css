@@ -490,6 +490,78 @@
 .agent-run-workflow-step--complete  .agent-run-workflow-step-status { color: #047857; }
 .agent-run-workflow-step--error     .agent-run-workflow-step-status { color: #b91c1c; font-weight: 500; }
 
+/* Phase 7: per-artifact validation chip + invalid-output error panel */
+.agent-run-artifact-validation {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 8px;
+}
+
+.agent-run-artifact-validation--valid    { background: rgba(16, 185, 129, 0.12); color: #047857; }
+.agent-run-artifact-validation--invalid  { background: rgba(239, 68, 68, 0.14); color: #b91c1c; }
+.agent-run-artifact-validation--skipped  { background: var(--lex-bg-tertiary); color: var(--lex-text-tertiary); }
+
+.agent-run-artifact-validation-panel {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-left: 3px solid #ef4444;
+  background: rgba(239, 68, 68, 0.05);
+  border-radius: 0 6px 6px 0;
+}
+
+.agent-run-artifact-validation-panel-head {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #b91c1c;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.agent-run-artifact-validation-errors {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.8125rem;
+  color: var(--lex-text-secondary);
+}
+
+.agent-run-artifact-validation-errors li {
+  margin: 2px 0;
+  line-height: 1.5;
+}
+
+.agent-run-artifact-validation-path {
+  background: var(--lex-bg-tertiary);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-family: var(--lex-font-mono, ui-monospace, monospace);
+  color: var(--lex-text-primary);
+  margin-right: 6px;
+}
+
+.agent-run-artifact-validation-msg {
+  color: var(--lex-text-primary);
+}
+
+/* Phase 7: categorical outcome badge on the run-detail header */
+.agent-run-badge--outcome {
+  font-weight: 600;
+}
+
+.agent-run-badge--outcome-success      { background: rgba(16, 185, 129, 0.14); color: #047857; }
+.agent-run-badge--outcome-invalid      { background: rgba(239, 68, 68, 0.14);  color: #b91c1c; }
+.agent-run-badge--outcome-tool-error   { background: rgba(245, 158, 11, 0.16); color: #b45309; }
+.agent-run-badge--outcome-model-error  { background: rgba(124, 58, 237, 0.14); color: #6d28d9; }
+.agent-run-badge--outcome-cancelled    { background: var(--lex-bg-tertiary);   color: var(--lex-text-tertiary); }
+.agent-run-badge--outcome-rejected     { background: rgba(245, 158, 11, 0.14); color: #b45309; }
+
 .hidden {
   display: none !important;
 }
