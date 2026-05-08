@@ -28,10 +28,19 @@
 //   '#run/<runId>'                     -> agentRun       ({ runId })
 //   '#activity'                        -> activity       ({})
 //   '#activity/<id>'                   -> activityDetail ({ id })
+//   '#create'                          -> create         ({})
+//   '#tools/browse'                    -> toolsBrowse    ({})
 //
 // Sub-routes keep the parent's sidebar nav highlighted:
 //   agentDetail, agentRun  -> 'catalog'
 //   activityDetail         -> 'activity'
+//   create, toolsBrowse    -> 'create' (sidebar Create button stays highlighted
+//                            while the user is in the full-screen
+//                            create + browse-tools flow). 'create' is a
+//                            non-nav virtual parent — it doesn't appear
+//                            in SIDEBAR_NAV_ITEMS but the sidebar Create
+//                            button shares the id so VIEW_PARENT can map
+//                            both views to it.
 //
 // Public surface (window.LanaAgentsApp):
 //   .setView(view, params)   navigate to a view (also updates URL hash)
@@ -59,16 +68,23 @@
     agentDetail: 'agentDetail',
     agentRun: 'agentRun',
     activity: 'activity',
-    activityDetail: 'activityDetail'
+    activityDetail: 'activityDetail',
+    create: 'create',
+    toolsBrowse: 'toolsBrowse'
   };
 
   // Sub-route -> top-level nav id used for sidebar activeId.
+  // 'create' is a virtual parent: it isn't in SIDEBAR_NAV_ITEMS, but the
+  // sidebar's static Create button uses the same id so the highlight is
+  // shared. Both 'create' and 'toolsBrowse' map to it.
   var VIEW_PARENT = {
     catalog: 'catalog',
     agentDetail: 'catalog',
     agentRun: 'catalog',
     activity: 'activity',
-    activityDetail: 'activity'
+    activityDetail: 'activity',
+    create: 'create',
+    toolsBrowse: 'create'
   };
 
   // Topbar / page title metadata. Falls back to 'Agents' for unknown views.
@@ -77,7 +93,9 @@
     agentDetail:    { title: 'Agent' },
     agentRun:       { title: 'Run' },
     activity:       { title: 'Activity' },
-    activityDetail: { title: 'Run detail' }
+    activityDetail: { title: 'Run detail' },
+    create:         { title: 'Create agent' },
+    toolsBrowse:    { title: 'Browse tools' }
   };
 
   // -------------------------------------------------------------------------
@@ -133,6 +151,9 @@
       {
         id: 'main-actions',
         isStaticTop: true,
+        // Phase 8: full-screen create flow. The sidebar Create button now
+        // routes to the '#create' view; the legacy modal in catalog.js is
+        // kept around for reference until that PR-follow-up removes it.
         items: [{ id: 'create', label: 'Create', icon: 'plus', isButton: true, onClick: 'openAgentCreateModal' }]
       },
       {
@@ -324,6 +345,16 @@
       return { view: VIEW_IDS.activity, params: {} };
     }
 
+    // '#create' — full-screen agent-create view.
+    if (hash === 'create') {
+      return { view: VIEW_IDS.create, params: {} };
+    }
+
+    // '#tools/browse' — full-screen tools-browser view.
+    if (hash === 'tools/browse' || hash === 'tools') {
+      return { view: VIEW_IDS.toolsBrowse, params: {} };
+    }
+
     // Top-level nav id used as a hash (e.g. '#catalog', '#activity').
     if (VIEW_PARENT[hash]) {
       return { view: hash, params: {} };
@@ -346,6 +377,10 @@
         return p.runId ? '#run/' + encodeURIComponent(p.runId) : '#catalog';
       case VIEW_IDS.activityDetail:
         return p.id ? '#activity/' + encodeURIComponent(p.id) : '#activity';
+      case VIEW_IDS.create:
+        return '#create';
+      case VIEW_IDS.toolsBrowse:
+        return '#tools/browse';
       default:
         return '#catalog';
     }
@@ -482,17 +517,14 @@
   global.LanaAgentsApp.navigate = setView;
 
   // Wired to the sidebar's static Create button (see applySidebarSections).
-  // The create modal element lives inside the catalog view's TEMPLATE, so
-  // navigate there first; then dispatch a click on the in-view button whose
-  // existing handler (catalog.js wireCreateModal) opens the modal.
+  // Phase 8: this used to open the in-view modal in the catalog template;
+  // it now navigates to the full-screen '#create' view. The function name
+  // is kept stable so the sidebar onClick string ('openAgentCreateModal')
+  // doesn't need to be updated everywhere all at once. A follow-up PR
+  // will rename to openAgentCreateView and delete the legacy modal in
+  // catalog.js (search for "LEGACY: Phase 8").
   global.openAgentCreateModal = function () {
-    if (state.currentView !== 'catalog') {
-      setView('catalog');
-    }
-    requestAnimationFrame(function () {
-      var btn = document.getElementById('agentsCreateBtn');
-      if (btn) btn.click();
-    });
+    setView('create', {});
   };
 
   // -------------------------------------------------------------------------
