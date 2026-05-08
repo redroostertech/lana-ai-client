@@ -420,6 +420,76 @@
   pointer-events: none;
 }
 
+/* Phase 6: Workflow step trace pane on the run-detail view */
+.agent-run-pane--workflow {
+  grid-column: 1 / -1;
+}
+
+.agent-run-workflow-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.agent-run-workflow-step {
+  display: grid;
+  grid-template-columns: 28px 1fr auto auto auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 12px;
+  border-left: 3px solid var(--lex-border-subtle);
+  font-size: 0.8125rem;
+  background: var(--lex-bg-primary);
+}
+
+.agent-run-workflow-step-index {
+  font-family: var(--lex-font-mono, ui-monospace, monospace);
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-run-workflow-step-id {
+  font-family: var(--lex-font-mono, ui-monospace, monospace);
+  font-weight: 500;
+  color: var(--lex-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agent-run-workflow-step-type {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--lex-text-secondary);
+  background: var(--lex-bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.agent-run-workflow-step-status,
+.agent-run-workflow-step-dur,
+.agent-run-workflow-step-time {
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-run-workflow-step--running   { border-left-color: #3b82f6; }
+.agent-run-workflow-step--complete  { border-left-color: #10b981; }
+.agent-run-workflow-step--error     { border-left-color: #ef4444; }
+.agent-run-workflow-step--skipped   { border-left-color: #9ca3af; }
+.agent-run-workflow-step--pending   { border-left-color: var(--lex-border-subtle); }
+
+.agent-run-workflow-step--running   .agent-run-workflow-step-status { color: #2563eb; font-weight: 500; }
+.agent-run-workflow-step--complete  .agent-run-workflow-step-status { color: #047857; }
+.agent-run-workflow-step--error     .agent-run-workflow-step-status { color: #b91c1c; font-weight: 500; }
+
 .hidden {
   display: none !important;
 }

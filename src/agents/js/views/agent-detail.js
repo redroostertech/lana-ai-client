@@ -83,6 +83,21 @@
     +     '<lex-card heading="Approval Policy" padding="normal">'
     +       '<p id="agentDetailApprovalPolicy" class="agent-detail-description">-</p>'
     +     '</lex-card>'
+    +     '<lex-card heading="Workflow" padding="normal">'
+    +       '<div id="agentDetailWorkflowEmpty" class="agent-detail-empty-text">'
+    +         'No workflow attached. This agent runs the prompt-driven loop.'
+    +       '</div>'
+    +       '<div id="agentDetailWorkflowMeta" class="agent-detail-workflow-meta hidden">'
+    +         '<span class="agent-detail-chip">v<span id="agentDetailWorkflowVersion">-</span></span>'
+    +         '<span class="agent-detail-chip agent-detail-chip--accent">'
+    +           '<span id="agentDetailWorkflowStateCount">0</span> states'
+    +         '</span>'
+    +         '<span class="agent-detail-workflow-initial">'
+    +           'starts at <code id="agentDetailWorkflowInitial">-</code>'
+    +         '</span>'
+    +       '</div>'
+    +       '<ol id="agentDetailWorkflowStates" class="agent-detail-workflow-states hidden"></ol>'
+    +     '</lex-card>'
     +   '</div>'
     + '</section>'
 
@@ -1543,12 +1558,101 @@
         }
         renderProfile(state, agent);
         onAgentLoaded(state);
+        loadWorkflow(state);
       })
       .catch(function (err) {
         if (state.destroyed) return;
         console.error('[agent-detail] Failed to load agent:', err);
         showLoadError(state, err);
       });
+  }
+
+  // =========================================================================
+  // Workflow viewer (Phase 6) — read-only state-machine display
+  // =========================================================================
+
+  function loadWorkflow(state) {
+    if (state.destroyed || !state.slug) return;
+    if (!window.api || typeof window.api.get !== 'function') return;
+    window.api.get('/api/v1/agents/' + encodeURIComponent(state.slug) + '/workflows')
+      .then(function (resp) {
+        if (state.destroyed) return;
+        var workflow = resp && resp.workflow ? resp.workflow : null;
+        renderWorkflow(workflow);
+      })
+      .catch(function (err) {
+        if (state.destroyed) return;
+        // Non-fatal: capability tab still renders without the workflow card.
+        console.warn('[agent-detail] Failed to load workflow:', err && err.message);
+      });
+  }
+
+  function renderWorkflow(workflow) {
+    var emptyEl = el('agentDetailWorkflowEmpty');
+    var metaEl = el('agentDetailWorkflowMeta');
+    var listEl = el('agentDetailWorkflowStates');
+    if (!emptyEl || !metaEl || !listEl) return;
+
+    var def = workflow && workflow.definition;
+    var states = def && Array.isArray(def.states) ? def.states : [];
+    if (!workflow || states.length === 0) {
+      show(emptyEl);
+      hide(metaEl);
+      hide(listEl);
+      listEl.innerHTML = '';
+      return;
+    }
+
+    hide(emptyEl);
+    show(metaEl);
+    show(listEl);
+
+    var versionEl = el('agentDetailWorkflowVersion');
+    var countEl = el('agentDetailWorkflowStateCount');
+    var initialEl = el('agentDetailWorkflowInitial');
+    if (versionEl) versionEl.textContent = String(workflow.version != null ? workflow.version : '-');
+    if (countEl) countEl.textContent = String(states.length);
+    if (initialEl) initialEl.textContent = String(def.initial_state || '-');
+
+    var html = '';
+    for (var i = 0; i < states.length; i++) {
+      var s = states[i] || {};
+      var typeLabel = String(s.type || 'state');
+      var typeMod = workflowTypeModifier(typeLabel);
+      var nextHint = renderWorkflowNextHint(s);
+      html += ''
+        + '<li class="agent-detail-workflow-state">'
+        +   '<div class="agent-detail-workflow-state-head">'
+        +     '<span class="agent-detail-workflow-state-id">' + escHtml(String(s.id || '')) + '</span>'
+        +     '<span class="agent-detail-chip agent-detail-workflow-type ' + typeMod + '">' + escHtml(typeLabel) + '</span>'
+        +   '</div>'
+        +   (nextHint ? '<div class="agent-detail-workflow-state-next">' + nextHint + '</div>' : '')
+        + '</li>';
+    }
+    listEl.innerHTML = html;
+  }
+
+  function workflowTypeModifier(type) {
+    switch (type) {
+      case 'tool_call':       return 'agent-detail-workflow-type--tool';
+      case 'llm_call':        return 'agent-detail-workflow-type--llm';
+      case 'human_approval':  return 'agent-detail-workflow-type--approval';
+      case 'branch':          return 'agent-detail-workflow-type--branch';
+      case 'terminal':        return 'agent-detail-workflow-type--terminal';
+      default:                return '';
+    }
+  }
+
+  function renderWorkflowNextHint(s) {
+    if (s && s.type === 'terminal') return '&rarr; (end)';
+    if (s && s.type === 'branch') {
+      return '&rarr; ' + escHtml(String(s.true_state || '?')) + ' / ' + escHtml(String(s.false_state || '?'));
+    }
+    if (s && s.next) return '&rarr; ' + escHtml(String(s.next));
+    if (s && Array.isArray(s.transitions) && s.transitions.length > 0 && s.transitions[0].to) {
+      return '&rarr; ' + escHtml(String(s.transitions[0].to));
+    }
+    return '';
   }
 
   function showLoadError(state, err) {

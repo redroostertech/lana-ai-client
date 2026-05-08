@@ -73,6 +73,14 @@
     +     '</div>'
     +   '</section>'
 
+    +   '<section id="agentRunWorkflowPane" class="agent-run-pane agent-run-pane--workflow hidden">'
+    +     '<header class="agent-run-pane-header">'
+    +       '<span class="agent-run-pane-title">Workflow Steps</span>'
+    +       '<span id="agentRunWorkflowStepsCount" class="agent-run-pane-status"></span>'
+    +     '</header>'
+    +     '<ol id="agentRunWorkflowStepsList" class="agent-run-workflow-steps"></ol>'
+    +   '</section>'
+
     + '</div>'
 
     + '<div id="agentRunApprovalBar" class="agent-run-approval-bar hidden">'
@@ -1081,10 +1089,15 @@
                 : ((resp && resp.data) ? resp.data : resp);
         var steps = (resp && resp.steps) || (run && run.steps) || [];
         var artifacts = (resp && resp.artifacts) || (run && run.artifacts) || [];
+        // Phase 6: workflow state-machine ledger (separate from the
+        // reasoning-step `steps` above — only present when the run was
+        // workflow-driven).
+        var runSteps = (resp && resp.run_steps) || [];
         if (!run) return;
         renderHeader(state, run);
         hydrateSteps(state, steps);
         hydrateArtifacts(state, artifacts);
+        hydrateWorkflowSteps(state, runSteps);
 
         if (!isTerminal(run.status)) {
           startStream(state);
@@ -1098,6 +1111,74 @@
         console.error('[agent-run] failed to load run:', err);
         showLoadError(state, err);
       });
+  }
+
+  // =========================================================================
+  // Phase 6: Workflow step trace (run_steps from agent_run_steps sidecar)
+  // =========================================================================
+
+  function hydrateWorkflowSteps(state, runSteps) {
+    var pane = el('agentRunWorkflowPane');
+    var listEl = el('agentRunWorkflowStepsList');
+    var countEl = el('agentRunWorkflowStepsCount');
+    if (!pane || !listEl) return;
+
+    if (!Array.isArray(runSteps) || runSteps.length === 0) {
+      hide(pane);
+      listEl.innerHTML = '';
+      if (countEl) countEl.textContent = '';
+      return;
+    }
+    show(pane);
+    if (countEl) countEl.textContent = runSteps.length + ' step' + (runSteps.length === 1 ? '' : 's');
+
+    var html = '';
+    for (var i = 0; i < runSteps.length; i++) {
+      var s = runSteps[i] || {};
+      var status = String(s.status || 'pending');
+      var statusMod = workflowStepStatusMod(status);
+      var typeLabel = s.state_type || s.state || '';
+      var startedRel = s.started_at ? timeAgoLite(s.started_at) : '';
+      var dur = (s.started_at && s.completed_at)
+        ? formatDurationMs(new Date(s.completed_at).getTime() - new Date(s.started_at).getTime())
+        : '';
+      html += ''
+        + '<li class="agent-run-workflow-step ' + statusMod + '">'
+        +   '<span class="agent-run-workflow-step-index">' + (i + 1) + '</span>'
+        +   '<span class="agent-run-workflow-step-id">' + escHtml(String(s.step_id || '')) + '</span>'
+        +   (typeLabel ? '<span class="agent-run-workflow-step-type">' + escHtml(String(typeLabel)) + '</span>' : '')
+        +   '<span class="agent-run-workflow-step-status">' + escHtml(status) + '</span>'
+        +   (dur ? '<span class="agent-run-workflow-step-dur">' + escHtml(dur) + '</span>' : '')
+        +   (startedRel ? '<span class="agent-run-workflow-step-time">' + escHtml(startedRel) + '</span>' : '')
+        + '</li>';
+    }
+    listEl.innerHTML = html;
+  }
+
+  function workflowStepStatusMod(status) {
+    if (status === 'running') return 'agent-run-workflow-step--running';
+    if (status === 'completed') return 'agent-run-workflow-step--complete';
+    if (status === 'errored') return 'agent-run-workflow-step--error';
+    if (status === 'skipped') return 'agent-run-workflow-step--skipped';
+    return 'agent-run-workflow-step--pending';
+  }
+
+  function timeAgoLite(iso) {
+    var t = new Date(iso).getTime();
+    if (!t || isNaN(t)) return '';
+    var ms = Date.now() - t;
+    if (ms < 60000) return Math.floor(ms / 1000) + 's ago';
+    if (ms < 3600000) return Math.floor(ms / 60000) + 'm ago';
+    if (ms < 86400000) return Math.floor(ms / 3600000) + 'h ago';
+    return Math.floor(ms / 86400000) + 'd ago';
+  }
+
+  function formatDurationMs(ms) {
+    if (!ms || isNaN(ms) || ms < 0) return '';
+    if (ms < 1000) return ms + 'ms';
+    if (ms < 60000) return (ms / 1000).toFixed(1) + 's';
+    if (ms < 3600000) return Math.floor(ms / 60000) + 'm ' + Math.floor((ms % 60000) / 1000) + 's';
+    return Math.floor(ms / 3600000) + 'h';
   }
 
   function hydrateSteps(state, steps) {
