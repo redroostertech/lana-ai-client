@@ -497,6 +497,74 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Phase 6: Workflow viewer (read-only state-machine display in Capabilities tab) */
+.agent-detail-workflow-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  font-size: 0.8125rem;
+  color: var(--lex-text-secondary);
+}
+
+.agent-detail-workflow-initial code {
+  background: var(--lex-bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  color: var(--lex-text-primary);
+}
+
+.agent-detail-workflow-states {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agent-detail-workflow-state {
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--lex-bg-primary);
+}
+
+.agent-detail-workflow-state-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.agent-detail-workflow-state-id {
+  font-family: var(--lex-font-mono, ui-monospace, monospace);
+  font-size: 0.8125rem;
+  color: var(--lex-text-primary);
+  font-weight: 500;
+}
+
+.agent-detail-workflow-state-next {
+  margin-top: 6px;
+  font-family: var(--lex-font-mono, ui-monospace, monospace);
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+}
+
+.agent-detail-workflow-type {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.agent-detail-workflow-type--tool      { background: rgba(59, 130, 246, 0.12); color: #2563eb; }
+.agent-detail-workflow-type--llm       { background: rgba(124, 58, 237, 0.12); color: #6d28d9; }
+.agent-detail-workflow-type--approval  { background: rgba(245, 158, 11, 0.14); color: #b45309; }
+.agent-detail-workflow-type--branch    { background: rgba(16, 185, 129, 0.12); color: #047857; }
+.agent-detail-workflow-type--terminal  { background: rgba(107, 114, 128, 0.14); color: #374151; }
+
 .hidden {
   display: none !important;
 }

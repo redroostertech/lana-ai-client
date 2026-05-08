@@ -1,0 +1,196 @@
+/* agent-create.css — Full-screen agent-create SPA view.
+   Scoped under .agent-create-page-container so other pages are not
+   affected. Uses Lex tokens (see src/css/lex-tokens.css).
+*/
+
+.agent-create-page-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-height: 100%;
+  padding: 32px;
+  /* Reserve space below for the sticky bottom bar so content is never
+     hidden behind it. */
+  padding-bottom: 96px;
+}
+
+@media (max-width: 768px) {
+  .agent-create-page-container {
+    padding: 20px;
+    padding-bottom: 88px;
+  }
+}
+
+.agent-create-form-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 880px;
+  width: 100%;
+}
+
+.agent-create-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--lex-color-surface, #ffffff);
+  border: 1px solid var(--lex-color-border, rgba(15, 23, 42, 0.08));
+  border-radius: 14px;
+  padding: 20px 22px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+.agent-create-section-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--lex-color-text-primary, #0f172a);
+}
+
+.agent-create-section-hint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--lex-color-text-muted, #64748b);
+  line-height: 1.45;
+}
+
+/* Template preview block */
+.agent-create-template-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--lex-color-surface-muted, #f8fafc);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.agent-create-template-preview-row {
+  display: flex;
+  gap: 12px;
+  font-size: 0.8rem;
+}
+
+.agent-create-template-preview-label {
+  flex: 0 0 80px;
+  font-weight: 600;
+  color: var(--lex-color-text-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.7rem;
+}
+
+.agent-create-template-preview-value {
+  color: var(--lex-color-text-primary, #0f172a);
+  word-break: break-word;
+  flex: 1;
+}
+
+/* Tool chips */
+.agent-create-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 40px;
+  padding: 6px 8px;
+  border: 1px dashed var(--lex-color-border, rgba(15, 23, 42, 0.12));
+  border-radius: 10px;
+  background: var(--lex-color-surface-muted, #fafafa);
+}
+
+.agent-create-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 4px 10px;
+  border-radius: 999px;
+  background: var(--lex-color-accent-subtle, #eef2ff);
+  color: var(--lex-color-accent-strong, #4338ca);
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: 1px solid var(--lex-color-accent-border, rgba(79, 70, 229, 0.18));
+}
+
+.agent-create-chip-name {
+  font-family: var(--lex-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+
+.agent-create-chip-remove {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0;
+}
+
+.agent-create-chip-remove:hover {
+  background: rgba(15, 23, 42, 0.08);
+}
+
+.agent-create-empty-text {
+  font-size: 0.82rem;
+  color: var(--lex-color-text-muted, #64748b);
+  font-style: italic;
+}
+
+.agent-create-tools-controls {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: end;
+}
+
+@media (max-width: 640px) {
+  .agent-create-tools-controls {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Schedule fields */
+.agent-create-schedule-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+@media (max-width: 640px) {
+  .agent-create-schedule-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Sticky bottom bar */
+.agent-create-sticky-bar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 32px;
+  margin: 0 -32px -32px;
+  background: var(--lex-color-surface, #ffffff);
+  border-top: 1px solid var(--lex-color-border, rgba(15, 23, 42, 0.08));
+  box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.04);
+  z-index: 5;
+}
+
+@media (max-width: 768px) {
+  .agent-create-sticky-bar {
+    padding: 12px 20px;
+    margin: 0 -20px -20px;
+  }
+}
+
+.hidden {
+  display: none !important;
+}
