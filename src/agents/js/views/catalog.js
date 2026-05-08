@@ -720,13 +720,25 @@
   }
 
   function wireCreateModal(ctx, state) {
+    // PHASE 8 — full-screen create view supersedes this in-template modal.
+    // The banner's Create button now navigates to '#create' rather than
+    // opening agentsCreateModal.
     var btn = el('agentsCreateBtn');
     if (btn) {
-      var openHandler = function () { openCreateModal(state); };
+      var openHandler = function () {
+        if (ctx && ctx.app && typeof ctx.app.setView === 'function') {
+          ctx.app.setView('create', {});
+        } else {
+          // LEGACY fallback — only hit if the SPA shell isn't wired,
+          // which shouldn't happen in practice.
+          openCreateModal(state);
+        }
+      };
       btn.addEventListener('click', openHandler);
       state._unbindFns.push(function () { btn.removeEventListener('click', openHandler); });
     }
 
+    // LEGACY: Phase 8 follow-up — remove once #create view is canonical.
     var modal = el('agentsCreateModal');
     if (modal) {
       var confirmHandler = function () { submitCreate(ctx, state); };
@@ -734,6 +746,7 @@
       state._unbindFns.push(function () { modal.removeEventListener('lex-confirm', confirmHandler); });
     }
 
+    // LEGACY: Phase 8 follow-up — remove once #create view is canonical.
     var tplSelect = el('agentsCreateTemplate');
     if (tplSelect) {
       var tplHandler = function (e) { onTemplateChange(state, e); };
@@ -741,6 +754,7 @@
       state._unbindFns.push(function () { tplSelect.removeEventListener('lex-change', tplHandler); });
     }
 
+    // LEGACY: Phase 8 follow-up — remove once #create view is canonical.
     var toolsList = el('agentsCreateToolsList');
     if (toolsList) {
       var toolHandler = function (e) { onToolToggle(state, e); };
@@ -748,6 +762,7 @@
       state._unbindFns.push(function () { toolsList.removeEventListener('change', toolHandler); });
     }
 
+    // LEGACY: Phase 8 follow-up — remove once #create view is canonical.
     var schedToggle = el('agentsCreateScheduleEnabled');
     if (schedToggle) {
       schedToggle.addEventListener('lex-change', onScheduleEnabledChange);
