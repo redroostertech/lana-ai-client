@@ -444,6 +444,91 @@
         margin-left: auto;
         flex-shrink: 0;
       }
+
+      /* ── @-mention popover (mirrors docpicker layout) ───────── */
+      .lex-cmp-mentionpicker {
+        position: absolute;
+        bottom: calc(100% + 8px);
+        left: 0;
+        right: 0;
+        max-width: 400px;
+        background: var(--lex-chat-bg-surface);
+        border: 1px solid var(--lex-chat-border);
+        border-radius: var(--lex-radius-lg, 8px);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.16);
+        z-index: 60;
+        opacity: 0;
+        transform: translateY(4px);
+        pointer-events: none;
+        transition: opacity 0.15s ease, transform 0.15s ease;
+      }
+      .lex-cmp-mentionpicker--open {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+      }
+      .lex-cmp-mentionpicker-list {
+        max-height: 240px;
+        overflow-y: auto;
+        padding: 6px;
+      }
+      .lex-cmp-mentionpicker-empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 18px 16px;
+        color: var(--lex-chat-text-dim);
+        font-size: 13px;
+      }
+      .lex-cmp-mentionpicker-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: var(--lex-radius-md, 6px);
+        cursor: pointer;
+        transition: background var(--lex-transition-fast, 0.15s);
+      }
+      .lex-cmp-mentionpicker-item:hover,
+      .lex-cmp-mentionpicker-item--active {
+        background: var(--lex-chat-bg-elevated);
+      }
+      .lex-cmp-mentionpicker-item-kind {
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 2px 6px;
+        border-radius: 9999px;
+        flex-shrink: 0;
+      }
+      .lex-cmp-mentionpicker-item-kind--user {
+        background: var(--lex-chat-bg-elevated, #eef);
+        color: var(--lex-chat-text-muted, #555);
+      }
+      .lex-cmp-mentionpicker-item-kind--agent {
+        background: var(--lex-chat-accent, #4f46e5);
+        color: var(--lex-chat-accent-text, #fff);
+      }
+      .lex-cmp-mentionpicker-item-label {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--lex-chat-text);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        flex: 1;
+      }
+      .lex-cmp-mentionpicker-item-sub {
+        font-size: 11px;
+        color: var(--lex-chat-text-dim);
+        margin-left: auto;
+        flex-shrink: 0;
+        max-width: 50%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -504,6 +589,23 @@
       this._hashTriggerPos = -1; // caret position of the # character
       this._attachedDocs = []; // { id, filename } — documents attached via # picker
       this._boundOutsideClick = null;
+
+      // ── @-mention picker state (independent from doc picker) ──
+      // The dropdown state machine + helpers live in
+      // lex-chat.composer-mentions.js so the logic is unit-testable
+      // without the DOM. Resolve them once, gracefully degrade if absent
+      // (the composer still works as before — @ is just plain text).
+      const helpers = (typeof window !== 'undefined'
+                       && window.Lex
+                       && window.Lex.Chat
+                       && window.Lex.Chat.MentionHelpers) || null;
+      this._mentionHelpers = helpers;
+      this._mentionState = helpers ? helpers.initialState() : null;
+      this._mentionDebounced = helpers
+        ? helpers.debounce((prefix) => this._fetchMentions(prefix), 300)
+        : null;
+      this._mentionAbortCtrl = null;
+      this._mentionFetchSeq = 0;
     }
 
     connected() {
@@ -542,6 +644,11 @@
                 ${ICON_FILE_TEXT}
                 <span>No documents found</span>
               </div>
+            </div>
+          </div>
+          <div class="lex-cmp-mentionpicker" data-mentionpicker>
+            <div class="lex-cmp-mentionpicker-list" data-mentionpicker-list>
+              <div class="lex-cmp-mentionpicker-empty">No matches</div>
             </div>
           </div>
           <div class="lex-cmp-doc-badges" data-doc-badges></div>
@@ -595,14 +702,59 @@
       const ta = this._textarea;
       if (!ta) return;
 
-      // Auto-resize on input + # trigger detection
+      // Auto-resize on input + # trigger detection + @ trigger detection.
+      // The @-trigger is additive: it never blocks the existing # path or
+      // suppresses normal typing.
       ta.addEventListener('input', () => {
         this._autoResize();
         this._checkHashTrigger();
+        this._checkAtTrigger();
       });
 
       // Enter → send, Shift+Enter → newline, Escape → close picker
       ta.addEventListener('keydown', (e) => {
+        // ── @-mention picker priorities (only when open) ──
+        if (this._isMentionOpen()) {
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            this._mentionDispatch({ type: 'DISMISSED' });
+            this._refreshMentionPopover();
+            return;
+          }
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            this._mentionDispatch({ type: 'MOVE_DOWN' });
+            this._refreshMentionPopover();
+            return;
+          }
+          if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            this._mentionDispatch({ type: 'MOVE_UP' });
+            this._refreshMentionPopover();
+            return;
+          }
+          if (e.key === 'Enter' && !e.shiftKey) {
+            // Insert the active match if there is one; otherwise fall
+            // through to the normal send path (covers "no matches" UX).
+            const st = this._mentionState;
+            if (st && st.results && st.results.length > 0) {
+              e.preventDefault();
+              this._selectMention(st.results[st.activeIndex]);
+              return;
+            }
+          }
+          if (e.key === 'Tab') {
+            // Tab also accepts the active match — common keyboard pattern
+            // for typeaheads. Falls through silently when no results.
+            const st = this._mentionState;
+            if (st && st.results && st.results.length > 0) {
+              e.preventDefault();
+              this._selectMention(st.results[st.activeIndex]);
+              return;
+            }
+          }
+        }
+
         if (e.key === 'Escape' && this._docPickerOpen) {
           this._closeDocPicker();
           return;
@@ -700,6 +852,17 @@
           return;
         }
 
+        // @-mention picker selection
+        const mentionEl = e.target.closest('[data-mention-select]');
+        if (mentionEl) {
+          const idx = Number(mentionEl.dataset.mentionSelect);
+          const st = this._mentionState;
+          if (st && Array.isArray(st.results) && st.results[idx]) {
+            this._selectMention(st.results[idx]);
+          }
+          return;
+        }
+
         // Suggestion
         const suggEl = e.target.closest('[data-suggestion]');
         if (suggEl) {
@@ -742,6 +905,10 @@
       }
       if (this._docPickerOpen && !this.contains(e.target)) {
         this._closeDocPicker();
+      }
+      if (this._isMentionOpen() && !this.contains(e.target)) {
+        this._mentionDispatch({ type: 'DISMISSED' });
+        this._refreshMentionPopover();
       }
     }
 
@@ -993,6 +1160,153 @@
             ${ICON_FILE}
             <span class="lex-cmp-docpicker-item-name" title="${name}">${name}</span>
             ${meta ? `<span class="lex-cmp-docpicker-item-meta">${meta}</span>` : ''}
+          </div>`;
+      }).join('');
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // @-mention picker
+    //
+    // Layered above the existing #/document picker. The dropdown state
+    // machine + token parser live in lex-chat.composer-mentions.js so the
+    // logic can be unit-tested without the DOM. Resolved at construction
+    // and gracefully degraded if the helpers script is missing.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    _isMentionOpen() {
+      return !!(this._mentionState && this._mentionState.open);
+    }
+
+    _mentionDispatch(action) {
+      if (!this._mentionHelpers) return;
+      this._mentionState = this._mentionHelpers.reduce(this._mentionState, action);
+    }
+
+    _checkAtTrigger() {
+      if (!this._mentionHelpers || !this._textarea) return;
+      const val = this._textarea.value;
+      const pos = this._textarea.selectionStart;
+      const trigger = this._mentionHelpers.detectMentionTrigger(val, pos);
+
+      if (!trigger) {
+        // The caret is no longer inside an @-token. Close if open.
+        if (this._isMentionOpen()) {
+          this._mentionDispatch({ type: 'DISMISSED' });
+          this._refreshMentionPopover();
+        }
+        return;
+      }
+
+      if (!this._isMentionOpen()) {
+        this._mentionDispatch({
+          type: 'TRIGGER_OPENED',
+          atIndex: trigger.atIndex,
+          prefix: trigger.prefix,
+        });
+        // Close other popovers so they don't fight for screen space.
+        this._closePopovers();
+        this._refreshMentionPopover();
+        if (this._mentionDebounced) this._mentionDebounced(trigger.prefix);
+        return;
+      }
+
+      // Already open — update prefix only if it changed (avoids redundant fetches).
+      if (trigger.prefix !== this._mentionState.prefix) {
+        this._mentionDispatch({ type: 'PREFIX_CHANGED', prefix: trigger.prefix });
+        this._refreshMentionPopover();
+        if (this._mentionDebounced) this._mentionDebounced(trigger.prefix);
+      }
+    }
+
+    async _fetchMentions(prefix) {
+      // Token + base URL come from the global api client used elsewhere
+      // in the chat surface (see lex-chat.js _openCitationDocument). If
+      // it's not configured, silently bail — the autocomplete simply
+      // shows "No matches".
+      const apiClient = (typeof window !== 'undefined') ? window.api : null;
+      const baseUrl = apiClient && apiClient.baseUrl ? apiClient.baseUrl : '';
+      const token = (apiClient && apiClient.token) || (typeof localStorage !== 'undefined'
+                                                       ? localStorage.getItem('token')
+                                                       : '') || '';
+      const seq = ++this._mentionFetchSeq;
+      try {
+        const url = baseUrl + '/api/v1/mentions/search?q='
+                  + encodeURIComponent(prefix || '')
+                  + '&limit=20';
+        const resp = await fetch(url, {
+          headers: token ? { 'Authorization': 'Bearer ' + token } : {},
+        });
+        if (!resp.ok) {
+          // Drop quietly; show empty results so the UI stays responsive.
+          if (seq !== this._mentionFetchSeq) return;
+          this._mentionDispatch({ type: 'RESULTS_RECEIVED', prefix: prefix, results: [] });
+          this._refreshMentionPopover();
+          return;
+        }
+        const body = await resp.json();
+        if (seq !== this._mentionFetchSeq) return; // a newer fetch superseded
+        const results = Array.isArray(body && body.matches) ? body.matches : [];
+        this._mentionDispatch({ type: 'RESULTS_RECEIVED', prefix: prefix, results });
+        this._refreshMentionPopover();
+      } catch (err) {
+        if (seq !== this._mentionFetchSeq) return;
+        this._mentionDispatch({ type: 'RESULTS_RECEIVED', prefix: prefix, results: [] });
+        this._refreshMentionPopover();
+      }
+    }
+
+    _selectMention(match) {
+      if (!match || !this._mentionHelpers || !this._textarea) return;
+      const st = this._mentionState;
+      if (!st || !st.open) return;
+      const value = this._textarea.value;
+      const caret = this._textarea.selectionStart;
+      const patched = this._mentionHelpers.applyMentionToValue(
+        value, st.atIndex, caret, match
+      );
+      this._textarea.value = patched.value;
+      this._textarea.selectionStart = this._textarea.selectionEnd = patched.caret;
+      this._autoResize();
+      this._mentionDispatch({ type: 'CLOSED' });
+      this._refreshMentionPopover();
+      this._textarea.focus();
+      this.emit('lex-composer-mention-select', { match });
+    }
+
+    _refreshMentionPopover() {
+      const picker = this.querySelector('[data-mentionpicker]');
+      const list = this.querySelector('[data-mentionpicker-list]');
+      if (!picker || !list) return;
+
+      const st = this._mentionState;
+      if (!st || !st.open) {
+        picker.classList.remove('lex-cmp-mentionpicker--open');
+        return;
+      }
+      picker.classList.add('lex-cmp-mentionpicker--open');
+
+      const results = Array.isArray(st.results) ? st.results : [];
+      if (results.length === 0) {
+        const hint = st.status === 'pending' ? 'Searching…' : 'No matches';
+        list.innerHTML = `<div class="lex-cmp-mentionpicker-empty">${esc(hint)}</div>`;
+        return;
+      }
+
+      list.innerHTML = results.map((m, idx) => {
+        const isActive = idx === st.activeIndex;
+        const kindClass = m.kind === 'agent'
+          ? 'lex-cmp-mentionpicker-item-kind--agent'
+          : 'lex-cmp-mentionpicker-item-kind--user';
+        const kindLabel = m.kind === 'agent' ? 'Agent' : 'User';
+        const sub = m.kind === 'agent'
+          ? (m.description || (m.slug ? '@' + m.slug : ''))
+          : (m.username ? '@' + m.username : (m.email || ''));
+        return `
+          <div class="lex-cmp-mentionpicker-item${isActive ? ' lex-cmp-mentionpicker-item--active' : ''}"
+               data-mention-select="${idx}">
+            <span class="lex-cmp-mentionpicker-item-kind ${kindClass}">${esc(kindLabel)}</span>
+            <span class="lex-cmp-mentionpicker-item-label" title="${esc(m.label || '')}">${esc(m.label || '')}</span>
+            ${sub ? `<span class="lex-cmp-mentionpicker-item-sub">${esc(sub)}</span>` : ''}
           </div>`;
       }).join('');
     }
