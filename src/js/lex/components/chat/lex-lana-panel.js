@@ -241,7 +241,16 @@
       var self = this;
       if (typeof api === 'undefined') return Promise.reject(new Error('api not available'));
 
-      return api.post('/api/v1/conversation-threads', config).then(function (resp) {
+      // Default the matter_id from the panel's bound matter context when the
+      // caller didn't supply one. Without this, threads created from a
+      // matter page get persisted without a matter_id and disappear from the
+      // matter-scoped fetch (?matter_id=…).
+      var payload = Object.assign({}, config || {});
+      if (!payload.matter_id && self.matterId) {
+        payload.matter_id = self.matterId;
+      }
+
+      return api.post('/api/v1/conversation-threads', payload).then(function (resp) {
         var thread = resp.data || resp;
 
         if (self._threadsEl) {
@@ -317,15 +326,20 @@
         });
       }
 
-      // Create conversation-thread record in backend + add to threads component
+      // Create conversation-thread record in backend + add to threads component.
+      // Include matter_id so the thread shows up in the matter-scoped fetch
+      // (?matter_id=…); without it, threads vanish from per-matter views.
       if (typeof api !== 'undefined') {
-        api.post('/api/v1/conversation-threads', {
+        var boundMatterId = (opts && opts.matterId) || self.matterId || null;
+        var threadPayload = {
           title: threadTitle,
           thread_type: 'page_general',
           context_type: self.contextType,
           page_scope: self.pageScope,
           thread_id: id
-        }).then(function (resp) {
+        };
+        if (boundMatterId) threadPayload.matter_id = boundMatterId;
+        api.post('/api/v1/conversation-threads', threadPayload).then(function (resp) {
           var created = resp.data || resp;
           if (self._threadsEl) {
             self._threadsEl.addThread(created);
@@ -594,14 +608,17 @@
           }
         }
 
-        // Create new page_general thread
-        api.post('/api/v1/conversation-threads', {
+        // Create new page_general thread. Carry the panel's bound matter_id
+        // through so the thread is discoverable via ?matter_id=… filters.
+        var generalPayload = {
           title: self.threadTitle,
           thread_type: 'page_general',
           context_type: self.contextType,
           page_scope: self.pageScope,
           thread_id: conversationId
-        }).then(function (resp) {
+        };
+        if (self.matterId) generalPayload.matter_id = self.matterId;
+        api.post('/api/v1/conversation-threads', generalPayload).then(function (resp) {
           var created = resp.data || resp;
           if (self._threadsEl) {
             self._threadsEl.addThread(created);
