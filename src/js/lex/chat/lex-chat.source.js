@@ -442,7 +442,15 @@
           return { type: 'tool_progress', tool: data.tool, message: data.message || '' };
 
         case 'tool_end':
-          return { type: 'tool_end', tool: data.tool, success: data.success !== false };
+          return {
+            type: 'tool_end',
+            tool: data.tool,
+            success: data.success !== false,
+            // Backend emits a human-readable rollup like "Found 1 user
+            // (top: Jennifer Norton)." — pass it through so the UI can
+            // render "Completed <summary>" without recomputing it.
+            summary: data.summary || data.message || ''
+          };
 
         case 'content':
         case 'message':

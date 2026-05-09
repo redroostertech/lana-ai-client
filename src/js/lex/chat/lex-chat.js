@@ -12,6 +12,19 @@
   const Chat = global.Lex.Chat || {};
   if (!LexElement) { console.error('[lex-chat] LexElement not loaded'); return; }
 
+  // Escape user/server text before injecting into innerHTML for the activity
+  // bar. The bar accepts a tiny amount of HTML (e.g. <strong>Completed</strong>)
+  // for tool_end summaries, but the *summary string itself* comes from the
+  // backend and could in theory contain markup we don't want to render.
+  function escapeChatHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   let stylesInjected = false;
 
   function injectStyles() {
@@ -643,21 +656,46 @@
           break;
 
         case 'tool_start':
+          // Two-line display per design: "Executing <tool name>..." sits
+          // above "Working...". Underscores in the tool name are turned
+          // into spaces so internal IDs read naturally to a user.
+          // Phase is cleared so the small "TOOL" category label doesn't
+          // appear under the message.
           if (this._activityEl) {
-            this._activityEl.show('Preparing tool...', 'tool');
+            const toolFriendly = String(event.tool || '').replace(/_/g, ' ').trim();
+            this._activityEl.show({
+              primary: toolFriendly ? `Executing ${toolFriendly}...` : 'Executing tool...',
+              message: 'Working...',
+              phase: ''
+            });
           }
           break;
 
         case 'tool_progress':
+          // Per design, keep "Working..." steady on every progress tick.
+          // The dynamic per-tick text from the backend is intentionally
+          // not surfaced here so the activity bar doesn't flicker.
           if (this._activityEl) {
-            this._activityEl.update(event.message || 'Processing...', 'tool');
+            this._activityEl.update({ message: 'Working...', phase: '' });
           }
           break;
 
         case 'tool_end':
-          // Don't hide — LLM continues streaming after tools; activity hides on first content chunk
+          // "Completed <summary>" with bold prefix. Clear the primary
+          // "Executing X..." line since the tool is no longer running.
+          // Don't hide the activity — the LLM keeps streaming after
+          // tools; activity hides on the first content chunk.
           if (this._activityEl) {
-            this._activityEl.update('Analyzing results...', 'tool');
+            const summary = String(event.summary || '').trim();
+            const safeSummary = escapeChatHtml(summary);
+            this._activityEl.update({
+              primary: '',
+              message: safeSummary
+                ? `<strong>Completed</strong> ${safeSummary}`
+                : '<strong>Completed</strong>',
+              phase: '',
+              html: true
+            });
           }
           break;
 

@@ -695,13 +695,36 @@
         '</div>'
       : '';
 
+    // Created-by name from the API's denormalized fields. Fall back to
+    // email when neither name field is present, then to "—" so we never
+    // render an empty label.
+    var creatorFirst = (matter.created_by_first_name || '').trim();
+    var creatorLast  = (matter.created_by_last_name || '').trim();
+    var creatorName;
+    if (creatorFirst && creatorLast) creatorName = creatorFirst + ' ' + creatorLast;
+    else if (creatorFirst) creatorName = creatorFirst;
+    else if (matter.created_by_email) creatorName = matter.created_by_email;
+    else creatorName = '—';
+
+    // Visibility from the sharing block: "Private", "Organization-wide",
+    // or just title-cased fallback if the backend ever adds new values.
+    var sharing = matter.sharing || {};
+    var rawVisibility = String(sharing.visibility || (matter.visibility || '')).toLowerCase();
+    var visibilityLabel;
+    if (rawVisibility === 'private') visibilityLabel = 'Private';
+    else if (rawVisibility === 'organization' || rawVisibility === 'org') visibilityLabel = 'Organization-wide';
+    else if (rawVisibility) visibilityLabel = rawVisibility.charAt(0).toUpperCase() + rawVisibility.slice(1);
+    else visibilityLabel = sharing.is_private === false ? 'Organization-wide' : 'Private';
+
     html += '<lex-card id="infoCard" heading="Information" variant="flat" padding="compact">' +
       '<div class="space-y-2.5 text-sm">' +
         descriptionBlock +
         '<div class="flex justify-between"><span class="text-gray-500">Client</span><span class="text-gray-900 font-medium">' + escapeHtml(matter.client_name || 'N/A') + '</span></div>' +
         '<div class="flex justify-between"><span class="text-gray-500">Type</span><span class="text-gray-900">' + (matter.matter_type === 'workspace' ? 'Workspace' : 'Matter') + '</span></div>' +
         '<div class="flex justify-between"><span class="text-gray-500">Status</span><span class="text-gray-900">' + (matter.status ? matter.status.charAt(0).toUpperCase() + matter.status.substring(1) : 'Active') + '</span></div>' +
+        '<div class="flex justify-between"><span class="text-gray-500">Visibility</span><span class="text-gray-900">' + escapeHtml(visibilityLabel) + '</span></div>' +
         '<div class="flex justify-between"><span class="text-gray-500">Created</span><span class="text-gray-900">' + formatDate(matter.created_at) + '</span></div>' +
+        '<div class="flex justify-between"><span class="text-gray-500">Created By</span><span class="text-gray-900">' + escapeHtml(creatorName) + '</span></div>' +
         '<div class="flex justify-between"><span class="text-gray-500">Last Updated</span><span class="text-gray-900">' + formatDate(matter.updated_at) + '</span></div>' +
       '</div>' +
     '</lex-card>';

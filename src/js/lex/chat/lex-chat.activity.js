@@ -138,6 +138,12 @@
       this._reasoningEntries = [];
       this._reasoningCollapsed = true;
       this._hideTimeout = null;
+      // Optional secondary line shown ABOVE the main message (e.g.
+      // "Executing find organization users..." sits above "Working...").
+      this._primary = '';
+      // When true, the main message is rendered as innerHTML so callers
+      // can include light formatting like "<strong>Completed</strong>".
+      this._messageIsHtml = false;
     }
 
     connected() {
@@ -154,6 +160,7 @@
         <div class="lex-chat-activity-wrapper">
           ${BREATHING_LOGO}
           <div class="lex-chat-activity-body">
+            <div class="lex-chat-activity-primary" data-primary style="display:none;font-size:0.8125rem;color:var(--lex-text-secondary,#6b7280);margin-bottom:2px;"></div>
             <div class="lex-chat-activity-message" data-msg></div>
             <div class="lex-chat-activity-phase" data-phase></div>
             <div class="lex-chat-reasoning-drawer" data-drawer style="display:none">
@@ -181,11 +188,34 @@
     }
 
     /**
+     * Apply a structured update.
+     *   { primary, message, phase, html }
+     * - primary (string) — small line above the main message ('' clears it)
+     * - message (string) — main line
+     * - phase   (string) — small label below the main message
+     * - html    (boolean) — when true, message is rendered as innerHTML
+     *
+     * Plain string forms still work (msg, phase) for backwards compatibility.
+     */
+    _applyOptions(arg, phase) {
+      if (arg && typeof arg === 'object') {
+        if ('primary' in arg) this._primary = String(arg.primary || '');
+        if ('message' in arg && arg.message != null) this._props.message = String(arg.message);
+        if ('phase' in arg && arg.phase != null) this._props.phase = String(arg.phase);
+        this._messageIsHtml = !!arg.html;
+      } else {
+        if (arg) this._props.message = arg;
+        if (phase) this._props.phase = phase;
+        // Plain string callers always want plain text rendering.
+        this._messageIsHtml = false;
+      }
+    }
+
+    /**
      * Show the activity indicator.
      */
     show(msg, phase) {
-      if (msg) this._props.message = msg;
-      if (phase) this._props.phase = phase;
+      this._applyOptions(msg, phase);
       this._props.active = true;
       this._showTime = Date.now();
       this.removeAttribute('hidden');
@@ -200,8 +230,7 @@
      * Update the message / phase without hiding.
      */
     update(msg, phase) {
-      if (msg) this._props.message = msg;
-      if (phase) this._props.phase = phase;
+      this._applyOptions(msg, phase);
       this._updateDisplay();
     }
 
@@ -263,10 +292,38 @@
     }
 
     _updateDisplay() {
+      const primaryEl = this.querySelector('[data-primary]');
       const msgEl = this.querySelector('[data-msg]');
       const phaseEl = this.querySelector('[data-phase]');
-      if (msgEl) msgEl.textContent = this.message;
-      if (phaseEl) phaseEl.textContent = this.phase;
+
+      if (primaryEl) {
+        if (this._primary) {
+          primaryEl.textContent = this._primary;
+          primaryEl.style.display = '';
+        } else {
+          primaryEl.textContent = '';
+          primaryEl.style.display = 'none';
+        }
+      }
+      if (msgEl) {
+        if (this._messageIsHtml) {
+          msgEl.innerHTML = this.message;
+        } else {
+          msgEl.textContent = this.message;
+        }
+      }
+      if (phaseEl) {
+        // Hide the phase row entirely when there's nothing meaningful to
+        // show — keeps the activity bar from flashing a stray "TOOL" label
+        // below "Working..." when callers don't supply one.
+        if (this.phase) {
+          phaseEl.textContent = this.phase;
+          phaseEl.style.display = '';
+        } else {
+          phaseEl.textContent = '';
+          phaseEl.style.display = 'none';
+        }
+      }
     }
 
     disconnected() {
