@@ -638,6 +638,15 @@
       }
     });
 
+    // When the user resumes a saved thread from the sidebar, suppress the
+    // first-message session bootstrap below. Without this, the next send
+    // would POST /chat/sessions, mint a fresh thread_id, and silently
+    // replace the just-loaded conversation — every "continue this chat"
+    // would actually start a new one.
+    panel.addEventListener('lex-lana-thread-selected', function () {
+      state._lanaSessionBootstrapped = true;
+    });
+
     // Inject file attachment on every send + session bootstrap on first send
     panel.addEventListener('lex-lana-before-send', function (e) {
       var file = state.currentFile;
@@ -656,8 +665,15 @@
         opts.matterId = matterId;
       }
 
-      // First message: bootstrap session + register document before send
-      if (!state._lanaSessionBootstrapped) {
+      // First message: bootstrap session + register document before send.
+      // Skip bootstrap if a conversation is already active on the panel —
+      // covers the case where the user resumed a saved thread before the
+      // bootstrap flag was flipped (defensive backstop to the
+      // lex-lana-thread-selected listener above).
+      var hasActiveConversation = panel._chatEl
+        && panel._chatEl._props
+        && panel._chatEl._props.conversationId;
+      if (!state._lanaSessionBootstrapped && !hasActiveConversation) {
         e.preventDefault(); // take over send manually
         state._lanaSessionBootstrapped = true;
         var content = e.detail.content;
