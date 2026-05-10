@@ -67,16 +67,30 @@
 
   /**
    * Compose the inline token for a selected mention match.
-   *  - users : `@<username>` (slug-friendly)
-   *  - agents: `@<slug>`
+   *  - users   : `@<username>` (slug-friendly)
+   *  - agents  : `@<slug>`
+   *  - contacts: `@<slugified label>` (display name slugified to a
+   *              whitespace-free token; contacts have no canonical handle).
    *
-   * Both are prefixed with `@` so the chat backend can later parse the
+   * All are prefixed with `@` so the chat backend can later parse the
    * message body and resolve mentions with the same regex.
    */
   function buildMentionToken(match) {
     if (!match || typeof match !== 'object') return '';
     if (match.kind === 'agent') {
       const slug = match.slug || match.label || '';
+      return slug ? `@${slug}` : '';
+    }
+    if (match.kind === 'contact') {
+      // Contacts don't have usernames. Slugify the display label so the
+      // inserted token is a single @-word and parses cleanly server-side.
+      const raw = (match.label
+        || (match.email ? String(match.email).split('@')[0] : '')
+        || '').trim();
+      const slug = raw
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]+/g, '-')
+        .replace(/^-+|-+$/g, '');
       return slug ? `@${slug}` : '';
     }
     // user
@@ -127,6 +141,10 @@
       atIndex: -1,
       prefix: '',
       results: [],
+      // Optional sectioned shape from the API. When present, the renderer
+      // groups items under labeled headers; keyboard nav still walks the
+      // flat `results` array so the active index remains a single number.
+      groups: [],
       activeIndex: 0,
       // 'idle' | 'pending' | 'ready'
       status: 'idle',
@@ -161,8 +179,10 @@
           return state;
         }
         const results = Array.isArray(action.results) ? action.results : [];
+        const groups = Array.isArray(action.groups) ? action.groups : [];
         return Object.assign({}, state, {
           results,
+          groups,
           status: 'ready',
           activeIndex: results.length > 0 ? Math.min(state.activeIndex, results.length - 1) : 0,
         });

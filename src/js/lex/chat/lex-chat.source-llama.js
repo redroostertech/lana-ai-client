@@ -91,7 +91,7 @@ Keep responses concise but thorough. Provide actionable insights. Structure comp
       yield { type: 'connected', threadId: this._conversationId, model: this._model };
 
       // Yield thinking
-      yield { type: 'thinking', message: 'Thinking...', phase: 'thinking' };
+      yield { type: 'thinking', message: 'Working...', phase: '' };
 
       let fullContent = '';
 

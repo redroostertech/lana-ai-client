@@ -510,6 +510,32 @@
         background: var(--lex-chat-accent, #4f46e5);
         color: var(--lex-chat-accent-text, #fff);
       }
+      .lex-cmp-mentionpicker-item-kind--contact {
+        background: var(--lex-chat-success-soft, #dcfce7);
+        color: var(--lex-chat-success-text, #166534);
+      }
+      .lex-cmp-mentionpicker-section-header {
+        padding: 6px 10px 4px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--lex-chat-text-muted, #6b7280);
+        background: var(--lex-chat-bg-subtle, #f9fafb);
+        border-top: 1px solid var(--lex-chat-border-soft, #e5e7eb);
+      }
+      .lex-cmp-mentionpicker-section-header:first-child {
+        border-top: none;
+      }
+      .lex-cmp-mentionpicker-item-note {
+        margin-left: 6px;
+        padding: 1px 6px;
+        font-size: 10px;
+        font-weight: 500;
+        color: var(--lex-chat-text-muted, #6b7280);
+        background: var(--lex-chat-bg-elevated, #f3f4f6);
+        border-radius: 4px;
+      }
       .lex-cmp-mentionpicker-item-label {
         font-size: 13px;
         font-weight: 500;
@@ -573,7 +599,12 @@
         maxHeight:    { type: Number, default: 128, attribute: 'max-height' },
         suggestions:  { type: Array, default: [] },
         tools:        { type: Array, default: null },
-        activeTools:  { type: Array, default: [] }
+        activeTools:  { type: Array, default: [] },
+        // Optional matter scope. When set, the @-mention typeahead also
+        // searches contacts attached to this matter (in addition to org
+        // users + discoverable agents). Forwarded to /api/v1/mentions/search
+        // as the `matter_id` query param.
+        matterId:     { type: String, default: null, attribute: 'matter-id' }
       };
     }
 
@@ -1230,9 +1261,15 @@
                                                        : '') || '';
       const seq = ++this._mentionFetchSeq;
       try {
+        // When the chat is matter-scoped, forward the matter id so the
+        // backend can also search the matter's attached contacts.
+        const matterParam = this.matterId
+          ? '&matter_id=' + encodeURIComponent(this.matterId)
+          : '';
         const url = baseUrl + '/api/v1/mentions/search?q='
                   + encodeURIComponent(prefix || '')
-                  + '&limit=20';
+                  + '&limit=20'
+                  + matterParam;
         const resp = await fetch(url, {
           headers: token ? { 'Authorization': 'Bearer ' + token } : {},
         });
@@ -1246,7 +1283,8 @@
         const body = await resp.json();
         if (seq !== this._mentionFetchSeq) return; // a newer fetch superseded
         const results = Array.isArray(body && body.matches) ? body.matches : [];
-        this._mentionDispatch({ type: 'RESULTS_RECEIVED', prefix: prefix, results });
+        const groups = Array.isArray(body && body.groups) ? body.groups : [];
+        this._mentionDispatch({ type: 'RESULTS_RECEIVED', prefix: prefix, results, groups });
         this._refreshMentionPopover();
       } catch (err) {
         if (seq !== this._mentionFetchSeq) return;
@@ -1292,23 +1330,63 @@
         return;
       }
 
-      list.innerHTML = results.map((m, idx) => {
-        const isActive = idx === st.activeIndex;
-        const kindClass = m.kind === 'agent'
-          ? 'lex-cmp-mentionpicker-item-kind--agent'
-          : 'lex-cmp-mentionpicker-item-kind--user';
-        const kindLabel = m.kind === 'agent' ? 'Agent' : 'User';
-        const sub = m.kind === 'agent'
-          ? (m.description || (m.slug ? '@' + m.slug : ''))
-          : (m.username ? '@' + m.username : (m.email || ''));
+      // Renders one row in the popover. The flatIndex is the index into
+      // st.results (the same array keyboard nav walks), so clicking and
+      // arrow-key navigation both resolve back to the same selection.
+      const renderRow = (m, flatIndex) => {
+        const isActive = flatIndex === st.activeIndex;
+        let kindClass;
+        let kindLabel;
+        let sub;
+        if (m.kind === 'agent') {
+          kindClass = 'lex-cmp-mentionpicker-item-kind--agent';
+          kindLabel = 'Agent';
+          sub = m.description || (m.slug ? '@' + m.slug : '');
+        } else if (m.kind === 'contact') {
+          kindClass = 'lex-cmp-mentionpicker-item-kind--contact';
+          kindLabel = 'Contact';
+          // Prefer email; fall back to company so the row stays informative
+          // even when an email isn't on file.
+          sub = m.email || m.company || '';
+        } else {
+          kindClass = 'lex-cmp-mentionpicker-item-kind--user';
+          kindLabel = 'User';
+          sub = m.username ? '@' + m.username : (m.email || '');
+        }
+        // Show a small hint when a user can't be shared with directly
+        // (agents and external contacts) so the user knows the @-mention
+        // is reference-only, not a sharing target. For share-eligible
+        // rows the badge stays clean.
+        const eligibilityNote = (m.share_eligible === false && m.kind !== 'agent')
+          ? '<span class="lex-cmp-mentionpicker-item-note" title="Reference only — cannot be granted matter access">reference</span>'
+          : '';
         return `
           <div class="lex-cmp-mentionpicker-item${isActive ? ' lex-cmp-mentionpicker-item--active' : ''}"
-               data-mention-select="${idx}">
+               data-mention-select="${flatIndex}">
             <span class="lex-cmp-mentionpicker-item-kind ${kindClass}">${esc(kindLabel)}</span>
             <span class="lex-cmp-mentionpicker-item-label" title="${esc(m.label || '')}">${esc(m.label || '')}</span>
             ${sub ? `<span class="lex-cmp-mentionpicker-item-sub">${esc(sub)}</span>` : ''}
+            ${eligibilityNote}
           </div>`;
-      }).join('');
+      };
+
+      // Sectioned render when the API returned groups; otherwise flat.
+      // The flat-index counter keeps click/keyboard nav addressing the
+      // same st.results array regardless of section.
+      const groups = Array.isArray(st.groups) ? st.groups : [];
+      if (groups.length > 0) {
+        let flatIndex = 0;
+        const html = groups.map((g) => {
+          const matches = Array.isArray(g.matches) ? g.matches : [];
+          if (matches.length === 0) return '';
+          const header = `<div class="lex-cmp-mentionpicker-section-header">${esc(g.label || '')}</div>`;
+          const rows = matches.map((m) => renderRow(m, flatIndex++)).join('');
+          return header + rows;
+        }).join('');
+        list.innerHTML = html;
+      } else {
+        list.innerHTML = results.map((m, idx) => renderRow(m, idx)).join('');
+      }
     }
 
     // ─────────────────────────────────────────────────────────────────────────

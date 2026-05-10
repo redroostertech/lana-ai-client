@@ -12,17 +12,70 @@
   const Chat = global.Lex.Chat || {};
   if (!LexElement) { console.error('[lex-chat] LexElement not loaded'); return; }
 
-  // Escape user/server text before injecting into innerHTML for the activity
-  // bar. The bar accepts a tiny amount of HTML (e.g. <strong>Completed</strong>)
-  // for tool_end summaries, but the *summary string itself* comes from the
-  // backend and could in theory contain markup we don't want to render.
-  function escapeChatHtml(value) {
-    return String(value == null ? '' : value)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
+  // ---------------------------------------------------------------------------
+  // Tool-name humanizer
+  // ---------------------------------------------------------------------------
+  // Maps backend tool identifiers (and, where useful, params) to short
+  // human-friendly phrases that appear above "Working..." on the activity
+  // bar while a tool runs. Keep these phrases short (they replace the small
+  // primary line in <lex-chat-activity>); the trailing ellipsis matches the
+  // server-supplied tool_progress messages so the bar reads consistently.
+  //
+  // To extend: add a new entry below; for tools whose phrasing depends on a
+  // param (e.g. get_matter_data + data_type), branch inside the function.
+  // ---------------------------------------------------------------------------
+
+  function humanizeSnakeCase(name) {
+    const cleaned = String(name || '').replace(/_/g, ' ').trim();
+    if (!cleaned) return '';
+    return `Running ${cleaned}…`;
+  }
+
+  function humanizeToolStart(toolName, params) {
+    const name = String(toolName || '').trim();
+    if (!name) return '';
+    const p = params || {};
+
+    switch (name) {
+      case 'get_matter_data': {
+        // Sub-shape varies by data_type; pick a friendly phrase per kind.
+        const kind = String(p.data_type || '').toLowerCase();
+        switch (kind) {
+          case 'documents': return 'Looking up matter documents…';
+          case 'tasks':     return 'Looking up matter tasks…';
+          case 'contacts':  return 'Looking up matter contacts…';
+          case 'notes':     return 'Looking up matter notes…';
+          case 'comments':  return 'Looking up matter comments…';
+          case 'activity':  return 'Looking up matter activity…';
+          case 'access':    return 'Checking matter access…';
+          default:          return 'Looking up matter data…';
+        }
+      }
+      case 'get_matter_documents': return 'Looking up matter documents…';
+      case 'get_matter_tasks':     return 'Looking up matter tasks…';
+      case 'get_matter_contacts':  return 'Looking up matter contacts…';
+      case 'get_matter_notes':     return 'Looking up matter notes…';
+      case 'get_matter_calendar':  return 'Looking up matter calendar…';
+      case 'get_automation_details': return 'Looking up automation details…';
+
+      case 'find_organization_users': return 'Finding organization users…';
+      case 'share_matter':            return 'Sharing matter…';
+
+      case 'entity_search': return 'Searching records…';
+      case 'entity_list':   return 'Listing records…';
+      case 'entity_read':   return 'Reading record…';
+      case 'entity_create': return 'Creating record…';
+      case 'entity_update': return 'Updating record…';
+      case 'entity_delete': return 'Deleting record…';
+
+      case 'query_platform_knowledge': return 'Looking up platform knowledge…';
+      case 'query_analytics_data':     return 'Querying analytics…';
+      case 'generate_forecast':        return 'Generating forecast…';
+      case 'request_additional_tools': return 'Loading more tools…';
+
+      default:
+        return humanizeSnakeCase(name);
+    }
   }
 
   let stylesInjected = false;
@@ -152,6 +205,9 @@
       // Apply initial props
       if (this._composerEl) {
         this._composerEl.placeholder = this.placeholder;
+        // Forward matter scope so the composer's @-mention typeahead can
+        // include matter contacts in addition to org users + agents.
+        if (this.matterId) this._composerEl.matterId = this.matterId;
       }
       if (this._documentsEl) {
         this._documentsEl.mode = this.chatMode;
@@ -372,7 +428,7 @@
       // Show activity indicator
       if (this._activityEl) {
         this._activityEl.clearReasoning();
-        this._activityEl.show('Thinking...', 'thinking');
+        this._activityEl.show('Working...');
       }
 
       // Emit send event
@@ -625,6 +681,11 @@
           // Capture backend-resolved matter ID early (before handler runs)
           if (event.matterId && !this.matterId) {
             this._props.matterId = event.matterId;
+            // Propagate to the composer so subsequent @-mention searches
+            // include matter contacts. (The initial render forwarded
+            // whatever matter id was set at mount time; this catches the
+            // case where the matter is resolved by the backend mid-turn.)
+            if (this._composerEl) this._composerEl.matterId = event.matterId;
           }
           this.emit('lex-chat-response-start', { conversationId: this.conversationId });
           break;
@@ -656,15 +717,16 @@
           break;
 
         case 'tool_start':
-          // Two-line display per design: "Executing <tool name>..." sits
-          // above "Working...". Underscores in the tool name are turned
-          // into spaces so internal IDs read naturally to a user.
-          // Phase is cleared so the small "TOOL" category label doesn't
-          // appear under the message.
+        case 'tool_call_starting':
+          // Show the humanized tool phrase on the small primary line ABOVE
+          // the main "Working..." label. The main label intentionally never
+          // changes mid-turn — only the primary moves — so the bar stays
+          // calm while multiple tools chain.
           if (this._activityEl) {
-            const toolFriendly = String(event.tool || '').replace(/_/g, ' ').trim();
+            const toolName = event.toolName || event.tool || '';
+            const primary = humanizeToolStart(toolName, event.params);
             this._activityEl.show({
-              primary: toolFriendly ? `Executing ${toolFriendly}...` : 'Executing tool...',
+              primary: primary || (toolName ? `Running ${toolName}…` : ''),
               message: 'Working...',
               phase: ''
             });
@@ -672,29 +734,32 @@
           break;
 
         case 'tool_progress':
-          // Per design, keep "Working..." steady on every progress tick.
-          // The dynamic per-tick text from the backend is intentionally
-          // not surfaced here so the activity bar doesn't flicker.
+          // Prefer the server-supplied friendly progress string (e.g.
+          // "Looking up matter documents…"). If the server didn't send
+          // one, leave the existing primary line in place.
           if (this._activityEl) {
-            this._activityEl.update({ message: 'Working...', phase: '' });
+            const progressMsg = String(event.message || '').trim();
+            if (progressMsg) {
+              this._activityEl.update({
+                primary: progressMsg,
+                message: 'Working...',
+                phase: ''
+              });
+            }
           }
           break;
 
         case 'tool_end':
-          // "Completed <summary>" with bold prefix. Clear the primary
-          // "Executing X..." line since the tool is no longer running.
-          // Don't hide the activity — the LLM keeps streaming after
-          // tools; activity hides on the first content chunk.
+        case 'tool_call_complete':
+          // Tool finished: clear the primary line and keep the main
+          // "Working..." label so the next tool's start can take over.
+          // We deliberately don't surface the result summary here — the
+          // model writes its own summary through the `content` stream.
           if (this._activityEl) {
-            const summary = String(event.summary || '').trim();
-            const safeSummary = escapeChatHtml(summary);
             this._activityEl.update({
               primary: '',
-              message: safeSummary
-                ? `<strong>Completed</strong> ${safeSummary}`
-                : '<strong>Completed</strong>',
-              phase: '',
-              html: true
+              message: 'Working...',
+              phase: ''
             });
           }
           break;
@@ -832,6 +897,7 @@
           // This ensures subsequent messages include the correct matter_id
           if (event.matterId && !this.matterId) {
             this._props.matterId = event.matterId;
+            if (this._composerEl) this._composerEl.matterId = event.matterId;
           }
 
           this.emit('lex-chat-response-end', {

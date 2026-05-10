@@ -436,20 +436,57 @@
           return { type: 'tool_thinking', content: data.content || data.message || '' };
 
         case 'tool_start':
-          return { type: 'tool_start', tool: data.tool };
+          // Forward tool_name AND params so the chat component can
+          // humanize the activity-bar primary line (e.g. inspect
+          // params.data_type for get_matter_data).
+          return {
+            type: 'tool_start',
+            tool: data.tool || data.tool_name || '',
+            toolName: data.tool_name || data.tool || '',
+            params: data.params || {}
+          };
 
         case 'tool_progress':
-          return { type: 'tool_progress', tool: data.tool, message: data.message || '' };
+          return {
+            type: 'tool_progress',
+            tool: data.tool || data.tool_name || '',
+            toolName: data.tool_name || data.tool || '',
+            message: data.message || ''
+          };
 
         case 'tool_end':
           return {
             type: 'tool_end',
-            tool: data.tool,
+            tool: data.tool || data.tool_name || '',
+            toolName: data.tool_name || data.tool || '',
             success: data.success !== false,
             // Backend emits a human-readable rollup like "Found 1 user
-            // (top: Jennifer Norton)." — pass it through so the UI can
-            // render "Completed <summary>" without recomputing it.
+            // (top: Jennifer Norton)." — pass it through; the UI uses
+            // this for telemetry but no longer renders it on the bar.
             summary: data.summary || data.message || ''
+          };
+
+        // Legacy variants emitted by matter-context-tool-loop.js. Same
+        // semantics as tool_start / tool_end above; kept distinct so the
+        // chat component can keep handlers symmetrical.
+        case 'tool_call_starting':
+          return {
+            type: 'tool_call_starting',
+            tool: data.tool_name || '',
+            toolName: data.tool_name || '',
+            paramsPreview: data.params_preview || '',
+            agentId: data.agent_id || null,
+            step: data.step || null
+          };
+
+        case 'tool_call_complete':
+          return {
+            type: 'tool_call_complete',
+            tool: data.tool_name || '',
+            toolName: data.tool_name || '',
+            ok: data.ok !== false,
+            summary: data.summary || '',
+            step: data.step || null
           };
 
         case 'content':

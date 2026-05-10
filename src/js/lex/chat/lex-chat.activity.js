@@ -126,8 +126,8 @@
     static get properties() {
       return {
         active:         { type: Boolean, default: false, reflect: true },
-        message:        { type: String, default: 'Thinking...' },
-        phase:          { type: String, default: 'thinking' },
+        message:        { type: String, default: 'Working...' },
+        phase:          { type: String, default: '' },
         minDisplayTime: { type: Number, default: 500, attribute: 'min-display-time' }
       };
     }
