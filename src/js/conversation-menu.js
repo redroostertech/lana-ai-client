@@ -5,7 +5,8 @@
 
 const ConversationMenu = {
   container: null,
-  conversations: [],
+  conversations: [],          // unpinned list, paginated
+  pinnedConversations: [],    // pinned list, fetched in parallel on page 1
   currentConversationId: null,
   hasMore: true,
   isLoading: false,
@@ -26,6 +27,7 @@ const ConversationMenu = {
     if (currentKey !== nextKey) {
       this.page = 1;
       this.conversations = [];
+      this.pinnedConversations = [];
       this.hasMore = true;
     }
   },
@@ -109,16 +111,44 @@ const ConversationMenu = {
       if (reset) {
         this.page = 1;
         this.conversations = [];
+        this.pinnedConversations = [];
         this.hasMore = true;
       }
 
       console.log('[ConversationMenu.loadConversations] Fetching from API...');
+      // Page 1 fetches pinned + unpinned in parallel (mirrors workspaces).
+      // Subsequent pages only fetch the unpinned tail.
+      let pinnedResult = { sessions: [] };
+      if (this.page === 1) {
+        try {
+          pinnedResult = await this.fetchPinnedConversations();
+        } catch (pinnedErr) {
+          // Backend may not expose the /pinned route yet — treat as empty
+          console.warn('[ConversationMenu.loadConversations] Pinned fetch failed, falling back to none:', pinnedErr && pinnedErr.message);
+          pinnedResult = { sessions: [] };
+        }
+      }
       const response = await this.fetchConversations(reset);
       const newConversations = response.sessions || [];
-      console.log('[ConversationMenu.loadConversations] Received', newConversations.length, 'conversations');
+      const pinnedFromMain = newConversations.filter(c => c.is_pinned);
+      const unpinnedFromMain = newConversations.filter(c => !c.is_pinned);
+      console.log('[ConversationMenu.loadConversations] Received', newConversations.length, 'conversations,', pinnedResult.sessions?.length || 0, 'pinned');
 
-      this.hasMore = response.hasMore || newConversations.length >= this.limit;
-      this.conversations = reset ? newConversations : [...this.conversations, ...newConversations];
+      this.hasMore = response.hasMore || unpinnedFromMain.length >= this.limit;
+      // If the server doesn't filter on exclude_pinned, pinnedFromMain
+      // would otherwise duplicate items in pinnedResult — dedupe by thread_id.
+      const pinnedAll = ((pinnedResult.sessions || []).concat(this.page === 1 ? pinnedFromMain : []));
+      const seenPinnedIds = new Set();
+      const dedupedPinned = pinnedAll.filter(c => {
+        const id = c.thread_id || c.id;
+        if (!id || seenPinnedIds.has(id)) return false;
+        seenPinnedIds.add(id);
+        return true;
+      });
+      if (this.page === 1) {
+        this.pinnedConversations = dedupedPinned;
+      }
+      this.conversations = reset ? unpinnedFromMain : [...this.conversations, ...unpinnedFromMain];
 
       // Clear loading before render so we don't append the bottom spinner (only show it when loading more pages)
       this.isLoading = false;
@@ -155,24 +185,42 @@ const ConversationMenu = {
 
   async fetchConversations(reset = false) {
     if (this.scope && this.scope.type === 'conversation_threads') {
-      return this.fetchConversationThreads();
+      return this.fetchConversationThreads({ excludePinned: true });
     }
 
     // Add cache-busting parameter when resetting to ensure fresh data after title updates
     const cacheBuster = reset ? `&_=${Date.now()}` : '';
-    return api.get(`/api/v1/chat/sessions?page=${this.page}&limit=${this.limit}&sort=updated_at&order=desc${cacheBuster}`);
+    return api.get(`/api/v1/chat/sessions?page=${this.page}&limit=${this.limit}&sort=updated_at&order=desc&exclude_pinned=true${cacheBuster}`);
   },
 
-  async fetchConversationThreads() {
+  // Page-1 only — fetches the pinned strip in parallel with the regular list.
+  async fetchPinnedConversations() {
+    if (this.scope && this.scope.type === 'conversation_threads') {
+      return this.fetchConversationThreads({ pinnedOnly: true });
+    }
+    const result = await api.getPinnedChatSessions({ limit: 100, offset: 0 });
+    // Normalize to { sessions: [...] } regardless of envelope
+    const sessions = result.sessions || result.data || result.threads || [];
+    return { sessions };
+  },
+
+  async fetchConversationThreads(opts = {}) {
     const pageScopes = (this.scope && this.scope.pageScopes) || [];
     const limit = this.limit;
-    const offset = (this.page - 1) * limit;
+    const offset = opts.pinnedOnly ? 0 : (this.page - 1) * limit;
+    const pinnedQs = opts.pinnedOnly ? '' : (opts.excludePinned ? '&exclude_pinned=true' : '');
+    const fetchLimit = opts.pinnedOnly ? 100 : 100;
+
+    const buildUrl = (pageScope) => {
+      const base = '/api/v1/conversation-threads' + (opts.pinnedOnly ? '/pinned' : '');
+      const ps = pageScope ? `page_scope=${encodeURIComponent(pageScope)}&` : '';
+      const sort = opts.pinnedOnly ? '' : '&sort_by=last_activity&sort_order=desc';
+      return `${base}?${ps}limit=${fetchLimit}${sort}${pinnedQs}`;
+    };
 
     const requests = pageScopes.length > 0
-      ? pageScopes.map((pageScope) => api.get(
-          `/api/v1/conversation-threads?page_scope=${encodeURIComponent(pageScope)}&limit=100&sort_by=last_activity&sort_order=desc`
-        ))
-      : [api.get('/api/v1/conversation-threads?limit=100&sort_by=last_activity&sort_order=desc')];
+      ? pageScopes.map((pageScope) => api.get(buildUrl(pageScope)))
+      : [api.get(buildUrl(null))];
 
     const results = await Promise.all(requests);
     const allThreads = [];
@@ -186,13 +234,17 @@ const ConversationMenu = {
       });
     });
 
-    allThreads.sort((a, b) => {
-      const aTime = new Date(a.last_activity || a.updated_at || a.created_at || 0).getTime();
-      const bTime = new Date(b.last_activity || b.updated_at || b.created_at || 0).getTime();
-      return bTime - aTime;
-    });
+    if (!opts.pinnedOnly) {
+      // Sort by last activity for the regular list. Pinned-only is already
+      // ordered by pinned_at on the server.
+      allThreads.sort((a, b) => {
+        const aTime = new Date(a.last_activity || a.updated_at || a.created_at || 0).getTime();
+        const bTime = new Date(b.last_activity || b.updated_at || b.created_at || 0).getTime();
+        return bTime - aTime;
+      });
+    }
 
-    const pageThreads = allThreads.slice(offset, offset + limit);
+    const pageThreads = opts.pinnedOnly ? allThreads : allThreads.slice(offset, offset + limit);
 
     return {
       sessions: pageThreads.map((thread) => ({
@@ -202,10 +254,12 @@ const ConversationMenu = {
         metadata: thread.metadata || {},
         matter_id: thread.matter_id || '',
         matter_name: thread.metadata?.matter_name || '',
+        is_pinned: !!thread.is_pinned,
+        pinned_at: thread.pinned_at || null,
         created_at: thread.created_at,
         updated_at: thread.last_activity || thread.updated_at || thread.created_at
       })),
-      hasMore: offset + pageThreads.length < allThreads.length,
+      hasMore: opts.pinnedOnly ? false : offset + pageThreads.length < allThreads.length,
       pagination: {
         page: this.page,
         limit,
@@ -228,23 +282,42 @@ const ConversationMenu = {
    * Render conversations in the menu
    */
   render() {
-    console.log('[ConversationMenu.render] Called with', this.conversations.length, 'conversations');
+    console.log('[ConversationMenu.render] Called with',
+      this.pinnedConversations.length, 'pinned,',
+      this.conversations.length, 'unpinned');
 
     if (!this.container) {
       console.error('[ConversationMenu.render] Container not found');
       return;
     }
 
-    if (this.conversations.length === 0) {
+    if (this.pinnedConversations.length === 0 && this.conversations.length === 0) {
       console.log('[ConversationMenu.render] No conversations, showing empty state');
       this.renderEmpty();
       return;
     }
 
-    console.log('[ConversationMenu.render] Rendering', this.conversations.length, 'conversation items');
-    const html = this.conversations.map(conv => this.renderConversationItem(conv)).join('');
-    const loadingHtml = this.isLoading && this.hasMore ? this.renderLoading() : '';
+    let html = '';
 
+    if (this.pinnedConversations.length > 0) {
+      const pinnedItems = this.pinnedConversations.map(conv => this.renderConversationItem(conv)).join('');
+      html += `
+        <div class="px-1 pt-1 pb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">
+          <svg class="w-3 h-3 text-yellow-500" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg>
+          <span>Pinned</span>
+        </div>
+        <div class="space-y-1 mb-2">${pinnedItems}</div>
+      `;
+      if (this.conversations.length > 0) {
+        html += `<div class="px-1 pt-1 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">All</div>`;
+      }
+    }
+
+    if (this.conversations.length > 0) {
+      html += this.conversations.map(conv => this.renderConversationItem(conv)).join('');
+    }
+
+    const loadingHtml = this.isLoading && this.hasMore ? this.renderLoading() : '';
     this.container.innerHTML = html + loadingHtml;
     console.log('[ConversationMenu.render] Render complete');
   },
@@ -305,19 +378,25 @@ const ConversationMenu = {
     // Format timestamp
     const timestamp = this.formatTimestamp(conv.updated_at || conv.created_at);
 
+    const isPinned = !!conv.is_pinned;
+    const pinnedGlyph = isPinned ? `
+      <svg class="w-3 h-3 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24" title="Pinned" aria-label="Pinned">
+        <path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/>
+      </svg>` : '';
+
     return `
       <div class="conversation-item ${activeClass} p-2 rounded-lg border border-gray-700 cursor-pointer transition-colors group"
            onclick="ConversationMenu.selectConversation('${threadId}', '${matterId}')"
            data-thread-id="${threadId}">
         <div class="flex items-start justify-between gap-2">
           <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-white truncate">${safeTitle}</p>
+            <p class="text-sm font-medium text-white truncate flex items-center gap-1.5">${pinnedGlyph}<span class="truncate">${safeTitle}</span></p>
             ${matterLabel}
             ${safePreview ? `<p class="text-xs text-gray-400 truncate mt-1">${safePreview}</p>` : ''}
           </div>
           <div class="flex items-center gap-1 flex-shrink-0">
             <span class="text-xs text-gray-500">${timestamp}</span>
-            <div class="opacity-0 group-hover:opacity-100 transition-opacity" onclick="event.stopPropagation(); if (typeof window.openConversationActionsModal === 'function') { window.openConversationActionsModal('${threadId}', '${safeTitleForJs}', ${matterId ? `'${matterId}'` : 'null'}); }">
+            <div class="opacity-0 group-hover:opacity-100 transition-opacity" onclick="event.stopPropagation(); if (typeof window.openConversationActionsModal === 'function') { window.openConversationActionsModal('${threadId}', '${safeTitleForJs}', ${matterId ? `'${matterId}'` : 'null'}, ${isPinned ? 'true' : 'false'}); }">
               <button class="p-1 hover:bg-gray-700 rounded transition-colors">
                 <svg class="w-4 h-4 text-gray-400 hover:text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
@@ -358,10 +437,10 @@ const ConversationMenu = {
    * @returns {boolean} True if conversation found and set active, false otherwise
    */
   setActive(conversationId) {
-    // Validate conversation exists before setting active
-    const conversationExists = this.conversations.some(c =>
-      (c.thread_id || c.id) === conversationId
-    );
+    // Validate conversation exists in either pinned or unpinned list
+    const conversationExists =
+      this.conversations.some(c => (c.thread_id || c.id) === conversationId) ||
+      this.pinnedConversations.some(c => (c.thread_id || c.id) === conversationId);
 
     if (!conversationExists) {
       console.warn(`[ConversationMenu] Conversation ${conversationId} not found in loaded conversations`);
@@ -379,9 +458,16 @@ const ConversationMenu = {
    * Update a specific conversation (e.g., after new message)
    */
   updateConversation(conversationId, updates) {
-    const index = this.conversations.findIndex(c => (c.thread_id || c.id) === conversationId);
-    if (index !== -1) {
-      this.conversations[index] = { ...this.conversations[index], ...updates };
+    const idMatch = c => (c.thread_id || c.id) === conversationId;
+    const ui = this.conversations.findIndex(idMatch);
+    if (ui !== -1) {
+      this.conversations[ui] = { ...this.conversations[ui], ...updates };
+      this.render();
+      return;
+    }
+    const pi = this.pinnedConversations.findIndex(idMatch);
+    if (pi !== -1) {
+      this.pinnedConversations[pi] = { ...this.pinnedConversations[pi], ...updates };
       this.render();
     }
   },
@@ -390,15 +476,21 @@ const ConversationMenu = {
    * Add a new conversation to the top of the list
    */
   addConversation(conversation) {
-    this.conversations.unshift(conversation);
+    if (conversation && conversation.is_pinned) {
+      this.pinnedConversations.unshift(conversation);
+    } else {
+      this.conversations.unshift(conversation);
+    }
     this.render();
   },
 
   /**
-   * Remove a conversation from the list
+   * Remove a conversation from both lists
    */
   removeConversation(conversationId) {
-    this.conversations = this.conversations.filter(c => (c.thread_id || c.id) !== conversationId);
+    const keep = c => (c.thread_id || c.id) !== conversationId;
+    this.conversations = this.conversations.filter(keep);
+    this.pinnedConversations = this.pinnedConversations.filter(keep);
     this.render();
   },
 

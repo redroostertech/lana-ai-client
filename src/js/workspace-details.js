@@ -252,11 +252,12 @@
         api.getMatter(matterId, fetchOpts),
         api.getMatterPermissions(matterId).catch(function () { return { permissions: [] }; }),
         api.getMatterActivity(matterId, 20, 0).catch(function () { return { activities: [], pagination: {} }; }),
-        api.getMatterConversations(matterId, 25, 0).catch(function () { return { sessions: [], pagination: {} }; }),
+        api.getMatterConversations(matterId, 25, 0, { excludePinned: true }).catch(function () { return { sessions: [], pagination: {} }; }),
         api.getMatterFiles(matterId, { page: 1, pageSize: 500 }).catch(function () { return { files: [], pagination: { total_count: 0 } }; }),
         api.getOrphanedFiles(matterId).catch(function () { return { orphaned_files: [], total_count: 0 }; }),
         api.getMatterTasks(matterId).catch(function () { return { tasks: [], total_count: 0 }; }),
-        api.getComments(matterId, { limit: 0 }).catch(function () { return { data: [], pagination: { total: 0 } }; })
+        api.getComments(matterId, { limit: 0 }).catch(function () { return { data: [], pagination: { total: 0 } }; }),
+        api.getPinnedChatSessions({ matterId: matterId, limit: 100, offset: 0 }).catch(function () { return { sessions: [] }; })
       ]);
 
       // Extract results (match shapes returned by api.js methods)
@@ -276,6 +277,7 @@
       var orphanedData = results[5].status === 'fulfilled' ? results[5].value : { orphaned_files: [], total_count: 0 };
       var tasksData = results[6].status === 'fulfilled' ? results[6].value : { tasks: [], total_count: 0 };
       var commentsResult = results[7].status === 'fulfilled' ? results[7].value : { data: [], pagination: { total: 0 } };
+      var pinnedChatsData = results[8].status === 'fulfilled' ? results[8].value : { sessions: [] };
       var commentCount = (commentsResult.pagination && commentsResult.pagination.total) || 0;
 
       // Extract contacts and notes from matter object (shadow tables)
@@ -290,6 +292,7 @@
         activities: activityData.activities || [],
         activityPagination: activityData.pagination || {},
         chats: getConversationList(chatsData),
+        pinnedChats: getConversationList(pinnedChatsData),
         chatPagination: chatsData.pagination || {},
         documents: docsData.files || [],
         docPagination: docsData.pagination || { total_count: 0 },
@@ -619,7 +622,7 @@
         renderDocumentsTab(m.matter, m.documents, m.docPagination, m.orphanedFiles);
         break;
       case 'conversations':
-        renderConversationsTab(m.matter, m.chats, m.chatPagination);
+        renderConversationsTab(m.matter, m.chats, m.chatPagination, m.pinnedChats || []);
         break;
       case 'comments':
         renderCommentsTab(m.matter, m.commentCount);
@@ -2282,11 +2285,50 @@
   window.createMatterConversation = createMatterConversation;
   _trackGlobal('createMatterConversation');
 
-  function renderConversationsTab(matter, chats, pagination) {
+  function renderConversationRow(chat, matterId) {
+    var title = escapeHtml(chat.title || (chat.metadata && chat.metadata.title) || 'Untitled Conversation');
+    var msgCount = chat.metadata && chat.metadata.messageCount
+      ? '<span>&#8226; ' + chat.metadata.messageCount + ' messages</span>'
+      : '';
+    var conversationId = getConversationIdFromSession(chat);
+    var isPinned = !!chat.is_pinned;
+    var pinTitle = isPinned ? 'Unpin conversation' : 'Pin conversation';
+    var pinSvg = isPinned
+      ? '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg>'
+      : '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>';
+    var pinColor = isPinned ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-400 hover:text-yellow-600';
+
+    return '<div onclick="NavigationHelpers.navigateToConversation(\'' + conversationId + '\', \'' + matterId + '\')" class="block bg-white border border-gray-200 hover:lex-border-accent hover:shadow-sm rounded-lg p-4 transition-all group cursor-pointer">' +
+      '<div class="flex items-start gap-3">' +
+        '<div class="w-10 h-10 bg-gradient-to-br lex-bg-accent rounded-lg flex items-center justify-center flex-shrink-0">' +
+          '<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>' +
+          '</svg>' +
+        '</div>' +
+        '<div class="flex-1 min-w-0">' +
+          '<h6 class="text-sm font-semibold text-gray-900 group-hover:lex-text-accent mb-1 truncate">' + title + '</h6>' +
+          '<p class="text-xs text-gray-500 flex items-center gap-4">' +
+            '<span>Started ' + timeAgo(chat.created_at) + '</span>' +
+            msgCount +
+          '</p>' +
+        '</div>' +
+        '<button type="button" onclick="event.stopPropagation(); toggleConversationPin(\'' + matterId + '\', \'' + conversationId + '\', ' + (isPinned ? 'true' : 'false') + ')" class="' + pinColor + ' transition-colors flex-shrink-0 p-1" title="' + pinTitle + '" aria-label="' + pinTitle + '">' +
+          pinSvg +
+        '</button>' +
+        '<svg class="w-5 h-5 text-gray-400 group-hover:lex-text-accent flex-shrink-0 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>' +
+        '</svg>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function renderConversationsTab(matter, chats, pagination, pinnedChats) {
     var content = document.getElementById('tabContentConversations');
     if (!content) return;
 
-    if (!chats || chats.length === 0) {
+    pinnedChats = pinnedChats || [];
+
+    if ((!chats || chats.length === 0) && pinnedChats.length === 0) {
       content.innerHTML =
         '<div class="text-center py-12">' +
           '<svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
@@ -2307,36 +2349,56 @@
     var currentOffset = (pagination && pagination.offset) || 0;
     var limit = (pagination && pagination.limit) || 25;
     var total = (pagination && pagination.total) || 0;
-    var hasMore = (currentOffset + chats.length) < total;
     var currentPage = Math.floor(currentOffset / limit) + 1;
     var totalPages = Math.ceil(total / limit);
 
-    var chatRows = chats.map(function (chat) {
-      var title = escapeHtml(chat.title || (chat.metadata && chat.metadata.title) || 'Untitled Conversation');
-      var msgCount = chat.metadata && chat.metadata.messageCount
-        ? '<span>&#8226; ' + chat.metadata.messageCount + ' messages</span>'
+    // Pinned comes from a parallel /pinned fetch. Defensive dedupe in case the
+    // unpinned list also contains pinned rows (server hasn't filtered yet).
+    var pinnedIds = new Set();
+    var pinned = pinnedChats.slice();
+    pinned.forEach(function (c) {
+      var id = c.thread_id || c.id;
+      if (id) pinnedIds.add(id);
+    });
+    chats.forEach(function (c) {
+      if (c.is_pinned) {
+        var id = c.thread_id || c.id;
+        if (id && !pinnedIds.has(id)) {
+          pinnedIds.add(id);
+          pinned.push(c);
+        }
+      }
+    });
+    var unpinned = chats.filter(function (c) {
+      var id = c.thread_id || c.id;
+      return !c.is_pinned && !(id && pinnedIds.has(id));
+    });
+
+    var pinnedSection = '';
+    if (pinned.length > 0) {
+      var pinnedRows = pinned.map(function (c) { return renderConversationRow(c, matter.matter_id); }).join('');
+      pinnedSection =
+        '<div class="space-y-2">' +
+          '<div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500">' +
+            '<svg class="w-4 h-4 text-yellow-500" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg>' +
+            '<span>Pinned</span>' +
+          '</div>' +
+          pinnedRows +
+        '</div>';
+    }
+
+    var unpinnedSection = '';
+    if (unpinned.length > 0) {
+      var unpinnedRows = unpinned.map(function (c) { return renderConversationRow(c, matter.matter_id); }).join('');
+      var unpinnedHeader = pinned.length > 0
+        ? '<div class="text-xs font-semibold uppercase tracking-wide text-gray-500">All conversations</div>'
         : '';
-      var conversationId = getConversationIdFromSession(chat);
-      return '<div onclick="NavigationHelpers.navigateToConversation(\'' + conversationId + '\', \'' + matter.matter_id + '\')" class="block bg-white border border-gray-200 hover:lex-border-accent hover:shadow-sm rounded-lg p-4 transition-all group cursor-pointer">' +
-        '<div class="flex items-start gap-3">' +
-          '<div class="w-10 h-10 bg-gradient-to-br lex-bg-accent rounded-lg flex items-center justify-center flex-shrink-0">' +
-            '<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-              '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>' +
-            '</svg>' +
-          '</div>' +
-          '<div class="flex-1 min-w-0">' +
-            '<h6 class="text-sm font-semibold text-gray-900 group-hover:lex-text-accent mb-1 truncate">' + title + '</h6>' +
-            '<p class="text-xs text-gray-500 flex items-center gap-4">' +
-              '<span>Started ' + timeAgo(chat.created_at) + '</span>' +
-              msgCount +
-            '</p>' +
-          '</div>' +
-          '<svg class="w-5 h-5 text-gray-400 group-hover:lex-text-accent flex-shrink-0 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>' +
-          '</svg>' +
-        '</div>' +
-      '</div>';
-    }).join('');
+      unpinnedSection =
+        '<div class="space-y-2">' +
+          unpinnedHeader +
+          unpinnedRows +
+        '</div>';
+    }
 
     var paginationHtml = '';
     if (total > 0) {
@@ -2354,7 +2416,8 @@
             'New Chat' +
           '</button>' +
         '</div>' +
-        '<div class="space-y-2">' + chatRows + '</div>' +
+        pinnedSection +
+        unpinnedSection +
         paginationHtml +
       '</div>';
 
@@ -2368,15 +2431,47 @@
     }
   }
 
+  async function toggleConversationPin(matterId, threadId, isCurrentlyPinned) {
+    if (!matterId || !threadId) return;
+    if (_pinningThreads.has(threadId)) return;
+    _pinningThreads.add(threadId);
+    try {
+      if (isCurrentlyPinned) {
+        await api.unpinThread(threadId);
+        if (window.Lex && Lex.Toast) Lex.Toast.success('Conversation unpinned');
+      } else {
+        await api.pinThread(threadId);
+        if (window.Lex && Lex.Toast) Lex.Toast.success('Conversation pinned');
+      }
+      // Reload current page so ordering + is_pinned flags refresh
+      var currentOffset = (currentMatterData && currentMatterData.chatPagination && currentMatterData.chatPagination.offset) || 0;
+      await loadConversationsPage(matterId, currentOffset);
+    } catch (err) {
+      console.error('[toggleConversationPin] Failed:', err);
+      if (window.Lex && Lex.Toast) Lex.Toast.error(err && err.message ? err.message : 'Failed to update pin');
+    } finally {
+      _pinningThreads.delete(threadId);
+    }
+  }
+  var _pinningThreads = new Set();
+
   async function loadConversationsPage(matterId, offset) {
     try {
       var limit = 25;
-      var result = await api.getMatterConversations(matterId, limit, offset);
+      // Refresh pinned + unpinned in parallel. Pinned is paged separately and
+      // re-fetched on every page change so newly-pinned items pop to the top.
+      var fetches = await Promise.all([
+        api.getMatterConversations(matterId, limit, offset, { excludePinned: true }),
+        api.getPinnedChatSessions({ matterId: matterId, limit: 100, offset: 0 }).catch(function () { return { sessions: [] }; })
+      ]);
+      var result = fetches[0];
+      var pinnedResult = fetches[1];
 
       if (currentMatterData) {
+        currentMatterData.pinnedChats = getConversationList(pinnedResult);
         currentMatterData.chats = getConversationList(result);
         currentMatterData.chatPagination = result.pagination || { total: 0, limit: limit, offset: offset };
-        renderConversationsTab(currentMatterData.matter, currentMatterData.chats, currentMatterData.chatPagination);
+        renderConversationsTab(currentMatterData.matter, currentMatterData.chats, currentMatterData.chatPagination, currentMatterData.pinnedChats || []);
       }
     } catch (error) {
       console.error('[loadConversationsPage] Failed:', error);
@@ -3662,6 +3757,7 @@
   // =========================================================================
 
   window.loadConversationsPage = loadConversationsPage;
+  window.toggleConversationPin = toggleConversationPin;
   window.loadComments = loadComments;
   window.renderCommentContent = renderCommentContent;
   window.handleKanbanDragStart = window.handleKanbanDragStart;
@@ -3673,7 +3769,7 @@
   window.openTaskQuickView = window.openTaskQuickView;
   window.closeTaskReadonlyModal = window.closeTaskReadonlyModal;
 
-  ['loadConversationsPage', 'loadComments', 'renderCommentContent',
+  ['loadConversationsPage', 'toggleConversationPin', 'loadComments', 'renderCommentContent',
    'handleKanbanDragStart', 'handleKanbanDragEnd', 'handleKanbanDragOver',
    'handleKanbanDragLeave', 'handleKanbanDrop', 'changeKanbanPage',
    'openTaskQuickView', 'closeTaskReadonlyModal'].forEach(_trackGlobal);

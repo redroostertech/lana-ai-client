@@ -1493,10 +1493,54 @@ class ApiClient {
     return this.get(`/api/v1/activity/matter/${matterId}?limit=${limit}&offset=${offset}`);
   }
 
-  async getMatterConversations(matterId, limit = 5, offset = 0) {
-    // Add cache-busting timestamp to ensure fresh data after conversation creation
-    const timestamp = Date.now();
-    return this.get(`/api/v1/chat/sessions?matter_id=${matterId}&limit=${limit}&offset=${offset}&_t=${timestamp}`);
+  async getMatterConversations(matterId, limit = 5, offset = 0, opts = {}) {
+    const params = new URLSearchParams({
+      matter_id: matterId,
+      limit: String(limit),
+      offset: String(offset),
+      _t: String(Date.now())
+    });
+    if (opts.excludePinned) params.set('exclude_pinned', 'true');
+    return this.get(`/api/v1/chat/sessions?${params.toString()}`);
+  }
+
+  // Pinned chat sessions — mirrors /matters/pinned. When matterId is supplied
+  // results are scoped to that matter (matches the matter detail tab).
+  async getPinnedChatSessions(opts = {}) {
+    const params = new URLSearchParams({
+      limit: String(opts.limit != null ? opts.limit : 100),
+      offset: String(opts.offset != null ? opts.offset : 0),
+      _t: String(Date.now())
+    });
+    if (opts.matterId) params.set('matter_id', opts.matterId);
+    if (opts.pageScope) params.set('page_scope', opts.pageScope);
+    return this.get(`/api/v1/chat/sessions/pinned?${params.toString()}`);
+  }
+
+  // Pinned conversation threads — mirrors /matters/pinned for the
+  // /conversation-threads endpoint used by the insights sidebar scope.
+  async getPinnedConversationThreads(opts = {}) {
+    const params = new URLSearchParams({
+      limit: String(opts.limit != null ? opts.limit : 100),
+      offset: String(opts.offset != null ? opts.offset : 0)
+    });
+    if (opts.pageScope) params.set('page_scope', opts.pageScope);
+    if (opts.matterId) params.set('matter_id', opts.matterId);
+    return this.get(`/api/v1/conversation-threads/pinned?${params.toString()}`);
+  }
+
+  // Conversation thread pinning + permanent delete (separate from soft archive
+  // which is the existing DELETE /:id route).
+  async pinThread(threadId) {
+    return this.post(`/api/v1/conversation-threads/${threadId}/pin`, {});
+  }
+
+  async unpinThread(threadId) {
+    return this.post(`/api/v1/conversation-threads/${threadId}/unpin`, {});
+  }
+
+  async hardDeleteThread(threadId) {
+    return this.delete(`/api/v1/conversation-threads/${threadId}/permanent`);
   }
 
   // ============================================================

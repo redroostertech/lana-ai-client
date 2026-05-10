@@ -92,7 +92,8 @@
             var tid = row.getAttribute('data-thread-id');
             var title = row.getAttribute('data-conv-title') || 'Untitled Chat';
             var mid = row.getAttribute('data-matter-id') || null;
-            window.openConversationActionsModal(tid, title, mid);
+            var pinned = row.getAttribute('data-is-pinned') === '1';
+            window.openConversationActionsModal(tid, title, mid, pinned);
           }
           return;
         }
@@ -288,6 +289,7 @@
     var lastMessage = conv.last_message || conv.lastMessage || '';
     var matterName = conv.matter_name || (conv.metadata && conv.metadata.matter_name) || '';
     var timestamp = formatTimestamp(conv.updated_at || conv.created_at);
+    var isPinned = !!conv.is_pinned;
 
     if (!threadId) return '';
 
@@ -324,9 +326,14 @@
       + ' data-thread-id="' + escapeAttr(threadId) + '"'
       + ' data-matter-id="' + escapeAttr(matterId) + '"'
       + ' data-conv-title="' + escapeAttr(title) + '"'
+      + ' data-is-pinned="' + (isPinned ? '1' : '0') + '"'
       + '>'
       + '  <div class="flex-1 min-w-0">'
-      + '    <p class="text-sm font-medium lex-text-primary truncate">' + displayTitle + '</p>'
+      + '    <p class="text-sm font-medium lex-text-primary truncate flex items-center gap-1.5">'
+      + (isPinned
+          ? '<svg class="w-3 h-3 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24" aria-label="Pinned"><path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg>'
+          : '')
+      + '<span class="truncate">' + displayTitle + '</span></p>'
       + matterBadge
       + previewLine
       + '  </div>'

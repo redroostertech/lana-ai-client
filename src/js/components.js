@@ -468,6 +468,12 @@ const ConversationActionsModal = {
                 '</div>' +
                 '<div class="flex-1"><div class="font-medium text-gray-900">Rename Conversation</div><div class="text-sm text-gray-500">Change the conversation name</div></div>' +
               '</button>' +
+              '<button id="togglePinConversationBtn" onclick="ConversationActionsModal.togglePin()" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-yellow-300 hover:bg-yellow-50 transition-all group">' +
+                '<div class="flex-shrink-0 w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center group-hover:bg-yellow-200 transition-colors">' +
+                  '<svg id="togglePinConversationIcon" class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path></svg>' +
+                '</div>' +
+                '<div class="flex-1"><div id="togglePinConversationLabel" class="font-medium text-gray-900">Pin Conversation</div><div id="togglePinConversationDescription" class="text-sm text-gray-500">Keep this conversation at the top of the list</div></div>' +
+              '</button>' +
               '<button id="viewMatterDetailsBtn" onclick="ConversationActionsModal.viewMatterDetails()" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-indigo-300 hover:bg-indigo-50 transition-all group hidden">' +
                 '<div class="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">' +
                   '<svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>' +
@@ -476,9 +482,15 @@ const ConversationActionsModal = {
               '</button>' +
               '<button onclick="ConversationActionsModal.deleteConversation()" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-red-300 hover:bg-red-50 transition-all group">' +
                 '<div class="flex-shrink-0 w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center group-hover:bg-red-200 transition-colors">' +
+                  '<svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>' +
+                '</div>' +
+                '<div class="flex-1"><div class="font-medium text-gray-900">Archive Conversation</div><div class="text-sm text-gray-500">Hide from the list — can be restored later</div></div>' +
+              '</button>' +
+              '<button onclick="ConversationActionsModal.permanentDeleteConversation()" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-red-400 hover:bg-red-50 transition-all group">' +
+                '<div class="flex-shrink-0 w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center group-hover:bg-red-200 transition-colors">' +
                   '<svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>' +
                 '</div>' +
-                '<div class="flex-1"><div class="font-medium text-gray-900">Delete Conversation</div><div class="text-sm text-gray-500">Permanently remove this conversation</div></div>' +
+                '<div class="flex-1"><div class="font-medium text-red-700">Delete Permanently</div><div class="text-sm text-gray-500">Hard delete — cannot be recovered</div></div>' +
               '</button>' +
             '</div>' +
           '</div>' +
@@ -506,13 +518,14 @@ const ConversationActionsModal = {
   },
 
   // Open conversation actions modal
-  open(conversationId, conversationTitle, matterId) {
+  open(conversationId, conversationTitle, matterId, isPinned) {
     this.init(); // Ensure modal is initialized
 
     this.selectedConversationId = conversationId;
     this.selectedConversationTitle = conversationTitle;
     this.selectedConversationMatterId = matterId;
     this.selectedConversationIsProject = matterId !== null && matterId !== 'null';
+    this.selectedConversationIsPinned = !!isPinned;
 
     // Decode HTML entities in title — string methods only, no regex
     const decodedTitle = conversationTitle
@@ -529,6 +542,22 @@ const ConversationActionsModal = {
       matterBtn.classList.remove('hidden');
     } else {
       matterBtn.classList.add('hidden');
+    }
+
+    // Update Pin/Unpin label + icon based on current state
+    const pinLabel = document.getElementById('togglePinConversationLabel');
+    const pinDesc = document.getElementById('togglePinConversationDescription');
+    const pinIcon = document.getElementById('togglePinConversationIcon');
+    if (pinLabel) pinLabel.textContent = this.selectedConversationIsPinned ? 'Unpin Conversation' : 'Pin Conversation';
+    if (pinDesc) pinDesc.textContent = this.selectedConversationIsPinned
+      ? 'Remove from pinned'
+      : 'Keep this conversation at the top of the list';
+    if (pinIcon) {
+      // Filled pin glyph when pinned, outlined bookmark when not.
+      pinIcon.innerHTML = this.selectedConversationIsPinned
+        ? '<path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/>'
+        : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path>';
+      pinIcon.setAttribute('fill', this.selectedConversationIsPinned ? 'currentColor' : 'none');
     }
 
     // Show modal
@@ -644,7 +673,7 @@ const ConversationActionsModal = {
     });
   },
 
-  // Delete conversation
+  // Delete conversation (soft archive — DELETE /chat/sessions/:id)
   async deleteConversation() {
     if (!this.selectedConversationId || !this.selectedConversationTitle) {
       Toast.error('No conversation selected');
@@ -662,29 +691,104 @@ const ConversationActionsModal = {
 
     this.close();
 
-    // Show confirmation modal
     Modal.confirm(
-      'Delete Conversation',
-      `Are you sure you want to delete "${convTitle}"? This action cannot be undone.`,
+      'Archive Conversation',
+      `Archive "${convTitle}"? It will be hidden from the list but can be restored later.`,
       async () => {
         try {
           await api.delete(`/api/v1/chat/sessions/${convId}`);
-          Toast.success('Conversation deleted successfully');
+          Toast.success('Conversation archived');
 
-          // Refresh sidebar conversation menu
           if (typeof window.ConversationMenu !== 'undefined' && window.ConversationMenu.loadConversations) {
             window.ConversationMenu.loadConversations(true);
           }
-          // Refresh page-level content (e.g. search results)
           if (typeof this.onRefresh === 'function') {
             this.onRefresh();
           }
         } catch (error) {
-          console.error('Failed to delete conversation:', error);
+          console.error('Failed to archive conversation:', error);
+          Toast.error(error.message || 'Failed to archive conversation');
+        }
+      },
+      'Archive',
+      'danger'
+    );
+  },
+
+  // Pin / unpin conversation
+  async togglePin() {
+    if (!this.selectedConversationId) {
+      Toast.error('No conversation selected');
+      this.close();
+      return;
+    }
+
+    const convId = this.selectedConversationId;
+    const wasPinned = this.selectedConversationIsPinned;
+    const onRefresh = this.onRefresh;
+    this.close();
+
+    try {
+      if (wasPinned) {
+        await api.unpinThread(convId);
+        Toast.success('Conversation unpinned');
+      } else {
+        await api.pinThread(convId);
+        Toast.success('Conversation pinned');
+      }
+
+      if (typeof window.ConversationMenu !== 'undefined' && window.ConversationMenu.loadConversations) {
+        window.ConversationMenu.loadConversations(true);
+      }
+      if (typeof onRefresh === 'function') {
+        onRefresh();
+      }
+    } catch (error) {
+      console.error('Failed to toggle pin:', error);
+      Toast.error(error.message || 'Failed to update pin');
+    }
+  },
+
+  // Hard delete (cannot be recovered) — DELETE /conversation-threads/:id/permanent
+  async permanentDeleteConversation() {
+    if (!this.selectedConversationId || !this.selectedConversationTitle) {
+      Toast.error('No conversation selected');
+      this.close();
+      return;
+    }
+
+    const convId = this.selectedConversationId;
+    const convTitle = this.selectedConversationTitle
+      .split('&apos;').join("'")
+      .split('&quot;').join('"')
+      .split('&#96;').join('`')
+      .split('&amp;').join('&');
+
+    this.close();
+
+    Modal.confirm(
+      'Permanently Delete Conversation',
+      `Permanently delete "${convTitle}" and all its messages? This cannot be undone.`,
+      async () => {
+        try {
+          const result = await api.hardDeleteThread(convId);
+          const deletedMessages = (result && (result.deleted_messages || result.deletedMessages)) || 0;
+          Toast.success(deletedMessages > 0
+            ? `Conversation and ${deletedMessages} message${deletedMessages === 1 ? '' : 's'} deleted`
+            : 'Conversation deleted');
+
+          if (typeof window.ConversationMenu !== 'undefined' && window.ConversationMenu.loadConversations) {
+            window.ConversationMenu.loadConversations(true);
+          }
+          if (typeof this.onRefresh === 'function') {
+            this.onRefresh();
+          }
+        } catch (error) {
+          console.error('Failed to permanently delete conversation:', error);
           Toast.error(error.message || 'Failed to delete conversation');
         }
       },
-      'Delete',
+      'Delete Permanently',
       'danger'
     );
   }
@@ -694,8 +798,8 @@ const ConversationActionsModal = {
 window.ConversationActionsModal = ConversationActionsModal;
 
 // Create global alias for backward compatibility
-window.openConversationActionsModal = function(conversationId, conversationTitle, matterId) {
-  ConversationActionsModal.open(conversationId, conversationTitle, matterId);
+window.openConversationActionsModal = function(conversationId, conversationTitle, matterId, isPinned) {
+  ConversationActionsModal.open(conversationId, conversationTitle, matterId, isPinned);
 };
 window.closeConversationActionsModal = function() {
   ConversationActionsModal.close();
