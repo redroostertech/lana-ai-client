@@ -33,7 +33,9 @@
         corners
         heading="Billable Hours"
         subtitle="Firm-wide time tracking, utilization, and approval management"
-      ></lex-banner>
+      >
+        <lex-ask-lana-btn id="bhLanaBtn" panel="bhLana" size="sm"></lex-ask-lana-btn>
+      </lex-banner>
 
       <lex-spacer size="md"></lex-spacer>
 
@@ -75,6 +77,22 @@
       <div id="bhAdminTabMatters" class="hidden"></div>
       <div id="bhAdminTabApprovals" class="hidden"></div>
 
+    <!-- Unified LANA Insights panel (drawer mode, destroy on close).
+         Wired to #bhLanaBtn in the page banner. page-scope is shared across
+         the LanaInsights app so threads from any insights page appear here. -->
+    <lex-lana-panel
+      id="bhLana"
+      mode="drawer"
+      drawer-heading="LANA Insights"
+      drawer-width="lg"
+      page-scope="data_visualization"
+      context-type="insights_chat"
+      placeholder="Ask about utilization, time entries, and approvals..."
+      tools-locked="true"
+      default-tool="insights_chat"
+      thread-title="Insights Chat"
+      destroy-on-close="true"
+    ></lex-lana-panel>
     </main>
 
   </template>
@@ -108,6 +126,28 @@
   <script src="../js/lex/components/layout/lex-topbar.js"></script>
   <script src="../js/lex/components/layout/lex-notification-panel.js"></script>
   <script src="../js/lex/components/layout/lex-app.js"></script>
+
+  <!-- Lex Chat (powers <lex-lana-panel> + <lex-ask-lana-btn>).
+       MUST load before lex-page-init.js so the custom elements are
+       defined by the time the page-content template is materialized
+       — otherwise <lex-lana-panel> mounts before <lex-chat> is a real
+       custom element, _chatEl ends up as a generic HTMLElement, and
+       calls like clearConversation() blow up. -->
+  <script src="../js/lex/chat/lex-chat.format.js"></script>
+  <script src="../js/lex/chat/lex-chat.source.js"></script>
+  <script src="../js/lex/chat/lex-chat.message.js"></script>
+  <script src="../js/lex/chat/lex-chat.activity.js"></script>
+  <script src="../js/lex/chat/lex-chat.documents.js"></script>
+  <script src="../js/lex/chat/lex-chat.composer-mentions.js"></script>
+  <script src="../js/lex/chat/lex-chat.composer.js"></script>
+  <script src="../js/lex/chat/lex-chat.thread.js"></script>
+  <script src="../js/lex/chat/lex-chat.threads.js"></script>
+  <script src="../js/lex/chat/lex-chat.js"></script>
+  <script src="../js/lex/chat/lex-dynamic-card.renderer.js"></script>
+  <script src="../js/lex/chat/lex-agentic-plan-card.js"></script>
+  <script src="../js/lex/chat/lex-chat.index.js"></script>
+  <script src="../js/lex/components/chat/lex-ask-lana-btn.js"></script>
+  <script src="../js/lex/components/chat/lex-lana-panel.js"></script>
 
   <!-- Lex Page Init -->
   <script src="../js/lex/lex-page-init.js"></script>

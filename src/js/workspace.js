@@ -281,6 +281,82 @@
       renderMattersView();
     }
 
+    // Inject a leading pin column into the lex-table after each render.
+    // lex-table HTML-escapes cell values via _formatCellValue, so a custom
+    // cell can't go through the data column path. We attach a MutationObserver
+    // once and re-inject on sort/page changes too.
+    function ensureListPinColumn(listEl, rows) {
+      var sources = {};
+      for (var i = 0; i < rows.length; i++) {
+        sources[rows[i].matter_id] = rows[i].source || 'lana';
+      }
+      listEl._pinRowSources = sources;
+
+      injectListPinColumn(listEl);
+
+      if (!listEl._pinColumnObserver) {
+        var observer = new MutationObserver(function () {
+          injectListPinColumn(listEl);
+        });
+        observer.observe(listEl, { childList: true, subtree: true });
+        listEl._pinColumnObserver = observer;
+      }
+    }
+
+    function injectListPinColumn(listEl) {
+      var thead = listEl.querySelector('thead tr');
+      var tbody = listEl.querySelector('tbody');
+      if (!thead || !tbody) return;
+      var sources = listEl._pinRowSources || {};
+
+      // Header cell
+      if (!thead.querySelector('th[data-pin-header]')) {
+        var th = document.createElement('th');
+        th.setAttribute('data-pin-header', '');
+        th.className = 'px-2 py-2 w-10';
+        var firstTh = thead.children[0];
+        var firstThIsCheckbox = firstTh && firstTh.querySelector && firstTh.querySelector('input[type="checkbox"]');
+        if (firstThIsCheckbox) {
+          firstTh.parentNode.insertBefore(th, firstTh.nextSibling);
+        } else {
+          thead.insertBefore(th, thead.firstChild);
+        }
+      }
+
+      // Body cells
+      var trs = tbody.querySelectorAll('tr[data-row-id]');
+      for (var i = 0; i < trs.length; i++) {
+        var tr = trs[i];
+        if (tr.querySelector('td[data-pin-cell]')) continue;
+        var matterId = tr.getAttribute('data-row-id');
+        var source = sources[matterId] || 'lana';
+        var td = document.createElement('td');
+        td.setAttribute('data-pin-cell', '');
+        td.className = 'px-2 py-2 w-10';
+        td.innerHTML = '<button type="button" class="pin-button text-gray-400 hover:text-yellow-600 transition-colors" data-matter-id="' + matterId + '" data-source="' + source + '" title="Pin matter" aria-label="Pin matter">' +
+          '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>' +
+          '</button>';
+        var firstTd = tr.children[0];
+        var firstTdIsCheckbox = firstTd && firstTd.querySelector && firstTd.querySelector('input[type="checkbox"]');
+        if (firstTdIsCheckbox) {
+          firstTd.parentNode.insertBefore(td, firstTd.nextSibling);
+        } else {
+          tr.insertBefore(td, tr.firstChild);
+        }
+        var btn = td.querySelector('button');
+        btn.addEventListener('click', function (ev) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          var t = ev.currentTarget;
+          var mid = t.getAttribute('data-matter-id');
+          var src = t.getAttribute('data-source') || 'lana';
+          if (typeof window.togglePin === 'function') {
+            window.togglePin(mid, src, false);
+          }
+        });
+      }
+    }
+
     // Render matters into the active view (grid or list) using current data
     function renderMattersView() {
       var gridEl = document.getElementById('mattersGrid');
@@ -327,6 +403,12 @@
         if (typeof listEl.setData === 'function') {
           listEl.setData(rows);
         }
+
+        // lex-table doesn't expose a per-cell render hook (cells are
+        // HTML-escaped via _formatCellValue), so we inject a leading
+        // pin column post-render. A MutationObserver on the internal
+        // tbody re-injects on sort/page changes too.
+        ensureListPinColumn(listEl, rows);
 
         // Update section header with count
         var sectionHeading = document.getElementById('listSectionHeading');
@@ -563,6 +645,16 @@
 
         // Combine for currentMatters (for select all functionality)
         matters = [...allPinnedMatters, ...unpinnedMatters];
+
+        // "Show archived" toggle — when off (default), hide rows with
+        // status === 'archived'. When on, archived rows get a status badge
+        // via the existing statusBadge helper (which already knows the
+        // 'archived' value). This is purely client-side; no extra request.
+        var _showArchivedEl = document.getElementById('showArchivedToggle');
+        var _showArchived = !!(_showArchivedEl && _showArchivedEl.checked);
+        if (!_showArchived) {
+          matters = matters.filter(function (m) { return m && m.status !== 'archived'; });
+        }
         currentMatters = matters;
 
         console.log('[Matters] Pinned matters loaded:', pinnedMatters.length);
@@ -931,6 +1023,19 @@
       totalPinnedCount = 0;
       loadMatters();
     });
+
+    // "Show archived" toggle — re-runs loadMatters() on change so the
+    // archived rows are filtered in/out of currentMatters.
+    var _showArchivedToggle = document.getElementById('showArchivedToggle');
+    if (_showArchivedToggle) {
+      _showArchivedToggle.addEventListener('change', function () {
+        currentPage = 1;
+        pinnedPage = 1;
+        allPinnedMatters = [];
+        totalPinnedCount = 0;
+        loadMatters();
+      });
+    }
 
     // View toggle (grid / list)
     var _gridViewBtn = document.getElementById('gridViewBtn');
@@ -1565,6 +1670,32 @@
     }
 
     // Delete matter
+    // Archive / Unarchive a matter. Both are confirmable but lightweight —
+    // no destructive copy because nothing is lost; the matter is just moved
+    // out of the default list. The "Show archived" toggle in the workspaces
+    // header brings them back into view.
+    window.archiveMatter = async function(matterId) {
+      try {
+        await api.archiveMatter(matterId);
+        if (window.Lex && Lex.Toast) Lex.Toast.success('Workspace archived');
+        loadMatters();
+      } catch (error) {
+        console.error('[Matters] Archive failed:', error);
+        if (window.Lex && Lex.Toast) Lex.Toast.error(error.message || 'Failed to archive');
+      }
+    };
+
+    window.unarchiveMatter = async function(matterId) {
+      try {
+        await api.unarchiveMatter(matterId);
+        if (window.Lex && Lex.Toast) Lex.Toast.success('Workspace unarchived');
+        loadMatters();
+      } catch (error) {
+        console.error('[Matters] Unarchive failed:', error);
+        if (window.Lex && Lex.Toast) Lex.Toast.error(error.message || 'Failed to unarchive');
+      }
+    };
+
     window.deleteMatter = async function(matterId) {
       Modal.confirm('Delete Matter', 'Are you sure you want to delete this matter? This action cannot be undone.', async () => {
         try {
@@ -1636,11 +1767,33 @@
       if (left < 8) left = 8;
       dropdown.style.left = left + 'px';
 
+      // Find the matter object so the Archive button knows whether it's
+      // currently archived (label flips to "Unarchive") and so we can call
+      // the right API endpoint.
+      var targetMatter = null;
+      for (var i = 0; i < currentMatters.length; i++) {
+        if (currentMatters[i].matter_id === matterId) { targetMatter = currentMatters[i]; break; }
+      }
+      var isArchived = !!(targetMatter && targetMatter.status === 'archived');
+
       // Wire up actions for this matter
       var editBtn = document.getElementById('matterOptionsEdit');
+      var archiveBtn = document.getElementById('matterOptionsArchive');
       var deleteBtn = document.getElementById('matterOptionsDelete');
       if (editBtn) {
         editBtn.onclick = function() { dropdown.classList.add('hidden'); dropdown._currentMatterId = null; editMatter(matterId); };
+      }
+      if (archiveBtn) {
+        archiveBtn.textContent = isArchived ? 'Unarchive' : 'Archive';
+        archiveBtn.onclick = function() {
+          dropdown.classList.add('hidden');
+          dropdown._currentMatterId = null;
+          if (isArchived) {
+            unarchiveMatter(matterId);
+          } else {
+            archiveMatter(matterId);
+          }
+        };
       }
       if (deleteBtn) {
         deleteBtn.onclick = function() { dropdown.classList.add('hidden'); dropdown._currentMatterId = null; deleteMatter(matterId); };

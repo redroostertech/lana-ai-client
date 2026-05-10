@@ -105,6 +105,16 @@
             <h2 id="listSectionHeading" class="text-lg font-semibold" style="color: var(--lex-text-primary)">All Matters</h2>
           </div>
           <div class="flex items-center gap-3">
+            <!--
+              "Show archived" toggle — off by default. workspace.js reads this
+              checkbox in loadMatters() and filters status='archived' rows out
+              when unchecked. Backend endpoint already returns archived rows;
+              filter is purely client-side so we don't need a new query param.
+            -->
+            <label class="flex items-center gap-2 text-sm cursor-pointer" style="color: var(--lex-text-secondary);" title="Include archived matters in the list">
+              <input type="checkbox" id="showArchivedToggle" class="w-4 h-4 rounded border-gray-300">
+              <span>Show archived</span>
+            </label>
             <lex-btn id="createMatterBtn" variant="primary" leading-icon="+">
               New Matter
             </lex-btn>
@@ -135,8 +145,8 @@
         <lex-table
           id="mattersListView"
           class="hidden"
-          columns="matter_id,name,description,status,matter_type,created_at"
-          labels="Matter ID,Name,Description,Status,Type,Created"
+          columns="matter_id,name,status,matter_type,created_at"
+          labels="Matter ID,Name,Status,Type,Created"
           searchable
           filterable
           column-filters
@@ -155,8 +165,10 @@
     </main>
 
     <!-- Shared Matter Options Dropdown -->
-    <div id="matterOptionsDropdown" class="hidden fixed w-32 bg-white rounded-lg shadow-lg border border-gray-200 py-1" style="z-index: 9999">
+    <div id="matterOptionsDropdown" class="hidden fixed w-36 bg-white rounded-lg shadow-lg border border-gray-200 py-1" style="z-index: 9999">
       <button id="matterOptionsEdit" class="w-full px-4 py-2 text-left text-sm lex-text-accent hover:bg-gray-50 transition-colors">Edit</button>
+      <!-- Label flips to "Unarchive" when the targeted matter is already archived; see js/workspace.js showMatterOptions. -->
+      <button id="matterOptionsArchive" class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors">Archive</button>
       <button id="matterOptionsDelete" class="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors">Delete</button>
     </div>
 

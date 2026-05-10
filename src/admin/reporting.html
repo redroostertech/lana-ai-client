@@ -57,6 +57,7 @@
             Import Report
           </span>
         </lex-btn>
+        <lex-ask-lana-btn id="reportingLanaBtn" panel="reportingLana" size="sm"></lex-ask-lana-btn>
       </lex-banner>
 
       <lex-spacer size="md"></lex-spacer>
@@ -168,13 +169,19 @@
           <div id="moduleResults" style="display:none;flex-direction:column;gap:1.5rem;">
             <!-- Results Header Card -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <!-- Header: Title + Learn More (left), Ask LANA (right) -->
+              <!--
+                Header: Title + Learn More.
+                The Ask LANA button used to live here (id=reportingLanaBtn).
+                It moved into the page banner so users can chat with Lana
+                from the moment the page opens, not just after running a
+                module. Removing the duplicate avoids two buttons fighting
+                over the same id.
+              -->
               <div class="flex items-center justify-between mb-4">
                 <div class="flex items-center gap-3">
                   <h2 id="moduleTitle" class="text-xl font-bold text-gray-900"></h2>
                   <button onclick="window._reporting.showModuleInfo()" class="flex items-center gap-1 px-3 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg">Learn More</button>
                 </div>
-                <lex-ask-lana-btn size="sm" id="reportingLanaBtn"></lex-ask-lana-btn>
               </div>
               <!-- All metadata on one row -->
               <div class="flex items-center justify-between text-sm">
@@ -497,17 +504,20 @@
       </div>
 
     <!-- Unified LANA Insights panel (drawer mode, destroy on close) -->
+    <!-- Shared page-scope across the LanaInsights app so threads from any
+         insights page (Dashboard / Firm Reporting / Billable Hours / Data
+         Visualization) show in one unified sidebar list. -->
     <lex-lana-panel
       id="reportingLana"
       mode="drawer"
       drawer-heading="LANA Insights"
       drawer-width="lg"
-      page-scope="reporting"
+      page-scope="data_visualization"
       context-type="insights_chat"
       placeholder="Ask about forecasts, trends, and insights..."
       tools-locked="true"
       default-tool="insights_chat"
-      thread-title="General Insights"
+      thread-title="Insights Chat"
       destroy-on-close="true"
     ></lex-lana-panel>
     </main>

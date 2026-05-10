@@ -7371,9 +7371,25 @@
 
     var selectEl = document.getElementById('statusChangeSelect');
     var newStatus = selectEl ? (selectEl.value || 'active') : 'active';
+    var matterId = currentMatterData.matter_id;
+    var currentStatus = (currentMatterData.matter && currentMatterData.matter.status) || 'active';
 
     try {
-      await api.updateMatter(currentMatterData.matter_id, { status: newStatus });
+      // Archive / Unarchive transitions go through dedicated endpoints —
+      // PUT /matters/:id rejects status='archived' as a validation error
+      // because archived is a soft-delete state managed via its own route.
+      if (newStatus === 'archived' && currentStatus !== 'archived') {
+        await api.archiveMatter(matterId);
+      } else if (currentStatus === 'archived' && newStatus !== 'archived') {
+        // Coming out of archived → unarchive first, then apply the chosen
+        // status if it isn't 'active' (unarchive defaults to 'active').
+        await api.unarchiveMatter(matterId);
+        if (newStatus !== 'active') {
+          await api.updateMatter(matterId, { status: newStatus });
+        }
+      } else {
+        await api.updateMatter(matterId, { status: newStatus });
+      }
 
       Lex.Toast.success('Status updated to ' + newStatus.charAt(0).toUpperCase() + newStatus.substring(1));
 

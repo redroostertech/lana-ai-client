@@ -1467,6 +1467,16 @@ class ApiClient {
     return this.delete(`/api/v1/matters/${matterId}/pin?source=${source}`);
   }
 
+  // Archive / Unarchive — soft-hide a matter from default lists without
+  // deleting it. Backend sets archived_at + status='archived'.
+  async archiveMatter(matterId) {
+    return this.post(`/api/v1/matters/${matterId}/archive`, {});
+  }
+
+  async unarchiveMatter(matterId) {
+    return this.post(`/api/v1/matters/${matterId}/unarchive`, {});
+  }
+
   async getMatterPermissions(matterId) {
     return this.get(`/api/v1/matters/${matterId}/permissions`);
   }

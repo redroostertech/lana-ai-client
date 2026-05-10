@@ -744,12 +744,20 @@
           firstModule: response.modules?.[0]
         });
 
-        // Store modules and categories globally
-        allModules = response.modules || [];
+        // Store modules and categories globally.
+        // Temporarily suppress the "imported" category — keep the data in
+        // the API response intact, but don't surface it in the dropdown
+        // or the sidebar. To re-enable, drop the entry from this Set.
+        const HIDDEN_CATEGORIES = new Set(['imported']);
 
-        // Build category map from response (category key -> display name)
+        const rawModules = response.modules || [];
+        allModules = rawModules.filter(m => !HIDDEN_CATEGORIES.has(m.category));
+
+        // Build category map from response (category key -> display name),
+        // dropping any hidden categories so they never reach the renderer.
         if (response.categories && Array.isArray(response.categories)) {
           response.categories.forEach(cat => {
+            if (HIDDEN_CATEGORIES.has(cat.key)) return;
             moduleCategories[cat.key] = cat.name;
           });
         }
