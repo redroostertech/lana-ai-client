@@ -630,22 +630,55 @@ const ConversationActionsModal = {
     }
 
     const renameInput = document.getElementById('renameInput');
-    const newTitle = renameInput.value.trim();
+    const rawTitle = renameInput ? renameInput.value : '';
+    const threadId = this.selectedConversationId;
 
-    if (!newTitle) {
-      Toast.error('Conversation name cannot be empty');
+    // Delegate to the shared rename helper. It:
+    //   - validates the title (empty / too long),
+    //   - PUTs /api/v1/conversation-threads/:id,
+    //   - dispatches `conversation:renamed` on window so the chat header,
+    //     sidebar, and workspace Conversations tab can self-refresh.
+    const helper = (typeof window !== 'undefined') ? window.RenameConversation : null;
+    if (!helper || typeof helper.renameConversation !== 'function') {
+      console.error('RenameConversation helper not loaded — falling back to inline PUT.');
+      try {
+        const trimmed = (rawTitle || '').trim();
+        if (!trimmed) {
+          Toast.error('Conversation name cannot be empty');
+          return;
+        }
+        await api.put(`/api/v1/conversation-threads/${threadId}`, { title: trimmed });
+        Toast.success('Conversation renamed successfully');
+        this.closeRename();
+        if (typeof window !== 'undefined' && typeof window.CustomEvent === 'function') {
+          window.dispatchEvent(new CustomEvent('conversation:renamed', {
+            detail: { threadId: threadId, title: trimmed }
+          }));
+        }
+        if (typeof window.ConversationMenu !== 'undefined' && window.ConversationMenu.loadConversations) {
+          window.ConversationMenu.loadConversations(true);
+        }
+        if (typeof this.onRefresh === 'function') this.onRefresh();
+      } catch (error) {
+        console.error('Failed to rename conversation:', error);
+        Toast.error(error.message || 'Failed to rename conversation');
+      }
       return;
     }
 
     try {
-      await api.put(`/api/v1/chat/sessions/${this.selectedConversationId}`, {
-        title: newTitle
+      await helper.renameConversation({
+        api: api,
+        threadId: threadId,
+        title: rawTitle
       });
 
       Toast.success('Conversation renamed successfully');
       this.closeRename();
 
-      // Refresh sidebar conversation menu
+      // Refresh sidebar conversation menu directly (it's a simple call;
+      // the `conversation:renamed` event is also dispatched for any other
+      // mounted views — chat header, workspace Conversations tab, etc.)
       if (typeof window.ConversationMenu !== 'undefined' && window.ConversationMenu.loadConversations) {
         window.ConversationMenu.loadConversations(true);
       }
@@ -654,8 +687,12 @@ const ConversationActionsModal = {
         this.onRefresh();
       }
     } catch (error) {
+      if (error && error.code === 'INVALID_TITLE') {
+        Toast.error(error.message);
+        return;
+      }
       console.error('Failed to rename conversation:', error);
-      Toast.error(error.message || 'Failed to rename conversation');
+      Toast.error((error && error.message) || 'Failed to rename conversation');
     }
   },
 
@@ -702,6 +739,11 @@ const ConversationActionsModal = {
           if (typeof window.ConversationMenu !== 'undefined' && window.ConversationMenu.loadConversations) {
             window.ConversationMenu.loadConversations(true);
           }
+          if (typeof window !== 'undefined' && typeof window.CustomEvent === 'function') {
+            window.dispatchEvent(new CustomEvent('conversation:archived', {
+              detail: { threadId: convId }
+            }));
+          }
           if (typeof this.onRefresh === 'function') {
             this.onRefresh();
           }
@@ -739,6 +781,11 @@ const ConversationActionsModal = {
 
       if (typeof window.ConversationMenu !== 'undefined' && window.ConversationMenu.loadConversations) {
         window.ConversationMenu.loadConversations(true);
+      }
+      if (typeof window !== 'undefined' && typeof window.CustomEvent === 'function') {
+        window.dispatchEvent(new CustomEvent('conversation:pin-changed', {
+          detail: { threadId: convId, isPinned: !wasPinned }
+        }));
       }
       if (typeof onRefresh === 'function') {
         onRefresh();
@@ -779,6 +826,11 @@ const ConversationActionsModal = {
 
           if (typeof window.ConversationMenu !== 'undefined' && window.ConversationMenu.loadConversations) {
             window.ConversationMenu.loadConversations(true);
+          }
+          if (typeof window !== 'undefined' && typeof window.CustomEvent === 'function') {
+            window.dispatchEvent(new CustomEvent('conversation:deleted', {
+              detail: { threadId: convId, permanent: true }
+            }));
           }
           if (typeof this.onRefresh === 'function') {
             this.onRefresh();

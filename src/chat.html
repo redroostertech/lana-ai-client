@@ -12,6 +12,7 @@
   <script src="js/config.js"></script>
   <script src="js/mock-data.js"></script>
   <script src="js/api.js"></script>
+  <script src="js/utils/rename-conversation.js"></script>
   <script src="js/components.js"></script>
   <script src="js/version.js"></script>
   <script src="js/menu.js"></script>
@@ -436,6 +437,35 @@
       border-bottom-right-radius: 0.5rem;
     }
 
+    /* Inline-edit for chat header title (double-click to rename). */
+    #chatTitle.chat-title-editable {
+      cursor: text;
+      border-radius: 0.375rem;
+      padding: 0 0.25rem;
+      margin-left: -0.25rem;
+      transition: background-color 0.15s ease;
+    }
+    #chatTitle.chat-title-editable:hover {
+      background-color: #f3f4f6;
+    }
+    .chat-title-edit-input {
+      font-size: 1.25rem;       /* matches text-xl */
+      line-height: 1.75rem;
+      font-weight: 600;
+      color: #111827;
+      background-color: #ffffff;
+      border: 1px solid #6366f1;
+      border-radius: 0.375rem;
+      padding: 0.125rem 0.375rem;
+      width: 100%;
+      max-width: 32rem;
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
+    }
+    .chat-title-edit-input:focus {
+      border-color: #4f46e5;
+    }
+
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
@@ -488,7 +518,7 @@
         </button>
 
         <div class="flex-1 px-4 lg:px-0">
-          <h1 id="chatTitle" class="text-xl font-semibold text-gray-900">Initial Chat</h1>
+          <h1 id="chatTitle" class="text-xl font-semibold text-gray-900 chat-title-editable" title="Double-click to rename">Initial Chat</h1>
         </div>
 
         <div class="flex items-center gap-4">
@@ -1863,6 +1893,154 @@
 
       // Initialize chat mode toggle
       initChatMode();
+
+      // Wire inline-edit on the chat header title (double-click to rename).
+      initChatTitleInlineEdit();
+
+      // Listen for rename events from any other surface (sidebar menu, workspace
+      // Conversations tab, conversation actions modal) — keep the header in sync.
+      window.addEventListener('conversation:renamed', (e) => {
+        try {
+          const detail = (e && e.detail) || {};
+          if (!detail.threadId || !detail.title) return;
+          if (detail.threadId !== currentConversationId) return;
+          const titleEl = document.getElementById('chatTitle');
+          if (titleEl && !titleEl.dataset.editing) {
+            titleEl.textContent = detail.title;
+          }
+          // Keep local cache in sync so re-renders don't bring back the old title.
+          if (Array.isArray(allConversations)) {
+            const conv = allConversations.find(c => (c.thread_id || c.id) === detail.threadId);
+            if (conv) {
+              conv.title = detail.title;
+              if (conv.metadata) conv.metadata.title = detail.title;
+            }
+          }
+        } catch (err) {
+          console.error('[conversation:renamed] handler error:', err);
+        }
+      });
+    }
+
+    // ===== INLINE-EDIT CHAT TITLE =====
+    // Double-click the chat header title to enter inline edit mode.
+    // Enter / blur saves via PUT /api/v1/conversation-threads/:id.
+    // Esc reverts. Empty title reverts (with a toast).
+    function initChatTitleInlineEdit() {
+      const titleEl = document.getElementById('chatTitle');
+      if (!titleEl || titleEl.dataset.inlineEditBound === 'true') return;
+      titleEl.dataset.inlineEditBound = 'true';
+
+      let lastTouchTime = 0;
+      const enter = () => beginChatTitleEdit(titleEl);
+
+      titleEl.addEventListener('dblclick', enter);
+      // Mobile fallback: two taps within 300ms
+      titleEl.addEventListener('touchend', () => {
+        const now = Date.now();
+        if (now - lastTouchTime < 300) {
+          enter();
+        }
+        lastTouchTime = now;
+      });
+    }
+
+    function beginChatTitleEdit(titleEl) {
+      // Guard: must have an active conversation. Don't allow editing the
+      // placeholder "Initial Chat" / "New Chat" titles.
+      if (!currentConversationId) {
+        if (typeof Toast !== 'undefined' && Toast.info) {
+          Toast.info('Open a conversation to rename it');
+        }
+        return;
+      }
+      if (titleEl.dataset.editing === 'true') return;
+      titleEl.dataset.editing = 'true';
+
+      const originalTitle = titleEl.textContent;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'chat-title-edit-input';
+      input.value = originalTitle;
+      input.setAttribute('aria-label', 'Rename conversation');
+      input.maxLength = 200;
+
+      titleEl.textContent = '';
+      titleEl.appendChild(input);
+      input.focus();
+      input.select();
+
+      let settled = false;
+      const threadIdAtStart = currentConversationId;
+
+      const finish = (revert) => {
+        if (settled) return;
+        settled = true;
+        titleEl.removeChild(input);
+        titleEl.textContent = revert ? originalTitle : originalTitle;
+        delete titleEl.dataset.editing;
+      };
+
+      const commit = async () => {
+        if (settled) return;
+        const newTitle = (input.value || '').trim();
+        if (!newTitle) {
+          if (typeof Toast !== 'undefined' && Toast.error) Toast.error('Conversation name cannot be empty');
+          finish(true);
+          return;
+        }
+        if (newTitle === originalTitle) {
+          finish(true);
+          return;
+        }
+        // Optimistic — show new title immediately.
+        settled = true;
+        titleEl.removeChild(input);
+        titleEl.textContent = newTitle;
+        delete titleEl.dataset.editing;
+
+        try {
+          const helper = window.RenameConversation;
+          if (helper && typeof helper.renameConversation === 'function') {
+            await helper.renameConversation({
+              api: api,
+              threadId: threadIdAtStart,
+              title: newTitle
+            });
+          } else {
+            await api.put('/api/v1/conversation-threads/' + encodeURIComponent(threadIdAtStart), { title: newTitle });
+            window.dispatchEvent(new CustomEvent('conversation:renamed', {
+              detail: { threadId: threadIdAtStart, title: newTitle }
+            }));
+          }
+          if (typeof Toast !== 'undefined' && Toast.success) Toast.success('Conversation renamed');
+          // Refresh sidebar so timestamps / ordering reflect the change.
+          if (typeof window.ConversationMenu !== 'undefined' && window.ConversationMenu.loadConversations) {
+            window.ConversationMenu.loadConversations(true);
+          }
+        } catch (err) {
+          console.error('Inline rename failed:', err);
+          if (typeof Toast !== 'undefined' && Toast.error) Toast.error((err && err.message) || 'Failed to rename conversation');
+          // Revert title.
+          titleEl.textContent = originalTitle;
+        }
+      };
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          commit();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          finish(true);
+        }
+      });
+      input.addEventListener('blur', () => {
+        // Defer slightly so Esc/Enter handlers settle first.
+        setTimeout(() => {
+          if (!settled) commit();
+        }, 0);
+      });
     }
 
     // ===== TOOLS DROPDOWN =====

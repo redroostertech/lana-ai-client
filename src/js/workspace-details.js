@@ -7,6 +7,7 @@
 
   var _windowKeys = [];
   var _documentListeners = [];
+  var _windowListeners = [];
   var _intervals = [];
   var _timeouts = [];
   var _preInitKeys = null;
@@ -15,6 +16,10 @@
   function trackDocListener(event, handler) {
     document.addEventListener(event, handler);
     _documentListeners.push({ event: event, handler: handler });
+  }
+  function trackWindowListener(event, handler) {
+    window.addEventListener(event, handler);
+    _windowListeners.push({ event: event, handler: handler });
   }
   function trackInterval(id) { _intervals.push(id); return id; }
   function trackTimeout(id) { _timeouts.push(id); return id; }
@@ -75,6 +80,29 @@
       else if (ch === '>') result += '&gt;';
       else if (ch === '"') result += '&quot;';
       else if (ch === "'") result += '&#39;';
+      else result += ch;
+    }
+    return result;
+  }
+
+  // Escape a string for safe inclusion inside a single-quoted JS string literal
+  // that itself lives in an HTML double-quoted attribute (e.g. onclick="..."
+  // where args are wrapped in '...'). NO regex — per LEX-COMPONENT-RULES.
+  function escapeJsForHtmlAttr(text) {
+    if (text === null || text === undefined) return '';
+    var str = String(text);
+    var result = '';
+    for (var i = 0; i < str.length; i++) {
+      var ch = str[i];
+      if (ch === '\\') result += '\\\\';
+      else if (ch === "'") result += "\\'";
+      else if (ch === '"') result += '&quot;'; // safe inside double-quoted attr
+      else if (ch === '&') result += '&amp;';
+      else if (ch === '<') result += '&lt;';
+      else if (ch === '>') result += '&gt;';
+      else if (ch === '\n') result += '\\n';
+      else if (ch === '\r') result += '\\r';
+      else if (ch === '\t') result += '\\t';
       else result += ch;
     }
     return result;
@@ -2286,7 +2314,8 @@
   _trackGlobal('createMatterConversation');
 
   function renderConversationRow(chat, matterId) {
-    var title = escapeHtml(chat.title || (chat.metadata && chat.metadata.title) || 'Untitled Conversation');
+    var rawTitle = chat.title || (chat.metadata && chat.metadata.title) || 'Untitled Conversation';
+    var title = escapeHtml(rawTitle);
     var msgCount = chat.metadata && chat.metadata.messageCount
       ? '<span>&#8226; ' + chat.metadata.messageCount + ' messages</span>'
       : '';
@@ -2298,7 +2327,19 @@
       : '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>';
     var pinColor = isPinned ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-400 hover:text-yellow-600';
 
-    return '<div onclick="NavigationHelpers.navigateToConversation(\'' + conversationId + '\', \'' + matterId + '\')" class="block bg-white border border-gray-200 hover:lex-border-accent hover:shadow-sm rounded-lg p-4 transition-all group cursor-pointer">' +
+    // Safe attribute payload for the kebab. The ConversationActionsModal
+    // already implements rename/archive/delete-permanent and now points at the
+    // new conversation-threads endpoint, so we just delegate. The title comes
+    // from user input so it MUST be escaped for both HTML-attribute context
+    // AND JS-string-literal context.
+    var matterAttr = matterId ? "'" + escapeJsForHtmlAttr(matterId) + "'" : 'null';
+    var convIdAttr = escapeJsForHtmlAttr(conversationId);
+    var titleAttr = escapeJsForHtmlAttr(rawTitle);
+    var kebabOnClick = "event.stopPropagation(); " +
+      "if (typeof window.openConversationActionsModal === 'function') { " +
+      "window.openConversationActionsModal('" + convIdAttr + "', '" + titleAttr + "', " + matterAttr + ", " + (isPinned ? 'true' : 'false') + "); }";
+
+    return '<div data-thread-id="' + escapeHtml(conversationId) + '" onclick="NavigationHelpers.navigateToConversation(\'' + conversationId + '\', \'' + matterId + '\')" class="block bg-white border border-gray-200 hover:lex-border-accent hover:shadow-sm rounded-lg p-4 transition-all group cursor-pointer">' +
       '<div class="flex items-start gap-3">' +
         '<div class="w-10 h-10 bg-gradient-to-br lex-bg-accent rounded-lg flex items-center justify-center flex-shrink-0">' +
           '<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
@@ -2306,7 +2347,7 @@
           '</svg>' +
         '</div>' +
         '<div class="flex-1 min-w-0">' +
-          '<h6 class="text-sm font-semibold text-gray-900 group-hover:lex-text-accent mb-1 truncate">' + title + '</h6>' +
+          '<h6 class="text-sm font-semibold text-gray-900 group-hover:lex-text-accent mb-1 truncate" data-conversation-title>' + title + '</h6>' +
           '<p class="text-xs text-gray-500 flex items-center gap-4">' +
             '<span>Started ' + timeAgo(chat.created_at) + '</span>' +
             msgCount +
@@ -2314,6 +2355,11 @@
         '</div>' +
         '<button type="button" onclick="event.stopPropagation(); toggleConversationPin(\'' + matterId + '\', \'' + conversationId + '\', ' + (isPinned ? 'true' : 'false') + ')" class="' + pinColor + ' transition-colors flex-shrink-0 p-1" title="' + pinTitle + '" aria-label="' + pinTitle + '">' +
           pinSvg +
+        '</button>' +
+        '<button type="button" onclick="' + kebabOnClick + '" class="text-gray-400 hover:text-gray-700 transition-colors flex-shrink-0 p-1 rounded hover:bg-gray-100 opacity-0 group-hover:opacity-100 focus:opacity-100" title="More actions — rename, archive, delete" aria-label="Conversation actions">' +
+          '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>' +
+          '</svg>' +
         '</button>' +
         '<svg class="w-5 h-5 text-gray-400 group-hover:lex-text-accent flex-shrink-0 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
           '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>' +
@@ -9121,6 +9167,66 @@
     if (openFileId) {
       _timeouts.push(setTimeout(function () { _navToFileViewer(openFileId); }, 100));
     }
+
+    // Listen for rename events fired by any other surface (chat header inline
+    // edit, sidebar conversation menu, conversation actions modal). When the
+    // Conversations tab is mounted we update titles inline; if it's not
+    // currently rendered the next switchMatterTab will pick up the new data.
+    trackWindowListener('conversation:renamed', function (e) {
+      try {
+        var detail = (e && e.detail) || {};
+        if (!detail.threadId || !detail.title) return;
+
+        // Update any rendered row's title in place — avoids a full re-fetch
+        // for the common case (one row changed).
+        var content = document.getElementById('tabContentConversations');
+        if (content) {
+          var rows = content.querySelectorAll('[data-thread-id="' + detail.threadId.split('"').join('') + '"]');
+          for (var i = 0; i < rows.length; i++) {
+            var titleNode = rows[i].querySelector('[data-conversation-title]');
+            if (titleNode) titleNode.textContent = detail.title;
+          }
+        }
+
+        // Update cached state so subsequent renders persist the new title.
+        if (currentMatterData) {
+          var lists = [currentMatterData.chats, currentMatterData.pinnedChats];
+          for (var li = 0; li < lists.length; li++) {
+            var list = lists[li];
+            if (!list || !list.length) continue;
+            for (var j = 0; j < list.length; j++) {
+              var c = list[j];
+              if ((c.thread_id || c.id) === detail.threadId) {
+                c.title = detail.title;
+                if (c.metadata) c.metadata.title = detail.title;
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[workspace-details] conversation:renamed handler error:', err);
+      }
+    });
+
+    // Refresh the Conversations tab after archive / hard-delete / pin
+    // operations originating from the kebab actions modal. We re-fetch the
+    // current page so ordering and pinned state reflect server truth.
+    function _refreshConvosIfMounted() {
+      if (!currentMatterData || !currentMatterData.matter) return;
+      var mId = currentMatterData.matter.matter_id;
+      if (!mId) return;
+      // Only refresh when the conversations tab is the active one — otherwise
+      // the cached data will reload on the next tab switch anyway.
+      var tabContent = document.getElementById('tabContentConversations');
+      if (!tabContent) return;
+      var isVisible = tabContent.offsetParent !== null;
+      if (!isVisible) return;
+      var currentOffset = (currentMatterData.chatPagination && currentMatterData.chatPagination.offset) || 0;
+      loadConversationsPage(mId, currentOffset);
+    }
+    trackWindowListener('conversation:archived', _refreshConvosIfMounted);
+    trackWindowListener('conversation:deleted', _refreshConvosIfMounted);
+    trackWindowListener('conversation:pin-changed', _refreshConvosIfMounted);
   }
 
   function onLeave() {
@@ -9145,6 +9251,12 @@
       document.removeEventListener(entry.event, entry.handler);
     });
     _documentListeners = [];
+
+    // 3b. Remove tracked window-level listeners (e.g. conversation:renamed)
+    _windowListeners.forEach(function (entry) {
+      window.removeEventListener(entry.event, entry.handler);
+    });
+    _windowListeners = [];
 
     // 4. Clear tracked intervals
     _intervals.forEach(clearInterval);
