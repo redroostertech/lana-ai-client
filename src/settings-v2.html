@@ -93,6 +93,26 @@
       </section>
 
 
+      <!-- Regional
+           ══════════════════════════════════════════════════════════════ -->
+      <section id="sv2-section-regional" style="margin-bottom:0.5rem">
+        <lex-card heading="Time Zone" subtitle="How dates and times appear across LANA AI">
+          <lex-stack direction="vertical" gap="3">
+            <lex-select id="sv2-timezone-select"
+              name="timezone"
+              label="Time zone"
+              placeholder="Select your time zone..."
+              searchable="true">
+            </lex-select>
+            <lex-stack direction="horizontal" gap="3" align="center">
+              <lex-btn id="sv2-tz-detect-btn" variant="ghost" size="sm">Use browser default</lex-btn>
+              <lex-text id="sv2-tz-current" variant="tertiary" size="body-sm"></lex-text>
+            </lex-stack>
+          </lex-stack>
+        </lex-card>
+      </section>
+
+
       <!-- Security
            ══════════════════════════════════════════════════════════════ -->
       <section id="sv2-section-security" style="margin-bottom:0.5rem">
@@ -257,6 +277,7 @@
   <script src="js/lex/components/form/lex-input.js"></script>
   <script src="js/lex/components/form/lex-form.js"></script>
   <script src="js/lex/components/form/lex-toggle.js"></script>
+  <script src="js/lex/components/form/lex-select.js"></script>
   <script src="js/lex/components/data/lex-table.js"></script>
   <script src="js/lex/components/data/lex-pagination.js"></script>
 

@@ -74,6 +74,11 @@
     dom.preferencesSection = document.getElementById('sv2-section-preferences');
     dom.vpnSection         = document.getElementById('sv2-section-vpn');
 
+    // Regional / Time Zone
+    dom.timezoneSelect = document.getElementById('sv2-timezone-select');
+    dom.tzDetectBtn    = document.getElementById('sv2-tz-detect-btn');
+    dom.tzCurrent      = document.getElementById('sv2-tz-current');
+
     // Preferences
     dom.prefEmail = document.getElementById('sv2-pref-email');
     dom.prefDark  = document.getElementById('sv2-pref-dark');
@@ -122,6 +127,16 @@
     api.getProfile().then(function (result) {
       var user = result.profile || result.user || result;
       _profileData = user;
+
+      if (user && user.timezone) {
+        var stored = readStoredUser();
+        if (stored.timezone !== user.timezone) {
+          stored.timezone = user.timezone;
+          writeStoredUser(stored);
+          renderTimezoneCurrent(user.timezone);
+          if (dom.timezoneSelect) dom.timezoneSelect.setAttribute('value', user.timezone);
+        }
+      }
 
       var firstName = user.first_name || '';
       var lastName = user.last_name || '';
@@ -491,6 +506,131 @@
 
 
   // =========================================================================
+  // Regional / Time Zone
+  // =========================================================================
+
+  function browserTimezone() {
+    try {
+      return new Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    } catch (e) { return ''; }
+  }
+
+  function readStoredUser() {
+    try { return JSON.parse(localStorage.getItem('user') || 'null') || {}; }
+    catch (e) { return {}; }
+  }
+
+  function writeStoredUser(user) {
+    localStorage.setItem('user', JSON.stringify(user));
+  }
+
+  function buildTimezoneOptions(currentValue) {
+    var zones = [];
+    if (typeof Intl.supportedValuesOf === 'function') {
+      try { zones = Intl.supportedValuesOf('timeZone'); } catch (e) { zones = []; }
+    }
+    if (!zones.length) {
+      zones = [
+        'UTC',
+        'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
+        'America/Anchorage', 'America/Phoenix', 'America/Toronto', 'America/Vancouver',
+        'America/Mexico_City', 'America/Sao_Paulo', 'America/Buenos_Aires',
+        'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Madrid',
+        'Europe/Rome', 'Europe/Amsterdam', 'Europe/Stockholm', 'Europe/Warsaw',
+        'Africa/Johannesburg', 'Africa/Cairo',
+        'Asia/Dubai', 'Asia/Kolkata', 'Asia/Singapore', 'Asia/Hong_Kong',
+        'Asia/Tokyo', 'Asia/Shanghai', 'Asia/Seoul',
+        'Australia/Sydney', 'Australia/Melbourne', 'Pacific/Auckland'
+      ];
+    }
+    if (currentValue && zones.indexOf(currentValue) === -1) zones.push(currentValue);
+
+    var groups = {};
+    for (var i = 0; i < zones.length; i++) {
+      var zone = zones[i];
+      var slash = zone.indexOf('/');
+      var region = slash === -1 ? 'Other' : zone.substring(0, slash);
+      if (!groups[region]) groups[region] = [];
+      groups[region].push(zone);
+    }
+
+    var regionOrder = ['America', 'Europe', 'Africa', 'Asia', 'Australia', 'Pacific', 'Atlantic', 'Indian', 'Antarctica', 'Arctic', 'Etc', 'Other'];
+    var seen = {};
+    var ordered = [];
+    for (var j = 0; j < regionOrder.length; j++) {
+      if (groups[regionOrder[j]]) { ordered.push(regionOrder[j]); seen[regionOrder[j]] = true; }
+    }
+    var keys = Object.keys(groups).sort();
+    for (var k = 0; k < keys.length; k++) {
+      if (!seen[keys[k]]) ordered.push(keys[k]);
+    }
+
+    var options = [];
+    for (var r = 0; r < ordered.length; r++) {
+      var region = ordered[r];
+      var list = groups[region].sort();
+      for (var z = 0; z < list.length; z++) {
+        options.push({
+          value: list[z],
+          label: list[z].replace(/_/g, ' '),
+          group: region
+        });
+      }
+    }
+    return options;
+  }
+
+  function renderTimezoneCurrent(value) {
+    if (!dom.tzCurrent) return;
+    if (!value) {
+      dom.tzCurrent.textContent = 'Using browser default: ' + (browserTimezone() || 'UTC');
+      return;
+    }
+    try {
+      var time = new Intl.DateTimeFormat('en-US', {
+        timeZone: value, hour: 'numeric', minute: '2-digit', hour12: true
+      }).format(new Date());
+      dom.tzCurrent.textContent = 'Current local time: ' + time;
+    } catch (e) {
+      dom.tzCurrent.textContent = '';
+    }
+  }
+
+  function loadTimezone() {
+    if (!dom.timezoneSelect) return;
+    var user = readStoredUser();
+    var current = user.timezone || '';
+    var options = buildTimezoneOptions(current);
+    dom.timezoneSelect.setAttribute('options', JSON.stringify(options));
+    if (current) dom.timezoneSelect.setAttribute('value', current);
+    renderTimezoneCurrent(current);
+  }
+
+  function handleTimezoneChange(value) {
+    if (!value) return;
+    api.updatePreferences({ regional: { timezone: value } }).then(function () {
+      var user = readStoredUser();
+      user.timezone = value;
+      writeStoredUser(user);
+      renderTimezoneCurrent(value);
+      Lex.Toast.success('Time zone updated');
+    }).catch(function (error) {
+      Lex.Toast.error(error.message || 'Failed to update time zone');
+    });
+  }
+
+  function handleTimezoneDetect() {
+    var detected = browserTimezone();
+    if (!detected) {
+      Lex.Toast.error('Could not detect browser time zone');
+      return;
+    }
+    if (dom.timezoneSelect) dom.timezoneSelect.setAttribute('value', detected);
+    handleTimezoneChange(detected);
+  }
+
+
+  // =========================================================================
   // Preferences
   // =========================================================================
 
@@ -778,6 +918,16 @@
       dom.updatePasswordBtn.disabled = true;
     }
 
+    // ── Time Zone ──
+    if (dom.timezoneSelect) {
+      dom.timezoneSelect.addEventListener('lex-change', function (e) {
+        handleTimezoneChange(e.detail && e.detail.value);
+      });
+    }
+    if (dom.tzDetectBtn) {
+      dom.tzDetectBtn.addEventListener('click', handleTimezoneDetect);
+    }
+
     // ── Preferences ──
     if (dom.prefEmail) {
       dom.prefEmail.addEventListener('lex-change', function (e) {
@@ -807,6 +957,7 @@
 
     // ── Load all data ──
     loadProfile();
+    loadTimezone();
     loadMfaStatus();
     loadSessions();
     showConditionalSections();

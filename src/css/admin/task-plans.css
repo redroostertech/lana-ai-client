@@ -87,6 +87,13 @@
   margin: var(--lex-spacing-md, 0.75rem) 0 0;
 }
 
+.task-plan-detail__hint {
+  margin: var(--lex-spacing-sm, 0.5rem) 0 0;
+  color: var(--lex-text-tertiary, var(--lex-text-secondary));
+  font-size: var(--lex-body-xs-size, 0.75rem);
+  font-style: italic;
+}
+
 .task-plan-items {
   display: grid;
   gap: var(--lex-spacing-sm, 0.5rem);

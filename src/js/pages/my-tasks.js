@@ -10,8 +10,13 @@
     searchTimer: null,
     page: 1,
     limit: 20,
-    total: 0
+    total: 0,
+    newMenuOpen: false,
+    matterSearchTimer: null,
+    selectedMatterId: null
   };
+
+  var TASK_PLAN_ROLES = ['system_admin', 'org_admin', 'admin', 'upper_leader', 'senior_leader', 'senior_user'];
 
   function el(id) {
     return document.getElementById(id);
@@ -253,6 +258,221 @@
     state.searchTimer = setTimeout(resetAndLoad, 250);
   }
 
+  function userHasRole(roleName) {
+    var user = Lex.Auth && Lex.Auth.user;
+    if (!user || !roleName) return false;
+    var target = String(roleName).toLowerCase();
+    var roles = user.roles || user.role_names || [];
+    var roleNameField = user.role_name || user.role;
+    function matches(role) {
+      if (!role) return false;
+      if (typeof role === 'string') return role.toLowerCase() === target;
+      if (role.name) return String(role.name).toLowerCase() === target;
+      return false;
+    }
+    for (var i = 0; i < roles.length; i++) {
+      if (matches(roles[i])) return true;
+    }
+    return matches(roleNameField);
+  }
+
+  function canCreateTaskPlans() {
+    if (Lex.Auth && Lex.Auth.isAdmin && Lex.Auth.isAdmin()) return true;
+    for (var i = 0; i < TASK_PLAN_ROLES.length; i++) {
+      if (userHasRole(TASK_PLAN_ROLES[i])) return true;
+    }
+    return false;
+  }
+
+  function syncNewMenuVisibility() {
+    var menu = el('myTasksNewMenu');
+    var btn = el('myTasksNewBtn');
+    if (!menu) return;
+    if (state.newMenuOpen) {
+      menu.classList.remove('hidden');
+      if (btn) btn.setAttribute('aria-expanded', 'true');
+    } else {
+      menu.classList.add('hidden');
+      if (btn) btn.setAttribute('aria-expanded', 'false');
+    }
+  }
+
+  function toggleNewMenu(force) {
+    state.newMenuOpen = typeof force === 'boolean' ? force : !state.newMenuOpen;
+    syncNewMenuVisibility();
+  }
+
+  function hideNewMenu() {
+    if (!state.newMenuOpen) return;
+    state.newMenuOpen = false;
+    syncNewMenuVisibility();
+  }
+
+  function applyTaskPlanRoleGate() {
+    var menu = el('myTasksNewMenu');
+    if (!menu) return;
+    var canPlans = canCreateTaskPlans();
+    var planItem = menu.querySelector('[data-new-action="task-plan"]');
+    if (planItem) {
+      if (canPlans) {
+        planItem.classList.remove('hidden');
+      } else {
+        planItem.classList.add('hidden');
+      }
+    }
+  }
+
+  function renderMatterResults(matters) {
+    var container = el('myTaskMatterResults');
+    if (!container) return;
+    if (!matters.length) {
+      container.innerHTML = '<div class="my-task-matter-result is-empty">No matching matters</div>';
+      container.classList.remove('hidden');
+      return;
+    }
+    container.innerHTML = matters.map(function (matter) {
+      var id = matter.matter_id || matter.id || '';
+      var name = matter.matter_name || matter.name || matter.title || id || 'Untitled matter';
+      return [
+        '<button type="button" class="my-task-matter-result" data-matter-id="' + esc(id) + '" data-matter-name="' + esc(name) + '">',
+        '  <span class="my-task-matter-result__name">' + esc(name) + '</span>',
+        '  <span class="my-task-matter-result__id">' + esc(id) + '</span>',
+        '</button>'
+      ].join('');
+    }).join('');
+    container.classList.remove('hidden');
+  }
+
+  function hideMatterResults() {
+    var container = el('myTaskMatterResults');
+    if (container) container.classList.add('hidden');
+  }
+
+  function normalizeMatters(response) {
+    if (!response) return [];
+    if (response.data) return normalizeMatters(response.data);
+    if (Array.isArray(response)) return response;
+    if (Array.isArray(response.matters)) return response.matters;
+    if (Array.isArray(response.items)) return response.items;
+    if (Array.isArray(response.results)) return response.results;
+    return [];
+  }
+
+  async function searchMatterScope() {
+    var input = el('myTaskMatterId');
+    var query = input ? String(input.value || '').trim() : '';
+    if (query.length < 2) {
+      hideMatterResults();
+      return;
+    }
+    try {
+      var response = await api.searchMatters(query, 1, 8);
+      renderMatterResults(normalizeMatters(response));
+    } catch (error) {
+      hideMatterResults();
+    }
+  }
+
+  function queueMatterSearch() {
+    clearTimeout(state.matterSearchTimer);
+    state.matterSearchTimer = setTimeout(searchMatterScope, 250);
+  }
+
+  function selectMatterScope(matterId, matterName) {
+    var input = el('myTaskMatterId');
+    state.selectedMatterId = matterId || null;
+    if (input) input.value = matterName || matterId || '';
+    hideMatterResults();
+  }
+
+  function openNewTaskModal() {
+    var modal = el('myTaskCreateModal');
+    var title = el('myTaskTitle');
+    var priority = el('myTaskPriority');
+    var matterInput = el('myTaskMatterId');
+    var description = el('myTaskDescription');
+    var dueDate = el('myTaskDueDate');
+
+    state.selectedMatterId = null;
+    if (title) title.value = '';
+    if (priority) priority.value = 'medium';
+    if (matterInput) matterInput.value = '';
+    if (description) description.value = '';
+    if (dueDate) dueDate.value = '';
+    hideMatterResults();
+    if (modal) modal.open = true;
+  }
+
+  function closeNewTaskModal() {
+    var modal = el('myTaskCreateModal');
+    if (modal) modal.open = false;
+  }
+
+  async function submitNewTask(event) {
+    if (event) event.preventDefault();
+    if (event && event.detail && event.detail.valid === false) {
+      Lex.Toast.error('Please fix the highlighted fields');
+      return;
+    }
+    var saveBtn = el('myTaskSaveBtn');
+    var titleInput = el('myTaskTitle');
+    var priorityInput = el('myTaskPriority');
+    var matterInput = el('myTaskMatterId');
+    var descriptionInput = el('myTaskDescription');
+    var dueDateInput = el('myTaskDueDate');
+
+    var title = titleInput ? String(titleInput.value || '').trim() : '';
+    // Only accept a matter that the user explicitly picked from the
+    // search results — never fall back to the typed input text, since
+    // that could send a matter NAME to a route that expects an ID.
+    var matterId = state.selectedMatterId;
+
+    if (!title) {
+      Lex.Toast.error('Title is required');
+      return;
+    }
+    if (!matterId) {
+      Lex.Toast.error('Pick a matter from the search results before saving.');
+      if (matterInput && typeof matterInput.focus === 'function') matterInput.focus();
+      return;
+    }
+
+    var payload = {
+      title: title,
+      description: descriptionInput && descriptionInput.value ? String(descriptionInput.value).trim() : null,
+      priority: priorityInput && priorityInput.value ? priorityInput.value : 'medium',
+      due_date: dueDateInput && dueDateInput.value ? new Date(dueDateInput.value + 'T12:00:00').toISOString() : null,
+      status: 'pending'
+    };
+
+    if (saveBtn) saveBtn.loading = true;
+    try {
+      await api.createTask(matterId, payload);
+      Lex.Toast.success('Task created');
+      closeNewTaskModal();
+      resetAndLoad();
+    } catch (error) {
+      Lex.Toast.error(error.message || 'Unable to create task');
+    } finally {
+      if (saveBtn) saveBtn.loading = false;
+    }
+  }
+
+  function handleNewMenuClick(action) {
+    hideNewMenu();
+    if (action === 'task') {
+      openNewTaskModal();
+      return;
+    }
+    if (action === 'task-plan') {
+      if (!canCreateTaskPlans()) {
+        Lex.Toast.error('You do not have permission to create task plans.');
+        return;
+      }
+      Lex.Nav.go('admin/task-plans.html', { params: { action: 'create' } });
+    }
+  }
+
   function bindEvents() {
     var status = el('myTasksStatusFilter');
     var priority = el('myTasksPriorityFilter');
@@ -320,10 +540,63 @@
         });
       });
     }
+
+    var newBtn = el('myTasksNewBtn');
+    var newMenu = el('myTasksNewMenu');
+    if (newBtn) {
+      newBtn.addEventListener('click', function (event) {
+        event.stopPropagation();
+        toggleNewMenu();
+      });
+    }
+    if (newMenu) {
+      newMenu.addEventListener('click', function (event) {
+        var item = event.target.closest('[data-new-action]');
+        if (!item) return;
+        event.stopPropagation();
+        handleNewMenuClick(item.getAttribute('data-new-action'));
+      });
+    }
+    document.addEventListener('click', function (event) {
+      if (!state.newMenuOpen) return;
+      var wrapper = event.target.closest('.my-tasks-new-wrapper');
+      if (!wrapper) hideNewMenu();
+    });
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') hideNewMenu();
+    });
+
+    var createForm = el('myTaskCreateForm');
+    var cancelBtn = el('myTaskCancelBtn');
+    var matterInput = el('myTaskMatterId');
+    var matterResults = el('myTaskMatterResults');
+    if (createForm) {
+      createForm.addEventListener('submit', submitNewTask);
+      createForm.addEventListener('lex-submit', submitNewTask);
+    }
+    if (cancelBtn) cancelBtn.addEventListener('click', closeNewTaskModal);
+    if (matterInput) {
+      matterInput.addEventListener('input', function () {
+        state.selectedMatterId = null;
+        queueMatterSearch();
+      });
+      matterInput.addEventListener('focus', queueMatterSearch);
+      matterInput.addEventListener('blur', function () {
+        setTimeout(hideMatterResults, 150);
+      });
+    }
+    if (matterResults) {
+      matterResults.addEventListener('click', function (event) {
+        var result = event.target.closest('[data-matter-id]');
+        if (!result) return;
+        selectMatterScope(result.getAttribute('data-matter-id'), result.getAttribute('data-matter-name'));
+      });
+    }
   }
 
   function init() {
     bindEvents();
+    applyTaskPlanRoleGate();
     loadTasks();
   }
 

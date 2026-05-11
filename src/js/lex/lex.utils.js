@@ -73,6 +73,14 @@
     }
   }
 
+  function browserTimezone() {
+    try {
+      return new Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    } catch (_error) {
+      return 'UTC';
+    }
+  }
+
   function getOrganizationTimezone(options) {
     var user = readStoredUser();
     var preferences = user.preferences || {};
@@ -85,7 +93,7 @@
       || user.timezone
       || (preferences.general && preferences.general.timezone)
       || preferences.timezone
-    ) || 'UTC';
+    ) || browserTimezone();
   }
 
   function dateParts(dateString, options) {

@@ -145,6 +145,15 @@
     }
   }
 
+  function getUrlAction() {
+    try {
+      var params = new URLSearchParams(window.location.search || '');
+      return params.get('action') || '';
+    } catch (error) {
+      return '';
+    }
+  }
+
   function normalizeMatters(response) {
     if (!response) return [];
     if (response.data) return normalizeMatters(response.data);
@@ -367,11 +376,13 @@
       '  <lex-badge label="' + esc(statusLabel(status)) + '" color="' + esc(statusBadgeColor(status)) + '"></lex-badge>',
       '</div>',
       '<p class="task-plan-detail__description">' + esc(description) + '</p>',
-      !published ? '<div class="task-plan-items">' + draftItemsHtml + '</div>' : '',
+      published ? '<p class="task-plan-detail__hint">Published plans are read-only. Assignees were notified when this plan was published.</p>' : '<p class="task-plan-detail__hint">Assignees are notified now and again when the plan is published.</p>',
+      '<div class="task-plan-items">' + draftItemsHtml + '</div>',
       '<div class="task-plan-detail__actions">',
       !published ? '<lex-btn id="editTaskPlanBtn" variant="secondary" leading-icon="pencil">Edit Plan</lex-btn>' : '',
       !published ? '<lex-btn id="addTaskPlanItemBtn" variant="secondary" leading-icon="plus">Add Item</lex-btn>' : '',
       canPublish ? '<lex-btn id="publishTaskPlanBtn" variant="success" leading-icon="send">Publish</lex-btn>' : '',
+      '<lex-btn id="deleteTaskPlanBtn" variant="danger" leading-icon="trash">Delete Plan</lex-btn>',
       '</div>'
     ].join('');
   }
@@ -599,6 +610,10 @@
       closeCreateModal();
       Lex.Toast.success(editingPlanId ? 'Task plan updated' : (isLanaDraftMode() ? 'Lana draft generated' : 'Task plan draft created'));
       await loadPlans();
+      // loadPlans() refreshes the list rows which omit per-plan items.
+      // Re-fetch the selected plan's detail so items render immediately
+      // after create/update.
+      if (state.selectedId) await selectPlan(state.selectedId);
     } catch (error) {
       Lex.Toast.error(error.message || (isLanaDraftMode() ? 'Unable to generate Lana draft' : 'Unable to create task plan'));
     } finally {
@@ -713,6 +728,32 @@
     Lex.Toast.success('Task plan items updated');
   }
 
+  async function deletePlan() {
+    var plan = selectedPlan();
+    var planId = getPlanId(plan);
+    if (!planId) return;
+
+    var confirmed = window.confirm('Delete this task plan? Draft plans will be archived; published plans remain in audit history.');
+    if (!confirmed) return;
+
+    var deleteBtn = el('deleteTaskPlanBtn');
+    if (deleteBtn) deleteBtn.loading = true;
+
+    try {
+      await api.deleteTaskPlan(planId);
+      Lex.Toast.success('Task plan deleted');
+      state.plans = state.plans.filter(function (entry) { return getPlanId(entry) !== planId; });
+      state.selectedId = state.plans.length ? getPlanId(state.plans[0]) : null;
+      renderList();
+      renderDetail(selectedPlan());
+      if (state.selectedId) await selectPlan(state.selectedId);
+    } catch (error) {
+      Lex.Toast.error(error.message || 'Unable to delete task plan');
+    } finally {
+      if (deleteBtn) deleteBtn.loading = false;
+    }
+  }
+
   async function publishPlan() {
     var plan = selectedPlan();
     var planId = getPlanId(plan);
@@ -806,6 +847,7 @@
         if (editBtn) openItemModal(parseInt(editBtn.getAttribute('data-edit-item'), 10));
         if (removeBtn) removeItem(parseInt(removeBtn.getAttribute('data-remove-item'), 10));
         if (event.target.closest('#publishTaskPlanBtn')) publishPlan();
+        if (event.target.closest('#deleteTaskPlanBtn')) deletePlan();
       });
     }
 
@@ -831,6 +873,10 @@
     bindEvents();
     loadUsers();
     loadPlans();
+
+    if (getUrlAction() === 'create') {
+      openCreateModal();
+    }
   }
 
   init();

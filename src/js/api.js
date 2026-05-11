@@ -887,6 +887,11 @@ class ApiClient {
       };
     }
 
+    if (path.match(/\/api\/v1\/task-plans\/[^/]+$/) && method === 'DELETE') {
+      const planId = path.split('/').pop();
+      return { id: planId, deleted: true, message: 'Task plan deleted (demo mode)' };
+    }
+
     // -------------------- AUDIT --------------------
     if (path === '/api/v1/audit/logs' && method === 'GET') {
       return { logs: mock.auditLogs || [], total: (mock.auditLogs || []).length };
@@ -1384,6 +1389,10 @@ class ApiClient {
 
   async publishTaskPlan(planId, options = {}) {
     return this.post(`/api/v1/task-plans/${planId}/publish`, options);
+  }
+
+  async deleteTaskPlan(planId) {
+    return this.delete(`/api/v1/task-plans/${planId}`);
   }
 
   // ============================================================
@@ -2355,6 +2364,11 @@ class ApiClient {
   async updatePreference(key, value) {
     if (!this.user?.id) throw new Error('Not logged in');
     return this.put(`/api/v1/users/me/preferences/${key}`, { value });
+  }
+
+  async updatePreferences(updates) {
+    if (!this.user?.id) throw new Error('Not logged in');
+    return this.request('PATCH', '/api/v1/users/me/preferences', updates);
   }
 
   // ============================================================
